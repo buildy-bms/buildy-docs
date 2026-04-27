@@ -38,6 +38,43 @@ function loadStyles(name) {
   return fs.readFileSync(cssPath, 'utf-8');
 }
 
+// ── Fonts embed (data URL base64) ────────────────────────────────────
+// On embed Poppins + Manrope WOFF2 directement dans le CSS pour eviter
+// tout fetch reseau (Google Fonts est bloque par le firewall Jelastic).
+const FONT_FILES = [
+  { family: 'Poppins', weight: 500, file: '@fontsource/poppins/files/poppins-latin-500-normal.woff2' },
+  { family: 'Poppins', weight: 600, file: '@fontsource/poppins/files/poppins-latin-600-normal.woff2' },
+  { family: 'Poppins', weight: 700, file: '@fontsource/poppins/files/poppins-latin-700-normal.woff2' },
+  { family: 'Manrope', weight: 400, file: '@fontsource/manrope/files/manrope-latin-400-normal.woff2' },
+  { family: 'Manrope', weight: 500, file: '@fontsource/manrope/files/manrope-latin-500-normal.woff2' },
+  { family: 'Manrope', weight: 600, file: '@fontsource/manrope/files/manrope-latin-600-normal.woff2' },
+  { family: 'Manrope', weight: 700, file: '@fontsource/manrope/files/manrope-latin-700-normal.woff2' },
+];
+
+let _embeddedFontsCss = null;
+function getEmbeddedFontsCss() {
+  if (_embeddedFontsCss != null) return _embeddedFontsCss;
+  const parts = [];
+  for (const f of FONT_FILES) {
+    try {
+      const fontPath = require.resolve(f.file);
+      const base64 = fs.readFileSync(fontPath).toString('base64');
+      parts.push(`@font-face {
+  font-family: '${f.family}';
+  font-style: normal;
+  font-weight: ${f.weight};
+  font-display: swap;
+  src: url(data:font/woff2;base64,${base64}) format('woff2');
+}`);
+    } catch (err) {
+      // Si une font manque, on continue (le rendu utilisera le fallback system)
+      require('./logger').system.warn(`Font ${f.family} ${f.weight} absente : ${err.message}`);
+    }
+  }
+  _embeddedFontsCss = parts.join('\n');
+  return _embeddedFontsCss;
+}
+
 function loadFileAsDataUrl(absPath) {
   if (!fs.existsSync(absPath)) return null;
   const ext = path.extname(absPath).slice(1).toLowerCase();
@@ -93,20 +130,22 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {} }
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
 
+  // Prepend les @font-face avec data URLs en debut de CSS
+  const fullCss = getEmbeddedFontsCss() + '\n' + css;
   const html = tpl({
     ...data,
-    styles: css,
+    styles: fullCss,
   });
 
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    // 'networkidle2' attend que les fetch externes (Google Fonts) finissent.
-    // Timeout 90s pour les gros PDF avec beaucoup de captures embed.
-    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 90_000 });
+    // 'load' suffit : tout est inline (fonts + captures en data URL),
+    // pas de fetch externe a attendre.
+    await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
     await page.emulateMediaType('print');
-    // Petit delay pour s'assurer que les fonts WOFF2 sont chargees + parsees
-    await new Promise(r => setTimeout(r, 300));
+    // Garantit que les fonts data: sont parsees par le browser
+    await page.evaluateHandle('document.fonts.ready');
 
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

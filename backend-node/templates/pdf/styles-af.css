@@ -1,9 +1,8 @@
 /* ──────────────────────────────────────────────────────────────────
    Analyse Fonctionnelle — A4 portrait — DOE Buildy
-   Polices : Poppins (titres) / Manrope (corps) — embed via Google Fonts
+   Polices : Poppins (titres) / Manrope (corps) — embed local en data:
+   (les @font-face sont prepended par lib/pdf.js getEmbeddedFontsCss)
    ────────────────────────────────────────────────────────────────── */
-
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
 
 @page {
   size: A4 portrait;
