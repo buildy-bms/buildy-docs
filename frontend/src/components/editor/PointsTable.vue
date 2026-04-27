@@ -124,7 +124,7 @@ function tableFor(direction) {
     <!-- Formulaire ajout inline -->
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
       <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
-        <input v-model="draftPoint.label" type="text" required placeholder="Libellé du point (ex : Pression filtre)"
+        <input v-model="draftPoint.label" type="text" required placeholder="Libellé du point (ex : Pression filtre)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="flex-1 min-w-[180px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <select v-model="draftPoint.data_type" class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option>Mesure</option><option>État</option><option>Alarme</option><option>Commande</option><option>Consigne</option>
@@ -133,7 +133,7 @@ function tableFor(direction) {
           <option value="read">Lecture</option>
           <option value="write">Écriture</option>
         </select>
-        <input v-model="draftPoint.unit" type="text" placeholder="Unité"
+        <input v-model="draftPoint.unit" type="text" placeholder="Unité" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="w-20 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
         <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>

@@ -144,6 +144,12 @@ const exportDescription = computed(() => exportKind.value === 'af'
           v-model="exportMotif"
           type="text"
           required
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          data-lpignore="true"
           placeholder="ex : version initiale transmise au bureau d'études"
           class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
