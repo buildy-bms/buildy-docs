@@ -16,6 +16,7 @@ import { useNotification } from '@/composables/useNotification'
 import AutosaveStatus from './AutosaveStatus.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import BacsBadge from '@/components/BacsBadge.vue'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -170,9 +171,7 @@ function setLink() {
         class="flex-1 min-w-0 text-base font-semibold text-gray-800 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
       />
       <ServiceLevelBadge :level="section.service_level" />
-      <span v-if="section.bacs_articles" class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap" :title="`Fonctionnalité exigée par le décret BACS — ${section.bacs_articles}`">
-        ⚖️ Exigé par le décret BACS · {{ section.bacs_articles }}
-      </span>
+      <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" />
       <AutosaveStatus
         :state="globalState"
         :last-saved="globalLastSaved"

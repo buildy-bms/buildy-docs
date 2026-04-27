@@ -75,6 +75,15 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
+// ── BACS articles (statique) ──
+let _bacsCache = null
+export async function getBacsArticles() {
+  if (_bacsCache) return _bacsCache
+  const { data } = await api.get('/bacs/articles')
+  _bacsCache = data
+  return data
+}
+
 // ── Recherche ──
 export const search = (q, params = {}) => api.get('/search', { params: { q, ...params } })
 

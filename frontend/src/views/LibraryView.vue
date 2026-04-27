@@ -4,6 +4,7 @@ import { ChevronLeftIcon, BookmarkIcon } from '@heroicons/vue/24/outline'
 import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
+import BacsBadge from '@/components/BacsBadge.vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -117,9 +118,9 @@ onMounted(refresh)
             <span class="capitalize">{{ CATEGORY_LABELS[selected.category] || selected.category }}</span>
             · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
           </p>
-          <p v-if="selected.bacs_articles" class="text-xs text-gray-600 mt-2">
-            ⚖️ Fonctionnalité exigée par le décret BACS — {{ selected.bacs_articles }}
-          </p>
+          <div v-if="selected.bacs_articles" class="mt-2">
+            <BacsBadge :reference="selected.bacs_articles" />
+          </div>
           <div v-if="selected.preferred_protocols" class="mt-3">
             <ProtocolPills :protocols="selected.preferred_protocols" />
           </div>
