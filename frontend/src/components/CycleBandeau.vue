@@ -5,7 +5,7 @@ import {
   DocumentArrowDownIcon, TableCellsIcon,
 } from '@heroicons/vue/24/outline'
 import {
-  updateAf, exportPointsList, exportAf, downloadExportUrl,
+  updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
   createInspection, listInspections,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -88,12 +88,16 @@ async function submitExport() {
   if (!exportMotif.value.trim()) return
   submitting.value = true
   try {
-    const fn = exportKind.value === 'af' ? exportAf : exportPointsList
+    const fn = exportKind.value === 'af' ? exportAf
+             : exportKind.value === 'synthesis' ? exportSynthesis
+             : exportPointsList
     const payload = { motif: exportMotif.value.trim() }
     if (exportKind.value === 'af') payload.includeBacsAnnex = exportIncludeBacs.value
     const { data } = await fn(props.af.id, payload)
     if (exportKind.value === 'af') {
       success(`PDF AF généré : ${data.version} — ${data.sections_total} sections (${(data.file_size_bytes / 1024).toFixed(0)} KB) — Niveau requis : ${data.service_level?.label || '—'}`)
+    } else if (exportKind.value === 'synthesis') {
+      success(`Tableau de synthèse généré : ${data.version} — ${data.rows_count} systèmes (${(data.file_size_bytes / 1024).toFixed(0)} KB)`)
     } else {
       success(`PDF généré : ${data.version} — ${data.total_lines} ligne${data.total_lines > 1 ? 's' : ''} (${(data.file_size_bytes / 1024).toFixed(0)} KB)`)
     }
@@ -107,14 +111,16 @@ async function submitExport() {
   }
 }
 
-const exportTitle = computed(() => exportKind.value === 'af'
-  ? "Exporter l'analyse fonctionnelle (PDF A4)"
-  : 'Exporter la liste de points contractuelle (PDF A3)'
-)
-const exportDescription = computed(() => exportKind.value === 'af'
-  ? "Génère le PDF complet de l'AF (12 chapitres, sections, captures, badges niveau service, calcul auto du niveau requis sur la page de garde). A4 portrait."
-  : "Génère un PDF A3 portrait avec page de garde Buildy, sommaire par catégorie d'équipement, et toutes les lignes points × instances définies dans la fiche AF."
-)
+const exportTitle = computed(() => {
+  if (exportKind.value === 'af') return "Exporter l'analyse fonctionnelle (PDF A4)"
+  if (exportKind.value === 'synthesis') return 'Exporter le tableau de synthèse (PDF A3 paysage)'
+  return 'Exporter la liste de points contractuelle (PDF A3)'
+})
+const exportDescription = computed(() => {
+  if (exportKind.value === 'af') return "Génère le PDF complet de l'AF (12 chapitres, sections, captures, badges niveau service, calcul auto du niveau requis sur la page de garde). A4 portrait."
+  if (exportKind.value === 'synthesis') return "Génère un tableau matriciel A3 paysage : tous les systèmes en lignes, par colonnes les compteurs de points par type, instances, fonctions Hyperveez applicables. Vue d'ensemble synthétique pour DOE."
+  return "Génère un PDF A3 portrait avec page de garde Buildy, sommaire par catégorie d'équipement, et toutes les lignes points × instances définies dans la fiche AF."
+})
 </script>
 
 <template>
@@ -137,7 +143,7 @@ const exportDescription = computed(() => exportKind.value === 'af'
       title="Exporter l'analyse fonctionnelle complète en PDF A4"
     >
       <DocumentArrowDownIcon class="w-4 h-4" />
-      AF (PDF A4)
+      AF (A4)
     </button>
     <button
       @click="openExport('points-list')"
@@ -145,7 +151,15 @@ const exportDescription = computed(() => exportKind.value === 'af'
       title="Exporter la liste de points contractuelle en PDF A3"
     >
       <TableCellsIcon class="w-4 h-4" />
-      Points (PDF A3)
+      Points (A3)
+    </button>
+    <button
+      @click="openExport('synthesis')"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
+      title="Exporter le tableau de synthèse en PDF A3 paysage"
+    >
+      <TableCellsIcon class="w-4 h-4" />
+      Synthèse (A3)
     </button>
     <button
       v-if="canDeliver"

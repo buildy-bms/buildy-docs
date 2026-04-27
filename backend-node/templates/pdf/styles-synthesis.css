@@ -1,0 +1,180 @@
+/* ──────────────────────────────────────────────────────────────────
+   Tableau de synthèse — A3 paysage — DOE Buildy
+   ────────────────────────────────────────────────────────────────── */
+
+@page {
+  size: A3 landscape;
+  margin: 12mm 12mm 12mm 12mm;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 8.5pt;
+  color: #1f2937;
+  line-height: 1.4;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+h1, h2, h3 { font-family: 'Poppins', sans-serif; }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #1b2842;
+  padding-bottom: 4mm;
+  margin-bottom: 4mm;
+}
+.header-left { display: flex; gap: 5mm; align-items: center; }
+.header-logo { width: 28mm; }
+.header-doc-type {
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #6b7280;
+  margin: 0 0 1mm;
+  font-weight: 500;
+}
+.header-title {
+  font-size: 14pt;
+  font-weight: 700;
+  color: #1b2842;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.header-address { font-size: 8pt; color: #6b7280; margin: 1mm 0 0; }
+.header-right { text-align: right; }
+.header-meta { font-size: 8pt; margin: 0 0 1mm; color: #1f2937; }
+.header-meta-label {
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #9ca3af;
+  display: inline-block;
+  min-width: 14mm;
+  text-align: right;
+  margin-right: 2mm;
+}
+.version-tag {
+  font-family: "SFMono-Regular", monospace;
+  background: #1b2842;
+  color: white;
+  padding: 0.5mm 2mm;
+  border-radius: 1mm;
+  font-size: 7.5pt;
+  font-weight: 600;
+}
+.header-motif { font-size: 7.5pt; color: #6b7280; font-style: italic; margin: 1.5mm 0 0; max-width: 80mm; }
+
+/* ── Tableau synthese ───────────────────────────────────────────── */
+table.synth {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+  table-layout: fixed;
+}
+table.synth th {
+  background: #1b2842;
+  color: white;
+  font-family: 'Manrope', sans-serif;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1.2mm 1.5mm;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  vertical-align: middle;
+  text-align: center;
+  line-height: 1.2;
+}
+table.synth th.col-cat { text-align: left; width: 36mm; }
+table.synth th.col-bacs { width: 22mm; }
+table.synth th.col-level { width: 26mm; }
+table.synth th.col-instances { width: 14mm; }
+table.synth th.col-type { width: 12mm; }
+table.synth th.col-rw { width: 14mm; background: #243352; }
+table.synth th.col-fn { width: 18mm; background: #243352; }
+table.synth th.col-group {
+  background: #2a3a5c;
+  font-size: 6.5pt;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+
+table.synth td {
+  padding: 1.2mm 1.5mm;
+  border-bottom: 1px solid #e8ebf0;
+  border-right: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+table.synth tbody tr:nth-child(even) td { background: #fafbfc; }
+table.synth tbody tr:hover td { background: #eef2ff; }
+
+.cell-cat { font-weight: 600; color: #1b2842; font-size: 8.5pt; }
+.cell-num { text-align: center; font-variant-numeric: tabular-nums; }
+.muted { color: #cbd5e1; }
+.dash { color: #d1d5db; }
+.ok { color: #059669; font-weight: 700; font-size: 11pt; }
+
+.cell-type .check {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 8.5pt;
+  min-width: 6mm;
+  padding: 0.3mm 1.5mm;
+  border-radius: 0.8mm;
+  font-variant-numeric: tabular-nums;
+}
+.t-mesure   { background: #dbeafe; color: #1e40af; }
+.t-etat     { background: #f1f5f9; color: #475569; }
+.t-alarme   { background: #fee2e2; color: #b91c1c; }
+.t-commande { background: #d1fae5; color: #065f46; }
+.t-consigne { background: #fef3c7; color: #92400e; }
+
+.badge-bacs {
+  display: inline-block;
+  font-size: 7pt;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 0.4mm 1.5mm;
+  border-radius: 0.8mm;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.badge-level {
+  display: inline-block;
+  font-size: 7pt;
+  font-weight: 700;
+  padding: 0.4mm 1.8mm;
+  border: 1px solid;
+  border-radius: 0.8mm;
+  white-space: nowrap;
+}
+.badge-level.lvl-E   { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.badge-level.lvl-S   { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+.badge-level.lvl-P   { background: #ecfdf5; color: #065f46; border-color: #6ee7b7; }
+.badge-level.lvl-ESP { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.badge-level.lvl-SP  { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+
+table.synth tfoot td {
+  background: #f1f3f6;
+  font-weight: 700;
+  border-top: 2px solid #1b2842;
+  padding: 2mm 1.5mm;
+  color: #1b2842;
+}
+table.synth tfoot td:first-child { text-align: right; font-family: 'Poppins', sans-serif; }
+
+.legend {
+  margin-top: 4mm;
+  font-size: 7.5pt;
+  color: #6b7280;
+  line-height: 1.5;
+}
+.legend strong { color: #1b2842; font-weight: 600; }

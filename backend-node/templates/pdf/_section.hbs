@@ -1,7 +1,7 @@
 {{!-- Partial recursif pour rendre une section + ses enfants. --}}
 {{!-- Le niveau (depth) determine la balise H : depth=0 → h1, depth=1 → h2, etc. --}}
 
-<div class="section depth-{{depth}}" data-toc-anchor="sec-{{id}}">
+<div class="section depth-{{depth}}" data-toc-anchor="sec-{{id}}" id="sec-{{id}}">
   {{#if (eq depth 0)}}
     <h1>
       <span class="section-num">{{number}}</span>{{title}}

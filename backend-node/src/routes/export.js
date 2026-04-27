@@ -199,6 +199,146 @@ async function routes(fastify) {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // POST /api/afs/:afId/exports/synthesis — tableau de synthese A3 paysage
+  // ═══════════════════════════════════════════════════════════════════
+  fastify.post('/afs/:afId/exports/synthesis', async (request, reply) => {
+    const afId = parseInt(request.params.afId, 10);
+    const af = db.afs.getById(afId);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+
+    let body;
+    try { body = exportSchema.parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Motif requis' }); }
+
+    const userId = request.authUser?.id;
+    const user = userId ? db.users.getById(userId) : null;
+    const authorName = user?.display_name || user?.email || 'Inconnu';
+
+    // ── Construit les lignes : tous les equipements (kind='equipment') ──
+    const equipmentSections = db.sections.listByAf(afId).filter(s => s.kind === 'equipment');
+
+    const FUNCTION_KEYWORDS = {
+      hasProgramming: ['program', 'horaire', 'consigne', 'commande'],
+      hasDrift: ['compteur', 'consommation', 'kwh', 'm3', 'energie'],
+      hasNotif: ['alarme', 'defaut', 'panne'],
+      hasDashboard: ['energie', 'cvc', 'eclairage', 'qualite', 'comptage'],
+    };
+
+    function matchesAny(text, keywords) {
+      const t = (text || '').toLowerCase();
+      return keywords.some(k => t.includes(k));
+    }
+
+    const rows = equipmentSections.map((sec) => {
+      const points = resolveSectionPoints(sec.id);
+      const instances = db.equipmentInstances.listBySection(sec.id);
+      const counts = { Mesure: 0, 'État': 0, Alarme: 0, Commande: 0, Consigne: 0 };
+      let reads = 0, writes = 0;
+      for (const p of points) {
+        if (counts[p.data_type] !== undefined) counts[p.data_type]++;
+        if (p.direction === 'read') reads++;
+        else if (p.direction === 'write') writes++;
+      }
+      const sl = sec.service_level;
+      const levelClass = sl ? sl.replace(/[^A-Z]/g, '') : '';
+      const sectionText = `${sec.title} ${(points.map(p => p.label).join(' '))}`;
+      return {
+        name: sec.title,
+        bacs: sec.bacs_articles,
+        levelLabel: formatLevelFull(sl),
+        levelClass,
+        instances: instances.length,
+        mesures: counts.Mesure,
+        etats: counts['État'],
+        alarmes: counts.Alarme,
+        commandes: counts.Commande,
+        consignes: counts.Consigne,
+        readsTotal: reads,
+        writesTotal: writes,
+        hasProgramming: counts.Commande > 0 || counts.Consigne > 0,
+        hasDrift: matchesAny(sectionText, FUNCTION_KEYWORDS.hasDrift),
+        hasNotif: counts.Alarme > 0,
+        hasDashboard: matchesAny(sectionText, FUNCTION_KEYWORDS.hasDashboard),
+      };
+    });
+
+    const totals = rows.reduce((acc, r) => ({
+      instances: acc.instances + r.instances,
+      mesures: acc.mesures + r.mesures,
+      etats: acc.etats + r.etats,
+      alarmes: acc.alarmes + r.alarmes,
+      commandes: acc.commandes + r.commandes,
+      consignes: acc.consignes + r.consignes,
+      reads: acc.reads + r.readsTotal,
+      writes: acc.writes + r.writesTotal,
+    }), { instances: 0, mesures: 0, etats: 0, alarmes: 0, commandes: 0, consignes: 0, reads: 0, writes: 0 });
+
+    const previousCount = db.db.prepare(`
+      SELECT COUNT(*) AS c FROM exports WHERE af_id = ? AND kind = 'pdf-synthesis'
+    `).get(afId).c;
+    const version = `synth-v0.${previousCount + 1}`;
+
+    const exportDate = new Date().toLocaleDateString('fr-FR', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    });
+
+    const data = {
+      af, authorName, exportDate, version,
+      motif: body.motif,
+      logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+      rows, totals,
+    };
+
+    const exportsDir = path.resolve(config.exportsDir);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${af.slug}-synthesis-${version}-${ts}.pdf`;
+    const outputPath = path.join(exportsDir, String(afId), filename);
+
+    let result;
+    try {
+      result = await renderPdf({
+        template: 'synthesis',
+        styles: 'styles-synthesis',
+        data,
+        outputPath,
+        pageFormat: 'A3',
+        pdfOptions: { landscape: true },
+      });
+    } catch (err) {
+      log.error(`PDF synthesis render failed: ${err.message}`);
+      return reply.code(500).send({ detail: `Echec generation : ${err.message}` });
+    }
+
+    // Insert en base — kind 'pdf-synthesis' n'existe pas dans la contrainte
+    // CHECK actuelle, on stocke comme 'pdf-af' avec un tag dedie pour V1.
+    const insertedRow = db.db.prepare(`
+      INSERT INTO exports (af_id, kind, file_path, sections_snapshot, options, motif,
+                           git_tag, exported_by, file_size_bytes)
+      VALUES (?, 'pdf-af', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      afId, result.path,
+      JSON.stringify({ rows: rows.length, totals }),
+      JSON.stringify({ version, format: 'A3-landscape-synthesis' }),
+      body.motif, version, userId || null, result.sizeBytes
+    );
+
+    db.auditLog.add({
+      afId, userId, action: 'export.synthesis',
+      payload: { version, motif: body.motif, rows: rows.length },
+    });
+    log.info(`PDF synthesis exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB)`);
+
+    return {
+      id: insertedRow.lastInsertRowid,
+      version,
+      file_size_bytes: result.sizeBytes,
+      download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
+      rows_count: rows.length,
+      totals,
+    };
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   // POST /api/afs/:afId/exports/af — generer le PDF de l'AF complete
   // ═══════════════════════════════════════════════════════════════════
   fastify.post('/afs/:afId/exports/af', async (request, reply) => {

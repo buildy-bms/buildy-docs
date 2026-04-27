@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Tableau de synthèse — {{af.client_name}} — {{af.project_name}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Page de garde compacte ═══════════ --}}
+<header class="header">
+  <div class="header-left">
+    <img class="header-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <div>
+      <p class="header-doc-type">Tableau de synthèse — Analyse fonctionnelle</p>
+      <h1 class="header-title">{{af.client_name}} — {{af.project_name}}</h1>
+      {{#if af.site_address}}<p class="header-address">{{af.site_address}}</p>{{/if}}
+    </div>
+  </div>
+  <div class="header-right">
+    <p class="header-meta"><span class="header-meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
+    <p class="header-meta"><span class="header-meta-label">Date</span> {{exportDate}}</p>
+    <p class="header-meta"><span class="header-meta-label">Auteur</span> {{authorName}}</p>
+    {{#if motif}}<p class="header-motif">{{motif}}</p>{{/if}}
+  </div>
+</header>
+
+{{!-- ═══════════ Tableau matriciel ═══════════ --}}
+<table class="synth">
+  <thead>
+    <tr>
+      <th class="col-cat" rowspan="2">Système / Équipement</th>
+      <th class="col-bacs" rowspan="2">Décret BACS</th>
+      <th class="col-level" rowspan="2">Niveau service</th>
+      <th class="col-instances" rowspan="2">Instances</th>
+      <th colspan="5" class="col-group">Données</th>
+      <th class="col-rw" rowspan="2">Lectures</th>
+      <th class="col-rw" rowspan="2">Écritures</th>
+      <th colspan="4" class="col-group">Fonctions</th>
+    </tr>
+    <tr>
+      <th class="col-type">Mesures</th>
+      <th class="col-type">États</th>
+      <th class="col-type">Alarmes</th>
+      <th class="col-type">Commandes</th>
+      <th class="col-type">Consignes</th>
+      <th class="col-fn">Programmation horaire</th>
+      <th class="col-fn">Détection dérives</th>
+      <th class="col-fn">Notifications push</th>
+      <th class="col-fn">Tableau de bord</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="cell-cat">{{name}}</td>
+      <td class="cell-bacs">{{#if bacs}}<span class="badge-bacs">{{bacs}}</span>{{else}}—{{/if}}</td>
+      <td class="cell-level">{{#if levelLabel}}<span class="badge-level lvl-{{levelClass}}">{{levelLabel}}</span>{{else}}—{{/if}}</td>
+      <td class="cell-num">{{#if instances}}<strong>{{instances}}</strong>{{else}}<span class="muted">0</span>{{/if}}</td>
+      <td class="cell-num cell-type">{{#if mesures}}<span class="check t-mesure">{{mesures}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-type">{{#if etats}}<span class="check t-etat">{{etats}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-type">{{#if alarmes}}<span class="check t-alarme">{{alarmes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-type">{{#if commandes}}<span class="check t-commande">{{commandes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-type">{{#if consignes}}<span class="check t-consigne">{{consignes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num"><strong>{{readsTotal}}</strong></td>
+      <td class="cell-num"><strong>{{writesTotal}}</strong></td>
+      <td class="cell-num cell-fn">{{#if hasProgramming}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-fn">{{#if hasDrift}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-fn">{{#if hasNotif}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+      <td class="cell-num cell-fn">{{#if hasDashboard}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr class="totals">
+      <td colspan="3">Total ({{rows.length}} systèmes)</td>
+      <td class="cell-num"><strong>{{totals.instances}}</strong></td>
+      <td class="cell-num">{{totals.mesures}}</td>
+      <td class="cell-num">{{totals.etats}}</td>
+      <td class="cell-num">{{totals.alarmes}}</td>
+      <td class="cell-num">{{totals.commandes}}</td>
+      <td class="cell-num">{{totals.consignes}}</td>
+      <td class="cell-num"><strong>{{totals.reads}}</strong></td>
+      <td class="cell-num"><strong>{{totals.writes}}</strong></td>
+      <td colspan="4"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<p class="legend">
+  <strong>Lecture des colonnes :</strong> Décret BACS = articles R175-1 §x applicables ·
+  Niveau service = niveau Buildy minimum requis pour cet équipement ·
+  Instances = nombre de références réelles déclarées sur le site ·
+  Mesures/États/Alarmes/Commandes/Consignes = nombre de points par type (par instance) ·
+  Programmation horaire / Détection dérives / Notifications push / Tableau de bord = fonctions Hyperveez applicables au système.
+</p>
+
+</body>
+</html>
