@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 8;
+const TARGET_VERSION = 9;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -414,6 +414,21 @@ function runMigrations() {
     db.pragma('foreign_keys = ON');
     log.info('Migration 8 appliquee : refonte statuts AF (5 etats) + af_inspections.kind');
     db.pragma('user_version = 8');
+  }
+
+  if (current < 9) {
+    // Lot 22 — supprime le chapitre 10 (Application Hyperveez) et toutes ses
+    // sous-sections (10.x + pages Hyperveez peuplées dynamiquement) dans toutes
+    // les AFs existantes. Cascade ON DELETE supprime overrides + instances + attachments.
+    const result = db.prepare(`
+      DELETE FROM sections
+      WHERE number LIKE '10' OR number LIKE '10.%' OR kind = 'hyperveez_page'
+    `).run();
+    if (result.changes > 0) {
+      log.info(`Migration 9 : ${result.changes} sections supprimées (chapitre 10 Hyperveez)`);
+    }
+    db.pragma('user_version = 9');
+    log.info('Migration 9 appliquee : suppression chapitre 10 Hyperveez');
   }
 
   if (current > TARGET_VERSION) {

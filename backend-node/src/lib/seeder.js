@@ -5,6 +5,8 @@ const log = require('./logger').system;
 
 const ctaTemplate = require('../seeds/equipment-templates/cta');
 const { buildSnapshot } = require('./template-propagation');
+// HYPERVEEZ_PAGES n'est plus utilisé (Lot 22 — section 10 supprimée), conservé pour usage futur.
+// eslint-disable-next-line no-unused-vars
 const { PLAN_AF } = require('../seeds/plan-af');
 const { HYPERVEEZ_PAGES } = require('../seeds/hyperveez-pages');
 const { formatServiceLevel } = require('../seeds/service-levels');
@@ -150,26 +152,8 @@ function seedAfStructure(afId) {
     });
     total++;
 
-    // Cas special : 10.2 Pages Hyperveez → enfants peuples depuis HYPERVEEZ_PAGES
-    if (node.number === '10.2') {
-      let posOffset = 0;
-      for (const [slug, page] of Object.entries(HYPERVEEZ_PAGES)) {
-        const pageServiceLevel = page.features ? formatServiceLevel(page.features) : null;
-        db.sections.create({
-          afId,
-          parentId: section.id,
-          position: posOffset++,
-          number: null, // numero auto-calcule a l'export
-          title: page.name,
-          serviceLevel: pageServiceLevel,
-          serviceLevelSource: 'pdf-offres-2026',
-          bodyHtml: `<p>${escapeHtml(page.description)}</p>${page.note ? `<p><em>${escapeHtml(page.note)}</em></p>` : ''}`,
-          kind: 'hyperveez_page',
-          hyperveezPageSlug: slug,
-        });
-        total++;
-      }
-    }
+    // (Lot 22) Le peuplement dynamique de la section 10.2 depuis HYPERVEEZ_PAGES
+    // a été retiré ; le chapitre 10 entier n'existe plus dans le plan AF.
 
     // Recursion sur les enfants statiques
     if (Array.isArray(node.children)) {

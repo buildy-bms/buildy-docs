@@ -258,20 +258,9 @@ const PLAN_AF = [
 • Pas de SLA défini`,
   },
 
-  // ═══════════ Chapitre 10 — Hyperveez ═══════════
-  {
-    number: '10', title: 'Application Hyperveez', kind: 'standard',
-    children: [
-      { number: '10.1', title: 'Description générale', kind: 'standard',
-        features: ['hyperveez_acces'],
-        body_placeholder: 'Application web accessible depuis tout navigateur. Interface principale de supervision et de pilotage pour les exploitants et gestionnaires.',
-      },
-      { number: '10.2', title: 'Pages et fonctionnalités disponibles', kind: 'standard',
-        body_placeholder: 'Section auto-seedée depuis le catalogue Hyperveez (hyperveez-pages.js). Une sous-section par page de l\'UI réelle.',
-        children: [], // peuplé dynamiquement par seedAfStructure depuis HYPERVEEZ_PAGES
-      },
-    ],
-  },
+  // Chapitre 10 (Application Hyperveez) — supprimé (Lot 22). Le numéro 10 est libéré ;
+  // les chapitres suivants conservent leurs numéros (trou volontaire) pour ne pas casser
+  // les références internes des AFs déjà rédigées.
 
   // ═══════════ Chapitre 11 — Gojee ═══════════
   {
