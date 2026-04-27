@@ -12,6 +12,9 @@ async function main() {
 
   db.init();
 
+  // Seed bibliotheque equipements (idempotent : ne touche pas l'existant)
+  require('./lib/seeder').seedLibraryOnBoot();
+
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {
     if (!fs.existsSync(config.httpsCertPath) || !fs.existsSync(config.httpsKeyPath)) {
@@ -63,6 +66,9 @@ async function main() {
 
   // Routes
   await fastify.register(require('./routes/auth'), { prefix: '/api' });
+  await fastify.register(require('./routes/afs'), { prefix: '/api' });
+  await fastify.register(require('./routes/sections'), { prefix: '/api' });
+  await fastify.register(require('./routes/equipment-templates'), { prefix: '/api' });
 
   // Sert le frontend Vue build (production uniquement)
   const frontendDist = path.resolve(__dirname, '../../frontend/dist');

@@ -14,9 +14,22 @@ const routes = [
   },
   {
     path: '/',
-    name: 'home',
+    name: 'afs',
     meta: { title: 'Mes AFs' },
-    component: () => import('@/views/HomeView.vue'),
+    component: () => import('@/views/AfsListView.vue'),
+  },
+  {
+    path: '/afs/:id',
+    name: 'af-detail',
+    meta: { title: 'AF' },
+    component: () => import('@/views/AfDetailView.vue'),
+    props: true,
+  },
+  {
+    path: '/library',
+    name: 'library',
+    meta: { title: 'Bibliothèque équipements' },
+    component: () => import('@/views/LibraryView.vue'),
   },
 ]
 
