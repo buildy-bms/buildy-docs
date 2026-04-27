@@ -30,7 +30,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
             <XMarkIcon class="w-5 h-5" />
           </button>
         </div>
-        <div class="px-6 py-5">
+        <div class="px-7 py-6">
           <slot />
         </div>
         <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 flex items-center justify-end gap-2">

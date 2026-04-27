@@ -27,7 +27,7 @@ const showCreate = ref(false)
 const showClone = ref(false)
 const cloneSource = ref(null)
 
-const newAf = ref({ client_name: '', project_name: '', site_address: '', service_level: 'S' })
+const newAf = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
 const submitting = ref(false)
 
@@ -63,7 +63,7 @@ async function submitCreate() {
     const { data } = await createAf(newAf.value)
     success(`AF créée : ${data.client_name} — ${data.project_name} (${data.sections_count} sections seedées)`)
     showCreate.value = false
-    newAf.value = { client_name: '', project_name: '', site_address: '', service_level: 'S' }
+    newAf.value = { client_name: '', project_name: '', site_address: '', service_level: null }
     refresh()
     router.push(`/afs/${data.id}`)
   } catch (e) {
@@ -243,15 +243,19 @@ onMounted(refresh)
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau de service contractuel</label>
-          <div class="grid grid-cols-3 gap-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Niveau de contrat Buildy
+            <span class="text-gray-400 font-normal">— optionnel, à définir plus tard si besoin</span>
+          </label>
+          <div class="grid grid-cols-4 gap-2">
             <label
               v-for="opt in [
+                { value: null, label: 'À déterminer' },
                 { value: 'E', label: 'Essentials' },
                 { value: 'S', label: 'Smart' },
                 { value: 'P', label: 'Premium' },
               ]"
-              :key="opt.value"
+              :key="opt.value || 'none'"
               :class="[
                 'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
                 newAf.service_level === opt.value
@@ -263,6 +267,9 @@ onMounted(refresh)
               {{ opt.label }}
             </label>
           </div>
+          <p class="text-[11px] text-gray-500 mt-1.5">
+            Le niveau requis par l'AF sera calculé automatiquement à partir des sections que vous incluez.
+          </p>
         </div>
         <p class="text-xs text-gray-500 leading-relaxed">
           La création va seeder automatiquement les 12 chapitres du plan AF type

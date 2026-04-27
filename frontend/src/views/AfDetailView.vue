@@ -7,6 +7,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
 import ActivityPanel from '@/components/ActivityPanel.vue'
+import RequiredServiceLevelPanel from '@/components/RequiredServiceLevelPanel.vue'
 import { useResizable } from '@/composables/useResizable'
 
 const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
@@ -30,6 +31,7 @@ const selectedId = ref(null)
 const loading = ref(true)
 const showActivity = ref(false)
 const activityRef = ref(null)
+const requiredLevelKey = ref(0) // bumpé pour forcer un recalcul du niveau requis
 const { success: notifySuccess, error: notifyError } = useNotification()
 
 // Modale ajout section (Lot 16)
@@ -119,8 +121,9 @@ function onSectionUpdated(updated) {
   if (selectedSection.value?.id === updated.id) {
     selectedSection.value = { ...selectedSection.value, ...updated }
   }
-  // Refresh panneau activite (debounced cote panel)
+  // Refresh panneau activite + recalcul niveau requis si service_level a pu changer
   activityRef.value?.refresh?.()
+  requiredLevelKey.value++
 }
 
 function onAfUpdated(updated) {
@@ -155,6 +158,7 @@ watch(() => route.params.id, async () => {
     <!-- Bandeau cycle de vie (en haut, full-width) -->
     <div class="px-5 lg:px-6 pt-4 space-y-2">
       <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" />
+      <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" />
       <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
 

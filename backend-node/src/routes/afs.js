@@ -11,14 +11,14 @@ const createAfSchema = z.object({
   client_name: z.string().min(1, 'Nom du client requis'),
   project_name: z.string().min(1, 'Nom du projet requis'),
   site_address: z.string().optional(),
-  service_level: z.enum(['E', 'S', 'P']).optional(),
+  service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
 });
 
 const updateAfSchema = z.object({
   client_name: z.string().min(1).optional(),
   project_name: z.string().min(1).optional(),
   site_address: z.string().optional(),
-  service_level: z.enum(['E', 'S', 'P']).optional(),
+  service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
 });
 
@@ -302,6 +302,38 @@ async function routes(fastify) {
     });
     log.info(`AF cloned: #${source.id} → #${cloned.id} (${cloned.slug}) by user #${userId}`);
     return cloned;
+  });
+
+  // GET /api/afs/:id/required-level — niveau de service minimum nécessaire (Lot 25b)
+  // Query optionnelle ?excluded=12,34 pour simuler la décoche de sections
+  fastify.get('/afs/:id/required-level', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+
+    const excluded = new Set(
+      (request.query.excluded || '')
+        .split(',').map(s => parseInt(s, 10)).filter(Boolean)
+    );
+
+    const allSections = db.sections.listByAf(id);
+    const includedSections = allSections.filter(s => s.included_in_export && !excluded.has(s.id));
+
+    const { resolveAfLevel } = require('../lib/service-level-resolver');
+    const resolved = resolveAfLevel(includedSections);
+
+    return {
+      contract_level: af.service_level || null,
+      required: resolved.level,
+      required_label: resolved.label,
+      justifications: resolved.justifications,
+      sections_evaluated: includedSections.length,
+      sections_excluded: excluded.size,
+      // Comparaison contrat vs requis
+      shortfall: af.service_level && resolved.level
+        ? (require('../lib/service-level-resolver').RANK[resolved.level] > require('../lib/service-level-resolver').RANK[af.service_level])
+        : false,
+    };
   });
 
   // GET /api/afs/:id/audit — historique (50 dernieres entrees)

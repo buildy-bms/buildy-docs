@@ -72,22 +72,22 @@ onMounted(() => {
   </button>
 
   <BaseModal v-if="showModal" :title="`Décret BACS — ${reference}`" size="lg" @close="showModal = false">
-    <div class="space-y-5 max-h-[65vh] overflow-y-auto text-sm">
-      <p class="text-xs text-gray-500 italic">
+    <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2 -mr-2">
+      <p class="text-xs text-gray-500 italic leading-relaxed">
         Extraits du décret n° 2023-259 du 7 avril 2023 (articles R175-1 à R175-6 du Code de la construction et de l'habitation).
       </p>
 
-      <div v-for="(item, idx) in articlesToShow" :key="idx" class="border border-purple-100 rounded-none">
-        <div class="px-4 py-2 bg-purple-50 border-b border-purple-100">
-          <p class="font-semibold text-purple-900">
+      <article v-for="(item, idx) in articlesToShow" :key="idx" class="border border-purple-100 rounded-none">
+        <header class="px-5 py-3 bg-purple-50 border-b border-purple-100">
+          <p class="font-semibold text-purple-900 text-sm">
             Article {{ item.code }} — {{ item.article.title }}
           </p>
-          <p v-if="item.paragraphs.length" class="text-[11px] text-purple-700 mt-0.5">
+          <p v-if="item.paragraphs.length" class="text-[11px] text-purple-700 mt-1">
             Paragraphes mis en évidence : {{ item.paragraphs.map(p => '§' + p).join(', ') }}
           </p>
-        </div>
-        <div class="px-4 py-3 prose prose-sm max-w-none text-gray-800" v-html="item.article.full_html"></div>
-      </div>
+        </header>
+        <div class="bacs-prose px-5 py-4 text-[13px] text-gray-800" v-html="item.article.full_html"></div>
+      </article>
 
       <div v-if="!articlesToShow.length" class="text-xs text-gray-400 italic px-2">
         {{ bacsData ? `Article(s) « ${reference} » introuvable(s) dans le seed BACS.` : 'Chargement…' }}
@@ -98,3 +98,33 @@ onMounted(() => {
     </template>
   </BaseModal>
 </template>
+
+<style scoped>
+/* Aération du HTML brut du décret (rendu via v-html) — Lot 17 fix */
+.bacs-prose :deep(p) { margin: 0 0 0.85rem; line-height: 1.7; }
+.bacs-prose :deep(p:last-child) { margin-bottom: 0; }
+.bacs-prose :deep(ol),
+.bacs-prose :deep(ul) {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.4rem;
+  list-style-position: outside;
+}
+.bacs-prose :deep(ol) { list-style-type: decimal; }
+.bacs-prose :deep(ul) { list-style-type: disc; }
+.bacs-prose :deep(li) {
+  margin: 0.55rem 0;
+  line-height: 1.65;
+  padding-left: 0.25rem;
+}
+.bacs-prose :deep(li > strong) {
+  display: inline;
+  margin-right: 0.15rem;
+  color: #1f2937;
+}
+.bacs-prose :deep(li > ul),
+.bacs-prose :deep(li > ol) {
+  margin-top: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.bacs-prose :deep(strong) { color: #1f2937; font-weight: 700; }
+</style>

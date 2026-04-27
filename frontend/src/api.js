@@ -31,6 +31,8 @@ export const deleteAf = (id) => api.delete(`/afs/${id}`)
 export const cloneAf = (id, data) => api.post(`/afs/${id}/clone`, data)
 export const getAfAudit = (id) => api.get(`/afs/${id}/audit`)
 export const getAfTemplateUpdates = (id) => api.get(`/afs/${id}/template-updates`)
+export const getAfRequiredLevel = (id, excludedIds = []) =>
+  api.get(`/afs/${id}/required-level`, { params: excludedIds.length ? { excluded: excludedIds.join(',') } : {} })
 
 // ── Sections ──
 export const listSections = (afId) => api.get(`/afs/${afId}/sections`)
