@@ -1,6 +1,9 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { PhotoIcon, TrashIcon, ArrowsUpDownIcon, CloudArrowUpIcon } from '@heroicons/vue/24/outline'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import Sortable from 'sortablejs'
+import {
+  PhotoIcon, TrashIcon, CloudArrowUpIcon, XMarkIcon,
+} from '@heroicons/vue/24/outline'
 import {
   listSectionAttachments, uploadSectionAttachment, updateAttachment,
   reorderAttachments, deleteAttachment,
@@ -12,17 +15,23 @@ const props = defineProps({
   afId: { type: Number, required: true },
 })
 
-function urlFor(att) {
-  return `/attachments/${props.afId}/${att.filename}`
-}
-
-const { success, error: notifyError } = useNotification()
+const { error: notifyError } = useNotification()
 const attachments = ref([])
 const loading = ref(false)
 const isDragging = ref(false)
-const uploading = ref(0) // nombre d'uploads en cours
-const dragOverId = ref(null)
+const uploading = ref(0)
 const fileInput = ref(null)
+const viewerUrl = ref(null)
+const viewerName = ref('')
+const gridRef = ref(null)
+let sortable = null
+
+// Cache-buster basé sur l'id (immuable). Si on a un caption-update on garde
+// le même id donc le cache reste cohérent. Si l'image elle-même est remplacée
+// (suppression + nouvelle upload), nouvel id → nouvelle URL → bypass cache.
+function urlFor(att) {
+  return `/attachments/${props.afId}/${att.filename}?v=${att.id}`
+}
 
 async function refresh() {
   loading.value = true
@@ -56,7 +65,7 @@ async function uploadFiles(files) {
 
 function onFilePicker(e) {
   if (e.target.files?.length) uploadFiles(Array.from(e.target.files))
-  e.target.value = '' // reset
+  e.target.value = ''
 }
 
 function onDrop(e) {
@@ -84,44 +93,55 @@ async function removeAttachment(att) {
   }
 }
 
-// Drag & drop reorder simple (HTML5 native sans lib)
-let draggedId = null
-function onCardDragStart(att, e) {
-  draggedId = att.id
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('text/plain', String(att.id))
+function openViewer(att) {
+  viewerUrl.value = urlFor(att)
+  viewerName.value = att.original_name || att.filename
 }
-function onCardDragOver(att, e) {
-  e.preventDefault()
-  if (draggedId && draggedId !== att.id) dragOverId.value = att.id
+function closeViewer() {
+  viewerUrl.value = null
+  viewerName.value = ''
 }
-function onCardDragLeave() {
-  dragOverId.value = null
-}
-async function onCardDrop(targetAtt, e) {
-  e.preventDefault()
-  e.stopPropagation()
-  dragOverId.value = null
-  if (!draggedId || draggedId === targetAtt.id) { draggedId = null; return }
+function onEsc(e) { if (e.key === 'Escape' && viewerUrl.value) closeViewer() }
 
-  const oldIdx = attachments.value.findIndex(a => a.id === draggedId)
-  const newIdx = attachments.value.findIndex(a => a.id === targetAtt.id)
-  if (oldIdx === -1 || newIdx === -1) { draggedId = null; return }
-
-  const [moved] = attachments.value.splice(oldIdx, 1)
-  attachments.value.splice(newIdx, 0, moved)
-  draggedId = null
-
-  try {
-    await reorderAttachments(props.sectionId, attachments.value.map(a => a.id))
-  } catch {
-    notifyError('Échec de la réorganisation')
-    refresh()
-  }
+// SortableJS pour réorganiser : drop entre items (intuitif)
+function setupSortable() {
+  if (sortable) { sortable.destroy(); sortable = null }
+  if (!gridRef.value || attachments.value.length < 2) return
+  sortable = Sortable.create(gridRef.value, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      // Réordonne le tableau local (Sortable a déjà déplacé le DOM)
+      const [moved] = attachments.value.splice(evt.oldIndex, 1)
+      attachments.value.splice(evt.newIndex, 0, moved)
+      try {
+        await reorderAttachments(props.sectionId, attachments.value.map(a => a.id))
+      } catch {
+        notifyError('Échec de la réorganisation')
+        refresh()
+      }
+    },
+  })
 }
+
+watch(attachments, async () => {
+  await nextTick()
+  setupSortable()
+}, { deep: false })
 
 watch(() => props.sectionId, refresh)
-onMounted(refresh)
+
+onMounted(() => {
+  document.addEventListener('keydown', onEsc)
+  refresh()
+})
+onBeforeUnmount(() => {
+  if (sortable) sortable.destroy()
+  document.removeEventListener('keydown', onEsc)
+})
 </script>
 
 <template>
@@ -141,6 +161,7 @@ onMounted(refresh)
         </h3>
         <p class="text-xs text-gray-500 mt-0.5">
           Glisse-dépose des images dans cette zone, ou clique sur le bouton.
+          Glisse une miniature pour la déplacer entre les autres.
         </p>
       </div>
       <button
@@ -155,57 +176,27 @@ onMounted(refresh)
 
     <div v-if="loading" class="text-center py-6 text-sm text-gray-400">Chargement…</div>
 
-    <!-- Empty state -->
-    <div
-      v-else-if="!attachments.length"
-      class="px-5 py-10 text-center"
-    >
+    <div v-else-if="!attachments.length" class="px-5 py-10 text-center">
       <PhotoIcon class="w-12 h-12 mx-auto text-gray-300" />
-      <p class="text-sm text-gray-500 mt-3">
-        Aucune capture pour cette section.
-      </p>
-      <p class="text-xs text-gray-400 mt-1">
-        Glisse-dépose des images dans cette zone pour les ajouter.
-      </p>
+      <p class="text-sm text-gray-500 mt-3">Aucune capture pour cette section.</p>
+      <p class="text-xs text-gray-400 mt-1">Glisse-dépose des images dans cette zone pour les ajouter.</p>
     </div>
 
-    <!-- Grille -->
-    <div v-else class="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+    <div v-else ref="gridRef" class="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
       <div
         v-for="att in attachments"
         :key="att.id"
-        :class="[
-          'group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden transition-all',
-          dragOverId === att.id ? 'border-indigo-500 ring-2 ring-indigo-200 scale-[1.02]' : '',
-        ]"
+        class="att-card group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-move"
       >
-        <!-- Zone image (non draggable, pas de lien) -->
-        <img :src="urlFor(att)" :alt="att.original_name || ''" class="w-full aspect-video object-cover bg-gray-100" />
-
-        <!-- Handle de drag visible en haut à gauche : c'est le seul endroit qui declenche le drag -->
-        <div
-          :draggable="true"
-          @dragstart="(e) => onCardDragStart(att, e)"
-          @dragover="(e) => onCardDragOver(att, e)"
-          @dragleave="onCardDragLeave"
-          @drop="(e) => onCardDrop(att, e)"
-          class="absolute top-1.5 left-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-white/90 text-gray-600 rounded text-[10px] font-medium cursor-move shadow-sm"
-          title="Glisser pour réorganiser"
-        >
-          <ArrowsUpDownIcon class="w-3 h-3" /> {{ att.position + 1 }}
-        </div>
-
-        <!-- Drop target (overlay invisible qui couvre la card pour recevoir un drop) -->
-        <div
-          @dragover="(e) => onCardDragOver(att, e)"
-          @dragleave="onCardDragLeave"
-          @drop="(e) => onCardDrop(att, e)"
-          class="absolute inset-0 pointer-events-none"
-          :class="dragOverId === att.id ? 'pointer-events-auto bg-indigo-500/10' : ''"
-        ></div>
+        <img
+          :src="urlFor(att)"
+          :alt="att.original_name || ''"
+          class="w-full aspect-video object-cover bg-gray-100 cursor-zoom-in"
+          @click="openViewer(att)"
+        />
 
         <button
-          @click="removeAttachment(att)"
+          @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
           title="Supprimer"
         >
@@ -215,11 +206,40 @@ onMounted(refresh)
         <input
           v-model="att.caption"
           @blur="saveCaption(att)"
+          @click.stop
           type="text"
           placeholder="Légende…"
-          class="relative z-10 w-full px-2 py-1 text-xs bg-white border-t border-gray-200 focus:outline-none focus:bg-indigo-50"
+          class="relative z-10 w-full px-2 py-1 text-xs bg-white border-t border-gray-200 focus:outline-none focus:bg-indigo-50 cursor-text"
         />
       </div>
     </div>
+
+    <!-- Lightbox -->
+    <Teleport to="body">
+      <div
+        v-if="viewerUrl"
+        class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
+        @click.self="closeViewer"
+      >
+        <button
+          @click="closeViewer"
+          class="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg"
+          title="Fermer (Esc)"
+        >
+          <XMarkIcon class="w-6 h-6" />
+        </button>
+        <div class="max-w-full max-h-full flex flex-col items-center gap-3">
+          <img :src="viewerUrl" :alt="viewerName" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+          <p v-if="viewerName" class="text-sm text-white/70 text-center">{{ viewerName }}</p>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
+
+<style>
+/* SortableJS classes */
+.att-card.sortable-ghost { opacity: 0.4; background: #eef2ff; }
+.att-card.sortable-chosen { cursor: grabbing; }
+.att-card.sortable-drag { opacity: 0.9; transform: rotate(1deg); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+</style>
