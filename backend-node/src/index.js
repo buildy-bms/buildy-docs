@@ -104,7 +104,10 @@ async function main() {
       wildcard: false,
     });
     fastify.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith('/api/')) {
+      // /api/* et /attachments/* doivent renvoyer 404 propres, pas le SPA.
+      // (Sinon une image manquante recoit le index.html en text/html, et le
+      //  navigateur affiche un IMG cassee silencieusement.)
+      if (request.url.startsWith('/api/') || request.url.startsWith('/attachments/')) {
         return reply.code(404).send({ detail: 'Not found' });
       }
       return reply.sendFile('index.html');
