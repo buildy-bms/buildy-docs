@@ -14,9 +14,9 @@ module.exports = {
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 443,
+        // PORT non defini ici : laisse le .env decider (3443 par defaut sur le VPS,
+        // FM occupe deja 443 sur le meme node). Eviter de hardcoder.
         TZ: 'Europe/Paris',
-        // En prod, on ne watch pas (PM2 le desactive via env_production).
         watch: false,
       },
     },
