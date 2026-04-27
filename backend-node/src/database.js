@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 2;
+const TARGET_VERSION = 3;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -252,6 +252,21 @@ function runMigrations() {
     `);
     db.pragma('user_version = 2');
     log.info('Migration 2 appliquee : bibliotheque + AFs + sections + FTS5');
+  }
+
+  if (current < 3) {
+    // Lot 2.7 — refresh description CTA si elle correspond a l'ancienne phrase
+    // (ne touche pas aux templates dont la description a deja ete editee).
+    const OLD_FRAGMENT = 'fait seule foi pour chaque déploiement.</em></p>';
+    const NEW_FRAGMENT = 'fait seule foi pour chaque déploiement. Les données effectivement disponibles dépendent également de l\'équipement lui-même et des informations qu\'il expose ; Buildy n\'est pas responsable de l\'absence ou de l\'indisponibilité de données qui ne seraient pas mises à disposition par l\'équipement.</em></p>';
+    const ctaRow = db.prepare('SELECT id, description_html FROM equipment_templates WHERE slug = ?').get('cta');
+    if (ctaRow && ctaRow.description_html?.includes(OLD_FRAGMENT) && !ctaRow.description_html?.includes(NEW_FRAGMENT)) {
+      const updated = ctaRow.description_html.replace(OLD_FRAGMENT, NEW_FRAGMENT);
+      db.prepare('UPDATE equipment_templates SET description_html = ?, current_version = current_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(updated, ctaRow.id);
+      log.info('Migration 3 : description du template CTA mise a jour (mention responsabilite Buildy)');
+    }
+    db.pragma('user_version = 3');
+    log.info('Migration 3 appliquee : refresh description CTA');
   }
 
   if (current > TARGET_VERSION) {

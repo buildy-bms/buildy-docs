@@ -240,19 +240,23 @@ onMounted(refresh)
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Niveau de service contractuel</label>
-          <div class="flex gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <label
-              v-for="lvl in ['E', 'S', 'P']"
-              :key="lvl"
+              v-for="opt in [
+                { value: 'E', label: 'Essentials' },
+                { value: 'S', label: 'Smart' },
+                { value: 'P', label: 'Premium' },
+              ]"
+              :key="opt.value"
               :class="[
-                'flex-1 cursor-pointer text-center py-2 rounded-lg border text-xs font-medium',
-                newAf.service_level === lvl
+                'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
+                newAf.service_level === opt.value
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
                   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               ]"
             >
-              <input v-model="newAf.service_level" :value="lvl" type="radio" class="sr-only" />
-              [{{ lvl }}] {{ { E: 'Essentials', S: 'Smart', P: 'Premium' }[lvl] }}
+              <input v-model="newAf.service_level" :value="opt.value" type="radio" class="sr-only" />
+              {{ opt.label }}
             </label>
           </div>
         </div>

@@ -41,7 +41,7 @@ const PLAN_AF = [
 • La solution Buildy permet de superviser, piloter et analyser les systèmes techniques au travers d'Hyperveez et Gojee
 • Buildy lit et écrit des points sur les équipements terrain (mesures, états, consignes, commandes, programmations horaires)
 • Buildy n'assure aucune fonction de régulation : la régulation est réalisée par les équipements terrain
-• La solution s'appuie sur une infrastructure matérielle dont la maintenance est assurée dans le cadre d'un contrat [S/P]`,
+• La solution s'appuie sur une infrastructure matérielle dont la maintenance est assurée dans le cadre d'un contrat Smart ou Premium`,
       },
       {
         number: '1.3', title: 'Conformité au décret BACS', kind: 'standard',
@@ -54,8 +54,8 @@ const PLAN_AF = [
       {
         number: '1.4', title: 'Niveaux de service', kind: 'standard',
         body_placeholder: `À rédiger — Points à couvrir :
-• Trois niveaux : Licence Essentials [E], Contrat Smart [S], Contrat Premium [P]
-• Chaque fonctionnalité est étiquetée [E], [S] ou [P] dans le document
+• Trois niveaux : Licence Essentials, Contrat Smart, Contrat Premium
+• Chaque fonctionnalité est étiquetée Essentials, Smart ou Premium dans le document
 • Tableau synthétique des grandes fonctionnalités par niveau (auto-généré depuis service-levels.js)`,
       },
     ],
@@ -168,7 +168,7 @@ const PLAN_AF = [
         body_placeholder: 'Définition des plages horaires depuis Hyperveez. Envoyées aux équipements terrain qui les exécutent en autonomie. Conformité R175-3 §4.',
       },
       { number: '4.3', title: 'Commandes générales virtuelles', kind: 'standard',
-        body_placeholder: 'Équipements virtuels regroupant tout ou partie des équipements d\'un même type. Une commande adressée au virtuel est propagée à l\'ensemble. Création par Buildy sur demande (incluse en [S/P], payante en [E]). Utilisables dès [E] une fois créées.',
+        body_placeholder: 'Équipements virtuels regroupant tout ou partie des équipements d\'un même type. Une commande adressée au virtuel est propagée à l\'ensemble. Création par Buildy sur demande (incluse en Smart et Premium, payante en Essentials). Utilisables dès le niveau Essentials une fois créées.',
       },
     ],
   },
@@ -218,7 +218,7 @@ const PLAN_AF = [
 • Périodes définies par programmations horaires hebdomadaires
 • Pour chaque seuil : valeur + message d'alerte personnalisé
 • Statistiques historiques (moyenne, médiane, min, max) pour aider à calibrer
-• Franchissement → alarme (cf. 5.1) + notification [S/P]`,
+• Franchissement → alarme (cf. 5.1) + notification (Smart et Premium)`,
       },
       { number: '6.4', title: 'Tableau de bord qualité de l\'air intérieur', kind: 'standard',
         features: ['dashboard_qai'],
@@ -246,7 +246,7 @@ const PLAN_AF = [
 • Correspond à la fonctionnalité "GTB Flex-Ready" du tableau des offres
 • Droits d'accès gérés exclusivement par Buildy (périmètre, lecture seule ou lecture/écriture)
 • Un connecteur API REST par système tiers, indépendamment du nombre de sites
-• Disponible uniquement en licence Premium [P]`,
+• Disponible uniquement en licence Premium`,
   },
 
   // ═══════════ Chapitre 9 — Support ═══════════
@@ -254,9 +254,9 @@ const PLAN_AF = [
     number: '9', title: 'Support et assistance utilisateur', kind: 'standard',
     features: ['crisp_chat_support', 'support_standard'],
     body_placeholder: `Points à couvrir :
-• Module de chat intégré dans Hyperveez et Gojee (Crisp) [S/P]
+• Module de chat intégré dans Hyperveez et Gojee (Crisp) — Smart et Premium
 • Contact email : support@buildy.fr
-• Inclus en [S/P], payant en [E]
+• Inclus en Smart et Premium, payant en Essentials
 • Pas de SLA défini`,
   },
 
@@ -286,11 +286,11 @@ const PLAN_AF = [
       },
       { number: '11.2', title: 'Fonctionnalités disponibles', kind: 'standard',
         body_placeholder: `Tableau à intégrer (à confirmer fonctionnalité par fonctionnalité) :
-• Supervision temps réel [S/P]
-• Notifications push d'alarmes [S/P]
-• Support intégré chat [S/P]
-• Accès par QR Code sécurisé [P]
-• Déclarations manuelles d'anomalies [P]`,
+• Supervision temps réel — Smart et Premium
+• Notifications push d'alarmes — Smart et Premium
+• Support intégré chat — Smart et Premium
+• Accès par QR Code sécurisé — Premium uniquement
+• Déclarations manuelles d'anomalies — Premium uniquement`,
       },
     ],
   },

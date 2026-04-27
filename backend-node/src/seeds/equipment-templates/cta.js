@@ -26,7 +26,7 @@ module.exports = {
 <li>Système de climatisation (R175-1 §2) — si la CTA intègre une batterie de froid</li>
 </ul>
 <p>Une centrale de traitement d'air assure le renouvellement, le filtrage et le conditionnement de l'air insufflé dans le bâtiment. Elle dispose de son propre système de régulation embarqué, qui gère de façon autonome l'ensemble de sa logique de fonctionnement. La solution Buildy supervise la CTA en lisant ses états et mesures, et en lui transmettant des commandes et consignes depuis l'application Hyperveez.</p>
-<p><em>Les données listées ci-dessous sont indicatives et représentatives des points couramment intégrés. La liste de points contractuelle, définie en avant-projet, fait seule foi pour chaque déploiement.</em></p>
+<p><em>Les données listées ci-dessous sont indicatives et représentatives des points couramment intégrés. La liste de points contractuelle, définie en avant-projet, fait seule foi pour chaque déploiement. Les données effectivement disponibles dépendent également de l'équipement lui-même et des informations qu'il expose ; Buildy n'est pas responsable de l'absence ou de l'indisponibilité de données qui ne seraient pas mises à disposition par l'équipement.</em></p>
 `.trim(),
   points: [
     // ── Donnees lues ──
