@@ -17,6 +17,7 @@ import AutosaveStatus from './AutosaveStatus.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
+import BacsContextBox from '@/components/BacsContextBox.vue'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -222,6 +223,18 @@ function setLink() {
               title="Rédiger avec Claude">
         <SparklesIcon class="w-3.5 h-3.5" /> Claude
       </button>
+    </div>
+
+    <!-- Encart contextualisé "lien avec le décret BACS" (visible, éditable) -->
+    <div v-if="section.bacs_articles" class="px-5 pt-4">
+      <BacsContextBox
+        :reference="section.bacs_articles"
+        :justification="section.bacs_justification"
+        :context="section.kind === 'equipment' ? 'equipment' : 'section'"
+        :section-id="section.id"
+        editable
+        @updated="emit('updated', $event)"
+      />
     </div>
 
     <!-- Éditeur Tiptap -->

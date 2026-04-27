@@ -4,7 +4,7 @@ import { ChevronLeftIcon, BookmarkIcon } from '@heroicons/vue/24/outline'
 import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
-import BacsBadge from '@/components/BacsBadge.vue'
+import BacsContextBox from '@/components/BacsContextBox.vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -118,13 +118,22 @@ onMounted(refresh)
             <span class="capitalize">{{ CATEGORY_LABELS[selected.category] || selected.category }}</span>
             · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
           </p>
-          <div v-if="selected.bacs_articles" class="mt-2">
-            <BacsBadge :reference="selected.bacs_articles" context="equipment" />
-          </div>
           <div v-if="selected.preferred_protocols" class="mt-3">
             <ProtocolPills :protocols="selected.preferred_protocols" />
           </div>
         </div>
+      </div>
+
+      <!-- Encart contextualisé "lien avec le décret BACS" -->
+      <div v-if="selected.bacs_articles" class="mb-6">
+        <BacsContextBox
+          :reference="selected.bacs_articles"
+          :justification="selected.bacs_justification"
+          :template-id="selected.id"
+          context="equipment"
+          editable
+          @updated="selected = { ...selected, ...$event }"
+        />
       </div>
 
       <!-- Description -->

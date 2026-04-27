@@ -417,6 +417,8 @@ async function routes(fastify) {
           points_read: points.filter(p => p.direction === 'read'),
           points_write: points.filter(p => p.direction === 'write'),
           preferred_protocols: protocols,
+          // Justification BACS du template (priorité au texte de la section, sinon hérite du template)
+          bacs_justification: tpl?.bacs_justification || null,
         };
       }
 
@@ -447,6 +449,8 @@ async function routes(fastify) {
             bacs_articles_label: s.bacs_articles
               ? `${s.kind === 'equipment' ? 'Système concerné par le décret BACS' : 'Exigé par le décret BACS'} · ${s.bacs_articles}`
               : null,
+            // Justification BACS : priorité au texte de la section, sinon hérite du template équipement
+            bacs_justification: s.bacs_justification || data.equipment?.bacs_justification || null,
             synthesis_table_html: synthesisHtml,
             body_html: s.body_html,
             generic_note: s.generic_note,

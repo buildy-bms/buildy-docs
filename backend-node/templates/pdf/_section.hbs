@@ -7,7 +7,7 @@
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
-        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
+        {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
       </span>
     </h1>
   {{else if (eq depth 1)}}
@@ -15,7 +15,7 @@
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
-        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
+        {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
       </span>
     </h2>
   {{else if (eq depth 2)}}
@@ -23,7 +23,7 @@
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
-        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
+        {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
       </span>
     </h3>
   {{else}}
@@ -31,12 +31,22 @@
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
-        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
+        {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
       </span>
     </h4>
   {{/if}}
 
   {{!-- Disclaimer générique retiré (Lot 14.3) — désormais affiché une seule fois en page de garde --}}
+
+  {{!-- Encart contextualisé "lien avec le décret BACS" (Lot 17b) --}}
+  {{#if bacs_articles_label}}
+  <div class="bacs-context">
+    <p class="bacs-context-label">⚖️ {{bacs_articles_label}}</p>
+    {{#if bacs_justification}}
+    <p class="bacs-context-text">{{bacs_justification}}</p>
+    {{/if}}
+  </div>
+  {{/if}}
 
   {{#if body_html}}
   <div class="section-body">{{{body_html}}}</div>

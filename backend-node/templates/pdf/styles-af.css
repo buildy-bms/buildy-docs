@@ -298,6 +298,29 @@ h1, h2, h3, h4, h5 {
 }
 .section-body em.placeholder { color: #cbd5e1; font-style: italic; }
 
+/* Encart contextualisé "lien avec le décret BACS" (Lot 17b) */
+.bacs-context {
+  background: #faf5ff;
+  border-left: 0.8mm solid #a855f7;
+  padding: 2.5mm 4mm;
+  margin: 2mm 0 4mm;
+  page-break-inside: avoid;
+}
+.bacs-context-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 8pt;
+  font-weight: 700;
+  color: #6d28d9;
+  margin: 0 0 1.5mm;
+  letter-spacing: 0.02em;
+}
+.bacs-context-text {
+  font-size: 8.5pt;
+  color: #374151;
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* Bandeau protocoles préférés (Lot 18) */
 .protocols-bar {
   margin: 2mm 0 1mm;

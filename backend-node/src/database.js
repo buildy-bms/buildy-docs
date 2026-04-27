@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 10;
+const TARGET_VERSION = 11;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -447,6 +447,17 @@ function runMigrations() {
     db.pragma('user_version = 10');
   }
 
+  if (current < 11) {
+    // Lot 17b — justification BACS contextualisée par section et par équipement.
+    // Permet d'expliquer en clair pourquoi tel élément est lié au décret BACS.
+    db.exec(`
+      ALTER TABLE equipment_templates ADD COLUMN bacs_justification TEXT;
+      ALTER TABLE sections ADD COLUMN bacs_justification TEXT;
+    `);
+    log.info('Migration 11 appliquee : bacs_justification (templates + sections)');
+    db.pragma('user_version = 11');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -537,22 +548,24 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, description_html, icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(slug, name, category || null, bacsArticles || null, descriptionHtml || null,
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
+            descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
+  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
     db.prepare(`
       UPDATE equipment_templates
       SET name = COALESCE(?, name),
           category = COALESCE(?, category),
           bacs_articles = COALESCE(?, bacs_articles),
+          bacs_justification = COALESCE(?, bacs_justification),
           description_html = COALESCE(?, description_html),
           icon_kind = COALESCE(?, icon_kind),
           icon_value = COALESCE(?, icon_value),
@@ -561,7 +574,7 @@ const equipmentTemplates = {
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
+    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -706,7 +719,7 @@ const sections = {
   update(id, fields) {
     const allowed = [
       'parent_id', 'position', 'number', 'title', 'service_level', 'service_level_source',
-      'bacs_articles', 'body_html', 'kind', 'included_in_export', 'generic_note',
+      'bacs_articles', 'bacs_justification', 'body_html', 'kind', 'included_in_export', 'generic_note',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
       'hyperveez_page_slug',
     ];
