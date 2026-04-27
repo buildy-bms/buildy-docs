@@ -50,16 +50,28 @@
     {{#if equipment.description_html}}
     <div class="section-body">{{{equipment.description_html}}}</div>
     {{/if}}
+
+    {{#if equipment.preferred_protocols.length}}
+    <p class="protocols-bar">
+      <span class="protocols-label">Protocoles préférés :</span>
+      {{#each equipment.preferred_protocols}}
+      <span class="protocol-pill">{{this}}</span>
+      {{/each}}
+    </p>
+    {{/if}}
+
     {{#if equipment.points_read.length}}
     <div class="points-block">
       <h5 class="points-block-title">Données typiquement lues ({{equipment.points_read.length}})</h5>
       <table class="points-mini">
-        <thead><tr><th>Donnée</th><th>Type</th><th>Unité</th></tr></thead>
+        <thead><tr><th>Donnée</th><th>Nom technique</th><th>Type</th><th>Nature</th><th>Unité</th></tr></thead>
         <tbody>
           {{#each equipment.points_read}}
           <tr>
             <td>{{label}}</td>
+            <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+            <td class="nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
             <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
           </tr>
           {{/each}}
@@ -71,12 +83,14 @@
     <div class="points-block">
       <h5 class="points-block-title">Données typiquement écrites ({{equipment.points_write.length}})</h5>
       <table class="points-mini">
-        <thead><tr><th>Donnée</th><th>Type</th><th>Unité</th></tr></thead>
+        <thead><tr><th>Donnée</th><th>Nom technique</th><th>Type</th><th>Nature</th><th>Unité</th></tr></thead>
         <tbody>
           {{#each equipment.points_write}}
           <tr>
             <td>{{label}}</td>
+            <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+            <td class="nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
             <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
           </tr>
           {{/each}}

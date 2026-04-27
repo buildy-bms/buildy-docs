@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 9;
+const TARGET_VERSION = 10;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -431,6 +431,22 @@ function runMigrations() {
     log.info('Migration 9 appliquee : suppression chapitre 10 Hyperveez');
   }
 
+  if (current < 10) {
+    // Lot 18 — enrichissement schéma équipements :
+    //   * tech_name : nom technique attendu côté intégrateur (ex. T_AIR_NEUF)
+    //   * nature : type de donnée technique (Booléen | Numérique | Enum | Chaîne)
+    //   * preferred_protocols : protocoles recommandés par template (CSV)
+    db.exec(`
+      ALTER TABLE equipment_template_points ADD COLUMN tech_name TEXT;
+      ALTER TABLE equipment_template_points ADD COLUMN nature TEXT;
+      ALTER TABLE section_point_overrides ADD COLUMN tech_name TEXT;
+      ALTER TABLE section_point_overrides ADD COLUMN nature TEXT;
+      ALTER TABLE equipment_templates ADD COLUMN preferred_protocols TEXT;
+    `);
+    log.info('Migration 10 appliquee : tech_name + nature + preferred_protocols');
+    db.pragma('user_version = 10');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -521,16 +537,17 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, createdBy }) {
+  create({ slug, name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, description_html, icon_kind, icon_value, icon_color, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, description_html, icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, descriptionHtml || null,
-            iconKind || null, iconValue || null, iconColor || null, createdBy || null, createdBy || null);
+            iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
+            createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, updatedBy }) {
+  update(id, { name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
     db.prepare(`
       UPDATE equipment_templates
       SET name = COALESCE(?, name),
@@ -540,10 +557,11 @@ const equipmentTemplates = {
           icon_kind = COALESCE(?, icon_kind),
           icon_value = COALESCE(?, icon_value),
           icon_color = COALESCE(?, icon_color),
+          preferred_protocols = COALESCE(?, preferred_protocols),
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, updatedBy || null, id);
+    `).run(name, category, bacsArticles, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -587,12 +605,13 @@ const equipmentTemplatePoints = {
       ORDER BY position, id
     `).all(templateId);
   },
-  create(templateId, { slug, position, label, dataType, direction, unit, notes, isOptional }) {
+  create(templateId, { slug, position, label, dataType, direction, unit, notes, isOptional, techName, nature }) {
     const result = db.prepare(`
       INSERT INTO equipment_template_points
-        (template_id, slug, position, label, data_type, direction, unit, notes, is_optional)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(templateId, slug, position || 0, label, dataType, direction, unit || null, notes || null, isOptional ? 1 : 0);
+        (template_id, slug, position, label, data_type, direction, unit, notes, is_optional, tech_name, nature)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(templateId, slug, position || 0, label, dataType, direction, unit || null, notes || null,
+            isOptional ? 1 : 0, techName || null, nature || null);
     return db.prepare('SELECT * FROM equipment_template_points WHERE id = ?').get(result.lastInsertRowid);
   },
   deleteByTemplate(templateId) {
@@ -790,15 +809,17 @@ const sectionPointOverrides = {
       ORDER BY position, id
     `).all(sectionId);
   },
-  create(sectionId, { action, basePointId, position, label, dataType, direction, unit, isOptional, createdBy }) {
+  create(sectionId, { action, basePointId, position, label, dataType, direction, unit, isOptional, techName, nature, createdBy }) {
     const result = db.prepare(`
       INSERT INTO section_point_overrides
-        (section_id, action, base_point_id, position, label, data_type, direction, unit, is_optional, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (section_id, action, base_point_id, position, label, data_type, direction, unit, is_optional, tech_name, nature, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sectionId, action, basePointId || null, position || 0, label || null,
       dataType || null, direction || null, unit || null,
-      isOptional == null ? null : (isOptional ? 1 : 0), createdBy || null
+      isOptional == null ? null : (isOptional ? 1 : 0),
+      techName || null, nature || null,
+      createdBy || null
     );
     return db.prepare('SELECT * FROM section_point_overrides WHERE id = ?').get(result.lastInsertRowid);
   },

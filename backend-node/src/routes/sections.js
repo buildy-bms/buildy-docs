@@ -24,6 +24,8 @@ const overrideSchema = z.object({
   direction: z.enum(['read', 'write']).optional(),
   unit: z.string().nullable().optional(),
   is_optional: z.boolean().optional(),
+  tech_name: z.string().nullable().optional(),
+  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne']).nullable().optional(),
 });
 
 const instanceSchema = z.object({
@@ -198,6 +200,8 @@ async function routes(fastify) {
       direction: body.direction,
       unit: body.unit,
       isOptional: body.is_optional,
+      techName: body.tech_name,
+      nature: body.nature,
       createdBy: request.authUser?.id,
     });
     db.auditLog.add({

@@ -1,18 +1,20 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { PlusCircleIcon, TrashIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
-import { getSectionPoints, addSectionOverride, deleteSectionOverride } from '@/api'
+import { getSectionPoints, addSectionOverride, deleteSectionOverride, getEquipmentTemplate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import ProtocolPills from '@/components/ProtocolPills.vue'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
+  equipmentTemplateId: { type: Number, default: null },
 })
 
 const { error: notifyError } = useNotification()
 const points = ref([])
 const loading = ref(false)
 const showAdd = ref(false)
-const draftPoint = ref({ label: '', data_type: 'Mesure', direction: 'read', unit: '' })
+const draftPoint = ref({ label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '' })
 
 const TYPE_COLORS = {
   Mesure:   { bg: 'bg-blue-50',     text: 'text-blue-700' },
@@ -31,6 +33,15 @@ const SOURCE_BADGE = {
 const readPoints = computed(() => points.value.filter(p => p.direction === 'read'))
 const writePoints = computed(() => points.value.filter(p => p.direction === 'write'))
 const localCount = computed(() => points.value.filter(p => p.source !== 'template').length)
+const preferredProtocols = ref(null)
+
+async function loadProtocols() {
+  if (!props.equipmentTemplateId) return
+  try {
+    const { data } = await getEquipmentTemplate(props.equipmentTemplateId)
+    preferredProtocols.value = data.preferred_protocols || null
+  } catch { /* ignore */ }
+}
 
 async function refresh() {
   loading.value = true
@@ -86,9 +97,11 @@ async function submitAdd() {
       data_type: draftPoint.value.data_type,
       direction: draftPoint.value.direction,
       unit: draftPoint.value.unit?.trim() || null,
+      tech_name: draftPoint.value.tech_name?.trim() || null,
+      nature: draftPoint.value.nature || null,
       position: maxPos + 10,
     })
-    draftPoint.value = { label: '', data_type: 'Mesure', direction: 'read', unit: '' }
+    draftPoint.value = { label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '' }
     showAdd.value = false
     await refresh()
   } catch (e) {
@@ -96,8 +109,9 @@ async function submitAdd() {
   }
 }
 
-watch(() => props.sectionId, refresh)
-onMounted(refresh)
+watch(() => props.sectionId, () => { refresh(); loadProtocols(); })
+watch(() => props.equipmentTemplateId, loadProtocols)
+onMounted(() => { refresh(); loadProtocols(); })
 
 function tableFor(direction) {
   return direction === 'read' ? readPoints.value : writePoints.value
@@ -121,6 +135,11 @@ function tableFor(direction) {
       </button>
     </div>
 
+    <!-- Bandeau protocoles préférés (Lot 18) -->
+    <div v-if="preferredProtocols" class="px-5 py-2 bg-gray-50 border-b border-gray-100">
+      <ProtocolPills :protocols="preferredProtocols" />
+    </div>
+
     <!-- Formulaire ajout inline -->
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
       <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
@@ -135,6 +154,12 @@ function tableFor(direction) {
         </select>
         <input v-model="draftPoint.unit" type="text" placeholder="Unité" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="w-20 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input v-model="draftPoint.tech_name" type="text" placeholder="Nom technique (T_AIR_NEUF…)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-44 px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <select v-model="draftPoint.nature" class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">Nature…</option>
+          <option>Booléen</option><option>Numérique</option><option>Enum</option><option>Chaîne</option>
+        </select>
         <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
         <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
       </form>
@@ -158,9 +183,14 @@ function tableFor(direction) {
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
-              <td class="py-1.5 pr-2 w-32">
+              <td class="py-1.5 pr-2 w-40 text-xs">
+                <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
+                <span v-else class="text-gray-300 italic">non défini</span>
+              </td>
+              <td class="py-1.5 pr-2 w-28">
                 <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
+              <td class="py-1.5 pr-2 w-24 text-xs text-gray-500">{{ p.nature || '—' }}</td>
               <td class="py-1.5 pr-2 w-16 text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 w-16 text-right">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" title="Restaurer la valeur du template">
@@ -190,9 +220,14 @@ function tableFor(direction) {
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
-              <td class="py-1.5 pr-2 w-32">
+              <td class="py-1.5 pr-2 w-40 text-xs">
+                <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
+                <span v-else class="text-gray-300 italic">non défini</span>
+              </td>
+              <td class="py-1.5 pr-2 w-28">
                 <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
+              <td class="py-1.5 pr-2 w-24 text-xs text-gray-500">{{ p.nature || '—' }}</td>
               <td class="py-1.5 pr-2 w-16 text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 w-16 text-right">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1">

@@ -18,8 +18,10 @@ function buildSnapshot(templateId) {
     unit: p.unit,
     notes: p.notes,
     is_optional: p.is_optional,
+    tech_name: p.tech_name,
+    nature: p.nature,
   }));
-  return { description_html: tpl.description_html, points };
+  return { description_html: tpl.description_html, points, preferred_protocols: tpl.preferred_protocols };
 }
 
 /**
@@ -89,7 +91,7 @@ function diffSectionVsTemplate(sectionId) {
       added.push(p);
     } else {
       const old = frozenBySlug.get(slug);
-      const fields = ['label', 'data_type', 'direction', 'unit'];
+      const fields = ['label', 'data_type', 'direction', 'unit', 'tech_name', 'nature'];
       const changes = {};
       for (const f of fields) {
         if ((old[f] || null) !== (p[f] || null)) changes[f] = { from: old[f], to: p[f] };

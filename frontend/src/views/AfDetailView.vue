@@ -205,7 +205,7 @@ watch(() => route.params.id, async () => {
 
           <!-- Pour kind='equipment' : tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">
-            <PointsTable :section-id="selectedSection.id" />
+            <PointsTable :section-id="selectedSection.id" :equipment-template-id="selectedSection.equipment_template_id" />
             <EquipmentInstancesTable :section-id="selectedSection.id" />
           </template>
 

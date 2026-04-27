@@ -15,6 +15,7 @@ const createTemplateSchema = z.object({
   icon_kind: z.enum(['fa', 'svg-hyperveez', 'svg-custom']).optional(),
   icon_value: z.string().optional(),
   icon_color: z.string().optional(),
+  preferred_protocols: z.string().nullable().optional(),
 });
 
 const updateTemplateSchema = createTemplateSchema.partial().omit({ slug: true });
@@ -28,6 +29,8 @@ const pointSchema = z.object({
   unit: z.string().optional(),
   notes: z.string().optional(),
   is_optional: z.boolean().optional(),
+  tech_name: z.string().nullable().optional(),
+  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne']).nullable().optional(),
 });
 
 async function routes(fastify) {
@@ -75,6 +78,7 @@ async function routes(fastify) {
       iconKind: body.icon_kind,
       iconValue: body.icon_value,
       iconColor: body.icon_color,
+      preferredProtocols: body.preferred_protocols,
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -101,8 +105,13 @@ async function routes(fastify) {
       iconKind: body.icon_kind,
       iconValue: body.icon_value,
       iconColor: body.icon_color,
+      preferredProtocols: body.preferred_protocols,
       updatedBy: userId,
     });
+    // Si la description ou les protocoles changent, on cree une nouvelle version
+    if ('preferred_protocols' in body && body.preferred_protocols !== tpl.preferred_protocols) {
+      snapshotAndBump(id, { changelog: 'Mise a jour protocoles preferes', authorId: userId });
+    }
     // Si la description a change, on cree une nouvelle version (bump + snapshot)
     // pour que les AFs concernees voient une mise a jour de propagation.
     if ('description_html' in body && body.description_html !== tpl.description_html) {
@@ -148,6 +157,7 @@ async function routes(fastify) {
         slug: body.slug, position: body.position, label: body.label,
         dataType: body.data_type, direction: body.direction, unit: body.unit,
         notes: body.notes, isOptional: body.is_optional,
+        techName: body.tech_name, nature: body.nature,
       });
       snapshotAndBump(templateId, { changelog: `Ajout point "${body.label}"`, authorId: request.authUser?.id });
       db.auditLog.add({ templateId, userId: request.authUser?.id, action: 'template.point.add', payload: body });

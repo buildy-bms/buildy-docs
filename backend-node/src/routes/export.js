@@ -383,10 +383,14 @@ async function routes(fastify) {
       if (sec.kind === 'equipment') {
         const tpl = sec.equipment_template_id ? db.equipmentTemplates.getById(sec.equipment_template_id) : null;
         const points = resolveSectionPoints(sec.id);
+        const protocols = tpl?.preferred_protocols
+          ? tpl.preferred_protocols.split(',').map(s => s.trim()).filter(Boolean)
+          : [];
         equipment = {
           description_html: tpl?.description_html || null,
           points_read: points.filter(p => p.direction === 'read'),
           points_write: points.filter(p => p.direction === 'write'),
+          preferred_protocols: protocols,
         };
       }
 

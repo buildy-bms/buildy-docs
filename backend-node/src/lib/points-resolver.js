@@ -41,6 +41,8 @@ function resolveSectionPoints(sectionId) {
             direction: ed.direction ?? p.direction,
             unit: ed.unit ?? p.unit,
             is_optional: ed.is_optional != null ? ed.is_optional : p.is_optional,
+            tech_name: ed.tech_name ?? p.tech_name,
+            nature: ed.nature ?? p.nature,
             source: 'local-edit', base_point_id: p.id, override_id: ed.id,
             position: ed.position ?? p.position,
           };
@@ -49,6 +51,7 @@ function resolveSectionPoints(sectionId) {
           id: p.id, slug: p.slug, label: p.label,
           data_type: p.data_type, direction: p.direction, unit: p.unit,
           is_optional: p.is_optional,
+          tech_name: p.tech_name, nature: p.nature,
           source: 'template', base_point_id: p.id, override_id: null,
           position: p.position,
         };
@@ -62,6 +65,7 @@ function resolveSectionPoints(sectionId) {
       id: null, slug: null,
       label: o.label, data_type: o.data_type, direction: o.direction, unit: o.unit,
       is_optional: o.is_optional,
+      tech_name: o.tech_name, nature: o.nature,
       source: 'local-add', base_point_id: null, override_id: o.id,
       position: o.position,
     }));
