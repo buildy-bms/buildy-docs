@@ -1,0 +1,280 @@
+/* ──────────────────────────────────────────────────────────────────
+   Liste de points contractuelle — A3 portrait — DOE Buildy
+   ────────────────────────────────────────────────────────────────── */
+
+@page {
+  size: A3 portrait;
+  margin: 22mm 18mm 18mm 18mm;
+}
+
+@page :first {
+  margin: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 10pt;
+  color: #1f2937;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Page de garde ─────────────────────────────────────────────── */
+.cover {
+  width: 297mm;
+  height: 420mm;
+  padding: 30mm 24mm;
+  box-sizing: border-box;
+  background: #1b2842;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+}
+.cover-logo { width: 56mm; margin-bottom: 30mm; filter: brightness(0) invert(1); }
+.cover-doc-type {
+  font-size: 11pt;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 12mm;
+}
+.cover-title {
+  font-size: 32pt;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 14mm;
+  color: white;
+}
+.cover-client {
+  font-size: 18pt;
+  font-weight: 500;
+  margin-bottom: 4mm;
+  color: rgba(255, 255, 255, 0.9);
+}
+.cover-project {
+  font-size: 14pt;
+  margin-bottom: 6mm;
+  color: rgba(255, 255, 255, 0.7);
+}
+.cover-address {
+  font-size: 11pt;
+  color: rgba(255, 255, 255, 0.55);
+}
+.cover-meta {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8mm 12mm;
+  padding-top: 12mm;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cover-meta-row { display: flex; flex-direction: column; }
+.cover-meta-label {
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 1.5mm;
+}
+.cover-meta-value {
+  font-size: 11pt;
+  color: white;
+  font-weight: 500;
+}
+.cover-version-tag {
+  display: inline-block;
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 10pt;
+  background: #00cd92;
+  color: #051428;
+  padding: 1mm 3mm;
+  border-radius: 1mm;
+  font-weight: 600;
+}
+.cover-motif {
+  margin-top: 4mm;
+  font-size: 9.5pt;
+  color: rgba(255, 255, 255, 0.65);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ── Sommaire ──────────────────────────────────────────────────── */
+.toc { page-break-after: always; }
+.toc h1 {
+  font-size: 22pt;
+  font-weight: 700;
+  margin: 0 0 8mm;
+  color: #1b2842;
+}
+.toc-list { list-style: none; padding: 0; margin: 0; }
+.toc-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2.5mm 0;
+  border-bottom: 1px dashed #d1d5db;
+  font-size: 11pt;
+}
+.toc-cat-name { font-weight: 600; color: #1f2937; }
+.toc-cat-count { color: #6b7280; font-size: 9pt; margin-left: 4mm; }
+
+/* ── Catégorie d'équipement ────────────────────────────────────── */
+.cat {
+  page-break-before: always;
+}
+.cat:first-of-type { page-break-before: avoid; }
+.cat-header {
+  display: flex;
+  align-items: baseline;
+  border-bottom: 2px solid #1b2842;
+  padding-bottom: 2mm;
+  margin: 0 0 4mm;
+}
+.cat-title {
+  font-size: 18pt;
+  font-weight: 700;
+  color: #1b2842;
+  margin: 0;
+  flex: 1;
+}
+.cat-count {
+  font-size: 9pt;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.cat-bacs {
+  display: inline-block;
+  font-size: 8.5pt;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 0.5mm 2mm;
+  border-radius: 1mm;
+  margin-left: 4mm;
+  white-space: nowrap;
+}
+
+/* ── Groupe par instance ───────────────────────────────────────── */
+.instance {
+  margin-bottom: 6mm;
+  page-break-inside: avoid;
+}
+.instance-header {
+  background: #f8f9fb;
+  border-left: 3px solid #1b2842;
+  padding: 2.5mm 4mm;
+  display: flex;
+  align-items: baseline;
+  gap: 5mm;
+}
+.instance-ref {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-weight: 700;
+  color: #1b2842;
+  font-size: 10pt;
+}
+.instance-location { color: #4b5563; font-size: 9.5pt; }
+.instance-qty {
+  margin-left: auto;
+  font-size: 8.5pt;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.instance-empty { padding: 4mm; text-align: center; color: #9ca3af; font-style: italic; font-size: 9pt; }
+
+/* ── Tableau de points ─────────────────────────────────────────── */
+table.points {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin-top: 0;
+}
+table.points thead th {
+  text-align: left;
+  padding: 2mm 3mm;
+  background: #f1f3f6;
+  border-bottom: 1px solid #d1d5db;
+  font-size: 7.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+table.points tbody tr:nth-child(even) { background: #fafbfc; }
+table.points td {
+  padding: 1.8mm 3mm;
+  border-bottom: 1px solid #e8ebf0;
+  vertical-align: top;
+  line-height: 1.4;
+}
+table.points td.col-data { font-weight: 500; color: #1f2937; }
+table.points td.col-empty { color: #cbd5e1; font-style: italic; }
+
+/* Largeurs colonnes (totaux % calibrés pour A3 portrait) */
+.col-data       { width: auto;  }
+.col-type       { width: 18mm;  }
+.col-direction  { width: 8mm;   }
+.col-unit       { width: 14mm;  }
+.col-description { width: 50mm; }
+.col-blank      { width: 28mm; }
+
+/* Badges Type colorés */
+.badge-type {
+  display: inline-block;
+  font-size: 7.5pt;
+  font-weight: 600;
+  padding: 0.6mm 2mm;
+  border-radius: 1mm;
+  white-space: nowrap;
+}
+.type-Mesure   { background: #dbeafe; color: #1e40af; }
+.type-Alarme   { background: #fee2e2; color: #b91c1c; }
+.type-État     { background: #f1f5f9; color: #475569; }
+.type-Commande { background: #d1fae5; color: #065f46; }
+.type-Consigne { background: #fef3c7; color: #92400e; }
+
+.badge-dir {
+  display: inline-block;
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  padding: 0.4mm 1.5mm;
+  border-radius: 1mm;
+  letter-spacing: 0.05em;
+}
+.dir-R { background: #e0e7ff; color: #3730a3; }
+.dir-W { background: #fce7f3; color: #9d174d; }
+
+/* ── Récap final ───────────────────────────────────────────────── */
+.summary {
+  page-break-before: always;
+  padding-top: 4mm;
+}
+.summary h2 {
+  font-size: 16pt;
+  margin: 0 0 6mm;
+  color: #1b2842;
+  border-bottom: 2px solid #1b2842;
+  padding-bottom: 2mm;
+}
+table.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+table.summary-table th, table.summary-table td {
+  padding: 2.5mm 4mm;
+  text-align: left;
+  border-bottom: 1px solid #e8ebf0;
+}
+table.summary-table th { background: #f1f3f6; font-weight: 600; }
+table.summary-table tfoot td { font-weight: 700; background: #f8f9fb; border-top: 2px solid #1b2842; }
+.summary-num { text-align: right; font-variant-numeric: tabular-nums; }

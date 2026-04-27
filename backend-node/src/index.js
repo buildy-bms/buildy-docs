@@ -73,6 +73,7 @@ async function main() {
   await fastify.register(require('./routes/sections'), { prefix: '/api' });
   await fastify.register(require('./routes/equipment-templates'), { prefix: '/api' });
   await fastify.register(require('./routes/attachments'), { prefix: '/api' });
+  await fastify.register(require('./routes/export'), { prefix: '/api' });
 
   // Sert les captures uploadees sous /attachments/<af-id>/<uuid>.png
   // (auth verifiee par le hook global qui couvre /attachments/*).

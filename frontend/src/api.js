@@ -59,6 +59,12 @@ export const reorderAttachments = (sectionId, order) =>
   api.post(`/sections/${sectionId}/attachments/reorder`, { order })
 export const deleteAttachment = (id) => api.delete(`/attachments/${id}`)
 
+// ── Exports ──
+export const listAfExports = (afId) => api.get(`/afs/${afId}/exports`)
+export const exportPointsList = (afId, data) =>
+  api.post(`/afs/${afId}/exports/points-list`, data)
+export const downloadExportUrl = (id) => `/api/exports/${id}/download`
+
 // ── Equipment templates (bibliothèque) ──
 export const listEquipmentTemplates = (params) => api.get('/equipment-templates', { params })
 export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`)

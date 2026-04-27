@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Liste de points — {{af.client_name}} — {{af.project_name}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Page de garde ═══════════ --}}
+<section class="cover">
+  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+  <p class="cover-doc-type">Liste de points contractuelle</p>
+  <h1 class="cover-title">{{af.project_name}}</h1>
+  <p class="cover-client">{{af.client_name}}</p>
+  {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
+
+  <div class="cover-meta">
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Version</span>
+      <span class="cover-meta-value"><span class="cover-version-tag">{{version}}</span></span>
+      {{#if motif}}<span class="cover-motif">{{motif}}</span>{{/if}}
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Date d'export</span>
+      <span class="cover-meta-value">{{exportDate}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Auteur</span>
+      <span class="cover-meta-value">{{authorName}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Niveau de service</span>
+      <span class="cover-meta-value">{{serviceLevelLabel}}</span>
+    </div>
+  </div>
+</section>
+
+{{!-- ═══════════ Sommaire ═══════════ --}}
+<section class="toc">
+  <h1>Sommaire</h1>
+  <ul class="toc-list">
+    {{#each categories}}
+    <li class="toc-row">
+      <span class="toc-cat-name">{{name}}</span>
+      <span class="toc-cat-count">{{instancesCount}} instance{{#if (gt instancesCount 1)}}s{{/if}} · {{pointsTotal}} point{{#if (gt pointsTotal 1)}}s{{/if}}</span>
+    </li>
+    {{/each}}
+  </ul>
+</section>
+
+{{!-- ═══════════ Une catégorie par section ═══════════ --}}
+{{#each categories}}
+<section class="cat">
+  <header class="cat-header">
+    <h2 class="cat-title">{{name}}</h2>
+    {{#if bacsArticles}}<span class="cat-bacs">⚖️ {{bacsArticles}}</span>{{/if}}
+    <span class="cat-count">{{instancesCount}} instance{{#if (gt instancesCount 1)}}s{{/if}} · {{pointsTotal}} ligne{{#if (gt pointsTotal 1)}}s{{/if}}</span>
+  </header>
+
+  {{#each instances}}
+  <div class="instance">
+    <header class="instance-header">
+      <span class="instance-ref">{{reference}}</span>
+      {{#if location}}<span class="instance-location">{{location}}</span>{{/if}}
+      {{#if (gt qty 1)}}<span class="instance-qty">×{{qty}}</span>{{/if}}
+    </header>
+
+    {{#if points.length}}
+    <table class="points">
+      <thead>
+        <tr>
+          <th class="col-data">Donnée</th>
+          <th class="col-type">Type</th>
+          <th class="col-direction">Sens</th>
+          <th class="col-unit">Unité</th>
+          <th class="col-description">Description / Notes</th>
+          <th class="col-blank">Adresse</th>
+          <th class="col-blank">Échelle</th>
+          <th class="col-blank">Commentaire</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each points}}
+        <tr>
+          <td class="col-data">{{label}}</td>
+          <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+          <td><span class="badge-dir dir-{{dirLabel}}">{{dirLabel}}</span></td>
+          <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
+          <td></td>
+          <td class="col-empty">—</td>
+          <td class="col-empty">—</td>
+          <td class="col-empty">—</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="instance-empty">Aucun point défini pour cette instance</div>
+    {{/if}}
+  </div>
+  {{/each}}
+
+  {{#unless instances.length}}
+  <div class="instance-empty">
+    Aucune instance saisie pour cette catégorie. Définir au moins une instance dans l'éditeur.
+  </div>
+  {{/unless}}
+</section>
+{{/each}}
+
+{{!-- ═══════════ Récapitulatif final ═══════════ --}}
+<section class="summary">
+  <h2>Récapitulatif</h2>
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Catégorie d'équipement</th>
+        <th class="summary-num">Instances</th>
+        <th class="summary-num">Points par instance</th>
+        <th class="summary-num">Total points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each categories}}
+      <tr>
+        <td>{{name}}</td>
+        <td class="summary-num">{{instancesCount}}</td>
+        <td class="summary-num">{{pointsPerInstance}}</td>
+        <td class="summary-num">{{pointsTotal}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>Total général</td>
+        <td class="summary-num">{{totals.instances}}</td>
+        <td class="summary-num">—</td>
+        <td class="summary-num">{{totals.points}}</td>
+      </tr>
+    </tfoot>
+  </table>
+</section>
+
+</body>
+</html>
