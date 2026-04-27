@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/**
+ * Brand color (Buildy) — alignee sur edge-fleet-manager / buildy-tools.
+ * Couleur principale #1b2842 (bleu marine Buildy) pour les classes indigo.
+ */
+@theme {
+  --color-indigo-50:  #f4f5f9;
+  --color-indigo-100: #e3e6ee;
+  --color-indigo-200: #c7ccd9;
+  --color-indigo-300: #9ba3b5;
+  --color-indigo-400: #6b7590;
+  --color-indigo-500: #3b4a6b;
+  --color-indigo-600: #1b2842;
+  --color-indigo-700: #151f34;
+  --color-indigo-800: #0f1625;
+  --color-indigo-900: #0a0f1a;
+  --color-indigo-950: #050810;
+}
+
+@layer base {
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button, a, input, select, textarea {
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}

@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.env
+.DS_Store
+*.log
+
+# Data persistante (DB SQLite + attachments + exports)
+data/buildy_af.db
+data/buildy_af.db-shm
+data/buildy_af.db-wal
+data/attachments/
+data/exports/
+data/repos/
+# Securite : si la DB est resolue ailleurs (ex: backend-node/data/) on l'ignore aussi
+**/buildy_af.db
+**/buildy_af.db-shm
+**/buildy_af.db-wal
+
+# Certs HTTPS (auto-generes en dev)
+certs/*.crt
+certs/*.key
+
+# PM2
+.pm2/
