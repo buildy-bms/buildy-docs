@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import {
-  ChevronRightIcon, ChevronDownIcon,
   RectangleStackIcon, GlobeAltIcon, ChartBarSquareIcon, DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
+import SectionTreeNode from './SectionTreeNode.vue'
 
 const props = defineProps({
   sections: { type: Array, required: true }, // liste plate (parent_id pour hierarchie)
