@@ -9,6 +9,18 @@ const log = require('../lib/logger').system;
 // Helpers Handlebars (gt, eq) sont enregistres au require de pdf.js.
 const Handlebars = require('handlebars');
 const { renderPdf, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
+const gitLib = require('../lib/git');
+
+async function commitExportSilently(afId, message, tag, user) {
+  try {
+    await gitLib.commitAf(afId, message, {
+      tag,
+      author: user ? { name: user.display_name || 'Buildy AF', email: user.email || 'noreply@buildy.fr' } : undefined,
+    });
+  } catch (err) {
+    log.warn(`Git commit skipped after export AF #${afId} : ${err.message}`);
+  }
+}
 
 // Compile une fois le partial _synthesis-table pour le re-rendre dans le body
 // d'une section kind='synthesis'.
@@ -187,6 +199,7 @@ async function routes(fastify) {
       payload: { version, motif: body.motif, instances: totals.instances, points: totals.points },
     });
     log.info(`PDF points-list exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+    await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
 
     return {
       id: insertedRow.lastInsertRowid,
@@ -327,6 +340,7 @@ async function routes(fastify) {
       payload: { version, motif: body.motif, rows: rows.length },
     });
     log.info(`PDF synthesis exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB)`);
+    await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
 
     return {
       id: insertedRow.lastInsertRowid,
@@ -512,6 +526,7 @@ async function routes(fastify) {
       payload: { version, motif: body.motif, sections: allSections.length, service_level: serviceLevel.level },
     });
     log.info(`PDF AF exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+    await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
 
     return {
       id: insertedRow.lastInsertRowid,

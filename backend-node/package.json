@@ -21,6 +21,7 @@
     "dotenv": "^16.4.7",
     "fastify": "^5.8.4",
     "handlebars": "^4.7.9",
+    "isomorphic-git": "^1.37.6",
     "jose": "^6.2.2",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

@@ -75,6 +75,7 @@ async function main() {
   await fastify.register(require('./routes/attachments'), { prefix: '/api' });
   await fastify.register(require('./routes/export'), { prefix: '/api' });
   await fastify.register(require('./routes/inspections'), { prefix: '/api' });
+  await fastify.register(require('./routes/versions'), { prefix: '/api' });
 
   // Sert les captures uploadees sous /attachments/<af-id>/<uuid>.png
   // (auth verifiee par le hook global qui couvre /attachments/*).
@@ -133,6 +134,29 @@ async function main() {
   // Cleanup sessions expirees (toutes les 10 min)
   setInterval(() => {
     try { db.sessions.deleteExpired(); } catch { /* ignore */ }
+  }, 10 * 60_000);
+
+  // Checkpoint Git auto toutes les 10 min pour les AFs ayant eu de l'activite
+  // depuis le dernier commit (compare audit_log.created_at au dernier commit Git).
+  const gitLib = require('./lib/git');
+  setInterval(async () => {
+    try {
+      const afs = db.afs.list({});
+      for (const af of afs) {
+        const lastActivity = db.db.prepare(`
+          SELECT MAX(created_at) AS last FROM audit_log WHERE af_id = ?
+        `).get(af.id)?.last;
+        if (!lastActivity) continue;
+        const commits = await gitLib.listCommits(af.id);
+        const lastCommitTs = commits[0]?.timestamp ? commits[0].timestamp * 1000 : 0;
+        const lastActivityTs = new Date(lastActivity + 'Z').getTime();
+        if (lastActivityTs > lastCommitTs) {
+          await gitLib.commitAf(af.id, 'Checkpoint auto');
+        }
+      }
+    } catch (e) {
+      log.warn(`Checkpoint Git auto en erreur : ${e.message}`);
+    }
   }, 10 * 60_000);
 
   try {

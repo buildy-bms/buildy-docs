@@ -14,6 +14,7 @@ const config = Object.freeze({
   databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../data/buildy_af.db'),
   attachmentsDir: process.env.ATTACHMENTS_DIR || path.resolve(__dirname, '../../data/attachments'),
   exportsDir: process.env.EXPORTS_DIR || path.resolve(__dirname, '../../data/exports'),
+  gitReposDir: process.env.GIT_REPOS_DIR || path.resolve(__dirname, '../../data/repos'),
 
   // Auth
   jwtSecret: process.env.JWT_SECRET || 'buildy-af-secret-change-me',

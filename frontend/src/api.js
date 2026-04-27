@@ -73,6 +73,15 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
+// ── Versions Git ──
+export const listAfVersions = (afId) => api.get(`/afs/${afId}/versions`)
+export const getAfVersionsDiff = (afId, from, to) =>
+  api.get(`/afs/${afId}/versions/diff`, { params: { from, to } })
+export const restoreAfVersion = (afId, sha) =>
+  api.post(`/afs/${afId}/versions/restore`, { sha })
+export const checkpointAf = (afId, message, tag) =>
+  api.post(`/afs/${afId}/versions/checkpoint`, { message, tag })
+
 // ── Inspections BACS ──
 export const listInspections = (afId) => api.get(`/afs/${afId}/inspections`)
 export const createInspection = (afId, data) =>

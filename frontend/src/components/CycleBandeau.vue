@@ -2,8 +2,9 @@
 import { computed, ref } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
-  DocumentArrowDownIcon, TableCellsIcon,
+  DocumentArrowDownIcon, TableCellsIcon, ClockIcon,
 } from '@heroicons/vue/24/outline'
+import { useRouter } from 'vue-router'
 import {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
   createInspection, listInspections,
@@ -19,6 +20,7 @@ const props = defineProps({
 const emit = defineEmits(['updated', 'back'])
 
 const { success, error } = useNotification()
+const router = useRouter()
 const submitting = ref(false)
 const showExport = ref(false)
 const exportKind = ref('points-list') // 'points-list' | 'af'
@@ -160,6 +162,14 @@ const exportDescription = computed(() => {
     >
       <TableCellsIcon class="w-4 h-4" />
       Synthèse (A3)
+    </button>
+    <button
+      @click="router.push(`/afs/${af.id}/versions`)"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      title="Historique des versions Git"
+    >
+      <ClockIcon class="w-4 h-4" />
+      Versions
     </button>
     <button
       v-if="canDeliver"

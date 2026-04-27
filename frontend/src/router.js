@@ -26,6 +26,13 @@ const routes = [
     props: true,
   },
   {
+    path: '/afs/:id/versions',
+    name: 'af-versions',
+    meta: { title: 'Versions de l\'AF' },
+    component: () => import('@/views/AfVersionsView.vue'),
+    props: true,
+  },
+  {
     path: '/library',
     name: 'library',
     meta: { title: 'Bibliothèque équipements' },
