@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
@@ -8,8 +8,9 @@ import {
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
-  createInspection, listInspections,
+  createInspection, listInspections, listSections, getAfRequiredLevel,
 } from '@/api'
+import SectionPickerTree from './SectionPickerTree.vue'
 import { useNotification } from '@/composables/useNotification'
 import BaseModal from './BaseModal.vue'
 import StatusBadge from './StatusBadge.vue'
@@ -29,6 +30,32 @@ const exportMotif = ref('')
 const exportIncludeBacs = ref(false)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
+
+// Lot 21 — sélecteur de sections à inclure
+const exportSections = ref([])
+const exportExcluded = ref(new Set())
+const showSectionPicker = ref(false)
+const liveRequiredLevel = ref(null)
+const LEVEL_LABEL = { E: 'Essentials', S: 'Smart', P: 'Premium' }
+
+async function loadSectionsForPicker() {
+  try {
+    const { data } = await listSections(props.af.id)
+    exportSections.value = data
+  } catch { exportSections.value = [] }
+}
+
+let recalcTimer = null
+async function recalcRequiredLevel() {
+  clearTimeout(recalcTimer)
+  recalcTimer = setTimeout(async () => {
+    try {
+      const { data } = await getAfRequiredLevel(props.af.id, [...exportExcluded.value])
+      liveRequiredLevel.value = data
+    } catch { /* ignore */ }
+  }, 200)
+}
+watch(exportExcluded, recalcRequiredLevel, { deep: true })
 
 const showInspection = ref(false)
 const inspectorName = ref('')
@@ -148,7 +175,12 @@ function openExport(kind) {
   exportIncludeBacs.value = false
   lastExportId.value = null
   lastExportInfo.value = null
+  exportExcluded.value = new Set()
+  showSectionPicker.value = false
+  liveRequiredLevel.value = null
   showExport.value = true
+  loadSectionsForPicker()
+  recalcRequiredLevel()
 }
 
 async function submitExport() {
@@ -160,6 +192,7 @@ async function submitExport() {
              : exportPointsList
     const payload = { motif: exportMotif.value.trim() }
     if (exportKind.value === 'af') payload.includeBacsAnnex = exportIncludeBacs.value
+    if (exportExcluded.value.size > 0) payload.excluded_section_ids = [...exportExcluded.value]
     const { data } = await fn(props.af.id, payload)
     if (exportKind.value === 'af') {
       success(`PDF AF généré : ${data.version} — ${data.sections_total} sections (${(data.file_size_bytes / 1024).toFixed(0)} KB) — Niveau requis : ${data.service_level?.label || '—'}`)
@@ -366,6 +399,30 @@ const exportDescription = computed(() => {
         <p class="text-[11px] text-gray-400 mt-1">
           Apparaîtra sur la page de garde du PDF + dans l'historique des exports.
         </p>
+      </div>
+
+      <!-- Sélecteur de sections à inclure (Lot 21) -->
+      <div class="pt-3 border-t border-gray-100">
+        <button type="button" @click="showSectionPicker = !showSectionPicker"
+                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center gap-1">
+          {{ showSectionPicker ? '▾' : '▸' }} Sections à inclure dans l'export
+          <span v-if="exportExcluded.size > 0" class="text-amber-700 font-normal">— {{ exportExcluded.size }} décochée{{ exportExcluded.size > 1 ? 's' : '' }}</span>
+          <span v-else class="text-gray-400 font-normal">— toutes incluses</span>
+        </button>
+        <div v-if="showSectionPicker" class="mt-2">
+          <SectionPickerTree
+            :sections="exportSections"
+            :excluded="exportExcluded"
+            @update:excluded="exportExcluded = $event"
+          />
+          <div v-if="liveRequiredLevel?.required" class="mt-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-900">
+            Avec votre sélection actuelle, le niveau de contrat requis est :
+            <strong>{{ LEVEL_LABEL[liveRequiredLevel.required] || liveRequiredLevel.required }}</strong>
+            <span v-if="liveRequiredLevel.shortfall" class="text-red-700 ml-1">
+              ⚠️ dépasse le contrat ({{ LEVEL_LABEL[liveRequiredLevel.contract_level] }})
+            </span>
+          </div>
+        </div>
       </div>
 
       <!-- Option Annexe BACS, uniquement pour AF -->

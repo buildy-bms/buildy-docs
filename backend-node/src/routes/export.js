@@ -54,6 +54,7 @@ const SERVICE_LEVEL_LABELS = {
 const exportSchema = z.object({
   motif: z.string().min(1, 'Motif requis'),
   includeBacsAnnex: z.boolean().optional(),
+  excluded_section_ids: z.array(z.number()).optional(),
 });
 
 async function routes(fastify) {
@@ -99,11 +100,14 @@ async function routes(fastify) {
 
     // ── Construit le payload pour le template ──
     const allSections = db.sections.listByAf(afId);
+    const excludedSet = new Set(body.excluded_section_ids || []);
 
     // Categories = sections kind='equipment' (peuvent etre directement dans le ch.2,
     // ou dans une sous-section comme 2.1.1 Chaudieres). On regroupe par section
     // equipment unique et on charge ses instances + points.
-    const equipmentSections = allSections.filter(s => s.kind === 'equipment' && s.included_in_export);
+    const equipmentSections = allSections.filter(s =>
+      s.kind === 'equipment' && s.included_in_export && !excludedSet.has(s.id)
+    );
 
     // (Lot 19) On produit aussi une liste à plat `rows` pour le tableau global
     // A3 paysage : une ligne par (instance × point), avec marquage isFirstOfInstance
@@ -254,7 +258,10 @@ async function routes(fastify) {
     const authorName = user?.display_name || user?.email || 'Inconnu';
 
     // ── Construit les lignes : tous les equipements (kind='equipment') ──
-    const equipmentSections = db.sections.listByAf(afId).filter(s => s.kind === 'equipment');
+    const synthExcluded = new Set(body.excluded_section_ids || []);
+    const equipmentSections = db.sections.listByAf(afId).filter(s =>
+      s.kind === 'equipment' && s.included_in_export && !synthExcluded.has(s.id)
+    );
 
     const FUNCTION_KEYWORDS = {
       hasProgramming: ['program', 'horaire', 'consigne', 'commande'],
@@ -395,7 +402,10 @@ async function routes(fastify) {
     const authorName = user?.display_name || user?.email || 'Inconnu';
 
     // ── Charge toutes les sections incluses + construit l'arbre ──
-    const allSections = db.sections.listByAf(afId).filter(s => s.included_in_export);
+    const afExcludedSet = new Set(body.excluded_section_ids || []);
+    const allSections = db.sections.listByAf(afId).filter(s =>
+      s.included_in_export && !afExcludedSet.has(s.id)
+    );
 
     // Charge attachments + equipment data pour chaque section
     const sectionData = new Map();
