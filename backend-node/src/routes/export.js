@@ -6,9 +6,32 @@ const { z } = require('zod');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
+// Helpers Handlebars (gt, eq) sont enregistres au require de pdf.js.
+const Handlebars = require('handlebars');
 const { renderPdf, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
+
+// Compile une fois le partial _synthesis-table pour le re-rendre dans le body
+// d'une section kind='synthesis'.
+const synthesisTablePath = path.resolve(__dirname, '../../templates/pdf/_synthesis-table.hbs');
+const renderSynthesisTable = Handlebars.compile(fs.readFileSync(synthesisTablePath, 'utf-8'));
 const { resolveSectionPoints } = require('../lib/points-resolver');
 const { resolveAfLevel, formatLevelFull } = require('../lib/service-level-resolver');
+const { BACS_ARTICLES } = require('../seeds/bacs-articles');
+
+// Lignes du tableau de synthese (matrice categorie x dimensions BACS)
+// Source : page Notion plan AF chapitre 12
+const SYNTHESIS_ROWS = [
+  { name: 'Chauffage & Climatisation', bacs: '§1 §2', monitoring: true, commande: true, alarmes: true, reporting: true, levelLabel: 'Essentials' },
+  { name: 'Ventilation', bacs: '§3', monitoring: true, commande: true, alarmes: true, reporting: true, levelLabel: 'Essentials' },
+  { name: 'Production ECS', bacs: '§4', monitoring: true, commande: true, alarmes: true, reporting: false, levelLabel: 'Essentials' },
+  { name: 'Éclairage et prises', bacs: '§4 (éclairage)', monitoring: true, commande: true, alarmes: true, reporting: false, levelLabel: 'Essentials' },
+  { name: 'Production électricité', bacs: '§4', monitoring: true, commande: false, alarmes: true, reporting: true, levelLabel: 'Essentials' },
+  { name: 'Comptage énergétique', bacs: null, monitoring: true, commande: false, alarmes: true, reporting: true, levelLabel: 'Essentials' },
+  { name: 'Qualité de l\'air', bacs: null, monitoring: true, commande: false, alarmes: true, reporting: true, levelLabel: 'Smart et Premium' },
+  { name: 'Occultation', bacs: null, monitoring: true, commande: true, alarmes: true, reporting: false, levelLabel: 'Essentials' },
+  { name: 'Process industriel', bacs: null, monitoring: true, commande: true, alarmes: true, reporting: false, levelLabel: 'Essentials' },
+  { name: 'Équipements génériques', bacs: null, monitoring: true, commande: false, alarmes: true, reporting: false, levelLabel: 'Essentials' },
+];
 
 const SERVICE_LEVEL_LABELS = {
   E: 'Essentials',
@@ -18,6 +41,7 @@ const SERVICE_LEVEL_LABELS = {
 
 const exportSchema = z.object({
   motif: z.string().min(1, 'Motif requis'),
+  includeBacsAnnex: z.boolean().optional(),
 });
 
 async function routes(fastify) {
@@ -224,6 +248,10 @@ async function routes(fastify) {
           const data = sectionData.get(s.id);
           const sl = s.service_level;
           const badgeClass = sl ? sl.replace(/[^A-Z]/g, '') : '';
+          // Pour kind='synthesis' (ch.12), on rend le partial _synthesis-table
+          const synthesisHtml = s.kind === 'synthesis'
+            ? renderSynthesisTable({ rows: SYNTHESIS_ROWS })
+            : null;
           return {
             id: s.id,
             number: s.number || '',
@@ -233,6 +261,7 @@ async function routes(fastify) {
             badgeClass: badgeClass || 'ESP',
             bacs_articles: s.bacs_articles,
             bacs_articles_label: s.bacs_articles ? `Décret BACS ${s.bacs_articles}` : null,
+            synthesis_table_html: synthesisHtml,
             body_html: s.body_html,
             generic_note: s.generic_note,
             kind: s.kind,
@@ -287,6 +316,8 @@ async function routes(fastify) {
       serviceLevel,
       tree,
       tocFlat,
+      includeBacsAnnex: !!body.includeBacsAnnex,
+      bacsArticles: body.includeBacsAnnex ? BACS_ARTICLES : null,
     };
 
     // Genere le PDF

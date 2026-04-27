@@ -1,0 +1,27 @@
+{{!-- Annexe optionnelle : Decret BACS — Articles R175-1 a R175-6 --}}
+<section class="bacs-annex">
+  <h1 class="bacs-annex-title">Annexe — Décret BACS (R175-1 à R175-6)</h1>
+  <p class="bacs-annex-intro">
+    Articles du Code de la construction et de l'habitation issus du décret n°2023-259 du 7 avril 2023.
+    Référence pour les marqueurs ⚖️ apparaissant tout au long du document.
+  </p>
+
+  {{#each bacsArticles}}
+  <div class="bacs-article">
+    <h2 class="bacs-article-title">
+      <span class="bacs-article-code">{{code}}</span>
+      <span class="bacs-article-name">{{title}}</span>
+    </h2>
+    {{#if summary}}
+    <p class="bacs-article-summary">{{summary}}</p>
+    {{/if}}
+    {{#if sections.length}}
+    <ul class="bacs-article-sections">
+      {{#each sections}}
+      <li><strong>{{num}}</strong> — {{title}}</li>
+      {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+  {{/each}}
+</section>

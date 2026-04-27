@@ -64,7 +64,7 @@ export const listAfExports = (afId) => api.get(`/afs/${afId}/exports`)
 export const exportPointsList = (afId, data) =>
   api.post(`/afs/${afId}/exports/points-list`, data)
 export const exportAf = (afId, data) =>
-  api.post(`/afs/${afId}/exports/af`, data)
+  api.post(`/afs/${afId}/exports/af`, data) // data: { motif, includeBacsAnnex }
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
 // ── Equipment templates (bibliothèque) ──

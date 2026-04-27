@@ -1,0 +1,31 @@
+{{!-- Tableau de synthese (ch.12) — auto-genere depuis l'arbre des sections --}}
+<table class="synthesis-table">
+  <thead>
+    <tr>
+      <th>Catégorie d'équipement</th>
+      <th>Décret BACS</th>
+      <th class="num">Monitoring</th>
+      <th class="num">Contrôle & Commande</th>
+      <th class="num">Alarmes</th>
+      <th class="num">Reporting & Analyse</th>
+      <th>Niveau min.</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="row-name">{{name}}</td>
+      <td class="row-bacs">{{#if bacs}}<span class="bacs-tag">⚖️ {{bacs}}</span>{{else}}—{{/if}}</td>
+      <td class="num">{{#if monitoring}}<span class="check">✓</span>{{else}}—{{/if}}</td>
+      <td class="num">{{#if commande}}<span class="check">✓</span>{{else}}—{{/if}}</td>
+      <td class="num">{{#if alarmes}}<span class="check">✓</span>{{else}}—{{/if}}</td>
+      <td class="num">{{#if reporting}}<span class="check">✓</span>{{else}}—{{/if}}</td>
+      <td><span class="row-level">{{levelLabel}}</span></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p class="synthesis-legend">
+  ✓ = applicable · — = non applicable · ⚖️ = couvert par le décret BACS.
+  Tableau indicatif, à ajuster selon le périmètre réel du déploiement.
+</p>

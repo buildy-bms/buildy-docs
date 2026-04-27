@@ -366,3 +366,117 @@ table.points-mini .badge-type {
   border-left: 2px solid #e5e7eb;
   line-height: 1.5;
 }
+
+/* ── Tableau de synthèse (ch.12 auto) ────────────────────────────── */
+.synthesis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin-top: 3mm;
+}
+.synthesis-table th {
+  text-align: left;
+  padding: 2mm 2.5mm;
+  background: #1b2842;
+  color: white;
+  font-family: 'Manrope', sans-serif;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.synthesis-table th.num { text-align: center; }
+.synthesis-table td {
+  padding: 1.8mm 2.5mm;
+  border-bottom: 1px solid #e8ebf0;
+  vertical-align: middle;
+}
+.synthesis-table td.num { text-align: center; }
+.synthesis-table tr:nth-child(even) td { background: #fafbfc; }
+.synthesis-table .row-name { font-weight: 600; color: #1f2937; }
+.synthesis-table .check { color: #059669; font-weight: 700; font-size: 11pt; }
+.synthesis-table .bacs-tag {
+  display: inline-block;
+  font-size: 7.5pt;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  padding: 0.5mm 1.5mm;
+  border-radius: 1mm;
+  white-space: nowrap;
+}
+.synthesis-table .row-level {
+  font-family: 'Manrope', sans-serif;
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #475569;
+}
+.synthesis-legend {
+  margin-top: 3mm;
+  font-size: 8pt;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ── Annexe BACS ────────────────────────────────────────────────── */
+.bacs-annex { page-break-before: always; }
+.bacs-annex-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16pt;
+  font-weight: 700;
+  color: #1b2842;
+  margin: 0 0 4mm;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid #1b2842;
+}
+.bacs-annex-intro {
+  font-size: 9pt;
+  color: #6b7280;
+  font-style: italic;
+  margin-bottom: 6mm;
+  line-height: 1.5;
+}
+.bacs-article {
+  margin-bottom: 6mm;
+  page-break-inside: avoid;
+}
+.bacs-article-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11pt;
+  font-weight: 600;
+  color: #1b2842;
+  margin: 0 0 2mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #e5e7eb;
+}
+.bacs-article-code {
+  display: inline-block;
+  font-family: "SFMono-Regular", Menlo, monospace;
+  background: #1b2842;
+  color: white;
+  font-size: 8.5pt;
+  font-weight: 700;
+  padding: 0.5mm 2mm;
+  border-radius: 1mm;
+  margin-right: 3mm;
+  vertical-align: middle;
+}
+.bacs-article-name { vertical-align: middle; }
+.bacs-article-summary {
+  font-size: 9.5pt;
+  color: #1f2937;
+  margin: 1mm 0 2mm;
+  line-height: 1.5;
+}
+.bacs-article-sections {
+  margin: 1.5mm 0 0 5mm;
+  padding: 0;
+  font-size: 9pt;
+  color: #374151;
+}
+.bacs-article-sections li { margin: 0.6mm 0; }
+.bacs-article-sections strong {
+  font-family: "SFMono-Regular", Menlo, monospace;
+  color: #6d28d9;
+  font-weight: 600;
+}

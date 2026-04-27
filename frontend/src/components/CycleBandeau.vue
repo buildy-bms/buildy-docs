@@ -20,6 +20,7 @@ const submitting = ref(false)
 const showExport = ref(false)
 const exportKind = ref('points-list') // 'points-list' | 'af'
 const exportMotif = ref('')
+const exportIncludeBacs = ref(false)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
 
@@ -47,6 +48,7 @@ function prepareInspection() {
 function openExport(kind) {
   exportKind.value = kind
   exportMotif.value = ''
+  exportIncludeBacs.value = false
   lastExportId.value = null
   lastExportInfo.value = null
   showExport.value = true
@@ -57,7 +59,9 @@ async function submitExport() {
   submitting.value = true
   try {
     const fn = exportKind.value === 'af' ? exportAf : exportPointsList
-    const { data } = await fn(props.af.id, { motif: exportMotif.value.trim() })
+    const payload = { motif: exportMotif.value.trim() }
+    if (exportKind.value === 'af') payload.includeBacsAnnex = exportIncludeBacs.value
+    const { data } = await fn(props.af.id, payload)
     if (exportKind.value === 'af') {
       success(`PDF AF généré : ${data.version} — ${data.sections_total} sections (${(data.file_size_bytes / 1024).toFixed(0)} KB) — Niveau requis : ${data.service_level?.label || '—'}`)
     } else {
@@ -156,6 +160,22 @@ const exportDescription = computed(() => exportKind.value === 'af'
         <p class="text-[11px] text-gray-400 mt-1">
           Apparaîtra sur la page de garde du PDF + dans l'historique des exports.
         </p>
+      </div>
+
+      <!-- Option Annexe BACS, uniquement pour AF -->
+      <div v-if="exportKind === 'af'" class="flex items-start gap-2 pt-2 border-t border-gray-100">
+        <input
+          v-model="exportIncludeBacs"
+          type="checkbox"
+          id="bacs-annex"
+          class="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        <label for="bacs-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
+          Inclure l'<strong>annexe Décret BACS</strong> (R175-1 à R175-6)
+          <span class="block text-[11px] text-gray-400 mt-0.5">
+            Ajoute en fin de document les articles complets pour référence.
+          </span>
+        </label>
       </div>
       <div v-if="lastExportId" class="p-3 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
         <p>✓ PDF généré et téléchargé. Si le téléchargement n'a pas démarré,
