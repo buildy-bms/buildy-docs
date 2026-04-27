@@ -82,9 +82,10 @@ async function main() {
     root: attachmentsRoot,
     prefix: '/attachments/',
     decorateReply: false, // 2nd enregistrement
-    wildcard: false,
-    // Force Content-Type explicite par extension (au cas ou le mime-db
-    // par defaut ne renvoie pas le bon header pour certaines extensions).
+    // wildcard: true (defaut) : sert dynamiquement TOUT fichier sous root/.
+    // NE PAS metttre wildcard: false ici car ca pre-scan le dossier au boot
+    // et les uploads ulterieurs renvoient 404 jusqu'au prochain restart PM2
+    // (cf. memoire feedback_deploy_static_restart pour le meme bug sur BT/FM).
     setHeaders: (res, filePath) => {
       const ext = path.extname(filePath).toLowerCase();
       const map = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
