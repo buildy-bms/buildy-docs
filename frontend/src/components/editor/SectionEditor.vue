@@ -170,8 +170,8 @@ function setLink() {
         class="flex-1 min-w-0 text-base font-semibold text-gray-800 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
       />
       <ServiceLevelBadge :level="section.service_level" />
-      <span v-if="section.bacs_articles" class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap" :title="`Décret BACS — ${section.bacs_articles}`">
-        ⚖️ {{ section.bacs_articles }}
+      <span v-if="section.bacs_articles" class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap" :title="`Fonctionnalité exigée par le décret BACS — ${section.bacs_articles}`">
+        ⚖️ Exigé par le décret BACS · {{ section.bacs_articles }}
       </span>
       <AutosaveStatus
         :state="globalState"
@@ -217,7 +217,8 @@ function setLink() {
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Lien"><LinkIcon class="w-4 h-4" /></button>
       <span class="flex-1"></span>
-      <button @click="openClaude"
+      <!-- Bouton Claude masqué temporairement (Lot 14.1) — code conservé, à réactiver plus tard -->
+      <button v-if="false" @click="openClaude"
               class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-linear-to-r from-violet-600 to-indigo-600 text-white rounded hover:from-violet-700 hover:to-indigo-700"
               title="Rédiger avec Claude">
         <SparklesIcon class="w-3.5 h-3.5" /> Claude

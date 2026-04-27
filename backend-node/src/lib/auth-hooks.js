@@ -82,6 +82,22 @@ function registerAuthHook(fastify) {
 
     request.authUser = decoded;
     db.users.touchLastSeen(decoded.id);
+
+    // Sliding session : ré-émet le token + cookie quand il reste moins de la
+    // moitié du TTL. Évite que l'utilisateur soit déconnecté en plein boulot.
+    const now = Math.floor(Date.now() / 1000);
+    const remaining = (decoded.exp || 0) - now;
+    if (remaining > 0 && remaining < config.accessTokenMaxAge / 2) {
+      const newToken = fastify.jwt.sign(
+        { id: decoded.id, email: decoded.email, jti: decoded.jti },
+        { expiresIn: config.accessTokenMaxAge }
+      );
+      reply.setCookie('af_token', newToken, cookieOpts(config.accessTokenMaxAge));
+      if (decoded.jti) {
+        const newExpiresAt = new Date(Date.now() + config.accessTokenMaxAge * 1000).toISOString();
+        db.sessions.extendByJti?.(decoded.jti, newExpiresAt);
+      }
+    }
   });
 }
 

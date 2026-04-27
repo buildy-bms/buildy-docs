@@ -5,6 +5,14 @@ import { getAf, listSections, getSection } from '@/api'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
 import ActivityPanel from '@/components/ActivityPanel.vue'
+import { useResizable } from '@/composables/useResizable'
+
+const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
+  storageKey: 'af-tree-width',
+  defaultWidth: 320,
+  minWidth: 220,
+  maxWidth: 720,
+})
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -96,8 +104,11 @@ watch(() => route.params.id, async () => {
 
     <!-- Layout split : arbre 320px + éditeur flex -->
     <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4">
-      <!-- Sidebar arbre des sections -->
-      <aside class="w-80 shrink-0 bg-white rounded-none border border-gray-200 overflow-y-auto">
+      <!-- Sidebar arbre des sections (redimensionnable) -->
+      <aside
+        :style="{ width: treeWidth + 'px' }"
+        class="shrink-0 bg-white rounded-none border border-gray-200 overflow-y-auto relative"
+      >
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
             Sections ({{ sections.length }})
@@ -112,6 +123,12 @@ watch(() => route.params.id, async () => {
         <div class="p-2">
           <SectionTree :sections="sections" :selected-id="selectedId" @select="selectSection" />
         </div>
+        <!-- Poignée de drag-resize -->
+        <div
+          @mousedown="onTreeResize"
+          class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-indigo-300 transition-colors z-20"
+          title="Glisser pour redimensionner"
+        ></div>
       </aside>
 
       <!-- Éditeur principal (scrollable) -->

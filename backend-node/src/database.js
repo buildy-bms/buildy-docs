@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 6;
+const TARGET_VERSION = 7;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -341,6 +341,24 @@ function runMigrations() {
     log.info('Migration 6 appliquee : backfill FTS5');
   }
 
+  if (current < 7) {
+    // Lot 14.3 — retire le disclaimer générique de la description du template CTA
+    // (désormais affiché une seule fois en page de garde du PDF AF, pas dans chaque section).
+    const FRAGMENT_RE = /<p><em>Les données listées ci-dessous sont indicatives.*?ne seraient pas mises à disposition par l'équipement\.<\/em><\/p>\s*/s;
+    const tpls = db.prepare('SELECT id, description_html FROM equipment_templates WHERE description_html IS NOT NULL').all();
+    let cleaned = 0;
+    for (const t of tpls) {
+      if (FRAGMENT_RE.test(t.description_html)) {
+        const newHtml = t.description_html.replace(FRAGMENT_RE, '').trim();
+        db.prepare('UPDATE equipment_templates SET description_html = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newHtml, t.id);
+        cleaned++;
+      }
+    }
+    if (cleaned > 0) log.info(`Migration 7 : disclaimer générique retiré de ${cleaned} template(s)`);
+    db.pragma('user_version = 7');
+    log.info('Migration 7 appliquee : nettoyage disclaimer CTA');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -405,6 +423,12 @@ const sessions = {
   },
   revokeByJti(jti) {
     db.prepare('UPDATE sessions SET is_revoked = 1 WHERE jti = ?').run(jti);
+  },
+  extendByJti(jti, newExpiresAt) {
+    db.prepare(`
+      UPDATE sessions SET expires_at = ?, last_activity_at = CURRENT_TIMESTAMP
+      WHERE jti = ?
+    `).run(newExpiresAt, jti);
   },
   deleteExpired() {
     db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();

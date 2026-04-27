@@ -117,7 +117,7 @@ onMounted(refresh)
             · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
           </p>
           <p v-if="selected.bacs_articles" class="text-xs text-gray-600 mt-2">
-            ⚖️ Décret BACS : {{ selected.bacs_articles }}
+            ⚖️ Fonctionnalité exigée par le décret BACS — {{ selected.bacs_articles }}
           </p>
         </div>
       </div>

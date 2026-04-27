@@ -414,7 +414,7 @@ async function routes(fastify) {
             service_level_label: formatLevelFull(sl), // libelle complet
             badgeClass: badgeClass || 'ESP',
             bacs_articles: s.bacs_articles,
-            bacs_articles_label: s.bacs_articles ? `Décret BACS ${s.bacs_articles}` : null,
+            bacs_articles_label: s.bacs_articles ? `Exigé par le décret BACS · ${s.bacs_articles}` : null,
             synthesis_table_html: synthesisHtml,
             body_html: s.body_html,
             generic_note: s.generic_note,

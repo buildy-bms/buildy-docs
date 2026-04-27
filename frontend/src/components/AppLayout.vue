@@ -70,9 +70,9 @@ async function logout() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         ]"
       >
-        <div class="hidden lg:flex flex-col items-center py-4 px-4 border-b border-white/10 shrink-0">
-          <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-8" />
-          <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.2em]">Analyse Fonctionnelle</span>
+        <div class="hidden lg:flex flex-col items-center justify-center py-4 px-4 border-b border-white/10 shrink-0 text-center">
+          <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-8 mx-auto" />
+          <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.18em] text-center block">Analyses Fonctionnelles</span>
         </div>
 
         <div class="px-2.5 mt-3">

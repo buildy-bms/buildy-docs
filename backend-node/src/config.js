@@ -18,7 +18,7 @@ const config = Object.freeze({
 
   // Auth
   jwtSecret: process.env.JWT_SECRET || 'buildy-af-secret-change-me',
-  accessTokenMaxAge: parseInt(process.env.ACCESS_TOKEN_MAX_AGE || '900', 10), // 15 min
+  accessTokenMaxAge: parseInt(process.env.ACCESS_TOKEN_MAX_AGE || '28800', 10), // 8 h (sliding)
   refreshTokenMaxAge: parseInt(process.env.REFRESH_TOKEN_MAX_AGE || '604800', 10), // 7 days
   // Mode dev : injecte un user fictif sans passer par PocketID. Inactif en prod.
   devBypassAuth: process.env.DEV_BYPASS_AUTH === '1' && process.env.NODE_ENV !== 'production',

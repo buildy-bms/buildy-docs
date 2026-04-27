@@ -25,6 +25,18 @@ const empty = computed(() => props.isEmpty(props.node))
 const indentStyle = computed(() => ({
   paddingLeft: `${0.5 + props.level * 0.75}rem`,
 }))
+
+// Lot 14.6 : font weight + couleur différenciés par niveau de profondeur
+const levelClasses = computed(() => {
+  if (props.level === 0) return 'font-bold text-gray-900'
+  if (props.level === 1) return 'font-semibold text-gray-700'
+  return 'font-normal text-gray-600'
+})
+const numberClasses = computed(() => {
+  if (props.level === 0) return 'text-gray-700 font-bold'
+  if (props.level === 1) return 'text-gray-500 font-semibold'
+  return 'text-gray-400 font-medium'
+})
 </script>
 
 <template>
@@ -50,11 +62,11 @@ const indentStyle = computed(() => ({
 
       <component :is="Icon" :class="['w-3.5 h-3.5 shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
 
-      <span v-if="node.number" :class="['text-[11px] font-medium shrink-0', isSelected ? 'text-indigo-700' : 'text-gray-500']">
+      <span v-if="node.number" :class="['text-[11px] shrink-0', isSelected ? 'text-indigo-700 font-bold' : numberClasses]">
         {{ node.number }}
       </span>
 
-      <span class="flex-1 min-w-0 truncate text-[13px]">{{ node.title }}</span>
+      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses]">{{ node.title }}</span>
 
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
 
