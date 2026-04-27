@@ -101,8 +101,9 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {} }
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
-    // Force backgrounds + couleurs en print
+    // 'load' suffit car on n'a pas de fetch externe (tout est en data URL).
+    // Timeout 90s pour les gros PDF avec beaucoup de captures embed.
+    await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
     await page.emulateMediaType('print');
 
     const dir = path.dirname(outputPath);
