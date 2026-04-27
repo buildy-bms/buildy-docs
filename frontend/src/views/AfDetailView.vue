@@ -1,112 +1,148 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  ArrowLeftIcon,
-  MapPinIcon,
-  UserCircleIcon,
-  ClockIcon,
-  DocumentTextIcon,
-  RectangleStackIcon,
-  GlobeAltIcon,
-  ChartBarSquareIcon,
-} from '@heroicons/vue/24/outline'
-import { getAf, listSections } from '@/api'
-import StatusBadge from '@/components/StatusBadge.vue'
-import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+import { getAf, listSections, getSection } from '@/api'
+import CycleBandeau from '@/components/CycleBandeau.vue'
+import SectionTree from '@/components/editor/SectionTree.vue'
+import SectionEditor from '@/components/editor/SectionEditor.vue'
+import PointsTable from '@/components/editor/PointsTable.vue'
+import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable.vue'
 
 const route = useRoute()
 const router = useRouter()
 const af = ref(null)
 const sections = ref([])
+const selectedSection = ref(null)
+const selectedId = ref(null)
 const loading = ref(true)
 
-const counts = computed(() => {
+const sectionsCountByKind = computed(() => {
   const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
   for (const s of sections.value) c[s.kind] = (c[s.kind] || 0) + 1
   return c
 })
 
+async function refreshAf() {
+  af.value = (await getAf(route.params.id)).data
+}
+
+async function refreshSections() {
+  sections.value = (await listSections(route.params.id)).data
+  // Si rien de sélectionné encore, prendre la 1ère section root
+  if (!selectedId.value && sections.value.length) {
+    selectSection(sections.value[0].id)
+  }
+}
+
+async function selectSection(id) {
+  selectedId.value = id
+  const { data } = await getSection(id)
+  selectedSection.value = data
+}
+
+function onSectionUpdated(updated) {
+  // Mettre à jour la liste plate (titre, body_html, service_level, etc.)
+  const idx = sections.value.findIndex(s => s.id === updated.id)
+  if (idx !== -1) {
+    sections.value[idx] = { ...sections.value[idx], ...updated }
+  }
+  // Garder selectedSection en sync
+  if (selectedSection.value?.id === updated.id) {
+    selectedSection.value = { ...selectedSection.value, ...updated }
+  }
+}
+
+function onAfUpdated(updated) {
+  af.value = { ...af.value, ...updated }
+}
+
 onMounted(async () => {
+  loading.value = true
   try {
-    const id = route.params.id
-    const [a, s] = await Promise.all([getAf(id), listSections(id)])
-    af.value = a.data
-    sections.value = s.data
+    await Promise.all([refreshAf(), refreshSections()])
   } finally {
     loading.value = false
   }
 })
 
-function formatDate(s) {
-  if (!s) return '—'
-  return new Date(s.replace(' ', 'T')).toLocaleString('fr-FR')
-}
+watch(() => route.params.id, async () => {
+  selectedId.value = null
+  selectedSection.value = null
+  loading.value = true
+  try {
+    await Promise.all([refreshAf(), refreshSections()])
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto">
-    <button @click="router.push('/')" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4">
-      <ArrowLeftIcon class="w-4 h-4" /> Retour aux AFs
-    </button>
+  <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
+  <div v-else-if="af" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
+    <!-- Bandeau cycle de vie (en haut, full-width) -->
+    <div class="px-5 lg:px-6 pt-4">
+      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" />
+    </div>
 
-    <template v-else-if="af">
-      <!-- Header -->
-      <div class="flex items-start justify-between mb-6">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold text-gray-800 truncate">{{ af.client_name }}</h1>
-          <p class="text-base text-gray-700 mt-1">{{ af.project_name }}</p>
-          <div v-if="af.site_address" class="flex items-center gap-1.5 text-sm text-gray-500 mt-2">
-            <MapPinIcon class="w-4 h-4" /> {{ af.site_address }}
+    <!-- Layout split : arbre 320px + éditeur flex -->
+    <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4">
+      <!-- Sidebar arbre des sections -->
+      <aside class="w-80 flex-shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
+        <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Sections ({{ sections.length }})
+          </h3>
+          <p class="text-[11px] text-gray-400 mt-0.5">
+            {{ sectionsCountByKind.standard }} texte ·
+            {{ sectionsCountByKind.equipment }} équip. ·
+            {{ sectionsCountByKind.hyperveez_page }} Hyperveez ·
+            {{ sectionsCountByKind.synthesis }} synth.
+          </p>
+        </div>
+        <div class="p-2">
+          <SectionTree :sections="sections" :selected-id="selectedId" @select="selectSection" />
+        </div>
+      </aside>
+
+      <!-- Éditeur principal (scrollable) -->
+      <div class="flex-1 min-w-0 overflow-y-auto pr-1 space-y-4">
+        <template v-if="selectedSection">
+          <SectionEditor
+            :key="selectedSection.id"
+            :section="selectedSection"
+            @updated="onSectionUpdated"
+          />
+
+          <!-- Pour kind='equipment' : tableaux points + instances -->
+          <template v-if="selectedSection.kind === 'equipment'">
+            <PointsTable :section-id="selectedSection.id" />
+            <EquipmentInstancesTable :section-id="selectedSection.id" />
+          </template>
+
+          <!-- Pour kind='hyperveez_page' : info de la page Hyperveez -->
+          <div v-else-if="selectedSection.kind === 'hyperveez_page' && selectedSection.hyperveez_page_slug" class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <p class="font-semibold mb-1">📖 Page Hyperveez : <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs">{{ selectedSection.hyperveez_page_slug }}</code></p>
+            <p class="text-xs text-blue-800">
+              Cette section décrit une page réelle de l'UI Hyperveez. La description est pré-remplie depuis le code Hyperveez.
+              Tu peux la peaufiner pour le contexte du projet.
+            </p>
           </div>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <ServiceLevelBadge :level="af.service_level" />
-          <StatusBadge :status="af.status" />
-        </div>
-      </div>
 
-      <!-- Meta -->
-      <div class="flex items-center gap-4 text-xs text-gray-500 mb-6 pb-4 border-b border-gray-200">
-        <span class="inline-flex items-center gap-1">
-          <UserCircleIcon class="w-3.5 h-3.5" /> Créée par {{ af.created_by_name || 'Inconnu' }}
-        </span>
-        <span class="inline-flex items-center gap-1">
-          <ClockIcon class="w-3.5 h-3.5" /> Modifiée le {{ formatDate(af.updated_at) }}
-          {{ af.updated_by_name ? ` par ${af.updated_by_name}` : '' }}
-        </span>
-      </div>
-
-      <!-- Sections summary cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="flex items-center gap-2 text-xs text-gray-500"><DocumentTextIcon class="w-4 h-4" /> Sections texte</div>
-          <p class="text-2xl font-semibold text-gray-800 mt-1">{{ counts.standard }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="flex items-center gap-2 text-xs text-gray-500"><RectangleStackIcon class="w-4 h-4" /> Équipements</div>
-          <p class="text-2xl font-semibold text-gray-800 mt-1">{{ counts.equipment }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="flex items-center gap-2 text-xs text-gray-500"><GlobeAltIcon class="w-4 h-4" /> Pages Hyperveez</div>
-          <p class="text-2xl font-semibold text-gray-800 mt-1">{{ counts.hyperveez_page }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="flex items-center gap-2 text-xs text-gray-500"><ChartBarSquareIcon class="w-4 h-4" /> Synthèse</div>
-          <p class="text-2xl font-semibold text-gray-800 mt-1">{{ counts.synthesis }}</p>
+          <!-- Pour kind='synthesis' : note auto-generation -->
+          <div v-else-if="selectedSection.kind === 'synthesis'" class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+            <p class="font-semibold mb-1">📊 Tableau de synthèse</p>
+            <p class="text-xs text-amber-800">
+              Ce tableau matriciel sera auto-généré à l'export PDF (Lot 6) depuis le contenu des chapitres précédents.
+              Tu peux ajuster la note d'introduction si besoin.
+            </p>
+          </div>
+        </template>
+        <div v-else class="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
+          Sélectionne une section dans l'arbre à gauche pour commencer.
         </div>
       </div>
-
-      <!-- Placeholder éditeur -->
-      <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <p class="text-sm text-gray-500 max-w-md mx-auto">
-          L'éditeur de sections (arborescence + Tiptap + tableau de points résolus + instances)
-          arrive au <strong>Lot 3</strong>. La structure des {{ af.sections_count }} sections seedées
-          est déjà en place dans la base.
-        </p>
-      </div>
-    </template>
+    </div>
   </div>
 </template>

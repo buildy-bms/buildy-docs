@@ -434,6 +434,7 @@ const afs = {
     const allowed = ['client_name', 'project_name', 'site_address', 'service_level', 'status', 'delivered_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
       const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
       if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
     }
@@ -494,6 +495,7 @@ const sections = {
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;          // skip clés non fournies (PATCH partiel)
       const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
       if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
     }
