@@ -521,6 +521,43 @@ const sections = {
   },
 };
 
+// ── Attachments ──────────────────────────────────────────────────────
+const attachments = {
+  listBySection(sectionId) {
+    return db.prepare(`
+      SELECT a.*, u.display_name AS uploaded_by_name
+      FROM attachments a
+      LEFT JOIN users u ON u.id = a.uploaded_by
+      WHERE section_id = ?
+      ORDER BY position, id
+    `).all(sectionId);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM attachments WHERE id = ?').get(id);
+  },
+  create(sectionId, { filename, originalName, caption, position, width, height, uploadedBy }) {
+    const result = db.prepare(`
+      INSERT INTO attachments
+        (section_id, filename, original_name, caption, position, width, height, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(sectionId, filename, originalName || null, caption || null, position || 0,
+            width || null, height || null, uploadedBy || null);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, { caption, position }) {
+    const sets = [], params = [];
+    if (caption !== undefined) { sets.push('caption = ?'); params.push(caption); }
+    if (position !== undefined) { sets.push('position = ?'); params.push(position); }
+    if (!sets.length) return this.getById(id);
+    params.push(id);
+    db.prepare(`UPDATE attachments SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return this.getById(id);
+  },
+  delete(id) {
+    db.prepare('DELETE FROM attachments WHERE id = ?').run(id);
+  },
+};
+
 // ── Section point overrides ──────────────────────────────────────────
 const sectionPointOverrides = {
   listBySection(sectionId) {
@@ -614,6 +651,7 @@ module.exports = {
   equipmentTemplatePoints,
   sectionPointOverrides,
   equipmentInstances,
+  attachments,
   afs,
   sections,
   auditLog,

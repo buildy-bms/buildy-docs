@@ -44,6 +44,21 @@ export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instan
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
 
+// ── Attachments ──
+export const listSectionAttachments = (id) => api.get(`/sections/${id}/attachments`)
+export const uploadSectionAttachment = (id, file, onProgress) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post(`/sections/${id}/attachments`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
+  })
+}
+export const updateAttachment = (id, data) => api.patch(`/attachments/${id}`, data)
+export const reorderAttachments = (sectionId, order) =>
+  api.post(`/sections/${sectionId}/attachments/reorder`, { order })
+export const deleteAttachment = (id) => api.delete(`/attachments/${id}`)
+
 // ── Equipment templates (bibliothèque) ──
 export const listEquipmentTemplates = (params) => api.get('/equipment-templates', { params })
 export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`)

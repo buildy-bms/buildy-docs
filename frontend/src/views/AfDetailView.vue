@@ -7,6 +7,7 @@ import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
 import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable.vue'
+import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,6 +121,13 @@ watch(() => route.params.id, async () => {
             <PointsTable :section-id="selectedSection.id" />
             <EquipmentInstancesTable :section-id="selectedSection.id" />
           </template>
+
+          <!-- Captures (toutes sections sauf synthesis qui est auto-généré) -->
+          <AttachmentsGrid
+            v-if="selectedSection.kind !== 'synthesis'"
+            :section-id="selectedSection.id"
+            :af-id="af.id"
+          />
 
           <!-- Pour kind='hyperveez_page' : info de la page Hyperveez -->
           <div v-else-if="selectedSection.kind === 'hyperveez_page' && selectedSection.hyperveez_page_slug" class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">

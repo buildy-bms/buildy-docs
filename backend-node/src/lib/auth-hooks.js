@@ -50,7 +50,11 @@ function registerAuthHook(fastify) {
       url === '/api/auth/logout'
     ) return;
 
-    if (!url.startsWith('/api/')) return;
+    // Protege /api/* ET /attachments/* (les captures sont sensibles meme avec
+    // des filenames UUID).
+    const isApi = url.startsWith('/api/');
+    const isAttachment = url.startsWith('/attachments/');
+    if (!isApi && !isAttachment) return;
 
     // DEV bypass : injecte un user fictif sans cookie
     if (config.devBypassAuth) {

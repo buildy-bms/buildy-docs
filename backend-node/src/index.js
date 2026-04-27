@@ -33,6 +33,9 @@ async function main() {
 
   await fastify.register(require('@fastify/cookie'));
   await fastify.register(require('@fastify/jwt'), { secret: config.jwtSecret });
+  await fastify.register(require('@fastify/multipart'), {
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 }, // 10 MB / fichier
+  });
 
   await fastify.register(require('@fastify/cors'), {
     origin: (origin, cb) => {
@@ -69,6 +72,18 @@ async function main() {
   await fastify.register(require('./routes/afs'), { prefix: '/api' });
   await fastify.register(require('./routes/sections'), { prefix: '/api' });
   await fastify.register(require('./routes/equipment-templates'), { prefix: '/api' });
+  await fastify.register(require('./routes/attachments'), { prefix: '/api' });
+
+  // Sert les captures uploadees sous /attachments/<af-id>/<uuid>.png
+  // (auth verifiee par le hook global qui couvre /attachments/*).
+  const attachmentsRoot = path.resolve(config.attachmentsDir);
+  if (!fs.existsSync(attachmentsRoot)) fs.mkdirSync(attachmentsRoot, { recursive: true });
+  await fastify.register(require('@fastify/static'), {
+    root: attachmentsRoot,
+    prefix: '/attachments/',
+    decorateReply: false, // 2nd enregistrement
+    wildcard: false,
+  });
 
   // Sert le frontend Vue build (production uniquement)
   const frontendDist = path.resolve(__dirname, '../../frontend/dist');
