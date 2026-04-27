@@ -101,10 +101,12 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {} }
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    // 'load' suffit car on n'a pas de fetch externe (tout est en data URL).
+    // 'networkidle2' attend que les fetch externes (Google Fonts) finissent.
     // Timeout 90s pour les gros PDF avec beaucoup de captures embed.
-    await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
+    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 90_000 });
     await page.emulateMediaType('print');
+    // Petit delay pour s'assurer que les fonts WOFF2 sont chargees + parsees
+    await new Promise(r => setTimeout(r, 300));
 
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

@@ -1,6 +1,9 @@
 /* ──────────────────────────────────────────────────────────────────
    Analyse Fonctionnelle — A4 portrait — DOE Buildy
+   Polices : Poppins (titres) / Manrope (corps) — embed via Google Fonts
    ────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
 
 @page {
   size: A4 portrait;
@@ -11,8 +14,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 10.5pt;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 9.5pt;
   color: #1f2937;
   line-height: 1.55;
   -webkit-print-color-adjust: exact;
@@ -20,7 +23,18 @@ html, body {
 }
 
 a { color: inherit; text-decoration: none; }
-code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 9pt; background: #f1f3f6; padding: 0.2mm 1mm; border-radius: 0.5mm; }
+code {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8.5pt;
+  background: #f1f3f6;
+  padding: 0.2mm 1mm;
+  border-radius: 0.5mm;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Poppins', -apple-system, sans-serif;
+  font-weight: 600;
+}
 
 /* ── Page de garde ───────────────────────────────────────────────── */
 .cover {
@@ -36,24 +50,27 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
 }
 .cover-logo { width: 50mm; margin-bottom: 24mm; filter: brightness(0) invert(1); }
 .cover-doc-type {
-  font-size: 10pt;
+  font-family: 'Manrope', sans-serif;
+  font-size: 9pt;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.28em;
   color: rgba(255, 255, 255, 0.5);
   margin-bottom: 10mm;
 }
 .cover-title {
-  font-size: 28pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 30pt;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.1;
   margin: 0 0 12mm;
   color: white;
+  letter-spacing: -0.01em;
 }
-.cover-client { font-size: 16pt; font-weight: 500; margin-bottom: 3mm; color: rgba(255, 255, 255, 0.9); }
-.cover-project { font-size: 13pt; margin-bottom: 5mm; color: rgba(255, 255, 255, 0.7); }
-.cover-address { font-size: 10pt; color: rgba(255, 255, 255, 0.55); }
+.cover-client { font-size: 15pt; font-weight: 500; margin-bottom: 3mm; color: rgba(255, 255, 255, 0.92); }
+.cover-project { font-size: 12pt; margin-bottom: 5mm; color: rgba(255, 255, 255, 0.7); }
+.cover-address { font-size: 9.5pt; color: rgba(255, 255, 255, 0.55); }
 
-/* Encart Niveau service requis */
 .cover-service-level {
   margin-top: 14mm;
   padding: 6mm 8mm;
@@ -61,21 +78,23 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
   border-left: 3px solid #00cd92;
 }
 .cover-service-level-label {
-  font-size: 8.5pt;
+  font-size: 8pt;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   color: rgba(255, 255, 255, 0.55);
   margin-bottom: 2mm;
 }
 .cover-service-level-value {
-  font-size: 22pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 24pt;
   font-weight: 700;
   color: #00cd92;
   margin: 0;
 }
 .cover-service-level-justif {
   margin-top: 3mm;
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 }
@@ -90,17 +109,18 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
 }
 .cover-meta-row { display: flex; flex-direction: column; }
 .cover-meta-label {
-  font-size: 7.5pt;
+  font-size: 7pt;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   color: rgba(255, 255, 255, 0.4);
   margin-bottom: 1.5mm;
 }
-.cover-meta-value { font-size: 10.5pt; color: white; font-weight: 500; }
+.cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
 .cover-version-tag {
   display: inline-block;
   font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 9.5pt;
+  font-size: 9pt;
   background: #00cd92;
   color: #051428;
   padding: 1mm 3mm;
@@ -109,57 +129,83 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
 }
 .cover-motif {
   margin-top: 3mm;
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: rgba(255, 255, 255, 0.6);
   font-style: italic;
 }
 
-/* ── Sommaire ────────────────────────────────────────────────────── */
+/* ── Sommaire (compact) ──────────────────────────────────────────── */
 .toc { page-break-after: always; }
-.toc h1 { font-size: 20pt; font-weight: 700; margin: 0 0 8mm; color: #1b2842; }
+.toc h1 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18pt;
+  font-weight: 700;
+  margin: 0 0 6mm;
+  color: #1b2842;
+  letter-spacing: -0.01em;
+}
 .toc-list { list-style: none; padding: 0; margin: 0; }
 .toc-row {
   display: flex;
   align-items: baseline;
-  padding: 1.5mm 0;
-  border-bottom: 1px dotted #e5e7eb;
-  font-size: 10.5pt;
+  padding: 0.8mm 0;
+  font-size: 9.5pt;
+  line-height: 1.35;
 }
-.toc-row.lvl-1 { font-weight: 600; color: #1b2842; padding-top: 4mm; padding-bottom: 2mm; border-bottom: 1px solid #d1d5db; }
-.toc-row.lvl-2 { padding-left: 6mm; color: #374151; }
-.toc-row.lvl-3 { padding-left: 12mm; color: #4b5563; font-size: 10pt; }
-.toc-row.lvl-4 { padding-left: 18mm; color: #6b7280; font-size: 9.5pt; }
-.toc-num { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-weight: 600; min-width: 14mm; }
+.toc-row.lvl-1 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  color: #1b2842;
+  margin-top: 2mm;
+  padding-top: 1.5mm;
+  padding-bottom: 1.2mm;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 10pt;
+}
+.toc-row.lvl-1:first-child { margin-top: 0; }
+.toc-row.lvl-2 { padding-left: 5mm; color: #374151; font-weight: 500; }
+.toc-row.lvl-3 { padding-left: 10mm; color: #6b7280; font-size: 9pt; }
+.toc-row.lvl-4 { padding-left: 15mm; color: #9ca3af; font-size: 8.5pt; }
+.toc-num {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  min-width: 14mm;
+  font-weight: 500;
+  color: #9ca3af;
+}
+.toc-row.lvl-1 .toc-num { color: #1b2842; font-weight: 600; }
 .toc-title { flex: 1; }
 
 /* ── Sections AF ─────────────────────────────────────────────────── */
-.sections { /* container global */ }
+.sections { /* container */ }
 
 .section {
-  margin-bottom: 8mm;
-  page-break-inside: auto;
+  margin-bottom: 6mm;
 }
 .section h1, .section h2, .section h3, .section h4 {
-  margin: 0 0 3mm;
+  margin: 0 0 2mm;
   color: #1b2842;
-  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .section h1 {
-  font-size: 18pt;
+  font-size: 16pt;
+  font-weight: 700;
   padding-bottom: 2mm;
   border-bottom: 2px solid #1b2842;
-  margin-top: 8mm;
+  margin-top: 6mm;
   page-break-before: always;
+  page-break-after: avoid;
 }
 .section h1:first-of-type { page-break-before: avoid; }
 .section h2 {
-  font-size: 14pt;
+  font-size: 12.5pt;
+  font-weight: 600;
   padding-bottom: 1.5mm;
-  border-bottom: 1px solid #d1d5db;
-  margin-top: 6mm;
+  border-bottom: 1px solid #e5e7eb;
+  margin-top: 5mm;
+  page-break-after: avoid;
 }
-.section h3 { font-size: 12pt; margin-top: 4mm; }
-.section h4 { font-size: 11pt; color: #374151; margin-top: 3mm; }
+.section h3 { font-size: 11pt; font-weight: 600; margin-top: 3.5mm; page-break-after: avoid; }
+.section h4 { font-size: 10pt; font-weight: 600; color: #374151; margin-top: 2.5mm; page-break-after: avoid; }
 
 .section-num {
   font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
@@ -167,15 +213,18 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
   color: #6b7280;
   font-weight: 500;
 }
-.section-badges { display: inline-flex; gap: 2mm; align-items: center; margin-left: 3mm; vertical-align: middle; }
+.section h1 .section-num { color: #94a3b8; }
+
+.section-badges { display: inline-flex; gap: 2mm; align-items: center; margin-left: 3mm; vertical-align: middle; font-family: 'Manrope', sans-serif; }
 .badge-level {
   display: inline-block;
-  font-size: 7.5pt;
+  font-size: 7pt;
   font-weight: 700;
-  padding: 0.5mm 2mm;
+  padding: 0.6mm 2mm;
   border: 1px solid;
   border-radius: 1mm;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 .badge-level.E   { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
 .badge-level.S   { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
@@ -184,67 +233,79 @@ code { font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; 
 .badge-level.SP  { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
 .badge-bacs {
   display: inline-block;
-  font-size: 7.5pt;
+  font-size: 7pt;
   color: #6d28d9;
   background: #f5f3ff;
   border: 1px solid #ddd6fe;
-  padding: 0.5mm 2mm;
+  padding: 0.6mm 2mm;
   border-radius: 1mm;
+  font-weight: 600;
 }
 
 .section-body {
-  font-size: 10.5pt;
+  font-size: 9.5pt;
   color: #1f2937;
-  margin-top: 2mm;
+  margin-top: 1.5mm;
+  line-height: 1.6;
 }
-.section-body p { margin: 1.5mm 0; }
-.section-body ul, .section-body ol { margin: 2mm 0 2mm 6mm; padding: 0; }
-.section-body li { margin: 0.8mm 0; }
+.section-body p { margin: 1.2mm 0; }
+.section-body ul, .section-body ol { margin: 1.5mm 0 1.5mm 5mm; padding: 0; }
+.section-body li { margin: 0.6mm 0; }
+.section-body strong { color: #111827; font-weight: 600; }
 .section-body blockquote {
   border-left: 3px solid #d1d5db;
-  margin: 3mm 0;
-  padding: 1mm 4mm;
+  margin: 2.5mm 0;
+  padding: 0.5mm 4mm;
   color: #6b7280;
   font-style: italic;
 }
 .section-body em.placeholder { color: #cbd5e1; font-style: italic; }
 
-/* Tableau de points pour les sections kind=equipment */
+/* Tableaux Données lues / écrites — plus aérés */
 .points-block { margin-top: 4mm; page-break-inside: avoid; }
 .points-block-title {
-  font-size: 9pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 8.5pt;
   font-weight: 600;
-  color: #6b7280;
+  color: #1b2842;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   margin-bottom: 2mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #e5e7eb;
 }
 table.points-mini {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5pt;
-}
-table.points-mini th, table.points-mini td {
-  text-align: left;
-  padding: 1.5mm 3mm;
-  border-bottom: 1px solid #e8ebf0;
-  vertical-align: top;
+  font-size: 9pt;
 }
 table.points-mini th {
-  background: #f1f3f6;
-  font-size: 7.5pt;
-  font-weight: 600;
-  color: #6b7280;
+  text-align: left;
+  padding: 1.8mm 3mm;
+  background: #fafbfc;
+  border-bottom: 1.5px solid #1b2842;
+  font-family: 'Manrope', sans-serif;
+  font-size: 7pt;
+  font-weight: 700;
+  color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
+table.points-mini td {
+  padding: 2mm 3mm;
+  border-bottom: 1px solid #f1f3f6;
+  vertical-align: middle;
+}
+table.points-mini tr:last-child td { border-bottom: none; }
+table.points-mini td:first-child { font-weight: 500; color: #1f2937; }
 table.points-mini .badge-type {
   display: inline-block;
   font-size: 7pt;
   font-weight: 600;
-  padding: 0.4mm 1.5mm;
+  padding: 0.5mm 1.8mm;
   border-radius: 1mm;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 .type-Mesure   { background: #dbeafe; color: #1e40af; }
 .type-Alarme   { background: #fee2e2; color: #b91c1c; }
@@ -252,34 +313,34 @@ table.points-mini .badge-type {
 .type-Commande { background: #d1fae5; color: #065f46; }
 .type-Consigne { background: #fef3c7; color: #92400e; }
 
-/* Captures (images) */
+/* Captures */
 .captures { margin-top: 4mm; }
 .captures-title {
-  font-size: 9pt;
+  font-family: 'Poppins', sans-serif;
+  font-size: 8.5pt;
   font-weight: 600;
-  color: #6b7280;
+  color: #1b2842;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   margin-bottom: 2mm;
 }
 .capture { page-break-inside: avoid; margin-bottom: 4mm; }
 .capture img { max-width: 100%; max-height: 90mm; border: 1px solid #e8ebf0; }
 .capture-caption {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #6b7280;
   font-style: italic;
   text-align: center;
   margin-top: 1mm;
 }
 
-/* Notice generique pour ch.2 */
+/* Notice générique pour ch.2 */
 .generic-note {
-  font-size: 9pt;
+  font-size: 8pt;
   color: #6b7280;
   font-style: italic;
-  margin: 2mm 0 4mm;
+  margin: 1.5mm 0 3mm;
   padding-left: 3mm;
   border-left: 2px solid #e5e7eb;
+  line-height: 1.5;
 }
-
-/* Footer global (header/footer Puppeteer ajoute via displayHeaderFooter) */
