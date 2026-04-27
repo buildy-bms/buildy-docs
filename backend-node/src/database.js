@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 4;
+const TARGET_VERSION = 5;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -283,6 +283,36 @@ function runMigrations() {
     log.info('Migration 4 appliquee');
   }
 
+  if (current < 5) {
+    // Lot 9 — snapshot initial des templates existants comme version 1.
+    // Permet aux sections deja seedees (figees a v1) de comparer contre la
+    // version courante du template pour declencher la propagation.
+    const templates = db.prepare('SELECT id, current_version, description_html FROM equipment_templates').all();
+    let snapshotted = 0;
+    for (const tpl of templates) {
+      const exists = db.prepare(
+        'SELECT 1 FROM equipment_template_versions WHERE template_id = ? AND version = ?'
+      ).get(tpl.id, tpl.current_version);
+      if (exists) continue;
+      const points = db.prepare(`
+        SELECT slug, position, label, data_type, direction, unit, notes, is_optional
+        FROM equipment_template_points WHERE template_id = ?
+        ORDER BY position, id
+      `).all(tpl.id);
+      const snapshot = JSON.stringify({ description_html: tpl.description_html, points });
+      db.prepare(`
+        INSERT INTO equipment_template_versions (template_id, version, snapshot, changelog)
+        VALUES (?, ?, ?, ?)
+      `).run(tpl.id, tpl.current_version, snapshot, 'Snapshot initial (migration v5)');
+      snapshotted++;
+    }
+    if (snapshotted > 0) {
+      log.info(`Migration 5 : ${snapshotted} snapshots de templates poses`);
+    }
+    db.pragma('user_version = 5');
+    log.info('Migration 5 appliquee : snapshots templates equipement');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -397,6 +427,31 @@ const equipmentTemplates = {
   },
   bumpVersion(id) {
     db.prepare('UPDATE equipment_templates SET current_version = current_version + 1 WHERE id = ?').run(id);
+  },
+};
+
+const equipmentTemplateVersions = {
+  listByTemplate(templateId) {
+    return db.prepare(`
+      SELECT v.id, v.template_id, v.version, v.changelog, v.created_at,
+             v.author_id, u.display_name AS author_name
+      FROM equipment_template_versions v
+      LEFT JOIN users u ON u.id = v.author_id
+      WHERE template_id = ?
+      ORDER BY version DESC
+    `).all(templateId);
+  },
+  getByTemplateAndVersion(templateId, version) {
+    return db.prepare(`
+      SELECT * FROM equipment_template_versions
+      WHERE template_id = ? AND version = ?
+    `).get(templateId, version);
+  },
+  create({ templateId, version, snapshot, changelog, authorId }) {
+    db.prepare(`
+      INSERT INTO equipment_template_versions (template_id, version, snapshot, changelog, author_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(templateId, version, JSON.stringify(snapshot), changelog || null, authorId || null);
   },
 };
 
@@ -522,6 +577,31 @@ const sections = {
   },
   delete(id) {
     db.prepare('DELETE FROM sections WHERE id = ?').run(id);
+  },
+  // Sections d'une AF qui referencent un template a une version anterieure
+  // a la version courante du template (= une mise a jour est disponible).
+  outdatedByAf(afId) {
+    return db.prepare(`
+      SELECT s.id, s.number, s.title, s.equipment_template_id, s.equipment_template_version,
+             t.name AS template_name, t.slug AS template_slug, t.current_version
+      FROM sections s
+      JOIN equipment_templates t ON t.id = s.equipment_template_id
+      WHERE s.af_id = ? AND s.kind = 'equipment'
+        AND s.equipment_template_id IS NOT NULL
+        AND (s.equipment_template_version IS NULL OR s.equipment_template_version < t.current_version)
+      ORDER BY s.position, s.id
+    `).all(afId);
+  },
+  // AFs (non supprimees) qui referencent un template, groupees par version pinnee
+  affectedAfsByTemplate(templateId) {
+    return db.prepare(`
+      SELECT a.id AS af_id, a.client_name, a.project_name, a.status, a.deleted_at,
+             s.id AS section_id, s.number, s.title, s.equipment_template_version
+      FROM sections s
+      JOIN afs a ON a.id = s.af_id
+      WHERE s.equipment_template_id = ? AND a.deleted_at IS NULL
+      ORDER BY a.updated_at DESC, s.position
+    `).all(templateId);
   },
   // Indexation FTS5 (appelee depuis le service apres modif body_html)
   reindexFts(sectionId, afId, title, bodyText) {
@@ -686,6 +766,7 @@ module.exports = {
   sessions,
   equipmentTemplates,
   equipmentTemplatePoints,
+  equipmentTemplateVersions,
   sectionPointOverrides,
   equipmentInstances,
   attachments,

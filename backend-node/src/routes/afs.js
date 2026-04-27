@@ -233,6 +233,34 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     return db.auditLog.recent(id, 50);
   });
+
+  // GET /api/afs/:id/template-updates — sections avec une mise a jour de template disponible
+  fastify.get('/afs/:id/template-updates', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const { diffSectionVsTemplate } = require('../lib/template-propagation');
+    const outdated = db.sections.outdatedByAf(id);
+    const items = outdated.map(s => {
+      const diff = diffSectionVsTemplate(s.id);
+      return {
+        section_id: s.id,
+        section_number: s.number,
+        section_title: s.title,
+        template_id: s.equipment_template_id,
+        template_name: s.template_name,
+        template_slug: s.template_slug,
+        from_version: s.equipment_template_version,
+        to_version: s.current_version,
+        total_changes: diff?.total_changes || 0,
+        added: diff?.added || [],
+        removed: diff?.removed || [],
+        modified: diff?.modified || [],
+        description_changed: diff?.description_changed || false,
+      };
+    });
+    return { count: items.length, items };
+  });
 }
 
 module.exports = routes;

@@ -4,6 +4,7 @@ const db = require('../database');
 const log = require('./logger').system;
 
 const ctaTemplate = require('../seeds/equipment-templates/cta');
+const { buildSnapshot } = require('./template-propagation');
 const { PLAN_AF } = require('../seeds/plan-af');
 const { HYPERVEEZ_PAGES } = require('../seeds/hyperveez-pages');
 const { formatServiceLevel } = require('../seeds/service-levels');
@@ -83,6 +84,26 @@ function seedLibraryOnBoot() {
 
   if (createdCount > 0) {
     log.info(`Seed library: ${createdCount} template(s) created, ${updatedPointsCount} point(s) seeded`);
+  }
+
+  // Filet de securite : tout template doit avoir un snapshot pour sa version
+  // courante (necessaire au diff de propagation Lot 9). Idempotent.
+  const allTpls = db.equipmentTemplates.list();
+  let snapshotsCreated = 0;
+  for (const tpl of allTpls) {
+    const exists = db.equipmentTemplateVersions.getByTemplateAndVersion(tpl.id, tpl.current_version);
+    if (exists) continue;
+    db.equipmentTemplateVersions.create({
+      templateId: tpl.id,
+      version: tpl.current_version,
+      snapshot: buildSnapshot(tpl.id),
+      changelog: 'Snapshot initial (seed)',
+      authorId: null,
+    });
+    snapshotsCreated++;
+  }
+  if (snapshotsCreated > 0) {
+    log.info(`Seed library: ${snapshotsCreated} snapshot(s) initial(aux) crees`);
   }
 }
 

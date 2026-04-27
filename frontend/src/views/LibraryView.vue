@@ -1,8 +1,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ChevronLeftIcon, BookmarkIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate } from '@/api'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const versions = ref([])
+const affectedAfs = ref([])
 
 const templates = ref([])
 const selected = ref(null)
@@ -43,8 +48,14 @@ async function refresh() {
 }
 
 async function openTemplate(t) {
-  const { data } = await getEquipmentTemplate(t.id)
-  selected.value = data
+  const [tplRes, verRes, afsRes] = await Promise.all([
+    getEquipmentTemplate(t.id),
+    getTemplateVersions(t.id).catch(() => ({ data: { versions: [] } })),
+    getTemplateAffectedAfs(t.id).catch(() => ({ data: { afs: [] } })),
+  ])
+  selected.value = tplRes.data
+  versions.value = verRes.data.versions || []
+  affectedAfs.value = afsRes.data.afs || []
 }
 
 onMounted(refresh)
@@ -170,6 +181,77 @@ onMounted(refresh)
           </table>
         </div>
         <div v-else class="text-sm text-gray-400 italic">Aucun point d'écriture défini.</div>
+      </div>
+
+      <!-- Historique des versions -->
+      <div class="mt-8" v-if="versions.length">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+          Historique des versions ({{ versions.length }})
+        </h3>
+        <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th class="text-left px-4 py-2 font-medium w-20">Version</th>
+                <th class="text-left px-4 py-2 font-medium">Changelog</th>
+                <th class="text-left px-4 py-2 font-medium w-40">Auteur</th>
+                <th class="text-left px-4 py-2 font-medium w-44">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in versions" :key="v.id" class="border-t border-gray-100">
+                <td class="px-4 py-2">
+                  <span class="font-mono text-xs">v{{ v.version }}</span>
+                  <span v-if="v.version === selected.current_version" class="ml-1 inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800">actuelle</span>
+                </td>
+                <td class="px-4 py-2 text-gray-700">{{ v.changelog || '—' }}</td>
+                <td class="px-4 py-2 text-gray-500 text-xs">{{ v.author_name || '—' }}</td>
+                <td class="px-4 py-2 text-gray-500 text-xs">{{ new Date(v.created_at + 'Z').toLocaleString('fr-FR') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AFs qui utilisent ce template -->
+      <div class="mt-8" v-if="affectedAfs.length">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+          AFs qui utilisent ce template ({{ affectedAfs.length }})
+        </h3>
+        <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th class="text-left px-4 py-2 font-medium">Projet</th>
+                <th class="text-left px-4 py-2 font-medium w-28">Statut</th>
+                <th class="text-left px-4 py-2 font-medium w-44">Sections</th>
+                <th class="text-left px-4 py-2 font-medium w-32">Synchro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="af in affectedAfs" :key="af.af_id" class="border-t border-gray-100">
+                <td class="px-4 py-2">
+                  <button @click="router.push(`/afs/${af.af_id}`)" class="text-left hover:text-indigo-700">
+                    <p class="font-semibold text-gray-800">{{ af.client_name }}</p>
+                    <p class="text-xs text-gray-500">{{ af.project_name }}</p>
+                  </button>
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-600 capitalize">{{ af.status }}</td>
+                <td class="px-4 py-2 text-xs text-gray-600">
+                  <span v-for="(s, i) in af.sections" :key="s.section_id">
+                    <span :class="s.is_outdated ? 'text-amber-700' : 'text-gray-500'">
+                      § {{ s.number || '?' }} (v{{ s.equipment_template_version || 0 }})
+                    </span><span v-if="i < af.sections.length - 1">, </span>
+                  </span>
+                </td>
+                <td class="px-4 py-2">
+                  <span v-if="af.outdated_count === 0" class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800">à jour</span>
+                  <span v-else class="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800">{{ af.outdated_count }} en retard</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
   </div>

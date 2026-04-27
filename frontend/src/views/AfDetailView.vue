@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAf, listSections, getSection } from '@/api'
 import CycleBandeau from '@/components/CycleBandeau.vue'
+import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -83,8 +84,9 @@ watch(() => route.params.id, async () => {
 
   <div v-else-if="af" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
     <!-- Bandeau cycle de vie (en haut, full-width) -->
-    <div class="px-5 lg:px-6 pt-4">
+    <div class="px-5 lg:px-6 pt-4 space-y-2">
       <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" />
+      <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
 
     <!-- Layout split : arbre 320px + éditeur flex -->

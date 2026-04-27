@@ -30,6 +30,7 @@ export const updateAf = (id, data) => api.patch(`/afs/${id}`, data)
 export const deleteAf = (id) => api.delete(`/afs/${id}`)
 export const cloneAf = (id, data) => api.post(`/afs/${id}/clone`, data)
 export const getAfAudit = (id) => api.get(`/afs/${id}/audit`)
+export const getAfTemplateUpdates = (id) => api.get(`/afs/${id}/template-updates`)
 
 // ── Sections ──
 export const listSections = (afId) => api.get(`/afs/${afId}/sections`)
@@ -40,6 +41,9 @@ export const addSectionOverride = (id, data) => api.post(`/sections/${id}/overri
 export const deleteSectionOverride = (sectionId, overrideId) =>
   api.delete(`/sections/${sectionId}/overrides/${overrideId}`)
 export const listSectionInstances = (id) => api.get(`/sections/${id}/instances`)
+export const getSectionTemplateUpdate = (id) => api.get(`/sections/${id}/template-update`)
+export const applySectionTemplateUpdate = (id) => api.post(`/sections/${id}/template-update/apply`)
+export const dismissSectionTemplateUpdate = (id) => api.post(`/sections/${id}/template-update/dismiss`)
 export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instances`, data)
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
@@ -84,5 +88,7 @@ export const addTemplatePoint = (templateId, data) =>
   api.post(`/equipment-templates/${templateId}/points`, data)
 export const deleteTemplatePoint = (templateId, pointId) =>
   api.delete(`/equipment-templates/${templateId}/points/${pointId}`)
+export const getTemplateVersions = (id) => api.get(`/equipment-templates/${id}/versions`)
+export const getTemplateAffectedAfs = (id) => api.get(`/equipment-templates/${id}/affected-afs`)
 
 export default api

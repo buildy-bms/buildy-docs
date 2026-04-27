@@ -3,6 +3,7 @@
 const { z } = require('zod');
 const db = require('../database');
 const { resolveSectionPoints } = require('../lib/points-resolver');
+const { diffSectionVsTemplate } = require('../lib/template-propagation');
 
 const updateSectionSchema = z.object({
   title: z.string().min(1).optional(),
@@ -169,6 +170,60 @@ async function routes(fastify) {
   fastify.delete('/instances/:id', async (request) => {
     db.equipmentInstances.delete(parseInt(request.params.id, 10));
     return { ok: true };
+  });
+
+  // GET /api/sections/:id/template-update — diff entre version pinnee et version courante
+  fastify.get('/sections/:id/template-update', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const section = db.sections.getById(id);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (section.kind !== 'equipment' || !section.equipment_template_id) {
+      return reply.code(400).send({ detail: 'Section sans template équipement' });
+    }
+    return diffSectionVsTemplate(id);
+  });
+
+  // POST /api/sections/:id/template-update/apply — synchronise la section sur la version courante
+  fastify.post('/sections/:id/template-update/apply', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const section = db.sections.getById(id);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!section.equipment_template_id) return reply.code(400).send({ detail: 'Section sans template' });
+
+    const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
+    const userId = request.authUser?.id;
+    const updated = db.sections.update(id, {
+      equipmentTemplateVersion: tpl.current_version,
+      updatedBy: userId,
+    });
+    db.auditLog.add({
+      afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+      action: 'section.template.sync',
+      payload: { from: section.equipment_template_version, to: tpl.current_version },
+    });
+    return updated;
+  });
+
+  // POST /api/sections/:id/template-update/dismiss — meme effet (acquitte sans changer le contenu)
+  // (le contenu est deja synchronise dynamiquement via points-resolver, ce flag n'est qu'un pin)
+  fastify.post('/sections/:id/template-update/dismiss', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const section = db.sections.getById(id);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!section.equipment_template_id) return reply.code(400).send({ detail: 'Section sans template' });
+
+    const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
+    const userId = request.authUser?.id;
+    const updated = db.sections.update(id, {
+      equipmentTemplateVersion: tpl.current_version,
+      updatedBy: userId,
+    });
+    db.auditLog.add({
+      afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+      action: 'section.template.dismiss',
+      payload: { from: section.equipment_template_version, to: tpl.current_version },
+    });
+    return updated;
   });
 }
 
