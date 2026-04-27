@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
       <div
         v-for="att in attachments"
         :key="att.id"
-        class="att-card group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-move"
+        class="att-card group relative bg-gray-50 border border-gray-200 overflow-hidden cursor-move"
       >
         <!-- Image OK -->
         <img
