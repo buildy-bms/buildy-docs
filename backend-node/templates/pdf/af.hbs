@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Analyse Fonctionnelle — {{af.client_name}} — {{af.project_name}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Page de garde ═══════════ --}}
+<section class="cover">
+  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+  <p class="cover-doc-type">Analyse Fonctionnelle</p>
+  <h1 class="cover-title">{{af.project_name}}</h1>
+  <p class="cover-client">{{af.client_name}}</p>
+  {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
+
+  {{#if serviceLevel.label}}
+  <div class="cover-service-level">
+    <p class="cover-service-level-label">Niveau de service requis pour cette AF</p>
+    <p class="cover-service-level-value">{{serviceLevel.label}}</p>
+    {{#if serviceLevel.justifications.length}}
+    <p class="cover-service-level-justif">
+      Justifié par :
+      {{#each serviceLevel.justifications}}
+        §{{number}} {{title}}{{#unless @last}} · {{/unless}}
+      {{/each}}
+    </p>
+    {{/if}}
+  </div>
+  {{/if}}
+
+  <div class="cover-meta">
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Version</span>
+      <span class="cover-meta-value"><span class="cover-version-tag">{{version}}</span></span>
+      {{#if motif}}<span class="cover-motif">{{motif}}</span>{{/if}}
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Date d'export</span>
+      <span class="cover-meta-value">{{exportDate}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Auteur</span>
+      <span class="cover-meta-value">{{authorName}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Niveau contractuel</span>
+      <span class="cover-meta-value">{{contractualLevelLabel}}</span>
+    </div>
+  </div>
+</section>
+
+{{!-- ═══════════ Sommaire ═══════════ --}}
+<section class="toc">
+  <h1>Sommaire</h1>
+  <ul class="toc-list">
+    {{#each tocFlat}}
+    <li class="toc-row lvl-{{depthOneBased}}">
+      <span class="toc-num">{{number}}</span>
+      <span class="toc-title">{{title}}</span>
+    </li>
+    {{/each}}
+  </ul>
+</section>
+
+{{!-- ═══════════ Sections recursives ═══════════ --}}
+<div class="sections">
+  {{#each tree}}
+    {{> _section this}}
+  {{/each}}
+</div>
+
+</body>
+</html>

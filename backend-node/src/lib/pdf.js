@@ -10,20 +10,42 @@ const log = require('./logger').system;
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
+// Charge tous les partials (.hbs commencant par _) au demarrage
+const templatesDir = path.resolve(__dirname, '../../templates/pdf');
+function registerPartials() {
+  for (const file of fs.readdirSync(templatesDir)) {
+    if (file.startsWith('_') && file.endsWith('.hbs')) {
+      const name = file.replace(/^_|\.hbs$/g, '');
+      Handlebars.registerPartial(`_${name}`, fs.readFileSync(path.join(templatesDir, file), 'utf-8'));
+    }
+  }
+}
+registerPartials();
+
 // Cache des templates compilés (évite de recompiler à chaque export)
 const templateCache = new Map();
 
 function loadTemplate(name) {
   if (templateCache.has(name)) return templateCache.get(name);
-  const tplPath = path.resolve(__dirname, '../../templates/pdf', `${name}.hbs`);
+  const tplPath = path.resolve(templatesDir, `${name}.hbs`);
   const compiled = Handlebars.compile(fs.readFileSync(tplPath, 'utf-8'));
   templateCache.set(name, compiled);
   return compiled;
 }
 
 function loadStyles(name) {
-  const cssPath = path.resolve(__dirname, '../../templates/pdf', `${name}.css`);
+  const cssPath = path.resolve(templatesDir, `${name}.css`);
   return fs.readFileSync(cssPath, 'utf-8');
+}
+
+function loadFileAsDataUrl(absPath) {
+  if (!fs.existsSync(absPath)) return null;
+  const ext = path.extname(absPath).slice(1).toLowerCase();
+  const mime = ext === 'svg' ? 'image/svg+xml'
+             : ext === 'jpg' ? 'image/jpeg'
+             : `image/${ext}`;
+  const base64 = fs.readFileSync(absPath).toString('base64');
+  return `data:${mime};base64,${base64}`;
 }
 
 function loadAssetDataUrl(filename) {
@@ -114,5 +136,6 @@ async function shutdown() {
 module.exports = {
   renderPdf,
   loadAssetDataUrl,
+  loadFileAsDataUrl,
   shutdown,
 };

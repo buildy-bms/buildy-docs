@@ -1,0 +1,108 @@
+{{!-- Partial recursif pour rendre une section + ses enfants. --}}
+{{!-- Le niveau (depth) determine la balise H : depth=0 → h1, depth=1 → h2, etc. --}}
+
+<div class="section depth-{{depth}}">
+  {{#if (eq depth 0)}}
+    <h1>
+      <span class="section-num">{{number}}</span>{{title}}
+      <span class="section-badges">
+        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
+        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+      </span>
+    </h1>
+  {{else if (eq depth 1)}}
+    <h2>
+      <span class="section-num">{{number}}</span>{{title}}
+      <span class="section-badges">
+        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
+        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+      </span>
+    </h2>
+  {{else if (eq depth 2)}}
+    <h3>
+      <span class="section-num">{{number}}</span>{{title}}
+      <span class="section-badges">
+        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
+        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+      </span>
+    </h3>
+  {{else}}
+    <h4>
+      <span class="section-num">{{number}}</span>{{title}}
+      <span class="section-badges">
+        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
+        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+      </span>
+    </h4>
+  {{/if}}
+
+  {{#if generic_note}}
+  <p class="generic-note">
+    Les données listées ci-dessous sont indicatives et représentatives des points couramment intégrés.
+    La liste de points contractuelle, définie en avant-projet, fait seule foi pour chaque déploiement.
+    Les données effectivement disponibles dépendent également de l'équipement lui-même et des informations
+    qu'il expose ; Buildy n'est pas responsable de l'absence ou de l'indisponibilité de données qui ne
+    seraient pas mises à disposition par l'équipement.
+  </p>
+  {{/if}}
+
+  {{#if body_html}}
+  <div class="section-body">{{{body_html}}}</div>
+  {{/if}}
+
+  {{#if equipment}}
+    {{#if equipment.description_html}}
+    <div class="section-body">{{{equipment.description_html}}}</div>
+    {{/if}}
+    {{#if equipment.points_read.length}}
+    <div class="points-block">
+      <h5 class="points-block-title">Données typiquement lues ({{equipment.points_read.length}})</h5>
+      <table class="points-mini">
+        <thead><tr><th>Donnée</th><th>Type</th><th>Unité</th></tr></thead>
+        <tbody>
+          {{#each equipment.points_read}}
+          <tr>
+            <td>{{label}}</td>
+            <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+            <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+    {{#if equipment.points_write.length}}
+    <div class="points-block">
+      <h5 class="points-block-title">Données typiquement écrites ({{equipment.points_write.length}})</h5>
+      <table class="points-mini">
+        <thead><tr><th>Donnée</th><th>Type</th><th>Unité</th></tr></thead>
+        <tbody>
+          {{#each equipment.points_write}}
+          <tr>
+            <td>{{label}}</td>
+            <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+            <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+  {{/if}}
+
+  {{#if attachments.length}}
+  <div class="captures">
+    <h5 class="captures-title">Captures ({{attachments.length}})</h5>
+    {{#each attachments}}
+    <div class="capture">
+      <img src="{{dataUrl}}" alt="{{caption}}" />
+      {{#if caption}}<p class="capture-caption">{{caption}}</p>{{/if}}
+    </div>
+    {{/each}}
+  </div>
+  {{/if}}
+
+  {{#each children}}
+    {{> _section this}}
+  {{/each}}
+</div>

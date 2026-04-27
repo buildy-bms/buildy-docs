@@ -63,6 +63,8 @@ export const deleteAttachment = (id) => api.delete(`/attachments/${id}`)
 export const listAfExports = (afId) => api.get(`/afs/${afId}/exports`)
 export const exportPointsList = (afId, data) =>
   api.post(`/afs/${afId}/exports/points-list`, data)
+export const exportAf = (afId, data) =>
+  api.post(`/afs/${afId}/exports/af`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
 // ── Equipment templates (bibliothèque) ──
