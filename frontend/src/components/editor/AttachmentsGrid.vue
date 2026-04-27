@@ -273,7 +273,7 @@ onBeforeUnmount(() => {
           <XMarkIcon class="w-6 h-6" />
         </button>
         <div class="max-w-full max-h-full flex flex-col items-center gap-3">
-          <img :src="viewerUrl" :alt="viewerName" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+          <img :src="viewerUrl" :alt="viewerName" class="max-w-full max-h-[85vh] object-contain shadow-2xl" />
           <p v-if="viewerName" class="text-sm text-white/70 text-center">{{ viewerName }}</p>
         </div>
       </div>

@@ -29,7 +29,7 @@ function loginOidc() {
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-indigo-600 px-4">
-    <div class="bg-white rounded-lg shadow-xl p-10 w-full max-w-md">
+    <div class="bg-white shadow-xl p-10 w-full max-w-md">
       <div class="flex flex-col items-center mb-8">
         <img src="/logo-buildy.svg" alt="Buildy" class="h-12 mb-4" />
         <h1 class="text-xl font-semibold text-gray-800">Buildy AF</h1>
