@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 3;
+const TARGET_VERSION = 4;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -267,6 +267,20 @@ function runMigrations() {
     }
     db.pragma('user_version = 3');
     log.info('Migration 3 appliquee : refresh description CTA');
+  }
+
+  if (current < 4) {
+    // Lot 5 fixes : retire les badges BACS sur 1.1 (Objet) et 1.3
+    // (Conformite au decret BACS — titre deja explicite, badge redondant)
+    const result = db.prepare(`
+      UPDATE sections SET bacs_articles = NULL
+      WHERE number IN ('1.1', '1.3') AND bacs_articles IN ('R175-5-1', 'R175-3')
+    `).run();
+    if (result.changes > 0) {
+      log.info(`Migration 4 : retire badges BACS sur ${result.changes} sections (1.1 + 1.3)`);
+    }
+    db.pragma('user_version = 4');
+    log.info('Migration 4 appliquee');
   }
 
   if (current > TARGET_VERSION) {

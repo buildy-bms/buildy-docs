@@ -32,7 +32,6 @@ const PLAN_AF = [
 • Nature du document : analyse fonctionnelle de la solution de supervision Buildy déployée sur le site
 • Rôle réglementaire : ce document constitue l'analyse fonctionnelle examinée lors de l'inspection périodique obligatoire (Article R175-5-1 du CCH)
 • Il est remis au propriétaire à l'issue du chantier et doit être conservé 10 ans`,
-        bacs_articles: 'R175-5-1',
       },
       {
         number: '1.2', title: 'Rôle de Buildy dans l\'écosystème GTB', kind: 'standard',
@@ -49,7 +48,6 @@ const PLAN_AF = [
 • Décret n°2023-259 du 7 avril 2023 (Articles R175-1 à R175-6)
 • Les 4 exigences fonctionnelles de l'Article R175-3 auxquelles répond la solution Buildy
 • Tableau de correspondance R175-3 ↔ Fonctions Buildy (à intégrer)`,
-        bacs_articles: 'R175-3',
       },
       {
         number: '1.4', title: 'Niveaux de service', kind: 'standard',

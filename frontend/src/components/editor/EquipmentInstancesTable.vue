@@ -88,7 +88,7 @@ onMounted(refresh)
                class="w-44 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <input v-model="draft.location" type="text" placeholder="Localisation (ex : Niveau 1 - Aile Est)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                class="flex-1 min-w-[160px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" / autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true">
+        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
         <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
         <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
       </form>

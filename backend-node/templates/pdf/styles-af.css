@@ -207,25 +207,25 @@ h1, h2, h3, h4, h5 {
   letter-spacing: -0.01em;
 }
 .section h1 {
-  font-size: 16pt;
+  font-size: 13pt;
   font-weight: 700;
-  padding-bottom: 2mm;
+  padding-bottom: 1.5mm;
   border-bottom: 2px solid #1b2842;
-  margin-top: 6mm;
+  margin-top: 5mm;
   page-break-before: always;
   page-break-after: avoid;
 }
 .section h1:first-of-type { page-break-before: avoid; }
 .section h2 {
-  font-size: 12.5pt;
+  font-size: 11pt;
   font-weight: 600;
-  padding-bottom: 1.5mm;
+  padding-bottom: 1mm;
   border-bottom: 1px solid #e5e7eb;
-  margin-top: 5mm;
+  margin-top: 4mm;
   page-break-after: avoid;
 }
-.section h3 { font-size: 11pt; font-weight: 600; margin-top: 3.5mm; page-break-after: avoid; }
-.section h4 { font-size: 10pt; font-weight: 600; color: #374151; margin-top: 2.5mm; page-break-after: avoid; }
+.section h3 { font-size: 10pt; font-weight: 600; margin-top: 3mm; page-break-after: avoid; }
+.section h4 { font-size: 9.5pt; font-weight: 600; color: #374151; margin-top: 2.5mm; page-break-after: avoid; }
 
 .section-num {
   font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
