@@ -140,8 +140,7 @@ onMounted(refresh)
           </span>
         </h3>
         <p class="text-xs text-gray-500 mt-0.5">
-          Glisse-dépose des images directement ici, ou clique sur le bouton.
-          Réorganise par drag & drop des miniatures.
+          Glisse-dépose des images dans cette zone, ou clique sur le bouton.
         </p>
       </div>
       <button
@@ -176,37 +175,49 @@ onMounted(refresh)
         v-for="att in attachments"
         :key="att.id"
         :class="[
-          'group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-move transition-all',
+          'group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden transition-all',
           dragOverId === att.id ? 'border-indigo-500 ring-2 ring-indigo-200 scale-[1.02]' : '',
         ]"
-        draggable="true"
-        @dragstart="(e) => onCardDragStart(att, e)"
-        @dragover="(e) => onCardDragOver(att, e)"
-        @dragleave="onCardDragLeave"
-        @drop="(e) => onCardDrop(att, e)"
       >
-        <a :href="urlFor(att)" target="_blank" rel="noopener">
-          <img :src="urlFor(att)" :alt="att.original_name || ''" class="w-full aspect-video object-cover" />
-        </a>
+        <!-- Zone image (non draggable, pas de lien) -->
+        <img :src="urlFor(att)" :alt="att.original_name || ''" class="w-full aspect-video object-cover bg-gray-100" />
+
+        <!-- Handle de drag visible en haut à gauche : c'est le seul endroit qui declenche le drag -->
+        <div
+          :draggable="true"
+          @dragstart="(e) => onCardDragStart(att, e)"
+          @dragover="(e) => onCardDragOver(att, e)"
+          @dragleave="onCardDragLeave"
+          @drop="(e) => onCardDrop(att, e)"
+          class="absolute top-1.5 left-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-white/90 text-gray-600 rounded text-[10px] font-medium cursor-move shadow-sm"
+          title="Glisser pour réorganiser"
+        >
+          <ArrowsUpDownIcon class="w-3 h-3" /> {{ att.position + 1 }}
+        </div>
+
+        <!-- Drop target (overlay invisible qui couvre la card pour recevoir un drop) -->
+        <div
+          @dragover="(e) => onCardDragOver(att, e)"
+          @dragleave="onCardDragLeave"
+          @drop="(e) => onCardDrop(att, e)"
+          class="absolute inset-0 pointer-events-none"
+          :class="dragOverId === att.id ? 'pointer-events-auto bg-indigo-500/10' : ''"
+        ></div>
 
         <button
           @click="removeAttachment(att)"
-          class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition"
+          class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
           title="Supprimer"
         >
           <TrashIcon class="w-3.5 h-3.5" />
         </button>
-
-        <div class="absolute top-1.5 left-1.5 p-1 bg-white/90 text-gray-400 rounded opacity-0 group-hover:opacity-100 transition" title="Glisser pour réordonner">
-          <ArrowsUpDownIcon class="w-3.5 h-3.5" />
-        </div>
 
         <input
           v-model="att.caption"
           @blur="saveCaption(att)"
           type="text"
           placeholder="Légende…"
-          class="w-full px-2 py-1 text-xs bg-white border-t border-gray-200 focus:outline-none focus:bg-indigo-50"
+          class="relative z-10 w-full px-2 py-1 text-xs bg-white border-t border-gray-200 focus:outline-none focus:bg-indigo-50"
         />
       </div>
     </div>

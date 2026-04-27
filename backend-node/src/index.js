@@ -83,6 +83,15 @@ async function main() {
     prefix: '/attachments/',
     decorateReply: false, // 2nd enregistrement
     wildcard: false,
+    // Force Content-Type explicite par extension (au cas ou le mime-db
+    // par defaut ne renvoie pas le bon header pour certaines extensions).
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      const map = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
+      if (map[ext]) res.setHeader('Content-Type', map[ext]);
+      // Cache cote navigateur (les filenames sont des UUIDs immuables)
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+    },
   });
 
   // Sert le frontend Vue build (production uniquement)
