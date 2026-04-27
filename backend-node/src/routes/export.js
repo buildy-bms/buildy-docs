@@ -8,7 +8,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
 const { resolveSectionPoints } = require('../lib/points-resolver');
-const { resolveAfLevel } = require('../lib/service-level-resolver');
+const { resolveAfLevel, formatLevelFull } = require('../lib/service-level-resolver');
 
 const SERVICE_LEVEL_LABELS = {
   E: 'Essentials',
@@ -228,9 +228,11 @@ async function routes(fastify) {
             id: s.id,
             number: s.number || '',
             title: s.title,
-            service_level: sl,
+            service_level: sl, // brut pour CSS class
+            service_level_label: formatLevelFull(sl), // libelle complet
             badgeClass: badgeClass || 'ESP',
             bacs_articles: s.bacs_articles,
+            bacs_articles_label: s.bacs_articles ? `Décret BACS ${s.bacs_articles}` : null,
             body_html: s.body_html,
             generic_note: s.generic_note,
             kind: s.kind,
@@ -248,6 +250,7 @@ async function routes(fastify) {
       for (const n of nodes) {
         if (n.depth <= 2) {
           acc.push({
+            id: n.id,
             number: n.number,
             title: n.title,
             depth: n.depth,
@@ -294,20 +297,24 @@ async function routes(fastify) {
 
     let result;
     try {
+      const logoSmall = loadAssetDataUrl('logo-buildy.svg');
       result = await renderPdf({
         template: 'af',
         styles: 'styles-af',
         data,
         outputPath,
+        populateToc: true,
+        pageFormat: 'A4',
         pdfOptions: {
           displayHeaderFooter: true,
-          margin: { top: '22mm', bottom: '18mm', left: '18mm', right: '18mm' },
-          headerTemplate: `<div style="font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; justify-content:space-between;">
+          margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' },
+          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; justify-content:space-between;">
             <span>${af.client_name} — ${af.project_name}</span>
             <span>Analyse Fonctionnelle ${version}</span>
           </div>`,
-          footerTemplate: `<div style="font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; justify-content:space-between;">
-            <span>Buildy AF · confidentiel</span>
+          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; align-items:center; gap:6mm;">
+            <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
+            <span style="flex:1;">Analyse fonctionnelle Buildy · confidentiel</span>
             <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
           </div>`,
         },

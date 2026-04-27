@@ -51,14 +51,16 @@
   </div>
 </section>
 
-{{!-- ═══════════ Sommaire ═══════════ --}}
+{{!-- ═══════════ Sommaire (les .toc-page sont remplis a posteriori par pdf.js) ═══════════ --}}
 <section class="toc">
   <h1>Sommaire</h1>
   <ul class="toc-list">
     {{#each tocFlat}}
-    <li class="toc-row lvl-{{depthOneBased}}">
+    <li class="toc-row lvl-{{depthOneBased}}" data-toc-link="sec-{{id}}">
       <span class="toc-num">{{number}}</span>
       <span class="toc-title">{{title}}</span>
+      <span class="toc-dots"></span>
+      <span class="toc-page">···</span>
     </li>
     {{/each}}
   </ul>

@@ -61,4 +61,24 @@ function resolveAfLevel(includedSections) {
   };
 }
 
-module.exports = { resolveAfLevel, LABELS, RANK };
+/**
+ * Pour un service_level brut ('E', 'S/P', 'E/S/P', etc.), retourne un libelle
+ * complet pour affichage : 'Essentials', 'Smart', 'Premium', 'Smart et Premium',
+ * 'Tous niveaux', etc.
+ */
+function formatLevelFull(value) {
+  if (!value) return null;
+  if (value === 'E') return 'Essentials';
+  if (value === 'S') return 'Smart';
+  if (value === 'P') return 'Premium';
+  if (value === 'E/S/P') return 'Tous niveaux';
+  if (value === 'S/P') return 'Smart et Premium';
+  // Fallback : decompose 'X/Y/Z' → 'Xlabel, Ylabel et Zlabel'
+  const parts = value.split('/').map(s => s.trim()).filter(Boolean);
+  const labels = parts.map(p => LABELS[p] || p).filter(Boolean);
+  if (!labels.length) return null;
+  if (labels.length === 1) return labels[0];
+  return labels.slice(0, -1).join(', ') + ' et ' + labels.slice(-1);
+}
+
+module.exports = { resolveAfLevel, formatLevelFull, LABELS, RANK };

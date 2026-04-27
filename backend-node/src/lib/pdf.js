@@ -119,40 +119,79 @@ function getBrowser() {
 /**
  * Rend un template Handlebars en PDF Puppeteer.
  *
+ * Si `populateToc` est true (default false) :
+ *  - Mesure la page de chaque element [data-toc-anchor="X"] apres render
+ *  - Met a jour les .toc-page des [data-toc-link="X"] correspondants
+ *  - Recompose le PDF avec les vrais numeros de page dans la TOC
+ *
  * @param {object} opts
- * @param {string} opts.template — nom du template (sans .hbs), ex 'points-list' ou 'af'
- * @param {string} opts.styles — nom du CSS (sans .css), ex 'styles-points'
+ * @param {string} opts.template — nom du template (sans .hbs)
+ * @param {string} opts.styles — nom du CSS (sans .css)
  * @param {object} opts.data — données fournies au template
  * @param {string} opts.outputPath — chemin du PDF généré
- * @param {object} opts.pdfOptions — options page.pdf() (format A3/A4, margin, etc.)
+ * @param {object} opts.pdfOptions — options page.pdf()
+ * @param {boolean} opts.populateToc — true pour injecter les n° de page dans la TOC
+ * @param {string} opts.pageFormat — 'A4' | 'A3' (pour calcul hauteur page)
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {} }) {
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
-
-  // Prepend les @font-face avec data URLs en debut de CSS
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
-  const html = tpl({
-    ...data,
-    styles: fullCss,
-  });
+  const html = tpl({ ...data, styles: fullCss });
 
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    // 'load' suffit : tout est inline (fonts + captures en data URL),
-    // pas de fetch externe a attendre.
+    // Viewport en pixels = format de page A4 ou A3 a 96 DPI (1mm = 3.7795px)
+    // A4 = 210x297mm = 794x1123px, A3 = 297x420mm = 1123x1587px
+    const viewportPortrait = pageFormat === 'A3'
+      ? { width: 1123, height: 1587 }
+      : { width: 794, height: 1123 };
+    await page.setViewport(viewportPortrait);
+
     await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
     await page.emulateMediaType('print');
-    // Garantit que les fonts data: sont parsees par le browser
     await page.evaluateHandle('document.fonts.ready');
+
+    if (populateToc) {
+      // 1. Mesure les positions de chaque ancre (data-toc-anchor)
+      // 2. Calcule sa page basee sur la hauteur de page utile
+      // 3. Met a jour les .toc-page correspondants
+      // Note : margins @page CSS = 22mm/18mm. Hauteur utile A4 ≈ 257mm = 971px,
+      // A3 ≈ 380mm = 1436px. Cover + TOC = 2 pages avant les sections.
+      const pageInnerPx = pageFormat === 'A3' ? 1436 : 971;
+      const FIRST_SECTION_PAGE = 3; // page 1 = cover, page 2 = TOC
+      await page.evaluate((innerPx, firstPage) => {
+        // Trouve le scroll-top du container des sections (apres cover + TOC)
+        const sectionsContainer = document.querySelector('.sections');
+        if (!sectionsContainer) return;
+        const sectionsTop = sectionsContainer.getBoundingClientRect().top + window.scrollY;
+
+        const anchors = document.querySelectorAll('[data-toc-anchor]');
+        const anchorPages = new Map();
+        for (const a of anchors) {
+          const top = a.getBoundingClientRect().top + window.scrollY;
+          const offsetInSections = Math.max(0, top - sectionsTop);
+          const pageNum = firstPage + Math.floor(offsetInSections / innerPx);
+          anchorPages.set(a.getAttribute('data-toc-anchor'), pageNum);
+        }
+
+        // Met a jour les liens TOC
+        for (const link of document.querySelectorAll('[data-toc-link]')) {
+          const id = link.getAttribute('data-toc-link');
+          const pageNum = anchorPages.get(id);
+          const pageEl = link.querySelector('.toc-page');
+          if (pageEl && pageNum != null) pageEl.textContent = String(pageNum);
+        }
+      }, pageInnerPx, FIRST_SECTION_PAGE);
+    }
 
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
     const finalPdfOptions = {
       printBackground: true,
-      preferCSSPageSize: true, // utilise @page size CSS
+      preferCSSPageSize: true,
       ...pdfOptions,
       path: outputPath,
     };

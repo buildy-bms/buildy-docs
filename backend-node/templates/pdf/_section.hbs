@@ -1,37 +1,37 @@
 {{!-- Partial recursif pour rendre une section + ses enfants. --}}
 {{!-- Le niveau (depth) determine la balise H : depth=0 → h1, depth=1 → h2, etc. --}}
 
-<div class="section depth-{{depth}}">
+<div class="section depth-{{depth}}" data-toc-anchor="sec-{{id}}">
   {{#if (eq depth 0)}}
     <h1>
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
-        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
-        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+        {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
+        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
       </span>
     </h1>
   {{else if (eq depth 1)}}
     <h2>
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
-        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
-        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+        {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
+        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
       </span>
     </h2>
   {{else if (eq depth 2)}}
     <h3>
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
-        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
-        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+        {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
+        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
       </span>
     </h3>
   {{else}}
     <h4>
       <span class="section-num">{{number}}</span>{{title}}
       <span class="section-badges">
-        {{#if service_level}}<span class="badge-level {{badgeClass}}">{{service_level}}</span>{{/if}}
-        {{#if bacs_articles}}<span class="badge-bacs">⚖️ {{bacs_articles}}</span>{{/if}}
+        {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
+        {{#if bacs_articles_label}}<span class="badge-bacs">⚖️ {{bacs_articles_label}}</span>{{/if}}
       </span>
     </h4>
   {{/if}}
