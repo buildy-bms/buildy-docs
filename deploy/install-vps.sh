@@ -21,8 +21,20 @@ else
 fi
 cd "$INSTALL_DIR"
 
-# 2. Dependencies backend
-echo "[2/6] Install dependances backend..."
+# 2a. Dependencies systeme pour Puppeteer (Chromium headless)
+echo "[2/6] Install dependances systeme Chromium..."
+apt-get update -qq
+# Ubuntu 24.04 utilise libasound2t64 (au lieu de libasound2)
+LIBASOUND="libasound2t64"
+apt-cache show $LIBASOUND >/dev/null 2>&1 || LIBASOUND="libasound2"
+apt-get install -y -qq \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libgbm1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+    libpango-1.0-0 libpangocairo-1.0-0 libxkbcommon0 libxshmfence1 \
+    $LIBASOUND fonts-liberation 2>&1 | tail -2
+
+# 2b. Dependencies backend (Puppeteer telecharge Chromium ~170MB au postinstall)
+echo "[2b/6] Install dependances backend (long : telecharge Chromium)..."
 (cd backend-node && npm ci --omit=dev)
 
 # 3. Dependencies frontend + build
