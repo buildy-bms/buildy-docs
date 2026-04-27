@@ -119,7 +119,7 @@ onMounted(refresh)
             · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
           </p>
           <div v-if="selected.bacs_articles" class="mt-2">
-            <BacsBadge :reference="selected.bacs_articles" />
+            <BacsBadge :reference="selected.bacs_articles" context="equipment" />
           </div>
           <div v-if="selected.preferred_protocols" class="mt-3">
             <ProtocolPills :protocols="selected.preferred_protocols" />

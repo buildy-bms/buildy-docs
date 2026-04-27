@@ -7,7 +7,14 @@ import BaseModal from './BaseModal.vue'
 const props = defineProps({
   // Référence brute : "R175-1" ou "R175-1 §1, §2" ou "R175-1 §1, §2 ; R175-3 §3"
   reference: { type: String, required: true },
+  // 'section' (défaut) → "Exigé par le décret BACS"
+  // 'equipment'        → "Système concerné par le décret BACS"
+  context: { type: String, default: 'section' },
 })
+
+const labelPrefix = props.context === 'equipment'
+  ? 'Système concerné par le décret BACS'
+  : 'Exigé par le décret BACS'
 
 const showModal = ref(false)
 const bacsData = ref(null)
@@ -61,7 +68,7 @@ onMounted(() => {
     :title="`Voir l'extrait du décret BACS — ${reference}`"
   >
     <ScaleIcon class="w-3 h-3" />
-    Exigé par le décret BACS · {{ reference }}
+    {{ labelPrefix }} · {{ reference }}
   </button>
 
   <BaseModal v-if="showModal" :title="`Décret BACS — ${reference}`" size="lg" @close="showModal = false">

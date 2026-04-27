@@ -171,7 +171,7 @@ function setLink() {
         class="flex-1 min-w-0 text-base font-semibold text-gray-800 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
       />
       <ServiceLevelBadge :level="section.service_level" />
-      <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" />
+      <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
       <AutosaveStatus
         :state="globalState"
         :last-saved="globalLastSaved"
