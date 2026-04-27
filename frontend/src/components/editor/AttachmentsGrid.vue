@@ -2,8 +2,11 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PhotoIcon, TrashIcon, CloudArrowUpIcon, XMarkIcon,
+  PhotoIcon, TrashIcon, CloudArrowUpIcon, XMarkIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
+
+const failedIds = ref(new Set())
+const retryCount = new Map()
 import {
   listSectionAttachments, uploadSectionAttachment, updateAttachment,
   reorderAttachments, deleteAttachment,
@@ -26,11 +29,33 @@ const viewerName = ref('')
 const gridRef = ref(null)
 let sortable = null
 
-// Cache-buster basé sur l'id (immuable). Si on a un caption-update on garde
-// le même id donc le cache reste cohérent. Si l'image elle-même est remplacée
-// (suppression + nouvelle upload), nouvel id → nouvelle URL → bypass cache.
+// Cache-buster basé sur l'id + un nonce de retry pour bypass un échec antérieur.
 function urlFor(att) {
-  return `/attachments/${props.afId}/${att.filename}?v=${att.id}`
+  const retry = retryCount.get(att.id) || 0
+  return `/attachments/${props.afId}/${att.filename}?v=${att.id}${retry ? `&r=${retry}` : ''}`
+}
+
+function onImgError(att, e) {
+  const tries = (retryCount.get(att.id) || 0) + 1
+  if (tries <= 2) {
+    // Retry une fois après 600ms (ex : fichier pas encore flush sur disque)
+    retryCount.set(att.id, tries)
+    setTimeout(() => {
+      // Force re-render en touchant l'objet
+      const src = e.target
+      if (src) src.src = urlFor(att)
+    }, 600)
+  } else {
+    failedIds.value.add(att.id)
+    failedIds.value = new Set(failedIds.value)
+  }
+}
+
+function onImgLoad(att) {
+  if (failedIds.value.has(att.id)) {
+    failedIds.value.delete(att.id)
+    failedIds.value = new Set(failedIds.value)
+  }
 }
 
 async function refresh() {
@@ -188,12 +213,31 @@ onBeforeUnmount(() => {
         :key="att.id"
         class="att-card group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden cursor-move"
       >
+        <!-- Image OK -->
         <img
+          v-if="!failedIds.has(att.id)"
           :src="urlFor(att)"
           :alt="att.original_name || ''"
+          loading="lazy"
           class="w-full aspect-video object-cover bg-gray-100 cursor-zoom-in"
           @click="openViewer(att)"
+          @error="(e) => onImgError(att, e)"
+          @load="onImgLoad(att)"
         />
+        <!-- Placeholder si image cassee (apres 3 essais) -->
+        <div
+          v-else
+          class="w-full aspect-video bg-gray-100 flex flex-col items-center justify-center gap-2 text-center px-3 cursor-pointer hover:bg-gray-200"
+          @click="retryCount.delete(att.id); failedIds.delete(att.id); failedIds = new Set(failedIds)"
+          title="Cliquer pour réessayer"
+        >
+          <ExclamationCircleIcon class="w-8 h-8 text-amber-500" />
+          <p class="text-[11px] text-gray-600 leading-tight">
+            Image non disponible<br>
+            <span class="text-gray-400">{{ att.original_name }}</span>
+          </p>
+          <p class="text-[10px] text-indigo-600">Cliquer pour réessayer</p>
+        </div>
 
         <button
           @click.stop="removeAttachment(att)"

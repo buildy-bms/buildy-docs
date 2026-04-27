@@ -90,7 +90,7 @@ watch(() => route.params.id, async () => {
     <!-- Layout split : arbre 320px + éditeur flex -->
     <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4">
       <!-- Sidebar arbre des sections -->
-      <aside class="w-80 flex-shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
+      <aside class="w-80 shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
             Sections ({{ sections.length }})
@@ -122,15 +122,8 @@ watch(() => route.params.id, async () => {
             <EquipmentInstancesTable :section-id="selectedSection.id" />
           </template>
 
-          <!-- Captures (toutes sections sauf synthesis qui est auto-généré) -->
-          <AttachmentsGrid
-            v-if="selectedSection.kind !== 'synthesis'"
-            :section-id="selectedSection.id"
-            :af-id="af.id"
-          />
-
           <!-- Pour kind='hyperveez_page' : info de la page Hyperveez -->
-          <div v-else-if="selectedSection.kind === 'hyperveez_page' && selectedSection.hyperveez_page_slug" class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+          <div v-if="selectedSection.kind === 'hyperveez_page' && selectedSection.hyperveez_page_slug" class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
             <p class="font-semibold mb-1">📖 Page Hyperveez : <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs">{{ selectedSection.hyperveez_page_slug }}</code></p>
             <p class="text-xs text-blue-800">
               Cette section décrit une page réelle de l'UI Hyperveez. La description est pré-remplie depuis le code Hyperveez.
@@ -139,13 +132,20 @@ watch(() => route.params.id, async () => {
           </div>
 
           <!-- Pour kind='synthesis' : note auto-generation -->
-          <div v-else-if="selectedSection.kind === 'synthesis'" class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+          <div v-if="selectedSection.kind === 'synthesis'" class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
             <p class="font-semibold mb-1">📊 Tableau de synthèse</p>
             <p class="text-xs text-amber-800">
               Ce tableau matriciel sera auto-généré à l'export PDF (Lot 6) depuis le contenu des chapitres précédents.
               Tu peux ajuster la note d'introduction si besoin.
             </p>
           </div>
+
+          <!-- Captures (toutes sections sauf synthesis qui est auto-généré) -->
+          <AttachmentsGrid
+            v-if="selectedSection.kind !== 'synthesis'"
+            :section-id="selectedSection.id"
+            :af-id="af.id"
+          />
         </template>
         <div v-else class="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
           Sélectionne une section dans l'arbre à gauche pour commencer.

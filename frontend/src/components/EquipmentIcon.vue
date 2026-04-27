@@ -36,7 +36,7 @@ const faName = computed(() => {
 </script>
 
 <template>
-  <span :class="['inline-flex items-center justify-center flex-shrink-0', sizeClass]" :style="{ color: iconColor }">
+  <span :class="['inline-flex items-center justify-center shrink-0', sizeClass]" :style="{ color: iconColor }">
     <FontAwesomeIcon v-if="iconKind === 'fa'" :icon="['fas', faName]" />
     <!-- TODO svg-hyperveez et svg-custom : copier les SVG depuis hyperveez/src/assets quand on en aura besoin -->
     <span v-else class="text-[10px] text-gray-400">{{ iconValue }}</span>

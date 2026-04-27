@@ -106,7 +106,7 @@ function setLink() {
   <div class="bg-white rounded-xl border border-gray-200">
     <!-- Header section : numéro + titre éditable + badges + autosave -->
     <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <span v-if="section.number" class="text-sm font-semibold text-gray-400 flex-shrink-0">
+      <span v-if="section.number" class="text-sm font-semibold text-gray-400 shrink-0">
         {{ section.number }}
       </span>
       <input
@@ -124,7 +124,7 @@ function setLink() {
         :state="globalState"
         :last-saved="globalLastSaved"
         :error="bodyAutosave.lastError.value || titleAutosave.lastError.value"
-        class="ml-2 flex-shrink-0"
+        class="ml-2 shrink-0"
       />
     </div>
 

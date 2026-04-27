@@ -75,7 +75,7 @@ onMounted(refresh)
       </div>
       <button
         @click="showAdd = !showAdd"
-        class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium flex-shrink-0"
+        class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium shrink-0"
       >
         <PlusCircleIcon class="w-4 h-4" /> Ajouter une instance
       </button>

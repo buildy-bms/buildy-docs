@@ -178,7 +178,7 @@ onMounted(refresh)
             </div>
             <p class="text-sm text-gray-700 mb-2 truncate">{{ af.project_name }}</p>
             <div v-if="af.site_address" class="flex items-center gap-1.5 text-xs text-gray-500 mb-2 truncate">
-              <MapPinIcon class="w-3.5 h-3.5 flex-shrink-0" />
+              <MapPinIcon class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{{ af.site_address }}</span>
             </div>
             <div class="flex items-center gap-1.5 text-xs text-gray-400 mb-3">

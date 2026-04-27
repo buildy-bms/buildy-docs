@@ -41,16 +41,16 @@ const indentStyle = computed(() => ({
         v-if="hasChildren"
         type="button"
         @click.stop="emit('toggle', node)"
-        class="flex-shrink-0 p-0.5 -my-0.5 rounded hover:bg-gray-200"
+        class="shrink-0 p-0.5 -my-0.5 rounded hover:bg-gray-200"
       >
         <ChevronRightIcon v-if="isCollapsed" class="w-3 h-3 text-gray-500" />
         <ChevronDownIcon v-else class="w-3 h-3 text-gray-500" />
       </button>
-      <span v-else class="w-4 h-3 flex-shrink-0"></span>
+      <span v-else class="w-4 h-3 shrink-0"></span>
 
-      <component :is="Icon" :class="['w-3.5 h-3.5 flex-shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
+      <component :is="Icon" :class="['w-3.5 h-3.5 shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
 
-      <span v-if="node.number" :class="['text-[11px] font-medium flex-shrink-0', isSelected ? 'text-indigo-700' : 'text-gray-500']">
+      <span v-if="node.number" :class="['text-[11px] font-medium shrink-0', isSelected ? 'text-indigo-700' : 'text-gray-500']">
         {{ node.number }}
       </span>
 
@@ -58,7 +58,7 @@ const indentStyle = computed(() => ({
 
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
 
-      <span v-if="empty" class="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" title="Section vide — à rédiger"></span>
+      <span v-if="empty" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Section vide — à rédiger"></span>
     </button>
 
     <div v-if="hasChildren && !isCollapsed">

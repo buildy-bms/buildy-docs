@@ -23,7 +23,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4" @click.self="emit('close')">
-      <div :class="['bg-white rounded-2xl shadow-2xl w-full', sizeClass]">
+      <div :class="['bg-white rounded-lg shadow-xl w-full', sizeClass]">
         <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100">
           <h2 class="text-base font-semibold text-gray-800">{{ title }}</h2>
           <button @click="emit('close')" class="text-gray-400 hover:text-gray-700 p-1 -mr-1">
@@ -33,7 +33,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
         <div class="px-6 py-5">
           <slot />
         </div>
-        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-2">
+        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 rounded-b-lg flex items-center justify-end gap-2">
           <slot name="footer" />
         </div>
       </div>

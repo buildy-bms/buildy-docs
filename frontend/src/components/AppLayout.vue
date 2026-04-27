@@ -50,7 +50,7 @@ async function logout() {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Mobile header -->
-    <div class="lg:hidden flex items-center justify-between bg-[#1b2842] px-4 py-3">
+    <div class="lg:hidden flex items-center justify-between bg-indigo-600 px-4 py-3">
       <div class="flex items-center gap-2">
         <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-6" />
         <span class="text-white font-semibold text-sm">Buildy AF</span>
@@ -65,11 +65,11 @@ async function logout() {
       <!-- Sidebar -->
       <aside
         :class="[
-          'fixed inset-y-0 left-0 z-30 w-52 h-screen bg-[#1b2842] flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0',
+          'fixed inset-y-0 left-0 z-30 w-52 h-screen bg-indigo-600 flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         ]"
       >
-        <div class="hidden lg:flex flex-col items-center py-4 px-4 border-b border-white/10 flex-shrink-0">
+        <div class="hidden lg:flex flex-col items-center py-4 px-4 border-b border-white/10 shrink-0">
           <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-8" />
           <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.2em]">Analyse Fonctionnelle</span>
         </div>
@@ -97,7 +97,7 @@ async function logout() {
           </template>
         </nav>
 
-        <div class="flex-shrink-0 px-4 py-3 border-t border-white/10">
+        <div class="shrink-0 px-4 py-3 border-t border-white/10">
           <div class="flex items-center gap-2 px-2.5 py-1.5 mb-1 text-xs text-white/70">
             <UserCircleIcon class="w-4 h-4" />
             {{ currentUser?.display_name || currentUser?.email || 'Utilisateur' }}
