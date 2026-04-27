@@ -13,6 +13,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   UserCircleIcon,
 } from '@heroicons/vue/24/outline'
+import CommandPalette from './CommandPalette.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,14 +27,14 @@ onMounted(async () => {
   } catch { /* offline */ }
 })
 
+const paletteRef = ref(null)
 const nav = [
   { name: 'Mes AFs', to: '/', icon: DocumentTextIcon },
   { section: 'Bibliotheque' },
   { name: 'Equipements', to: '/library', icon: RectangleStackIcon },
-  { section: 'Outils' },
-  { name: 'Recherche', to: '/search', icon: MagnifyingGlassIcon },
-  { name: 'Reglages', to: '/settings', icon: CogIcon },
 ]
+const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
+const cmdKey = isMac ? '⌘' : 'Ctrl'
 
 function isActive(to) {
   if (to === '/') return route.path === '/'
@@ -72,6 +73,19 @@ async function logout() {
         <div class="hidden lg:flex flex-col items-center py-4 px-4 border-b border-white/10 shrink-0">
           <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-8" />
           <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.2em]">Analyse Fonctionnelle</span>
+        </div>
+
+        <div class="px-2.5 mt-3">
+          <button
+            @click="paletteRef?.openPalette ? paletteRef.openPalette() : null"
+            class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs text-white/60 hover:text-white/90 hover:bg-white/8 border border-white/10"
+          >
+            <span class="flex items-center gap-2">
+              <MagnifyingGlassIcon class="w-4 h-4" />
+              Rechercher…
+            </span>
+            <kbd class="text-[10px] px-1 py-0.5 bg-white/10 font-mono">{{ cmdKey }} K</kbd>
+          </button>
         </div>
 
         <nav class="mt-3 px-2.5 space-y-0.5 flex-1 overflow-y-auto">
@@ -121,5 +135,7 @@ async function logout() {
         <slot />
       </main>
     </div>
+
+    <CommandPalette ref="paletteRef" />
   </div>
 </template>

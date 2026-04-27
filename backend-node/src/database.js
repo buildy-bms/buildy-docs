@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 5;
+const TARGET_VERSION = 6;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -311,6 +311,34 @@ function runMigrations() {
     }
     db.pragma('user_version = 5');
     log.info('Migration 5 appliquee : snapshots templates equipement');
+  }
+
+  if (current < 6) {
+    // Lot 8 — backfill index FTS5 pour toutes les sections existantes (les
+    // sections seedees avant Lot 8 n'avaient pas d'entree FTS, la recherche
+    // remontait vide).
+    const sections = db.prepare(`
+      SELECT s.id, s.af_id, s.title, s.body_html
+      FROM sections s
+      JOIN afs a ON a.id = s.af_id
+      WHERE a.deleted_at IS NULL
+    `).all();
+    let indexed = 0;
+    const ins = db.prepare(`
+      INSERT INTO sections_fts (section_id, af_id, title, body_text) VALUES (?, ?, ?, ?)
+    `);
+    const del = db.prepare('DELETE FROM sections_fts WHERE section_id = ?');
+    for (const s of sections) {
+      del.run(s.id);
+      const bodyText = (s.body_html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      if (s.title || bodyText) {
+        ins.run(s.id, s.af_id, s.title || '', bodyText);
+        indexed++;
+      }
+    }
+    log.info(`Migration 6 : ${indexed} sections indexees dans FTS5`);
+    db.pragma('user_version = 6');
+    log.info('Migration 6 appliquee : backfill FTS5');
   }
 
   if (current > TARGET_VERSION) {

@@ -73,6 +73,9 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
+// ── Recherche ──
+export const search = (q, params = {}) => api.get('/search', { params: { q, ...params } })
+
 // ── Versions Git ──
 export const listAfVersions = (afId) => api.get(`/afs/${afId}/versions`)
 export const getAfVersionsDiff = (afId, from, to) =>
