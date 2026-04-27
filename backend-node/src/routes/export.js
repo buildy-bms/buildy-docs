@@ -105,23 +105,46 @@ async function routes(fastify) {
     // equipment unique et on charge ses instances + points.
     const equipmentSections = allSections.filter(s => s.kind === 'equipment' && s.included_in_export);
 
+    // (Lot 19) On produit aussi une liste à plat `rows` pour le tableau global
+    // A3 paysage : une ligne par (instance × point), avec marquage isFirstOfInstance
+    // pour les separateurs visuels et l'affichage des cellules « catégorie / repère / loc » uniquement sur la 1re ligne.
+    const rows = [];
     const categories = equipmentSections.map((sec) => {
       const instances = db.equipmentInstances.listBySection(sec.id);
       const points = resolveSectionPoints(sec.id);
-      const instancesWithPoints = instances.map((inst) => {
-        // Pour chaque instance, on duplique tous les points (avec qty pour info)
-        return {
-          reference: inst.reference,
-          location: inst.location,
-          qty: inst.qty,
-          points: points.map((p) => ({
+      const instancesWithPoints = instances.map((inst) => ({
+        reference: inst.reference,
+        location: inst.location,
+        qty: inst.qty,
+        points: points.map((p) => ({
+          label: p.label,
+          data_type: p.data_type,
+          unit: p.unit,
+          tech_name: p.tech_name,
+          nature: p.nature,
+          dirLabel: p.direction === 'read' ? 'R' : 'W',
+        })),
+      }));
+
+      for (const inst of instancesWithPoints) {
+        let first = true;
+        for (const p of inst.points) {
+          rows.push({
+            categoryName: sec.title,
+            instanceRef: inst.reference,
+            instanceLocation: inst.location || '',
+            isFirstOfInstance: first,
             label: p.label,
             data_type: p.data_type,
             unit: p.unit,
-            dirLabel: p.direction === 'read' ? 'R' : 'W',
-          })),
-        };
-      });
+            tech_name: p.tech_name,
+            nature: p.nature,
+            dirLabel: p.dirLabel,
+          });
+          first = false;
+        }
+      }
+
       return {
         name: sec.title,
         bacsArticles: sec.bacs_articles,
@@ -156,6 +179,7 @@ async function routes(fastify) {
       serviceLevelLabel: SERVICE_LEVEL_LABELS[af.service_level] || af.service_level || '—',
       logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
       categories,
+      rows, // (Lot 19) liste à plat pour le tableau global A3 paysage
       totals,
     };
 
@@ -172,6 +196,8 @@ async function routes(fastify) {
         styles: 'styles-points',
         data,
         outputPath,
+        pageFormat: 'A3',
+        pageOrientation: 'landscape',
       });
     } catch (err) {
       log.error(`PDF render failed: ${err.message}`);

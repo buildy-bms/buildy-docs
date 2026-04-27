@@ -1,11 +1,13 @@
 /* ──────────────────────────────────────────────────────────────────
-   Liste de points contractuelle — A3 portrait — DOE Buildy
-   (Poppins / Manrope embed via lib/pdf.js getEmbeddedFontsCss)
+   Liste de points contractuelle — A3 PAYSAGE — DOE Buildy (Lot 19)
+   - Une seule grande table, no-wrap absolu, table-layout: fixed
+   - Colonnes calibrées pour fitter exactement la largeur utile
+   - thead répété sur chaque page (display: table-header-group)
    ────────────────────────────────────────────────────────────────── */
 
 @page {
-  size: A3 portrait;
-  margin: 22mm 18mm 18mm 18mm;
+  size: A3 landscape; /* 420 mm × 297 mm */
+  margin: 14mm 10mm 12mm 10mm;
 }
 
 @page :first {
@@ -15,267 +17,235 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 10pt;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 7.5pt;
   color: #1f2937;
+  line-height: 1.35;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-a { color: inherit; text-decoration: none; }
+h1, h2, h3 { font-family: 'Poppins', sans-serif; }
 
-/* ── Page de garde ─────────────────────────────────────────────── */
+/* ── Page de garde — A3 paysage 420×297 ──────────────────────── */
 .cover {
-  width: 297mm;
-  height: 420mm;
-  padding: 30mm 24mm;
-  box-sizing: border-box;
+  width: 420mm;
+  height: 297mm;
+  padding: 22mm 24mm;
   background: #1b2842;
   color: white;
+  page-break-after: always;
   display: flex;
   flex-direction: column;
-  page-break-after: always;
+  position: relative;
 }
-.cover-logo { width: 56mm; margin-bottom: 30mm; filter: brightness(0) invert(1); }
+.cover-logo {
+  width: 50mm;
+  margin-bottom: 12mm;
+  filter: brightness(0) invert(1);
+}
 .cover-doc-type {
-  font-size: 11pt;
+  font-size: 9pt;
   text-transform: uppercase;
   letter-spacing: 0.25em;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 12mm;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 4mm;
+  font-weight: 500;
 }
 .cover-title {
   font-size: 32pt;
   font-weight: 700;
-  line-height: 1.15;
-  margin: 0 0 14mm;
-  color: white;
+  margin: 0 0 4mm;
+  letter-spacing: -0.01em;
 }
 .cover-client {
-  font-size: 18pt;
+  font-size: 16pt;
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 500;
-  margin-bottom: 4mm;
-  color: rgba(255, 255, 255, 0.9);
-}
-.cover-project {
-  font-size: 14pt;
-  margin-bottom: 6mm;
-  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 2mm;
 }
 .cover-address {
-  font-size: 11pt;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 10pt;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
 }
-.cover-meta {
-  margin-top: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8mm 12mm;
-  padding-top: 12mm;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
+.cover-meta { margin-top: auto; padding-top: 18mm; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm 16mm; }
 .cover-meta-row { display: flex; flex-direction: column; }
 .cover-meta-label {
-  font-size: 8pt;
+  font-size: 7.5pt;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.15em;
   color: rgba(255, 255, 255, 0.4);
   margin-bottom: 1.5mm;
 }
-.cover-meta-value {
-  font-size: 11pt;
-  color: white;
-  font-weight: 500;
-}
+.cover-meta-value { font-size: 11pt; color: white; font-weight: 500; }
 .cover-version-tag {
-  display: inline-block;
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 10pt;
+  font-family: 'SFMono-Regular', monospace;
   background: #00cd92;
-  color: #051428;
+  color: #1b2842;
   padding: 1mm 3mm;
   border-radius: 1mm;
   font-weight: 600;
 }
 .cover-motif {
-  margin-top: 4mm;
-  font-size: 9.5pt;
+  margin-top: 2mm;
+  font-size: 9pt;
   color: rgba(255, 255, 255, 0.65);
   font-style: italic;
-  line-height: 1.5;
+}
+.cover-disclaimer {
+  position: absolute;
+  bottom: 18mm;
+  left: 24mm;
+  right: 24mm;
+  font-size: 8pt;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.55;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 4mm;
 }
 
-/* ── Sommaire ──────────────────────────────────────────────────── */
-.toc { page-break-after: always; }
-.toc h1 {
-  font-size: 22pt;
-  font-weight: 700;
-  margin: 0 0 8mm;
-  color: #1b2842;
+/* ── Tableau principal — full width, fixed layout, no-wrap ────── */
+.points-section {
+  width: 100%;
 }
-.toc-list { list-style: none; padding: 0; margin: 0; }
-.toc-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 2.5mm 0;
-  border-bottom: 1px dashed #d1d5db;
-  font-size: 11pt;
-}
-.toc-cat-name { font-weight: 600; color: #1f2937; }
-.toc-cat-count { color: #6b7280; font-size: 9pt; margin-left: 4mm; }
-
-/* ── Catégorie d'équipement ────────────────────────────────────── */
-.cat {
-  page-break-before: always;
-}
-.cat:first-of-type { page-break-before: avoid; }
-.cat-header {
-  display: flex;
-  align-items: baseline;
-  border-bottom: 2px solid #1b2842;
-  padding-bottom: 2mm;
-  margin: 0 0 4mm;
-}
-.cat-title {
-  font-size: 18pt;
-  font-weight: 700;
-  color: #1b2842;
-  margin: 0;
-  flex: 1;
-}
-.cat-count {
-  font-size: 9pt;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-.cat-bacs {
-  display: inline-block;
-  font-size: 8.5pt;
-  color: #6d28d9;
-  background: #f5f3ff;
-  border: 1px solid #ddd6fe;
-  padding: 0.5mm 2mm;
-  border-radius: 1mm;
-  margin-left: 4mm;
-  white-space: nowrap;
-}
-
-/* ── Groupe par instance ───────────────────────────────────────── */
-.instance {
-  margin-bottom: 6mm;
-  page-break-inside: avoid;
-}
-.instance-header {
-  background: #f8f9fb;
-  border-left: 3px solid #1b2842;
-  padding: 2.5mm 4mm;
-  display: flex;
-  align-items: baseline;
-  gap: 5mm;
-}
-.instance-ref {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-weight: 700;
-  color: #1b2842;
-  font-size: 10pt;
-}
-.instance-location { color: #4b5563; font-size: 9.5pt; }
-.instance-qty {
-  margin-left: auto;
-  font-size: 8.5pt;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-.instance-empty { padding: 4mm; text-align: center; color: #9ca3af; font-style: italic; font-size: 9pt; }
-
-/* ── Tableau de points ─────────────────────────────────────────── */
 table.points {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9pt;
-  margin-top: 0;
-}
-table.points thead th {
-  text-align: left;
-  padding: 2mm 3mm;
-  background: #f1f3f6;
-  border-bottom: 1px solid #d1d5db;
+  table-layout: fixed;
   font-size: 7.5pt;
-  font-weight: 600;
-  color: #6b7280;
+}
+/* Largeurs calibrées pour A3 paysage 400mm utile (420 - 2×10mm)
+   Total : 38 + 30 + 40 + 38 + 80 + 22 + 14 + 24 + 16 + 98 = 400 mm */
+table.points col, /* fallback */
+table.points th.col-cat,         table.points td.col-cat         { width: 38mm; }
+table.points th.col-ref,         table.points td.col-ref         { width: 30mm; }
+table.points th.col-loc,         table.points td.col-loc         { width: 40mm; }
+table.points th.col-tech,        table.points td.col-tech        { width: 38mm; }
+table.points th.col-label,       table.points td.col-label       { width: 80mm; }
+table.points th.col-type,        table.points td.col-type        { width: 22mm; }
+table.points th.col-dir,         table.points td.col-dir         { width: 14mm; }
+table.points th.col-nature,      table.points td.col-nature      { width: 24mm; }
+table.points th.col-unit,        table.points td.col-unit        { width: 16mm; }
+table.points th.col-commentaire, table.points td.col-commentaire { width: 98mm; }
+
+table.points thead { display: table-header-group; } /* répétition headers sur chaque page */
+table.points tr { page-break-inside: avoid; }
+
+table.points th {
+  background: #1b2842;
+  color: white;
+  font-family: 'Manrope', sans-serif;
+  font-size: 7pt;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
+  padding: 1.5mm 1.5mm;
+  border-right: 0.3mm solid rgba(255, 255, 255, 0.12);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
 }
-table.points tbody tr:nth-child(even) { background: #fafbfc; }
+
 table.points td {
-  padding: 1.8mm 3mm;
-  border-bottom: 1px solid #e8ebf0;
-  vertical-align: top;
-  line-height: 1.4;
+  padding: 1mm 1.5mm;
+  border-bottom: 0.3mm solid #e8ebf0;
+  border-right: 0.3mm solid #f3f4f6;
+  vertical-align: middle;
+
+  /* Règle d'or Lot 19 : jamais de retour à la ligne */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-table.points td.col-data { font-weight: 500; color: #1f2937; }
-table.points td.col-empty { color: #cbd5e1; font-style: italic; }
 
-/* Largeurs colonnes (totaux % calibrés pour A3 portrait) */
-.col-data       { width: auto;  }
-.col-type       { width: 18mm;  }
-.col-direction  { width: 8mm;   }
-.col-unit       { width: 14mm;  }
-.col-description { width: 50mm; }
-.col-blank      { width: 28mm; }
+table.points tbody tr:nth-child(even) td { background: #fafbfc; }
+table.points tr.row-first td {
+  border-top: 0.6mm solid #1b2842;
+  background: #f8f9fb !important;
+}
+table.points tr.row-first td.col-cat,
+table.points tr.row-first td.col-ref { font-weight: 700; color: #1b2842; }
 
-/* Badges Type colorés */
+table.points td.col-tech code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  background: #f3f4f6;
+  color: #374151;
+  padding: 0.2mm 1.2mm;
+  border-radius: 0.6mm;
+  font-size: 6.8pt;
+  font-weight: 600;
+}
+
+table.points td.col-label { font-weight: 500; color: #1f2937; }
+table.points td.col-nature { color: #6b7280; font-style: italic; font-size: 7pt; }
+table.points td.col-unit { text-align: center; color: #4b5563; font-variant-numeric: tabular-nums; }
+
+/* Badges Type (Mesure / État / Alarme / Commande / Consigne) */
 .badge-type {
   display: inline-block;
-  font-size: 7.5pt;
-  font-weight: 600;
-  padding: 0.6mm 2mm;
-  border-radius: 1mm;
+  padding: 0.4mm 1.8mm;
+  font-size: 6.5pt;
+  font-weight: 700;
+  border-radius: 0.8mm;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 .type-Mesure   { background: #dbeafe; color: #1e40af; }
-.type-Alarme   { background: #fee2e2; color: #b91c1c; }
 .type-État     { background: #f1f5f9; color: #475569; }
+.type-Alarme   { background: #fee2e2; color: #b91c1c; }
 .type-Commande { background: #d1fae5; color: #065f46; }
 .type-Consigne { background: #fef3c7; color: #92400e; }
 
+/* Badges Sens R/W */
 .badge-dir {
   display: inline-block;
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 8pt;
+  width: 4.5mm;
+  text-align: center;
+  padding: 0.4mm 0;
+  font-size: 6.5pt;
   font-weight: 700;
-  padding: 0.4mm 1.5mm;
-  border-radius: 1mm;
-  letter-spacing: 0.05em;
+  border-radius: 0.6mm;
+  border: 0.3mm solid;
 }
-.dir-R { background: #e0e7ff; color: #3730a3; }
-.dir-W { background: #fce7f3; color: #9d174d; }
+.dir-R { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.dir-W { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 
-/* ── Récap final ───────────────────────────────────────────────── */
+/* ── Récapitulatif final ─────────────────────────────────────── */
 .summary {
+  margin-top: 8mm;
   page-break-before: always;
-  padding-top: 4mm;
 }
 .summary h2 {
-  font-size: 16pt;
-  margin: 0 0 6mm;
+  font-size: 14pt;
   color: #1b2842;
-  border-bottom: 2px solid #1b2842;
-  padding-bottom: 2mm;
+  margin: 0 0 4mm;
+  font-weight: 600;
 }
 table.summary-table {
-  width: 100%;
+  width: 70%;
   border-collapse: collapse;
-  font-size: 10pt;
+  font-size: 9pt;
 }
-table.summary-table th, table.summary-table td {
-  padding: 2.5mm 4mm;
+table.summary-table th {
+  background: #f1f3f6;
+  color: #1b2842;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 7.5pt;
+  letter-spacing: 0.05em;
+  padding: 2mm 3mm;
   text-align: left;
-  border-bottom: 1px solid #e8ebf0;
+  border-bottom: 0.6mm solid #1b2842;
 }
-table.summary-table th { background: #f1f3f6; font-weight: 600; }
-table.summary-table tfoot td { font-weight: 700; background: #f8f9fb; border-top: 2px solid #1b2842; }
-.summary-num { text-align: right; font-variant-numeric: tabular-nums; }
+table.summary-table td {
+  padding: 2mm 3mm;
+  border-bottom: 0.3mm solid #e8ebf0;
+}
+table.summary-table .summary-num { text-align: right; font-variant-numeric: tabular-nums; }
+table.summary-table tfoot td {
+  font-weight: 700;
+  background: #f8fafc;
+  border-top: 0.6mm solid #1b2842;
+  border-bottom: none;
+}

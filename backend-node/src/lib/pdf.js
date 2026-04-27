@@ -133,7 +133,7 @@ function getBrowser() {
  * @param {boolean} opts.populateToc — true pour injecter les n° de page dans la TOC
  * @param {string} opts.pageFormat — 'A4' | 'A3' (pour calcul hauteur page)
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4' }) {
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -144,10 +144,13 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
   try {
     // Viewport en pixels = format de page A4 ou A3 a 96 DPI (1mm = 3.7795px)
     // A4 = 210x297mm = 794x1123px, A3 = 297x420mm = 1123x1587px
-    const viewportPortrait = pageFormat === 'A3'
+    let viewport = pageFormat === 'A3'
       ? { width: 1123, height: 1587 }
       : { width: 794, height: 1123 };
-    await page.setViewport(viewportPortrait);
+    if (pageOrientation === 'landscape') {
+      viewport = { width: viewport.height, height: viewport.width };
+    }
+    await page.setViewport(viewport);
 
     await page.setContent(html, { waitUntil: 'load', timeout: 90_000 });
     await page.emulateMediaType('print');

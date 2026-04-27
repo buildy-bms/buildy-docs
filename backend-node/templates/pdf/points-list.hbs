@@ -33,85 +33,59 @@
       <span class="cover-meta-label">Niveau de service</span>
       <span class="cover-meta-value">{{serviceLevelLabel}}</span>
     </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Total</span>
+      <span class="cover-meta-value">{{totals.instances}} instance{{#if (gt totals.instances 1)}}s{{/if}} · {{totals.points}} point{{#if (gt totals.points 1)}}s{{/if}}</span>
+    </div>
   </div>
+
+  <p class="cover-disclaimer">
+    <em>Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
+    Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
+    La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
+    en avant-projet ou validés par Buildy avant mise en production.</em>
+  </p>
 </section>
 
-{{!-- ═══════════ Sommaire ═══════════ --}}
-<section class="toc">
-  <h1>Sommaire</h1>
-  <ul class="toc-list">
-    {{#each categories}}
-    <li class="toc-row">
-      <span class="toc-cat-name">{{name}}</span>
-      <span class="toc-cat-count">{{instancesCount}} instance{{#if (gt instancesCount 1)}}s{{/if}} · {{pointsTotal}} point{{#if (gt pointsTotal 1)}}s{{/if}}</span>
-    </li>
-    {{/each}}
-  </ul>
+{{!-- ═══════════ Tableau global de tous les points ═══════════ --}}
+<section class="points-section">
+  <table class="points">
+    <thead>
+      <tr>
+        <th class="col-cat">Catégorie</th>
+        <th class="col-ref">Repère</th>
+        <th class="col-loc">Localisation</th>
+        <th class="col-tech">Nom technique</th>
+        <th class="col-label">Donnée</th>
+        <th class="col-type">Type</th>
+        <th class="col-dir">Sens</th>
+        <th class="col-nature">Nature</th>
+        <th class="col-unit">Unité</th>
+        <th class="col-commentaire">Commentaire intégrateur</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each rows}}
+      <tr class="{{#if isFirstOfInstance}}row-first{{/if}}">
+        <td class="col-cat">{{#if isFirstOfInstance}}{{categoryName}}{{/if}}</td>
+        <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{/if}}</td>
+        <td class="col-loc">{{#if isFirstOfInstance}}{{instanceLocation}}{{/if}}</td>
+        <td class="col-tech">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
+        <td class="col-label">{{label}}</td>
+        <td class="col-type"><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
+        <td class="col-dir"><span class="badge-dir dir-{{dirLabel}}">{{dirLabel}}</span></td>
+        <td class="col-nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
+        <td class="col-unit">{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
+        <td class="col-commentaire"></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
 </section>
-
-{{!-- ═══════════ Une catégorie par section ═══════════ --}}
-{{#each categories}}
-<section class="cat">
-  <header class="cat-header">
-    <h2 class="cat-title">{{name}}</h2>
-    {{#if bacsArticles}}<span class="cat-bacs">⚖️ {{bacsArticles}}</span>{{/if}}
-    <span class="cat-count">{{instancesCount}} instance{{#if (gt instancesCount 1)}}s{{/if}} · {{pointsTotal}} ligne{{#if (gt pointsTotal 1)}}s{{/if}}</span>
-  </header>
-
-  {{#each instances}}
-  <div class="instance">
-    <header class="instance-header">
-      <span class="instance-ref">{{reference}}</span>
-      {{#if location}}<span class="instance-location">{{location}}</span>{{/if}}
-      {{#if (gt qty 1)}}<span class="instance-qty">×{{qty}}</span>{{/if}}
-    </header>
-
-    {{#if points.length}}
-    <table class="points">
-      <thead>
-        <tr>
-          <th class="col-data">Donnée</th>
-          <th class="col-type">Type</th>
-          <th class="col-direction">Sens</th>
-          <th class="col-unit">Unité</th>
-          <th class="col-description">Description / Notes</th>
-          <th class="col-blank">Adresse</th>
-          <th class="col-blank">Échelle</th>
-          <th class="col-blank">Commentaire</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each points}}
-        <tr>
-          <td class="col-data">{{label}}</td>
-          <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
-          <td><span class="badge-dir dir-{{dirLabel}}">{{dirLabel}}</span></td>
-          <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
-          <td></td>
-          <td class="col-empty">—</td>
-          <td class="col-empty">—</td>
-          <td class="col-empty">—</td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
-    {{else}}
-    <div class="instance-empty">Aucun point défini pour cette instance</div>
-    {{/if}}
-  </div>
-  {{/each}}
-
-  {{#unless instances.length}}
-  <div class="instance-empty">
-    Aucune instance saisie pour cette catégorie. Définir au moins une instance dans l'éditeur.
-  </div>
-  {{/unless}}
-</section>
-{{/each}}
 
 {{!-- ═══════════ Récapitulatif final ═══════════ --}}
 <section class="summary">
-  <h2>Récapitulatif</h2>
+  <h2>Récapitulatif par catégorie</h2>
   <table class="summary-table">
     <thead>
       <tr>
