@@ -14,8 +14,10 @@ module.exports = {
       },
       env_production: {
         NODE_ENV: 'production',
-        // PORT non defini ici : laisse le .env decider (3443 par defaut sur le VPS,
-        // FM occupe deja 443 sur le meme node). Eviter de hardcoder.
+        // 3443 = port HTTPS de buildy-af sur le VPS Jelastic (FM occupe deja 443).
+        // PM2 merge env_production par-dessus env, donc il faut redefinir PORT
+        // sinon il garde 3100 (dev).
+        PORT: 3443,
         TZ: 'Europe/Paris',
         watch: false,
       },
