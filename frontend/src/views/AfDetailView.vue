@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getAf, listSections, getSection } from '@/api'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
+import ActivityPanel from '@/components/ActivityPanel.vue'
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -17,6 +18,8 @@ const sections = ref([])
 const selectedSection = ref(null)
 const selectedId = ref(null)
 const loading = ref(true)
+const showActivity = ref(false)
+const activityRef = ref(null)
 
 const sectionsCountByKind = computed(() => {
   const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
@@ -52,6 +55,8 @@ function onSectionUpdated(updated) {
   if (selectedSection.value?.id === updated.id) {
     selectedSection.value = { ...selectedSection.value, ...updated }
   }
+  // Refresh panneau activite (debounced cote panel)
+  activityRef.value?.refresh?.()
 }
 
 function onAfUpdated(updated) {
@@ -85,7 +90,7 @@ watch(() => route.params.id, async () => {
   <div v-else-if="af" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
     <!-- Bandeau cycle de vie (en haut, full-width) -->
     <div class="px-5 lg:px-6 pt-4 space-y-2">
-      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" />
+      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" />
       <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
 
@@ -153,6 +158,16 @@ watch(() => route.params.id, async () => {
           Sélectionne une section dans l'arbre à gauche pour commencer.
         </div>
       </div>
+
+      <!-- Sidebar activité (collapsible) -->
+      <aside v-if="showActivity" class="w-72 shrink-0 relative">
+        <button
+          @click="showActivity = false"
+          class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10"
+          title="Replier"
+        >✕</button>
+        <ActivityPanel ref="activityRef" :af-id="af.id" />
+      </aside>
     </div>
   </div>
 </template>

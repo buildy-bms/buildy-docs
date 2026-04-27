@@ -564,7 +564,12 @@ const sections = {
     `).all(afId);
   },
   getById(id) {
-    return db.prepare('SELECT * FROM sections WHERE id = ?').get(id);
+    return db.prepare(`
+      SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email
+      FROM sections s
+      LEFT JOIN users u ON u.id = s.updated_by
+      WHERE s.id = ?
+    `).get(id);
   },
   create({ afId, parentId, position, number, title, serviceLevel, serviceLevelSource,
            bacsArticles, bodyHtml, kind, equipmentTemplateId, equipmentTemplateVersion,

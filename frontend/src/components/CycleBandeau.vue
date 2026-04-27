@@ -17,7 +17,7 @@ import ServiceLevelBadge from './ServiceLevelBadge.vue'
 const props = defineProps({
   af: { type: Object, required: true },
 })
-const emit = defineEmits(['updated', 'back'])
+const emit = defineEmits(['updated', 'back', 'toggle-activity'])
 
 const { success, error } = useNotification()
 const router = useRouter()
@@ -162,6 +162,14 @@ const exportDescription = computed(() => {
     >
       <TableCellsIcon class="w-4 h-4" />
       Synthèse (A3)
+    </button>
+    <button
+      @click="emit('toggle-activity')"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      title="Panneau d'activité"
+    >
+      <ClockIcon class="w-4 h-4" />
+      Activité
     </button>
     <button
       @click="router.push(`/afs/${af.id}/versions`)"

@@ -132,6 +132,15 @@ function applyClaude() {
   showClaudeModal.value = false
 }
 
+function formatUpdatedAt(iso) {
+  const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z')
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return 'à l\'instant'
+  if (diff < 3600) return `il y a ${Math.round(diff / 60)} min`
+  if (diff < 86400) return `il y a ${Math.round(diff / 3600)} h`
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
 // Toolbar helpers
 const isActive = (name, attrs) => editor.value?.isActive(name, attrs) || false
 function setLink() {
@@ -170,6 +179,12 @@ function setLink() {
         :error="bodyAutosave.lastError.value || titleAutosave.lastError.value"
         class="ml-2 shrink-0"
       />
+    </div>
+
+    <!-- Signature de derniere modif -->
+    <div v-if="section.updated_by_name || section.updated_at" class="px-5 py-1 text-[10px] text-gray-400 border-b border-gray-100 bg-gray-50">
+      Dernière modification {{ section.updated_by_name ? `par ${section.updated_by_name}` : '' }}
+      <span v-if="section.updated_at"> · {{ formatUpdatedAt(section.updated_at) }}</span>
     </div>
 
     <!-- Toolbar Tiptap -->
