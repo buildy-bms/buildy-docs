@@ -85,6 +85,9 @@ async function uploadFiles(files) {
       uploading.value--
     }
   }
+  // Petite latence pour laisser le navigateur invalider tout cache d'echec
+  // antérieur sur des URLs proches (ex. retry échoué en boucle juste avant).
+  await new Promise(r => setTimeout(r, 200))
   refresh()
 }
 

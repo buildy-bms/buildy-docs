@@ -59,24 +59,43 @@ async function routes(fastify) {
     const dir = ensureSectionDir(section.af_id);
     const fullPath = path.join(dir, filename);
 
-    // Stream vers le disque (avec garde-fou file too large)
+    // Stream vers le disque + fsync pour garantir que le fichier est
+    // disponible immediatement aux GETs qui suivent (sinon le frontend
+    // peut recevoir une image tronquee si son refresh post-upload est
+    // plus rapide que le flush du filesystem).
     try {
       await new Promise((resolve, reject) => {
         const ws = fs.createWriteStream(fullPath);
+        let aborted = false;
         file.file.pipe(ws);
         file.file.on('limit', () => {
+          aborted = true;
           ws.destroy();
           fs.unlink(fullPath, () => {});
           reject(new Error('FILE_TOO_LARGE'));
         });
-        ws.on('finish', resolve);
         ws.on('error', reject);
+        ws.on('finish', () => {
+          if (aborted) return;
+          // Force le flush kernel → disque AVANT de retourner OK
+          fs.open(fullPath, 'r', (err, fd) => {
+            if (err) return resolve();
+            fs.fsync(fd, () => fs.close(fd, () => resolve()));
+          });
+        });
       });
     } catch (err) {
       if (err.message === 'FILE_TOO_LARGE') {
         return reply.code(413).send({ detail: `Fichier trop lourd (max ${MAX_BYTES / 1024 / 1024} MB)` });
       }
       throw err;
+    }
+
+    // Verifie que le fichier est bien sur disque avec la bonne taille
+    let writtenSize = 0;
+    try { writtenSize = fs.statSync(fullPath).size; } catch {}
+    if (writtenSize === 0) {
+      return reply.code(500).send({ detail: 'Echec ecriture fichier' });
     }
 
     const userId = request.authUser?.id;
