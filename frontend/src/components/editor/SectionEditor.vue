@@ -7,11 +7,15 @@ import Placeholder from '@tiptap/extension-placeholder'
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon,
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
+  SparklesIcon, StopIcon,
 } from '@heroicons/vue/24/outline'
 import { updateSection } from '@/api'
 import { useAutosave } from '@/composables/useAutosave'
+import { useClaudeDraft } from '@/composables/useClaudeDraft'
+import { useNotification } from '@/composables/useNotification'
 import AutosaveStatus from './AutosaveStatus.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -90,6 +94,44 @@ onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
+// ── Assistant Claude ──
+const claudeStream = useClaudeDraft()
+const { error: notifyError, success: notifySuccess } = useNotification()
+const showClaudeModal = ref(false)
+const claudeInstruction = ref('')
+const claudePreview = ref('')
+const claudeAction = ref('replace') // 'replace' | 'append'
+
+function openClaude() {
+  claudeInstruction.value = ''
+  claudePreview.value = ''
+  claudeAction.value = props.section.body_html ? 'append' : 'replace'
+  showClaudeModal.value = true
+}
+
+async function runClaude() {
+  claudePreview.value = ''
+  await claudeStream.start(props.section.id, {
+    instruction: claudeInstruction.value.trim() || null,
+    onText: (chunk) => { claudePreview.value += chunk },
+    onError: (msg) => notifyError(msg || 'Échec Claude'),
+    onDone: () => { /* preview ready */ },
+  })
+}
+
+function applyClaude() {
+  if (!claudePreview.value.trim() || !editor.value) return
+  if (claudeAction.value === 'replace') {
+    editor.value.commands.setContent(claudePreview.value)
+  } else {
+    editor.value.commands.focus('end')
+    editor.value.commands.insertContent(claudePreview.value)
+  }
+  bodyAutosave.schedule(editor.value.getHTML())
+  notifySuccess('Brouillon Claude inséré dans la section.')
+  showClaudeModal.value = false
+}
+
 // Toolbar helpers
 const isActive = (name, attrs) => editor.value?.isActive(name, attrs) || false
 function setLink() {
@@ -159,6 +201,12 @@ function setLink() {
       <button @click="setLink"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Lien"><LinkIcon class="w-4 h-4" /></button>
+      <span class="flex-1"></span>
+      <button @click="openClaude"
+              class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-linear-to-r from-violet-600 to-indigo-600 text-white rounded hover:from-violet-700 hover:to-indigo-700"
+              title="Rédiger avec Claude">
+        <SparklesIcon class="w-3.5 h-3.5" /> Claude
+      </button>
     </div>
 
     <!-- Éditeur Tiptap -->
@@ -166,6 +214,65 @@ function setLink() {
       <EditorContent :editor="editor" />
     </div>
   </div>
+
+  <BaseModal v-if="showClaudeModal" title="Rédiger avec Claude" size="lg" @close="showClaudeModal = false">
+    <div class="space-y-3">
+      <p class="text-xs text-gray-500">
+        Claude va rédiger un brouillon pour cette section dans le style Buildy, en s'appuyant sur le contexte
+        (titre, niveau de service, BACS, points équipement, instances réelles).
+      </p>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Instruction spécifique (optionnel)</label>
+        <input v-model="claudeInstruction" type="text" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               placeholder="Ex : insiste sur la traçabilité des dérives, mentionne le tableau de bord QAI…"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+
+      <div class="flex items-center gap-3 text-xs">
+        <span class="text-gray-700 font-semibold">Insertion :</span>
+        <label class="inline-flex items-center gap-1">
+          <input v-model="claudeAction" type="radio" value="replace" /> Remplacer le contenu
+        </label>
+        <label class="inline-flex items-center gap-1">
+          <input v-model="claudeAction" type="radio" value="append" /> Ajouter à la suite
+        </label>
+      </div>
+
+      <div class="border border-gray-200 rounded-none min-h-50 max-h-[40vh] overflow-y-auto bg-gray-50">
+        <div v-if="!claudePreview && !claudeStream.streaming.value" class="p-6 text-center text-xs text-gray-400 italic">
+          Le brouillon de Claude apparaîtra ici en streaming.
+        </div>
+        <div v-else class="prose prose-sm max-w-none p-4" v-html="claudePreview || ''"></div>
+        <div v-if="claudeStream.streaming.value" class="px-4 py-2 text-[11px] text-indigo-600 border-t border-gray-200">
+          <span class="inline-block w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse mr-1"></span>
+          Claude rédige…
+        </div>
+      </div>
+    </div>
+
+    <template #footer>
+      <button @click="showClaudeModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">
+        Fermer
+      </button>
+      <button v-if="claudeStream.streaming.value" @click="claudeStream.abort"
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-red-50 text-red-700 hover:bg-red-100">
+        <StopIcon class="w-3.5 h-3.5" /> Arrêter
+      </button>
+      <button v-else-if="!claudePreview" @click="runClaude"
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-linear-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700">
+        <SparklesIcon class="w-3.5 h-3.5" /> Lancer Claude
+      </button>
+      <template v-else>
+        <button @click="runClaude" class="px-3 py-1.5 text-xs border border-gray-300 hover:bg-gray-50">
+          Régénérer
+        </button>
+        <button @click="applyClaude" class="px-3 py-1.5 text-xs bg-emerald-600 text-white hover:bg-emerald-700">
+          {{ claudeAction === 'replace' ? 'Remplacer' : 'Ajouter' }}
+        </button>
+      </template>
+    </template>
+  </BaseModal>
 </template>
 
 <style>

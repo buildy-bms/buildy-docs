@@ -37,6 +37,10 @@ const config = Object.freeze({
   // Public URL (utilise pour les redirects + emails). Ex: https://buildy-af.buildy.wan
   publicUrl: process.env.PUBLIC_URL || 'http://localhost:5173',
 
+  // Claude (Anthropic) — assistant redaction
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  claudeModel: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+
   // CORS — origines autorisees
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3100')
     .split(',').map(s => s.trim()).filter(Boolean),
