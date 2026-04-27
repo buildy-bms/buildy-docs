@@ -1,7 +1,9 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getAf, listSections, getSection } from '@/api'
+import { getAf, listSections, getSection, createSection, deleteSection, listEquipmentTemplates } from '@/api'
+import { useNotification } from '@/composables/useNotification'
+import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
 import ActivityPanel from '@/components/ActivityPanel.vue'
@@ -28,6 +30,60 @@ const selectedId = ref(null)
 const loading = ref(true)
 const showActivity = ref(false)
 const activityRef = ref(null)
+const { success: notifySuccess, error: notifyError } = useNotification()
+
+// Modale ajout section (Lot 16)
+const showAddModal = ref(false)
+const addParent = ref(null) // null = section racine
+const addForm = ref({ title: '', kind: 'standard', equipment_template_id: null })
+const equipmentTemplates = ref([])
+
+async function openAddSection(parentNode) {
+  addParent.value = parentNode || null
+  addForm.value = { title: '', kind: 'standard', equipment_template_id: null }
+  if (!equipmentTemplates.value.length) {
+    try { equipmentTemplates.value = (await listEquipmentTemplates()).data || [] }
+    catch { /* ignore */ }
+  }
+  showAddModal.value = true
+}
+
+async function submitAddSection() {
+  if (!addForm.value.title.trim()) return
+  try {
+    const { data } = await createSection(af.value.id, {
+      parent_id: addParent.value?.id || null,
+      title: addForm.value.title.trim(),
+      kind: addForm.value.kind,
+      equipment_template_id: addForm.value.kind === 'equipment' ? addForm.value.equipment_template_id : null,
+    })
+    notifySuccess(`Section "${data.title}" ajoutée`)
+    showAddModal.value = false
+    await refreshSections()
+    selectSection(data.id)
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
+  }
+}
+
+async function handleDeleteSection(node) {
+  const childCount = sections.value.filter(s => s.parent_id === node.id).length
+  const msg = childCount > 0
+    ? `Supprimer "${node.title}" ET ses ${childCount} sous-section(s) ?\nCela supprimera aussi tous les overrides, instances et captures associés.`
+    : `Supprimer la section "${node.title}" ?`
+  if (!confirm(msg)) return
+  try {
+    await deleteSection(node.id)
+    notifySuccess('Section supprimée')
+    if (selectedId.value === node.id) {
+      selectedId.value = null
+      selectedSection.value = null
+    }
+    await refreshSections()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec suppression')
+  }
+}
 
 const sectionsCountByKind = computed(() => {
   const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
@@ -121,7 +177,14 @@ watch(() => route.params.id, async () => {
           </p>
         </div>
         <div class="p-2">
-          <SectionTree :sections="sections" :selected-id="selectedId" @select="selectSection" />
+          <SectionTree
+            :sections="sections"
+            :selected-id="selectedId"
+            @select="selectSection"
+            @add-root="openAddSection(null)"
+            @add-child="openAddSection"
+            @delete="handleDeleteSection"
+          />
         </div>
         <!-- Poignée de drag-resize -->
         <div
@@ -187,4 +250,40 @@ watch(() => route.params.id, async () => {
       </aside>
     </div>
   </div>
+
+  <!-- Modale ajout section (Lot 16) -->
+  <BaseModal v-if="showAddModal" :title="addParent ? `Ajouter une sous-section dans « ${addParent.title} »` : 'Ajouter une section racine'" size="md" @close="showAddModal = false">
+    <form @submit.prevent="submitAddSection" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Titre *</label>
+        <input v-model="addForm.title" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               placeholder="Ex : Architecture réseau, Schéma de principe…"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Type de section</label>
+        <select v-model="addForm.kind" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="standard">Texte standard</option>
+          <option value="equipment">Équipement (rattaché à un template)</option>
+        </select>
+      </div>
+      <div v-if="addForm.kind === 'equipment'">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Template équipement</label>
+        <select v-model="addForm.equipment_template_id" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option :value="null" disabled>— Choisir —</option>
+          <option v-for="t in equipmentTemplates" :key="t.id" :value="t.id">{{ t.name }} ({{ t.points_count }} points)</option>
+        </select>
+      </div>
+      <p class="text-[11px] text-gray-500">
+        Le numéro de section est laissé vide pour l'instant — tu peux l'éditer manuellement ensuite.
+      </p>
+    </form>
+    <template #footer>
+      <button @click="showAddModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+      <button @click="submitAddSection" :disabled="!addForm.title.trim() || (addForm.kind === 'equipment' && !addForm.equipment_template_id)"
+              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+        Ajouter
+      </button>
+    </template>
+  </BaseModal>
 </template>

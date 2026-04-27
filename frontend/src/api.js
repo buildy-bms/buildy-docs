@@ -36,6 +36,8 @@ export const getAfTemplateUpdates = (id) => api.get(`/afs/${id}/template-updates
 export const listSections = (afId) => api.get(`/afs/${afId}/sections`)
 export const getSection = (id) => api.get(`/sections/${id}`)
 export const updateSection = (id, data) => api.patch(`/sections/${id}`, data)
+export const createSection = (afId, data) => api.post(`/afs/${afId}/sections`, data)
+export const deleteSection = (id) => api.delete(`/sections/${id}`)
 export const getSectionPoints = (id) => api.get(`/sections/${id}/points`)
 export const addSectionOverride = (id, data) => api.post(`/sections/${id}/overrides`, data)
 export const deleteSectionOverride = (sectionId, overrideId) =>
