@@ -19,7 +19,7 @@ const updateAfSchema = z.object({
   project_name: z.string().min(1).optional(),
   site_address: z.string().optional(),
   service_level: z.enum(['E', 'S', 'P']).optional(),
-  status: z.enum(['setup', 'chantier', 'livree', 'revision']).optional(),
+  status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
 });
 
 async function routes(fastify) {
@@ -45,7 +45,7 @@ async function routes(fastify) {
   // GET /api/afs/stats — counts par status
   fastify.get('/afs/stats', async () => {
     const counts = db.afs.countByStatus();
-    const out = { setup: 0, chantier: 0, livree: 0, revision: 0, total: 0 };
+    const out = { redaction: 0, validee: 0, commissioning: 0, commissioned: 0, livree: 0, total: 0 };
     for (const c of counts) { out[c.status] = c.count; out.total += c.count; }
     return out;
   });
@@ -129,6 +129,82 @@ async function routes(fastify) {
       payload: Object.fromEntries(Object.entries(body).filter(([_, v]) => v != null)),
     });
     return updated;
+  });
+
+  // POST /api/afs/:id/transition — bascule de statut avec gestion snapshots/milestones
+  // body : { to: 'redaction'|'validee'|'commissioning'|'commissioned'|'livree', motif?, notes? }
+  // Pour 'validee' et 'livree' : génère un PDF AF horodaté + tag Git + entrée milestone.
+  fastify.post('/afs/:id/transition', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+
+    const validTargets = ['redaction', 'validee', 'commissioning', 'commissioned', 'livree'];
+    const { to, motif, notes } = request.body || {};
+    if (!validTargets.includes(to)) {
+      return reply.code(400).send({ detail: 'Statut cible invalide' });
+    }
+    if (to === af.status) {
+      return reply.code(400).send({ detail: 'L\'AF est déjà dans cet état' });
+    }
+
+    // Snapshot + tag pour validee / livree
+    const snapshotPhases = { validee: 'validation', livree: 'delivery' };
+    const milestoneKind = snapshotPhases[to];
+    let exportData = null;
+
+    if (milestoneKind) {
+      const transitionMotif = motif || (to === 'validee' ? 'Validation de l\'AF' : 'Livraison du DOE');
+      const headers = { ...request.headers };
+      delete headers['content-length'];
+      delete headers['content-type'];
+      const exportRes = await fastify.inject({
+        method: 'POST',
+        url: `/api/afs/${id}/exports/af`,
+        payload: { motif: transitionMotif, includeBacsAnnex: to === 'livree' },
+        headers,
+      });
+      if (exportRes.statusCode !== 200) {
+        log.error(`Transition ${to} : échec génération PDF (${exportRes.statusCode}): ${exportRes.body}`);
+        return reply.code(500).send({ detail: 'Échec de la génération du PDF de jalon' });
+      }
+      exportData = JSON.parse(exportRes.body);
+    }
+
+    const userId = request.authUser?.id;
+    const fields = { status: to, updatedBy: userId };
+    if (to === 'livree' && af.status !== 'livree') {
+      fields.deliveredAt = new Date().toISOString();
+    }
+    db.afs.update(id, fields);
+
+    let milestone = null;
+    if (milestoneKind) {
+      const datePart = new Date().toISOString().slice(0, 10);
+      const gitTag = milestoneKind === 'validation'
+        ? `validee-${datePart}`
+        : `v1.0-livraison-DOE-${datePart}`;
+      milestone = db.afInspections.create(id, {
+        gitTag,
+        pdfExportId: exportData.id,
+        notes: notes || motif || null,
+        createdBy: userId,
+        kind: milestoneKind,
+      });
+    }
+
+    db.auditLog.add({
+      afId: id, userId,
+      action: to === 'livree' ? 'af.delivered' : `af.status.${to}`,
+      payload: { from: af.status, to, motif, milestone_id: milestone?.id },
+    });
+    log.info(`AF #${id} : transition ${af.status} → ${to} par user #${userId}`);
+
+    return {
+      af: db.afs.getById(id),
+      milestone,
+      pdf_export_id: exportData?.id || null,
+    };
   });
 
   // DELETE /api/afs/:id — soft delete

@@ -1,13 +1,14 @@
 <script setup>
-const props = defineProps({
-  status: { type: String, required: true }, // 'setup' | 'chantier' | 'livree' | 'revision'
+defineProps({
+  status: { type: String, required: true }, // 'redaction' | 'validee' | 'commissioning' | 'commissioned' | 'livree'
 })
 
 const config = {
-  setup:     { label: 'Démarrage',    classes: 'bg-gray-100 text-gray-700' },
-  chantier:  { label: 'Chantier',     classes: 'bg-amber-100 text-amber-800' },
-  livree:    { label: 'Livrée',       classes: 'bg-emerald-100 text-emerald-800' },
-  revision:  { label: 'Révision',     classes: 'bg-blue-100 text-blue-800' },
+  redaction:     { label: 'Rédaction en cours',          classes: 'bg-gray-100 text-gray-700' },
+  validee:       { label: 'Validée',                     classes: 'bg-blue-100 text-blue-800' },
+  commissioning: { label: 'Commissionnement en cours',   classes: 'bg-amber-100 text-amber-800' },
+  commissioned:  { label: 'Commissionnée',               classes: 'bg-indigo-100 text-indigo-800' },
+  livree:        { label: 'Projet livré',                classes: 'bg-emerald-100 text-emerald-800' },
 }
 </script>
 

@@ -22,8 +22,8 @@ async function routes(fastify) {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
-    if (!['livree', 'revision'].includes(af.status)) {
-      return reply.code(400).send({ detail: 'L\'AF doit être livrée pour préparer une inspection' });
+    if (af.status !== 'livree') {
+      return reply.code(400).send({ detail: 'L\'AF doit être livrée pour préparer une inspection BACS' });
     }
 
     let body;

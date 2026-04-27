@@ -20,7 +20,7 @@ const router = useRouter()
 const { success, error } = useNotification()
 
 const afs = ref([])
-const stats = ref({ setup: 0, chantier: 0, livree: 0, revision: 0, total: 0 })
+const stats = ref({ redaction: 0, validee: 0, commissioning: 0, commissioned: 0, livree: 0, total: 0 })
 const loading = ref(false)
 
 const showCreate = ref(false)
@@ -34,10 +34,13 @@ const submitting = ref(false)
 // Groupement par statut pour affichage
 const grouped = computed(() => {
   const groups = {
-    'En cours': afs.value.filter((a) => ['setup', 'chantier'].includes(a.status)),
-    'Livrées': afs.value.filter((a) => ['livree', 'revision'].includes(a.status)),
+    'En rédaction': afs.value.filter((a) => a.status === 'redaction'),
+    'Validées': afs.value.filter((a) => a.status === 'validee'),
+    'En commissionnement': afs.value.filter((a) => ['commissioning', 'commissioned'].includes(a.status)),
+    'Livrées': afs.value.filter((a) => a.status === 'livree'),
   }
-  return groups
+  // Ne renvoie que les groupes non vides
+  return Object.fromEntries(Object.entries(groups).filter(([_, list]) => list.length > 0))
 })
 
 async function refresh() {
@@ -124,8 +127,9 @@ onMounted(refresh)
         <h1 class="text-2xl font-semibold text-gray-800">Mes Analyses Fonctionnelles</h1>
         <p class="text-sm text-gray-500 mt-1">
           {{ stats.total }} AF{{ stats.total > 1 ? 's' : '' }} —
-          <span class="text-amber-700">{{ stats.setup + stats.chantier }} en cours</span>,
-          <span class="text-emerald-700">{{ stats.livree + stats.revision }} livrée{{ (stats.livree + stats.revision) > 1 ? 's' : '' }}</span>
+          <span class="text-gray-700">{{ stats.redaction }} en rédaction</span>,
+          <span class="text-amber-700">{{ stats.commissioning + stats.commissioned }} en commissionnement</span>,
+          <span class="text-emerald-700">{{ stats.livree }} livrée{{ stats.livree > 1 ? 's' : '' }}</span>
         </p>
       </div>
       <button

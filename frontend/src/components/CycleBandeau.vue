@@ -2,10 +2,11 @@
 import { computed, ref } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
-  DocumentArrowDownIcon, TableCellsIcon, ClockIcon,
+  DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
+  RocketLaunchIcon,
 } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
-import {
+import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
   createInspection, listInspections,
 } from '@/api'
@@ -34,18 +35,82 @@ const inspectorName = ref('')
 const inspectionNotes = ref('')
 const lastInspection = ref(null)
 
-const canDeliver = computed(() => ['setup', 'chantier'].includes(props.af.status))
-const canInspect = computed(() => ['livree', 'revision'].includes(props.af.status))
+const canInspect = computed(() => props.af.status === 'livree')
 
-async function markDelivered() {
-  if (!confirm(`Marquer "${props.af.client_name} — ${props.af.project_name}" comme LIVRÉE ?\nUn snapshot sera figé pour les futures comparaisons d'inspection.`)) return
+// Workflow d'avancement de phase (Lot 15)
+const PHASE_FLOW = ['redaction', 'validee', 'commissioning', 'commissioned', 'livree']
+const PHASE_LABELS = {
+  redaction: 'Rédaction en cours',
+  validee: 'Validée',
+  commissioning: 'Commissionnement en cours',
+  commissioned: 'Commissionnée',
+  livree: 'Projet livré',
+}
+const nextPhase = computed(() => {
+  const idx = PHASE_FLOW.indexOf(props.af.status)
+  return idx >= 0 && idx < PHASE_FLOW.length - 1 ? PHASE_FLOW[idx + 1] : null
+})
+const showPhaseMenu = ref(false)
+const showTransitionModal = ref(false)
+const transitionTo = ref(null)
+const transitionMotif = ref('')
+const transitionNotes = ref('')
+
+function openPhaseMenu() { showPhaseMenu.value = !showPhaseMenu.value }
+
+function startTransition(target) {
+  showPhaseMenu.value = false
+  transitionTo.value = target
+  transitionMotif.value = ''
+  transitionNotes.value = ''
+  // Validee + livree : modale obligatoire (snapshot figé)
+  if (target === 'validee' || target === 'livree') {
+    showTransitionModal.value = true
+  } else {
+    // Bascule simple
+    confirmTransition()
+  }
+}
+
+async function confirmTransition() {
+  const target = transitionTo.value
+  const isSnapshot = target === 'validee' || target === 'livree'
+  if (isSnapshot && !transitionMotif.value.trim()) return
   submitting.value = true
   try {
-    const { data } = await updateAf(props.af.id, { status: 'livree' })
-    success('AF marquée comme livrée')
-    emit('updated', data)
+    const { data } = await api.post(`/afs/${props.af.id}/transition`, {
+      to: target,
+      motif: transitionMotif.value.trim() || null,
+      notes: transitionNotes.value.trim() || null,
+    })
+    success(isSnapshot
+      ? `${PHASE_LABELS[target]} — snapshot figé (PDF + tag Git)`
+      : `Phase passée à : ${PHASE_LABELS[target]}`)
+    showTransitionModal.value = false
+    emit('updated', data.af)
+    if (data.pdf_export_id) {
+      window.open(`/api/exports/${data.pdf_export_id}/download`, '_blank')
+    }
   } catch (e) {
-    error('Échec de la mise à jour')
+    error(e.response?.data?.detail || 'Échec de la transition')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function rollbackPhase() {
+  const idx = PHASE_FLOW.indexOf(props.af.status)
+  if (idx <= 0) return
+  const prev = PHASE_FLOW[idx - 1]
+  if (!confirm(`Revenir à "${PHASE_LABELS[prev]}" ? Cela lève le verrou doux et permet à nouveau toutes les modifications.`)) return
+  submitting.value = true
+  try {
+    const { data } = await api.post(`/afs/${props.af.id}/transition`, { to: prev })
+    success(`Phase revenue à : ${PHASE_LABELS[prev]}`)
+    showPhaseMenu.value = false
+    emit('updated', data.af)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec')
   } finally {
     submitting.value = false
   }
@@ -179,15 +244,41 @@ const exportDescription = computed(() => {
       <ClockIcon class="w-4 h-4" />
       Versions
     </button>
-    <button
-      v-if="canDeliver"
-      @click="markDelivered"
-      :disabled="submitting"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-    >
+    <!-- Bouton "Faire avancer la phase" (Lot 15) -->
+    <div v-if="nextPhase" class="relative">
+      <button
+        @click="openPhaseMenu"
+        :disabled="submitting"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+        title="Faire avancer la phase de l'AF"
+      >
+        <RocketLaunchIcon class="w-4 h-4" />
+        Faire avancer la phase
+        <ChevronDownIcon class="w-3 h-3" />
+      </button>
+      <div v-if="showPhaseMenu" class="absolute right-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg rounded-none z-30">
+        <button
+          @click="startTransition(nextPhase)"
+          class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 text-sm border-b border-gray-100"
+        >
+          <p class="font-semibold text-gray-800">→ {{ PHASE_LABELS[nextPhase] }}</p>
+          <p v-if="nextPhase === 'validee'" class="text-[11px] text-gray-500 mt-0.5">Snapshot figé : tag Git + PDF AF horodaté</p>
+          <p v-else-if="nextPhase === 'livree'" class="text-[11px] text-gray-500 mt-0.5">Livraison DOE : tag v1.0 + PDF AF final</p>
+          <p v-else class="text-[11px] text-gray-500 mt-0.5">Bascule simple de phase</p>
+        </button>
+        <button
+          v-if="af.status !== 'redaction'"
+          @click="rollbackPhase"
+          class="w-full text-left px-4 py-2 hover:bg-gray-50 text-xs text-gray-500"
+        >
+          ← Revenir à la phase précédente
+        </button>
+      </div>
+    </div>
+    <span v-else class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg border border-emerald-200">
       <CheckBadgeIcon class="w-4 h-4" />
-      Marquer comme livrée
-    </button>
+      Projet livré
+    </span>
     <button
       v-if="canInspect"
       @click="prepareInspection"
@@ -313,6 +404,40 @@ const exportDescription = computed(() => {
       >
         <DocumentArrowDownIcon class="w-4 h-4" />
         {{ submitting ? 'Génération…' : 'Générer le PDF' }}
+      </button>
+    </template>
+  </BaseModal>
+
+  <!-- Modale transition de phase avec snapshot (validee / livree) -->
+  <BaseModal v-if="showTransitionModal" :title="transitionTo === 'livree' ? 'Livraison du DOE' : 'Validation de l\'AF'" size="md" @close="showTransitionModal = false">
+    <form @submit.prevent="confirmTransition" class="space-y-4">
+      <p class="text-xs text-gray-600 leading-relaxed">
+        <template v-if="transitionTo === 'validee'">
+          La validation va <strong>figer un snapshot</strong> de l'AF (PDF horodaté + tag Git <code class="bg-gray-100 px-1">validee-YYYY-MM-DD</code>).
+          L'AF reste éditable, mais toute modification ultérieure sera tracée comme post-validation.
+        </template>
+        <template v-else>
+          La livraison du DOE va générer le <strong>PDF AF final</strong> (avec annexe BACS), poser le tag Git <code class="bg-gray-100 px-1">v1.0-livraison-DOE</code>
+          et faire basculer l'AF en mode "Projet livré".
+        </template>
+      </p>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Motif (obligatoire) *</label>
+        <input v-model="transitionMotif" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               :placeholder="transitionTo === 'livree' ? 'Ex : Livraison DOE finale Acme Lyon' : 'Ex : Validation pour démarrage chantier'"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Notes (optionnel)</label>
+        <textarea v-model="transitionNotes" rows="2" autocomplete="off" data-1p-ignore="true"
+                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      </div>
+    </form>
+    <template #footer>
+      <button @click="showTransitionModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+      <button @click="confirmTransition" :disabled="submitting || !transitionMotif.trim()"
+              :class="['px-3 py-1.5 text-xs text-white disabled:opacity-50', transitionTo === 'livree' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700']">
+        {{ submitting ? 'En cours…' : (transitionTo === 'livree' ? 'Livrer le DOE' : 'Valider l\'AF') }}
       </button>
     </template>
   </BaseModal>

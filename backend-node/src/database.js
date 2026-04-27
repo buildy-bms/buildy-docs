@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 7;
+const TARGET_VERSION = 8;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -357,6 +357,63 @@ function runMigrations() {
     if (cleaned > 0) log.info(`Migration 7 : disclaimer générique retiré de ${cleaned} template(s)`);
     db.pragma('user_version = 7');
     log.info('Migration 7 appliquee : nettoyage disclaimer CTA');
+  }
+
+  if (current < 8) {
+    // Lot 15 — refonte du cycle de vie d'une AF :
+    //   setup    → redaction       (Rédaction en cours)
+    //   chantier → commissioning   (Commissionnement en cours)
+    //   livree   → livree           (Projet livré)
+    //   revision → livree           (les révisions sont des modifs sur livree)
+    //   nouveaux : validee, commissioned
+    //
+    // SQLite ne permet pas d'éditer un CHECK constraint → on recrée la table
+    // (pattern PRAGMA foreign_keys=OFF + BEGIN + INSERT INTO new SELECT FROM old).
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE afs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL UNIQUE,
+        client_name TEXT NOT NULL,
+        project_name TEXT NOT NULL,
+        site_address TEXT,
+        service_level TEXT,
+        status TEXT NOT NULL DEFAULT 'redaction'
+          CHECK (status IN ('redaction', 'validee', 'commissioning', 'commissioned', 'livree')),
+        delivered_at TEXT,
+        last_inspection_at TEXT,
+        created_by INTEGER REFERENCES users(id),
+        updated_by INTEGER REFERENCES users(id),
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT
+      );
+      INSERT INTO afs_new
+        (id, slug, client_name, project_name, site_address, service_level, status,
+         delivered_at, last_inspection_at, created_by, updated_by, created_at, updated_at, deleted_at)
+      SELECT
+        id, slug, client_name, project_name, site_address, service_level,
+        CASE status
+          WHEN 'setup'    THEN 'redaction'
+          WHEN 'chantier' THEN 'commissioning'
+          WHEN 'livree'   THEN 'livree'
+          WHEN 'revision' THEN 'livree'
+          ELSE 'redaction'
+        END,
+        delivered_at, last_inspection_at, created_by, updated_by, created_at, updated_at, deleted_at
+      FROM afs;
+      DROP TABLE afs;
+      ALTER TABLE afs_new RENAME TO afs;
+      CREATE INDEX IF NOT EXISTS idx_afs_status ON afs(status, deleted_at);
+
+      -- af_inspections devient générique : ajout d'un champ kind
+      ALTER TABLE af_inspections ADD COLUMN kind TEXT
+        CHECK (kind IN ('validation', 'commissioning', 'delivery', 'inspection_bacs'))
+        DEFAULT 'inspection_bacs';
+    `);
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 8 appliquee : refonte statuts AF (5 etats) + af_inspections.kind');
+    db.pragma('user_version = 8');
   }
 
   if (current > TARGET_VERSION) {
@@ -771,25 +828,27 @@ const equipmentInstances = {
   },
 };
 
-// ── Inspections BACS ─────────────────────────────────────────────────
+// ── Inspections BACS + Milestones (généralisée Lot 15) ──────────────
 const afInspections = {
-  listByAf(afId) {
-    return db.prepare(`
+  listByAf(afId, { kind } = {}) {
+    const sql = `
       SELECT i.*, u.display_name AS created_by_name,
              e.file_path, e.file_size_bytes
       FROM af_inspections i
       LEFT JOIN users u ON u.id = i.created_by
       LEFT JOIN exports e ON e.id = i.pdf_export_id
       WHERE af_id = ?
+      ${kind ? 'AND i.kind = ?' : ''}
       ORDER BY inspected_at DESC
-    `).all(afId);
+    `;
+    return kind ? db.prepare(sql).all(afId, kind) : db.prepare(sql).all(afId);
   },
-  create(afId, { inspectorName, gitTag, pdfExportId, notes, createdBy }) {
+  create(afId, { inspectorName, gitTag, pdfExportId, notes, createdBy, kind = 'inspection_bacs' }) {
     const inspectedAt = new Date().toISOString();
     const result = db.prepare(`
-      INSERT INTO af_inspections (af_id, inspected_at, inspector_name, git_tag, pdf_export_id, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(afId, inspectedAt, inspectorName, gitTag || null, pdfExportId || null, notes || null, createdBy || null);
+      INSERT INTO af_inspections (af_id, inspected_at, inspector_name, git_tag, pdf_export_id, notes, created_by, kind)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(afId, inspectedAt, inspectorName || null, gitTag || null, pdfExportId || null, notes || null, createdBy || null, kind);
     return db.prepare('SELECT * FROM af_inspections WHERE id = ?').get(result.lastInsertRowid);
   },
 };
