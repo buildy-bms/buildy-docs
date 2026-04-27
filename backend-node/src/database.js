@@ -634,6 +634,29 @@ const equipmentInstances = {
   },
 };
 
+// ── Inspections BACS ─────────────────────────────────────────────────
+const afInspections = {
+  listByAf(afId) {
+    return db.prepare(`
+      SELECT i.*, u.display_name AS created_by_name,
+             e.file_path, e.file_size_bytes
+      FROM af_inspections i
+      LEFT JOIN users u ON u.id = i.created_by
+      LEFT JOIN exports e ON e.id = i.pdf_export_id
+      WHERE af_id = ?
+      ORDER BY inspected_at DESC
+    `).all(afId);
+  },
+  create(afId, { inspectorName, gitTag, pdfExportId, notes, createdBy }) {
+    const inspectedAt = new Date().toISOString();
+    const result = db.prepare(`
+      INSERT INTO af_inspections (af_id, inspected_at, inspector_name, git_tag, pdf_export_id, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(afId, inspectedAt, inspectorName, gitTag || null, pdfExportId || null, notes || null, createdBy || null);
+    return db.prepare('SELECT * FROM af_inspections WHERE id = ?').get(result.lastInsertRowid);
+  },
+};
+
 // ── Audit log ────────────────────────────────────────────────────────
 const auditLog = {
   add({ afId, sectionId, templateId, userId, action, payload }) {
@@ -667,6 +690,7 @@ module.exports = {
   equipmentInstances,
   attachments,
   afs,
+  afInspections,
   sections,
   auditLog,
   get db() { return db; },

@@ -463,20 +463,22 @@ table.points-mini .badge-type {
 }
 .bacs-article-name { vertical-align: middle; }
 .bacs-article-summary {
-  font-size: 9.5pt;
-  color: #1f2937;
+  font-size: 8.5pt;
+  color: #6b7280;
+  font-style: italic;
   margin: 1mm 0 2mm;
   line-height: 1.5;
+  padding-left: 3mm;
+  border-left: 2px solid #e5e7eb;
 }
-.bacs-article-sections {
-  margin: 1.5mm 0 0 5mm;
-  padding: 0;
+.bacs-article-body {
   font-size: 9pt;
-  color: #374151;
+  color: #1f2937;
+  line-height: 1.55;
+  margin-top: 2mm;
 }
-.bacs-article-sections li { margin: 0.6mm 0; }
-.bacs-article-sections strong {
-  font-family: "SFMono-Regular", Menlo, monospace;
-  color: #6d28d9;
-  font-weight: 600;
-}
+.bacs-article-body p { margin: 1.2mm 0; }
+.bacs-article-body ul, .bacs-article-body ol { margin: 1.5mm 0 1.5mm 5mm; padding: 0; }
+.bacs-article-body li { margin: 0.5mm 0; }
+.bacs-article-body strong { color: #1b2842; font-weight: 600; }
+.bacs-article-body em { color: #6b7280; }

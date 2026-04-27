@@ -67,6 +67,11 @@ export const exportAf = (afId, data) =>
   api.post(`/afs/${afId}/exports/af`, data) // data: { motif, includeBacsAnnex }
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
+// ── Inspections BACS ──
+export const listInspections = (afId) => api.get(`/afs/${afId}/inspections`)
+export const createInspection = (afId, data) =>
+  api.post(`/afs/${afId}/inspections`, data) // { inspector_name, notes? }
+
 // ── Equipment templates (bibliothèque) ──
 export const listEquipmentTemplates = (params) => api.get('/equipment-templates', { params })
 export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`)

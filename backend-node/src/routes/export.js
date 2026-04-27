@@ -16,7 +16,7 @@ const synthesisTablePath = path.resolve(__dirname, '../../templates/pdf/_synthes
 const renderSynthesisTable = Handlebars.compile(fs.readFileSync(synthesisTablePath, 'utf-8'));
 const { resolveSectionPoints } = require('../lib/points-resolver');
 const { resolveAfLevel, formatLevelFull } = require('../lib/service-level-resolver');
-const { BACS_ARTICLES } = require('../seeds/bacs-articles');
+const { BACS_ARTICLES, BACS_INTRO_HTML } = require('../seeds/bacs-articles');
 
 // Lignes du tableau de synthese (matrice categorie x dimensions BACS)
 // Source : page Notion plan AF chapitre 12
@@ -318,6 +318,7 @@ async function routes(fastify) {
       tocFlat,
       includeBacsAnnex: !!body.includeBacsAnnex,
       bacsArticles: body.includeBacsAnnex ? BACS_ARTICLES : null,
+      bacsIntroHtml: body.includeBacsAnnex ? BACS_INTRO_HTML : null,
     };
 
     // Genere le PDF
