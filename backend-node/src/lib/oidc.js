@@ -1,6 +1,13 @@
 'use strict';
 
 const crypto = require('crypto');
+const { Agent } = require('undici');
+
+// PocketID tourne en HTTPS auto-signe sur le VPS Jelastic. Node refuse
+// les certs invalides par defaut → on declare un dispatcher dedie OIDC
+// qui les accepte (uniquement pour les fetch OIDC, pas globalement).
+const oidcDispatcher = new Agent({ connect: { rejectUnauthorized: false } });
+const oidcFetch = (url, opts = {}) => fetch(url, { ...opts, dispatcher: oidcDispatcher });
 
 // Lazy-load jose (ESM-only)
 let _jose;
@@ -15,8 +22,8 @@ const TTL = 3600_000; // 1h
 async function discoverOidc(issuerUrl) {
   if (cache.discovery && Date.now() - cache.discoveryAt < TTL) return cache.discovery;
   const url = `${issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status}`);
+  const res = await oidcFetch(url);
+  if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status} ${res.statusText} (URL: ${url})`);
   cache.discovery = await res.json();
   cache.discoveryAt = Date.now();
   return cache.discovery;
@@ -24,8 +31,8 @@ async function discoverOidc(issuerUrl) {
 
 async function fetchJwks(jwksUri) {
   if (cache.jwks && Date.now() - cache.jwksAt < TTL) return cache.jwks;
-  const { createRemoteJWKSet } = await jose();
-  cache.jwks = createRemoteJWKSet(new URL(jwksUri));
+  const { createRemoteJWKSet, customFetch } = await jose();
+  cache.jwks = createRemoteJWKSet(new URL(jwksUri), { [customFetch]: oidcFetch });
   cache.jwksAt = Date.now();
   return cache.jwks;
 }
@@ -68,7 +75,7 @@ async function exchangeCode(config, code, codeVerifier) {
     redirect_uri: config.oidcRedirectUri,
     code_verifier: codeVerifier,
   });
-  const res = await fetch(discovery.token_endpoint, {
+  const res = await oidcFetch(discovery.token_endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),

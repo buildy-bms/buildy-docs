@@ -18,15 +18,20 @@ async function routes(fastify) {
   fastify.get('/auth/oidc/login', async (request, reply) => {
     if (!config.oidcEnabled) return reply.code(404).send({ detail: 'OIDC non active' });
 
-    const params = oidc.generateOidcParams();
-    reply.setCookie('af_oidc_state', JSON.stringify({
-      state: params.state,
-      nonce: params.nonce,
-      codeVerifier: params.codeVerifier,
-    }), cookieOpts(300));
+    try {
+      const params = oidc.generateOidcParams();
+      reply.setCookie('af_oidc_state', JSON.stringify({
+        state: params.state,
+        nonce: params.nonce,
+        codeVerifier: params.codeVerifier,
+      }), cookieOpts(300));
 
-    const authUrl = await oidc.getAuthorizationUrl(config, params);
-    return reply.redirect(authUrl);
+      const authUrl = await oidc.getAuthorizationUrl(config, params);
+      return reply.redirect(authUrl);
+    } catch (err) {
+      log.error(`OIDC login init failed: ${err.message} (cause: ${err.cause?.message || 'n/a'})`);
+      return reply.redirect(`${config.publicUrl}/login?oidc_error=${encodeURIComponent('OIDC init impossible : ' + err.message)}`);
+    }
   });
 
   // GET /auth/oidc/callback — recoit le code de PocketID
