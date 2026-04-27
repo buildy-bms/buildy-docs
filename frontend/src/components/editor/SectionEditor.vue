@@ -3,7 +3,7 @@ import { ref, watch, onBeforeUnmount, computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Link from '@tiptap/extension-link'
+// StarterKit (Tiptap 2.10+) inclut deja Link nativement.
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon,
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
@@ -30,12 +30,14 @@ watch(() => props.section.id, () => {
 const editor = useEditor({
   content: props.section.body_html || '',
   extensions: [
-    StarterKit.configure({ heading: { levels: [2, 3, 4] } }),
+    StarterKit.configure({
+      heading: { levels: [2, 3, 4] },
+      link: { openOnClick: false, autolink: true, linkOnPaste: true },
+    }),
     Placeholder.configure({
       placeholder: 'Commence à rédiger ici…',
       emptyEditorClass: 'is-editor-empty',
     }),
-    Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
   ],
   editorProps: {
     attributes: {
