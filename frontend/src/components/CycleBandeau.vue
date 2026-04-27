@@ -37,7 +37,7 @@ function prepareInspection() {
 </script>
 
 <template>
-  <div class="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-3 mb-4">
+  <div class="bg-white rounded-none border border-gray-200 px-5 py-3 flex items-center gap-3 mb-4">
     <button @click="emit('back')" class="p-1 -ml-1 text-gray-500 hover:text-gray-800">
       <ArrowLeftIcon class="w-4 h-4" />
     </button>

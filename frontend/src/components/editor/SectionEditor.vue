@@ -103,7 +103,7 @@ function setLink() {
 </script>
 
 <template>
-  <div class="bg-white rounded-xl border border-gray-200">
+  <div class="bg-white rounded-none border border-gray-200">
     <!-- Header section : numéro + titre éditable + badges + autosave -->
     <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
       <span v-if="section.number" class="text-sm font-semibold text-gray-400 shrink-0">

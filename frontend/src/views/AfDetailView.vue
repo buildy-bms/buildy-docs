@@ -90,7 +90,7 @@ watch(() => route.params.id, async () => {
     <!-- Layout split : arbre 320px + éditeur flex -->
     <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4">
       <!-- Sidebar arbre des sections -->
-      <aside class="w-80 shrink-0 bg-white rounded-xl border border-gray-200 overflow-y-auto">
+      <aside class="w-80 shrink-0 bg-white rounded-none border border-gray-200 overflow-y-auto">
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
             Sections ({{ sections.length }})
@@ -147,7 +147,7 @@ watch(() => route.params.id, async () => {
             :af-id="af.id"
           />
         </template>
-        <div v-else class="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
+        <div v-else class="bg-white rounded-none border border-gray-200 p-12 text-center text-sm text-gray-400">
           Sélectionne une section dans l'arbre à gauche pour commencer.
         </div>
       </div>

@@ -143,7 +143,7 @@ onMounted(refresh)
     <!-- Empty state -->
     <div
       v-else-if="!afs.length"
-      class="bg-white rounded-xl border border-gray-200 p-12 text-center"
+      class="bg-white rounded-none border border-gray-200 p-12 text-center"
     >
       <DocumentTextIcon class="w-16 h-16 mx-auto text-gray-300" />
       <h2 class="mt-4 text-base font-medium text-gray-800">Aucune AF pour l'instant</h2>
@@ -164,7 +164,7 @@ onMounted(refresh)
           <div
             v-for="af in items"
             :key="af.id"
-            class="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow group cursor-pointer"
+            class="bg-white rounded-none border border-gray-200 p-4 hover:shadow-md transition-shadow group cursor-pointer"
             @click="router.push(`/afs/${af.id}`)"
           >
             <div class="flex items-start justify-between mb-2">

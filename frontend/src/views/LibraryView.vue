@@ -73,7 +73,7 @@ onMounted(refresh)
             v-for="t in items"
             :key="t.id"
             @click="openTemplate(t)"
-            class="text-left bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group"
+            class="text-left bg-white rounded-none border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group"
           >
             <div class="flex items-center justify-between mb-2">
               <EquipmentIcon :template="t" size="lg" />
@@ -114,8 +114,8 @@ onMounted(refresh)
       <!-- Description -->
       <div class="mb-6">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Description fonctionnelle</h3>
-        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-xl p-5"></div>
-        <div v-else class="bg-white border border-dashed border-gray-300 rounded-xl p-5 text-sm text-gray-400 italic">
+        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-none p-5"></div>
+        <div v-else class="bg-white border border-dashed border-gray-300 rounded-none p-5 text-sm text-gray-400 italic">
           Pas encore de description rédigée pour ce template. Édite-le depuis une AF puis promeus tes modifications dans la bibliothèque.
         </div>
       </div>
@@ -125,7 +125,7 @@ onMounted(refresh)
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           Données typiquement lues ({{ selected.points.filter(p => p.direction === 'read').length }})
         </h3>
-        <div v-if="selected.points.filter(p => p.direction === 'read').length" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div v-if="selected.points.filter(p => p.direction === 'read').length" class="bg-white border border-gray-200 rounded-none overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
@@ -151,7 +151,7 @@ onMounted(refresh)
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           Données typiquement écrites ({{ selected.points.filter(p => p.direction === 'write').length }})
         </h3>
-        <div v-if="selected.points.filter(p => p.direction === 'write').length" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div v-if="selected.points.filter(p => p.direction === 'write').length" class="bg-white border border-gray-200 rounded-none overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>

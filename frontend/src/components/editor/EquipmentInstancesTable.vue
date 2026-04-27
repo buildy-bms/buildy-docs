@@ -61,7 +61,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="bg-white rounded-xl border border-gray-200">
+  <div class="bg-white rounded-none border border-gray-200">
     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
       <div>
         <h3 class="text-sm font-semibold text-gray-700">
