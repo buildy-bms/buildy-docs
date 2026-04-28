@@ -22,6 +22,7 @@ import PointsTable from '@/components/editor/PointsTable.vue'
 import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable.vue'
 import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
 import ZonesTable from '@/components/editor/ZonesTable.vue'
+import EquipmentDescriptionPanel from '@/components/editor/EquipmentDescriptionPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -211,8 +212,9 @@ watch(() => route.params.id, async () => {
           <!-- Pour kind='zones' : tableau des zones fonctionnelles -->
           <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" />
 
-          <!-- Pour kind='equipment' : tableaux points + instances -->
+          <!-- Pour kind='equipment' : description + tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">
+            <EquipmentDescriptionPanel v-if="selectedSection.equipment_template_id" :template-id="selectedSection.equipment_template_id" />
             <PointsTable :section-id="selectedSection.id" :equipment-template-id="selectedSection.equipment_template_id" />
             <EquipmentInstancesTable :section-id="selectedSection.id" />
           </template>

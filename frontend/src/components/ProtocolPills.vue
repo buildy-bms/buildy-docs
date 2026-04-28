@@ -35,7 +35,7 @@ function colorFor(p) {
 
 <template>
   <div v-if="list.length" class="flex items-center gap-1.5 flex-wrap">
-    <span class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1">Protocoles :</span>
+    <span class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1">Protocoles exigés :</span>
     <span
       v-for="p in list"
       :key="p"
