@@ -4,7 +4,7 @@ module.exports = {
   slug: 'compteur-calories',
   name: 'Compteur calories',
   category: 'comptage',
-  bacs_articles: 'R175-3',
+  bacs_articles: null,
   bacs_justification: '<p>L\'article R175-3 du décret BACS exige un <strong>suivi continu de la consommation énergétique par usage</strong>. Le comptage thermique (calories pour le chauffage, frigories pour la climatisation) permet de mesurer précisément l\'énergie effectivement délivrée à un sous-réseau, indépendamment de la source d\'énergie primaire.</p><p>Cette mesure est indispensable pour répondre à l\'exigence d\'analyse comparative entre la consommation prévisionnelle et la consommation réelle, et pour détecter les dérives.</p><p>L\'intégration des compteurs de calories dans la solution Buildy permet de remonter en continu l\'énergie thermique délivrée par sous-réseau et d\'alimenter les tableaux de bord énergétiques exigés par le décret.</p>',
   preferred_protocols: 'M-Bus IP,M-Bus filaire,Modbus RTU',
   icon_kind: 'fa',

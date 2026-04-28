@@ -394,44 +394,40 @@ async function routes(fastify) {
     const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
       instances > 0 || (sec.bacs_articles && sec.bacs_articles.trim()) || sec.opted_out_by_moa
     );
-    const COMPTAGE_KEYWORDS = ['compteur', 'comptage', 'consommation'];
-    function isCountingSystem(sec) {
-      const t = (sec.title || '').toLowerCase();
-      return COMPTAGE_KEYWORDS.some(k => t.includes(k));
+    const COMPTEUR_SLUGS_SET = new Set(['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories']);
+    function isMeteringSystem(sec) {
+      // Detection : la section pointe vers un equipment_template de comptage
+      if (!sec.equipment_template_id) return false;
+      const tpl = db.equipmentTemplates.getById(sec.equipment_template_id);
+      return tpl ? COMPTEUR_SLUGS_SET.has(tpl.slug) : false;
     }
-    const systemsMatrix = relevantEquipment.map(({ sec, points, instances, reads, writes, alarms, commands, consignes }) => {
+    const systemsMatrix = relevantEquipment.map(({ sec, points, instances }) => {
       const isOptedOut = sec.opted_out_by_moa === 1;
       const isExcluded = !sec.included_in_export;
       let status, statusClass;
       if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
       else if (isExcluded) { status = 'Exclue de l\'export'; statusClass = 'excluded'; }
-      else if (instances === 0) { status = 'Non instanciée à ce jour'; statusClass = 'not-instanced'; }
+      else if (instances === 0) { status = 'Non instanciée'; statusClass = 'not-instanced'; }
       else { status = 'Couverte'; statusClass = 'covered'; }
 
-      // Couverture fonctionnelle
-      const hasMonitoring = reads > 0;
-      const hasCommand = (commands + consignes) > 0;
-      const hasAlarms = alarms > 0;
-      const hasReporting = isCountingSystem(sec) || (sec.bacs_articles || '').includes('R175-1 §4');
+      const totalPoints = (isOptedOut || isExcluded) ? 0 : points.length * instances;
 
-      const sl = sec.service_level;
       return {
         number: sec.number,
         title: sec.title,
         bacs: sec.bacs_articles || null,
-        levelLabel: sl ? formatLevelFull(sl) : null,
-        levelClass: sl ? sl.replace(/[^A-Z]/g, '') : '',
+        isMetering: isMeteringSystem(sec),
         instances,
-        pointsCount: points.length,
+        pointsPerInstance: points.length,
+        totalPoints,
         status, statusClass,
         isOptedOut, isExcluded,
-        hasMonitoring, hasCommand, hasAlarms, hasReporting,
       };
     });
 
     const totalsMatrix = systemsMatrix.reduce((acc, r) => ({
       instances: acc.instances + (r.isOptedOut || r.isExcluded ? 0 : r.instances),
-      points: acc.points + (r.isOptedOut || r.isExcluded ? 0 : r.pointsCount * r.instances),
+      points: acc.points + r.totalPoints,
     }), { instances: 0, points: 0 });
 
     const previousCount = db.db.prepare(`

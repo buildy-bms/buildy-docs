@@ -323,12 +323,10 @@ table.matrix-table td {
 }
 table.matrix-table tbody tr:nth-child(even) td { background: #fafbfc; }
 
-.m-cat { width: 70mm; white-space: normal !important; line-height: 1.35; }
-.m-bacs { width: 28mm; }
-.m-level { width: 28mm; text-align: center; }
-.m-num { width: 14mm; text-align: center; font-variant-numeric: tabular-nums; }
-.m-fn { width: 16mm; text-align: center; }
+.m-cat { width: 75mm; white-space: normal !important; line-height: 1.35; }
+.m-bacs { width: 70mm; white-space: normal !important; line-height: 1.35; }
 .m-status { width: 38mm; text-align: center; }
+.m-num { width: 22mm; text-align: center; font-variant-numeric: tabular-nums; }
 
 .m-num-prefix {
   font-family: 'SFMono-Regular', monospace;
@@ -340,11 +338,22 @@ table.matrix-table tbody tr:nth-child(even) td { background: #fafbfc; }
   display: inline-block;
   background: #faf5ff;
   color: #6d28d9;
-  font-size: 7pt;
-  padding: 0.5mm 1.5mm;
+  font-size: 7.5pt;
+  padding: 0.6mm 1.8mm;
   border-radius: 0.6mm;
   font-weight: 600;
   border: 0.2mm solid #d8b4fe;
+}
+.m-bacs-tag-soft {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 7pt;
+  padding: 0.6mm 1.8mm;
+  border-radius: 0.6mm;
+  font-weight: 500;
+  border: 0.2mm solid #cbd5e1;
+  font-style: italic;
 }
 .level-pill {
   display: inline-block;

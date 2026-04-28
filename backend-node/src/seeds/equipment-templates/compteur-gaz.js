@@ -4,7 +4,7 @@ module.exports = {
   slug: 'compteur-gaz',
   name: 'Compteur gaz',
   category: 'comptage',
-  bacs_articles: 'R175-3',
+  bacs_articles: null,
   bacs_justification: '<p>L\'article R175-3 du décret BACS exige un <strong>suivi continu et l\'analyse de la consommation énergétique</strong> du bâtiment, par source d\'énergie. Le gaz, lorsqu\'il alimente les systèmes de chauffage ou la production d\'ECS, doit donc être compté en continu.</p><p>Le compteur gaz fournit les index, débits instantanés et énergie consommée que la solution Buildy expose pour produire les tableaux de bord énergétiques et détecter les anomalies de consommation.</p><p>L\'intégration du compteur gaz dans la solution Buildy permet de remonter ces données en continu et de corréler la consommation gaz avec le fonctionnement des générateurs de chaleur.</p>',
   preferred_protocols: 'M-Bus IP,M-Bus filaire,Modbus RTU',
   icon_kind: 'fa',

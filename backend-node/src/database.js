@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 20;
+const TARGET_VERSION = 21;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -725,6 +725,32 @@ function runMigrations() {
     catch { /* deja la */ }
     db.pragma('user_version = 20');
     log.info('Migration 20 appliquee : opted_out_by_moa sur sections');
+  }
+
+  if (current < 21) {
+    // Lot 31bis — Cohérence colonne BACS : R175-1 = definitions des systemes
+    // (chauffage/clim/ventilation/STB), R175-3 = exigences fonctionnelles.
+    // Les compteurs ne sont PAS des systemes au sens R175-1, ils contribuent
+    // a l'exigence R175-3 §1 (suivi continu). On clear donc leur bacs_articles
+    // pour ne plus melanger les deux semantiques. Le tag "contribue R175-3"
+    // est gere visuellement dans la matrice de synthese.
+    const COMPTEUR_SLUGS = ['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories'];
+    let clearedTemplates = 0, clearedSections = 0;
+    for (const slug of COMPTEUR_SLUGS) {
+      const r = db.prepare("UPDATE equipment_templates SET bacs_articles = NULL WHERE slug = ? AND bacs_articles LIKE 'R175-3%'").run(slug);
+      clearedTemplates += r.changes;
+    }
+    const r2 = db.prepare(`
+      UPDATE sections SET bacs_articles = NULL
+      WHERE bacs_articles LIKE 'R175-3%'
+        AND equipment_template_id IN (SELECT id FROM equipment_templates WHERE slug IN ('compteur-electrique','compteur-gaz','compteur-eau','compteur-calories'))
+    `).run();
+    clearedSections = r2.changes;
+    if (clearedTemplates + clearedSections > 0) {
+      log.info(`Migration 21 : ${clearedTemplates} template(s) compteur + ${clearedSections} section(s) AF — bacs_articles R175-3 efface (R175-3 != R175-1)`);
+    }
+    db.pragma('user_version = 21');
+    log.info('Migration 21 appliquee : coherence BACS column (compteurs hors R175-1)');
   }
 
   if (current > TARGET_VERSION) {

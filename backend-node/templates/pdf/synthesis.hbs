@@ -156,21 +156,17 @@
     </div>
   </header>
 
-  <p class="section-intro">Vue par catégorie d'équipement. Une catégorie apparaît dans ce tableau si elle est <strong>instanciée sur le site</strong>, <strong>concernée par le décret BACS</strong>, ou <strong>écartée par la maîtrise d'ouvrage</strong>. Les colonnes Monitoring / Commande / Alarmes / Reporting indiquent les fonctions Buildy applicables au système.</p>
+  <p class="section-intro">Vue par catégorie d'équipement. Une catégorie apparaît dans ce tableau si elle est <strong>instanciée sur le site</strong>, <strong>concernée par le décret BACS</strong>, ou <strong>écartée par la maîtrise d'ouvrage</strong>.</p>
 
   <table class="matrix-table">
     <thead>
       <tr>
         <th class="m-cat">Système</th>
-        <th class="m-bacs">Décret BACS</th>
-        <th class="m-level">Niveau requis</th>
-        <th class="m-num">Inst.</th>
-        <th class="m-num">Points</th>
-        <th class="m-fn">Monitoring</th>
-        <th class="m-fn">Commande</th>
-        <th class="m-fn">Alarmes</th>
-        <th class="m-fn">Reporting</th>
-        <th class="m-status">Statut</th>
+        <th class="m-bacs">Statut au sens du décret BACS</th>
+        <th class="m-status">Statut projet</th>
+        <th class="m-num">Instances</th>
+        <th class="m-num">Points / inst.</th>
+        <th class="m-num">Total points</th>
       </tr>
     </thead>
     <tbody>
@@ -179,34 +175,37 @@
         <td class="m-cat">
           <span class="m-num-prefix">§{{number}}</span> {{title}}
         </td>
-        <td class="m-bacs">{{#if bacs}}<span class="m-bacs-tag">{{bacs}}</span>{{else}}—{{/if}}</td>
-        <td class="m-level">{{#if levelLabel}}<span class="level-pill lvl-{{levelClass}}">{{levelLabel}}</span>{{else}}—{{/if}}</td>
-        <td class="m-num">{{#if instances}}<strong>{{instances}}</strong>{{else}}<span class="muted">0</span>{{/if}}</td>
-        <td class="m-num">{{pointsCount}}</td>
-        <td class="m-fn">{{#if hasMonitoring}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-        <td class="m-fn">{{#if hasCommand}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-        <td class="m-fn">{{#if hasAlarms}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-        <td class="m-fn">{{#if hasReporting}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+        <td class="m-bacs">
+          {{#if bacs}}
+            <span class="m-bacs-tag">{{bacs}}</span>
+          {{else if isMetering}}
+            <span class="m-bacs-tag-soft" title="Hors périmètre R175-1, contribue à l'exigence de suivi continu R175-3 §1">Hors périmètre direct · contribue R175-3 §1</span>
+          {{else}}
+            <span class="muted">Hors périmètre BACS</span>
+          {{/if}}
+        </td>
         <td class="m-status"><span class="status-pill status-{{statusClass}}">{{status}}</span></td>
+        <td class="m-num">{{#if instances}}<strong>{{instances}}</strong>{{else}}<span class="muted">0</span>{{/if}}</td>
+        <td class="m-num">{{pointsPerInstance}}</td>
+        <td class="m-num">{{#if totalPoints}}<strong>{{totalPoints}}</strong>{{else}}<span class="muted">—</span>{{/if}}</td>
       </tr>
       {{/each}}
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3">Total des systèmes actifs</td>
+        <td colspan="3">Total projet</td>
         <td class="m-num"><strong>{{totalsMatrix.instances}}</strong></td>
+        <td class="m-num">—</td>
         <td class="m-num"><strong>{{totalsMatrix.points}}</strong></td>
-        <td colspan="5"></td>
       </tr>
     </tfoot>
   </table>
 
   <p class="legal-note">
     <em>Lecture des colonnes :</em>
-    <strong>Niveau requis</strong> = niveau Buildy minimum nécessaire pour activer ce système.
-    <strong>Inst.</strong> = nombre d'instances réelles déclarées (×qty).
-    <strong>Points</strong> = nombre de points par instance (la liste contractuelle complète figure dans l'export A3 dédié).
-    <strong>Monitoring</strong> = lectures, <strong>Commande</strong> = écritures, <strong>Alarmes</strong> = points type Alarme, <strong>Reporting</strong> = système éligible aux tableaux de bord énergie/QAI.
+    <strong>Statut au sens du décret BACS</strong> = comment le système est qualifié par R175-1 (chauffage §1, climatisation §2, ventilation §3, système technique §4) — les compteurs ne sont pas définis par R175-1 mais contribuent à l'exigence de suivi R175-3 §1.
+    <strong>Statut projet</strong> = couverte (instanciée et activée) / non instanciée / écartée par la MOA / exclue de l'export.
+    <strong>Total points</strong> = nombre d'instances × points par instance (la liste contractuelle complète figure dans l'export A3 dédié).
   </p>
 </section>
 
