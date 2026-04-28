@@ -1,15 +1,35 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
+import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
 const route = useRoute()
 const versions = ref([])
+const showEditor = ref(false)
+const editorTemplate = ref(null) // null = création, sinon édition
+
+function openCreate() { editorTemplate.value = null; showEditor.value = true }
+function openEdit() { editorTemplate.value = selected.value; showEditor.value = true }
+async function onSaved(savedTpl) {
+  showEditor.value = false
+  await refresh()
+  if (savedTpl?.id) {
+    const fresh = templates.value.find(t => t.id === savedTpl.id)
+    if (fresh) await openTemplate(fresh)
+  }
+}
+async function onDeleted() {
+  showEditor.value = false
+  selected.value = null
+  await refresh()
+}
+
 const affectedAfs = ref([])
 
 const templates = ref([])
@@ -129,6 +149,13 @@ onMounted(async () => {
             entre toutes les AFs. Édite un template pour propager les changements.
           </p>
         </div>
+        <button
+          @click="openCreate"
+          class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded"
+        >
+          <PlusIcon class="w-4 h-4" />
+          Nouveau modèle
+        </button>
       </div>
 
       <!-- Toolbar : recherche + toggle (Lot 23) -->
@@ -266,6 +293,13 @@ onMounted(async () => {
             <ProtocolPills :protocols="selected.preferred_protocols" />
           </div>
         </div>
+        <button
+          @click="openEdit"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 rounded shrink-0"
+        >
+          <PencilSquareIcon class="w-3.5 h-3.5" />
+          Éditer le modèle
+        </button>
       </div>
 
       <!-- Encart contextualisé "lien avec le décret BACS" -->
@@ -430,6 +464,15 @@ onMounted(async () => {
         </div>
       </div>
     </template>
+
+    <!-- Modale création / édition de template -->
+    <EquipmentTemplateEditor
+      v-if="showEditor"
+      :template="editorTemplate"
+      @close="showEditor = false"
+      @saved="onSaved"
+      @deleted="onDeleted"
+    />
   </div>
 </template>
 
