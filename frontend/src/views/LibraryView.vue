@@ -198,7 +198,7 @@ onMounted(async () => {
               <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ t.name }}</td>
               <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#1b2842] text-white text-xs font-bold tabular-nums">{{ t.points_count }}</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
                 <span class="inline-flex items-center gap-1 text-xs text-gray-500">
