@@ -505,7 +505,160 @@ async function routes(fastify) {
       : 0;
     kpis.coverage = coverageTotals;
 
-    // ── PAGE 4 : Matrice systemes (filtree strict) ──
+    // ── Synthèse zones × catégories ──
+    // Catégories d'équipement (par slug template) avec marquage BACS
+    const SYSTEM_CATEGORIES = [
+      { key: 'chauffage',     label: 'Chauffage',         bacs: 'R175-1 §1', slugs: ['chaudiere', 'aerotherme', 'destratificateur', 'drv', 'rooftop', 'cta'] },
+      { key: 'climatisation', label: 'Climatisation',     bacs: 'R175-1 §2', slugs: ['drv', 'rooftop', 'cta'] },
+      { key: 'ventilation',   label: 'Ventilation',       bacs: 'R175-1 §3', slugs: ['cta', 'ventilation-generique', 'rooftop'] },
+      { key: 'ecs',           label: 'ECS',               bacs: 'R175-1 §4', slugs: ['ecs'] },
+      { key: 'pv',            label: 'Production PV',     bacs: 'R175-1 §4', slugs: ['production-electricite'] },
+      { key: 'eclairage_int', label: 'Éclairage int.',    bacs: 'R175-1 §4', slugs: ['eclairage-interieur'] },
+      { key: 'eclairage_ext', label: 'Éclairage ext.',    bacs: null,        slugs: ['eclairage-exterieur'] },
+      { key: 'prises',        label: 'Prises pilotées',   bacs: null,        slugs: ['prises-pilotees'] },
+      { key: 'comptage',      label: 'Comptage',          bacs: null,        slugs: ['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories'] },
+      { key: 'qai',           label: 'QAI',               bacs: null,        slugs: ['qai'] },
+      { key: 'occultation',   label: 'Occultation',       bacs: null,        slugs: ['volets', 'stores'] },
+      { key: 'process',       label: 'Process',           bacs: null,        slugs: ['process-industriel'] },
+      { key: 'autres',        label: 'Autres',            bacs: null,        slugs: ['equipement-generique'] },
+    ];
+
+    function normalize(s) {
+      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    // Charge toutes les zones de l'AF (depuis la section kind='zones')
+    const zonesSection = allSections.find(s => s.kind === 'zones');
+    const zones = zonesSection ? db.afZones.listBySection(zonesSection.id) : [];
+
+    // Charge toutes les instances + leur slug template
+    const allInstances = [];
+    for (const e of equipmentEnriched) {
+      if (!e.sec.equipment_template_id) continue;
+      const tpl = db.equipmentTemplates.getById(e.sec.equipment_template_id);
+      const slug = tpl?.slug;
+      if (!slug) continue;
+      const insts = db.equipmentInstances.listBySection(e.sec.id);
+      for (const i of insts) allInstances.push({ ...i, slug });
+    }
+
+    // Construit la matrice zones × catégories
+    const zonesMatrix = zones.map(z => {
+      const zoneNameNorm = normalize(z.name);
+      const cells = SYSTEM_CATEGORIES.map(cat => {
+        let count = 0;
+        for (const inst of allInstances) {
+          if (!cat.slugs.includes(inst.slug)) continue;
+          const loc = normalize(inst.location);
+          if (loc && loc.includes(zoneNameNorm)) count += (inst.qty || 1);
+        }
+        return count;
+      });
+      const total = cells.reduce((a, b) => a + b, 0);
+      return { name: z.name, surface_m2: z.surface_m2, occupation_type: z.occupation_type, cells, total };
+    });
+    // Totaux par colonne
+    const zonesColTotals = SYSTEM_CATEGORIES.map((_, idx) =>
+      zonesMatrix.reduce((acc, row) => acc + row.cells[idx], 0)
+    );
+    const zonesGrandTotal = zonesColTotals.reduce((a, b) => a + b, 0);
+    // Instances orphelines (location ne match aucune zone, ou location vide)
+    const matchedInstanceIds = new Set();
+    for (const inst of allInstances) {
+      const loc = normalize(inst.location);
+      if (!loc) continue;
+      for (const z of zones) {
+        if (loc.includes(normalize(z.name))) { matchedInstanceIds.add(inst.id); break; }
+      }
+    }
+    const unzoned = allInstances.length - matchedInstanceIds.size;
+
+    // ── Synthèse fonctionnalités ──
+    // Toutes les sections kind=standard (hors chapitre 2 perimetre equipements et 12 synthese)
+    const FUNCTIONALITY_NUMBERS = ['1.5', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3', '5.1', '5.2', '5.3', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '7', '8', '9', '11.1', '11.2', '11.3'];
+    function levelRank(lvl) {
+      if (!lvl) return null;
+      const v = String(lvl).toUpperCase();
+      if (v === 'P') return 2;
+      if (v === 'S' || v.includes('S')) return 1;
+      return 0;
+    }
+    function minRequiredLevel(lvl) {
+      // 'S/P' → S (le minimum requis)
+      if (!lvl) return null;
+      const v = String(lvl).toUpperCase();
+      if (v === 'E' || v.includes('E')) return 'E';
+      if (v === 'S' || v.includes('S')) return 'S';
+      if (v === 'P') return 'P';
+      return null;
+    }
+    const contractRank = contractLevel ? { E: 0, S: 1, P: 2 }[contractLevel] : null;
+    const functionalities = FUNCTIONALITY_NUMBERS.map(num => {
+      const sec = allSections.find(s => s.number === num);
+      if (!sec) return null;
+      const requiredMin = minRequiredLevel(sec.service_level);
+      const requiredRank = requiredMin ? { E: 0, S: 1, P: 2 }[requiredMin] : null;
+      const isOptedOut = sec.opted_out_by_moa === 1;
+      const isExcluded = !sec.included_in_export;
+      const contractTooLow = contractRank !== null && requiredRank !== null && requiredRank > contractRank;
+      let included = true;
+      let reason = null;
+      if (isExcluded) { included = false; reason = 'Section exclue de l\'export'; }
+      else if (isOptedOut) {
+        included = false;
+        const need = requiredMin === 'P' ? 'Premium' : (requiredMin === 'S' ? 'Smart' : 'Smart ou Premium');
+        reason = `Écartée par la MOA — contrat ${need} requis pour activer`;
+      }
+      else if (contractTooLow) {
+        const need = requiredMin === 'P' ? 'Premium' : 'Smart';
+        const cur = contractLevel === 'E' ? 'Essentials' : (contractLevel === 'S' ? 'Smart' : 'Premium');
+        included = false;
+        reason = `Niveau de contrat actuel insuffisant (${cur} < ${need})`;
+      }
+      return {
+        number: sec.number,
+        title: sec.title,
+        serviceLevel: sec.service_level || null,
+        serviceLevelLabel: sec.service_level
+          ? (sec.service_level === 'P' ? 'Premium' : sec.service_level === 'S' ? 'Smart' : sec.service_level === 'E' ? 'Essentials' : sec.service_level)
+          : 'Tous niveaux',
+        levelClass: sec.service_level ? sec.service_level.replace(/[^A-Z]/g, '') : '',
+        included,
+        reason,
+      };
+    }).filter(Boolean);
+    const functionalitiesIncluded = functionalities.filter(f => f.included).length;
+
+    // ── Synthèse systèmes (toutes les sections equipement listées) ──
+    const systemsSummary = equipmentEnriched.map(e => {
+      const sec = e.sec;
+      const isOptedOut = sec.opted_out_by_moa === 1;
+      const isExcluded = !sec.included_in_export;
+      const totalReads = (isOptedOut || isExcluded) ? 0 : e.reads * e.instances;
+      const totalWrites = (isOptedOut || isExcluded) ? 0 : e.writes * e.instances;
+      let status, statusClass;
+      if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
+      else if (isExcluded) { status = 'Exclue'; statusClass = 'excluded'; }
+      else if (e.instances === 0) { status = 'Non instanciée'; statusClass = 'not-instanced'; }
+      else { status = 'Couverte'; statusClass = 'covered'; }
+      return {
+        number: sec.number,
+        title: sec.title,
+        bacs: sec.bacs_articles || null,
+        isMetering: isMeteringSystem(sec),
+        instances: e.instances,
+        totalReads,
+        totalWrites,
+        status, statusClass,
+      };
+    });
+    const systemsTotals = systemsSummary.reduce((a, s) => ({
+      instances: a.instances + s.instances,
+      totalReads: a.totalReads + s.totalReads,
+      totalWrites: a.totalWrites + s.totalWrites,
+    }), { instances: 0, totalReads: 0, totalWrites: 0 });
+
+    // ── PAGE 4 (legacy) : Matrice systemes (filtree strict, gardee pour compat) ──
     const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
       instances > 0 || sec.opted_out_by_moa
     );
@@ -552,8 +705,12 @@ async function routes(fastify) {
       af, authorName, exportDate, version,
       motif: body.motif,
       logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-      kpis, optedOutList, bacsConformity, systemsMatrix, totalsMatrix,
-      featuresByChapter, offCatalogCount,
+      kpis, optedOutList,
+      // Nouveau modele tabulaire :
+      systemCategories: SYSTEM_CATEGORIES,
+      zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
+      functionalities, functionalitiesIncluded,
+      systemsSummary, systemsTotals,
     };
 
     const exportsDir = path.resolve(config.exportsDir);
