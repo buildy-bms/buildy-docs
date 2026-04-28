@@ -125,15 +125,15 @@
 
   <table class="zones-matrix">
     <thead>
-      <tr class="zones-cat-row">
-        <th class="zones-name" rowspan="2">Zone</th>
-        {{#each systemCategories}}<th class="zones-cat">{{label}}</th>{{/each}}
-        <th class="zones-total" rowspan="2">Total</th>
-      </tr>
-      <tr class="zones-bacs-row">
+      <tr>
+        <th class="zones-name">Zone</th>
         {{#each systemCategories}}
-          {{#if bacs}}<th class="zones-bacs bacs-yes-marker"><span class="bacs-col-marker" title="{{bacs}}">⚖️ BACS</span></th>{{else}}<th class="zones-bacs muted">—</th>{{/if}}
+          <th class="zones-cat">
+            {{label}}
+            {{#if bacs}}<span class="bacs-col-marker" title="{{bacs}}">⚖️ BACS</span>{{/if}}
+          </th>
         {{/each}}
+        <th class="zones-total">Total</th>
       </tr>
     </thead>
     <tbody>

@@ -52,26 +52,27 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
 }
 .cover-address { font-size: 9.5pt; color: rgba(255,255,255,0.55); margin: 0; }
 
+/* Bloc Totaux centre — style aligne sur le PDF Liste de points */
 .cover-kpi-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm;
+  display: flex; align-items: center; justify-content: center;
+  gap: 16mm;
+  background: rgba(0, 205, 146, 0.08);
+  border: 1px solid rgba(0, 205, 146, 0.25);
+  border-radius: 2mm;
+  padding: 10mm 14mm;
   align-self: center;
 }
-.cover-kpi-card {
-  background: rgba(255,255,255,0.05);
-  border: 0.4mm solid rgba(255,255,255,0.12);
-  border-radius: 2mm;
-  padding: 6mm 5mm;
-  text-align: center;
-}
+.cover-kpi-card { text-align: center; }
+.cover-kpi-card + .cover-kpi-card { border-left: 1px solid rgba(255,255,255,0.12); padding-left: 16mm; }
 .cover-kpi-value {
   font-family: 'Poppins', sans-serif;
-  font-size: 32pt; color: #00cd92; margin: 0;
+  font-size: 44pt; color: #00cd92; margin: 0;
   font-weight: 700; line-height: 1; letter-spacing: -0.02em;
 }
-.cover-kpi-sub { font-size: 16pt; color: rgba(255,255,255,0.5); font-weight: 500; }
+.cover-kpi-sub { font-size: 22pt; color: rgba(255,255,255,0.5); font-weight: 500; }
 .cover-kpi-label {
-  font-size: 8.5pt; color: rgba(255,255,255,0.85); margin: 3mm 0 0;
-  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+  font-size: 9.5pt; color: rgba(255,255,255,0.85); margin: 3mm 0 0;
+  text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500;
 }
 
 .cover-level-band {
@@ -227,67 +228,49 @@ table.opted-table tbody tr:nth-child(even) td { background: #fafbfc; }
 table.opted-table code { font-family: 'SFMono-Regular', monospace; font-size: 8pt; color: #6b7280; }
 
 /* ── PAGE 2 : Matrice zones × catégories ──────────────────────── */
+/* Style aligne sur features-table et systems-table : plat, no-radius. */
 table.zones-matrix {
-  width: 100%; border-collapse: separate; border-spacing: 0;
-  font-size: 8.5pt; table-layout: fixed;
-  border-radius: 1.5mm; overflow: hidden;
-  box-shadow: 0 0 0 0.3mm #e5e7eb;
+  width: 100%; border-collapse: collapse; font-size: 8.5pt; table-layout: fixed;
 }
 table.zones-matrix thead { display: table-header-group; }
 table.zones-matrix th {
-  background: #1b2842; color: white; padding: 2.5mm 1.5mm; text-align: center;
-  font-family: 'Poppins', sans-serif; font-size: 7.5pt; font-weight: 700;
-  letter-spacing: 0.03em; vertical-align: middle;
-  border-bottom: 0.2mm solid rgba(255,255,255,0.1);
+  background: #1b2842; color: white;
+  padding: 2.5mm 1.5mm; text-align: center;
+  font-family: 'Poppins', sans-serif; font-size: 7pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
+  line-height: 1.25;
 }
 table.zones-matrix th.zones-name {
-  text-align: left; padding-left: 4mm; width: 38mm;
+  text-align: left; padding-left: 3mm; width: 38mm;
 }
-table.zones-matrix th.zones-cat {
-  font-size: 7pt; line-height: 1.25;
-  border-right: 0.2mm solid rgba(255,255,255,0.08);
+table.zones-matrix th.zones-cat .bacs-col-marker {
+  display: block; margin-top: 1mm; font-size: 6pt; font-weight: 700;
+  color: #00cd92; letter-spacing: 0.02em;
 }
-table.zones-matrix th.zones-bacs {
-  background: #2d3a55; color: rgba(255,255,255,0.55);
-  font-size: 6.5pt; padding: 1.2mm 1mm; font-weight: 500;
-  border-right: 0.2mm solid rgba(255,255,255,0.08);
-}
-table.zones-matrix th.zones-bacs.bacs-yes-marker {
-  background: #00cd92; color: #1b2842; font-weight: 700;
-}
-table.zones-matrix th.zones-bacs.muted { color: rgba(255,255,255,0.3); }
 table.zones-matrix th.zones-total {
   width: 16mm; background: #00cd92; color: #1b2842;
 }
 
 table.zones-matrix td {
-  padding: 3mm 1.5mm; border-bottom: 0.2mm solid #f1f3f6;
+  padding: 1.8mm 1.5mm; border-bottom: 0.3mm solid #e5e7eb;
   text-align: center; vertical-align: middle; font-variant-numeric: tabular-nums;
 }
 table.zones-matrix td.zones-name {
-  text-align: left; padding-left: 4mm; background: #f9fafb;
-  border-right: 0.3mm solid #e5e7eb;
+  text-align: left; padding-left: 3mm; font-weight: 600; color: #1b2842;
 }
-table.zones-matrix td.zones-name strong { color: #1b2842; font-size: 9pt; }
 table.zones-matrix td.zones-name .muted { color: #9ca3af; font-size: 7.5pt; font-weight: 400; }
-table.zones-matrix td.zones-cell { font-size: 10pt; color: #1b2842; }
+table.zones-matrix td.zones-cell { font-size: 9.5pt; color: #1b2842; }
 table.zones-matrix td.zones-cell strong { color: #00cd92; font-weight: 700; }
 table.zones-matrix td.zones-total {
-  background: #f8fafc; font-weight: 700; color: #1b2842;
-  border-left: 0.3mm solid #1b2842; font-size: 10pt;
+  background: #f8fafc; font-weight: 700; color: #1b2842; font-size: 9.5pt;
 }
-table.zones-matrix tbody tr:hover td { background: #f0fdf4; }
+table.zones-matrix tbody tr:nth-child(even) td { background: #fafbfc; }
+table.zones-matrix tbody tr:nth-child(even) td.zones-total { background: #f1f5f9; }
 table.zones-matrix tfoot td {
-  background: #1b2842; color: white; font-weight: 700; padding: 3mm 1.5mm;
-  font-size: 9pt;
+  background: #1b2842; color: white; font-weight: 700; padding: 2.5mm 1.5mm; font-size: 9pt;
 }
 table.zones-matrix tfoot td.zones-name { background: #1b2842; color: white; }
 table.zones-matrix tfoot td.zones-total { background: #00cd92; color: #1b2842; }
-
-.bacs-col-marker {
-  display: inline-block; font-size: 6.5pt; font-weight: 700;
-  letter-spacing: 0.02em;
-}
 
 .legal-note {
   margin-top: 4mm; padding: 3mm 4mm; background: #f9fafb;
