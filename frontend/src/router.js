@@ -34,9 +34,25 @@ const routes = [
   },
   {
     path: '/library',
-    name: 'library',
+    redirect: '/library/equipments',
+  },
+  {
+    path: '/library/equipments',
+    name: 'library-equipments',
     meta: { title: 'Bibliothèque équipements' },
-    component: () => import('@/views/LibraryView.vue'),
+    component: () => import('@/views/LibraryEquipmentView.vue'),
+  },
+  {
+    path: '/library/sections',
+    name: 'library-sections',
+    meta: { title: 'Bibliothèque sections types' },
+    component: () => import('@/views/LibrarySectionsView.vue'),
+  },
+  {
+    path: '/library/categories',
+    name: 'library-categories',
+    meta: { title: 'Catégories de systèmes' },
+    component: () => import('@/views/LibraryCategoriesView.vue'),
   },
 ]
 

@@ -29,7 +29,7 @@ async function refresh() {
 watch(() => props.templateId, refresh, { immediate: true })
 
 function openInLibrary() {
-  router.push({ path: '/library', query: { open: template.value.slug } })
+  router.push({ path: '/library/equipments', query: { open: template.value.slug } })
 }
 </script>
 
