@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
-  RocketLaunchIcon, PencilSquareIcon, UserGroupIcon,
+  RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
+import AfInstancesModal from './AfInstancesModal.vue'
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
@@ -20,7 +21,7 @@ import ServiceLevelBadge from './ServiceLevelBadge.vue'
 const props = defineProps({
   af: { type: Object, required: true },
 })
-const emit = defineEmits(['updated', 'back', 'toggle-activity'])
+const emit = defineEmits(['updated', 'back', 'toggle-activity', 'goto-section'])
 
 const { success, error } = useNotification()
 const router = useRouter()
@@ -34,6 +35,7 @@ const lastExportInfo = ref(null)
 
 // Lot 28 — partage AF
 const showShare = ref(false)
+const showInstances = ref(false)
 
 // Lot 29 — édition des métadonnées AF
 const showEdit = ref(false)
@@ -302,6 +304,14 @@ const exportDescription = computed(() => {
       Synthèse (A3)
     </button>
     <button
+      @click="showInstances = true"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      title="Vue tableau de toutes les instances d'équipements de l'AF"
+    >
+      <ListBulletIcon class="w-4 h-4" />
+      Instances
+    </button>
+    <button
       @click="showShare = true"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Partager cette AF avec d'autres utilisateurs"
@@ -549,6 +559,7 @@ const exportDescription = computed(() => {
 
   <!-- Modale partage AF (Lot 28) -->
   <ShareAfModal v-if="showShare" :af-id="af.id" @close="showShare = false" />
+  <AfInstancesModal v-if="showInstances" :af-id="af.id" @close="showInstances = false" @goto-section="(id) => emit('goto-section', id)" />
 
   <!-- Modale édition métadonnées AF (Lot 29) -->
   <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="md" @close="showEdit = false">

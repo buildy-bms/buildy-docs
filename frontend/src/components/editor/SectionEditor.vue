@@ -85,7 +85,7 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      class: 'prose prose-sm max-w-none focus:outline-none min-h-[300px] py-4',
+      class: 'prose prose-sm max-w-none focus:outline-none min-h-[120px] py-3',
     },
   },
   onUpdate: ({ editor }) => {

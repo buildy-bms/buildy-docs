@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 
 defineOptions({ name: 'SectionTreeNode' })
@@ -14,7 +14,9 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include'])
+
+const excluded = computed(() => props.node.included_in_export === 0)
 
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
@@ -86,14 +88,23 @@ const titleHtml = computed(() => {
         {{ node.number }}
       </span>
 
-      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses]" v-html="titleHtml"></span>
+      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '']" v-html="titleHtml"></span>
 
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
 
-      <span v-if="empty" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Section vide — à rédiger"></span>
+      <span v-if="empty && !excluded" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Section vide — à rédiger"></span>
 
-      <!-- Actions au survol : ajouter enfant + supprimer -->
+      <!-- Actions au survol : inclure/exclure + ajouter enfant + supprimer -->
       <span class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
+        <button
+          type="button"
+          @click.stop="emit('toggle-include', node)"
+          :class="['p-0.5 rounded', excluded ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
+          :title="excluded ? 'Inclure cette section dans les exports' : 'Exclure cette section des exports'"
+        >
+          <EyeIcon v-if="excluded" class="w-3 h-3" />
+          <EyeSlashIcon v-else class="w-3 h-3" />
+        </button>
         <button
           type="button"
           @click.stop="emit('add-child', node)"
@@ -110,6 +121,10 @@ const titleHtml = computed(() => {
         >
           <TrashIcon class="w-3 h-3" />
         </button>
+      </span>
+      <!-- Indicateur permanent si section exclue -->
+      <span v-if="excluded" class="shrink-0 text-amber-600" title="Exclue des exports">
+        <EyeSlashIcon class="w-3 h-3" />
       </span>
     </button>
 
@@ -128,6 +143,7 @@ const titleHtml = computed(() => {
         @toggle="emit('toggle', $event)"
         @add-child="emit('add-child', $event)"
         @delete="emit('delete', $event)"
+        @toggle-include="emit('toggle-include', $event)"
       />
     </div>
   </div>

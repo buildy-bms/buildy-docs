@@ -62,6 +62,14 @@ async function routes(fastify) {
     };
   });
 
+  // GET /api/afs/:id/instances — liste a plat de toutes les instances d'equipements de l'AF
+  fastify.get('/afs/:id/instances', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    return db.equipmentInstances.listByAf(id);
+  });
+
   // POST /api/afs — creation (declenche le seed du plan AF complet)
   fastify.post('/afs', async (request, reply) => {
     let body;

@@ -183,11 +183,13 @@ function seedAfStructure(afId) {
     // Resolution du template equipement (si declare)
     let equipmentTemplateId = null;
     let equipmentTemplateVersion = null;
+    let equipmentTemplateBacs = null;
     if (node.kind === 'equipment' && node.equipment_template_slug) {
       const tpl = db.equipmentTemplates.getBySlug(node.equipment_template_slug);
       if (tpl) {
         equipmentTemplateId = tpl.id;
         equipmentTemplateVersion = tpl.current_version;
+        equipmentTemplateBacs = tpl.bacs_articles;
       }
     }
 
@@ -195,7 +197,7 @@ function seedAfStructure(afId) {
     let sectionTemplateId = null;
     let sectionTemplateVersion = null;
     let bodyHtml = node.body_placeholder ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>` : null;
-    let bacsArticles = node.bacs_articles || null;
+    let bacsArticles = node.bacs_articles || equipmentTemplateBacs || null;
     if (node.kind === 'standard' || node.kind === 'zones') {
       const slug = sectionTemplateSlug(node);
       const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;

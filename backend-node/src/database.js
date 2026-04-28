@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 18;
+const TARGET_VERSION = 19;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -701,6 +701,22 @@ function runMigrations() {
     log.info('Migration 18 appliquee : section_templates + rattachement sections');
   }
 
+  if (current < 19) {
+    // Lot 30+ — Backfill bacs_articles sur les sections equipement existantes
+    // qui n'avaient pas hérité de la valeur du template.
+    const r = db.prepare(`
+      UPDATE sections
+         SET bacs_articles = (SELECT bacs_articles FROM equipment_templates WHERE id = sections.equipment_template_id)
+       WHERE kind = 'equipment'
+         AND (bacs_articles IS NULL OR bacs_articles = '')
+         AND equipment_template_id IS NOT NULL
+         AND (SELECT bacs_articles FROM equipment_templates WHERE id = sections.equipment_template_id) IS NOT NULL
+    `).run();
+    if (r.changes > 0) log.info(`Migration 19 : ${r.changes} sections equipement ont herite des BACS de leur template`);
+    db.pragma('user_version = 19');
+    log.info('Migration 19 appliquee : backfill BACS sections equipement');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1158,6 +1174,22 @@ const equipmentInstances = {
       WHERE section_id = ?
       ORDER BY position, id
     `).all(sectionId);
+  },
+  listByAf(afId) {
+    return db.prepare(`
+      SELECT
+        ei.id, ei.section_id, ei.position, ei.reference, ei.location, ei.qty, ei.notes,
+        s.number AS section_number, s.title AS section_title,
+        s.included_in_export AS section_included_in_export,
+        t.id AS template_id, t.slug AS template_slug, t.name AS template_name,
+        t.icon_kind AS template_icon_kind, t.icon_value AS template_icon_value, t.icon_color AS template_icon_color,
+        t.category AS template_category
+      FROM equipment_instances ei
+      JOIN sections s ON s.id = ei.section_id
+      LEFT JOIN equipment_templates t ON t.id = s.equipment_template_id
+      WHERE s.af_id = ?
+      ORDER BY s.position, s.id, ei.position, ei.id
+    `).all(afId);
   },
   create(sectionId, { position, reference, location, qty, notes }) {
     const result = db.prepare(`

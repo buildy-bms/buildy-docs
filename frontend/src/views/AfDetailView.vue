@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getAf, listSections, getSection, createSection, deleteSection, listEquipmentTemplates } from '@/api'
+import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
@@ -90,6 +90,21 @@ async function handleDeleteSection(node) {
   }
 }
 
+async function handleToggleInclude(node) {
+  const newVal = node.included_in_export === 0 ? 1 : 0
+  // Update optimiste de la liste plate pour feedback immediat
+  const idx = sections.value.findIndex(s => s.id === node.id)
+  if (idx >= 0) sections.value[idx] = { ...sections.value[idx], included_in_export: newVal }
+  try {
+    await updateSection(node.id, { included_in_export: !!newVal })
+    if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, included_in_export: newVal }
+  } catch (e) {
+    // rollback
+    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], included_in_export: node.included_in_export }
+    notifyError(e.response?.data?.detail || 'Échec mise à jour')
+  }
+}
+
 const sectionsCountByKind = computed(() => {
   const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
   for (const s of sections.value) c[s.kind] = (c[s.kind] || 0) + 1
@@ -160,7 +175,7 @@ watch(() => route.params.id, async () => {
   <div v-else-if="af" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
     <!-- Bandeau cycle de vie (en haut, full-width) -->
     <div class="px-5 lg:px-6 pt-4 space-y-2">
-      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" />
+      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @goto-section="selectSection" />
       <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" />
       <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
@@ -191,6 +206,7 @@ watch(() => route.params.id, async () => {
             @add-root="openAddSection(null)"
             @add-child="openAddSection"
             @delete="handleDeleteSection"
+            @toggle-include="handleToggleInclude"
           />
         </div>
         <!-- Poignée de drag-resize -->

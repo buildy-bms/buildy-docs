@@ -10,7 +10,7 @@ const props = defineProps({
   sections: { type: Array, required: true }, // liste plate (parent_id pour hierarchie)
   selectedId: { type: Number, default: null },
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete'])
+const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -158,6 +158,7 @@ watch(matchedIds, (ids) => {
       @toggle="toggle"
       @add-child="emit('add-child', $event)"
       @delete="emit('delete', $event)"
+      @toggle-include="emit('toggle-include', $event)"
     />
   </div>
 </template>
