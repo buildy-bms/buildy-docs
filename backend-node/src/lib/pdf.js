@@ -256,9 +256,10 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
     const {
       imagePath,
       skipFirstPage = false,
-      widthMm,           // largeur fixe en mm (prioritaire)
-      widthRatio = 0.8,  // sinon : ratio de la largeur de la page (80% par defaut)
-      opacity = 0.07,
+      widthMm,            // largeur fixe en mm (prioritaire si fournie)
+      widthRatio = 0.95,  // ratio de largeur de page (95% par defaut)
+      heightRatio = 0.95, // ratio de hauteur de page (cap pour pages paysage)
+      opacity = 0.06,
       position = 'center', // 'center' | 'bottom-right'
     } = watermark;
     const imageBytes = fs.readFileSync(imagePath);
@@ -270,7 +271,11 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
     for (let i = startIdx; i < pages.length; i++) {
       const p = pages[i];
       const { width: pw, height: ph } = p.getSize();
-      const wPt = widthMm ? mmToPt(widthMm) : pw * widthRatio;
+      // On veut le filigrane le plus grand possible tout en respectant
+      // les caps en largeur ET en hauteur (utile en A3 paysage).
+      const wByWidth = widthMm ? mmToPt(widthMm) : pw * widthRatio;
+      const wByHeight = (ph * heightRatio) / aspect;
+      const wPt = Math.min(wByWidth, wByHeight);
       const hPt = wPt * aspect;
       let x, y;
       if (position === 'bottom-right') {
