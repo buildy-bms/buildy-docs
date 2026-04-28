@@ -77,6 +77,12 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 
+// ── Permissions AF (Lot 28) ──
+export const listAfPermissions = (afId) => api.get(`/afs/${afId}/permissions`)
+export const grantAfPermission = (afId, user_id, role) => api.post(`/afs/${afId}/permissions`, { user_id, role })
+export const revokeAfPermission = (afId, userId) => api.delete(`/afs/${afId}/permissions/${userId}`)
+export const listUsers = (q) => api.get('/users', { params: q ? { q } : {} })
+
 // ── BACS articles (statique) ──
 let _bacsCache = null
 export async function getBacsArticles() {

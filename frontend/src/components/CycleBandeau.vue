@@ -3,8 +3,9 @@ import { computed, ref, watch } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
-  RocketLaunchIcon, PencilSquareIcon,
+  RocketLaunchIcon, PencilSquareIcon, UserGroupIcon,
 } from '@heroicons/vue/24/outline'
+import ShareAfModal from './ShareAfModal.vue'
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
@@ -30,6 +31,9 @@ const exportMotif = ref('')
 const exportIncludeBacs = ref(false)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
+
+// Lot 28 — partage AF
+const showShare = ref(false)
 
 // Lot 29 — édition des métadonnées AF
 const showEdit = ref(false)
@@ -298,6 +302,14 @@ const exportDescription = computed(() => {
       Synthèse (A3)
     </button>
     <button
+      @click="showShare = true"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      title="Partager cette AF avec d'autres utilisateurs"
+    >
+      <UserGroupIcon class="w-4 h-4" />
+      Partager
+    </button>
+    <button
       @click="emit('toggle-activity')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Panneau d'activité"
@@ -534,6 +546,9 @@ const exportDescription = computed(() => {
       </button>
     </template>
   </BaseModal>
+
+  <!-- Modale partage AF (Lot 28) -->
+  <ShareAfModal v-if="showShare" :af-id="af.id" @close="showShare = false" />
 
   <!-- Modale édition métadonnées AF (Lot 29) -->
   <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="md" @close="showEdit = false">

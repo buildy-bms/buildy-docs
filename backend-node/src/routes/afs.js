@@ -336,6 +336,41 @@ async function routes(fastify) {
     };
   });
 
+  // ── Permissions / Partage AF (Lot 28) ──────────────────────────────
+  fastify.get('/afs/:id/permissions', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    return {
+      owner_id: af.created_by,
+      grants: db.afPermissions.listByAf(id),
+    };
+  });
+
+  fastify.post('/afs/:id/permissions', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const { user_id, role } = request.body || {};
+    if (!user_id || !['read', 'write'].includes(role)) {
+      return reply.code(400).send({ detail: 'user_id + role (read|write) requis' });
+    }
+    if (user_id === af.created_by) {
+      return reply.code(400).send({ detail: 'Le créateur de l\'AF est déjà owner' });
+    }
+    const perm = db.afPermissions.grant(id, user_id, role, request.authUser?.id);
+    db.auditLog.add({ afId: id, userId: request.authUser?.id, action: 'af.share.grant', payload: { user_id, role } });
+    return perm;
+  });
+
+  fastify.delete('/afs/:id/permissions/:userId', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const userId = parseInt(request.params.userId, 10);
+    db.afPermissions.revoke(id, userId);
+    db.auditLog.add({ afId: id, userId: request.authUser?.id, action: 'af.share.revoke', payload: { user_id: userId } });
+    return { ok: true };
+  });
+
   // GET /api/afs/:id/audit — historique (50 dernieres entrees)
   fastify.get('/afs/:id/audit', async (request) => {
     const id = parseInt(request.params.id, 10);

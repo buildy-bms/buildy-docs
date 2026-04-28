@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 12;
+const TARGET_VERSION = 13;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -555,6 +555,28 @@ function runMigrations() {
     db.pragma('user_version = 12');
   }
 
+  if (current < 13) {
+    // Lot 28 — Partage des AFs avec permissions read/write par utilisateur.
+    // Modèle "permissive par défaut" : si une AF n'a aucune entrée dans
+    // af_permissions → tout le monde y accède (legacy compat). Le partage sert
+    // à formaliser les responsabilités, pas à restreindre (V1).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS af_permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK (role IN ('read', 'write')),
+        granted_by INTEGER REFERENCES users(id),
+        granted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(af_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_af_perm_af ON af_permissions(af_id);
+      CREATE INDEX IF NOT EXISTS idx_af_perm_user ON af_permissions(user_id);
+    `);
+    log.info('Migration 13 appliquee : af_permissions');
+    db.pragma('user_version = 13');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -974,6 +996,43 @@ const equipmentInstances = {
   },
 };
 
+// ── Permissions AF (Lot 28) ─────────────────────────────────────────
+const afPermissions = {
+  listByAf(afId) {
+    return db.prepare(`
+      SELECT p.*, u.display_name AS user_display_name, u.email AS user_email,
+             gb.display_name AS granted_by_name
+      FROM af_permissions p
+      JOIN users u ON u.id = p.user_id
+      LEFT JOIN users gb ON gb.id = p.granted_by
+      WHERE af_id = ?
+      ORDER BY p.granted_at DESC
+    `).all(afId);
+  },
+  hasAccess(afId, userId, requiredRole = 'read') {
+    if (!userId) return { ok: false, role: null };
+    const af = db.prepare('SELECT created_by FROM afs WHERE id = ?').get(afId);
+    if (af?.created_by === userId) return { ok: true, role: 'owner' };
+    const perms = db.prepare('SELECT 1 FROM af_permissions WHERE af_id = ? LIMIT 1').get(afId);
+    if (!perms) return { ok: true, role: 'public' }; // Mode legacy : pas de permission posée → tous accèdent
+    const row = db.prepare('SELECT role FROM af_permissions WHERE af_id = ? AND user_id = ?').get(afId, userId);
+    if (!row) return { ok: false, role: null };
+    if (requiredRole === 'write' && row.role === 'read') return { ok: false, role: 'read' };
+    return { ok: true, role: row.role };
+  },
+  grant(afId, userId, role, grantedBy) {
+    db.prepare(`
+      INSERT INTO af_permissions (af_id, user_id, role, granted_by)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(af_id, user_id) DO UPDATE SET role = excluded.role, granted_by = excluded.granted_by, granted_at = CURRENT_TIMESTAMP
+    `).run(afId, userId, role, grantedBy || null);
+    return db.prepare('SELECT * FROM af_permissions WHERE af_id = ? AND user_id = ?').get(afId, userId);
+  },
+  revoke(afId, userId) {
+    db.prepare('DELETE FROM af_permissions WHERE af_id = ? AND user_id = ?').run(afId, userId);
+  },
+};
+
 // ── Zones fonctionnelles du bâtiment (Lot 26) ─────────────────────────
 const afZones = {
   listBySection(sectionId) {
@@ -1068,6 +1127,7 @@ module.exports = {
   equipmentInstances,
   attachments,
   afZones,
+  afPermissions,
   afs,
   afInspections,
   sections,

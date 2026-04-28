@@ -101,4 +101,33 @@ function registerAuthHook(fastify) {
   });
 }
 
-module.exports = { cookieOpts, issueAccessToken, registerAuthHook };
+/**
+ * Garde par AF — vérifie que l'utilisateur authentifié a au moins le rôle requis
+ * sur l'AF cible (Lot 28). Renvoie 403 sinon, 404 si l'AF n'existe pas.
+ */
+function requireAfAccess(requiredRole = 'read') {
+  return async (request, reply) => {
+    if (!request.authUser?.id) return reply.code(401).send({ detail: 'Non authentifie' });
+    let afId = parseInt(request.params.afId || request.params.id, 10);
+    if (!afId && request.params.id) {
+      // params.id peut être section_id → résoudre vers af_id
+      const sec = db.prepare ? null : null; // évite circular
+      const section = db.sections?.getById?.(parseInt(request.params.id, 10));
+      if (section) afId = section.af_id;
+    }
+    if (!afId) return; // route non scopée AF
+    const af = db.afs.getById(afId);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const access = db.afPermissions.hasAccess(afId, request.authUser.id, requiredRole);
+    if (!access.ok) {
+      return reply.code(403).send({
+        detail: access.role
+          ? `Permissions insuffisantes (vous avez ${access.role}, ${requiredRole} requis)`
+          : 'Vous n\'êtes pas autorisé à accéder à cette AF',
+      });
+    }
+    request.afRole = access.role;
+  };
+}
+
+module.exports = { cookieOpts, issueAccessToken, registerAuthHook, requireAfAccess };
