@@ -14,6 +14,14 @@ import { SparklesIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
+import RichTextEditor from './RichTextEditor.vue'
+import * as allSolidIcons from '@fortawesome/free-solid-svg-icons'
+
+// Liste exhaustive des noms d'icones FA Solid Free (~1500), pour la recherche prédictive
+const ALL_FA_NAMES = Object.values(allSolidIcons)
+  .filter(i => i && i.iconName)
+  .map(i => i.iconName)
+  .sort()
 import { createEquipmentTemplate, updateEquipmentTemplate, deleteEquipmentTemplate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -41,21 +49,11 @@ const CATEGORIES = [
 
 const PROTOCOLS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']
 
-const ICON_PRESETS = [
-  { fa: 'fa-fan', color: '#3b82f6', label: 'Ventilation' },
-  { fa: 'fa-fire', color: '#ef4444', label: 'Chauffage' },
-  { fa: 'fa-snowflake', color: '#06b6d4', label: 'Froid' },
-  { fa: 'fa-droplet', color: '#0ea5e9', label: 'Eau' },
-  { fa: 'fa-lightbulb', color: '#facc15', label: 'Éclairage' },
-  { fa: 'fa-bolt', color: '#facc15', label: 'Électricité' },
-  { fa: 'fa-temperature-half', color: '#f97316', label: 'Température' },
-  { fa: 'fa-leaf', color: '#10b981', label: 'QAI / vert' },
-  { fa: 'fa-blinds', color: '#64748b', label: 'Occultation' },
-  { fa: 'fa-industry', color: '#475569', label: 'Process' },
-  { fa: 'fa-cube', color: '#6b7280', label: 'Générique' },
-  { fa: 'fa-plug', color: '#a855f7', label: 'Prise' },
-  { fa: 'fa-solar-panel', color: '#eab308', label: 'Solaire' },
-  { fa: 'fa-building', color: '#0ea5e9', label: 'Bâtiment' },
+// Palette de couleurs Buildy pour le pastillage des icônes
+const COLOR_PRESETS = [
+  '#3b82f6', '#1e40af', '#06b6d4', '#0ea5e9', '#10b981', '#22c55e',
+  '#facc15', '#eab308', '#f97316', '#ef4444', '#a855f7', '#ec4899',
+  '#475569', '#64748b', '#6b7280',
 ]
 
 const form = ref({
@@ -96,9 +94,24 @@ function toggleProtocol(p) {
   if (idx >= 0) form.value.preferred_protocols.splice(idx, 1)
   else form.value.preferred_protocols.push(p)
 }
-function selectIcon(preset) {
-  form.value.icon_value = preset.fa
-  form.value.icon_color = preset.color
+
+// Picker icône — recherche prédictive dans toute la base FA Solid Free
+const iconSearch = ref('')
+const filteredIcons = computed(() => {
+  const q = iconSearch.value.trim().toLowerCase()
+  if (!q) {
+    // Si pas de recherche, montrer un assortiment varié + l'icône courante
+    const defaults = ['fan', 'fire', 'snowflake', 'droplet', 'lightbulb', 'bolt', 'temperature-half', 'leaf', 'plug', 'solar-panel', 'industry', 'cube', 'building', 'gauge', 'water', 'fire-flame-simple', 'wind', 'gear', 'server', 'tower-broadcast']
+    return defaults.filter(n => ALL_FA_NAMES.includes(n))
+  }
+  return ALL_FA_NAMES.filter(n => n.includes(q)).slice(0, 60)
+})
+
+function selectIconName(name) {
+  form.value.icon_value = 'fa-' + name
+}
+function selectColor(color) {
+  form.value.icon_color = color
 }
 
 async function submit() {
@@ -180,13 +193,33 @@ async function destroy() {
           <p class="text-[10px] text-gray-400 mt-1">Format : <code>R175-1 §1, §2 ; R175-3 §4</code>. Laisser vide si non visé.</p>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Icône</label>
-          <div class="flex flex-wrap gap-1">
-            <button v-for="preset in ICON_PRESETS" :key="preset.fa" type="button" @click="selectIcon(preset)"
-                    :class="['inline-flex items-center justify-center w-8 h-8 border rounded transition-all', form.icon_value === preset.fa ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-gray-200 hover:border-gray-400']"
-                    :title="preset.label">
-              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: preset.fa, icon_color: preset.color }" size="sm" />
+          <label class="block text-xs font-medium text-gray-700 mb-1">Icône & couleur</label>
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="inline-flex items-center justify-center w-9 h-9 border-2 border-gray-300 rounded">
+              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
+            </span>
+            <input v-model="iconSearch" type="text" autocomplete="off" data-1p-ignore="true"
+                   placeholder="Rechercher (ex: fire, water, gauge…)"
+                   class="flex-1 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div class="border border-gray-200 rounded p-1 max-h-32 overflow-y-auto grid grid-cols-10 gap-0.5">
+            <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
+                    :class="['inline-flex items-center justify-center w-7 h-7 rounded transition-all', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
+                    :title="name">
+              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
             </button>
+            <p v-if="!filteredIcons.length" class="col-span-10 text-[10px] text-gray-400 italic text-center py-2">
+              Aucune icône ne correspond.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-1 mt-1.5">
+            <span class="text-[10px] text-gray-500 mr-1">Couleur :</span>
+            <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
+                    :class="['w-4 h-4 rounded-full border transition-all', form.icon_color === c ? 'border-gray-700 scale-125' : 'border-gray-200']"
+                    :style="{ background: c }" :title="c"></button>
+            <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1" title="Couleur personnalisée" />
           </div>
         </div>
       </div>
@@ -213,16 +246,20 @@ async function destroy() {
             Générer avec Claude Desktop
           </button>
         </div>
-        <textarea v-model="form.description_html" rows="6" autocomplete="off" data-1p-ignore="true"
-                  placeholder="<p>Ce que fait l'équipement…</p><p><strong>La régulation est assurée par l'équipement lui-même</strong>…</p><p>La solution Buildy supervise…</p>"
-                  class="w-full px-3 py-2 border border-gray-300 text-xs font-mono leading-snug focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        <RichTextEditor
+          v-model="form.description_html"
+          placeholder="Ce que fait l'équipement, à quel titre il est concerné par le décret BACS, par qui sa régulation est assurée, et comment la solution Buildy intervient en aval…"
+          min-height="180px"
+        />
       </div>
 
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Justification BACS (encart contextualisé)</label>
-        <textarea v-model="form.bacs_justification" rows="4" autocomplete="off" data-1p-ignore="true"
-                  placeholder="<p>L'article R175-X définit…</p><p>Le décret impose…</p><p>L'intégration de [équipement] dans la solution Buildy permet…</p>"
-                  class="w-full px-3 py-2 border border-gray-300 text-xs font-mono leading-snug focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        <RichTextEditor
+          v-model="form.bacs_justification"
+          placeholder="L'article R175-X définit… Le décret impose… La solution Buildy permet de répondre à ces obligations en…"
+          min-height="120px"
+        />
         <p class="text-[10px] text-gray-400 mt-1">Affiché dans l'encart « Pourquoi le décret BACS s'applique ici » au-dessus du badge.</p>
       </div>
     </form>

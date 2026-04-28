@@ -2,18 +2,12 @@
 import { computed } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import {
-  faFan, faFire, faTemperatureArrowUp, faSnowflake, faBuilding, faWind,
-  faDroplet, faLightbulb, faPlug, faSolarPanel, faBolt, faFireFlameSimple,
-  faTemperatureHalf, faLeaf, faIndustry, faCube, faRectangleAd,
-} from '@fortawesome/free-solid-svg-icons'
+import * as allSolidIcons from '@fortawesome/free-solid-svg-icons'
 
-// Enregistrer les icones FA utilisees par defaut dans nos templates
-library.add(
-  faFan, faFire, faTemperatureArrowUp, faSnowflake, faBuilding, faWind,
-  faDroplet, faLightbulb, faPlug, faSolarPanel, faBolt, faFireFlameSimple,
-  faTemperatureHalf, faLeaf, faIndustry, faCube, faRectangleAd,
-)
+// Enregistre TOUTES les icones FA Free Solid (~1500 icones, ~150KB gzippé)
+// pour permettre au picker de proposer une recherche dans toute la base.
+const iconObjs = Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon)
+library.add(...iconObjs)
 
 const props = defineProps({
   template: { type: Object, required: true },
@@ -28,10 +22,11 @@ const iconKind = computed(() => props.template?.icon_kind || 'fa')
 const iconValue = computed(() => props.template?.icon_value || 'fa-cube')
 const iconColor = computed(() => props.template?.icon_color || '#6b7280')
 
-// Pour FontAwesome, on enleve le prefixe 'fa-' et on convertit en camelCase
+// Pour FontAwesome, on enleve le prefixe 'fa-'. Si l'icone n'existe pas, fallback 'cube'.
+const knownNames = new Set(iconObjs.map(i => i.iconName))
 const faName = computed(() => {
   const v = (iconValue.value || 'fa-cube').replace(/^fa-/, '')
-  return v // FA Vue accept ce format directement via library.add() au-dessus
+  return knownNames.has(v) ? v : 'cube'
 })
 </script>
 
