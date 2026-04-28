@@ -20,6 +20,7 @@ import {
   updateSectionTemplate,
   deleteSectionTemplate,
   listSectionTemplates,
+  listEquipmentTemplates,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -70,11 +71,19 @@ const showEquipmentPicker = ref(false)
 // niveau racine "—"). Pour eviter les cycles, on exclut l'item courant et ses
 // descendants (le backend a le garde-fou definitif mais on filtre cote UI).
 const allTemplates = ref([])
+const equipmentTemplates = ref([])
 async function loadTemplates() {
   const { data } = await listSectionTemplates({})
   allTemplates.value = data
 }
-onMounted(loadTemplates)
+async function loadEquipmentTemplates() {
+  const { data } = await listEquipmentTemplates()
+  equipmentTemplates.value = data || []
+}
+onMounted(() => {
+  loadTemplates()
+  loadEquipmentTemplates()
+})
 
 const parentOptions = computed(() => {
   const opts = [{ id: null, label: '— (top-level)', depth: 0 }]
@@ -113,13 +122,11 @@ const parentOptions = computed(() => {
   return opts
 })
 
-const equipmentTemplate = computed(() => {
-  // Affichage du nom de l'equipment template lie
-  if (!form.value.equipment_template_id) return null
-  // Le template peut etre injecte via props.template.equipment_template_id puis
-  // recharge en arriere-plan. Pour le label on utilise EquipmentTemplatePicker
-  // qui gere la liste lui-meme.
-  return form.value.equipment_template_id
+const selectedEquipmentName = computed(() => {
+  const id = form.value.equipment_template_id
+  if (!id) return null
+  const t = equipmentTemplates.value.find(x => x.id === id)
+  return t ? t.name : null
 })
 
 watch(() => props.template, (t) => {
@@ -229,7 +236,7 @@ async function destroy() {
         <button type="button" @click="showEquipmentPicker = true"
                 class="w-full text-left px-3 py-2 border border-gray-300 text-sm hover:bg-gray-50">
           <span v-if="form.equipment_template_id" class="text-gray-800">
-            Équipement #{{ form.equipment_template_id }} — cliquer pour changer
+            {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }} — cliquer pour changer
           </span>
           <span v-else class="text-gray-400 italic">Aucun équipement choisi — cliquer pour sélectionner</span>
         </button>
@@ -302,6 +309,7 @@ async function destroy() {
   <BaseModal v-if="showEquipmentPicker" title="Choisir un modèle d'équipement" size="lg" @close="showEquipmentPicker = false">
     <EquipmentTemplatePicker
       :model-value="form.equipment_template_id"
+      :templates="equipmentTemplates"
       @update:model-value="(v) => { form.equipment_template_id = v; showEquipmentPicker = false }"
     />
   </BaseModal>
