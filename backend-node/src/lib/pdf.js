@@ -204,13 +204,13 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
       ...pdfOptions,
     };
 
-    if (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter) {
-      // Double rendu : cover sans HF, body avec HF, puis merge.
-      const coverBuf = await page.pdf({ ...baseOptions, displayHeaderFooter: false, pageRanges: '1', path: undefined });
-      const bodyBuf = await page.pdf({ ...baseOptions, displayHeaderFooter: true, pageRanges: '2-', path: undefined });
-      await mergeAndWritePdf(coverBuf, bodyBuf, outputPath);
-    } else {
-      await page.pdf({ ...baseOptions, path: outputPath });
+    await page.pdf({ ...baseOptions, path: outputPath });
+
+    // Masque l'en-tete et le pied de page de la page 1 (couverture) en y
+    // dessinant des rectangles de la couleur de fond du cover. Approche
+    // post-processing qui PRESERVE les annotations PDF (liens du sommaire).
+    if (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter && pdfOptions.margin) {
+      await maskFirstPageHeaderFooter(outputPath, pdfOptions.margin, '#1b2842');
     }
   } finally {
     await page.close().catch(() => {});
@@ -220,19 +220,22 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
   return { path: outputPath, sizeBytes: stats.size };
 }
 
-async function mergeAndWritePdf(coverBuf, bodyBuf, outputPath) {
-  const { PDFDocument } = require('pdf-lib');
-  const merged = await PDFDocument.create();
-  const cover = await PDFDocument.load(coverBuf);
-  const body = await PDFDocument.load(bodyBuf);
-  const coverPages = await merged.copyPages(cover, cover.getPageIndices());
-  for (const p of coverPages) merged.addPage(p);
-  const bodyPages = await merged.copyPages(body, body.getPageIndices());
-  for (const p of bodyPages) merged.addPage(p);
-  const out = await merged.save();
-  const dir = path.dirname(outputPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(outputPath, out);
+async function maskFirstPageHeaderFooter(pdfPath, margin, hexColor) {
+  const { PDFDocument, rgb } = require('pdf-lib');
+  const bytes = fs.readFileSync(pdfPath);
+  const doc = await PDFDocument.load(bytes);
+  const firstPage = doc.getPage(0);
+  const { width, height } = firstPage.getSize();
+  const mmToPt = (mm) => parseFloat(mm) * 2.83465;
+  const topPt = margin.top ? mmToPt(margin.top) : 0;
+  const botPt = margin.bottom ? mmToPt(margin.bottom) : 0;
+  const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+  const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+  const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+  const fill = rgb(r, g, b);
+  if (topPt > 0) firstPage.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
+  if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+  fs.writeFileSync(pdfPath, await doc.save());
 }
 
 async function shutdown() {
