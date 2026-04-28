@@ -161,9 +161,9 @@ onMounted(async () => {
 
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
-      <!-- Vue tableau (par défaut) — auto-width, no-wrap, scroll horizontal si nécessaire -->
-      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-none overflow-x-auto">
-        <table class="w-auto min-w-full text-sm" style="table-layout: auto">
+      <!-- Vue tableau (par défaut) — pas de scroll horizontal : pilules protocoles wrap dans leur cellule -->
+      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-none">
+        <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
               <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
@@ -205,7 +205,7 @@ onMounted(async () => {
                   <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                 </span>
               </td>
-              <td class="px-4 py-2 whitespace-nowrap">
+              <td class="px-4 py-2">
                 <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" />
                 <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
               </td>

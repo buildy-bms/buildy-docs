@@ -37,7 +37,7 @@ function colorFor(p) {
 </script>
 
 <template>
-  <div v-if="list.length" :class="['flex items-center gap-1.5', showLabel ? 'flex-wrap' : 'flex-nowrap']">
+  <div v-if="list.length" class="flex items-center gap-1 flex-wrap">
     <span v-if="showLabel" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1 whitespace-nowrap">Protocoles exigés :</span>
     <span
       v-for="p in list"
