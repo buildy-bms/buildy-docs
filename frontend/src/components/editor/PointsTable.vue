@@ -175,24 +175,34 @@ function tableFor(direction) {
         </h4>
         <div v-if="!readPoints.length" class="text-xs text-gray-400 italic py-2">Aucune donnée de lecture définie.</div>
         <table v-else class="w-full text-sm">
+          <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <tr>
+              <th class="py-1.5 px-2 text-center">Donnée</th>
+              <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
+              <th class="py-1.5 px-2 text-center w-28">Type</th>
+              <th class="py-1.5 px-2 text-center w-24">Nature</th>
+              <th class="py-1.5 px-2 text-center w-16">Unité</th>
+              <th class="py-1.5 px-2 w-16"></th>
+            </tr>
+          </thead>
           <tbody>
-            <tr v-for="p in readPoints" :key="p.override_id || p.id" class="border-b border-gray-50 last:border-0 group">
-              <td class="py-1.5 pr-2 text-gray-800">
+            <tr v-for="p in readPoints" :key="p.override_id || p.id" class="border-t border-gray-100 group">
+              <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
-                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', SOURCE_BADGE[p.source].classes]">
+                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
-              <td class="py-1.5 pr-2 w-40 text-xs">
+              <td class="py-1.5 px-2 text-center text-xs">
                 <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                 <span v-else class="text-gray-300 italic">non défini</span>
               </td>
-              <td class="py-1.5 pr-2 w-28">
-                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+              <td class="py-1.5 px-2 text-center">
+                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
-              <td class="py-1.5 pr-2 w-24 text-xs text-gray-500">{{ p.nature || '—' }}</td>
-              <td class="py-1.5 pr-2 w-16 text-xs text-gray-500">{{ p.unit || '—' }}</td>
-              <td class="py-1.5 w-16 text-right">
+              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.nature || '—' }}</td>
+              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
+              <td class="py-1.5 px-2 text-center">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" title="Restaurer la valeur du template">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
                 </button>
@@ -207,29 +217,39 @@ function tableFor(direction) {
 
       <!-- Écriture -->
       <div class="px-5 py-3 border-t border-gray-100">
-        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+        <h4 class="text-[11px] font-medium uppercase tracking-wider text-gray-500 mb-2">
           Données typiquement écrites ({{ writePoints.length }})
         </h4>
         <div v-if="!writePoints.length" class="text-xs text-gray-400 italic py-2">Aucune donnée d'écriture définie.</div>
         <table v-else class="w-full text-sm">
+          <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <tr>
+              <th class="py-1.5 px-2 text-center">Donnée</th>
+              <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
+              <th class="py-1.5 px-2 text-center w-28">Type</th>
+              <th class="py-1.5 px-2 text-center w-24">Nature</th>
+              <th class="py-1.5 px-2 text-center w-16">Unité</th>
+              <th class="py-1.5 px-2 w-16"></th>
+            </tr>
+          </thead>
           <tbody>
-            <tr v-for="p in writePoints" :key="p.override_id || p.id" class="border-b border-gray-50 last:border-0 group">
-              <td class="py-1.5 pr-2 text-gray-800">
+            <tr v-for="p in writePoints" :key="p.override_id || p.id" class="border-t border-gray-100 group">
+              <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
-                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', SOURCE_BADGE[p.source].classes]">
+                <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
                   {{ SOURCE_BADGE[p.source].label }}
                 </span>
               </td>
-              <td class="py-1.5 pr-2 w-40 text-xs">
+              <td class="py-1.5 px-2 text-center text-xs">
                 <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                 <span v-else class="text-gray-300 italic">non défini</span>
               </td>
-              <td class="py-1.5 pr-2 w-28">
-                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+              <td class="py-1.5 px-2 text-center">
+                <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
-              <td class="py-1.5 pr-2 w-24 text-xs text-gray-500">{{ p.nature || '—' }}</td>
-              <td class="py-1.5 pr-2 w-16 text-xs text-gray-500">{{ p.unit || '—' }}</td>
-              <td class="py-1.5 w-16 text-right">
+              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.nature || '—' }}</td>
+              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
+              <td class="py-1.5 px-2 text-center">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
                 </button>
