@@ -37,6 +37,17 @@ const instanceSchema = z.object({
   position: z.number().optional(),
 });
 
+const zoneSchema = z.object({
+  name: z.string().min(1),
+  surface_m2: z.number().nullable().optional(),
+  occupation_type: z.string().nullable().optional(),
+  occupation_max_personnes: z.number().int().nullable().optional(),
+  horaires: z.string().nullable().optional(),
+  qai_contraintes: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  position: z.number().optional(),
+});
+
 const createSectionSchema = z.object({
   parent_id: z.number().nullable().optional(),
   position: z.number().optional(),
@@ -264,6 +275,57 @@ async function routes(fastify) {
   // DELETE /api/instances/:id
   fastify.delete('/instances/:id', async (request) => {
     db.equipmentInstances.delete(parseInt(request.params.id, 10));
+    return { ok: true };
+  });
+
+  // ── Zones fonctionnelles (Lot 26) ─────────────────────────────────
+  fastify.get('/sections/:id/zones', async (request) => {
+    const sectionId = parseInt(request.params.id, 10);
+    return db.afZones.listBySection(sectionId);
+  });
+
+  fastify.post('/sections/:id/zones', async (request, reply) => {
+    const sectionId = parseInt(request.params.id, 10);
+    const section = db.sections.getById(sectionId);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    let body;
+    try { body = zoneSchema.parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+    const zone = db.afZones.create(sectionId, {
+      position: body.position,
+      name: body.name,
+      surfaceM2: body.surface_m2,
+      occupationType: body.occupation_type,
+      occupationMaxPersonnes: body.occupation_max_personnes,
+      horaires: body.horaires,
+      qaiContraintes: body.qai_contraintes,
+      notes: body.notes,
+    });
+    db.auditLog.add({ afId: section.af_id, sectionId, userId: request.authUser?.id, action: 'zone.add', payload: { name: body.name } });
+    return zone;
+  });
+
+  fastify.patch('/zones/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    let body;
+    try { body = zoneSchema.partial().parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+    const updated = db.afZones.update(id, {
+      position: body.position,
+      name: body.name,
+      surfaceM2: body.surface_m2,
+      occupationType: body.occupation_type,
+      occupationMaxPersonnes: body.occupation_max_personnes,
+      horaires: body.horaires,
+      qaiContraintes: body.qai_contraintes,
+      notes: body.notes,
+    });
+    if (!updated) return reply.code(404).send({ detail: 'Zone non trouvée' });
+    return updated;
+  });
+
+  fastify.delete('/zones/:id', async (request) => {
+    db.afZones.delete(parseInt(request.params.id, 10));
     return { ok: true };
   });
 

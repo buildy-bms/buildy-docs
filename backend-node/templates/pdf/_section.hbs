@@ -56,6 +56,35 @@
   <div class="section-body">{{{synthesis_table_html}}}</div>
   {{/if}}
 
+  {{#if zones.length}}
+  <div class="zones-block">
+    <table class="zones-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th class="num">Surface</th>
+          <th>Type</th>
+          <th class="num">Pers. max</th>
+          <th>Horaires</th>
+          <th>Contraintes / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each zones}}
+        <tr>
+          <td class="zone-name">{{name}}</td>
+          <td class="num">{{#if surface_m2}}{{surface_m2}} m²{{else}}—{{/if}}</td>
+          <td>{{#if occupation_type}}{{occupation_type}}{{else}}—{{/if}}</td>
+          <td class="num">{{#if occupation_max_personnes}}{{occupation_max_personnes}}{{else}}—{{/if}}</td>
+          <td>{{#if horaires}}{{horaires}}{{else}}—{{/if}}</td>
+          <td>{{#if qai_contraintes}}{{qai_contraintes}}{{else}}{{notes}}{{/if}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{/if}}
+
   {{#if equipment}}
     {{#if equipment.description_html}}
     <div class="section-body">{{{equipment.description_html}}}</div>

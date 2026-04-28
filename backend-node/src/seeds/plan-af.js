@@ -22,6 +22,12 @@
  */
 
 const PLAN_AF = [
+  // ═══════════ Section preliminaire — Zones fonctionnelles du batiment ═══════════
+  {
+    title: 'Zones fonctionnelles du bâtiment', kind: 'zones',
+    body_placeholder: `Découpage zonal du site (bureaux, logistique, ateliers, locaux techniques, parkings…). Ces zones éclairent les choix d'équipements (CTAs, éclairages, comptages) et les exigences propres à chaque usage. Saisir les zones en utilisant le tableau ci-dessous.`,
+  },
+
   // ═══════════ Chapitre 1 — Preambule ═══════════
   {
     number: '1', title: 'Préambule', kind: 'standard',

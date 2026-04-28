@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 11;
+const TARGET_VERSION = 12;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -458,6 +458,92 @@ function runMigrations() {
     db.pragma('user_version = 11');
   }
 
+  if (current < 12) {
+    // Lot 26 — Zones fonctionnelles du bâtiment :
+    //   * étendre l'enum sections.kind pour y ajouter 'zones'
+    //   * créer la table af_zones (bureaux/logistique/atelier/technique/parking…)
+    //   * pour chaque AF existante : ajouter une section kind='zones' en début de plan
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      CREATE TABLE sections_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        parent_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        number TEXT,
+        title TEXT NOT NULL,
+        service_level TEXT,
+        service_level_source TEXT,
+        bacs_articles TEXT,
+        bacs_justification TEXT,
+        body_html TEXT,
+        body_yjs BLOB,
+        kind TEXT NOT NULL DEFAULT 'standard'
+          CHECK (kind IN ('standard', 'equipment', 'synthesis', 'hyperveez_page', 'zones')),
+        included_in_export INTEGER NOT NULL DEFAULT 1,
+        generic_note INTEGER NOT NULL DEFAULT 0,
+        fact_check_status TEXT DEFAULT 'unverified',
+        equipment_template_id INTEGER REFERENCES equipment_templates(id),
+        equipment_template_version INTEGER,
+        hyperveez_page_slug TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id)
+      );
+      INSERT INTO sections_new SELECT * FROM sections;
+      DROP TABLE sections;
+      ALTER TABLE sections_new RENAME TO sections;
+      CREATE INDEX IF NOT EXISTS idx_sections_af_parent ON sections(af_id, parent_id, position);
+      CREATE INDEX IF NOT EXISTS idx_sections_kind ON sections(af_id, kind);
+      CREATE INDEX IF NOT EXISTS idx_sections_template ON sections(equipment_template_id)
+        WHERE equipment_template_id IS NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS af_zones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        name TEXT NOT NULL,
+        surface_m2 REAL,
+        occupation_type TEXT,
+        occupation_max_personnes INTEGER,
+        horaires TEXT,
+        qai_contraintes TEXT,
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_zones_section ON af_zones(section_id, position);
+
+      -- Trigger FTS5 cleanup à recréer (sections recréée)
+      CREATE TRIGGER IF NOT EXISTS sections_fts_delete
+      AFTER DELETE ON sections BEGIN
+        DELETE FROM sections_fts WHERE section_id = old.id;
+      END;
+    `);
+    db.pragma('foreign_keys = ON');
+
+    // Ajout d'une section "Zones fonctionnelles" dans chaque AF non-deleted
+    const afsToSeed = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+    let zonesAdded = 0;
+    for (const af of afsToSeed) {
+      // Vérifier qu'il n'y en a pas déjà
+      const exists = db.prepare("SELECT 1 FROM sections WHERE af_id = ? AND kind = 'zones'").get(af.id);
+      if (exists) continue;
+      db.prepare(`
+        INSERT INTO sections (af_id, parent_id, position, number, title, kind, body_html)
+        VALUES (?, NULL, ?, NULL, ?, 'zones', ?)
+      `).run(
+        af.id,
+        -100, // position négative → toujours en tête de l'arbre
+        'Zones fonctionnelles du bâtiment',
+        '<p>Découpage zonal du site (bureaux, logistique, ateliers, locaux techniques…). Ces zones éclairent les choix d\'équipements (CTAs, éclairages, comptages) et les exigences de confort/régulation propres à chaque usage.</p>'
+      );
+      zonesAdded++;
+    }
+    if (zonesAdded > 0) log.info(`Migration 12 : ${zonesAdded} sections "Zones fonctionnelles" creees`);
+    log.info('Migration 12 appliquee : sections.kind etendu (zones) + table af_zones');
+    db.pragma('user_version = 12');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -877,6 +963,41 @@ const equipmentInstances = {
   },
 };
 
+// ── Zones fonctionnelles du bâtiment (Lot 26) ─────────────────────────
+const afZones = {
+  listBySection(sectionId) {
+    return db.prepare(`
+      SELECT * FROM af_zones WHERE section_id = ? ORDER BY position, id
+    `).all(sectionId);
+  },
+  create(sectionId, { position, name, surfaceM2, occupationType, occupationMaxPersonnes, horaires, qaiContraintes, notes }) {
+    const result = db.prepare(`
+      INSERT INTO af_zones (section_id, position, name, surface_m2, occupation_type, occupation_max_personnes, horaires, qai_contraintes, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(sectionId, position || 0, name, surfaceM2 || null, occupationType || null,
+            occupationMaxPersonnes || null, horaires || null, qaiContraintes || null, notes || null);
+    return db.prepare('SELECT * FROM af_zones WHERE id = ?').get(result.lastInsertRowid);
+  },
+  update(id, { position, name, surfaceM2, occupationType, occupationMaxPersonnes, horaires, qaiContraintes, notes }) {
+    const sets = [], params = [];
+    if (position != null) { sets.push('position = ?'); params.push(position); }
+    if (name != null) { sets.push('name = ?'); params.push(name); }
+    if (surfaceM2 !== undefined) { sets.push('surface_m2 = ?'); params.push(surfaceM2); }
+    if (occupationType !== undefined) { sets.push('occupation_type = ?'); params.push(occupationType); }
+    if (occupationMaxPersonnes !== undefined) { sets.push('occupation_max_personnes = ?'); params.push(occupationMaxPersonnes); }
+    if (horaires !== undefined) { sets.push('horaires = ?'); params.push(horaires); }
+    if (qaiContraintes !== undefined) { sets.push('qai_contraintes = ?'); params.push(qaiContraintes); }
+    if (notes !== undefined) { sets.push('notes = ?'); params.push(notes); }
+    if (!sets.length) return null;
+    params.push(id);
+    db.prepare(`UPDATE af_zones SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return db.prepare('SELECT * FROM af_zones WHERE id = ?').get(id);
+  },
+  delete(id) {
+    db.prepare('DELETE FROM af_zones WHERE id = ?').run(id);
+  },
+};
+
 // ── Inspections BACS + Milestones (généralisée Lot 15) ──────────────
 const afInspections = {
   listByAf(afId, { kind } = {}) {
@@ -935,6 +1056,7 @@ module.exports = {
   sectionPointOverrides,
   equipmentInstances,
   attachments,
+  afZones,
   afs,
   afInspections,
   sections,

@@ -21,6 +21,7 @@ import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
 import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable.vue'
 import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
+import ZonesTable from '@/components/editor/ZonesTable.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -206,6 +207,9 @@ watch(() => route.params.id, async () => {
             :section="selectedSection"
             @updated="onSectionUpdated"
           />
+
+          <!-- Pour kind='zones' : tableau des zones fonctionnelles -->
+          <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" />
 
           <!-- Pour kind='equipment' : tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">

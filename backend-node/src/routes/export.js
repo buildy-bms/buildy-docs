@@ -415,6 +415,11 @@ async function routes(fastify) {
         dataUrl: loadFileAsDataUrl(path.join(config.attachmentsDir, String(afId), a.filename)),
       })).filter((a) => a.dataUrl);
 
+      let zones = [];
+      if (sec.kind === 'zones') {
+        zones = db.afZones.listBySection(sec.id);
+      }
+
       let equipment = null;
       if (sec.kind === 'equipment') {
         const tpl = sec.equipment_template_id ? db.equipmentTemplates.getById(sec.equipment_template_id) : null;
@@ -432,7 +437,7 @@ async function routes(fastify) {
         };
       }
 
-      sectionData.set(sec.id, { attachments, equipment });
+      sectionData.set(sec.id, { attachments, equipment, zones });
     }
 
     // Construit l'arbre hierarchique avec depth + numero recompose
@@ -468,6 +473,7 @@ async function routes(fastify) {
             depth,
             attachments: data.attachments,
             equipment: data.equipment,
+            zones: data.zones || [],
             children: buildTree(s.id, depth + 1),
           };
         });
