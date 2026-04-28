@@ -28,7 +28,7 @@ const editForm = ref(emptyDraft())
 const OCCUPATION_TYPES = ['Bureaux', 'Logistique', 'Atelier', 'Locaux techniques', 'Circulation', 'Parking', 'Salle serveur', 'Sanitaires', 'Restauration', 'Réunion', 'Extérieur', 'Autre']
 
 function emptyDraft() {
-  return { name: '', surface_m2: null, occupation_type: '', occupation_max_personnes: null, horaires: '', qai_contraintes: '', notes: '' }
+  return { name: '', surface_m2: null, occupation_type: '' }
 }
 
 async function refresh() {
@@ -43,9 +43,9 @@ async function refresh() {
 
 function buildPayload(form) {
   return {
-    ...form,
+    name: form.name,
     surface_m2: form.surface_m2 ? Number(form.surface_m2) : null,
-    occupation_max_personnes: form.occupation_max_personnes ? Number(form.occupation_max_personnes) : null,
+    occupation_type: form.occupation_type || null,
   }
 }
 
@@ -68,10 +68,6 @@ function openEdit(z) {
     name: z.name || '',
     surface_m2: z.surface_m2 || null,
     occupation_type: z.occupation_type || '',
-    occupation_max_personnes: z.occupation_max_personnes || null,
-    horaires: z.horaires || '',
-    qai_contraintes: z.qai_contraintes || '',
-    notes: z.notes || '',
   }
 }
 
@@ -109,27 +105,17 @@ onMounted(refresh)
       </button>
     </div>
 
-    <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100 grid grid-cols-2 gap-2">
+    <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
       <input v-model="draft.name" type="text" required placeholder="Nom de la zone (ex : Open-space N1 Est)" autocomplete="off" data-1p-ignore="true"
-             class="col-span-2 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+             class="flex-1 min-w-60 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       <input v-model.number="draft.surface_m2" type="number" min="0" step="1" placeholder="Surface m²" autocomplete="off"
-             class="px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <select v-model="draft.occupation_type" class="px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="w-24 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <select v-model="draft.occupation_type" class="w-44 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
         <option value="">Type d'occupation…</option>
         <option v-for="t in OCCUPATION_TYPES" :key="t">{{ t }}</option>
       </select>
-      <input v-model.number="draft.occupation_max_personnes" type="number" min="0" placeholder="Personnes max" autocomplete="off"
-             class="px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <input v-model="draft.horaires" type="text" placeholder="Horaires (ex : 8h-19h sem.)" autocomplete="off"
-             class="px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <input v-model="draft.qai_contraintes" type="text" placeholder="Contraintes QAI / confort" autocomplete="off"
-             class="col-span-2 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <input v-model="draft.notes" type="text" placeholder="Notes" autocomplete="off"
-             class="col-span-2 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <div class="col-span-2 flex items-center gap-2">
-        <button @click="submitAdd" :disabled="!draft.name.trim()" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">Ajouter la zone</button>
-        <button @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
-      </div>
+      <button @click="submitAdd" :disabled="!draft.name.trim()" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50">Ajouter</button>
+      <button @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
     </div>
 
     <div v-if="loading" class="text-center py-6 text-sm text-gray-400">Chargement…</div>
@@ -141,11 +127,8 @@ onMounted(refresh)
       <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
         <tr>
           <th class="text-left px-4 py-2 font-medium">Zone</th>
-          <th class="text-right px-4 py-2 font-medium w-20">Surface</th>
-          <th class="text-left px-4 py-2 font-medium w-32">Type</th>
-          <th class="text-right px-4 py-2 font-medium w-20">Pers. max</th>
-          <th class="text-left px-4 py-2 font-medium w-32">Horaires</th>
-          <th class="text-left px-4 py-2 font-medium">Contraintes</th>
+          <th class="text-right px-4 py-2 font-medium w-24">Surface</th>
+          <th class="text-left px-4 py-2 font-medium w-44">Type</th>
           <th class="px-4 py-2 w-20"></th>
         </tr>
       </thead>
@@ -154,9 +137,6 @@ onMounted(refresh)
           <td class="px-4 py-2 font-semibold text-gray-800">{{ z.name }}</td>
           <td class="px-4 py-2 text-right font-variant-numeric tabular-nums text-gray-600">{{ z.surface_m2 ? `${z.surface_m2} m²` : '—' }}</td>
           <td class="px-4 py-2 text-gray-600">{{ z.occupation_type || '—' }}</td>
-          <td class="px-4 py-2 text-right text-gray-600">{{ z.occupation_max_personnes || '—' }}</td>
-          <td class="px-4 py-2 text-gray-600">{{ z.horaires || '—' }}</td>
-          <td class="px-4 py-2 text-gray-500">{{ z.qai_contraintes || z.notes || '—' }}</td>
           <td class="px-4 py-2 text-right whitespace-nowrap">
             <button @click="openEdit(z)" class="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-800 mr-2" title="Éditer">
               <PencilSquareIcon class="w-3.5 h-3.5" />
@@ -247,26 +227,6 @@ onMounted(refresh)
             <option value="">—</option>
             <option v-for="t in OCCUPATION_TYPES" :key="t">{{ t }}</option>
           </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Personnes max</label>
-          <input v-model.number="editForm.occupation_max_personnes" type="number" min="0"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Horaires</label>
-          <input v-model="editForm.horaires" type="text" placeholder="ex : 8h-19h semaine"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-        <div class="col-span-2">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Contraintes QAI / confort</label>
-          <input v-model="editForm.qai_contraintes" type="text"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-        <div class="col-span-2">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-          <textarea v-model="editForm.notes" rows="2"
-                    class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
         </div>
       </form>
       <template #footer>

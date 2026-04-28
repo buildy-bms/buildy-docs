@@ -26,4 +26,13 @@ function normalizeText(s) {
   return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-module.exports = { SYSTEM_CATEGORIES, normalizeText };
+// Catégories candidates pour un slug d'equipement (= toutes les catégories
+// qui listent ce slug dans leurs candidats). Ex : pour 'cta' → ventilation,
+// chauffage, climatisation. L'utilisateur choisit ensuite les categories
+// effectives au niveau de chaque INSTANCE.
+function candidateCategoriesForSlug(slug) {
+  if (!slug) return [];
+  return SYSTEM_CATEGORIES.filter(c => c.slugs.includes(slug)).map(c => c.key);
+}
+
+module.exports = { SYSTEM_CATEGORIES, normalizeText, candidateCategoriesForSlug };

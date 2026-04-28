@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 22;
+const TARGET_VERSION = 23;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -768,6 +768,21 @@ function runMigrations() {
     log.info('Migration 22 appliquee : equipment_instance_zones (lien M2M instance <-> zones)');
   }
 
+  if (current < 23) {
+    // Lot 32 — Categories d'usage par INSTANCE (pas par template).
+    // Ex : une CTA peut etre marquee chauffage+ventilation OU ventilation seule.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS equipment_instance_categories (
+        instance_id INTEGER NOT NULL REFERENCES equipment_instances(id) ON DELETE CASCADE,
+        category_key TEXT NOT NULL,
+        PRIMARY KEY (instance_id, category_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_eic_instance ON equipment_instance_categories(instance_id);
+    `);
+    db.pragma('user_version = 23');
+    log.info('Migration 23 appliquee : equipment_instance_categories (categories par instance)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1287,6 +1302,31 @@ const equipmentInstances = {
   },
 };
 
+// ── Categories d'usage par instance (Lot 32) — multi-valeurs par instance ──
+const instanceCategories = {
+  listForInstance(instanceId) {
+    return db.prepare('SELECT category_key FROM equipment_instance_categories WHERE instance_id = ?')
+      .all(instanceId).map(r => r.category_key);
+  },
+  listForAf(afId) {
+    return db.prepare(`
+      SELECT eic.instance_id, eic.category_key
+      FROM equipment_instance_categories eic
+      JOIN equipment_instances ei ON ei.id = eic.instance_id
+      JOIN sections s ON s.id = ei.section_id
+      WHERE s.af_id = ?
+    `).all(afId);
+  },
+  setForInstance(instanceId, keys) {
+    const tx = db.transaction((iId, ks) => {
+      db.prepare('DELETE FROM equipment_instance_categories WHERE instance_id = ?').run(iId);
+      const stmt = db.prepare('INSERT OR IGNORE INTO equipment_instance_categories (instance_id, category_key) VALUES (?, ?)');
+      for (const k of ks) stmt.run(iId, k);
+    });
+    tx(instanceId, Array.isArray(keys) ? keys : []);
+  },
+};
+
 // ── Lien M2M instance d'equipement <-> zones fonctionnelles (Lot 32) ──
 const instanceZones = {
   listForInstance(instanceId) {
@@ -1448,6 +1488,7 @@ module.exports = {
   sectionPointOverrides,
   equipmentInstances,
   instanceZones,
+  instanceCategories,
   attachments,
   afZones,
   afPermissions,

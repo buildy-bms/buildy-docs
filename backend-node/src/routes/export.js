@@ -523,6 +523,23 @@ async function routes(fastify) {
       for (const i of insts) allInstances.push({ ...i, slug });
     }
 
+    // Categories d'usage par instance (Lot 32) — fallback : candidats du template
+    const catRows = db.instanceCategories.listForAf(afId);
+    const catsByInstance = new Map();
+    for (const r of catRows) {
+      if (!catsByInstance.has(r.instance_id)) catsByInstance.set(r.instance_id, new Set());
+      catsByInstance.get(r.instance_id).add(r.category_key);
+    }
+    // Enrichit chaque instance avec ses categories candidates depuis son template
+    for (const inst of allInstances) {
+      inst.candidateKeys = SYSTEM_CATEGORIES.filter(c => c.slugs.includes(inst.slug)).map(c => c.key);
+    }
+    function instanceMatchesCategory(inst, catKey) {
+      const chosen = catsByInstance.get(inst.id);
+      if (chosen && chosen.size > 0) return chosen.has(catKey);
+      return inst.candidateKeys.includes(catKey);
+    }
+
     // Lien explicite instance ↔ zones (Lot 32) ; fallback sur matching `location` si pas de lien.
     const linkRows = db.instanceZones.listForAf(afId);
     const zonesByInstance = new Map();
@@ -543,7 +560,7 @@ async function routes(fastify) {
       const cells = SYSTEM_CATEGORIES.map(cat => {
         let count = 0;
         for (const inst of allInstances) {
-          if (!cat.slugs.includes(inst.slug)) continue;
+          if (!instanceMatchesCategory(inst, cat.key)) continue;
           if (instanceMatchesZone(inst, z)) count += (inst.qty || 1);
         }
         return count;

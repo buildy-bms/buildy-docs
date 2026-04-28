@@ -296,6 +296,26 @@ async function routes(fastify) {
     return { ok: true, zone_ids: zoneIds };
   });
 
+  // GET /api/instances/:id/categories — categories d'usage choisies pour cette instance
+  fastify.get('/instances/:id/categories', async (request) => {
+    return db.instanceCategories.listForInstance(parseInt(request.params.id, 10));
+  });
+
+  // PUT /api/instances/:id/categories — set la liste des categories (ecrase)
+  fastify.put('/instances/:id/categories', async (request) => {
+    const id = parseInt(request.params.id, 10);
+    const body = request.body || {};
+    const keys = Array.isArray(body.category_keys) ? body.category_keys.filter(Boolean) : [];
+    db.instanceCategories.setForInstance(id, keys);
+    return { ok: true, category_keys: keys };
+  });
+
+  // GET /api/system-categories — catalogue complet (pour le picker UI)
+  fastify.get('/system-categories', async () => {
+    const { SYSTEM_CATEGORIES } = require('../lib/system-categories');
+    return SYSTEM_CATEGORIES.map(c => ({ key: c.key, label: c.label, bacs: c.bacs, slugs: c.slugs }));
+  });
+
   // GET /api/afs/:afId/zones — toutes les zones de l'AF (utilise par le picker)
   fastify.get('/afs/:afId/all-zones', async (request) => {
     const afId = parseInt(request.params.afId, 10);
@@ -306,6 +326,9 @@ async function routes(fastify) {
 
   // GET /api/afs/:afId/zones-matrix — matrice synthese zones × categories de systemes
   // Retourne uniquement les categories ayant au moins 1 instance dans le projet.
+  // Categories : choix explicite par instance (table equipment_instance_categories).
+  // Fallback : si une instance n'a aucun choix → toutes les categories candidates
+  // de son template (legacy / nouvelles instances pas encore configurees).
   fastify.get('/afs/:afId/zones-matrix', async (request) => {
     const afId = parseInt(request.params.afId, 10);
     const { SYSTEM_CATEGORIES, normalizeText } = require('../lib/system-categories');
@@ -313,14 +336,29 @@ async function routes(fastify) {
     const zonesSection = allSections.find(s => s.kind === 'zones');
     const zones = zonesSection ? db.afZones.listBySection(zonesSection.id) : [];
 
-    // Charge toutes les instances + slug template
+    // Charge toutes les instances + slug template + categories candidates du template
     const allInstances = [];
     for (const s of allSections) {
       if (s.kind !== 'equipment' || !s.equipment_template_id) continue;
       const tpl = db.equipmentTemplates.getById(s.equipment_template_id);
       if (!tpl) continue;
+      const candidateKeys = SYSTEM_CATEGORIES.filter(c => c.slugs.includes(tpl.slug)).map(c => c.key);
       const insts = db.equipmentInstances.listBySection(s.id);
-      for (const i of insts) allInstances.push({ ...i, slug: tpl.slug });
+      for (const i of insts) allInstances.push({ ...i, slug: tpl.slug, candidateKeys });
+    }
+
+    // Categories choisies par instance
+    const catRows = db.instanceCategories.listForAf(afId);
+    const catsByInstance = new Map();
+    for (const r of catRows) {
+      if (!catsByInstance.has(r.instance_id)) catsByInstance.set(r.instance_id, new Set());
+      catsByInstance.get(r.instance_id).add(r.category_key);
+    }
+    function instanceMatchesCategory(inst, catKey) {
+      const chosen = catsByInstance.get(inst.id);
+      if (chosen && chosen.size > 0) return chosen.has(catKey);
+      // Fallback : utilise les categories candidates du template
+      return inst.candidateKeys.includes(catKey);
     }
 
     // Liens explicites instance↔zone
@@ -340,7 +378,7 @@ async function routes(fastify) {
     // Pre-calcule le total d'instances par categorie (pour filtrer les colonnes vides)
     const totalsByCat = SYSTEM_CATEGORIES.map(cat => {
       let n = 0;
-      for (const inst of allInstances) if (cat.slugs.includes(inst.slug)) n += (inst.qty || 1);
+      for (const inst of allInstances) if (instanceMatchesCategory(inst, cat.key)) n += (inst.qty || 1);
       return n;
     });
     const visibleCategories = SYSTEM_CATEGORIES
@@ -352,7 +390,7 @@ async function routes(fastify) {
       const cells = visibleCategories.map(cat => {
         let count = 0;
         for (const inst of allInstances) {
-          if (!cat.slugs.includes(inst.slug)) continue;
+          if (!instanceMatchesCategory(inst, cat.key)) continue;
           if (instanceMatchesZone(inst, z)) count += (inst.qty || 1);
         }
         return count;
@@ -361,11 +399,11 @@ async function routes(fastify) {
       return { id: z.id, name: z.name, surface_m2: z.surface_m2, cells, total };
     });
 
-    // Colonne "non zone" : instances qui ne matchent aucune zone
+    // Ligne "non zone" : instances qui ne matchent aucune zone
     const unzonedByCat = visibleCategories.map(cat => {
       let n = 0;
       for (const inst of allInstances) {
-        if (!cat.slugs.includes(inst.slug)) continue;
+        if (!instanceMatchesCategory(inst, cat.key)) continue;
         const linked = zonesByInstance.get(inst.id);
         const isLinked = linked && linked.size > 0;
         const loc = normalizeText(inst.location);
