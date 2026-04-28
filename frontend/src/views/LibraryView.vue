@@ -168,7 +168,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto">
+  <div class="max-w-screen-2xl mx-auto">
     <!-- Toggle Equipements / Sections types (Lot 30) -->
     <div class="mb-5 inline-flex items-center border border-gray-300 rounded overflow-hidden text-sm">
       <button @click="setTab('equipment')" :class="['px-4 py-1.5', tab === 'equipment' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
@@ -529,41 +529,41 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="bg-white border border-gray-200 rounded-none">
-        <table class="w-full text-sm">
+      <div class="bg-white border border-gray-200 rounded-none overflow-x-auto">
+        <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
-              <th class="text-left px-4 py-2.5 w-20">Numéro</th>
-              <th class="text-left px-4 py-2.5">Titre</th>
-              <th class="text-left px-4 py-2.5 w-32">Niveau</th>
-              <th class="text-left px-4 py-2.5 w-48">BACS</th>
-              <th class="text-center px-4 py-2.5 w-32">AFs concernées</th>
-              <th class="text-center px-4 py-2.5 w-24">Version</th>
-              <th class="text-center px-4 py-2.5 w-16"></th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Numéro</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Niveau</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs concernées</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap">Version</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="t in filteredSectionTemplates" :key="t.id"
                 class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
                 @click="openSectionTplEditor(t)">
-              <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ t.number || '—' }}</td>
-              <td class="px-4 py-2 font-medium text-gray-800">{{ t.title }}</td>
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">{{ t.number || '—' }}</td>
+              <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
+              <td class="px-4 py-2 whitespace-nowrap">
                 <ServiceLevelBadge v-if="t.service_level" :level="t.service_level" />
                 <span v-else class="text-gray-300 italic text-xs">—</span>
               </td>
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 whitespace-nowrap">
                 <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
                 <span v-else class="text-gray-300 italic text-xs">—</span>
               </td>
-              <td class="px-4 py-2 text-center text-xs">
+              <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
                 <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
                   {{ t.outdated_count }} en retard / {{ t.affected_afs_count }}
                 </span>
                 <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
               </td>
-              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono">v{{ t.current_version }}</td>
-              <td class="px-4 py-2 text-center">
+              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
                 <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
               </td>
             </tr>
