@@ -756,7 +756,6 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         pageOrientation: 'landscape',
-        pdfOptions: { landscape: true, margin: { top: '14mm', bottom: '12mm', left: '14mm', right: '14mm' } },
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
       });
     } catch (err) {
