@@ -591,9 +591,6 @@ async function routes(fastify) {
       if (lvl === 'E') return 'Essentials';
       return '—';
     }
-    const RANK = { E: 0, S: 1, P: 2 };
-    const contractRank = contractLevel ? RANK[contractLevel] : null;
-
     const functionalities = FUNCTIONALITY_NUMBERS.map(num => {
       const sec = allSections.find(s => s.number === num);
       if (!sec) return null;
@@ -617,7 +614,8 @@ async function routes(fastify) {
         reason = `Écartée par la MOA — nécessite un contrat ${levelToLabel(requiredMin)} pour être activée`;
       } else if (contractLevel) {
         // Niveau cible défini : comparaison stricte
-        if (requiredRank > contractRank) {
+        const contractR = RANK[contractLevel];
+        if (requiredRank > contractR) {
           included = false;
           reason = `Le contrat ${levelToLabel(contractLevel)} actuellement visé ne couvre pas cette fonctionnalité (requiert ${levelToLabel(requiredMin)})`;
         }
