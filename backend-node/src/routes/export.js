@@ -365,16 +365,50 @@ async function routes(fastify) {
         buildyAnswer: 'Commandes manuelles depuis Hyperveez (marche/arrêt, consignes) + programmations horaires centralisées.',
       },
     ];
+    // Mapping § R175-3 → quels systemes du projet sont concernes
+    function systemsConcernedBy(reqCode) {
+      // §1 (suivi conso/prod energetique) : tous systemes consommateurs ou producteurs d'energie
+      //    + compteurs (contribuent meme s'ils ne sont pas dans R175-1)
+      // §2 (detection derives) : memes systemes que §1
+      // §3 (interoperabilite) : tous systemes instancies (le simple fait d'etre integres = preuve)
+      // §4 (arret manuel + gestion autonome) : systemes pilotables (avec points d'ecriture)
+      const instanced = equipmentEnriched.filter(e => e.instances > 0 && isSectionLive(e.sec));
+      function bacsHasParagraph(bacs, p) {
+        if (!bacs) return false;
+        return bacs.includes(`§${p}`);
+      }
+      if (reqCode === '§1' || reqCode === '§2') {
+        return instanced.filter(e => {
+          const isMet = isMeteringSystem(e.sec);
+          const hasEnergyBacs = bacsHasParagraph(e.sec.bacs_articles, '1') ||
+                                 bacsHasParagraph(e.sec.bacs_articles, '2') ||
+                                 bacsHasParagraph(e.sec.bacs_articles, '4');
+          return isMet || hasEnergyBacs;
+        });
+      }
+      if (reqCode === '§3') return instanced; // tout systeme integre prouve l'interop
+      if (reqCode === '§4') return instanced.filter(e => e.writes > 0); // pilotable
+      return instanced;
+    }
+
     const bacsConformity = BACS_REQUIREMENTS.map(req => {
       const coverSections = req.coverNumbers
         .map(n => allSections.find(s => s.number === n))
         .filter(Boolean);
       const liveCover = coverSections.filter(isSectionLive);
+      const concerned = systemsConcernedBy(req.code);
+
       let status;
       if (coverSections.length === 0) status = 'non-applicable';
+      else if (concerned.length === 0 && req.code !== '§3') {
+        // Aucun systeme du projet concerne : la conformite est non-applicable a ce projet
+        // (sauf §3 interoperabilite qui est une propriete de la solution Buildy elle-meme)
+        status = 'non-applicable-project';
+      }
       else if (liveCover.length === coverSections.length) status = 'covered';
       else if (liveCover.length > 0) status = 'partial';
       else status = 'not-covered';
+
       return {
         ...req,
         sections: coverSections.map(s => ({
@@ -384,16 +418,95 @@ async function routes(fastify) {
           opted_out: !!s.opted_out_by_moa,
           excluded: !s.included_in_export,
         })),
+        systemsConcerned: concerned.map(e => ({
+          number: e.sec.number, title: e.sec.title, instances: e.instances,
+        })),
         status,
-        statusLabel: { covered: 'Couvert', partial: 'Partiellement couvert', 'not-covered': 'Non couvert', 'non-applicable': 'Non applicable' }[status],
+        statusLabel: {
+          covered: 'Couvert',
+          partial: 'Partiellement couvert',
+          'not-covered': 'Non couvert',
+          'non-applicable': 'Non applicable',
+          'non-applicable-project': 'Aucun système concerné',
+        }[status],
       };
     });
 
-    // ── PAGE 3 : Matrice systemes (filtree) ──
-    // Ne garde que les equipements qui ont une instance, OU sont concernes par BACS, OU sont ecartes MOA.
+    // ── PAGE 3 : Couverture fonctionnelle Buildy ──
+    // Regroupe les sous-sections fonctionnelles par chapitre (hors equipements ch.2 et synthese ch.12).
+    // Un chapitre = nombre courant d'integer ou code (ex '7', '11.x', '1.5').
+    const FEATURE_CHAPTERS = [
+      { code: '1.5', title: 'Connectivité du site', match: n => n === '1.5' },
+      { code: '3', title: 'Monitoring', match: n => n === '3' || /^3\./.test(n) },
+      { code: '4', title: 'Contrôle & commande', match: n => n === '4' || /^4\./.test(n) },
+      { code: '5', title: 'Gestion des alarmes', match: n => n === '5' || /^5\./.test(n) },
+      { code: '6', title: 'Reporting & analyse', match: n => n === '6' || /^6\./.test(n) },
+      { code: '7', title: 'Traçabilité interne', match: n => n === '7' },
+      { code: '8', title: 'API Buildy Connect', match: n => n === '8' },
+      { code: '9', title: 'Support utilisateur', match: n => n === '9' },
+      { code: '11', title: 'Application Gojee', match: n => n === '11' || /^11\./.test(n) },
+    ];
+    function excerpt(html, maxLen = 130) {
+      if (!html) return '';
+      // Strip placeholder italic
+      const stripped = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      // Si c'est un placeholder "À rédiger…" on retourne vide
+      if (/^À rédiger/i.test(stripped)) return '';
+      if (stripped.length <= maxLen) return stripped;
+      return stripped.slice(0, maxLen).replace(/\s\S*$/, '') + '…';
+    }
+    const featuresByChapter = FEATURE_CHAPTERS.map(ch => {
+      const sections = allSections
+        .filter(s => s.kind === 'standard' && s.number && ch.match(s.number))
+        // On exclut les "containers" (parents purs) qui n'ont pas de body utile
+        .filter(s => s.number === ch.code || s.number.split('.').length >= 2);
+      const items = sections.map(s => {
+        let statusKey, statusLabel;
+        if (s.opted_out_by_moa) { statusKey = 'opted-out'; statusLabel = 'Écartée par la MOA'; }
+        else if (!s.included_in_export) { statusKey = 'excluded'; statusLabel = 'Exclue de l\'export'; }
+        else { statusKey = 'active'; statusLabel = 'Active'; }
+        const sl = s.service_level;
+        const requiredContract = s.opted_out_by_moa
+          ? (sl === 'P' ? 'Premium' : (sl === 'S' ? 'Smart' : 'Smart ou Premium'))
+          : null;
+        return {
+          number: s.number, title: s.title, statusKey, statusLabel,
+          serviceLevel: sl, levelClass: sl ? sl.replace(/[^A-Z]/g, '') : '',
+          excerpt: excerpt(s.body_html),
+          requiredContract,
+        };
+      });
+      const counts = items.reduce((a, i) => ({
+        active: a.active + (i.statusKey === 'active' ? 1 : 0),
+        optedOut: a.optedOut + (i.statusKey === 'opted-out' ? 1 : 0),
+        excluded: a.excluded + (i.statusKey === 'excluded' ? 1 : 0),
+        total: a.total + 1,
+      }), { active: 0, optedOut: 0, excluded: 0, total: 0 });
+      return { ...ch, items, counts };
+    }).filter(ch => ch.items.length > 0);
+
+    // KPI couverture global
+    const coverageTotals = featuresByChapter.reduce((a, ch) => ({
+      active: a.active + ch.counts.active,
+      optedOut: a.optedOut + ch.counts.optedOut,
+      excluded: a.excluded + ch.counts.excluded,
+      total: a.total + ch.counts.total,
+    }), { active: 0, optedOut: 0, excluded: 0, total: 0 });
+    coverageTotals.activePercent = coverageTotals.total > 0
+      ? Math.round((coverageTotals.active / coverageTotals.total) * 100)
+      : 0;
+    kpis.coverage = coverageTotals;
+
+    // ── PAGE 4 : Matrice systemes (filtree strict) ──
+    // Ne garde que les equipements vraiment dans le scope du chantier :
+    //   - soit instancies (instance >= 1)
+    //   - soit ecartes par la MOA (decision documentee, doit rester visible)
+    // Les autres equipements du catalogue (pas instancies + non ecartes) ne sont pas
+    // affiches mais comptes pour la note de transparence en bas du tableau.
     const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
-      instances > 0 || (sec.bacs_articles && sec.bacs_articles.trim()) || sec.opted_out_by_moa
+      instances > 0 || sec.opted_out_by_moa
     );
+    const offCatalogCount = equipmentSections.length - relevantEquipment.length;
     const COMPTEUR_SLUGS_SET = new Set(['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories']);
     function isMeteringSystem(sec) {
       // Detection : la section pointe vers un equipment_template de comptage
@@ -444,6 +557,7 @@ async function routes(fastify) {
       motif: body.motif,
       logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
       kpis, optedOutList, bacsConformity, systemsMatrix, totalsMatrix,
+      featuresByChapter, offCatalogCount,
     };
 
     const exportsDir = path.resolve(config.exportsDir);

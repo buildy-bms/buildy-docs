@@ -7,10 +7,7 @@
 </head>
 <body>
 
-{{!-- ═══════════════════ Header commun (chaque page) ═══════════════════ --}}
-{{!-- Pas un vrai header Puppeteer : juste un header HTML repete en haut de chaque section --}}
-
-{{!-- ═══════════════════ PAGE 1 — Bilan projet ═══════════════════ --}}
+{{!-- ═══════════════════ PAGE 1 — Bilan & verdict ═══════════════════ --}}
 <section class="page">
   <header class="page-header">
     <div class="page-header-left">
@@ -64,10 +61,27 @@
     <p class="verdict-text">{{kpis.verdict.text}}</p>
   </div>
 
+  {{!-- Barre de couverture fonctionnelle Buildy --}}
+  <div class="coverage-block">
+    <div class="coverage-head">
+      <h3 class="coverage-title">Couverture fonctionnelle de la solution Buildy</h3>
+      <p class="coverage-summary">
+        <strong>{{kpis.coverage.active}}</strong> sous-section{{#if (gt kpis.coverage.active 1)}}s{{/if}} active{{#if (gt kpis.coverage.active 1)}}s{{/if}}
+        sur {{kpis.coverage.total}} ({{kpis.coverage.activePercent}}%)
+        {{#if kpis.coverage.optedOut}} · <span class="coverage-tag tag-opt">{{kpis.coverage.optedOut}} écartée{{#if (gt kpis.coverage.optedOut 1)}}s{{/if}} MOA</span>{{/if}}
+        {{#if kpis.coverage.excluded}} · <span class="coverage-tag tag-exc">{{kpis.coverage.excluded}} exclue{{#if (gt kpis.coverage.excluded 1)}}s{{/if}}</span>{{/if}}
+      </p>
+    </div>
+    <div class="coverage-bar">
+      <div class="coverage-bar-active" style="width: {{kpis.coverage.activePercent}}%"></div>
+    </div>
+    <p class="coverage-note">Détail page 3.</p>
+  </div>
+
   {{#if optedOutList.length}}
   <div class="opted-block">
     <h3 class="opted-title">Fonctionnalités écartées par la maîtrise d'ouvrage ({{optedOutList.length}})</h3>
-    <p class="opted-intro">Ces fonctionnalités ne seront pas disponibles à la livraison. Pour les activer ultérieurement, un contrat adapté devra être conclu entre Buildy et l'exploitant du bâtiment.</p>
+    <p class="opted-intro">Ces fonctionnalités ne seront pas disponibles à la livraison. Pour les activer, un contrat adapté devra être conclu entre Buildy et l'exploitant.</p>
     <ul class="opted-list">
       {{#each optedOutList}}
       <li><strong>§{{number}} {{title}}</strong> <span class="opted-contract">→ contrat {{requiredContract}} requis</span></li>
@@ -77,7 +91,7 @@
   {{/if}}
 </section>
 
-{{!-- ═══════════════════ PAGE 2 — Conformité décret BACS ═══════════════════ --}}
+{{!-- ═══════════════════ PAGE 2 — Conformité BACS ═══════════════════ --}}
 <section class="page">
   <header class="page-header">
     <div class="page-header-left">
@@ -92,7 +106,7 @@
     </div>
   </header>
 
-  <p class="section-intro">L'article R175-3 du Code de la construction et de l'habitation définit les <strong>4 exigences fonctionnelles</strong> auxquelles doit répondre tout système d'automatisation et de contrôle des bâtiments (BACS). Ce tableau récapitule la couverture de chaque exigence par les fonctions Buildy décrites dans cette analyse fonctionnelle.</p>
+  <p class="section-intro">L'article R175-3 du Code de la construction et de l'habitation définit les <strong>4 exigences fonctionnelles</strong> auxquelles doit répondre tout système d'automatisation et de contrôle des bâtiments (BACS). Ce tableau récapitule la couverture de chaque exigence par les fonctions Buildy décrites dans cette analyse fonctionnelle, et liste les systèmes du projet réellement concernés.</p>
 
   <table class="bacs-table">
     <thead>
@@ -100,7 +114,8 @@
         <th class="bacs-col-art">Article</th>
         <th class="bacs-col-text">Exigence du décret</th>
         <th class="bacs-col-resp">Réponse Buildy</th>
-        <th class="bacs-col-sec">Sections de l'AF qui couvrent</th>
+        <th class="bacs-col-sec">Sections AF qui couvrent</th>
+        <th class="bacs-col-sys">Systèmes du projet concernés</th>
         <th class="bacs-col-sta">Statut</th>
       </tr>
     </thead>
@@ -126,6 +141,15 @@
           </ul>
           {{else}}—{{/if}}
         </td>
+        <td class="bacs-col-sys">
+          {{#if systemsConcerned.length}}
+          <ul class="bacs-sec-list">
+            {{#each systemsConcerned}}
+            <li><code>§{{number}}</code> {{title}} <span class="sys-qty">×{{instances}}</span></li>
+            {{/each}}
+          </ul>
+          {{else}}<span class="muted-italic">Aucun système du projet concerné</span>{{/if}}
+        </td>
         <td class="bacs-col-sta">
           <span class="bacs-status status-{{status}}">{{statusLabel}}</span>
         </td>
@@ -136,19 +160,18 @@
 
   <p class="legal-note">
     <strong>R175-5-1</strong> — Cette analyse fonctionnelle constitue le document examiné lors de l'inspection
-    périodique obligatoire du système d'automatisation et de contrôle. Elle doit être conservée par le propriétaire
-    pendant 10 ans.
+    périodique obligatoire du système d'automatisation et de contrôle. Elle doit être conservée par le propriétaire pendant 10 ans.
   </p>
 </section>
 
-{{!-- ═══════════════════ PAGE 3 — Matrice des systèmes ═══════════════════ --}}
+{{!-- ═══════════════════ PAGE 3 — Fonctionnalités Buildy par chapitre ═══════════════════ --}}
 <section class="page">
   <header class="page-header">
     <div class="page-header-left">
       <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
       <div>
         <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">3. Matrice des systèmes supervisés</h1>
+        <h1 class="page-title">3. Fonctionnalités Buildy activées</h1>
       </div>
     </div>
     <div class="page-header-right">
@@ -156,13 +179,77 @@
     </div>
   </header>
 
-  <p class="section-intro">Vue par catégorie d'équipement. Une catégorie apparaît dans ce tableau si elle est <strong>instanciée sur le site</strong>, <strong>concernée par le décret BACS</strong>, ou <strong>écartée par la maîtrise d'ouvrage</strong>.</p>
+  <p class="section-intro">Vue par grand domaine fonctionnel (chapitres 3 à 11 de l'AF). Chaque sous-section est marquée selon son statut : <span class="dot dot-active"></span> active dans le scope, <span class="dot dot-opt"></span> écartée par la maîtrise d'ouvrage, <span class="dot dot-exc"></span> exclue de l'export.</p>
+
+  <div class="features-grid">
+    {{#each featuresByChapter}}
+    <div class="feature-chapter">
+      <div class="feature-chapter-head">
+        <h3 class="feature-chapter-title">{{title}}</h3>
+        <span class="feature-chapter-counter">
+          <strong>{{counts.active}}</strong>/{{counts.total}} active{{#if (gt counts.active 1)}}s{{/if}}
+          {{#if counts.optedOut}}· <span class="opt-counter">{{counts.optedOut}} écartée{{#if (gt counts.optedOut 1)}}s{{/if}}</span>{{/if}}
+          {{#if counts.excluded}}· <span class="exc-counter">{{counts.excluded}} exclue{{#if (gt counts.excluded 1)}}s{{/if}}</span>{{/if}}
+        </span>
+      </div>
+      <ul class="feature-list">
+        {{#each items}}
+        <li class="feature-item feature-{{statusKey}}">
+          <span class="feature-icon">
+            {{#if (eq statusKey 'active')}}✓{{/if}}
+            {{#if (eq statusKey 'opted-out')}}🚫{{/if}}
+            {{#if (eq statusKey 'excluded')}}⊘{{/if}}
+          </span>
+          <div class="feature-body">
+            <p class="feature-head-line">
+              <code class="feature-num">§{{number}}</code>
+              <span class="feature-title">{{title}}</span>
+              {{#if serviceLevel}}<span class="level-pill lvl-{{levelClass}}">{{serviceLevel}}</span>{{/if}}
+            </p>
+            {{#if excerpt}}<p class="feature-desc">{{excerpt}}</p>{{/if}}
+            {{#if requiredContract}}<p class="feature-contract">Contrat <strong>{{requiredContract}}</strong> requis pour activer cette fonctionnalité</p>{{/if}}
+          </div>
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+    {{/each}}
+  </div>
+</section>
+
+{{!-- ═══════════════════ PAGE 4 — Périmètre supervisé ═══════════════════ --}}
+<section class="page">
+  <header class="page-header">
+    <div class="page-header-left">
+      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
+      <div>
+        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
+        <h1 class="page-title">4. Périmètre des équipements supervisés</h1>
+      </div>
+    </div>
+    <div class="page-header-right">
+      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
+    </div>
+  </header>
+
+  <p class="section-intro">
+    Liste des catégories d'équipement <strong>réellement présentes dans le scope du chantier</strong> :
+    soit instanciées (au moins une référence sur site), soit explicitement écartées par la maîtrise d'ouvrage.
+  </p>
+
+  <p class="bacs-legend">
+    <strong>Légende R175-1</strong> :
+    <span class="legend-item"><span class="m-bacs-tag">§1</span> chauffage</span>
+    <span class="legend-item"><span class="m-bacs-tag">§2</span> climatisation</span>
+    <span class="legend-item"><span class="m-bacs-tag">§3</span> ventilation</span>
+    <span class="legend-item"><span class="m-bacs-tag">§4</span> système technique de bâtiment (ECS, éclairage intégré, production électricité)</span>
+  </p>
 
   <table class="matrix-table">
     <thead>
       <tr>
         <th class="m-cat">Système</th>
-        <th class="m-bacs">Statut au sens du décret BACS</th>
+        <th class="m-bacs">Statut au sens BACS R175-1</th>
         <th class="m-status">Statut projet</th>
         <th class="m-num">Instances</th>
         <th class="m-num">Points / inst.</th>
@@ -179,7 +266,7 @@
           {{#if bacs}}
             <span class="m-bacs-tag">{{bacs}}</span>
           {{else if isMetering}}
-            <span class="m-bacs-tag-soft" title="Hors périmètre R175-1, contribue à l'exigence de suivi continu R175-3 §1">Hors périmètre direct · contribue R175-3 §1</span>
+            <span class="m-bacs-tag-soft">Hors périmètre direct · contribue R175-3 §1</span>
           {{else}}
             <span class="muted">Hors périmètre BACS</span>
           {{/if}}
@@ -190,6 +277,9 @@
         <td class="m-num">{{#if totalPoints}}<strong>{{totalPoints}}</strong>{{else}}<span class="muted">—</span>{{/if}}</td>
       </tr>
       {{/each}}
+      {{#unless systemsMatrix.length}}
+      <tr><td colspan="6" class="empty-row">Aucun équipement instancié ni écarté à ce jour.</td></tr>
+      {{/unless}}
     </tbody>
     <tfoot>
       <tr>
@@ -201,12 +291,15 @@
     </tfoot>
   </table>
 
+  {{#if offCatalogCount}}
   <p class="legal-note">
-    <em>Lecture des colonnes :</em>
-    <strong>Statut au sens du décret BACS</strong> = comment le système est qualifié par R175-1 (chauffage §1, climatisation §2, ventilation §3, système technique §4) — les compteurs ne sont pas définis par R175-1 mais contribuent à l'exigence de suivi R175-3 §1.
-    <strong>Statut projet</strong> = couverte (instanciée et activée) / non instanciée / écartée par la MOA / exclue de l'export.
-    <strong>Total points</strong> = nombre d'instances × points par instance (la liste contractuelle complète figure dans l'export A3 dédié).
+    <strong>{{offCatalogCount}} catégorie{{#if (gt offCatalogCount 1)}}s{{/if}} d'équipement</strong> du catalogue Buildy
+    {{#if (gt offCatalogCount 1)}}existent{{else}}existe{{/if}} mais
+    {{#if (gt offCatalogCount 1)}}ne sont pas incluses{{else}}n'est pas incluse{{/if}} dans ce projet
+    (par exemple : éclairage extérieur, occultation, process industriel, équipements génériques).
+    Voir le chapitre 2 de l'analyse fonctionnelle complète pour le détail.
   </p>
+  {{/if}}
 </section>
 
 </body>
