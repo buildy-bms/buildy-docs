@@ -46,3 +46,17 @@
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
+
+/**
+ * Cap typographique Buildy : aucun élément d'UI ne doit dépasser un poids 500.
+ * Toute classe Tailwind font-semibold (600), font-bold (700), font-extrabold (800),
+ * font-black (900) est ramenée à 500 (medium). Les <strong> et <b> du HTML
+ * brut (notamment dans le décret BACS rendu via v-html) sont aussi cappés.
+ */
+@layer utilities {
+  .font-semibold { font-weight: 500 !important; }
+  .font-bold { font-weight: 500 !important; }
+  .font-extrabold { font-weight: 500 !important; }
+  .font-black { font-weight: 500 !important; }
+}
+strong, b { font-weight: 500; }

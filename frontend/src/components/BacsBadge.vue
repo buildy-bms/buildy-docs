@@ -41,11 +41,55 @@ const articleRefs = computed(() => {
   return [...map.entries()].map(([code, paras]) => ({ code, paragraphs: [...paras] }))
 })
 
+// Filtre l'HTML d'un article pour ne garder que les paragraphes (li) précisés
+// dans la référence. Si paragraphes vides → renvoie l'article complet.
+function filterArticleHtml(fullHtml, paragraphs) {
+  if (!paragraphs?.length) return fullHtml
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(`<div id="root">${fullHtml}</div>`, 'text/html')
+    const root = doc.getElementById('root')
+    const ol = root.querySelector('ol')
+    if (!ol) return fullHtml
+    const allLis = Array.from(ol.children).filter(c => c.tagName === 'LI')
+    const indices = paragraphs
+      .map(p => parseInt(p, 10) - 1)
+      .filter(n => n >= 0 && n < allLis.length)
+    if (!indices.length) return fullHtml
+
+    const newOl = doc.createElement('ol')
+    for (const i of indices) {
+      const li = allLis[i].cloneNode(true)
+      li.setAttribute('value', String(i + 1)) // garde la numérotation d'origine
+      newOl.appendChild(li)
+    }
+
+    // Conserver l'éventuel <p> d'intro qui précède le <ol>
+    const out = doc.createElement('div')
+    let cur = root.firstElementChild
+    while (cur && cur !== ol) {
+      if (cur.tagName === 'P') out.appendChild(cur.cloneNode(true))
+      cur = cur.nextElementSibling
+    }
+    out.appendChild(newOl)
+    return out.innerHTML
+  } catch {
+    return fullHtml
+  }
+}
+
 const articlesToShow = computed(() => {
   if (!bacsData.value) return []
   return articleRefs.value.map(ref => {
     const article = bacsData.value.articles.find(a => a.code === ref.code)
-    return { ...ref, article }
+    if (!article) return { ...ref, article: null }
+    return {
+      ...ref,
+      article: {
+        ...article,
+        full_html: filterArticleHtml(article.full_html, ref.paragraphs),
+      },
+    }
   }).filter(x => x.article)
 })
 
