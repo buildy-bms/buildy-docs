@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/free-solid-svg-icons'
+import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 
-// Enregistre TOUTES les icones FA Free Solid (~1500 icones, ~150KB gzippé)
+// Enregistre TOUTES les icones FA Pro Solid (~3000 icones)
 // pour permettre au picker de proposer une recherche dans toute la base.
 const iconObjs = Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon)
 library.add(...iconObjs)

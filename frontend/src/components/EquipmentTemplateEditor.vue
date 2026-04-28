@@ -15,9 +15,9 @@ import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
-import * as allSolidIcons from '@fortawesome/free-solid-svg-icons'
+import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 
-// Liste exhaustive des noms d'icones FA Solid Free, déduplique les alias.
+// Liste exhaustive des noms d'icones FA Solid Pro, déduplique les alias.
 const ALL_FA_NAMES = [...new Set(
   Object.values(allSolidIcons)
     .filter(i => i && i.iconName && i.icon)

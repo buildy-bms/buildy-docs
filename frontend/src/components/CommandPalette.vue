@@ -92,7 +92,7 @@ defineExpose({ openPalette, closePalette })
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-24 px-4" @click.self="closePalette">
-      <div class="bg-white shadow-2xl w-full max-w-2xl rounded-none border border-gray-200 flex flex-col max-h-[70vh]">
+      <div class="bg-white shadow-2xl w-full max-w-2xl rounded-xl border border-gray-200 flex flex-col max-h-[70vh] overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
           <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 shrink-0" />
           <input

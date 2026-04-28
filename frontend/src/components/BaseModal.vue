@@ -23,7 +23,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4 py-6" @click.self="emit('close')">
-      <div :class="['bg-white rounded-none shadow-xl w-full flex flex-col max-h-[92vh]', sizeClass]">
+      <div :class="['bg-white rounded-xl shadow-xl w-full flex flex-col max-h-[92vh] overflow-hidden', sizeClass]">
         <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
           <h2 class="text-base font-semibold text-gray-800">{{ title }}</h2>
           <button @click="emit('close')" class="text-gray-400 hover:text-gray-700 p-1 -mr-1">
