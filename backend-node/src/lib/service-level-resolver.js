@@ -47,10 +47,10 @@ function resolveAfLevel(includedSections) {
       maxLevel = required;
       // Reset justifications avec la nouvelle section qui a augmente le niveau
       justifications.length = 0;
-      justifications.push({ number: sec.number, title: sec.title, level: sec.service_level });
+      justifications.push({ section_id: sec.id, number: sec.number, title: sec.title, level: sec.service_level });
     } else if (r === maxRank && r > 0) {
       // Meme niveau max : ajoute a la liste des justifications
-      justifications.push({ number: sec.number, title: sec.title, level: sec.service_level });
+      justifications.push({ section_id: sec.id, number: sec.number, title: sec.title, level: sec.service_level });
     }
   }
 

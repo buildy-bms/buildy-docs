@@ -16,6 +16,7 @@ const props = defineProps({
   // Trigger de refresh externe (ex: après modif d'une section, on incrémente)
   refreshKey: { type: [String, Number], default: 0 },
 })
+const emit = defineEmits(['goto-section'])
 
 const data = ref(null)
 const loading = ref(false)
@@ -90,15 +91,18 @@ defineExpose({ refresh })
       <div v-if="data.justifications.length" class="pt-3 border-t border-gray-100">
         <p class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Sections justifiant ce niveau</p>
         <div class="flex items-center gap-1.5 flex-wrap">
-          <span
+          <button
             v-for="j in data.justifications.slice(0, 6)"
             :key="(j.number || '?') + j.title"
-            class="inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 bg-gray-50 border border-gray-200 rounded-full text-[11px]"
+            type="button"
+            @click="emit('goto-section', { number: j.number, id: j.section_id })"
+            class="inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
+            title="Aller à cette section dans l'arbre"
           >
             <code class="font-mono text-gray-500">§{{ j.number || '?' }}</code>
             <span class="text-gray-700 font-medium">{{ j.title }}</span>
             <span :class="['inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full', LEVEL_COLOR[j.level]]">{{ LEVEL_LABEL[j.level] || j.level }}</span>
-          </span>
+          </button>
           <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic px-1">
             +{{ data.justifications.length - 6 }} autres
           </span>

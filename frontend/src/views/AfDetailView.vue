@@ -105,6 +105,15 @@ async function handleToggleInclude(node) {
   }
 }
 
+function onGotoSection(payload) {
+  // payload : { id?, number? } — preferer id, sinon resoudre par number
+  if (payload?.id) return selectSection(payload.id)
+  if (payload?.number) {
+    const match = sections.value.find(s => s.number === payload.number)
+    if (match) selectSection(match.id)
+  }
+}
+
 async function handleToggleOptOut(node) {
   const newVal = node.opted_out_by_moa === 1 ? 0 : 1
   const idx = sections.value.findIndex(s => s.id === node.id)
@@ -189,7 +198,7 @@ watch(() => route.params.id, async () => {
     <!-- Bandeau cycle de vie (en haut, full-width) -->
     <div class="px-5 lg:px-6 pt-4 space-y-2">
       <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @goto-section="selectSection" />
-      <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" />
+      <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" @goto-section="onGotoSection" />
       <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
 
