@@ -110,11 +110,20 @@ watch(() => props.justification, () => { editing.value = false })
           </div>
         </div>
 
-        <p v-else-if="displayedText" class="mt-1.5 text-xs text-gray-700 leading-relaxed">
-          {{ displayedText }}
-          <span v-if="!justification && fallbackText" class="text-[10px] text-gray-400 italic ml-1">(résumé automatique de l'article — précisez le lien si besoin)</span>
+        <div v-else-if="displayedText" class="mt-1.5 text-xs text-gray-700 leading-relaxed bacs-context-prose" v-html="displayedText"></div>
+        <p v-if="!editing && displayedText && !justification && fallbackText" class="text-[10px] text-gray-400 italic mt-0.5">
+          (résumé automatique de l'article — précisez le lien si besoin)
         </p>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Rendu HTML de la justification BACS (paragraphes + strong) */
+.bacs-context-prose :deep(p) { margin: 0 0 0.5rem; line-height: 1.55; }
+.bacs-context-prose :deep(p:last-child) { margin-bottom: 0; }
+.bacs-context-prose :deep(strong) { color: #1f2937; font-weight: 500; }
+.bacs-context-prose :deep(ul), .bacs-context-prose :deep(ol) { margin: 0.4rem 0; padding-left: 1.2rem; }
+.bacs-context-prose :deep(li) { margin: 0.2rem 0; }
+</style>
