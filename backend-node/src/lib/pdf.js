@@ -251,40 +251,29 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
     if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
   }
 
-  // 2. Filigrane Buildy
+  // 2. Filigrane Buildy — etire pour couvrir widthRatio x heightRatio
+  // de la page (pas de preservation d'aspect : on remplit les dimensions
+  // demandees independamment).
   if (watermark) {
     const {
       imagePath,
       skipFirstPage = false,
-      widthMm,            // largeur fixe en mm (prioritaire si fournie)
-      widthRatio = 0.95,  // ratio de largeur de page (95% par defaut)
-      heightRatio = 0.95, // ratio de hauteur de page (cap pour pages paysage)
-      opacity = 0.06,
-      position = 'center', // 'center' | 'bottom-right'
+      widthRatio = 0.75,
+      heightRatio = 0.75,
+      opacity = 0.05,
     } = watermark;
     const imageBytes = fs.readFileSync(imagePath);
     const img = imagePath.toLowerCase().endsWith('.png')
       ? await doc.embedPng(imageBytes)
       : await doc.embedJpg(imageBytes);
-    const aspect = img.height / img.width;
     const startIdx = skipFirstPage ? 1 : 0;
     for (let i = startIdx; i < pages.length; i++) {
       const p = pages[i];
       const { width: pw, height: ph } = p.getSize();
-      // On veut le filigrane le plus grand possible tout en respectant
-      // les caps en largeur ET en hauteur (utile en A3 paysage).
-      const wByWidth = widthMm ? mmToPt(widthMm) : pw * widthRatio;
-      const wByHeight = (ph * heightRatio) / aspect;
-      const wPt = Math.min(wByWidth, wByHeight);
-      const hPt = wPt * aspect;
-      let x, y;
-      if (position === 'bottom-right') {
-        x = pw - wPt - mmToPt(15);
-        y = mmToPt(15);
-      } else {
-        x = (pw - wPt) / 2;
-        y = (ph - hPt) / 2;
-      }
+      const wPt = pw * widthRatio;
+      const hPt = ph * heightRatio;
+      const x = (pw - wPt) / 2;
+      const y = (ph - hPt) / 2;
       p.drawImage(img, { x, y, width: wPt, height: hPt, opacity });
     }
   }
