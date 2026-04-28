@@ -23,6 +23,7 @@ import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable
 import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
 import ZonesTable from '@/components/editor/ZonesTable.vue'
 import EquipmentDescriptionPanel from '@/components/editor/EquipmentDescriptionPanel.vue'
+import EquipmentTemplatePicker from '@/components/EquipmentTemplatePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -262,27 +263,30 @@ watch(() => route.params.id, async () => {
   </div>
 
   <!-- Modale ajout section (Lot 16) -->
-  <BaseModal v-if="showAddModal" :title="addParent ? `Ajouter une sous-section dans « ${addParent.title} »` : 'Ajouter une section racine'" size="md" @close="showAddModal = false">
+  <BaseModal v-if="showAddModal" :title="addParent ? `Ajouter une sous-section dans « ${addParent.title} »` : 'Ajouter une section racine'" size="lg" @close="showAddModal = false">
     <form @submit.prevent="submitAddSection" class="space-y-4">
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Titre *</label>
-        <input v-model="addForm.title" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               placeholder="Ex : Architecture réseau, Schéma de principe…"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Type de section</label>
-        <select v-model="addForm.kind" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="standard">Texte standard</option>
-          <option value="equipment">Équipement (rattaché à un template)</option>
-        </select>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
+          <input v-model="addForm.title" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                 placeholder="Ex : Architecture réseau, Schéma de principe…"
+                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Type de section</label>
+          <select v-model="addForm.kind" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="standard">Texte standard</option>
+            <option value="equipment">Équipement (rattaché à un template)</option>
+          </select>
+        </div>
       </div>
       <div v-if="addForm.kind === 'equipment'">
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Template équipement</label>
-        <select v-model="addForm.equipment_template_id" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option :value="null" disabled>— Choisir —</option>
-          <option v-for="t in equipmentTemplates" :key="t.id" :value="t.id">{{ t.name }} ({{ t.points_count }} points)</option>
-        </select>
+        <label class="block text-xs font-medium text-gray-700 mb-2">Template équipement</label>
+        <EquipmentTemplatePicker
+          :model-value="addForm.equipment_template_id"
+          @update:model-value="addForm.equipment_template_id = $event"
+          :templates="equipmentTemplates"
+        />
       </div>
       <p class="text-[11px] text-gray-500">
         Le numéro de section est laissé vide pour l'instant — tu peux l'éditer manuellement ensuite.
