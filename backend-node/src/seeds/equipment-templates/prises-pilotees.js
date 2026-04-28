@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-plug',
   icon_color: '#a855f7',
   description_html: `
-<p>Les prises de courant pilotées sont commandées à distance pour couper l\'alimentation des équipements en veille (bureautique, équipements non essentiels) hors plages d\'occupation. La logique de pilotage repose sur des programmations horaires ou des scénarios. La solution Buildy supervise l\'état et la consommation par prise ou par groupe de prises, et peut transmettre des commandes d\'activation depuis l\'application Hyperveez.</p>
+<p>Une prise de courant pilotée est un point d\'alimentation électrique commutable à distance par un contrôleur. Le contrôleur assure la commutation physique de l\'alimentation et le retour d\'état. La solution Buildy supervise l\'état et la consommation par prise ou par groupe, et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios, coupure des équipements en veille hors plages d\'occupation) en transmettant les commandes d\'activation et de coupure appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.alimentation', label: 'État alimentation', dataType: 'État', direction: 'read', position: 10 },

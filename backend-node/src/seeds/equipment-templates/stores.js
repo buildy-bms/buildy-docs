@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-blinds-raised',
   icon_color: '#64748b',
   description_html: `
-<p>Les stores motorisés (intérieurs ou extérieurs) limitent les apports solaires directs et l\'éblouissement. Leur logique repose sur des scénarios horaires, des sondes solaires ou des ordres manuels. La régulation du déplacement et de l\'inclinaison des lames est portée par le moteur. La solution Buildy supervise position et inclinaison, et peut transmettre les commandes correspondantes.</p>
+<p>Les stores motorisés (intérieurs ou extérieurs) limitent les apports solaires directs et l\'éblouissement. Leur motorisation assure les fonctions techniques de bas niveau : déplacement, inclinaison des lames, retour de position, sécurité. La solution Buildy supervise position et inclinaison et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios solaires, mise en cohérence avec la climatisation et l\'éclairage) en transmettant les commandes correspondantes.</p>
 `.trim(),
   points: [
     { slug: 'mesure.position', label: 'Position effective', dataType: 'Mesure', direction: 'read', unit: '%', position: 10 },

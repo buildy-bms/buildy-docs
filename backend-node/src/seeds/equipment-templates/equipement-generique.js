@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-cube',
   icon_color: '#6b7280',
   description_html: `
-<p>Cette catégorie permet de documenter tout équipement technique non couvert par un template dédié (groupe froid, surpresseur, automate de salle propre, sonde isolée, etc.). La régulation est assurée par l\'équipement lui-même ou par son automate associé. La solution Buildy supervise les états, mesures et alarmes typiques, et peut transmettre les commandes appropriées au cas par cas.</p>
+<p>Cette catégorie permet de documenter tout équipement technique non couvert par un template dédié (groupe froid, surpresseur, sonde isolée, automate spécifique, etc.). L\'équipement assure sa propre régulation technique via son automate associé. La solution Buildy supervise les états, mesures et alarmes typiques, et porte les logiques applicatives (programmations horaires, scénarios) en transmettant les commandes appropriées au cas par cas.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },

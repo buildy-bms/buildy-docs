@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 14;
+const TARGET_VERSION = 15;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -595,6 +595,35 @@ function runMigrations() {
     if (cleared > 0) log.info(`Migration 14 : ${cleared} bacs_justification anciennes vidées (sera re-rempli au seed)`);
     db.pragma('user_version = 14');
     log.info('Migration 14 appliquee : reset bacs_justification ancien format');
+  }
+
+  if (current < 15) {
+    // Audit critères AF — corrections sur 7 templates (programmation horaire
+    // attribuée à tort au régulateur de l'équipement) + 1 point label.
+    // On vide les description_html concernées pour que le seeder les recharge
+    // depuis les fichiers seeds (qui contiennent maintenant la version corrigée).
+    const SLUGS_DESC_RESET = [
+      'eclairage-interieur', 'eclairage-exterieur', 'prises-pilotees',
+      'volets', 'stores', 'rooftop', 'equipement-generique',
+    ];
+    let cleared = 0;
+    for (const slug of SLUGS_DESC_RESET) {
+      const r = db.prepare('UPDATE equipment_templates SET description_html = NULL WHERE slug = ?').run(slug);
+      cleared += r.changes;
+    }
+    if (cleared > 0) log.info(`Migration 15 : ${cleared} description_html vidées pour reseed (audit critères AF)`);
+
+    // Renommage label point destratificateur "zone occupée" → "partie basse"
+    const r2 = db.prepare(`
+      UPDATE equipment_template_points
+      SET label = 'Température air en partie basse'
+      WHERE template_id = (SELECT id FROM equipment_templates WHERE slug = 'destratificateur')
+        AND slug = 'temp.basse' AND label = 'Température air zone occupée'
+    `).run();
+    if (r2.changes > 0) log.info(`Migration 15 : ${r2.changes} point destratificateur renommé`);
+
+    db.pragma('user_version = 15');
+    log.info('Migration 15 appliquee : audit critères AF (programmation horaire = Buildy)');
   }
 
   if (current > TARGET_VERSION) {

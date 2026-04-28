@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-blinds',
   icon_color: '#64748b',
   description_html: `
-<p>Les volets motorisés contribuent à la gestion solaire passive et au confort thermique en pilotant l\'ensoleillement entrant. Leur logique d\'orientation et de descente est portée par le moteur ou le contrôleur dédié, en fonction de scénarios horaires, de capteurs solaires ou d\'ordres manuels. La solution Buildy supervise leur position et peut transmettre des commandes d\'ouverture, de fermeture et de stop depuis l\'application Hyperveez.</p>
+<p>Les volets motorisés contribuent à la gestion solaire passive et au confort thermique en pilotant l\'ensoleillement entrant. Leur motorisation assure les fonctions techniques de bas niveau : déplacement, retour de position, sécurité (vent, fin de course). La solution Buildy supervise leur position et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios solaires, mise en cohérence avec la climatisation et l\'éclairage) en transmettant les commandes d\'ouverture, de fermeture et de positionnement appropriées.</p>
 `.trim(),
   points: [
     { slug: 'mesure.position', label: 'Position effective', dataType: 'Mesure', direction: 'read', unit: '%', position: 10 },

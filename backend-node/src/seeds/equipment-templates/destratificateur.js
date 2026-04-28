@@ -17,7 +17,7 @@ module.exports = {
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },
     { slug: 'temp.haute', label: 'Température air en hauteur', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
-    { slug: 'temp.basse', label: 'Température air zone occupée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
+    { slug: 'temp.basse', label: 'Température air en partie basse', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
     { slug: 'mesure.ecart', label: 'Écart de température mesuré', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
     { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50 },
     { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100 },

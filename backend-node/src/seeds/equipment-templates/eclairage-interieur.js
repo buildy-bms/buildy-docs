@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#facc15',
   description_html: `
 <p><strong>L\'éclairage intérieur intégré du bâtiment fait partie des systèmes techniques visés par le décret BACS (R175-1 §4).</strong></p>
-<p>Le pilotage de l\'éclairage intérieur peut s\'appuyer sur des détecteurs de présence, des sondes de luminosité, des programmations horaires ou des scénarios. La régulation en temps réel (gradation, allumage progressif, scénarios) est portée par le contrôleur d\'éclairage. La solution Buildy supervise les états et niveaux par circuit ou par luminaire, et peut transmettre des commandes d\'allumage, d\'extinction et de gradation depuis l\'application Hyperveez.</p>
+<p>Un système d\'éclairage intérieur est composé de luminaires et d\'organes de gradation pilotés par un contrôleur. Le contrôleur assure les fonctions techniques de bas niveau : modulation de l\'intensité, allumage progressif, retour d\'état des luminaires. La solution Buildy supervise les états et niveaux d\'éclairage et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios par usage, mise en cohérence avec la détection de présence et les apports solaires) en transmettant les commandes d\'allumage, d\'extinction et de gradation appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10 },

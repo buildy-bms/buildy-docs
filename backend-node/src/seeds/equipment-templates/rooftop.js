@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#0ea5e9',
   description_html: `
 <p><strong>Un rooftop est concerné par le décret BACS au titre de la ventilation (R175-1 §3), du chauffage (§1) et de la climatisation (§2).</strong></p>
-<p>Un rooftop est une centrale autonome installée en toiture qui assure le renouvellement d\'air, le chauffage et la climatisation d\'un local ou d\'une zone. Sa régulation est portée par son automate intégré (séquence chaud/froid, mode économique, free cooling). La solution Buildy supervise les températures, les états des composants frigorifiques et de chauffe, les alarmes et les compteurs, et peut transmettre des commandes et consignes depuis l\'application Hyperveez.</p>
+<p>Un rooftop est une centrale autonome installée en toiture qui assure le renouvellement d\'air, le chauffage et la climatisation. Son automate intégré porte la régulation technique (séquence chaud/froid, modulation, mode économique, free cooling, sécurités). La solution Buildy supervise les températures, les états des composants frigorifiques et de chauffe, les alarmes et les compteurs, et porte les logiques applicatives (programmations horaires, scénarios par usage) en transmettant les commandes et consignes appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },
