@@ -9,6 +9,10 @@ import {
   UserCircleIcon,
   ClockIcon,
   DocumentTextIcon,
+  TableCellsIcon,
+  Squares2X2Icon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import { listAfs, getAfsStats, createAf, cloneAf, deleteAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -26,6 +30,47 @@ const loading = ref(false)
 const showCreate = ref(false)
 const showClone = ref(false)
 const cloneSource = ref(null)
+
+// Lot 27 — vue tableau (par défaut) + recherche client/projet
+const viewMode = ref(localStorage.getItem('afs-view-mode') || 'table') // 'table' | 'grid'
+const searchQuery = ref('')
+const sortBy = ref('updated_at')
+const sortDir = ref('desc') // 'asc' | 'desc'
+function setViewMode(mode) {
+  viewMode.value = mode
+  localStorage.setItem('afs-view-mode', mode)
+}
+function toggleSort(col) {
+  if (sortBy.value === col) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  else { sortBy.value = col; sortDir.value = 'asc' }
+}
+function normalize(s) {
+  return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+const STATUS_ORDER = { redaction: 0, validee: 1, commissioning: 2, commissioned: 3, livree: 4 }
+
+const filteredSorted = computed(() => {
+  const q = normalize(searchQuery.value)
+  let list = afs.value
+  if (q.length >= 2) {
+    list = list.filter(a =>
+      normalize(a.client_name).includes(q) ||
+      normalize(a.project_name).includes(q) ||
+      normalize(a.site_address).includes(q)
+    )
+  }
+  list = [...list].sort((a, b) => {
+    let av, bv
+    if (sortBy.value === 'status') { av = STATUS_ORDER[a.status] ?? 99; bv = STATUS_ORDER[b.status] ?? 99 }
+    else if (sortBy.value === 'updated_at') { av = a.updated_at || ''; bv = b.updated_at || '' }
+    else { av = (a[sortBy.value] || '').toString().toLowerCase(); bv = (b[sortBy.value] || '').toString().toLowerCase() }
+    if (av < bv) return sortDir.value === 'asc' ? -1 : 1
+    if (av > bv) return sortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+  return list
+})
 
 const newAf = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
@@ -141,6 +186,34 @@ onMounted(refresh)
       </button>
     </div>
 
+    <!-- Toolbar : recherche + toggle vue (Lot 27) -->
+    <div v-if="afs.length" class="flex items-center justify-between gap-3 mb-4">
+      <div class="relative flex-1 max-w-md">
+        <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Rechercher par client, projet ou adresse…"
+          autocomplete="off"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          data-lpignore="true"
+          class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="inline-flex items-center border border-gray-300 rounded overflow-hidden text-xs">
+        <button @click="setViewMode('table')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+          <TableCellsIcon class="w-3.5 h-3.5" /> Tableau
+        </button>
+        <button @click="setViewMode('grid')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+          <Squares2X2Icon class="w-3.5 h-3.5" /> Grille
+        </button>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
@@ -157,7 +230,73 @@ onMounted(refresh)
       </p>
     </div>
 
-    <!-- Grouped lists -->
+    <!-- Vue tableau (par défaut, Lot 27) -->
+    <template v-else-if="viewMode === 'table'">
+      <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
+            <tr>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('client_name')">
+                Client {{ sortBy === 'client_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('project_name')">
+                Projet {{ sortBy === 'project_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-44" @click="toggleSort('status')">
+                Statut {{ sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-4 py-2.5 w-24">Contrat</th>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-40" @click="toggleSort('updated_at')">
+                Dernière modif {{ sortBy === 'updated_at' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-right px-4 py-2.5 w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="af in filteredSorted"
+              :key="af.id"
+              class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer group"
+              @click="router.push(`/afs/${af.id}`)"
+            >
+              <td class="px-4 py-2.5 font-semibold text-gray-800">{{ af.client_name }}</td>
+              <td class="px-4 py-2.5 text-gray-700">
+                {{ af.project_name }}
+                <p v-if="af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
+                  <MapPinIcon class="w-3 h-3 shrink-0" />{{ af.site_address }}
+                </p>
+              </td>
+              <td class="px-4 py-2.5"><StatusBadge :status="af.status" /></td>
+              <td class="px-4 py-2.5">
+                <ServiceLevelBadge v-if="af.service_level" :level="af.service_level" />
+                <span v-else class="text-[11px] text-gray-400 italic">—</span>
+              </td>
+              <td class="px-4 py-2.5 text-xs text-gray-500">
+                {{ formatDate(af.updated_at) }}
+                <p v-if="af.updated_by_name" class="text-[10px] text-gray-400 truncate">par {{ af.updated_by_name }}</p>
+              </td>
+              <td class="px-4 py-2.5 text-right">
+                <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                  <button @click.stop="openClone(af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
+                    <DocumentDuplicateIcon class="w-4 h-4" />
+                  </button>
+                  <button @click.stop="confirmDelete(af)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">
+                    <TrashIcon class="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!filteredSorted.length">
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                {{ searchQuery ? `Aucune AF ne correspond à « ${searchQuery} ».` : 'Aucune AF.' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <!-- Vue grille groupée (legacy) -->
     <template v-else>
       <div v-for="(items, group) in grouped" :key="group" class="mb-8">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
