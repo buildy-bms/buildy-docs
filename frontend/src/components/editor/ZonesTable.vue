@@ -1,13 +1,20 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { PlusCircleIcon, TrashIcon, BuildingOfficeIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
-import api from '@/api'
+import api, { getAfZonesMatrix } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
+  afId: { type: Number, required: true },
 })
+
+const matrix = ref(null) // { categories, zones, unzoned, totalsByCategory }
+async function refreshMatrix() {
+  try { const { data } = await getAfZonesMatrix(props.afId); matrix.value = data }
+  catch { matrix.value = null }
+}
 const { error: notifyError, success: notifySuccess } = useNotification()
 
 const zones = ref([])
@@ -31,6 +38,7 @@ async function refresh() {
     zones.value = data
   } catch { zones.value = [] }
   finally { loading.value = false }
+  await refreshMatrix()
 }
 
 function buildPayload(form) {
@@ -160,6 +168,66 @@ onMounted(refresh)
         </tr>
       </tbody>
     </table>
+
+    <!-- Synthèse zones × catégories de systèmes (live) -->
+    <div v-if="matrix && matrix.categories.length" class="mt-6 border-t border-gray-100 pt-4">
+      <div class="px-5 mb-3">
+        <h3 class="text-sm font-semibold text-gray-700">
+          Répartition des instances par zone et par catégorie
+        </h3>
+        <p class="text-xs text-gray-500 mt-0.5">
+          Mis à jour à chaque ajout d'instance ou modification de lien instance↔zone.
+          Seules les catégories ayant au moins une instance dans le projet sont affichées.
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
+            <tr>
+              <th class="text-left px-4 py-2 font-medium sticky left-0 bg-gray-50">Zone</th>
+              <th v-for="c in matrix.categories" :key="c.key" class="text-center px-3 py-2 font-medium whitespace-nowrap">
+                <div class="font-semibold text-gray-700">{{ c.label }}</div>
+                <div class="mt-0.5">
+                  <span v-if="c.bacs" class="inline-block px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[9px] font-bold normal-case tracking-normal">⚖️ BACS</span>
+                  <span v-else class="text-gray-300 text-[9px]">—</span>
+                </div>
+              </th>
+              <th class="text-center px-3 py-2 font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in matrix.zones" :key="row.id" class="border-t border-gray-100 hover:bg-emerald-50/30">
+              <td class="px-4 py-2 font-semibold text-gray-800 sticky left-0 bg-white">{{ row.name }}</td>
+              <td v-for="(n, i) in row.cells" :key="i" class="text-center px-3 py-2 tabular-nums">
+                <span v-if="n" class="text-emerald-700 font-bold">{{ n }}</span>
+                <span v-else class="text-gray-300">—</span>
+              </td>
+              <td class="text-center px-3 py-2 bg-emerald-50/50 text-emerald-800 font-bold tabular-nums">{{ row.total }}</td>
+            </tr>
+            <tr v-if="matrix.unzoned.total > 0" class="border-t border-amber-200 bg-amber-50">
+              <td class="px-4 py-2 font-medium text-amber-900 sticky left-0 bg-amber-50 italic">Instances sans zone</td>
+              <td v-for="(n, i) in matrix.unzoned.cells" :key="i" class="text-center px-3 py-2 tabular-nums">
+                <span v-if="n" class="text-amber-800 font-semibold">{{ n }}</span>
+                <span v-else class="text-amber-300">—</span>
+              </td>
+              <td class="text-center px-3 py-2 bg-amber-100 text-amber-900 font-bold tabular-nums">{{ matrix.unzoned.total }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="border-t-2 border-gray-300 bg-gray-100">
+              <td class="px-4 py-2 font-bold text-gray-900 sticky left-0 bg-gray-100">Total catégorie</td>
+              <td v-for="(n, i) in matrix.totalsByCategory" :key="i" class="text-center px-3 py-2 font-bold text-gray-900 tabular-nums">{{ n }}</td>
+              <td class="text-center px-3 py-2 bg-emerald-100 text-emerald-900 font-bold tabular-nums">
+                {{ matrix.totalsByCategory.reduce((a, b) => a + b, 0) }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p v-if="matrix.unzoned.total > 0" class="text-[11px] text-amber-700 italic px-5 mt-2">
+        ⚠ {{ matrix.unzoned.total }} instance{{ matrix.unzoned.total > 1 ? 's' : '' }} non encore rattachée{{ matrix.unzoned.total > 1 ? 's' : '' }} à une zone fonctionnelle. Édite chaque instance d'équipement pour la rattacher.
+      </p>
+    </div>
 
     <BaseModal v-if="editing" :title="`Éditer la zone « ${editing.name} »`" size="lg" @close="editing = null">
       <form @submit.prevent="submitEdit" class="grid grid-cols-2 gap-3">

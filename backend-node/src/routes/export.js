@@ -506,26 +506,7 @@ async function routes(fastify) {
     kpis.coverage = coverageTotals;
 
     // ── Synthèse zones × catégories ──
-    // Catégories d'équipement (par slug template) avec marquage BACS
-    const SYSTEM_CATEGORIES = [
-      { key: 'chauffage',     label: 'Chauffage',         bacs: 'R175-1 §1', slugs: ['chaudiere', 'aerotherme', 'destratificateur', 'drv', 'rooftop', 'cta'] },
-      { key: 'climatisation', label: 'Climatisation',     bacs: 'R175-1 §2', slugs: ['drv', 'rooftop', 'cta'] },
-      { key: 'ventilation',   label: 'Ventilation',       bacs: 'R175-1 §3', slugs: ['cta', 'ventilation-generique', 'rooftop'] },
-      { key: 'ecs',           label: 'ECS',               bacs: 'R175-1 §4', slugs: ['ecs'] },
-      { key: 'pv',            label: 'Production PV',     bacs: 'R175-1 §4', slugs: ['production-electricite'] },
-      { key: 'eclairage_int', label: 'Éclairage int.',    bacs: 'R175-1 §4', slugs: ['eclairage-interieur'] },
-      { key: 'eclairage_ext', label: 'Éclairage ext.',    bacs: null,        slugs: ['eclairage-exterieur'] },
-      { key: 'prises',        label: 'Prises pilotées',   bacs: null,        slugs: ['prises-pilotees'] },
-      { key: 'comptage',      label: 'Comptage',          bacs: null,        slugs: ['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories'] },
-      { key: 'qai',           label: 'QAI',               bacs: null,        slugs: ['qai'] },
-      { key: 'occultation',   label: 'Occultation',       bacs: null,        slugs: ['volets', 'stores'] },
-      { key: 'process',       label: 'Process',           bacs: null,        slugs: ['process-industriel'] },
-      { key: 'autres',        label: 'Autres',            bacs: null,        slugs: ['equipement-generique'] },
-    ];
-
-    function normalize(s) {
-      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    }
+    const { SYSTEM_CATEGORIES, normalizeText: normalize } = require('../lib/system-categories');
 
     // Charge toutes les zones de l'AF (depuis la section kind='zones')
     const zonesSection = allSections.find(s => s.kind === 'zones');

@@ -304,6 +304,88 @@ async function routes(fastify) {
     return db.afZones.listBySection(zonesSection.id);
   });
 
+  // GET /api/afs/:afId/zones-matrix — matrice synthese zones × categories de systemes
+  // Retourne uniquement les categories ayant au moins 1 instance dans le projet.
+  fastify.get('/afs/:afId/zones-matrix', async (request) => {
+    const afId = parseInt(request.params.afId, 10);
+    const { SYSTEM_CATEGORIES, normalizeText } = require('../lib/system-categories');
+    const allSections = db.sections.listByAf(afId);
+    const zonesSection = allSections.find(s => s.kind === 'zones');
+    const zones = zonesSection ? db.afZones.listBySection(zonesSection.id) : [];
+
+    // Charge toutes les instances + slug template
+    const allInstances = [];
+    for (const s of allSections) {
+      if (s.kind !== 'equipment' || !s.equipment_template_id) continue;
+      const tpl = db.equipmentTemplates.getById(s.equipment_template_id);
+      if (!tpl) continue;
+      const insts = db.equipmentInstances.listBySection(s.id);
+      for (const i of insts) allInstances.push({ ...i, slug: tpl.slug });
+    }
+
+    // Liens explicites instance↔zone
+    const linkRows = db.instanceZones.listForAf(afId);
+    const zonesByInstance = new Map();
+    for (const r of linkRows) {
+      if (!zonesByInstance.has(r.instance_id)) zonesByInstance.set(r.instance_id, new Set());
+      zonesByInstance.get(r.instance_id).add(r.zone_id);
+    }
+    function instanceMatchesZone(inst, zone) {
+      const linked = zonesByInstance.get(inst.id);
+      if (linked && linked.size > 0) return linked.has(zone.id);
+      const loc = normalizeText(inst.location);
+      return loc && loc.includes(normalizeText(zone.name));
+    }
+
+    // Pre-calcule le total d'instances par categorie (pour filtrer les colonnes vides)
+    const totalsByCat = SYSTEM_CATEGORIES.map(cat => {
+      let n = 0;
+      for (const inst of allInstances) if (cat.slugs.includes(inst.slug)) n += (inst.qty || 1);
+      return n;
+    });
+    const visibleCategories = SYSTEM_CATEGORIES
+      .map((cat, idx) => ({ ...cat, total: totalsByCat[idx] }))
+      .filter(c => c.total > 0);
+
+    // Pour chaque zone, compte les instances par categorie visible
+    const matrix = zones.map(z => {
+      const cells = visibleCategories.map(cat => {
+        let count = 0;
+        for (const inst of allInstances) {
+          if (!cat.slugs.includes(inst.slug)) continue;
+          if (instanceMatchesZone(inst, z)) count += (inst.qty || 1);
+        }
+        return count;
+      });
+      const total = cells.reduce((a, b) => a + b, 0);
+      return { id: z.id, name: z.name, surface_m2: z.surface_m2, cells, total };
+    });
+
+    // Colonne "non zone" : instances qui ne matchent aucune zone
+    const unzonedByCat = visibleCategories.map(cat => {
+      let n = 0;
+      for (const inst of allInstances) {
+        if (!cat.slugs.includes(inst.slug)) continue;
+        const linked = zonesByInstance.get(inst.id);
+        const isLinked = linked && linked.size > 0;
+        const loc = normalizeText(inst.location);
+        const hasMatch = isLinked || (loc && zones.some(z => loc.includes(normalizeText(z.name))));
+        if (!hasMatch) n += (inst.qty || 1);
+      }
+      return n;
+    });
+    const totalUnzoned = unzonedByCat.reduce((a, b) => a + b, 0);
+
+    return {
+      categories: visibleCategories,
+      zones: matrix,
+      unzoned: { cells: unzonedByCat, total: totalUnzoned },
+      totalsByCategory: visibleCategories.map((_, i) =>
+        matrix.reduce((acc, row) => acc + row.cells[i], 0) + unzonedByCat[i]
+      ),
+    };
+  });
+
   // ── Zones fonctionnelles (Lot 26) ─────────────────────────────────
   fastify.get('/sections/:id/zones', async (request) => {
     const sectionId = parseInt(request.params.id, 10);

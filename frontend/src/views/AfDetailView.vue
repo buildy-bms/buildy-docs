@@ -252,7 +252,7 @@ watch(() => route.params.id, async () => {
           />
 
           <!-- Pour kind='zones' : tableau des zones fonctionnelles -->
-          <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" />
+          <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" :af-id="af.id" />
 
           <!-- Pour kind='equipment' : description + tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">
