@@ -19,13 +19,24 @@ import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
   template: { type: Object, required: true },
+  // 'description' (défaut) → prompt qui produit la description fonctionnelle
+  // 'justification' → prompt qui produit la justification BACS contextualisée
+  mode: { type: String, default: 'description' },
 })
+
+const isJustif = computed(() => props.mode === 'justification')
+const titleText = computed(() => isJustif.value
+  ? 'Générer la justification BACS avec Claude Desktop'
+  : 'Générer la description avec Claude Desktop')
+const fieldLabel = computed(() => isJustif.value
+  ? 'Justification BACS (encart contextualisé)'
+  : 'Description fonctionnelle')
 const emit = defineEmits(['close'])
 const { success } = useNotification()
 
 const copied = ref(false)
 
-const prompt = computed(() => {
+const promptDescription = computed(() => {
   const t = props.template
   return `Tu es un ingénieur GTB rédacteur d'analyses fonctionnelles (AF) pour Buildy. Tu vas rédiger la **description fonctionnelle** d'un équipement pour la bibliothèque Buildy AF, dans le respect ABSOLU des règles ci-dessous.
 
@@ -117,6 +128,77 @@ EXEMPLE DE RÉFÉRENCE — Centrale de traitement d'air (CTA)
 Génère maintenant la description fonctionnelle de cet équipement en respectant à la lettre les règles ci-dessus. Renvoie UNIQUEMENT le HTML, sans préambule, sans commentaire, sans markdown.`
 })
 
+const promptJustification = computed(() => {
+  const t = props.template
+  return `Tu es un ingénieur GTB rédacteur d'analyses fonctionnelles (AF) pour Buildy. Tu vas rédiger la **justification BACS contextualisée** d'un équipement, c'est-à-dire l'explication métier qui apparaît dans l'encart « Pourquoi le décret BACS s'applique ici » au-dessus du badge BACS dans l'AF.
+
+═══════════════════════════════════════════════════════════════════════
+POSITIONNEMENT BUILDY (à respecter)
+═══════════════════════════════════════════════════════════════════════
+
+Buildy est une **solution logicielle de supervision et d'hypervision** des bâtiments tertiaires, **multi-sites et multi-systèmes**, **agnostique des marques, modèles et protocoles**. Buildy n'est PAS un intégrateur GTB classique. Buildy ne refait JAMAIS la régulation des équipements.
+
+Buildy intervient EN AVAL, en interconnectant les équipements existants pour assurer interopérabilité, pilotage à distance, conformité BACS et logiques applicatives transverses.
+
+═══════════════════════════════════════════════════════════════════════
+LES 4 EXIGENCES DU DÉCRET BACS (R175-3)
+═══════════════════════════════════════════════════════════════════════
+
+Le système d'automatisation et de contrôle des bâtiments doit :
+1. **Suivre, enregistrer et analyser en continu** les données de production et de consommation énergétique, par zone fonctionnelle, à un pas de temps horaire (conservées 5 ans).
+2. **Situer l'efficacité énergétique** par rapport à des valeurs de référence ; détecter les pertes d'efficacité ; informer l'exploitant des possibilités d'amélioration.
+3. Être **interopérable** avec les différents systèmes techniques du bâtiment (R175-1 §7).
+4. Permettre un **arrêt manuel** et une **gestion autonome** d'un ou plusieurs systèmes techniques.
+
+═══════════════════════════════════════════════════════════════════════
+DÉFINITIONS BACS UTILES (R175-1)
+═══════════════════════════════════════════════════════════════════════
+
+- §1 Système de chauffage : combinaison des composantes pour assurer l'augmentation contrôlée de la température de l'air intérieur.
+- §2 Système de climatisation : combinaison pour assurer un traitement de l'air permettant le contrôle/abaissement de la température.
+- §3 Système de ventilation : combinaison pour assurer le renouvellement de l'air intérieur.
+- §4 Système technique de bâtiment : tout équipement de chauffage, refroidissement, ventilation, ECS, éclairage intégré, automatisation, production d'électricité sur site.
+- §7 Interopérable : capacité d'un produit/système à communiquer et interagir avec d'autres dans le respect de la sécurité.
+
+═══════════════════════════════════════════════════════════════════════
+FORMAT DE SORTIE ATTENDU
+═══════════════════════════════════════════════════════════════════════
+
+Renvoie UNIQUEMENT du HTML simple structuré en **3 paragraphes courts** :
+
+1. **§1 — Définition légale** : citer l'article R175-1 §X qui s'applique à cet équipement et expliquer en quoi l'équipement entre dans cette définition. Utiliser \`<strong>\` sur les termes-clés du décret.
+2. **§2 — Obligations** : ce que le décret impose (interopérabilité, arrêt manuel, gestion autonome, suivi continu) en lien avec cet équipement spécifique.
+3. **§3 — Réponse Buildy** : comment la solution Buildy permet de répondre à ces obligations en supervisant/transmettant les données pertinentes pour cet équipement (sans refaire la régulation).
+
+Pas de classes CSS, pas de \`<div>\`, pas de \`<h1/h2/h3>\`. Juste \`<p>\` et \`<strong>\`.
+
+═══════════════════════════════════════════════════════════════════════
+EXEMPLE DE RÉFÉRENCE — Centrale de traitement d'air (CTA)
+═══════════════════════════════════════════════════════════════════════
+
+\`\`\`html
+<p>L'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p>
+
+<p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu'ils puissent être <strong>arrêtés manuellement</strong> et qu'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p>
+
+<p>L'intégration de la CTA dans la solution Buildy permet de répondre à ces obligations en supervisant les températures, les débits, les états des composants et en exposant les commandes nécessaires au pilotage à distance.</p>
+\`\`\`
+
+═══════════════════════════════════════════════════════════════════════
+ÉQUIPEMENT À RÉDIGER
+═══════════════════════════════════════════════════════════════════════
+
+- **Nom** : ${t.name}
+- **Catégorie** : ${t.category || '(non catégorisé)'}
+- **Référence(s) BACS applicable(s)** : ${t.bacs_articles || '(à choisir : si l\'équipement n\'est pas directement visé par le décret BACS, ne pas générer de justification — laisser le champ vide)'}
+
+═══════════════════════════════════════════════════════════════════════
+
+Génère maintenant la justification BACS contextualisée de cet équipement en respectant à la lettre le format ci-dessus. Renvoie UNIQUEMENT le HTML (3 paragraphes), sans préambule, sans commentaire, sans markdown.`
+})
+
+const prompt = computed(() => isJustif.value ? promptJustification.value : promptDescription.value)
+
 async function copyPrompt() {
   try {
     await navigator.clipboard.writeText(prompt.value)
@@ -132,7 +214,7 @@ async function copyPrompt() {
 </script>
 
 <template>
-  <BaseModal title="Générer la description avec Claude Desktop" size="lg" @close="emit('close')">
+  <BaseModal :title="titleText" size="lg" @close="emit('close')">
     <div class="space-y-4">
       <div class="bg-violet-50 border border-violet-200 px-4 py-3 text-xs text-violet-900 leading-relaxed">
         <p class="font-medium mb-1 inline-flex items-center gap-1.5">
@@ -143,7 +225,7 @@ async function copyPrompt() {
           <li>Clique sur <strong>« Copier le prompt »</strong> ci-dessous.</li>
           <li>Ouvre <strong>Claude Desktop</strong> (ou claude.ai) et colle le prompt dans une nouvelle conversation.</li>
           <li>Claude génère la description HTML respectant les 8 règles Buildy.</li>
-          <li>Copie le HTML généré et colle-le dans le champ <strong>« Description fonctionnelle »</strong> de l'équipement.</li>
+          <li>Copie le HTML généré et colle-le dans le champ <strong>« {{ fieldLabel }} »</strong> de l'équipement.</li>
         </ol>
       </div>
 

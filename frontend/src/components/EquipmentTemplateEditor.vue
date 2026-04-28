@@ -17,11 +17,12 @@ import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import * as allSolidIcons from '@fortawesome/free-solid-svg-icons'
 
-// Liste exhaustive des noms d'icones FA Solid Free (~1500), pour la recherche prédictive
-const ALL_FA_NAMES = Object.values(allSolidIcons)
-  .filter(i => i && i.iconName)
-  .map(i => i.iconName)
-  .sort()
+// Liste exhaustive des noms d'icones FA Solid Free, déduplique les alias.
+const ALL_FA_NAMES = [...new Set(
+  Object.values(allSolidIcons)
+    .filter(i => i && i.iconName && i.icon)
+    .map(i => i.iconName)
+)].sort()
 import { createEquipmentTemplate, updateEquipmentTemplate, deleteEquipmentTemplate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -71,6 +72,12 @@ const form = ref({
 
 const submitting = ref(false)
 const showClaudePrompt = ref(false)
+const claudeMode = ref('description') // 'description' | 'justification'
+
+function openClaudeFor(mode) {
+  claudeMode.value = mode
+  showClaudePrompt.value = true
+}
 
 watch(() => props.template, (t) => {
   if (t) {
@@ -240,7 +247,7 @@ async function destroy() {
             Description fonctionnelle
             <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
           </label>
-          <button type="button" @click="showClaudePrompt = true"
+          <button type="button" @click="openClaudeFor('description')"
                   class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-300 hover:bg-violet-50 rounded">
             <SparklesIcon class="w-3 h-3" />
             Générer avec Claude Desktop
@@ -254,7 +261,14 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Justification BACS (encart contextualisé)</label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs font-medium text-gray-700">Justification BACS <span class="text-gray-400 font-normal">— encart contextualisé</span></label>
+          <button type="button" @click="openClaudeFor('justification')"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-300 hover:bg-violet-50 rounded">
+            <SparklesIcon class="w-3 h-3" />
+            Générer avec Claude Desktop
+          </button>
+        </div>
         <RichTextEditor
           v-model="form.bacs_justification"
           placeholder="L'article R175-X définit… Le décret impose… La solution Buildy permet de répondre à ces obligations en…"
@@ -276,5 +290,5 @@ async function destroy() {
     </template>
   </BaseModal>
 
-  <ClaudePromptModal v-if="showClaudePrompt" :template="{ ...form, preferred_protocols: form.preferred_protocols.join(',') }" @close="showClaudePrompt = false" />
+  <ClaudePromptModal v-if="showClaudePrompt" :template="{ ...form, preferred_protocols: form.preferred_protocols.join(',') }" :mode="claudeMode" @close="showClaudePrompt = false" />
 </template>

@@ -22,18 +22,18 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4" @click.self="emit('close')">
-      <div :class="['bg-white rounded-none shadow-xl w-full', sizeClass]">
-        <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100">
+    <div class="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4 py-6" @click.self="emit('close')">
+      <div :class="['bg-white rounded-none shadow-xl w-full flex flex-col max-h-[92vh]', sizeClass]">
+        <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
           <h2 class="text-base font-semibold text-gray-800">{{ title }}</h2>
           <button @click="emit('close')" class="text-gray-400 hover:text-gray-700 p-1 -mr-1">
             <XMarkIcon class="w-5 h-5" />
           </button>
         </div>
-        <div class="px-7 py-6">
+        <div class="px-7 py-6 overflow-y-auto flex-1 min-h-0">
           <slot />
         </div>
-        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 flex items-center justify-end gap-2">
+        <div v-if="$slots.footer" class="px-6 py-4 bg-gray-50 flex items-center justify-end gap-2 shrink-0 border-t border-gray-100">
           <slot name="footer" />
         </div>
       </div>
