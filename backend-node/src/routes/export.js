@@ -505,8 +505,8 @@ async function routes(fastify) {
     }
     const tocFlat = flattenForToc(tree);
 
-    // Calcul du niveau service requis (depuis sections incluses)
-    const serviceLevel = resolveAfLevel(allSections);
+    // Calcul du niveau service requis (depuis sections incluses non ecartees)
+    const serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
 
     // Version
     const previousCount = db.db.prepare(`

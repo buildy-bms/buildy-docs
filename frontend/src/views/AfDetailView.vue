@@ -98,6 +98,7 @@ async function handleToggleInclude(node) {
   try {
     await updateSection(node.id, { included_in_export: !!newVal })
     if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, included_in_export: newVal }
+    requiredLevelKey.value++ // recalcul du niveau requis
   } catch (e) {
     // rollback
     if (idx >= 0) sections.value[idx] = { ...sections.value[idx], included_in_export: node.included_in_export }
@@ -121,6 +122,7 @@ async function handleToggleOptOut(node) {
   try {
     await updateSection(node.id, { opted_out_by_moa: !!newVal })
     if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, opted_out_by_moa: newVal }
+    requiredLevelKey.value++ // recalcul du niveau requis
   } catch (e) {
     if (idx >= 0) sections.value[idx] = { ...sections.value[idx], opted_out_by_moa: node.opted_out_by_moa }
     notifyError(e.response?.data?.detail || 'Échec mise à jour')

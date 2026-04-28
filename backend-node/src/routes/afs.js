@@ -325,7 +325,10 @@ async function routes(fastify) {
     );
 
     const allSections = db.sections.listByAf(id);
-    const includedSections = allSections.filter(s => s.included_in_export && !excluded.has(s.id));
+    // Exclure du calcul : sections desactivees a l'export, ecartees par la MOA, ou marquees excluded en query
+    const includedSections = allSections.filter(s =>
+      s.included_in_export && !s.opted_out_by_moa && !excluded.has(s.id)
+    );
 
     const { resolveAfLevel } = require('../lib/service-level-resolver');
     const resolved = resolveAfLevel(includedSections);
