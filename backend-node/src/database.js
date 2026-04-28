@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 19;
+const TARGET_VERSION = 20;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -717,6 +717,16 @@ function runMigrations() {
     log.info('Migration 19 appliquee : backfill BACS sections equipement');
   }
 
+  if (current < 20) {
+    // Lot 31 — Mode "ecartee par la MOA" : nouvelle colonne distincte de
+    // included_in_export. Section reste dans l'arbre + dans le PDF, mais
+    // affiche un encart "fonctionnalite ecartee par la maitrise d'ouvrage".
+    try { db.exec('ALTER TABLE sections ADD COLUMN opted_out_by_moa INTEGER NOT NULL DEFAULT 0'); }
+    catch { /* deja la */ }
+    db.pragma('user_version = 20');
+    log.info('Migration 20 appliquee : opted_out_by_moa sur sections');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1061,6 +1071,7 @@ const sections = {
     const allowed = [
       'parent_id', 'position', 'number', 'title', 'service_level', 'service_level_source',
       'bacs_articles', 'bacs_justification', 'body_html', 'kind', 'included_in_export', 'generic_note',
+      'opted_out_by_moa',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
       'section_template_id', 'section_template_version',
       'hyperveez_page_slug',

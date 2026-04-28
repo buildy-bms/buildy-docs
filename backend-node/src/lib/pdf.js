@@ -10,6 +10,16 @@ const log = require('./logger').system;
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
+// Lot 31 — Libelle du contrat requis a partir du service_level d'une section
+Handlebars.registerHelper('requiredContractLabel', (level) => {
+  if (!level) return 'Smart ou Premium';
+  const v = String(level).toUpperCase();
+  if (v === 'P') return 'Premium';
+  if (v === 'S') return 'Smart';
+  if (v.includes('S') && v.includes('P')) return 'Smart ou Premium';
+  return 'Smart ou Premium';
+});
+
 // Charge tous les partials (.hbs commencant par _) au demarrage
 const templatesDir = path.resolve(__dirname, '../../templates/pdf');
 function registerPartials() {

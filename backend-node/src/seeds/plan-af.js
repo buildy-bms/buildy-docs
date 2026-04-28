@@ -62,6 +62,15 @@ const PLAN_AF = [
 • Chaque fonctionnalité est étiquetée Essentials, Smart ou Premium dans le document
 • Tableau synthétique des grandes fonctionnalités par niveau (auto-généré depuis service-levels.js)`,
       },
+      {
+        number: '1.5', title: 'Connectivité du site et infrastructure réseau', kind: 'standard',
+        service_level: 'E/S/P',
+        body_placeholder: `À rédiger — Points à couvrir :
+• La solution Buildy est une solution cloud : la passerelle Buildy Edge nécessite une connexion Internet permanente pour échanger avec les applications Hyperveez et Gojee
+• Option « Connectivité » Buildy : connectivité 4G M2M multi-opérateurs fournie par Buildy (incluse en Premium, en option pour Essentials et Smart)
+• Alternative : l'exploitant fournit sa propre connectivité (box ADSL/fibre dédiée, ou carte SIM data fournie par l'exploitant)
+• Mode dégradé : en cas de coupure temporaire d'Internet, la passerelle Buildy Edge stocke localement les données acquises pour les remonter au retour de la connexion ; les programmations horaires déjà transmises continuent de s'exécuter en autonomie sur les équipements terrain`,
+      },
     ],
   },
 
@@ -228,6 +237,22 @@ const PLAN_AF = [
         features: ['dashboard_qai'],
         body_placeholder: 'Visualisation des indicateurs QAI (CO2, température, humidité, etc.). Historisation et alertes.',
       },
+      { number: '6.5', title: 'Plans 2D/3D interactifs', kind: 'standard',
+        service_level: 'P',
+        body_placeholder: `À rédiger — Points à couvrir :
+• Plans dynamiques et interactifs du bâtiment, épurés et toujours à jour
+• Vues métiers spécialisées : CVC, Éclairage, QAI
+• Cartes de chaleur (températures, occupations, consommations)
+• Inclus en Premium, disponible en option payante pour Smart`,
+      },
+      { number: '6.6', title: 'Cartographie multi-sites', kind: 'standard',
+        service_level: 'S/P',
+        body_placeholder: `À rédiger — Points à couvrir :
+• Vue cartographique de l'ensemble des sites supervisés du parc immobilier
+• Indicateurs de santé synthétiques par site (alarmes actives, communication OK/KO)
+• Drill-down vers le détail d'un site depuis la carte
+• Disponible en Smart et Premium`,
+      },
     ],
   },
 
@@ -284,6 +309,14 @@ const PLAN_AF = [
 • Support intégré chat — Smart et Premium
 • Accès par QR Code sécurisé — Premium uniquement
 • Déclarations manuelles d'anomalies — Premium uniquement`,
+      },
+      { number: '11.3', title: 'Accès simplifié par QR Codes', kind: 'standard',
+        service_level: 'P',
+        body_placeholder: `À rédiger — Points à couvrir :
+• Accès rapide à la zone scanée depuis un QR Code apposé sur site (panneau, équipement, salle)
+• QR Codes protégés et associés à un périmètre fonctionnel défini
+• Déconnexion automatique après inactivité pour préserver la sécurité
+• Disponible en Premium uniquement`,
       },
     ],
   },

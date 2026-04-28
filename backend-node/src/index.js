@@ -17,6 +17,8 @@ async function main() {
   // Lot 30 — Seed bibliotheque "Sections types" + backfill rattachement sections AF existantes
   require('./lib/seeder').seedSectionTemplatesOnBoot();
   require('./lib/seeder').backfillSectionTemplateLinks();
+  // Lot 31 — Backfill : insert les nouvelles sections du plan dans les AFs existantes
+  require('./lib/seeder').backfillNewPlanSections();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {

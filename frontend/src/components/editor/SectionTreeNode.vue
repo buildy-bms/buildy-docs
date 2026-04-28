@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 
 defineOptions({ name: 'SectionTreeNode' })
@@ -14,9 +14,15 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out'])
 
 const excluded = computed(() => props.node.included_in_export === 0)
+const optedOut = computed(() => props.node.opted_out_by_moa === 1)
+// L'option "écartée par la MOA" n'a de sens que pour des sections dont le niveau requis est S ou P.
+const canOptOut = computed(() => {
+  const lvl = (props.node.service_level || '').toUpperCase()
+  return lvl.includes('S') || lvl.includes('P')
+})
 
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
@@ -88,14 +94,23 @@ const titleHtml = computed(() => {
         {{ node.number }}
       </span>
 
-      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '']" v-html="titleHtml"></span>
+      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '']" v-html="titleHtml"></span>
 
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
 
       <span v-if="empty && !excluded" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Section vide — à rédiger"></span>
 
-      <!-- Actions au survol : inclure/exclure + ajouter enfant + supprimer -->
+      <!-- Actions au survol : ecarter MOA + inclure/exclure + ajouter enfant + supprimer -->
       <span class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
+        <button
+          v-if="canOptOut"
+          type="button"
+          @click.stop="emit('toggle-opt-out', node)"
+          :class="['p-0.5 rounded', optedOut ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
+          :title="optedOut ? 'Réactiver cette fonctionnalité' : 'Marquer comme écartée par la maîtrise d\'ouvrage (visible dans le PDF avec encart)'"
+        >
+          <NoSymbolIcon class="w-3 h-3" />
+        </button>
         <button
           type="button"
           @click.stop="emit('toggle-include', node)"
@@ -122,8 +137,11 @@ const titleHtml = computed(() => {
           <TrashIcon class="w-3 h-3" />
         </button>
       </span>
-      <!-- Indicateur permanent si section exclue -->
-      <span v-if="excluded" class="shrink-0 text-amber-600" title="Exclue des exports">
+      <!-- Indicateur permanent si section exclue ou ecartee -->
+      <span v-if="optedOut" class="shrink-0 text-amber-700" title="Écartée par la MOA — visible dans le PDF avec encart">
+        <NoSymbolIcon class="w-3 h-3" />
+      </span>
+      <span v-else-if="excluded" class="shrink-0 text-amber-600" title="Exclue des exports">
         <EyeSlashIcon class="w-3 h-3" />
       </span>
     </button>
@@ -144,6 +162,7 @@ const titleHtml = computed(() => {
         @add-child="emit('add-child', $event)"
         @delete="emit('delete', $event)"
         @toggle-include="emit('toggle-include', $event)"
+        @toggle-opt-out="emit('toggle-opt-out', $event)"
       />
     </div>
   </div>

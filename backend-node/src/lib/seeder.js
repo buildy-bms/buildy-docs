@@ -262,6 +262,79 @@ function escapeHtml(s) {
 }
 
 /**
+ * Lot 31 — Backfill : pour chaque nouvelle section ajoutee a PLAN_AF
+ * apres la creation initiale d'une AF, on l'inserre dans toutes les
+ * AFs existantes (a la position correspondant au plan canonique).
+ *
+ * Detecte les sections "manquantes" en comparant le set des `number`
+ * du PLAN_AF aux `number` deja presents dans chaque AF.
+ */
+function backfillNewPlanSections() {
+  // Collecte les nodes du PLAN_AF avec leur chemin (parent number, position)
+  const planNodes = []; // { number, parent_number, position, node }
+  function walk(node, parentNumber, idx) {
+    planNodes.push({ number: node.number || node.kind, parent_number: parentNumber, position: idx * 10, node });
+    if (Array.isArray(node.children)) {
+      node.children.forEach((c, i) => walk(c, node.number || null, i));
+    }
+  }
+  PLAN_AF.forEach((top, i) => walk(top, null, i));
+
+  const allAfs = db.db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+  let totalInserted = 0;
+
+  for (const af of allAfs) {
+    const existingNumbers = new Set(
+      db.db.prepare('SELECT number FROM sections WHERE af_id = ?').all(af.id).map(r => r.number)
+    );
+
+    for (const { number, parent_number, position, node } of planNodes) {
+      if (existingNumbers.has(number)) continue;
+      if (!node.number) continue; // skip 'zones' top-level (deja gere)
+
+      // Trouve le parent dans cette AF (par number)
+      let parentId = null;
+      if (parent_number) {
+        const parent = db.db.prepare('SELECT id FROM sections WHERE af_id = ? AND number = ?').get(af.id, parent_number);
+        if (!parent) continue; // parent absent → skip (cas theorique)
+        parentId = parent.id;
+      }
+
+      // Lookup section_template
+      const slug = sectionTemplateSlug(node);
+      const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
+      const serviceLevel = node.features
+        ? formatServiceLevel(node.features)
+        : (node.service_level || null);
+      const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
+      const bodyHtml = tpl?.body_html || (node.body_placeholder
+        ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>`
+        : null);
+
+      const created = db.sections.create({
+        afId: af.id,
+        parentId,
+        position,
+        number: node.number,
+        title: node.title,
+        serviceLevel,
+        serviceLevelSource,
+        bacsArticles: tpl?.bacs_articles || node.bacs_articles || null,
+        bodyHtml,
+        kind: node.kind,
+        genericNote: node.generic_note || 0,
+      });
+      if (tpl) {
+        db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+          .run(tpl.id, tpl.current_version, created.id);
+      }
+      totalInserted++;
+    }
+  }
+  if (totalInserted > 0) log.info(`Backfill nouvelles sections plan : ${totalInserted} section(s) inseree(s) dans les AFs existantes`);
+}
+
+/**
  * Lot 30 — Backfill : rattache les sections AF existantes (kind=standard/zones)
  * au section_template correspondant via le `number` (ou kind pour 'zones').
  * Ne touche pas le body_html : seulement section_template_id + version=1.
@@ -288,4 +361,4 @@ function backfillSectionTemplateLinks() {
   if (linked > 0) log.info(`Backfill section templates : ${linked} section(s) rattachee(s)`);
 }
 
-module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, seedAfStructure };
+module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, backfillNewPlanSections, seedAfStructure };

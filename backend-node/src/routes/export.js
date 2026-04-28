@@ -475,6 +475,7 @@ async function routes(fastify) {
             synthesis_table_html: synthesisHtml,
             body_html: s.body_html,
             generic_note: s.generic_note,
+            opted_out_by_moa: s.opted_out_by_moa === 1,
             kind: s.kind,
             depth,
             attachments: data.attachments,

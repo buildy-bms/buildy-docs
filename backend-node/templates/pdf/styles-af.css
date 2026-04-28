@@ -336,6 +336,31 @@ table.zones-table td {
 }
 table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 
+/* Lot 31 — Encart "Section ecartee par la maitrise d'ouvrage" (mode opt-out) */
+.section-opted-out {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  padding: 5mm 6mm;
+  margin: 3mm 0 5mm;
+  page-break-inside: avoid;
+  border-radius: 1mm;
+}
+.section-opted-out-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10pt;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 2mm;
+}
+.section-opted-out-text {
+  font-size: 9pt;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.55;
+}
+.section-opted-out-text strong { color: #451a03; font-weight: 600; }
+
 /* Encart contextualisé "lien avec le décret BACS" (Lot 17b) */
 .bacs-context {
   background: #faf5ff;

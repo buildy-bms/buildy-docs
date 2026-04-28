@@ -38,6 +38,19 @@
 
   {{!-- Disclaimer générique retiré (Lot 14.3) — désormais affiché une seule fois en page de garde --}}
 
+  {{!-- Lot 31 — Section ecartee par la MOA : remplace tout le contenu par un encart prominent.
+       Le header (titre, n°, badges) reste visible plus haut pour la tracabilite. --}}
+  {{#if opted_out_by_moa}}
+  <div class="section-opted-out">
+    <p class="section-opted-out-title">⚠️ Fonctionnalité écartée par la maîtrise d'ouvrage</p>
+    <p class="section-opted-out-text">
+      Cette fonctionnalité ne sera <strong>pas disponible à la livraison</strong> du chantier.
+      Pour l'activer, un <strong>contrat {{requiredContractLabel service_level}}</strong> doit être
+      conclu entre Buildy et l'exploitant du bâtiment.
+    </p>
+  </div>
+  {{else}}
+
   {{!-- Encart contextualisé "lien avec le décret BACS" (Lot 17b) --}}
   {{#if bacs_articles_label}}
   <div class="bacs-context">
@@ -150,7 +163,9 @@
     {{/each}}
   </div>
   {{/if}}
+  {{/if}} {{!-- /if opted_out_by_moa --}}
 
+  {{!-- Les enfants restent affiches meme si la section parent est ecartee --}}
   {{#each children}}
     {{> _section this}}
   {{/each}}

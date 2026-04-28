@@ -105,6 +105,19 @@ async function handleToggleInclude(node) {
   }
 }
 
+async function handleToggleOptOut(node) {
+  const newVal = node.opted_out_by_moa === 1 ? 0 : 1
+  const idx = sections.value.findIndex(s => s.id === node.id)
+  if (idx >= 0) sections.value[idx] = { ...sections.value[idx], opted_out_by_moa: newVal }
+  try {
+    await updateSection(node.id, { opted_out_by_moa: !!newVal })
+    if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, opted_out_by_moa: newVal }
+  } catch (e) {
+    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], opted_out_by_moa: node.opted_out_by_moa }
+    notifyError(e.response?.data?.detail || 'Échec mise à jour')
+  }
+}
+
 const sectionsCountByKind = computed(() => {
   const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
   for (const s of sections.value) c[s.kind] = (c[s.kind] || 0) + 1
@@ -207,6 +220,7 @@ watch(() => route.params.id, async () => {
             @add-child="openAddSection"
             @delete="handleDeleteSection"
             @toggle-include="handleToggleInclude"
+            @toggle-opt-out="handleToggleOptOut"
           />
         </div>
         <!-- Poignée de drag-resize -->

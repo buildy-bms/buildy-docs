@@ -15,6 +15,7 @@ const updateSectionSchema = z.object({
   included_in_export: z.boolean().optional(),
   fact_check_status: z.enum(['unverified', 'verified', 'backend_only', 'in_progress', 'documented']).optional(),
   section_template_version: z.number().int().optional(),
+  opted_out_by_moa: z.boolean().optional(),
 }).strict();
 
 const overrideSchema = z.object({
@@ -169,6 +170,8 @@ async function routes(fastify) {
       bacsJustification: body.bacs_justification,
       bodyHtml: body.body_html,
       includedInExport: body.included_in_export == null ? undefined : (body.included_in_export ? 1 : 0),
+      optedOutByMoa: body.opted_out_by_moa == null ? undefined : (body.opted_out_by_moa ? 1 : 0),
+      sectionTemplateVersion: body.section_template_version,
       factCheckStatus: body.fact_check_status,
       updatedBy: userId,
     });
