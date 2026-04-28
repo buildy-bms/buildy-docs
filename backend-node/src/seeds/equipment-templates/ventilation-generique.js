@@ -5,7 +5,7 @@ module.exports = {
   name: 'Système de ventilation (autre que CTA)',
   category: 'ventilation',
   bacs_articles: 'R175-1 §3',
-  bacs_justification: 'Tout système assurant le renouvellement de l\'air intérieur entre dans la définition du système de ventilation au sens du décret BACS (R175-1 §3).',
+  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l\'air intérieur. Tout équipement remplissant cette fonction (VMC, ventilateurs d\'extraction, tourelles utilisées en confort) entre dans cette définition.</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong>, qu\'ils puissent être <strong>arrêtés manuellement</strong> et qu\'ils soient <strong>gérés de manière autonome</strong> par le système BACS (programmation horaire, supervision continue, alarmes).</p><p>L\'intégration de ces ventilations dans la GTB Buildy permet de remonter leur état et leurs débits, et de transmettre les commandes de marche/vitesse appropriées.</p>',
   preferred_protocols: 'Modbus TCP,KNX/IP',
   icon_kind: 'fa',
   icon_value: 'fa-wind',

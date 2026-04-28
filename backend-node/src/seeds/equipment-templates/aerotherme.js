@@ -5,7 +5,7 @@ module.exports = {
   name: 'Aérotherme',
   category: 'chauffage',
   bacs_articles: 'R175-1 §1',
-  bacs_justification: 'Un aérotherme est un système de chauffage au sens du décret BACS (R175-1 §1) — il participe à l\'augmentation contrôlée de la température de l\'air intérieur.',
+  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de chauffage</strong> comme la combinaison des composantes nécessaires pour assurer l\'augmentation contrôlée de la température de l\'air intérieur. Un aérotherme, en tant qu\'émetteur de chaleur soufflée, entre dans cette définition.</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres équipements du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et que leur fonctionnement soit <strong>géré de manière autonome</strong> (programmation, supervision, alarmes).</p><p>L\'intégration de l\'aérotherme dans la GTB Buildy permet de superviser sa marche, sa consigne effective et ses défauts, et de transmettre les commandes nécessaires.</p>',
   preferred_protocols: 'Modbus TCP,KNX/IP',
   icon_kind: 'fa',
   icon_value: 'fa-temperature-arrow-up',

@@ -10,6 +10,9 @@ const props = defineProps({
   // 'section' (défaut) → "Exigé par le décret BACS"
   // 'equipment'        → "Système concerné par le décret BACS"
   context: { type: String, default: 'section' },
+  // Explication métier propre à l'équipement / la section : pourquoi le décret
+  // s'applique ici, comment la GTB Buildy y répond. Affichée en haut de la modale.
+  contextExplanation: { type: String, default: null },
 })
 
 const labelPrefix = props.context === 'equipment'
@@ -73,6 +76,14 @@ onMounted(() => {
 
   <BaseModal v-if="showModal" :title="`Décret BACS — ${reference}`" size="lg" @close="showModal = false">
     <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2 -mr-2">
+      <!-- Explication métier en tête (Lot UX BACS) -->
+      <div v-if="contextExplanation" class="bg-purple-50 border-l-4 border-purple-400 px-5 py-4">
+        <p class="text-[11px] uppercase tracking-wider text-purple-700 font-semibold mb-2">
+          Pourquoi le décret BACS s'applique ici
+        </p>
+        <div class="bacs-prose text-[14px] text-gray-800 leading-relaxed" v-html="contextExplanation"></div>
+      </div>
+
       <p class="text-xs text-gray-500 italic leading-relaxed">
         Extraits du décret n° 2023-259 du 7 avril 2023 (articles R175-1 à R175-6 du Code de la construction et de l'habitation).
       </p>

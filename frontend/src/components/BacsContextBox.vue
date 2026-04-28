@@ -87,7 +87,7 @@ watch(() => props.justification, () => { editing.value = false })
       <ScaleIcon class="w-4 h-4 text-purple-700 mt-0.5 shrink-0" />
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
-          <BacsBadge :reference="reference" :context="context" />
+          <BacsBadge :reference="reference" :context="context" :context-explanation="displayedText" />
           <button v-if="editable && !editing" @click="startEdit" class="text-[11px] text-purple-700 hover:text-purple-900 inline-flex items-center gap-0.5">
             <PencilSquareIcon class="w-3 h-3" />
             {{ justification ? 'Éditer' : 'Préciser le lien' }}

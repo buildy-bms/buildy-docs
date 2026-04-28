@@ -5,7 +5,7 @@ module.exports = {
   name: 'Rooftop',
   category: 'climatisation',
   bacs_articles: 'R175-1 §1, §2, §3',
-  bacs_justification: 'Un rooftop combine ventilation (R175-1 §3), chauffage (§1) et climatisation (§2) dans un même équipement compact installé en toiture. L\'ensemble est concerné par le décret BACS.',
+  bacs_justification: '<p>Un rooftop combine dans un seul équipement compact les <strong>trois fonctions définies par l\'article R175-1</strong> : ventilation (§3), chauffage (§1) et climatisation (§2). Il est donc pleinement concerné par le décret BACS, à plusieurs titres.</p><p>Le décret impose que cet équipement soit <strong>interopérable</strong> avec les autres systèmes techniques du bâtiment, qu\'il puisse être <strong>arrêté manuellement</strong> et qu\'il soit <strong>géré de manière autonome</strong> via le système BACS, avec un suivi continu et la remontée des alarmes.</p><p>L\'intégration du rooftop dans la GTB Buildy permet de superviser les températures, les puissances frigorifique et calorifique, l\'encrassement des filtres et tous les défauts, et de transmettre les commandes et consignes nécessaires.</p>',
   preferred_protocols: 'BACnet/IP,Modbus TCP',
   icon_kind: 'fa',
   icon_value: 'fa-building',

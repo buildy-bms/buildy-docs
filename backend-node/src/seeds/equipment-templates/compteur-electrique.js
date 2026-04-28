@@ -5,7 +5,7 @@ module.exports = {
   name: 'Compteur électrique',
   category: 'comptage',
   bacs_articles: 'R175-3',
-  bacs_justification: 'Le comptage énergétique fait partie des fonctions exigées par le décret BACS (R175-3) pour permettre le suivi continu de la consommation énergétique du bâtiment.',
+  bacs_justification: '<p>L\'article R175-3 du décret BACS exige que le système d\'automatisation et de contrôle assure un <strong>suivi continu, un enregistrement et une analyse de la consommation énergétique</strong> du bâtiment, par usage et par source d\'énergie.</p><p>Le comptage électrique est l\'instrument indispensable à cette obligation : il fournit les index, puissances et consommations qui alimentent les tableaux de bord énergétiques et la détection de dérives exigés par le décret.</p><p>L\'intégration des compteurs électriques dans la GTB Buildy permet de remonter en continu les paramètres électriques pour répondre à cette exigence et alerter en cas d\'écart par rapport aux profils de consommation attendus.</p>',
   preferred_protocols: 'Modbus TCP,Modbus RTU,M-Bus IP',
   icon_kind: 'fa',
   icon_value: 'fa-bolt',

@@ -15,7 +15,7 @@ module.exports = {
   name: 'Centrale de traitement d\'air (CTA)',
   category: 'ventilation',
   bacs_articles: 'R175-1 §1, §2, §3',
-  bacs_justification: 'Une CTA combine systématiquement la fonction de ventilation (R175-1 §3), et selon sa configuration peut intégrer du chauffage (§1) et/ou de la climatisation (§2). Le décret impose pour ces systèmes techniques l\'automatisation, la supervision continue, le pilotage à distance et la traçabilité.',
+  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l\'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et qu\'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p><p>L\'intégration de la CTA dans la GTB Buildy permet de répondre à ces obligations en supervisant les températures, les débits, les états des composants et en exposant les commandes nécessaires au pilotage à distance.</p>',
   preferred_protocols: 'Modbus TCP,BACnet/IP',
   icon_kind: 'fa',
   icon_value: 'fa-fan',

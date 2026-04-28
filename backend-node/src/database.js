@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 13;
+const TARGET_VERSION = 14;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -575,6 +575,26 @@ function runMigrations() {
     `);
     log.info('Migration 13 appliquee : af_permissions');
     db.pragma('user_version = 13');
+  }
+
+  if (current < 14) {
+    // Lot UX BACS — réécriture des bacs_justification existantes pour qu'elles
+    // soient pédagogiques et expliquent vraiment le lien équipement/décret.
+    // On ne réécrit que celles qui correspondent à l'ancienne version courte
+    // (générée Lot 17b/20) pour ne pas écraser une rédaction utilisateur.
+    const ANCIEN_PREFIX_RE = /^[A-ZÀÉÈÊÎÔÛ][^<]+$/; // texte simple sans HTML, ancien format
+    const tpls = db.prepare('SELECT id, slug, bacs_justification FROM equipment_templates WHERE bacs_justification IS NOT NULL').all();
+    let cleared = 0;
+    for (const t of tpls) {
+      if (ANCIEN_PREFIX_RE.test((t.bacs_justification || '').trim())) {
+        // Vide pour permettre au seeder de re-remplir avec la nouvelle version HTML
+        db.prepare('UPDATE equipment_templates SET bacs_justification = NULL WHERE id = ?').run(t.id);
+        cleared++;
+      }
+    }
+    if (cleared > 0) log.info(`Migration 14 : ${cleared} bacs_justification anciennes vidées (sera re-rempli au seed)`);
+    db.pragma('user_version = 14');
+    log.info('Migration 14 appliquee : reset bacs_justification ancien format');
   }
 
   if (current > TARGET_VERSION) {
