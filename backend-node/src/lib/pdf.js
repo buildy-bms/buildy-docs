@@ -139,7 +139,7 @@ function getBrowser() {
  *   - pages 2..N avec header/footer
  * Necessite displayHeaderFooter=true dans pdfOptions, sinon ignore.
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false }) {
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -206,11 +206,19 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
 
     await page.pdf({ ...baseOptions, path: outputPath });
 
-    // Masque l'en-tete et le pied de page de la page 1 (couverture) en y
-    // dessinant des rectangles de la couleur de fond du cover. Approche
-    // post-processing qui PRESERVE les annotations PDF (liens du sommaire).
-    if (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter && pdfOptions.margin) {
-      await maskFirstPageHeaderFooter(outputPath, pdfOptions.margin, '#1b2842');
+    // Post-processing pdf-lib en une seule passe (charge/save) :
+    //   - Masque header/footer de la page 1 si demande (preserve liens TOC).
+    //   - Applique le filigrane Buildy sur les pages demandees.
+    const needPostProcess =
+      (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter && pdfOptions.margin) ||
+      watermark;
+    if (needPostProcess) {
+      await postProcessPdf(outputPath, {
+        maskFirstPage: (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter)
+          ? { margin: pdfOptions.margin, color: '#1b2842' }
+          : null,
+        watermark,
+      });
     }
   } finally {
     await page.close().catch(() => {});
@@ -220,21 +228,60 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
   return { path: outputPath, sizeBytes: stats.size };
 }
 
-async function maskFirstPageHeaderFooter(pdfPath, margin, hexColor) {
+const mmToPt = (mm) => parseFloat(mm) * 2.83465;
+
+async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
   const { PDFDocument, rgb } = require('pdf-lib');
   const bytes = fs.readFileSync(pdfPath);
   const doc = await PDFDocument.load(bytes);
-  const firstPage = doc.getPage(0);
-  const { width, height } = firstPage.getSize();
-  const mmToPt = (mm) => parseFloat(mm) * 2.83465;
-  const topPt = margin.top ? mmToPt(margin.top) : 0;
-  const botPt = margin.bottom ? mmToPt(margin.bottom) : 0;
-  const r = parseInt(hexColor.slice(1, 3), 16) / 255;
-  const g = parseInt(hexColor.slice(3, 5), 16) / 255;
-  const b = parseInt(hexColor.slice(5, 7), 16) / 255;
-  const fill = rgb(r, g, b);
-  if (topPt > 0) firstPage.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
-  if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+  const pages = doc.getPages();
+
+  // 1. Masque header/footer page 1
+  if (maskFirstPage && pages.length > 0) {
+    const { margin, color } = maskFirstPage;
+    const firstPage = pages[0];
+    const { width, height } = firstPage.getSize();
+    const topPt = margin.top ? mmToPt(margin.top) : 0;
+    const botPt = margin.bottom ? mmToPt(margin.bottom) : 0;
+    const r = parseInt(color.slice(1, 3), 16) / 255;
+    const g = parseInt(color.slice(3, 5), 16) / 255;
+    const b = parseInt(color.slice(5, 7), 16) / 255;
+    const fill = rgb(r, g, b);
+    if (topPt > 0) firstPage.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
+    if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+  }
+
+  // 2. Filigrane Buildy
+  if (watermark) {
+    const {
+      imagePath,
+      skipFirstPage = false,
+      widthMm = 50,
+      opacity = 0.08,
+      position = 'center', // 'center' | 'bottom-right'
+    } = watermark;
+    const imageBytes = fs.readFileSync(imagePath);
+    const img = imagePath.toLowerCase().endsWith('.png')
+      ? await doc.embedPng(imageBytes)
+      : await doc.embedJpg(imageBytes);
+    const wPt = mmToPt(widthMm);
+    const hPt = wPt * (img.height / img.width);
+    const startIdx = skipFirstPage ? 1 : 0;
+    for (let i = startIdx; i < pages.length; i++) {
+      const p = pages[i];
+      const { width: pw, height: ph } = p.getSize();
+      let x, y;
+      if (position === 'bottom-right') {
+        x = pw - wPt - mmToPt(15);
+        y = mmToPt(15);
+      } else {
+        x = (pw - wPt) / 2;
+        y = (ph - hPt) / 2;
+      }
+      p.drawImage(img, { x, y, width: wPt, height: hPt, opacity });
+    }
+  }
+
   fs.writeFileSync(pdfPath, await doc.save());
 }
 

@@ -11,6 +11,10 @@ const Handlebars = require('handlebars');
 const { renderPdf, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
 const gitLib = require('../lib/git');
 
+// Filigrane Buildy (favicon) applique sur tous les exports PDF
+const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
+const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthMm: 60, opacity: 0.07, position: 'center' };
+
 async function commitExportSilently(afId, message, tag, user) {
   try {
     await gitLib.commitAf(afId, message, {
@@ -202,6 +206,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pageOrientation: 'landscape',
+        watermark: BUILDY_WATERMARK,
       });
     } catch (err) {
       log.error(`PDF render failed: ${err.message}`);
@@ -349,6 +354,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pdfOptions: { landscape: true },
+        watermark: BUILDY_WATERMARK,
       });
     } catch (err) {
       log.error(`PDF synthesis render failed: ${err.message}`);
@@ -544,6 +550,7 @@ async function routes(fastify) {
         populateToc: true,
         pageFormat: 'A4',
         skipFirstPageHeaderFooter: true,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
         pdfOptions: {
           displayHeaderFooter: true,
           margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' },
