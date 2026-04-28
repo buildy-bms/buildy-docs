@@ -1,12 +1,41 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, PencilIcon } from '@heroicons/vue/24/outline'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, listSectionTemplates } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
+import BacsBadge from '@/components/BacsBadge.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
+import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import { useRouter, useRoute } from 'vue-router'
+
+// Lot 30 — Onglets Bibliothèque
+const tab = ref(localStorage.getItem('library-tab') || 'equipment')
+function setTab(t) { tab.value = t; localStorage.setItem('library-tab', t); selected.value = null }
+
+// Sections types
+const sectionTemplates = ref([])
+const sectionTplSearch = ref('')
+const editingSectionTpl = ref(null)
+async function refreshSectionTemplates() {
+  const { data } = await listSectionTemplates()
+  sectionTemplates.value = data
+}
+function openSectionTplEditor(t) { editingSectionTpl.value = t }
+async function onSectionTplSaved() {
+  editingSectionTpl.value = null
+  await refreshSectionTemplates()
+}
+const filteredSectionTemplates = computed(() => {
+  const q = sectionTplSearch.value.trim().toLowerCase()
+  if (!q) return sectionTemplates.value
+  return sectionTemplates.value.filter(t =>
+    (t.title || '').toLowerCase().includes(q) ||
+    (t.number || '').toLowerCase().includes(q) ||
+    (t.bacs_articles || '').toLowerCase().includes(q)
+  )
+})
 
 const router = useRouter()
 const route = useRoute()
@@ -128,7 +157,7 @@ async function openTemplate(t) {
 }
 
 onMounted(async () => {
-  await refresh()
+  await Promise.all([refresh(), refreshSectionTemplates()])
   // Ouverture directe via ?open=<slug> (utilisée par EquipmentDescriptionPanel)
   if (route.query.open) {
     const t = templates.value.find(x => x.slug === route.query.open)
@@ -139,6 +168,18 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-6xl mx-auto">
+    <!-- Toggle Equipements / Sections types (Lot 30) -->
+    <div class="mb-5 inline-flex items-center border border-gray-300 rounded overflow-hidden text-sm">
+      <button @click="setTab('equipment')" :class="['px-4 py-1.5', tab === 'equipment' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+        Équipements
+      </button>
+      <button @click="setTab('section')" :class="['px-4 py-1.5 border-l border-gray-300', tab === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+        Sections types
+      </button>
+    </div>
+
+    <!-- ════════════════ Onglet ÉQUIPEMENTS ════════════════ -->
+    <template v-if="tab === 'equipment'">
     <!-- Vue liste -->
     <template v-if="!selected">
       <div class="mb-6 flex items-end justify-between gap-3">
@@ -465,13 +506,86 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- Modale création / édition de template -->
+    </template> <!-- /tab equipment -->
+
+    <!-- ════════════════ Onglet SECTIONS TYPES (Lot 30) ════════════════ -->
+    <template v-if="tab === 'section'">
+      <div class="mb-6">
+        <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque de sections types</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          {{ sectionTemplates.length }} section{{ sectionTemplates.length > 1 ? 's' : '' }} canonique{{ sectionTemplates.length > 1 ? 's' : '' }}
+          du plan AF. Édite le contenu pour qu'il s'applique aux nouvelles AFs et, si tu coches "propager", aux AFs existantes non personnalisées.
+        </p>
+      </div>
+
+      <div class="relative max-w-md mb-4">
+        <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+        <input v-model="sectionTplSearch" type="text" placeholder="Rechercher (titre, numéro, BACS)…" autocomplete="off"
+               data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <button v-if="sectionTplSearch" @click="sectionTplSearch = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-none">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
+            <tr>
+              <th class="text-left px-4 py-2.5 w-20">Numéro</th>
+              <th class="text-left px-4 py-2.5">Titre</th>
+              <th class="text-left px-4 py-2.5 w-48">BACS</th>
+              <th class="text-center px-4 py-2.5 w-32">AFs concernées</th>
+              <th class="text-center px-4 py-2.5 w-24">Version</th>
+              <th class="text-center px-4 py-2.5 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in filteredSectionTemplates" :key="t.id"
+                class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
+                @click="openSectionTplEditor(t)">
+              <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ t.number || '—' }}</td>
+              <td class="px-4 py-2 font-medium text-gray-800">{{ t.title }}</td>
+              <td class="px-4 py-2">
+                <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
+                <span v-else class="text-gray-300 italic text-xs">—</span>
+              </td>
+              <td class="px-4 py-2 text-center text-xs">
+                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
+                  {{ t.outdated_count }} en retard / {{ t.affected_afs_count }}
+                </span>
+                <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
+              </td>
+              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono">v{{ t.current_version }}</td>
+              <td class="px-4 py-2 text-center">
+                <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
+              </td>
+            </tr>
+            <tr v-if="!filteredSectionTemplates.length">
+              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                {{ sectionTplSearch ? `Aucune section type ne correspond à « ${sectionTplSearch} ».` : 'Aucune section type.' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <!-- Modale création / édition de template équipement -->
     <EquipmentTemplateEditor
       v-if="showEditor"
       :template="editorTemplate"
       @close="showEditor = false"
       @saved="onSaved"
       @deleted="onDeleted"
+    />
+
+    <!-- Modale édition section type (Lot 30) -->
+    <SectionTemplateEditor
+      v-if="editingSectionTpl"
+      :template="editingSectionTpl"
+      @close="editingSectionTpl = null"
+      @saved="onSectionTplSaved"
     />
   </div>
 </template>

@@ -19,18 +19,24 @@ import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
   template: { type: Object, required: true },
-  // 'description' (défaut) → prompt qui produit la description fonctionnelle
-  // 'justification' → prompt qui produit la justification BACS contextualisée
+  // 'description' (défaut) → prompt qui produit la description fonctionnelle d'un équipement
+  // 'justification' → prompt qui produit la justification BACS contextualisée d'un équipement
+  // 'standard-section' → prompt qui produit le contenu d'une section standard du plan AF
   mode: { type: String, default: 'description' },
 })
 
 const isJustif = computed(() => props.mode === 'justification')
-const titleText = computed(() => isJustif.value
-  ? 'Générer la justification BACS avec Claude Desktop'
-  : 'Générer la description avec Claude Desktop')
-const fieldLabel = computed(() => isJustif.value
-  ? 'Justification BACS (encart contextualisé)'
-  : 'Description fonctionnelle')
+const isStandardSection = computed(() => props.mode === 'standard-section')
+const titleText = computed(() => {
+  if (isStandardSection.value) return 'Générer le contenu de la section avec Claude Desktop'
+  if (isJustif.value) return 'Générer la justification BACS avec Claude Desktop'
+  return 'Générer la description avec Claude Desktop'
+})
+const fieldLabel = computed(() => {
+  if (isStandardSection.value) return 'Contenu de la section'
+  if (isJustif.value) return 'Justification BACS (encart contextualisé)'
+  return 'Description fonctionnelle'
+})
 const emit = defineEmits(['close'])
 const { success } = useNotification()
 
@@ -197,7 +203,53 @@ EXEMPLE DE RÉFÉRENCE — Centrale de traitement d'air (CTA)
 Génère maintenant la justification BACS contextualisée de cet équipement en respectant à la lettre le format ci-dessus. Renvoie UNIQUEMENT le HTML (3 paragraphes), sans préambule, sans commentaire, sans markdown.`
 })
 
-const prompt = computed(() => isJustif.value ? promptJustification.value : promptDescription.value)
+const promptStandardSection = computed(() => {
+  const t = props.template
+  return `Tu es un ingénieur GTB rédacteur d'analyses fonctionnelles (AF) pour Buildy. Tu vas rédiger le **contenu canonique** d'une section "standard" du plan AF Buildy (chapitre, intro, glossaire, conformité…), dans le style sobre et technique de la maison.
+
+═══════════════════════════════════════════════════════════════════════
+POSITIONNEMENT BUILDY (à respecter)
+═══════════════════════════════════════════════════════════════════════
+
+Buildy est une **solution logicielle de supervision et d'hypervision** des bâtiments tertiaires, **multi-sites et multi-systèmes**, **agnostique des marques, modèles et protocoles**. Buildy n'est PAS un intégrateur GTB classique (type Schneider EcoStruxure / Siemens Desigo). Buildy ne refait JAMAIS la régulation des équipements terrain.
+
+Buildy intervient EN AVAL : interopérabilité, supervision (lecture états/mesures), pilotage (transmission commandes/consignes), conformité au décret BACS (suivi continu, alarmes, arrêt manuel, gestion autonome), logiques applicatives transverses (programmations horaires, scénarios par usage, mise en cohérence multi-systèmes).
+
+═══════════════════════════════════════════════════════════════════════
+RÈGLES DE RÉDACTION
+═══════════════════════════════════════════════════════════════════════
+
+1. Ton **sobre et technique**, sans superlatifs marketing, en français professionnel avec accents corrects.
+2. **2 à 4 paragraphes courts** — une idée par paragraphe.
+3. **Pas de mention nominale du client/projet** — substituts génériques ("le bâtiment", "le site", "l'exploitant").
+4. **Pas d'invention** : s'appuyer sur la connaissance métier GTB. Si une info précise manque, formuler de manière neutre.
+5. **Vocabulaire Buildy précis** : supervision, hypervision, point, instance, équipement, anomalie, dérive, niveau de service (Essentials / Smart / Premium), Hyperveez (web), Gojee (mobile).
+6. **Références BACS contextualisées** si la section en mentionne (R175-1 §X, R175-3 §Y, R175-5-1) : citer l'article, expliquer en quoi il s'applique à cette section, sans réécrire la définition légale.
+7. **Pas de titre H1/H2/H3** : les titres sont gérés par l'app (la section a déjà son titre).
+8. HTML simple compatible Tiptap : \`<p>\`, \`<ul>/<li>\`, \`<strong>\`, \`<em>\`. Pas de classes CSS, pas de \`<div>\`.
+
+═══════════════════════════════════════════════════════════════════════
+SECTION À RÉDIGER
+═══════════════════════════════════════════════════════════════════════
+
+- **Numéro** : ${t.number || '(sans numéro)'}
+- **Titre** : ${t.title}
+- **Référence(s) BACS applicable(s)** : ${t.bacs_articles || '(aucune)'}
+- **Contenu actuel à reprendre / améliorer** :
+\`\`\`html
+${(t.body_html || '').replace(/\\n/g, '\n').slice(0, 4000) || '(vide)'}
+\`\`\`
+
+═══════════════════════════════════════════════════════════════════════
+
+Génère maintenant le contenu HTML de cette section en respectant les règles ci-dessus. Ce contenu sera le **canonique** réutilisé par toutes les nouvelles AFs Buildy. Renvoie UNIQUEMENT le HTML, sans préambule, sans commentaire, sans markdown.`
+})
+
+const prompt = computed(() => {
+  if (isStandardSection.value) return promptStandardSection.value
+  if (isJustif.value) return promptJustification.value
+  return promptDescription.value
+})
 
 async function copyPrompt() {
   try {

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 17;
+const TARGET_VERSION = 18;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -670,6 +670,37 @@ function runMigrations() {
     log.info('Migration 17 appliquee : reset descriptions + justifications pour positionnement Buildy non-GTB');
   }
 
+  if (current < 18) {
+    // Lot 30 — Bibliothèque "Sections types" : contenu canonique des sections
+    // standard (et 'zones') stocké en DB pour édition in-app, plus dans le seed.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS section_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL UNIQUE,
+        number TEXT,
+        title TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'standard',
+        body_html TEXT,
+        bacs_articles TEXT,
+        service_level TEXT,
+        service_level_source TEXT,
+        features TEXT,
+        current_version INTEGER NOT NULL DEFAULT 1,
+        updated_by INTEGER REFERENCES users(id),
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_section_templates_slug ON section_templates(slug);
+    `);
+
+    // Ajout des colonnes de rattachement sur sections (best-effort : ignore si déjà là)
+    try { db.exec('ALTER TABLE sections ADD COLUMN section_template_id INTEGER REFERENCES section_templates(id)'); } catch { /* déjà ajoutée */ }
+    try { db.exec('ALTER TABLE sections ADD COLUMN section_template_version INTEGER'); } catch { /* déjà ajoutée */ }
+
+    db.pragma('user_version = 18');
+    log.info('Migration 18 appliquee : section_templates + rattachement sections');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -844,6 +875,68 @@ const equipmentTemplatePoints = {
   },
 };
 
+// ── Section templates (Lot 30 : contenu canonique des sections standard) ───
+const sectionTemplates = {
+  list() {
+    return db.prepare(`
+      SELECT st.*,
+             (SELECT COUNT(*) FROM sections s
+                JOIN afs a ON a.id = s.af_id
+                WHERE s.section_template_id = st.id AND a.deleted_at IS NULL) AS affected_afs_count,
+             (SELECT COUNT(*) FROM sections s
+                JOIN afs a ON a.id = s.af_id
+                WHERE s.section_template_id = st.id AND a.deleted_at IS NULL
+                  AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)) AS outdated_count
+      FROM section_templates st
+      ORDER BY
+        CAST(SUBSTR(st.number, 1, INSTR(st.number || '.', '.') - 1) AS INTEGER),
+        st.number
+    `).all();
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM section_templates WHERE id = ?').get(id);
+  },
+  getBySlug(slug) {
+    return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
+  },
+  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features }) {
+    const result = db.prepare(`
+      INSERT INTO section_templates
+        (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source, features)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(slug, number || null, title, kind || 'standard', bodyHtml || null,
+            bacsArticles || null, serviceLevel || null, serviceLevelSource || null,
+            features ? JSON.stringify(features) : null);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, { title, bodyHtml, bacsArticles, updatedBy }) {
+    const fields = [], params = [];
+    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+    if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
+    if (bacsArticles !== undefined) { fields.push('bacs_articles = ?'); params.push(bacsArticles); }
+    if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
+    if (!fields.length) return this.getById(id);
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE section_templates SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return this.getById(id);
+  },
+  bumpVersion(id) {
+    db.prepare('UPDATE section_templates SET current_version = current_version + 1 WHERE id = ?').run(id);
+  },
+  // Propage le nouveau body_html aux sections AF où l'ancien body_html est encore présent
+  // (= user n'a pas customisé). Retourne le nombre de sections mises à jour.
+  propagateUnchanged(templateId, oldBodyHtml, newBodyHtml, newVersion) {
+    const r = db.prepare(`
+      UPDATE sections
+         SET body_html = ?, section_template_version = ?
+       WHERE section_template_id = ?
+         AND body_html IS ?
+    `).run(newBodyHtml, newVersion, templateId, oldBodyHtml);
+    return r.changes;
+  },
+};
+
 // ── AFs ──────────────────────────────────────────────────────────────
 const afs = {
   list({ status, includeDeleted = false } = {}) {
@@ -933,6 +1026,7 @@ const sections = {
       'parent_id', 'position', 'number', 'title', 'service_level', 'service_level_source',
       'bacs_articles', 'bacs_justification', 'body_html', 'kind', 'included_in_export', 'generic_note',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
+      'section_template_id', 'section_template_version',
       'hyperveez_page_slug',
     ];
     const sets = [], params = [];
@@ -1216,6 +1310,7 @@ module.exports = {
   equipmentTemplates,
   equipmentTemplatePoints,
   equipmentTemplateVersions,
+  sectionTemplates,
   sectionPointOverrides,
   equipmentInstances,
   attachments,

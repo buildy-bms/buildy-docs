@@ -14,6 +14,9 @@ async function main() {
 
   // Seed bibliotheque equipements (idempotent : ne touche pas l'existant)
   require('./lib/seeder').seedLibraryOnBoot();
+  // Lot 30 — Seed bibliotheque "Sections types" + backfill rattachement sections AF existantes
+  require('./lib/seeder').seedSectionTemplatesOnBoot();
+  require('./lib/seeder').backfillSectionTemplateLinks();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {
@@ -72,6 +75,7 @@ async function main() {
   await fastify.register(require('./routes/afs'), { prefix: '/api' });
   await fastify.register(require('./routes/sections'), { prefix: '/api' });
   await fastify.register(require('./routes/equipment-templates'), { prefix: '/api' });
+  await fastify.register(require('./routes/section-templates'), { prefix: '/api' });
   await fastify.register(require('./routes/attachments'), { prefix: '/api' });
   await fastify.register(require('./routes/export'), { prefix: '/api' });
   await fastify.register(require('./routes/inspections'), { prefix: '/api' });

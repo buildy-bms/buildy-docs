@@ -9,7 +9,7 @@ import {
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
   SparklesIcon, StopIcon,
 } from '@heroicons/vue/24/outline'
-import { updateSection } from '@/api'
+import { updateSection, getSectionTemplate } from '@/api'
 import { useAutosave } from '@/composables/useAutosave'
 import { useClaudeDraft } from '@/composables/useClaudeDraft'
 import { useNotification } from '@/composables/useNotification'
@@ -26,11 +26,49 @@ const emit = defineEmits(['updated'])
 
 // Titre éditable
 const title = ref(props.section.title)
+
+// Lot 30 — Bandeau "nouvelle version disponible" si la section type a été
+// éditée depuis la création de la section AF. On ne charge le template que
+// lorsque la section a un section_template_id et une version pinnée.
+const newSectionTplVersion = ref(null)
+async function checkSectionTemplateVersion() {
+  newSectionTplVersion.value = null
+  const tplId = props.section.section_template_id
+  const pinned = props.section.section_template_version
+  if (!tplId || pinned == null) return
+  try {
+    const { data } = await getSectionTemplate(tplId)
+    if (data && data.current_version > pinned) newSectionTplVersion.value = data
+  } catch { /* silencieux */ }
+}
+checkSectionTemplateVersion()
+
+function applySectionTplBody() {
+  if (!newSectionTplVersion.value || !editor.value) return
+  if (!confirm('Remplacer le contenu de cette section par la dernière version canonique ? Tes modifications locales seront perdues.')) return
+  const newBody = newSectionTplVersion.value.body_html || ''
+  editor.value.commands.setContent(newBody)
+  bodyAutosave.schedule(editor.value.getHTML())
+  // Note : l'autosave met à jour body_html ; le bump de version pinnée est fait côté
+  // backend via PATCH /sections/:id (updateSection accepte section_template_version).
+  updateSection(props.section.id, { section_template_version: newSectionTplVersion.value.current_version })
+    .catch(() => {})
+  newSectionTplVersion.value = null
+}
+function dismissSectionTplBanner() {
+  if (!newSectionTplVersion.value) return
+  // Pin local sans changer le contenu : l'utilisateur garde sa version mais ne sera plus alerté.
+  updateSection(props.section.id, { section_template_version: newSectionTplVersion.value.current_version })
+    .catch(() => {})
+  newSectionTplVersion.value = null
+}
+
 watch(() => props.section.id, () => {
   // Quand on change de section, on flush l'ancienne et reset
   flushAll()
   title.value = props.section.title
   if (editor.value) editor.value.commands.setContent(props.section.body_html || '')
+  checkSectionTemplateVersion()
 })
 
 const editor = useEditor({
@@ -223,6 +261,25 @@ function setLink() {
               title="Rédiger avec Claude">
         <SparklesIcon class="w-3.5 h-3.5" /> Claude
       </button>
+    </div>
+
+    <!-- Bandeau "nouvelle version canonique disponible" (Lot 30) -->
+    <div v-if="newSectionTplVersion" class="px-5 pt-4">
+      <div class="flex items-center justify-between gap-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-xs">
+        <span class="text-amber-900">
+          Une nouvelle version canonique de cette section est disponible
+          <span class="font-mono">(v{{ section.section_template_version }} → v{{ newSectionTplVersion.current_version }})</span>.
+          Tes modifications locales seront perdues si tu l'appliques.
+        </span>
+        <span class="flex items-center gap-2 shrink-0">
+          <button @click="dismissSectionTplBanner" class="px-2 py-0.5 text-[11px] text-amber-700 hover:text-amber-900">
+            Garder ma version
+          </button>
+          <button @click="applySectionTplBody" class="px-2 py-0.5 text-[11px] bg-amber-600 text-white hover:bg-amber-700 rounded">
+            Appliquer la nouvelle version
+          </button>
+        </span>
+      </div>
     </div>
 
     <!-- Encart contextualisé "lien avec le décret BACS" (visible, éditable) -->

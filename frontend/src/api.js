@@ -122,4 +122,10 @@ export const deleteTemplatePoint = (templateId, pointId) =>
 export const getTemplateVersions = (id) => api.get(`/equipment-templates/${id}/versions`)
 export const getTemplateAffectedAfs = (id) => api.get(`/equipment-templates/${id}/affected-afs`)
 
+// ── Section templates (Lot 30 — bibliothèque "Sections types") ──
+export const listSectionTemplates = () => api.get('/section-templates')
+export const getSectionTemplate = (id) => api.get(`/section-templates/${id}`)
+export const updateSectionTemplate = (id, data, { propagateUnchanged = false } = {}) =>
+  api.patch(`/section-templates/${id}`, data, { params: propagateUnchanged ? { propagate_unchanged: 1 } : {} })
+
 export default api

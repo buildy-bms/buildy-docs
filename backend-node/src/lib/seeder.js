@@ -11,6 +11,21 @@ const { PLAN_AF } = require('../seeds/plan-af');
 const { HYPERVEEZ_PAGES } = require('../seeds/hyperveez-pages');
 const { formatServiceLevel } = require('../seeds/service-levels');
 
+// Slug d'une section dans la table section_templates :
+// - sections numérotées : on prend le `number` du seed ('1.1', '6.3'…)
+// - section sans number (ex. 'zones' top-level) : on prend le kind
+function sectionTemplateSlug(node) {
+  return node.number || node.kind;
+}
+
+// Construit le body_html canonique initial pour un node du plan-af.
+// On garde le HTML wrappé italique gris pour reproduire l'ancien comportement,
+// mais cette valeur est stockée en DB et donc directement éditable depuis l'UI.
+function defaultCanonicalBody(node) {
+  if (!node.body_placeholder) return null;
+  return `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>`;
+}
+
 /**
  * Boot : cree les templates equipement de la bibliotheque s'ils n'existent
  * pas. Pour les templates deja crees mais "vides" (sans description ou sans
@@ -113,9 +128,47 @@ function seedLibraryOnBoot() {
 }
 
 /**
+ * Lot 30 — Boot : peuple section_templates depuis PLAN_AF pour les nodes
+ * kind='standard' (et 'zones'). Idempotent : insère uniquement les slugs
+ * absents de la table. Les éditions ultérieures vivent en DB.
+ */
+function seedSectionTemplatesOnBoot() {
+  let createdCount = 0;
+
+  function walk(node) {
+    if (node.kind === 'standard' || node.kind === 'zones') {
+      const slug = sectionTemplateSlug(node);
+      if (slug && !db.sectionTemplates.getBySlug(slug)) {
+        const serviceLevel = node.features
+          ? formatServiceLevel(node.features)
+          : (node.service_level || null);
+        const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
+        db.sectionTemplates.create({
+          slug,
+          number: node.number || null,
+          title: node.title,
+          kind: node.kind,
+          bodyHtml: defaultCanonicalBody(node),
+          bacsArticles: node.bacs_articles || null,
+          serviceLevel,
+          serviceLevelSource,
+          features: node.features || null,
+        });
+        createdCount++;
+      }
+    }
+    if (Array.isArray(node.children)) for (const c of node.children) walk(c);
+  }
+
+  for (const top of PLAN_AF) walk(top);
+  if (createdCount > 0) log.info(`Seed section templates: ${createdCount} cree(s)`);
+}
+
+/**
  * Pour une AF nouvellement creee, applique le PLAN_AF et insère toutes les
  * sections. Pour les sections kind='equipment', associe le template de la
- * bibliotheque s'il existe (slug → template_id).
+ * bibliotheque s'il existe (slug → template_id). Pour kind='standard'/'zones',
+ * lookup section_templates pour récupérer le contenu canonique courant + version.
  */
 function seedAfStructure(afId) {
   let total = 0;
@@ -138,6 +191,22 @@ function seedAfStructure(afId) {
       }
     }
 
+    // Lot 30 — Resolution du template "section" pour les sections standard / zones
+    let sectionTemplateId = null;
+    let sectionTemplateVersion = null;
+    let bodyHtml = node.body_placeholder ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>` : null;
+    let bacsArticles = node.bacs_articles || null;
+    if (node.kind === 'standard' || node.kind === 'zones') {
+      const slug = sectionTemplateSlug(node);
+      const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
+      if (tpl) {
+        sectionTemplateId = tpl.id;
+        sectionTemplateVersion = tpl.current_version;
+        bodyHtml = tpl.body_html;       // contenu canonique courant
+        bacsArticles = tpl.bacs_articles || bacsArticles;
+      }
+    }
+
     const section = db.sections.create({
       afId,
       parentId,
@@ -146,13 +215,18 @@ function seedAfStructure(afId) {
       title: node.title,
       serviceLevel,
       serviceLevelSource,
-      bacsArticles: node.bacs_articles || null,
-      bodyHtml: node.body_placeholder ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>` : null,
+      bacsArticles,
+      bodyHtml,
       kind: node.kind,
       equipmentTemplateId,
       equipmentTemplateVersion,
       genericNote: node.generic_note || 0,
     });
+    // Set section_template_id / version après création (champs hors signature publique)
+    if (sectionTemplateId) {
+      db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+        .run(sectionTemplateId, sectionTemplateVersion, section.id);
+    }
     total++;
 
     // (Lot 22) Le peuplement dynamique de la section 10.2 depuis HYPERVEEZ_PAGES
@@ -185,4 +259,31 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
-module.exports = { seedLibraryOnBoot, seedAfStructure };
+/**
+ * Lot 30 — Backfill : rattache les sections AF existantes (kind=standard/zones)
+ * au section_template correspondant via le `number` (ou kind pour 'zones').
+ * Ne touche pas le body_html : seulement section_template_id + version=1.
+ * Idempotent : ignore les sections déjà rattachées.
+ */
+function backfillSectionTemplateLinks() {
+  const orphans = db.db.prepare(`
+    SELECT id, number, kind FROM sections
+    WHERE section_template_id IS NULL
+      AND kind IN ('standard', 'zones')
+  `).all();
+  if (!orphans.length) return;
+
+  let linked = 0;
+  for (const s of orphans) {
+    const slug = s.number || s.kind;
+    if (!slug) continue;
+    const tpl = db.sectionTemplates.getBySlug(slug);
+    if (!tpl) continue;
+    db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+      .run(tpl.id, tpl.current_version, s.id);
+    linked++;
+  }
+  if (linked > 0) log.info(`Backfill section templates : ${linked} section(s) rattachee(s)`);
+}
+
+module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, seedAfStructure };

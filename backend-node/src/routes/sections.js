@@ -14,6 +14,7 @@ const updateSectionSchema = z.object({
   body_html: z.string().nullable().optional(),
   included_in_export: z.boolean().optional(),
   fact_check_status: z.enum(['unverified', 'verified', 'backend_only', 'in_progress', 'documented']).optional(),
+  section_template_version: z.number().int().optional(),
 }).strict();
 
 const overrideSchema = z.object({
