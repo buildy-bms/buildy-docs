@@ -25,7 +25,17 @@ const form = ref({
   title: '',
   bacs_articles: '',
   body_html: '',
+  service_level: '',
 })
+
+const SERVICE_LEVEL_OPTIONS = [
+  { value: '',       label: '— (non précisé)' },
+  { value: 'E',      label: 'Essentials' },
+  { value: 'S',      label: 'Smart' },
+  { value: 'P',      label: 'Premium' },
+  { value: 'S/P',    label: 'Smart et Premium' },
+  { value: 'E/S/P',  label: 'Tous niveaux' },
+]
 const propagate = ref(true)
 const submitting = ref(false)
 const showClaudePrompt = ref(false)
@@ -35,6 +45,7 @@ watch(() => props.template, (t) => {
     title: t.title || '',
     bacs_articles: t.bacs_articles || '',
     body_html: t.body_html || '',
+    service_level: t.service_level || '',
   }
 }, { immediate: true })
 
@@ -46,6 +57,7 @@ async function submit() {
       title: form.value.title.trim(),
       bacs_articles: form.value.bacs_articles.trim() || null,
       body_html: form.value.body_html || null,
+      service_level: form.value.service_level || null,
     }
     const { data } = await updateSectionTemplate(props.template.id, payload, { propagateUnchanged: propagate.value })
     if (data.propagated_count > 0) {
@@ -78,12 +90,22 @@ async function submit() {
         </div>
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Articles BACS applicables</label>
-        <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
-               placeholder="Ex : R175-3 §1, §2 ; R175-5-1"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <p class="text-[10px] text-gray-400 mt-1">Format : <code>R175-1 §1, §2 ; R175-3 §4</code>. Laisser vide si non visé.</p>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Articles BACS applicables</label>
+          <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
+                 placeholder="Ex : R175-3 §1, §2 ; R175-5-1"
+                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-[10px] text-gray-400 mt-1">Format : <code>R175-1 §1, §2 ; R175-3 §4</code>. Laisser vide si non visé.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau de contrat requis</label>
+          <select v-model="form.service_level"
+                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option v-for="o in SERVICE_LEVEL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+          <p class="text-[10px] text-gray-400 mt-1">Niveau Buildy minimum nécessaire pour couvrir cette section.</p>
+        </div>
       </div>
 
       <div>

@@ -925,11 +925,12 @@ const sectionTemplates = {
             features ? JSON.stringify(features) : null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { title, bodyHtml, bacsArticles, updatedBy }) {
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy }) {
     const fields = [], params = [];
     if (title !== undefined) { fields.push('title = ?'); params.push(title); }
     if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
     if (bacsArticles !== undefined) { fields.push('bacs_articles = ?'); params.push(bacsArticles); }
+    if (serviceLevel !== undefined) { fields.push('service_level = ?'); params.push(serviceLevel); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
     if (!fields.length) return this.getById(id);
     fields.push('updated_at = CURRENT_TIMESTAMP');

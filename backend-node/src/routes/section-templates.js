@@ -16,6 +16,7 @@ const updateSchema = z.object({
   title: z.string().min(1).optional(),
   body_html: z.string().nullable().optional(),
   bacs_articles: z.string().nullable().optional(),
+  service_level: z.string().nullable().optional(),
 });
 
 async function routes(fastify) {
@@ -49,6 +50,7 @@ async function routes(fastify) {
       title: body.title,
       bodyHtml: body.body_html,
       bacsArticles: body.bacs_articles,
+      serviceLevel: body.service_level,
       updatedBy: userId || null,
     });
 
