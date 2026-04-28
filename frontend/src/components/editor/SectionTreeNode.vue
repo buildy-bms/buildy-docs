@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 
@@ -27,6 +27,14 @@ const canOptOut = computed(() => {
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
 const isSelected = computed(() => props.selectedId === props.node.id)
+
+// Scroll-into-view automatique quand cette ligne devient selectionnee
+const btnRef = ref(null)
+watch(isSelected, async (sel) => {
+  if (!sel) return
+  await nextTick()
+  btnRef.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+}, { immediate: true })
 const Icon = computed(() => props.kindIcon[props.node.kind] || props.kindIcon.standard)
 const empty = computed(() => props.isEmpty(props.node))
 
@@ -70,6 +78,7 @@ const titleHtml = computed(() => {
 <template>
   <div>
     <button
+      ref="btnRef"
       :style="indentStyle"
       :class="[
         'group w-full text-left flex items-center gap-1.5 py-1.5 pr-2 rounded-md transition-colors',
