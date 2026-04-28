@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#eab308',
   description_html: `
 <p><strong>La production d\'électricité sur site est un système technique de bâtiment au sens du décret BACS (R175-1 §4).</strong></p>
-<p>Cette catégorie couvre les installations de production locale d\'électricité — onduleurs photovoltaïques, cogénérations, micro-éolien — supervisées par leur propre régulateur (MPPT, gestion d\'injection, sécurités). La solution Buildy lit la puissance instantanée, l\'énergie produite, l\'état de fonctionnement et les défauts pour permettre l\'analyse de production et l\'autoconsommation.</p>
+<p>Cette catégorie couvre les installations de production locale d\'électricité — onduleurs photovoltaïques, cogénérations, micro-éolien. <strong>La régulation de la production est assurée par l\'équipement lui-même</strong>, via le régulateur natif du fabricant (MPPT, gestion d\'injection, synchronisation réseau, sécurités). La solution Buildy lit la puissance instantanée, l\'énergie produite, l\'état de fonctionnement et les défauts pour permettre l\'analyse de production et l\'autoconsommation.</p>
 `.trim(),
   points: [
     { slug: 'etat.production', label: 'État production', dataType: 'État', direction: 'read', position: 10 },

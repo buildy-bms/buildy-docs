@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#f97316',
   description_html: `
 <p><strong>Un aérotherme est concerné par le décret BACS au titre du système de chauffage (R175-1 §1).</strong></p>
-<p>Un aérotherme est un émetteur de chaleur soufflée, alimenté en eau chaude ou en énergie électrique, équipé d\'un ventilateur intégré. La régulation de température et de vitesse de soufflage est assurée localement par le thermostat ou le régulateur dédié. La solution Buildy supervise l\'aérotherme en lisant son état, sa consigne effective et ses éventuels défauts, et peut transmettre une commande marche/arrêt et une consigne de température.</p>
+<p>Un aérotherme est un émetteur de chaleur soufflée, alimenté en eau chaude ou en énergie électrique, équipé d\'un ventilateur intégré. <strong>La régulation de l\'aérotherme (température et vitesse de soufflage) est assurée par l\'équipement lui-même</strong>, via le thermostat ou le régulateur fourni avec l\'équipement, ou via une régulation portée par l\'intégrateur lors de la mise en service. La solution Buildy supervise l\'aérotherme en lisant son état, sa consigne effective et ses éventuels défauts, et peut transmettre une commande marche/arrêt et une consigne de température.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },

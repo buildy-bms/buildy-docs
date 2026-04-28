@@ -27,7 +27,7 @@ module.exports = {
 <li>Système de chauffage (R175-1 §1) — si la CTA intègre une batterie de chauffe</li>
 <li>Système de climatisation (R175-1 §2) — si la CTA intègre une batterie de froid</li>
 </ul>
-<p>Une centrale de traitement d'air assure le renouvellement, le filtrage et le conditionnement de l'air insufflé dans le bâtiment. Elle dispose de son propre système de régulation embarqué, qui gère de façon autonome l'ensemble de sa logique de fonctionnement. La solution Buildy supervise la CTA en lisant ses états et mesures, et en lui transmettant des commandes et consignes depuis l'application Hyperveez.</p>
+<p>Une centrale de traitement d'air assure le renouvellement, le filtrage et le conditionnement de l'air insufflé dans le bâtiment. <strong>La régulation de la CTA est assurée par l'équipement lui-même</strong>, via le système de régulation embarqué fourni par le fabricant ou via une régulation portée par l'intégrateur lors de la mise en service. Elle gère en autonomie l'ensemble de la logique de fonctionnement bas niveau (séquences chaud/froid, modulation, sécurités). La solution Buildy supervise la CTA en lisant ses états et mesures, et en lui transmettant des commandes et consignes depuis l'application Hyperveez.</p>
 `.trim(),
   points: [
     // ── Donnees lues ──

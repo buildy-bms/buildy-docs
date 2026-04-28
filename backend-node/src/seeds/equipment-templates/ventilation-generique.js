@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#3b82f6',
   description_html: `
 <p><strong>Tout système de ventilation est concerné par le décret BACS (R175-1 §3).</strong></p>
-<p>Cette catégorie couvre les systèmes de ventilation simple ou double flux qui ne sont pas portés par une CTA (ventilateurs d\'extraction, VMC double flux compactes, tourelles de désenfumage utilisées en confort, etc.). La régulation des vitesses de soufflage et d\'extraction est portée par le régulateur intégré. La solution Buildy supervise les états et alarmes, et peut transmettre des commandes de marche/arrêt et de vitesse.</p>
+<p>Cette catégorie couvre les systèmes de ventilation simple ou double flux qui ne sont pas portés par une CTA (ventilateurs d\'extraction, VMC double flux compactes, tourelles de désenfumage utilisées en confort, etc.). <strong>La régulation de ces ventilations est assurée par l\'équipement lui-même</strong>, via le régulateur intégré fourni par le fabricant ou via une régulation portée par l\'intégrateur lors de la mise en service. La solution Buildy supervise les états et alarmes, et peut transmettre des commandes de marche/arrêt et de vitesse.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },

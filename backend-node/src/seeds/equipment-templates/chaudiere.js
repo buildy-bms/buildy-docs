@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#ef4444',
   description_html: `
 <p><strong>Une chaudière (ou tout générateur de chaleur) est concernée par le décret BACS au titre du système de chauffage (R175-1 §1).</strong></p>
-<p>Une chaudière assure la production de chaleur pour le bâtiment, qu\'elle soit alimentée par combustion (gaz, fioul, biomasse), par effet Joule, par pompe à chaleur ou par échange avec un réseau de chaleur. Elle dispose de son propre régulateur embarqué qui pilote en autonomie l\'allumage, la modulation de puissance et la sécurité. La solution Buildy supervise la chaudière en lisant ses états, mesures et alarmes, et en lui transmettant des commandes et consignes depuis l\'application Hyperveez.</p>
+<p>Une chaudière assure la production de chaleur pour le bâtiment, qu\'elle soit alimentée par combustion (gaz, fioul, biomasse), par effet Joule, par pompe à chaleur ou par échange avec un réseau de chaleur. <strong>La régulation de la chaudière est assurée par l\'équipement lui-même</strong> : régulateur natif du fabricant pour les générateurs simples, ou régulation de chaufferie portée par l\'intégrateur pour les installations multi-générateurs (cascades, séquences, courbes de chauffe, gestion ECS). Cette régulation pilote en autonomie l\'allumage, la modulation de puissance et la sécurité. La solution Buildy supervise la chaudière en lisant ses états, mesures et alarmes, et en lui transmettant des commandes et consignes depuis l\'application Hyperveez.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', techName: 'CHAUD_ETAT', nature: 'Booléen', position: 10 },

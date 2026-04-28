@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#fb923c',
   description_html: `
 <p><strong>Un destratificateur est concerné par le décret BACS au titre du système de chauffage (R175-1 §1) lorsqu\'il contribue à la performance globale du chauffage.</strong></p>
-<p>Un destratificateur brasse l\'air en hauteur pour homogénéiser la température et limiter les pertes liées à la stratification thermique, en particulier dans les volumes hauts. Sa logique de fonctionnement (déclenchement sur écart de température haut/bas) est portée par son régulateur intégré. La solution Buildy supervise son état et peut transmettre une commande marche/arrêt et une consigne d\'écart de déclenchement.</p>
+<p>Un destratificateur brasse l\'air en hauteur pour homogénéiser la température et limiter les pertes liées à la stratification thermique, en particulier dans les volumes hauts. <strong>La régulation du destratificateur (déclenchement sur écart de température haut/bas) est assurée par l\'équipement lui-même</strong>, via son régulateur intégré ou via une régulation portée par l\'intégrateur. La solution Buildy supervise son état et peut transmettre une commande marche/arrêt et une consigne d\'écart de déclenchement.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },

@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-lightbulb',
   icon_color: '#eab308',
   description_html: `
-<p>Un système d\'éclairage extérieur est composé de luminaires et de circuits commandés par un contrôleur dédié. Le contrôleur assure les fonctions techniques de bas niveau : commutation des circuits, modulation de l\'intensité, retour d\'état. La solution Buildy supervise les états et la consommation par circuit, et porte l\'ensemble des logiques applicatives de déclenchement (calendrier, horloge astronomique, mesure crépusculaire, scénarios) en transmettant les commandes d\'allumage, d\'extinction et de gradation appropriées.</p>
+<p>Un système d\'éclairage extérieur est composé de luminaires et de circuits commandés par un contrôleur dédié. <strong>La régulation de l\'éclairage extérieur est assurée par l\'équipement lui-même</strong>, via le contrôleur fourni par le fabricant ou via une configuration portée par l\'intégrateur. Le contrôleur assure les fonctions techniques de bas niveau : commutation des circuits, modulation de l\'intensité, retour d\'état. La solution Buildy supervise les états et la consommation par circuit, et porte l\'ensemble des logiques applicatives de déclenchement (calendrier, horloge astronomique, mesure crépusculaire, scénarios) en transmettant les commandes d\'allumage, d\'extinction et de gradation appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10 },

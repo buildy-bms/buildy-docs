@@ -11,7 +11,7 @@ module.exports = {
   icon_value: 'fa-plug',
   icon_color: '#a855f7',
   description_html: `
-<p>Une prise de courant pilotée est un point d\'alimentation électrique commutable à distance par un contrôleur. Le contrôleur assure la commutation physique de l\'alimentation et le retour d\'état. La solution Buildy supervise l\'état et la consommation par prise ou par groupe, et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios, coupure des équipements en veille hors plages d\'occupation) en transmettant les commandes d\'activation et de coupure appropriées.</p>
+<p>Une prise de courant pilotée est un point d\'alimentation électrique commutable à distance par un contrôleur. <strong>La commutation est assurée par l\'équipement lui-même</strong>, via le contrôleur du fabricant. Celui-ci assure la commutation physique de l\'alimentation et le retour d\'état. La solution Buildy supervise l\'état et la consommation par prise ou par groupe, et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios, coupure des équipements en veille hors plages d\'occupation) en transmettant les commandes d\'activation et de coupure appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.alimentation', label: 'État alimentation', dataType: 'État', direction: 'read', position: 10 },

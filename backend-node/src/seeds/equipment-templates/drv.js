@@ -12,7 +12,7 @@ module.exports = {
   icon_color: '#06b6d4',
   description_html: `
 <p><strong>Un système DRV/VRV/VRF est concerné par le décret BACS au titre des systèmes de chauffage (R175-1 §1) et de climatisation (§2).</strong></p>
-<p>Un système à débit de réfrigérant variable assure le conditionnement thermique d\'unités intérieures multiples (chaud et/ou froid) à partir d\'une ou plusieurs unités extérieures. La régulation de la puissance frigorifique, du basculement chaud/froid et de la modulation est portée par le régulateur du fabricant. La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure depuis l\'application Hyperveez.</p>
+<p>Un système à débit de réfrigérant variable assure le conditionnement thermique d\'unités intérieures multiples (chaud et/ou froid) à partir d\'une ou plusieurs unités extérieures. <strong>La régulation du système DRV est assurée par l\'équipement lui-même</strong>, via la régulation native du fabricant qui pilote la puissance frigorifique, le basculement chaud/froid, la modulation et les sécurités de la boucle frigorifique. La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure depuis l\'application Hyperveez.</p>
 `.trim(),
   points: [
     { slug: 'etat.unite_int', label: 'État unité intérieure (marche/arrêt)', dataType: 'État', direction: 'read', position: 10 },

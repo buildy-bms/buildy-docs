@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 15;
+const TARGET_VERSION = 16;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -624,6 +624,25 @@ function runMigrations() {
 
     db.pragma('user_version = 15');
     log.info('Migration 15 appliquee : audit critères AF (programmation horaire = Buildy)');
+  }
+
+  if (current < 16) {
+    // Reset descriptions équipement pour reseed avec mention explicite
+    // "régulation assurée par l'équipement (fabricant ou intégrateur)".
+    const SLUGS = [
+      'cta', 'chaudiere', 'aerotherme', 'destratificateur', 'drv', 'rooftop',
+      'ventilation-generique', 'ecs', 'eclairage-interieur', 'eclairage-exterieur',
+      'prises-pilotees', 'production-electricite', 'volets', 'stores',
+      'process-industriel', 'equipement-generique',
+    ];
+    let cleared = 0;
+    for (const slug of SLUGS) {
+      const r = db.prepare('UPDATE equipment_templates SET description_html = NULL WHERE slug = ?').run(slug);
+      cleared += r.changes;
+    }
+    if (cleared > 0) log.info(`Migration 16 : ${cleared} description_html vidées (régulation équipement = fabricant/intégrateur)`);
+    db.pragma('user_version = 16');
+    log.info('Migration 16 appliquee : reset descriptions pour mention regulation fabricant/integrateur');
   }
 
   if (current > TARGET_VERSION) {
