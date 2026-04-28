@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 25;
+const TARGET_VERSION = 26;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -840,6 +840,87 @@ function runMigrations() {
     log.info('Migration 25 appliquee : section_templates is_functionality + position');
   }
 
+  if (current < 26) {
+    // Lot 33 — section_templates devient la source de verite du plan AF.
+    // Ajout de parent_template_id (hierarchie) + equipment_template_id (lien
+    // vers la bibliotheque equipement). One-shot bootstrap depuis PLAN_AF :
+    // - INSERT les sous-sections equipment manquantes (auparavant non seedees)
+    // - UPDATE parent_template_id, equipment_template_id, position pour TOUS
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN parent_template_id INTEGER REFERENCES section_templates(id) ON DELETE SET NULL'); } catch (e) { /* deja presente */ }
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN equipment_template_id INTEGER REFERENCES equipment_templates(id) ON DELETE SET NULL'); } catch (e) { /* deja presente */ }
+
+    const { PLAN_AF } = require('./seeds/plan-af');
+    const equipmentSlugToId = new Map();
+    for (const row of db.prepare('SELECT id, slug FROM equipment_templates').all()) {
+      equipmentSlugToId.set(row.slug, row.id);
+    }
+
+    function slugOf(node) {
+      // Mirror de sectionTemplateSlug : number, sinon kind, sinon equipment_template_slug
+      // pour les noeuds equipment sans number.
+      return node.number || node.kind;
+    }
+
+    const insertStmt = db.prepare(`
+      INSERT OR IGNORE INTO section_templates
+        (slug, number, title, kind, body_html, bacs_articles, service_level, current_version)
+      VALUES (?, ?, ?, ?, NULL, ?, NULL, 1)
+    `);
+    const updateStmt = db.prepare(`
+      UPDATE section_templates
+         SET parent_template_id = ?, equipment_template_id = ?, position = ?
+       WHERE id = ?
+    `);
+
+    let positionPerParent = new Map(); // parentId|0 -> next position
+    function nextPos(parentId) {
+      const k = parentId || 0;
+      const cur = (positionPerParent.get(k) || 0) + 10;
+      positionPerParent.set(k, cur);
+      return cur;
+    }
+
+    const tx = db.transaction(() => {
+      // Refresh slug map dans la transaction (peut grossir au fur et a mesure
+      // qu'on insere des nouveaux rows equipment).
+      const slugToId = new Map();
+      function refreshSlugMap() {
+        for (const row of db.prepare('SELECT id, slug FROM section_templates').all()) {
+          slugToId.set(row.slug, row.id);
+        }
+      }
+      refreshSlugMap();
+
+      function walk(node, parentId) {
+        const slug = slugOf(node);
+        let id = slugToId.get(slug);
+        // INSERT manquant (notamment les noeuds kind='equipment' qui
+        // n'etaient pas seedes auparavant).
+        if (!id) {
+          insertStmt.run(slug, node.number || null, node.title, node.kind || 'standard',
+            node.bacs_articles || null);
+          refreshSlugMap();
+          id = slugToId.get(slug);
+        }
+        if (id) {
+          const equipId = node.equipment_template_slug
+            ? equipmentSlugToId.get(node.equipment_template_slug) || null
+            : null;
+          updateStmt.run(parentId || null, equipId, nextPos(parentId), id);
+        }
+        if (Array.isArray(node.children)) {
+          for (const c of node.children) walk(c, id || parentId);
+        }
+      }
+      for (const top of PLAN_AF) walk(top, null);
+    });
+    tx();
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_section_templates_parent ON section_templates(parent_template_id, position)');
+    db.pragma('user_version = 26');
+    log.info('Migration 26 appliquee : section_templates parent_template_id + equipment_template_id (bootstrap depuis PLAN_AF)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1044,25 +1125,38 @@ const sectionTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality }) {
-    const maxRow = db.prepare('SELECT COALESCE(MAX(position), 0) AS m FROM section_templates').get();
+  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality, parentTemplateId, equipmentTemplateId }) {
+    // Position : derniere de la fratrie (parent_template_id donne).
+    const maxRow = db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM section_templates WHERE parent_template_id IS ?'
+    ).get(parentTemplateId || null);
     const position = (maxRow?.m || 0) + 10;
     const result = db.prepare(`
       INSERT INTO section_templates
-        (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source, features, is_functionality, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source,
+         features, is_functionality, position, parent_template_id, equipment_template_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, number || null, title, kind || 'standard', bodyHtml || null,
             bacsArticles || null, serviceLevel || null, serviceLevelSource || null,
-            features ? JSON.stringify(features) : null, isFunctionality ? 1 : 0, position);
+            features ? JSON.stringify(features) : null, isFunctionality ? 1 : 0, position,
+            parentTemplateId || null, equipmentTemplateId || null);
     return this.getById(result.lastInsertRowid);
   },
   delete(id) {
     db.prepare('DELETE FROM section_templates WHERE id = ?').run(id);
   },
-  reorder(orderedIds) {
-    const stmt = db.prepare('UPDATE section_templates SET position = ? WHERE id = ?');
+  // Reorder dans une fratrie. Si parentTemplateId est passe, met aussi a jour
+  // le parent (cas du re-parenting via drag-drop). Sinon, garde le parent
+  // courant et ne change que la position.
+  reorder({ parentTemplateId = undefined, ids }) {
+    const stmt = parentTemplateId === undefined
+      ? db.prepare('UPDATE section_templates SET position = ? WHERE id = ?')
+      : db.prepare('UPDATE section_templates SET position = ?, parent_template_id = ? WHERE id = ?');
     db.transaction(() => {
-      orderedIds.forEach((id, i) => stmt.run((i + 1) * 10, id));
+      ids.forEach((id, i) => {
+        if (parentTemplateId === undefined) stmt.run((i + 1) * 10, id);
+        else stmt.run((i + 1) * 10, parentTemplateId || null, id);
+      });
     })();
   },
   countAffectedAfs(id) {
@@ -1073,12 +1167,28 @@ const sectionTemplates = {
     `).get(id);
     return r?.c || 0;
   },
-  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy }) {
+  // Garde-fou anti-cycle : verifie qu'on ne fait pas descendre un parent dans
+  // un de ses descendants. Retourne true si setting parentId sur targetId
+  // creerait un cycle.
+  wouldCreateCycle(targetId, parentId) {
+    if (!parentId) return false;
+    if (parentId === targetId) return true;
+    let cur = db.prepare('SELECT parent_template_id FROM section_templates WHERE id = ?').get(parentId);
+    while (cur && cur.parent_template_id) {
+      if (cur.parent_template_id === targetId) return true;
+      cur = db.prepare('SELECT parent_template_id FROM section_templates WHERE id = ?').get(cur.parent_template_id);
+    }
+    return false;
+  },
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId }) {
     const fields = [], params = [];
     if (title !== undefined) { fields.push('title = ?'); params.push(title); }
     if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
     if (bacsArticles !== undefined) { fields.push('bacs_articles = ?'); params.push(bacsArticles); }
     if (serviceLevel !== undefined) { fields.push('service_level = ?'); params.push(serviceLevel); }
+    if (kind !== undefined) { fields.push('kind = ?'); params.push(kind); }
+    if (parentTemplateId !== undefined) { fields.push('parent_template_id = ?'); params.push(parentTemplateId); }
+    if (equipmentTemplateId !== undefined) { fields.push('equipment_template_id = ?'); params.push(equipmentTemplateId); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
     if (!fields.length) return this.getById(id);
     fields.push('updated_at = CURRENT_TIMESTAMP');

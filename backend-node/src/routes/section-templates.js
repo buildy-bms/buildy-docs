@@ -18,20 +18,27 @@ const updateSchema = z.object({
   body_html: z.string().nullable().optional(),
   bacs_articles: z.string().nullable().optional(),
   service_level: z.string().nullable().optional(),
+  kind: z.enum(['standard', 'equipment', 'synthesis', 'zones', 'hyperveez_page']).optional(),
+  parent_template_id: z.number().int().positive().nullable().optional(),
+  equipment_template_id: z.number().int().positive().nullable().optional(),
 });
 
 const createSchema = z.object({
   title: z.string().min(1, 'Titre requis'),
   slug: z.string().optional(),
-  kind: z.enum(['standard', 'equipment', 'synthesis', 'hyperveez_page']).optional(),
+  kind: z.enum(['standard', 'equipment', 'synthesis', 'zones', 'hyperveez_page']).optional(),
   body_html: z.string().nullable().optional(),
   bacs_articles: z.string().nullable().optional(),
   service_level: z.string().nullable().optional(),
   is_functionality: z.boolean().optional(),
+  parent_template_id: z.number().int().positive().nullable().optional(),
+  equipment_template_id: z.number().int().positive().nullable().optional(),
 });
 
 const reorderSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1),
+  // Optionnel : si fourni, met aussi a jour parent_template_id (re-parenting drag-drop)
+  parent_template_id: z.number().int().positive().nullable().optional(),
 });
 
 function slugify(s) {
@@ -44,12 +51,37 @@ function slugify(s) {
     .slice(0, 60) || 'section';
 }
 
+// Construit l'arbre a partir de la liste plate (parent_template_id + position).
+function buildTree(rows) {
+  const byParent = new Map();
+  for (const r of rows) {
+    const k = r.parent_template_id || 0;
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k).push(r);
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  }
+  function build(parentId) {
+    return (byParent.get(parentId || 0) || []).map(r => ({
+      ...r,
+      children: build(r.id),
+    }));
+  }
+  return build(0);
+}
+
 async function routes(fastify) {
   fastify.get('/section-templates', async (request) => {
     const kind = String(request.query?.kind || '').toLowerCase();
-    return db.sectionTemplates.list(
-      kind === 'functionality' || kind === 'standard' ? { kind } : {}
-    );
+    const asTree = String(request.query?.tree || '') === '1';
+    const filter = (kind === 'functionality' || kind === 'standard') ? { kind } : {};
+    if (asTree) {
+      // En mode tree, on retourne TOUS les rows (sans filter is_functionality)
+      // pour que la structure parent/enfant reste coherente.
+      return buildTree(db.sectionTemplates.list({}));
+    }
+    return db.sectionTemplates.list(filter);
   });
 
   fastify.get('/section-templates/:id', async (request, reply) => {
@@ -80,6 +112,8 @@ async function routes(fastify) {
       bacsArticles: body.bacs_articles || null,
       serviceLevel: body.service_level || null,
       isFunctionality: body.is_functionality === true,
+      parentTemplateId: body.parent_template_id ?? null,
+      equipmentTemplateId: body.equipment_template_id ?? null,
     });
 
     db.auditLog.add({
@@ -115,11 +149,23 @@ async function routes(fastify) {
     try { body = reorderSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
-    db.sectionTemplates.reorder(body.ids);
+    // Si re-parenting demande, garde-fou anti-cycle pour chaque id.
+    if (body.parent_template_id != null) {
+      for (const id of body.ids) {
+        if (db.sectionTemplates.wouldCreateCycle(id, body.parent_template_id)) {
+          return reply.code(409).send({ detail: 'Cycle détecté : impossible de placer une section sous l\'un de ses descendants.' });
+        }
+      }
+    }
+
+    db.sectionTemplates.reorder({
+      parentTemplateId: body.parent_template_id !== undefined ? body.parent_template_id : undefined,
+      ids: body.ids,
+    });
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.reorder',
-      payload: { count: body.ids.length },
+      payload: { count: body.ids.length, parent_template_id: body.parent_template_id ?? null },
     });
     return { ok: true, count: body.ids.length };
   });
@@ -132,6 +178,13 @@ async function routes(fastify) {
     let body;
     try { body = updateSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+
+    // Garde-fou anti-cycle si on change parent_template_id.
+    if (body.parent_template_id !== undefined && body.parent_template_id !== null) {
+      if (db.sectionTemplates.wouldCreateCycle(id, body.parent_template_id)) {
+        return reply.code(409).send({ detail: 'Cycle détecté : impossible de placer une section sous l\'un de ses descendants.' });
+      }
+    }
 
     const propagate = String(request.query.propagate_unchanged || '') === '1';
     const userId = request.authUser?.id;
@@ -151,6 +204,9 @@ async function routes(fastify) {
       title: body.title,
       bodyHtml: body.body_html,
       bacsArticles: body.bacs_articles,
+      kind: body.kind,
+      parentTemplateId: body.parent_template_id,
+      equipmentTemplateId: body.equipment_template_id,
       serviceLevel: body.service_level,
       updatedBy: userId || null,
     });

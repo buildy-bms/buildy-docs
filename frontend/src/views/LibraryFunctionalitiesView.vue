@@ -59,7 +59,7 @@ function setupSortable() {
       const [moved] = items.value.splice(evt.oldIndex, 1)
       items.value.splice(evt.newIndex, 0, moved)
       try {
-        await reorderSectionTemplates(items.value.map(t => t.id))
+        await reorderSectionTemplates({ ids: items.value.map(t => t.id) })
       } catch {
         notifyError('Échec de la réorganisation')
         refresh()

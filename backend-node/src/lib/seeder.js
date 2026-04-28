@@ -144,33 +144,51 @@ const FUNCTIONALITY_NUMBERS = new Set([
 function seedSectionTemplatesOnBoot() {
   let createdCount = 0;
 
-  function walk(node) {
-    if (node.kind === 'standard' || node.kind === 'zones') {
-      const slug = sectionTemplateSlug(node);
-      if (slug && !db.sectionTemplates.getBySlug(slug)) {
-        const serviceLevel = node.features
-          ? formatServiceLevel(node.features)
-          : (node.service_level || null);
-        const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
-        db.sectionTemplates.create({
-          slug,
-          number: node.number || null,
-          title: node.title,
-          kind: node.kind,
-          bodyHtml: defaultCanonicalBody(node),
-          bacsArticles: node.bacs_articles || null,
-          serviceLevel,
-          serviceLevelSource,
-          features: node.features || null,
-          isFunctionality: node.number ? FUNCTIONALITY_NUMBERS.has(node.number) : false,
-        });
-        createdCount++;
-      }
-    }
-    if (Array.isArray(node.children)) for (const c of node.children) walk(c);
+  // Resolve les equipment_templates par slug (pour set equipment_template_id).
+  const equipmentSlugToId = new Map();
+  for (const eq of db.db.prepare('SELECT id, slug FROM equipment_templates').all()) {
+    equipmentSlugToId.set(eq.slug, eq.id);
   }
 
-  for (const top of PLAN_AF) walk(top);
+  // Walk recursif. Pour fresh DB, inserts standard + zones + equipment + synthesis,
+  // avec parent_template_id resolu via le slug du parent (deja insere).
+  function walk(node, parentTemplateId) {
+    const slug = sectionTemplateSlug(node);
+    let id = null;
+    const existing = slug ? db.sectionTemplates.getBySlug(slug) : null;
+    if (existing) {
+      id = existing.id;
+    } else if (slug) {
+      const serviceLevel = node.features
+        ? formatServiceLevel(node.features)
+        : (node.service_level || null);
+      const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
+      const equipmentTemplateId = node.equipment_template_slug
+        ? equipmentSlugToId.get(node.equipment_template_slug) || null
+        : null;
+      const created = db.sectionTemplates.create({
+        slug,
+        number: node.number || null,
+        title: node.title,
+        kind: node.kind,
+        bodyHtml: defaultCanonicalBody(node),
+        bacsArticles: node.bacs_articles || null,
+        serviceLevel,
+        serviceLevelSource,
+        features: node.features || null,
+        isFunctionality: node.number ? FUNCTIONALITY_NUMBERS.has(node.number) : false,
+        parentTemplateId: parentTemplateId || null,
+        equipmentTemplateId,
+      });
+      id = created.id;
+      createdCount++;
+    }
+    if (Array.isArray(node.children)) {
+      for (const c of node.children) walk(c, id || parentTemplateId);
+    }
+  }
+
+  for (const top of PLAN_AF) walk(top, null);
   if (createdCount > 0) log.info(`Seed section templates: ${createdCount} cree(s)`);
 }
 
@@ -181,84 +199,93 @@ function seedSectionTemplatesOnBoot() {
  * lookup section_templates pour récupérer le contenu canonique courant + version.
  */
 function seedAfStructure(afId) {
+  // Lot 33 — Ne lit plus PLAN_AF mais la table section_templates qui est
+  // devenue la source de verite (parent_template_id + equipment_template_id +
+  // position). La numerotation est calculee a la volee depuis la position
+  // dans la fratrie (1, 1.1, 1.2, 2…).
+  const allTemplates = db.sectionTemplates.list({});
+  const byParentTpl = new Map();
+  for (const t of allTemplates) {
+    const k = t.parent_template_id || 0;
+    if (!byParentTpl.has(k)) byParentTpl.set(k, []);
+    byParentTpl.get(k).push(t);
+  }
+  for (const arr of byParentTpl.values()) {
+    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  }
+
   let total = 0;
 
-  function insertNode(node, parentId) {
-    // Resolution du niveau de service depuis features (si declare)
-    const serviceLevel = node.features
-      ? formatServiceLevel(node.features)
-      : (node.service_level || null);
-    const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
+  function insertNode(tpl, parentSectionId, numberPrefix, indexInSiblings) {
+    const computedNumber = tpl.kind === 'zones'
+      ? null // les zones (preliminaire) n'ont pas de numero
+      : (numberPrefix ? `${numberPrefix}.${indexInSiblings + 1}` : String(indexInSiblings + 1));
 
-    // Resolution du template equipement (si declare)
+    // Resolution du template equipement (depuis section_templates.equipment_template_id)
     let equipmentTemplateId = null;
     let equipmentTemplateVersion = null;
     let equipmentTemplateBacs = null;
-    if (node.kind === 'equipment' && node.equipment_template_slug) {
-      const tpl = db.equipmentTemplates.getBySlug(node.equipment_template_slug);
-      if (tpl) {
-        equipmentTemplateId = tpl.id;
-        equipmentTemplateVersion = tpl.current_version;
-        equipmentTemplateBacs = tpl.bacs_articles;
-      }
-    }
-
-    // Lot 30 — Resolution du template "section" pour les sections standard / zones
-    let sectionTemplateId = null;
-    let sectionTemplateVersion = null;
-    let bodyHtml = node.body_placeholder ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>` : null;
-    let bacsArticles = node.bacs_articles || equipmentTemplateBacs || null;
-    if (node.kind === 'standard' || node.kind === 'zones') {
-      const slug = sectionTemplateSlug(node);
-      const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
-      if (tpl) {
-        sectionTemplateId = tpl.id;
-        sectionTemplateVersion = tpl.current_version;
-        bodyHtml = tpl.body_html;       // contenu canonique courant
-        bacsArticles = tpl.bacs_articles || bacsArticles;
+    if (tpl.kind === 'equipment' && tpl.equipment_template_id) {
+      const eq = db.equipmentTemplates.getById(tpl.equipment_template_id);
+      if (eq) {
+        equipmentTemplateId = eq.id;
+        equipmentTemplateVersion = eq.current_version;
+        equipmentTemplateBacs = eq.bacs_articles;
       }
     }
 
     const section = db.sections.create({
       afId,
-      parentId,
-      position: total * 10, // pas de 10 pour permettre l'insertion future
-      number: node.number,
-      title: node.title,
-      serviceLevel,
-      serviceLevelSource,
-      bacsArticles,
-      bodyHtml,
-      kind: node.kind,
+      parentId: parentSectionId,
+      position: total * 10,
+      number: computedNumber,
+      title: tpl.title,
+      serviceLevel: tpl.service_level || null,
+      serviceLevelSource: tpl.service_level_source || null,
+      bacsArticles: tpl.bacs_articles || equipmentTemplateBacs || null,
+      bodyHtml: tpl.body_html,
+      kind: tpl.kind,
       equipmentTemplateId,
       equipmentTemplateVersion,
-      genericNote: node.generic_note || 0,
+      genericNote: 0,
     });
-    // Set section_template_id / version après création (champs hors signature publique)
-    if (sectionTemplateId) {
-      db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
-        .run(sectionTemplateId, sectionTemplateVersion, section.id);
-    }
+    // Lien section_template_id / version (toujours, pour permettre la propagation)
+    db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+      .run(tpl.id, tpl.current_version, section.id);
     total++;
 
-    // (Lot 22) Le peuplement dynamique de la section 10.2 depuis HYPERVEEZ_PAGES
-    // a été retiré ; le chapitre 10 entier n'existe plus dans le plan AF.
-
-    // Recursion sur les enfants statiques
-    if (Array.isArray(node.children)) {
-      for (const child of node.children) {
-        insertNode(child, section.id);
-      }
-    }
+    const children = byParentTpl.get(tpl.id) || [];
+    children.forEach((child, i) => {
+      // Pour les enfants directs des "zones" (top-level sans number), le prefix
+      // est "" (les zones n'ont pas de descendants dans le plan actuel ; safe).
+      const childPrefix = computedNumber || '';
+      insertNode(child, section.id, childPrefix, i);
+    });
   }
 
-  // Wrap tout dans une transaction pour garantir atomicite
+  // Walk les top-level (parent_template_id = 0/null), ordonnes par position.
   const tx = db.db.transaction(() => {
-    for (const top of PLAN_AF) insertNode(top, null);
+    const tops = byParentTpl.get(0) || [];
+    tops.forEach((top, i) => {
+      // Numerotation top-level : on saute les "zones" (kind='zones' = preliminaire)
+      // pour que "Preambule" reste "1" comme aujourd'hui.
+      // Approche : compte uniquement les top-level numerotes pour le compteur.
+    });
+    // Compteur dedie aux top-level numerotes.
+    let topCounter = 0;
+    tops.forEach(top => {
+      if (top.kind === 'zones') {
+        // zones inserees mais sans number et sans incremenenter le compteur
+        insertNode(top, null, '', 0); // index ignore (zones n'a pas de number)
+      } else {
+        insertNode(top, null, '', topCounter);
+        topCounter++;
+      }
+    });
   });
   tx();
 
-  log.info(`Seed AF #${afId} : ${total} sections inserted`);
+  log.info(`Seed AF #${afId} : ${total} sections inserted (depuis section_templates)`);
   return total;
 }
 
