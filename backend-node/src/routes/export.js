@@ -576,53 +576,65 @@ async function routes(fastify) {
     // ── Synthèse fonctionnalités ──
     // Toutes les sections kind=standard (hors chapitre 2 perimetre equipements et 12 synthese)
     const FUNCTIONALITY_NUMBERS = ['1.5', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3', '5.1', '5.2', '5.3', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '7', '8', '9', '11.1', '11.2', '11.3'];
-    function levelRank(lvl) {
-      if (!lvl) return null;
-      const v = String(lvl).toUpperCase();
-      if (v === 'P') return 2;
-      if (v === 'S' || v.includes('S')) return 1;
-      return 0;
-    }
+    // Niveau MINIMUM requis (libre de S/P → S = Smart est le min)
     function minRequiredLevel(lvl) {
-      // 'S/P' → S (le minimum requis)
-      if (!lvl) return null;
+      if (!lvl) return 'E'; // pas de service_level défini = compatible Essentials (toujours vendu)
       const v = String(lvl).toUpperCase();
-      if (v === 'E' || v.includes('E')) return 'E';
-      if (v === 'S' || v.includes('S')) return 'S';
+      if (v.includes('E')) return 'E';
+      if (v.includes('S')) return 'S';
       if (v === 'P') return 'P';
-      return null;
+      return 'E';
     }
-    const contractRank = contractLevel ? { E: 0, S: 1, P: 2 }[contractLevel] : null;
+    function levelToLabel(lvl) {
+      if (lvl === 'P') return 'Premium';
+      if (lvl === 'S') return 'Smart';
+      if (lvl === 'E') return 'Essentials';
+      return '—';
+    }
+    const RANK = { E: 0, S: 1, P: 2 };
+    const contractRank = contractLevel ? RANK[contractLevel] : null;
+
     const functionalities = FUNCTIONALITY_NUMBERS.map(num => {
       const sec = allSections.find(s => s.number === num);
       if (!sec) return null;
       const requiredMin = minRequiredLevel(sec.service_level);
-      const requiredRank = requiredMin ? { E: 0, S: 1, P: 2 }[requiredMin] : null;
+      const requiredRank = RANK[requiredMin];
       const isOptedOut = sec.opted_out_by_moa === 1;
       const isExcluded = !sec.included_in_export;
-      const contractTooLow = contractRank !== null && requiredRank !== null && requiredRank > contractRank;
+
+      // Logique d'inclusion :
+      // - Si exclue de l'export → ✗ "Section retirée de l'AF"
+      // - Si écartée par la MOA → ✗ "Écartée par la MOA"
+      // - Si AF a un niveau cible → comparer requis vs contracté
+      // - Si AF n'a PAS de niveau cible → considerer Essentials (toujours vendu) comme baseline
       let included = true;
       let reason = null;
-      if (isExcluded) { included = false; reason = 'Section exclue de l\'export'; }
-      else if (isOptedOut) {
+      if (isExcluded) {
         included = false;
-        const need = requiredMin === 'P' ? 'Premium' : (requiredMin === 'S' ? 'Smart' : 'Smart ou Premium');
-        reason = `Écartée par la MOA — contrat ${need} requis pour activer`;
-      }
-      else if (contractTooLow) {
-        const need = requiredMin === 'P' ? 'Premium' : 'Smart';
-        const cur = contractLevel === 'E' ? 'Essentials' : (contractLevel === 'S' ? 'Smart' : 'Premium');
+        reason = 'Section retirée de l\'AF par l\'auteur';
+      } else if (isOptedOut) {
         included = false;
-        reason = `Niveau de contrat actuel insuffisant (${cur} < ${need})`;
+        reason = `Écartée par la MOA — nécessite un contrat ${levelToLabel(requiredMin)} pour être activée`;
+      } else if (contractLevel) {
+        // Niveau cible défini : comparaison stricte
+        if (requiredRank > contractRank) {
+          included = false;
+          reason = `Le contrat ${levelToLabel(contractLevel)} actuellement visé ne couvre pas cette fonctionnalité (requiert ${levelToLabel(requiredMin)})`;
+        }
+      } else {
+        // Pas de niveau cible défini → seul Essentials est garanti à la livraison
+        if (requiredMin !== 'E') {
+          included = false;
+          reason = `Aucun niveau de contrat n'est encore fixé pour cette AF — seules les fonctionnalités Essentials sont garanties à la livraison ; un contrat ${levelToLabel(requiredMin)} devra être conclu pour activer celle-ci`;
+        }
       }
+
       return {
         number: sec.number,
         title: sec.title,
-        serviceLevel: sec.service_level || null,
-        serviceLevelLabel: sec.service_level
-          ? (sec.service_level === 'P' ? 'Premium' : sec.service_level === 'S' ? 'Smart' : sec.service_level === 'E' ? 'Essentials' : sec.service_level)
-          : 'Tous niveaux',
-        levelClass: sec.service_level ? sec.service_level.replace(/[^A-Z]/g, '') : '',
+        requiredMin,
+        requiredMinLabel: levelToLabel(requiredMin),
+        levelClass: requiredMin,
         included,
         reason,
       };
@@ -639,17 +651,25 @@ async function routes(fastify) {
       let status, statusClass;
       if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
       else if (isExcluded) { status = 'Exclue'; statusClass = 'excluded'; }
-      else if (e.instances === 0) { status = 'Non instanciée'; statusClass = 'not-instanced'; }
+      else if (e.instances === 0) { status = 'Aucune instance'; statusClass = 'no-instance'; }
       else { status = 'Couverte'; statusClass = 'covered'; }
+
+      const bacsRequired = !!(sec.bacs_articles && sec.bacs_articles.trim());
+      // Alerte rouge pale : système exigé par BACS, instancié, mais exclu de l'AF
+      // (incoherence reglementaire potentielle a remonter au lecteur).
+      const bacsAlert = bacsRequired && e.instances > 0 && (isExcluded || isOptedOut);
+
       return {
         number: sec.number,
         title: sec.title,
+        bacsRequired,
         bacs: sec.bacs_articles || null,
         isMetering: isMeteringSystem(sec),
         instances: e.instances,
         totalReads,
         totalWrites,
         status, statusClass,
+        bacsAlert,
       };
     });
     const systemsTotals = systemsSummary.reduce((a, s) => ({
@@ -727,7 +747,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         pdfOptions: { landscape: true, margin: { top: '14mm', bottom: '12mm', left: '14mm', right: '14mm' } },
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: false, opacity: 0.025 },
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
       });
     } catch (err) {
       log.error(`PDF synthesis render failed: ${err.message}`);

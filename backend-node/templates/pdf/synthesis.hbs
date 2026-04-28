@@ -7,50 +7,103 @@
 </head>
 <body>
 
-{{!-- ═══════════════════ PAGE 1 — Bilan projet (tableau compact) ═══════════════════ --}}
+{{!-- ═══════════════════ PAGE 1 — Couverture (style coherent avec AF + points-list) ═══════════════════ --}}
+<section class="cover">
+  <div class="cover-top">
+    <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <p class="cover-doc-type">Synthèse de l'Analyse Fonctionnelle</p>
+    <h1 class="cover-title">{{af.project_name}}</h1>
+    <p class="cover-client">{{af.client_name}}</p>
+    {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
+  </div>
+
+  {{!-- KPI cards en grand sur la couverture --}}
+  <div class="cover-kpi-grid">
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{kpis.systemsCovered}}<span class="cover-kpi-sub">/{{kpis.systemsCatalog}}</span></p>
+      <p class="cover-kpi-label">Systèmes supervisés</p>
+    </div>
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{kpis.instancesTotal}}</p>
+      <p class="cover-kpi-label">Instances déclarées</p>
+    </div>
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{kpis.pointsTotal}}</p>
+      <p class="cover-kpi-label">Points attendus</p>
+    </div>
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{functionalitiesIncluded}}<span class="cover-kpi-sub">/{{functionalities.length}}</span></p>
+      <p class="cover-kpi-label">Fonctionnalités intégrées</p>
+    </div>
+  </div>
+
+  {{!-- Bandeau niveau de contrat --}}
+  <div class="cover-level-band cover-level-band-{{kpis.verdict.kind}}">
+    <div class="cover-level-band-row">
+      <div class="cover-level-band-item">
+        <p class="cover-level-band-label">Niveau Buildy requis</p>
+        <p class="cover-level-band-value">{{#if kpis.requiredLevelLabel}}{{kpis.requiredLevelLabel}}{{else}}—{{/if}}</p>
+      </div>
+      <div class="cover-level-band-arrow">vs</div>
+      <div class="cover-level-band-item">
+        <p class="cover-level-band-label">Niveau actuellement visé</p>
+        <p class="cover-level-band-value">{{#if kpis.contractLevelLabel}}{{kpis.contractLevelLabel}}{{else}}<em>à définir</em>{{/if}}</p>
+      </div>
+    </div>
+    <p class="cover-verdict-text">{{kpis.verdict.text}}</p>
+  </div>
+
+  {{!-- Meta projet --}}
+  <div class="cover-meta">
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Version</span>
+      <span class="cover-meta-value"><span class="cover-version-tag">{{version}}</span></span>
+      {{#if motif}}<span class="cover-motif">{{motif}}</span>{{/if}}
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Date d'export</span>
+      <span class="cover-meta-value">{{exportDate}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Auteur</span>
+      <span class="cover-meta-value">{{authorName}}</span>
+    </div>
+  </div>
+
+  <p class="cover-legal">
+    © Buildy SAS — Document confidentiel, propriété de Buildy SAS et de son client.
+    Toute reproduction, transmission ou diffusion à des tiers, même partielle, est interdite sans autorisation écrite préalable.
+  </p>
+</section>
+
+{{!-- ═══════════════════ PAGE 1bis — Détails projet (tabulaire) ═══════════════════ --}}
+{{#if optedOutList.length}}
 <section class="page">
   <header class="page-header">
     <div class="page-header-left">
       <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
       <div>
-        <p class="page-doctype">Synthèse de l'analyse fonctionnelle</p>
-        <h1 class="page-title">{{af.client_name}} — {{af.project_name}}</h1>
-        {{#if af.site_address}}<p class="page-subtitle">{{af.site_address}}</p>{{/if}}
+        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
+        <h1 class="page-title">Fonctionnalités écartées par la maîtrise d'ouvrage</h1>
       </div>
     </div>
     <div class="page-header-right">
       <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-      <p class="page-meta"><span class="meta-label">Date</span> {{exportDate}}</p>
-      <p class="page-meta"><span class="meta-label">Auteur</span> {{authorName}}</p>
     </div>
   </header>
 
-  <h2 class="section-h">1. Bilan du projet</h2>
+  <p class="section-intro">Ces fonctionnalités, bien que décrites dans l'AF, ont été <strong>volontairement écartées</strong> par la maîtrise d'ouvrage et ne seront pas disponibles à la livraison du chantier. Pour les activer ultérieurement, un contrat adapté doit être conclu entre Buildy et l'exploitant.</p>
 
-  <table class="summary-2col">
-    <tbody>
-      <tr><th>Niveau de contrat Buildy requis</th><td><span class="lvl-pill lvl-{{kpis.requiredLevel}}">{{#if kpis.requiredLevelLabel}}{{kpis.requiredLevelLabel}}{{else}}—{{/if}}</span></td></tr>
-      <tr><th>Niveau de contrat actuel</th><td>{{#if kpis.contractLevelLabel}}<span class="lvl-pill lvl-{{kpis.contractLevel}}">{{kpis.contractLevelLabel}}</span>{{else}}<em class="muted">à définir au bon de commande</em>{{/if}}</td></tr>
-      <tr><th>Verdict</th><td><span class="verdict-inline verdict-{{kpis.verdict.kind}}">{{kpis.verdict.text}}</span></td></tr>
-      <tr><th>Catégories de systèmes supervisées</th><td><strong>{{kpis.systemsCovered}}</strong> sur {{kpis.systemsCatalog}} disponibles au catalogue</td></tr>
-      <tr><th>Instances d'équipement déclarées</th><td><strong>{{kpis.instancesTotal}}</strong></td></tr>
-      <tr><th>Points contractuels (lecture + écriture)</th><td><strong>{{kpis.pointsTotal}}</strong></td></tr>
-      <tr><th>Fonctionnalités Buildy intégrées au projet</th><td><strong>{{functionalitiesIncluded}}</strong> sur {{functionalities.length}} décrites dans l'AF</td></tr>
-    </tbody>
-  </table>
-
-  {{#if optedOutList.length}}
-  <h2 class="section-h" style="margin-top: 8mm;">Fonctionnalités écartées par la maîtrise d'ouvrage</h2>
-  <table class="opted-table">
-    <thead><tr><th>Numéro</th><th>Titre</th><th>Contrat requis pour activer</th></tr></thead>
+  <table class="opted-table compact">
+    <thead><tr><th>N°</th><th>Titre</th><th>Contrat requis pour activer</th></tr></thead>
     <tbody>
       {{#each optedOutList}}
       <tr><td><code>§{{number}}</code></td><td>{{title}}</td><td><span class="lvl-pill lvl-warn">{{requiredContract}}</span></td></tr>
       {{/each}}
     </tbody>
   </table>
-  {{/if}}
 </section>
+{{/if}}
 
 {{!-- ═══════════════════ PAGE 2 — Zones fonctionnelles × catégories ═══════════════════ --}}
 <section class="page">
@@ -79,7 +132,7 @@
       </tr>
       <tr class="zones-bacs-row">
         {{#each systemCategories}}
-          {{#if bacs}}<th class="zones-bacs"><span class="bacs-col-marker" title="{{bacs}}">⚖️ {{bacs}}</span></th>{{else}}<th class="zones-bacs muted">—</th>{{/if}}
+          {{#if bacs}}<th class="zones-bacs bacs-yes-marker"><span class="bacs-col-marker" title="{{bacs}}">⚖️ BACS</span></th>{{else}}<th class="zones-bacs muted">—</th>{{/if}}
         {{/each}}
       </tr>
     </thead>
@@ -124,14 +177,14 @@
     </div>
   </header>
 
-  <p class="section-intro">Liste exhaustive des fonctionnalités décrites dans l'AF. La colonne <strong>Intégrée au projet</strong> indique si chaque fonctionnalité sera disponible à la livraison, en tenant compte du niveau de contrat actuel, des écartements MOA et des sections exclues de l'export.</p>
+  <p class="section-intro">Liste exhaustive des fonctionnalités décrites dans l'AF. La colonne <strong>Niveau d'offre minimum</strong> indique le contrat Buildy nécessaire pour cette fonctionnalité ; <strong>Intégrée au projet</strong> tient compte du niveau de contrat visé, des écartements MOA et des sections retirées.</p>
 
-  <table class="features-table">
+  <table class="features-table compact">
     <thead>
       <tr>
-        <th class="ft-num">Numéro</th>
+        <th class="ft-num">N°</th>
         <th class="ft-title">Fonctionnalité</th>
-        <th class="ft-level">Niveau d'offre requis</th>
+        <th class="ft-level">Niveau d'offre minimum</th>
         <th class="ft-include">Intégrée au projet</th>
         <th class="ft-reason">Motif si non intégrée</th>
       </tr>
@@ -141,7 +194,7 @@
       <tr class="ft-row {{#unless included}}ft-row-out{{/unless}}">
         <td class="ft-num"><code>§{{number}}</code></td>
         <td class="ft-title">{{title}}</td>
-        <td class="ft-level"><span class="lvl-pill lvl-{{levelClass}}">{{serviceLevelLabel}}</span></td>
+        <td class="ft-level"><span class="lvl-pill lvl-{{levelClass}}">{{requiredMinLabel}}</span></td>
         <td class="ft-include">
           {{#if included}}<span class="check-yes">✓</span>{{else}}<span class="check-no">✗</span>{{/if}}
         </td>
@@ -151,8 +204,8 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3">Total</td>
-        <td class="ft-include"><strong>{{functionalitiesIncluded}}/{{functionalities.length}}</strong></td>
+        <td colspan="3">Total intégré au projet</td>
+        <td class="ft-include"><strong>{{functionalitiesIncluded}} / {{functionalities.length}}</strong></td>
         <td></td>
       </tr>
     </tfoot>
@@ -174,29 +227,30 @@
     </div>
   </header>
 
-  <p class="section-intro">Liste de toutes les catégories de systèmes décrites dans l'AF, avec leur statut au regard du décret BACS, le nombre d'instances déclarées sur le site et le total de points en lecture / écriture.</p>
+  <p class="section-intro">Liste de toutes les catégories de systèmes décrites dans l'AF, leur statut au regard du décret BACS, le nombre d'instances déclarées et le total de points en lecture / écriture <strong>attendus</strong> côté Buildy.</p>
 
-  <table class="systems-table">
+  <table class="systems-table compact">
     <thead>
       <tr>
-        <th class="sys-num">Numéro</th>
+        <th class="sys-num">N°</th>
         <th class="sys-title">Système</th>
         <th class="sys-bacs">Exigé par BACS</th>
         <th class="sys-status">Statut</th>
         <th class="sys-num-cell">Instances</th>
-        <th class="sys-num-cell">Points lecture</th>
-        <th class="sys-num-cell">Points écriture</th>
+        <th class="sys-num-cell">Pts lecture</th>
+        <th class="sys-num-cell">Pts écriture</th>
       </tr>
     </thead>
     <tbody>
       {{#each systemsSummary}}
-      <tr class="sys-row sys-row-{{statusClass}}">
+      <tr class="sys-row sys-row-{{statusClass}} {{#if bacsAlert}}sys-row-bacs-alert{{/if}}">
         <td class="sys-num"><code>§{{number}}</code></td>
         <td class="sys-title">{{title}}</td>
         <td class="sys-bacs">
-          {{#if bacs}}<span class="check-yes">✓</span> <span class="m-bacs-tag">{{bacs}}</span>
-          {{else if isMetering}}<span class="muted-italic">contribue R175-3 §1</span>
-          {{else}}<span class="check-no">✗</span>
+          {{#if bacsRequired}}
+            <span class="bacs-yes" title="{{bacs}}">Oui</span>
+          {{else}}
+            <span class="bacs-no">Non</span>
           {{/if}}
         </td>
         <td class="sys-status"><span class="status-pill status-{{statusClass}}">{{status}}</span></td>
@@ -215,6 +269,14 @@
       </tr>
     </tfoot>
   </table>
+
+  <p class="legal-note">
+    <strong>Précision sur les points :</strong> les chiffres ci-dessus représentent les points <em>attendus</em>
+    par instance d'équipement selon les modèles Buildy. Le nombre de points <strong>réellement disponibles</strong>
+    à la livraison dépend de l'équipement terrain (modèle, firmware, configuration de l'intégrateur du système concerné)
+    et n'est pas garanti par Buildy : un équipement qui n'expose pas un point ne pourra pas être supervisé sur ce point.
+    La liste contractuelle figure dans l'export A3 dédié.
+  </p>
 </section>
 
 </body>

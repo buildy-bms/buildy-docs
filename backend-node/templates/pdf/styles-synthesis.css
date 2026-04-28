@@ -10,6 +10,7 @@
   size: A4 landscape;
   margin: 14mm 14mm 12mm 14mm;
 }
+@page :first { margin: 0; }
 
 html, body {
   margin: 0;
@@ -23,6 +24,103 @@ html, body {
 }
 
 h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
+
+/* ── COVER PAGE 1 (style coherent avec AF + points-list) ─────── */
+.cover {
+  width: 297mm; height: 210mm; /* A4 paysage */
+  padding: 18mm 22mm;
+  background: #1b2842; color: white;
+  page-break-after: always;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto auto;
+  gap: 8mm;
+  position: relative;
+  box-sizing: border-box;
+}
+.cover-top { display: flex; flex-direction: column; }
+.cover-logo { width: 36mm; margin-bottom: 6mm; filter: brightness(0) invert(1); }
+.cover-doc-type {
+  font-size: 8pt; text-transform: uppercase; letter-spacing: 0.25em;
+  color: rgba(255,255,255,0.6); margin: 0 0 2.5mm; font-weight: 500;
+}
+.cover-title {
+  font-size: 26pt; font-weight: 700; margin: 0 0 2.5mm;
+  letter-spacing: -0.01em; line-height: 1.1;
+}
+.cover-client {
+  font-size: 14pt; color: rgba(255,255,255,0.88); font-weight: 500; margin: 0 0 1.5mm;
+}
+.cover-address { font-size: 9.5pt; color: rgba(255,255,255,0.55); margin: 0; }
+
+.cover-kpi-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm;
+  align-self: center;
+}
+.cover-kpi-card {
+  background: rgba(255,255,255,0.05);
+  border: 0.4mm solid rgba(255,255,255,0.12);
+  border-radius: 2mm;
+  padding: 6mm 5mm;
+  text-align: center;
+}
+.cover-kpi-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 32pt; color: #00cd92; margin: 0;
+  font-weight: 700; line-height: 1; letter-spacing: -0.02em;
+}
+.cover-kpi-sub { font-size: 16pt; color: rgba(255,255,255,0.5); font-weight: 500; }
+.cover-kpi-label {
+  font-size: 8.5pt; color: rgba(255,255,255,0.85); margin: 3mm 0 0;
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+
+.cover-level-band {
+  background: rgba(255,255,255,0.08);
+  border: 0.4mm solid rgba(255,255,255,0.18);
+  border-left: 1.5mm solid #00cd92;
+  border-radius: 2mm;
+  padding: 5mm 8mm;
+}
+.cover-level-band-row { display: flex; align-items: center; gap: 6mm; margin-bottom: 3mm; }
+.cover-level-band-item { flex: 1; }
+.cover-level-band-label {
+  font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.55); margin: 0 0 1.5mm;
+}
+.cover-level-band-value { font-size: 16pt; color: white; margin: 0; font-weight: 600; font-family: 'Poppins', sans-serif; }
+.cover-level-band-arrow { font-size: 11pt; color: rgba(255,255,255,0.4); padding: 0 4mm; font-style: italic; }
+.cover-verdict-text {
+  font-size: 9.5pt; color: rgba(255,255,255,0.85); margin: 0; line-height: 1.55;
+  border-top: 1px solid rgba(255,255,255,0.1); padding-top: 3mm;
+}
+.cover-level-band-shortfall { border-left-color: #f87171; }
+.cover-level-band-shortfall .cover-kpi-value { color: #f87171; }
+.cover-level-band-no-contract { border-left-color: #fbbf24; }
+.cover-level-band-ok { border-left-color: #34d399; }
+.cover-level-band-over { border-left-color: #60a5fa; }
+
+.cover-meta {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm 12mm;
+  border-top: 1px solid rgba(255,255,255,0.12); padding-top: 5mm;
+}
+.cover-meta-row { display: flex; flex-direction: column; }
+.cover-meta-label {
+  font-size: 7pt; text-transform: uppercase; letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.4); margin-bottom: 1.5mm;
+}
+.cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
+.cover-version-tag {
+  font-family: 'SFMono-Regular', monospace; background: #00cd92;
+  color: #1b2842; padding: 0.5mm 2mm; border-radius: 0.8mm; font-weight: 600;
+}
+.cover-motif {
+  margin-top: 1.5mm; font-size: 8.5pt; color: rgba(255,255,255,0.65); font-style: italic;
+}
+.cover-legal {
+  font-size: 7pt; color: rgba(255,255,255,0.55); line-height: 1.55;
+  margin: 0; text-align: justify;
+  border-top: 1px solid rgba(255,255,255,0.1); padding-top: 3mm;
+}
 
 /* ── Page common ──────────────────────────────────────────────── */
 .page { page-break-after: always; }
@@ -130,46 +228,64 @@ table.opted-table code { font-family: 'SFMono-Regular', monospace; font-size: 8p
 
 /* ── PAGE 2 : Matrice zones × catégories ──────────────────────── */
 table.zones-matrix {
-  width: 100%; border-collapse: collapse; font-size: 8.5pt; table-layout: fixed;
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: 8.5pt; table-layout: fixed;
+  border-radius: 1.5mm; overflow: hidden;
+  box-shadow: 0 0 0 0.3mm #e5e7eb;
 }
 table.zones-matrix thead { display: table-header-group; }
 table.zones-matrix th {
-  background: #1b2842; color: white; padding: 2mm 1.5mm; text-align: center;
-  font-family: 'Poppins', sans-serif; font-size: 7pt; font-weight: 700;
+  background: #1b2842; color: white; padding: 2.5mm 1.5mm; text-align: center;
+  font-family: 'Poppins', sans-serif; font-size: 7.5pt; font-weight: 700;
   letter-spacing: 0.03em; vertical-align: middle;
+  border-bottom: 0.2mm solid rgba(255,255,255,0.1);
 }
-table.zones-matrix th.zones-name { text-align: left; padding-left: 3mm; width: 35mm; }
-table.zones-matrix th.zones-cat { font-size: 6.8pt; line-height: 1.2; }
+table.zones-matrix th.zones-name {
+  text-align: left; padding-left: 4mm; width: 38mm;
+}
+table.zones-matrix th.zones-cat {
+  font-size: 7pt; line-height: 1.25;
+  border-right: 0.2mm solid rgba(255,255,255,0.08);
+}
 table.zones-matrix th.zones-bacs {
-  background: #faf5ff; color: #6d28d9; font-size: 6.5pt; padding: 1mm 1mm;
-  border-top: 0.2mm solid #1b2842;
+  background: #2d3a55; color: rgba(255,255,255,0.55);
+  font-size: 6.5pt; padding: 1.2mm 1mm; font-weight: 500;
+  border-right: 0.2mm solid rgba(255,255,255,0.08);
 }
-table.zones-matrix th.zones-bacs.muted { color: #9ca3af; background: #f3f4f6; }
+table.zones-matrix th.zones-bacs.bacs-yes-marker {
+  background: #00cd92; color: #1b2842; font-weight: 700;
+}
+table.zones-matrix th.zones-bacs.muted { color: rgba(255,255,255,0.3); }
 table.zones-matrix th.zones-total {
-  width: 14mm; background: #00cd92; color: #1b2842;
+  width: 16mm; background: #00cd92; color: #1b2842;
 }
 
 table.zones-matrix td {
-  padding: 2.5mm 1.5mm; border-bottom: 0.3mm solid #e5e7eb;
+  padding: 3mm 1.5mm; border-bottom: 0.2mm solid #f1f3f6;
   text-align: center; vertical-align: middle; font-variant-numeric: tabular-nums;
 }
-table.zones-matrix td.zones-name { text-align: left; padding-left: 3mm; }
-table.zones-matrix td.zones-name strong { color: #1b2842; }
-table.zones-matrix td.zones-cell { font-size: 9pt; }
-table.zones-matrix td.zones-cell strong { color: #1b2842; }
+table.zones-matrix td.zones-name {
+  text-align: left; padding-left: 4mm; background: #f9fafb;
+  border-right: 0.3mm solid #e5e7eb;
+}
+table.zones-matrix td.zones-name strong { color: #1b2842; font-size: 9pt; }
+table.zones-matrix td.zones-name .muted { color: #9ca3af; font-size: 7.5pt; font-weight: 400; }
+table.zones-matrix td.zones-cell { font-size: 10pt; color: #1b2842; }
+table.zones-matrix td.zones-cell strong { color: #00cd92; font-weight: 700; }
 table.zones-matrix td.zones-total {
   background: #f8fafc; font-weight: 700; color: #1b2842;
-  border-left: 0.3mm solid #1b2842;
+  border-left: 0.3mm solid #1b2842; font-size: 10pt;
 }
-table.zones-matrix tbody tr:nth-child(even) td { background: #fafbfc; }
-table.zones-matrix tbody tr:nth-child(even) td.zones-total { background: #f1f5f9; }
+table.zones-matrix tbody tr:hover td { background: #f0fdf4; }
 table.zones-matrix tfoot td {
   background: #1b2842; color: white; font-weight: 700; padding: 3mm 1.5mm;
+  font-size: 9pt;
 }
+table.zones-matrix tfoot td.zones-name { background: #1b2842; color: white; }
 table.zones-matrix tfoot td.zones-total { background: #00cd92; color: #1b2842; }
 
 .bacs-col-marker {
-  display: inline-block; font-size: 6pt; color: #6d28d9; font-weight: 600;
+  display: inline-block; font-size: 6.5pt; font-weight: 700;
   letter-spacing: 0.02em;
 }
 
@@ -191,8 +307,11 @@ table.features-table th {
   text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
 }
 table.features-table td {
-  padding: 2.5mm 3mm; border-bottom: 0.3mm solid #e5e7eb; vertical-align: middle;
+  padding: 1.8mm 3mm; border-bottom: 0.3mm solid #e5e7eb; vertical-align: middle;
 }
+table.features-table.compact td { padding: 1.4mm 3mm; font-size: 8.5pt; }
+table.features-table.compact th { padding: 2mm 3mm; }
+table.features-table.compact .ft-reason { font-size: 7.5pt; }
 table.features-table tbody tr:nth-child(even) td { background: #fafbfc; }
 table.features-table tfoot td {
   background: #1b2842; color: white; font-weight: 700; padding: 3mm;
@@ -219,7 +338,27 @@ table.systems-table th {
   text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
 }
 table.systems-table td {
-  padding: 2.5mm 3mm; border-bottom: 0.3mm solid #e5e7eb; vertical-align: middle;
+  padding: 1.8mm 3mm; border-bottom: 0.3mm solid #e5e7eb; vertical-align: middle;
+}
+table.systems-table.compact td { padding: 1.4mm 3mm; font-size: 8.5pt; }
+table.systems-table.compact th { padding: 2mm 3mm; }
+
+/* Ligne d'alerte : systeme exige BACS, instancie, mais retire de l'AF */
+.sys-row-bacs-alert td { background: #fef2f2 !important; }
+.sys-row-bacs-alert td.sys-title::after {
+  content: ' ⚠'; color: #dc2626; font-size: 10pt; margin-left: 1.5mm;
+}
+
+/* Cellules BACS Oui / Non */
+.bacs-yes {
+  display: inline-block; padding: 0.6mm 3mm; border-radius: 999px;
+  font-size: 8.5pt; font-weight: 700; background: #d1fae5; color: #065f46;
+  border: 0.3mm solid #6ee7b7;
+}
+.bacs-no {
+  display: inline-block; padding: 0.6mm 3mm; border-radius: 999px;
+  font-size: 8.5pt; font-weight: 700; background: #fee2e2; color: #991b1b;
+  border: 0.3mm solid #fca5a5;
 }
 table.systems-table tbody tr:nth-child(even) td { background: #fafbfc; }
 table.systems-table tfoot td {
@@ -249,6 +388,7 @@ table.systems-table tfoot td {
 }
 .status-pill.status-covered      { background: #d1fae5; color: #065f46; }
 .status-pill.status-not-instanced { background: #f3f4f6; color: #6b7280; }
+.status-pill.status-no-instance   { background: #f3f4f6; color: #6b7280; }
 .status-pill.status-opted-out    { background: #fef3c7; color: #92400e; }
 .status-pill.status-excluded     { background: #fee2e2; color: #991b1b; }
 
