@@ -3,90 +3,93 @@
 const db = require('../database');
 const log = require('./logger').system;
 
-const ctaTemplate = require('../seeds/equipment-templates/cta');
-const { buildSnapshot } = require('./template-propagation');
+const ALL_TEMPLATES = require('../seeds/equipment-templates');
+const { buildSnapshot, snapshotAndBump } = require('./template-propagation');
 // HYPERVEEZ_PAGES n'est plus utilisé (Lot 22 — section 10 supprimée), conservé pour usage futur.
 // eslint-disable-next-line no-unused-vars
 const { PLAN_AF } = require('../seeds/plan-af');
 const { HYPERVEEZ_PAGES } = require('../seeds/hyperveez-pages');
 const { formatServiceLevel } = require('../seeds/service-levels');
 
-// ── Templates equipement par defaut ───────────────────────────────────
-// Liste des slugs reconnus par le plan AF. Pour la V1, seul CTA a un contenu
-// complet. Les autres sont crees comme squelettes vides (a remplir au fil de
-// l'eau via la bibliotheque + promotion depuis les AFs).
-const EMPTY_TEMPLATES = [
-  { slug: 'chaudiere', name: 'Chaudière / générateur de chaleur', category: 'chauffage', icon_kind: 'fa', icon_value: 'fa-fire', icon_color: '#ef4444' },
-  { slug: 'aerotherme', name: 'Aérotherme', category: 'chauffage', icon_kind: 'fa', icon_value: 'fa-temperature-arrow-up', icon_color: '#f97316' },
-  { slug: 'destratificateur', name: 'Destratificateur', category: 'chauffage', icon_kind: 'fa', icon_value: 'fa-fan', icon_color: '#fb923c' },
-  { slug: 'drv', name: 'Système DRV / VRV / VRF', category: 'climatisation', icon_kind: 'fa', icon_value: 'fa-snowflake', icon_color: '#06b6d4' },
-  { slug: 'rooftop', name: 'Rooftop', category: 'climatisation', icon_kind: 'fa', icon_value: 'fa-building', icon_color: '#0ea5e9' },
-  { slug: 'ventilation-generique', name: 'Système de ventilation (autre que CTA)', category: 'ventilation', icon_kind: 'fa', icon_value: 'fa-wind', icon_color: '#3b82f6' },
-  { slug: 'ecs', name: 'Production d\'eau chaude sanitaire', category: 'ecs', icon_kind: 'fa', icon_value: 'fa-droplet', icon_color: '#0ea5e9' },
-  { slug: 'eclairage-interieur', name: 'Éclairage intérieur', category: 'eclairage', icon_kind: 'fa', icon_value: 'fa-lightbulb', icon_color: '#facc15' },
-  { slug: 'eclairage-exterieur', name: 'Éclairage extérieur', category: 'eclairage', icon_kind: 'fa', icon_value: 'fa-lightbulb', icon_color: '#eab308' },
-  { slug: 'prises-pilotees', name: 'Prises de courant pilotées', category: 'electricite', icon_kind: 'fa', icon_value: 'fa-plug', icon_color: '#a855f7' },
-  { slug: 'production-electricite', name: 'Production d\'électricité sur site', category: 'electricite', icon_kind: 'fa', icon_value: 'fa-solar-panel', icon_color: '#eab308' },
-  { slug: 'compteur-electrique', name: 'Compteur électrique', category: 'comptage', icon_kind: 'fa', icon_value: 'fa-bolt', icon_color: '#facc15' },
-  { slug: 'compteur-gaz', name: 'Compteur gaz', category: 'comptage', icon_kind: 'fa', icon_value: 'fa-fire-flame-simple', icon_color: '#fb923c' },
-  { slug: 'compteur-eau', name: 'Compteur eau', category: 'comptage', icon_kind: 'fa', icon_value: 'fa-droplet', icon_color: '#0ea5e9' },
-  { slug: 'compteur-calories', name: 'Compteur calories', category: 'comptage', icon_kind: 'fa', icon_value: 'fa-temperature-half', icon_color: '#f97316' },
-  { slug: 'qai', name: 'Capteur qualité de l\'air intérieur', category: 'qai', icon_kind: 'fa', icon_value: 'fa-leaf', icon_color: '#10b981' },
-  { slug: 'volets', name: 'Volets motorisés', category: 'occultation', icon_kind: 'fa', icon_value: 'fa-blinds', icon_color: '#64748b' },
-  { slug: 'stores', name: 'Stores motorisés', category: 'occultation', icon_kind: 'fa', icon_value: 'fa-blinds-raised', icon_color: '#64748b' },
-  { slug: 'process-industriel', name: 'Équipement de process industriel', category: 'process', icon_kind: 'fa', icon_value: 'fa-industry', icon_color: '#475569' },
-  { slug: 'equipement-generique', name: 'Équipement générique', category: 'autres', icon_kind: 'fa', icon_value: 'fa-cube', icon_color: '#6b7280' },
-];
-
 /**
  * Boot : cree les templates equipement de la bibliotheque s'ils n'existent
- * pas. Ne touche pas aux templates deja edites.
+ * pas. Pour les templates deja crees mais "vides" (sans description ou sans
+ * preferred_protocols), on les enrichit avec le contenu actuel du fichier
+ * de seed (idempotent — n'écrase jamais une description que l'utilisateur a
+ * éditée manuellement, on regarde uniquement les champs vides).
+ *
+ * Lot 20 : tous les 21 templates équipement (CTA + 20 autres) sont rédigés
+ * dans backend-node/src/seeds/equipment-templates/<slug>.js suivant la
+ * structure stricte CTA (mention BACS si applicable + description fonctionnelle
+ * agnostique + points typiques Mesure/État/Alarme/Commande/Consigne).
  */
 function seedLibraryOnBoot() {
   let createdCount = 0;
-  let updatedPointsCount = 0;
+  let enrichedCount = 0;
+  let pointsCreated = 0;
 
-  // Template CTA complet (avec ses points)
-  let cta = db.equipmentTemplates.getBySlug(ctaTemplate.slug);
-  if (!cta) {
-    cta = db.equipmentTemplates.create({
-      slug: ctaTemplate.slug,
-      name: ctaTemplate.name,
-      category: ctaTemplate.category,
-      bacsArticles: ctaTemplate.bacs_articles,
-      descriptionHtml: ctaTemplate.description_html,
-      iconKind: ctaTemplate.icon_kind,
-      iconValue: ctaTemplate.icon_value,
-      iconColor: ctaTemplate.icon_color,
-    });
-    for (const p of ctaTemplate.points) {
-      db.equipmentTemplatePoints.create(cta.id, {
-        slug: p.slug, position: p.position, label: p.label,
-        dataType: p.dataType, direction: p.direction, unit: p.unit,
+  for (const tpl of ALL_TEMPLATES) {
+    const existing = db.equipmentTemplates.getBySlug(tpl.slug);
+    if (!existing) {
+      // Création complète
+      const created = db.equipmentTemplates.create({
+        slug: tpl.slug,
+        name: tpl.name,
+        category: tpl.category,
+        bacsArticles: tpl.bacs_articles,
+        bacsJustification: tpl.bacs_justification,
+        descriptionHtml: tpl.description_html,
+        iconKind: tpl.icon_kind,
+        iconValue: tpl.icon_value,
+        iconColor: tpl.icon_color,
+        preferredProtocols: tpl.preferred_protocols,
       });
-      updatedPointsCount++;
+      for (const p of (tpl.points || [])) {
+        db.equipmentTemplatePoints.create(created.id, {
+          slug: p.slug, position: p.position, label: p.label,
+          dataType: p.dataType, direction: p.direction, unit: p.unit,
+          techName: p.techName, nature: p.nature,
+        });
+        pointsCreated++;
+      }
+      createdCount++;
+    } else {
+      // Enrichissement : on ne touche aux champs que s'ils sont VIDES en BDD.
+      // On force aussi un nouveau snapshot si on enrichit (pour que la propagation
+      // remonte les nouveautés aux AFs existantes, qui pourront décider d'appliquer).
+      const updates = {};
+      if (!existing.description_html && tpl.description_html) updates.descriptionHtml = tpl.description_html;
+      if (!existing.bacs_articles && tpl.bacs_articles) updates.bacsArticles = tpl.bacs_articles;
+      if (!existing.bacs_justification && tpl.bacs_justification) updates.bacsJustification = tpl.bacs_justification;
+      if (!existing.preferred_protocols && tpl.preferred_protocols) updates.preferredProtocols = tpl.preferred_protocols;
+      let changed = Object.keys(updates).length > 0;
+      if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
+
+      // Points : on n'ajoute QUE ceux dont le slug n'existe pas déjà
+      const existingSlugs = new Set(db.equipmentTemplatePoints.listByTemplate(existing.id).map(p => p.slug));
+      for (const p of (tpl.points || [])) {
+        if (existingSlugs.has(p.slug)) continue;
+        try {
+          db.equipmentTemplatePoints.create(existing.id, {
+            slug: p.slug, position: p.position, label: p.label,
+            dataType: p.dataType, direction: p.direction, unit: p.unit,
+            techName: p.techName, nature: p.nature,
+          });
+          pointsCreated++;
+          changed = true;
+        } catch { /* ignore unique conflict */ }
+      }
+
+      if (changed) {
+        snapshotAndBump(existing.id, { changelog: 'Enrichissement seed Lot 20', authorId: null });
+        enrichedCount++;
+      }
     }
-    createdCount++;
-    log.info(`Seed library: created template "${ctaTemplate.name}" with ${ctaTemplate.points.length} points`);
   }
 
-  // Squelettes vides
-  for (const t of EMPTY_TEMPLATES) {
-    if (db.equipmentTemplates.getBySlug(t.slug)) continue;
-    db.equipmentTemplates.create({
-      slug: t.slug,
-      name: t.name,
-      category: t.category,
-      iconKind: t.icon_kind,
-      iconValue: t.icon_value,
-      iconColor: t.icon_color,
-    });
-    createdCount++;
-  }
-
-  if (createdCount > 0) {
-    log.info(`Seed library: ${createdCount} template(s) created, ${updatedPointsCount} point(s) seeded`);
-  }
+  if (createdCount > 0) log.info(`Seed library: ${createdCount} template(s) crees`);
+  if (enrichedCount > 0) log.info(`Seed library: ${enrichedCount} template(s) enrichis (Lot 20)`);
+  if (pointsCreated > 0) log.info(`Seed library: ${pointsCreated} point(s) seeds`);
 
   // Filet de securite : tout template doit avoir un snapshot pour sa version
   // courante (necessaire au diff de propagation Lot 9). Idempotent.

@@ -1,0 +1,35 @@
+'use strict';
+
+module.exports = {
+  slug: 'drv',
+  name: 'Système DRV / VRV / VRF',
+  category: 'climatisation',
+  bacs_articles: 'R175-1 §1, §2',
+  bacs_justification: 'Un système DRV/VRV/VRF combine les fonctions de chauffage (R175-1 §1) et de climatisation (§2) sur une même boucle frigorifique. Le décret BACS s\'applique pleinement.',
+  preferred_protocols: 'BACnet/IP,Modbus TCP',
+  icon_kind: 'fa',
+  icon_value: 'fa-snowflake',
+  icon_color: '#06b6d4',
+  description_html: `
+<p><strong>Un système DRV/VRV/VRF est concerné par le décret BACS au titre des systèmes de chauffage (R175-1 §1) et de climatisation (§2).</strong></p>
+<p>Un système à débit de réfrigérant variable assure le conditionnement thermique d\'unités intérieures multiples (chaud et/ou froid) à partir d\'une ou plusieurs unités extérieures. La régulation de la puissance frigorifique, du basculement chaud/froid et de la modulation est portée par le régulateur du fabricant. La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure depuis l\'application Hyperveez.</p>
+`.trim(),
+  points: [
+    { slug: 'etat.unite_int', label: 'État unité intérieure (marche/arrêt)', dataType: 'État', direction: 'read', position: 10 },
+    { slug: 'etat.mode', label: 'Mode (chauffage/clim/ventilation/auto)', dataType: 'État', direction: 'read', position: 20 },
+    { slug: 'etat.vitesse_ventilation', label: 'Vitesse de ventilation', dataType: 'État', direction: 'read', position: 30 },
+    { slug: 'temp.ambiance', label: 'Température d\'ambiance mesurée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
+    { slug: 'consigne.effective', label: 'Consigne effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 50 },
+    { slug: 'puissance.frigorifique', label: 'Puissance frigorifique instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 60 },
+    { slug: 'puissance.calorifique', label: 'Puissance calorifique instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 70 },
+    { slug: 'energie.consommee', label: 'Énergie électrique consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 80 },
+    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 90 },
+    { slug: 'alarme.defaut_compresseur', label: 'Défaut compresseur unité extérieure', dataType: 'Alarme', direction: 'read', position: 100 },
+    { slug: 'alarme.encrassement_filtre', label: 'Encrassement filtre unité intérieure', dataType: 'Alarme', direction: 'read', position: 110 },
+    { slug: 'alarme.fuite_refrigerant', label: 'Détection de fuite réfrigérant', dataType: 'Alarme', direction: 'read', position: 120 },
+    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt unité intérieure', dataType: 'Commande', direction: 'write', position: 200 },
+    { slug: 'cmd.mode', label: 'Commande mode (chaud/froid/vent/auto)', dataType: 'Commande', direction: 'write', position: 210 },
+    { slug: 'cmd.vitesse_ventilation', label: 'Commande vitesse de ventilation', dataType: 'Commande', direction: 'write', position: 220 },
+    { slug: 'consigne.temperature', label: 'Consigne température', dataType: 'Consigne', direction: 'write', unit: '°C', position: 230 },
+  ],
+};

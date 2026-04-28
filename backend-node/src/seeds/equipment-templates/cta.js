@@ -15,6 +15,8 @@ module.exports = {
   name: 'Centrale de traitement d\'air (CTA)',
   category: 'ventilation',
   bacs_articles: 'R175-1 §1, §2, §3',
+  bacs_justification: 'Une CTA combine systématiquement la fonction de ventilation (R175-1 §3), et selon sa configuration peut intégrer du chauffage (§1) et/ou de la climatisation (§2). Le décret impose pour ces systèmes techniques l\'automatisation, la supervision continue, le pilotage à distance et la traçabilité.',
+  preferred_protocols: 'Modbus TCP,BACnet/IP',
   icon_kind: 'fa',
   icon_value: 'fa-fan',
   icon_color: '#3b82f6',

@@ -1,0 +1,26 @@
+'use strict';
+
+module.exports = {
+  slug: 'destratificateur',
+  name: 'Destratificateur',
+  category: 'chauffage',
+  bacs_articles: 'R175-1 §1',
+  bacs_justification: 'Un destratificateur participe au système de chauffage (R175-1 §1) en homogénéisant la température de l\'air et en réduisant la consommation associée.',
+  preferred_protocols: 'Modbus TCP,KNX/IP',
+  icon_kind: 'fa',
+  icon_value: 'fa-fan',
+  icon_color: '#fb923c',
+  description_html: `
+<p><strong>Un destratificateur est concerné par le décret BACS au titre du système de chauffage (R175-1 §1) lorsqu\'il contribue à la performance globale du chauffage.</strong></p>
+<p>Un destratificateur brasse l\'air en hauteur pour homogénéiser la température et limiter les pertes liées à la stratification thermique, en particulier dans les volumes hauts. Sa logique de fonctionnement (déclenchement sur écart de température haut/bas) est portée par son régulateur intégré. La solution Buildy supervise son état et peut transmettre une commande marche/arrêt et une consigne d\'écart de déclenchement.</p>
+`.trim(),
+  points: [
+    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },
+    { slug: 'temp.haute', label: 'Température air en hauteur', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
+    { slug: 'temp.basse', label: 'Température air zone occupée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
+    { slug: 'mesure.ecart', label: 'Écart de température mesuré', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
+    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50 },
+    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100 },
+    { slug: 'consigne.ecart_declenchement', label: 'Consigne écart de déclenchement', dataType: 'Consigne', direction: 'write', unit: '°C', position: 110 },
+  ],
+};
