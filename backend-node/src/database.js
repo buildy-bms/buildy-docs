@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 21;
+const TARGET_VERSION = 22;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -753,6 +753,21 @@ function runMigrations() {
     log.info('Migration 21 appliquee : coherence BACS column (compteurs hors R175-1)');
   }
 
+  if (current < 22) {
+    // Lot 32 — Lien explicite instance d'equipement <-> zones fonctionnelles (M2M)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS equipment_instance_zones (
+        instance_id INTEGER NOT NULL REFERENCES equipment_instances(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES af_zones(id) ON DELETE CASCADE,
+        PRIMARY KEY (instance_id, zone_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_eiz_instance ON equipment_instance_zones(instance_id);
+      CREATE INDEX IF NOT EXISTS idx_eiz_zone ON equipment_instance_zones(zone_id);
+    `);
+    db.pragma('user_version = 22');
+    log.info('Migration 22 appliquee : equipment_instance_zones (lien M2M instance <-> zones)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1272,6 +1287,36 @@ const equipmentInstances = {
   },
 };
 
+// ── Lien M2M instance d'equipement <-> zones fonctionnelles (Lot 32) ──
+const instanceZones = {
+  listForInstance(instanceId) {
+    return db.prepare(`
+      SELECT z.* FROM af_zones z
+      JOIN equipment_instance_zones eiz ON eiz.zone_id = z.id
+      WHERE eiz.instance_id = ?
+      ORDER BY z.position, z.id
+    `).all(instanceId);
+  },
+  listForAf(afId) {
+    return db.prepare(`
+      SELECT eiz.instance_id, eiz.zone_id, z.name AS zone_name
+      FROM equipment_instance_zones eiz
+      JOIN af_zones z ON z.id = eiz.zone_id
+      JOIN equipment_instances ei ON ei.id = eiz.instance_id
+      JOIN sections s ON s.id = ei.section_id
+      WHERE s.af_id = ?
+    `).all(afId);
+  },
+  setForInstance(instanceId, zoneIds) {
+    const tx = db.transaction((iId, zIds) => {
+      db.prepare('DELETE FROM equipment_instance_zones WHERE instance_id = ?').run(iId);
+      const stmt = db.prepare('INSERT OR IGNORE INTO equipment_instance_zones (instance_id, zone_id) VALUES (?, ?)');
+      for (const z of zIds) stmt.run(iId, z);
+    });
+    tx(instanceId, Array.isArray(zoneIds) ? zoneIds : []);
+  },
+};
+
 // ── Permissions AF (Lot 28) ─────────────────────────────────────────
 const afPermissions = {
   listByAf(afId) {
@@ -1402,6 +1447,7 @@ module.exports = {
   sectionTemplates,
   sectionPointOverrides,
   equipmentInstances,
+  instanceZones,
   attachments,
   afZones,
   afPermissions,

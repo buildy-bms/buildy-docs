@@ -542,15 +542,28 @@ async function routes(fastify) {
       for (const i of insts) allInstances.push({ ...i, slug });
     }
 
+    // Lien explicite instance ↔ zones (Lot 32) ; fallback sur matching `location` si pas de lien.
+    const linkRows = db.instanceZones.listForAf(afId);
+    const zonesByInstance = new Map();
+    for (const r of linkRows) {
+      if (!zonesByInstance.has(r.instance_id)) zonesByInstance.set(r.instance_id, new Set());
+      zonesByInstance.get(r.instance_id).add(r.zone_id);
+    }
+    function instanceMatchesZone(inst, zone) {
+      const linked = zonesByInstance.get(inst.id);
+      if (linked && linked.size > 0) return linked.has(zone.id);
+      // Fallback : matching texte location (legacy)
+      const loc = normalize(inst.location);
+      return loc && loc.includes(normalize(zone.name));
+    }
+
     // Construit la matrice zones × catégories
     const zonesMatrix = zones.map(z => {
-      const zoneNameNorm = normalize(z.name);
       const cells = SYSTEM_CATEGORIES.map(cat => {
         let count = 0;
         for (const inst of allInstances) {
           if (!cat.slugs.includes(inst.slug)) continue;
-          const loc = normalize(inst.location);
-          if (loc && loc.includes(zoneNameNorm)) count += (inst.qty || 1);
+          if (instanceMatchesZone(inst, z)) count += (inst.qty || 1);
         }
         return count;
       });
@@ -562,16 +575,15 @@ async function routes(fastify) {
       zonesMatrix.reduce((acc, row) => acc + row.cells[idx], 0)
     );
     const zonesGrandTotal = zonesColTotals.reduce((a, b) => a + b, 0);
-    // Instances orphelines (location ne match aucune zone, ou location vide)
-    const matchedInstanceIds = new Set();
+    // Instances orphelines : aucune zone liée ET aucun match texte
+    let unzoned = 0;
     for (const inst of allInstances) {
+      const linked = zonesByInstance.get(inst.id);
+      if (linked && linked.size > 0) continue;
       const loc = normalize(inst.location);
-      if (!loc) continue;
-      for (const z of zones) {
-        if (loc.includes(normalize(z.name))) { matchedInstanceIds.add(inst.id); break; }
-      }
+      const hasMatch = loc && zones.some(z => loc.includes(normalize(z.name)));
+      if (!hasMatch) unzoned++;
     }
-    const unzoned = allInstances.length - matchedInstanceIds.size;
 
     // ── Synthèse fonctionnalités ──
     // Toutes les sections kind=standard (hors chapitre 2 perimetre equipements et 12 synthese)

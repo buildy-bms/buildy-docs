@@ -282,6 +282,28 @@ async function routes(fastify) {
     return { ok: true };
   });
 
+  // GET /api/instances/:id/zones (Lot 32) — zones liees a une instance
+  fastify.get('/instances/:id/zones', async (request) => {
+    return db.instanceZones.listForInstance(parseInt(request.params.id, 10));
+  });
+
+  // PUT /api/instances/:id/zones — set la liste des zones liees (ecrase)
+  fastify.put('/instances/:id/zones', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const body = request.body || {};
+    const zoneIds = Array.isArray(body.zone_ids) ? body.zone_ids.map(Number).filter(Boolean) : [];
+    db.instanceZones.setForInstance(id, zoneIds);
+    return { ok: true, zone_ids: zoneIds };
+  });
+
+  // GET /api/afs/:afId/zones — toutes les zones de l'AF (utilise par le picker)
+  fastify.get('/afs/:afId/all-zones', async (request) => {
+    const afId = parseInt(request.params.afId, 10);
+    const zonesSection = db.sections.listByAf(afId).find(s => s.kind === 'zones');
+    if (!zonesSection) return [];
+    return db.afZones.listBySection(zonesSection.id);
+  });
+
   // ── Zones fonctionnelles (Lot 26) ─────────────────────────────────
   fastify.get('/sections/:id/zones', async (request) => {
     const sectionId = parseInt(request.params.id, 10);

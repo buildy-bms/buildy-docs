@@ -258,7 +258,7 @@ watch(() => route.params.id, async () => {
           <template v-if="selectedSection.kind === 'equipment'">
             <EquipmentDescriptionPanel v-if="selectedSection.equipment_template_id" :template-id="selectedSection.equipment_template_id" />
             <PointsTable :section-id="selectedSection.id" :equipment-template-id="selectedSection.equipment_template_id" />
-            <EquipmentInstancesTable :section-id="selectedSection.id" />
+            <EquipmentInstancesTable :section-id="selectedSection.id" :af-id="af.id" />
           </template>
 
           <!-- Pour kind='hyperveez_page' : info de la page Hyperveez -->

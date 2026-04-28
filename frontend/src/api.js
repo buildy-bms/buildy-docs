@@ -52,6 +52,9 @@ export const dismissSectionTemplateUpdate = (id) => api.post(`/sections/${id}/te
 export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instances`, data)
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
+export const listInstanceZones = (id) => api.get(`/instances/${id}/zones`)
+export const setInstanceZones = (id, zone_ids) => api.put(`/instances/${id}/zones`, { zone_ids })
+export const listAfAllZones = (afId) => api.get(`/afs/${afId}/all-zones`)
 
 // ── Attachments ──
 export const listSectionAttachments = (id) => api.get(`/sections/${id}/attachments`)

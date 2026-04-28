@@ -1,26 +1,44 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { PlusCircleIcon, TrashIcon, MapPinIcon } from '@heroicons/vue/24/outline'
+import { ref, onMounted, watch, computed } from 'vue'
+import { PlusCircleIcon, TrashIcon, MapPinIcon, PencilSquareIcon, BuildingOfficeIcon } from '@heroicons/vue/24/outline'
 import {
   listSectionInstances, addSectionInstance, updateInstance, deleteInstance,
+  listInstanceZones, setInstanceZones, listAfAllZones,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
+  afId: { type: Number, required: true },
 })
 
-const { error: notifyError } = useNotification()
+const { error: notifyError, success: notifySuccess } = useNotification()
 const instances = ref([])
+const zonesAll = ref([])
+const instanceZonesMap = ref(new Map()) // instance_id → [zone, ...]
 const loading = ref(false)
 const draft = ref({ reference: '', location: '', qty: 1, notes: '' })
 const showAdd = ref(false)
 
+// Édition
+const editing = ref(null) // instance object or null
+const editForm = ref({ reference: '', location: '', qty: 1, notes: '', zone_ids: [] })
+
 async function refresh() {
   loading.value = true
   try {
-    const { data } = await listSectionInstances(props.sectionId)
-    instances.value = data
+    const [instRes, zonesRes] = await Promise.all([
+      listSectionInstances(props.sectionId),
+      listAfAllZones(props.afId).catch(() => ({ data: [] })),
+    ])
+    instances.value = instRes.data
+    zonesAll.value = zonesRes.data
+    // Charge les zones liées à chaque instance (en parallèle)
+    const zoneFetches = await Promise.all(
+      instances.value.map(i => listInstanceZones(i.id).then(r => [i.id, r.data]).catch(() => [i.id, []]))
+    )
+    instanceZonesMap.value = new Map(zoneFetches)
   } catch (e) {
     notifyError('Échec du chargement des instances')
   } finally {
@@ -44,6 +62,42 @@ async function submitAdd() {
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
   }
+}
+
+function openEdit(inst) {
+  editing.value = inst
+  const linked = instanceZonesMap.value.get(inst.id) || []
+  editForm.value = {
+    reference: inst.reference,
+    location: inst.location || '',
+    qty: inst.qty || 1,
+    notes: inst.notes || '',
+    zone_ids: linked.map(z => z.id),
+  }
+}
+
+async function submitEdit() {
+  if (!editForm.value.reference.trim()) return
+  try {
+    await updateInstance(editing.value.id, {
+      reference: editForm.value.reference.trim(),
+      location: editForm.value.location?.trim() || null,
+      qty: editForm.value.qty || 1,
+      notes: editForm.value.notes?.trim() || null,
+    })
+    await setInstanceZones(editing.value.id, editForm.value.zone_ids)
+    notifySuccess('Instance mise à jour')
+    editing.value = null
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la mise à jour')
+  }
+}
+
+function toggleZone(zoneId) {
+  const i = editForm.value.zone_ids.indexOf(zoneId)
+  if (i >= 0) editForm.value.zone_ids.splice(i, 1)
+  else editForm.value.zone_ids.push(zoneId)
 }
 
 async function removeInstance(inst) {
@@ -70,7 +124,7 @@ onMounted(refresh)
         </h3>
         <p class="text-xs text-gray-500 mt-0.5">
           Référence et localisation de chaque équipement réel. La liste de points contractuelle
-          (PDF A3) sera générée pour chaque instance.
+          (PDF A3) sera générée pour chaque instance. Cliquer le crayon pour éditer + lier des zones.
         </p>
       </div>
       <button
@@ -81,14 +135,13 @@ onMounted(refresh)
       </button>
     </div>
 
-    <!-- Formulaire ajout -->
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
       <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
-        <input v-model="draft.reference" type="text" required placeholder="Référence (ex : CTA-N1-EST)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+        <input v-model="draft.reference" type="text" required placeholder="Référence (ex : CTA-N1-EST)" autocomplete="off" data-1p-ignore="true"
                class="w-44 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model="draft.location" type="text" placeholder="Localisation (ex : Niveau 1 - Aile Est)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+        <input v-model="draft.location" type="text" placeholder="Localisation libre" autocomplete="off" data-1p-ignore="true"
                class="flex-1 min-w-[160px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
+        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
         <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
       </form>
@@ -105,12 +158,13 @@ onMounted(refresh)
         <tr>
           <th class="text-left px-5 py-2 font-medium">Référence</th>
           <th class="text-left px-2 py-2 font-medium">Localisation</th>
+          <th class="text-left px-2 py-2 font-medium">Zones fonctionnelles</th>
           <th class="text-left px-2 py-2 font-medium w-12">Qté</th>
-          <th class="px-5 py-2 w-12"></th>
+          <th class="px-5 py-2 w-20"></th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="inst in instances" :key="inst.id" class="border-t border-gray-100 group">
+        <tr v-for="inst in instances" :key="inst.id" class="border-t border-gray-100 group hover:bg-indigo-50/30">
           <td class="px-5 py-2 font-medium text-gray-800">{{ inst.reference }}</td>
           <td class="px-2 py-2 text-gray-600">
             <span v-if="inst.location" class="inline-flex items-center gap-1">
@@ -118,14 +172,76 @@ onMounted(refresh)
             </span>
             <span v-else class="text-gray-400 italic">—</span>
           </td>
+          <td class="px-2 py-2 text-xs">
+            <span v-if="(instanceZonesMap.get(inst.id) || []).length" class="flex flex-wrap gap-1">
+              <span v-for="z in instanceZonesMap.get(inst.id)" :key="z.id"
+                    class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded">
+                <BuildingOfficeIcon class="w-3 h-3" /> {{ z.name }}
+              </span>
+            </span>
+            <span v-else class="text-gray-400 italic">—</span>
+          </td>
           <td class="px-2 py-2 text-gray-600">{{ inst.qty }}</td>
           <td class="px-5 py-2 text-right">
-            <button @click="removeInstance(inst)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700">
+            <button @click="openEdit(inst)" class="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-800 mr-2" title="Éditer">
+              <PencilSquareIcon class="w-3.5 h-3.5 inline" />
+            </button>
+            <button @click="removeInstance(inst)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" title="Supprimer">
               <TrashIcon class="w-3.5 h-3.5 inline" />
             </button>
           </td>
         </tr>
       </tbody>
     </table>
+
+    <BaseModal v-if="editing" :title="`Éditer l'instance ${editing.reference}`" size="lg" @close="editing = null">
+      <form @submit.prevent="submitEdit" class="space-y-3">
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Référence *</label>
+            <input v-model="editForm.reference" type="text" required autocomplete="off" data-1p-ignore="true"
+                   class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Quantité</label>
+            <input v-model.number="editForm.qty" type="number" min="1"
+                   class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Localisation libre</label>
+          <input v-model="editForm.location" type="text" autocomplete="off" data-1p-ignore="true"
+                 placeholder="Texte libre — utile en complément des zones structurées"
+                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Zones fonctionnelles ({{ editForm.zone_ids.length }} sélectionnée{{ editForm.zone_ids.length > 1 ? 's' : '' }})</label>
+          <div v-if="!zonesAll.length" class="text-xs text-gray-400 italic px-2 py-3 bg-gray-50 rounded">
+            Aucune zone fonctionnelle définie pour cette AF. Créez d'abord des zones depuis la section « Zones fonctionnelles du bâtiment ».
+          </div>
+          <div v-else class="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded">
+            <label v-for="z in zonesAll" :key="z.id"
+                   :class="['flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer border',
+                            editForm.zone_ids.includes(z.id) ? 'bg-indigo-100 text-indigo-800 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100']">
+              <input type="checkbox" :checked="editForm.zone_ids.includes(z.id)" @change="toggleZone(z.id)" class="shrink-0" />
+              <BuildingOfficeIcon class="w-3 h-3 shrink-0" />
+              <span class="truncate">{{ z.name }}</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+          <textarea v-model="editForm.notes" rows="2" autocomplete="off"
+                    class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+      </form>
+      <template #footer>
+        <button @click="editing = null" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+        <button @click="submitEdit" :disabled="!editForm.reference.trim()"
+                class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+          Enregistrer
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
