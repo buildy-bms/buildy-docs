@@ -52,8 +52,11 @@ function openInLibrary() {
 </template>
 
 <style scoped>
-.equipment-desc :deep(p) { margin: 0.5rem 0; line-height: 1.6; }
-.equipment-desc :deep(ul) { padding-left: 1.4rem; margin: 0.5rem 0; list-style-type: disc; }
-.equipment-desc :deep(li) { margin: 0.3rem 0; }
-.equipment-desc :deep(strong) { color: #1f2937; font-weight: 600; }
+.equipment-desc :deep(p) { margin: 0 0 1rem; line-height: 1.65; }
+.equipment-desc :deep(p:last-child) { margin-bottom: 0; }
+.equipment-desc :deep(ul), .equipment-desc :deep(ol) { padding-left: 1.4rem; margin: 0.75rem 0 1rem; list-style-position: outside; }
+.equipment-desc :deep(ul) { list-style-type: disc; }
+.equipment-desc :deep(ol) { list-style-type: decimal; }
+.equipment-desc :deep(li) { margin: 0.4rem 0; line-height: 1.55; }
+.equipment-desc :deep(strong) { color: #1f2937; font-weight: 500; }
 </style>

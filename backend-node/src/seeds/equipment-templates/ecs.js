@@ -11,7 +11,11 @@ module.exports = {
   icon_value: 'fa-droplet',
   icon_color: '#0ea5e9',
   description_html: `
-<p>Une production d\'eau chaude sanitaire (ballon électrique, thermodynamique, gaz, ou ECS instantanée) assure la disponibilité de l\'eau chaude pour les usages sanitaires du bâtiment. <strong>La régulation de l\'ECS est assurée par l\'équipement lui-même</strong>, via le régulateur natif du fabricant pour les solutions compactes, ou via une régulation portée par l\'intégrateur pour les installations de production centralisées (cascade, bouclage, gestion des températures par zone d\'usage). Cette régulation pilote le maintien en température, les cycles anti-légionellose et la sécurité. La solution Buildy supervise la température de l\'eau, l\'état de fonctionnement et les éventuels défauts, et peut transmettre une consigne de température et déclencher les cycles anti-légionellose depuis l\'application Hyperveez.</p>
+<p>Une production d\'eau chaude sanitaire (ballon électrique, thermodynamique, gaz ou ECS instantanée) assure la disponibilité de l\'eau chaude pour les usages sanitaires du bâtiment.</p>
+
+<p><strong>La régulation de l\'ECS est assurée par l\'équipement lui-même</strong>, via le régulateur natif du fabricant pour les solutions compactes, ou via une régulation portée par l\'intégrateur de chauffage/sanitaire (chaufferiste, plombier-chauffagiste) pour les installations de production centralisées (cascade, bouclage, gestion des températures par usage). Cette régulation pilote le maintien en température, les cycles anti-légionellose et la sécurité.</p>
+
+<p>La solution Buildy supervise la température de l\'eau, l\'état de fonctionnement et les éventuels défauts, et peut transmettre une consigne de température et déclencher les cycles anti-légionellose à distance.</p>
 `.trim(),
   points: [
     { slug: 'etat.production', label: 'État de production en cours', dataType: 'État', direction: 'read', position: 10 },

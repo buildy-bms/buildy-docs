@@ -5,14 +5,19 @@ module.exports = {
   name: 'Compteur électrique',
   category: 'comptage',
   bacs_articles: 'R175-3',
-  bacs_justification: '<p>L\'article R175-3 du décret BACS exige que le système d\'automatisation et de contrôle assure un <strong>suivi continu, un enregistrement et une analyse de la consommation énergétique</strong> du bâtiment, par usage et par source d\'énergie.</p><p>Le comptage électrique est l\'instrument indispensable à cette obligation : il fournit les index, puissances et consommations qui alimentent les tableaux de bord énergétiques et la détection de dérives exigés par le décret.</p><p>L\'intégration des compteurs électriques dans la GTB Buildy permet de remonter en continu les paramètres électriques pour répondre à cette exigence et alerter en cas d\'écart par rapport aux profils de consommation attendus.</p>',
+  bacs_justification: '<p>L\'article R175-3 du décret BACS exige que le système d\'automatisation et de contrôle assure un <strong>suivi continu, un enregistrement et une analyse de la consommation énergétique</strong> du bâtiment, par usage et par source d\'énergie.</p><p>Le comptage électrique est l\'instrument indispensable à cette obligation : il fournit les index, puissances et consommations qui alimentent les tableaux de bord énergétiques et la détection de dérives exigés par le décret.</p><p>L\'intégration des compteurs électriques dans la solution Buildy permet de remonter en continu les paramètres électriques pour répondre à cette exigence et alerter en cas d\'écart par rapport aux profils de consommation attendus.</p>',
   preferred_protocols: 'Modbus TCP,Modbus RTU,M-Bus IP',
   icon_kind: 'fa',
   icon_value: 'fa-bolt',
   icon_color: '#facc15',
   description_html: `
-<p><strong>Le comptage énergétique est une exigence du décret BACS (R175-3) pour le suivi continu de la consommation.</strong></p>
-<p>Un compteur électrique mesure la consommation et restitue les paramètres électriques (puissance, énergie, courant, tension, facteur de puissance). Sa logique métrologique est portée par le compteur lui-même. La solution Buildy lit l\'index, la puissance instantanée et les paramètres pour alimenter les tableaux de bord énergétiques et la détection de dérives.</p>
+<p>Un compteur électrique mesure la consommation et restitue les paramètres électriques : puissance, énergie, courant, tension, facteur de puissance.</p>
+
+<p>Le comptage énergétique est une <strong>exigence du décret BACS</strong> (R175-3) pour le suivi continu de la consommation.</p>
+
+<p>La <strong>logique métrologique est portée par le compteur lui-même</strong>.</p>
+
+<p>La solution Buildy lit l\'index, la puissance instantanée et les paramètres électriques pour alimenter les tableaux de bord énergétiques et la détection de dérives.</p>
 `.trim(),
   points: [
     { slug: 'energie.active_total', label: 'Énergie active totale (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', techName: 'E_TOTAL', nature: 'Numérique', position: 10 },

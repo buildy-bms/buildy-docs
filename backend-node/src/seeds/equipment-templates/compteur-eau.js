@@ -11,7 +11,11 @@ module.exports = {
   icon_value: 'fa-droplet',
   icon_color: '#0ea5e9',
   description_html: `
-<p>Un compteur d\'eau mesure le volume d\'eau consommé sur le bâtiment ou par usage (sanitaires, ECS, arrosage, process). La métrologie est portée par le compteur. La solution Buildy lit l\'index et le débit instantané pour alimenter les tableaux de bord et détecter les fuites éventuelles (consommation continue hors plages d\'occupation).</p>
+<p>Un compteur d\'eau mesure le volume d\'eau consommé sur le bâtiment ou par usage (sanitaires, ECS, arrosage, process).</p>
+
+<p>La <strong>métrologie est portée par le compteur lui-même</strong>.</p>
+
+<p>La solution Buildy lit l\'index et le débit instantané pour alimenter les tableaux de bord et détecter les fuites éventuelles (consommation continue hors plages d\'occupation).</p>
 `.trim(),
   points: [
     { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 10 },

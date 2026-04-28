@@ -11,7 +11,11 @@ module.exports = {
   icon_value: 'fa-blinds',
   icon_color: '#64748b',
   description_html: `
-<p>Les volets motorisés contribuent à la gestion solaire passive et au confort thermique en pilotant l\'ensoleillement entrant. <strong>La motorisation et la régulation des volets sont assurées par l\'équipement lui-même</strong>, via le moteur fourni par le fabricant ou via une configuration portée par l\'intégrateur. La motorisation assure les fonctions techniques de bas niveau : déplacement, retour de position, sécurité (vent, fin de course). La solution Buildy supervise leur position et porte l\'ensemble des logiques applicatives (programmations horaires, scénarios solaires, mise en cohérence avec la climatisation et l\'éclairage) en transmettant les commandes d\'ouverture, de fermeture et de positionnement appropriées.</p>
+<p>Les volets motorisés contribuent à la gestion solaire passive et au confort thermique en pilotant l\'ensoleillement entrant.</p>
+
+<p><strong>La motorisation et la régulation des volets sont assurées par l\'équipement lui-même</strong>, via le moteur fourni par le fabricant ou via une configuration portée par l\'intégrateur du lot menuiserie/électricien lors de la mise en service. La motorisation assure les fonctions techniques de bas niveau : déplacement, retour de position, sécurité (vent, fin de course).</p>
+
+<p>La solution Buildy supervise leur position et porte l\'ensemble des logiques applicatives transverses : programmations horaires, scénarios solaires, mise en cohérence avec la climatisation et l\'éclairage.</p>
 `.trim(),
   points: [
     { slug: 'mesure.position', label: 'Position effective', dataType: 'Mesure', direction: 'read', unit: '%', position: 10 },

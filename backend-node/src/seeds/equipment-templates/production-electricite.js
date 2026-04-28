@@ -5,14 +5,19 @@ module.exports = {
   name: 'Production d\'électricité sur site',
   category: 'electricite',
   bacs_articles: 'R175-1 §4',
-  bacs_justification: '<p>L\'article R175-1 inclut explicitement la <strong>production d\'électricité sur site</strong> dans la définition des systèmes techniques de bâtiment (§4). Les installations photovoltaïques, cogénérations et micro-éoliennes entrent donc dans le périmètre du décret BACS.</p><p>Le décret impose que ces installations soient <strong>supervisées en continu</strong>, qu\'elles soient <strong>interopérables</strong> avec les autres systèmes techniques (notamment pour optimiser l\'autoconsommation) et qu\'elles puissent être <strong>arrêtées manuellement</strong>.</p><p>L\'intégration de la production électrique dans la GTB Buildy permet de remonter la puissance instantanée, l\'énergie produite, l\'énergie injectée et les défauts pour piloter l\'autoconsommation et détecter les pertes de production.</p>',
+  bacs_justification: '<p>L\'article R175-1 inclut explicitement la <strong>production d\'électricité sur site</strong> dans la définition des systèmes techniques de bâtiment (§4). Les installations photovoltaïques, cogénérations et micro-éoliennes entrent donc dans le périmètre du décret BACS.</p><p>Le décret impose que ces installations soient <strong>supervisées en continu</strong>, qu\'elles soient <strong>interopérables</strong> avec les autres systèmes techniques (notamment pour optimiser l\'autoconsommation) et qu\'elles puissent être <strong>arrêtées manuellement</strong>.</p><p>L\'intégration de la production électrique dans la solution Buildy permet de remonter la puissance instantanée, l\'énergie produite, l\'énergie injectée et les défauts pour piloter l\'autoconsommation et détecter les pertes de production.</p>',
   preferred_protocols: 'Modbus TCP,Modbus RTU,SunSpec',
   icon_kind: 'fa',
   icon_value: 'fa-solar-panel',
   icon_color: '#eab308',
   description_html: `
-<p><strong>La production d\'électricité sur site est un système technique de bâtiment au sens du décret BACS (R175-1 §4).</strong></p>
-<p>Cette catégorie couvre les installations de production locale d\'électricité — onduleurs photovoltaïques, cogénérations, micro-éolien. <strong>La régulation de la production est assurée par l\'équipement lui-même</strong>, via le régulateur natif du fabricant (MPPT, gestion d\'injection, synchronisation réseau, sécurités). La solution Buildy lit la puissance instantanée, l\'énergie produite, l\'état de fonctionnement et les défauts pour permettre l\'analyse de production et l\'autoconsommation.</p>
+<p>Cette catégorie couvre les installations de production locale d\'électricité : onduleurs photovoltaïques, cogénérations, micro-éolien.</p>
+
+<p>La production d\'électricité sur site est un <strong>système technique de bâtiment au sens du décret BACS</strong> (R175-1 §4).</p>
+
+<p><strong>La régulation de la production est assurée par l\'équipement lui-même</strong>, via le régulateur natif du fabricant (MPPT, gestion d\'injection, synchronisation réseau, sécurités).</p>
+
+<p>La solution Buildy lit la puissance instantanée, l\'énergie produite, l\'état de fonctionnement et les défauts pour permettre l\'analyse de production et l\'autoconsommation.</p>
 `.trim(),
   points: [
     { slug: 'etat.production', label: 'État production', dataType: 'État', direction: 'read', position: 10 },

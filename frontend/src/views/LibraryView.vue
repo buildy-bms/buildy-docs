@@ -283,7 +283,7 @@ onMounted(async () => {
       <!-- Description -->
       <div class="mb-6">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Description fonctionnelle</h3>
-        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-none p-5"></div>
+        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-none p-6 equipment-desc"></div>
         <div v-else class="bg-white border border-dashed border-gray-300 rounded-none p-5 text-sm text-gray-400 italic">
           Pas encore de description rédigée pour ce template. Édite-le depuis une AF puis promeus tes modifications dans la bibliothèque.
         </div>
@@ -432,3 +432,14 @@ onMounted(async () => {
     </template>
   </div>
 </template>
+
+<style scoped>
+/* Aération du HTML rendu via v-html (description fonctionnelle équipement) */
+.equipment-desc :deep(p) { margin: 0 0 1rem; line-height: 1.65; }
+.equipment-desc :deep(p:last-child) { margin-bottom: 0; }
+.equipment-desc :deep(ul), .equipment-desc :deep(ol) { padding-left: 1.4rem; margin: 0.75rem 0 1rem; list-style-position: outside; }
+.equipment-desc :deep(ul) { list-style-type: disc; }
+.equipment-desc :deep(ol) { list-style-type: decimal; }
+.equipment-desc :deep(li) { margin: 0.4rem 0; line-height: 1.55; }
+.equipment-desc :deep(strong) { color: #1f2937; font-weight: 500; }
+</style>

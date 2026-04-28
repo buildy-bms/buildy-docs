@@ -11,7 +11,11 @@ module.exports = {
   icon_value: 'fa-leaf',
   icon_color: '#10b981',
   description_html: `
-<p>Un capteur de qualité de l\'air intérieur mesure les paramètres représentatifs du confort et de la santé des occupants : CO₂, COV, particules fines, humidité, température. Sa sensibilité et sa fréquence d\'acquisition sont déterminées par le capteur. La solution Buildy lit ces mesures pour alimenter les tableaux de bord QAI, déclencher des alertes et le cas échéant moduler la ventilation associée.</p>
+<p>Un capteur de qualité de l\'air intérieur mesure les paramètres représentatifs du confort et de la santé des occupants : CO₂, COV, particules fines, humidité, température.</p>
+
+<p>La <strong>sensibilité et la fréquence d\'acquisition sont déterminées par le capteur lui-même</strong>.</p>
+
+<p>La solution Buildy lit ces mesures pour alimenter les tableaux de bord QAI, déclencher des alertes et, le cas échéant, moduler la ventilation associée.</p>
 `.trim(),
   points: [
     { slug: 'mesure.co2', label: 'Concentration CO₂', dataType: 'Mesure', direction: 'read', unit: 'ppm', position: 10 },

@@ -5,14 +5,19 @@ module.exports = {
   name: 'Compteur calories',
   category: 'comptage',
   bacs_articles: 'R175-3',
-  bacs_justification: '<p>L\'article R175-3 du décret BACS exige un <strong>suivi continu de la consommation énergétique par usage</strong>. Le comptage thermique (calories pour le chauffage, frigories pour la climatisation) permet de mesurer précisément l\'énergie effectivement délivrée à un sous-réseau, indépendamment de la source d\'énergie primaire.</p><p>Cette mesure est indispensable pour répondre à l\'exigence d\'analyse comparative entre la consommation prévisionnelle et la consommation réelle, et pour détecter les dérives.</p><p>L\'intégration des compteurs de calories dans la GTB Buildy permet de remonter en continu l\'énergie thermique délivrée par sous-réseau et d\'alimenter les tableaux de bord énergétiques exigés par le décret.</p>',
+  bacs_justification: '<p>L\'article R175-3 du décret BACS exige un <strong>suivi continu de la consommation énergétique par usage</strong>. Le comptage thermique (calories pour le chauffage, frigories pour la climatisation) permet de mesurer précisément l\'énergie effectivement délivrée à un sous-réseau, indépendamment de la source d\'énergie primaire.</p><p>Cette mesure est indispensable pour répondre à l\'exigence d\'analyse comparative entre la consommation prévisionnelle et la consommation réelle, et pour détecter les dérives.</p><p>L\'intégration des compteurs de calories dans la solution Buildy permet de remonter en continu l\'énergie thermique délivrée par sous-réseau et d\'alimenter les tableaux de bord énergétiques exigés par le décret.</p>',
   preferred_protocols: 'M-Bus IP,M-Bus filaire,Modbus RTU',
   icon_kind: 'fa',
   icon_value: 'fa-temperature-half',
   icon_color: '#f97316',
   description_html: `
-<p><strong>Le comptage de calories (ou frigories) est une exigence du décret BACS (R175-3) pour le suivi des consommations thermiques.</strong></p>
-<p>Un compteur de calories mesure l\'énergie thermique délivrée à un sous-réseau (chauffage, climatisation, ECS) à partir des températures aller/retour et du débit. La métrologie est portée par le compteur. La solution Buildy lit l\'index, la puissance et le débit pour alimenter les tableaux de bord par poste de consommation.</p>
+<p>Un compteur de calories mesure l\'énergie thermique délivrée à un sous-réseau (chauffage, climatisation, ECS) à partir des températures aller/retour et du débit.</p>
+
+<p>Le comptage thermique (calories ou frigories) est une <strong>exigence du décret BACS</strong> (R175-3) pour le suivi des consommations thermiques.</p>
+
+<p>La <strong>métrologie est portée par le compteur lui-même</strong>.</p>
+
+<p>La solution Buildy lit l\'index, la puissance et le débit pour alimenter les tableaux de bord par poste de consommation.</p>
 `.trim(),
   points: [
     { slug: 'energie.totale', label: 'Énergie thermique totale (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 10 },

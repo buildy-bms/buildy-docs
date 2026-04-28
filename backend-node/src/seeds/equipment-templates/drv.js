@@ -5,14 +5,19 @@ module.exports = {
   name: 'Système DRV / VRV / VRF',
   category: 'climatisation',
   bacs_articles: 'R175-1 §1, §2',
-  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de climatisation</strong> comme la combinaison des composantes nécessaires pour assurer un traitement de l\'air intérieur permettant le contrôle ou l\'abaissement de la température. Un système DRV/VRV/VRF entre dans cette définition, et combine également la fonction de chauffage (§1) sur une même boucle frigorifique réversible.</p><p>Le décret impose <strong>l\'interopérabilité</strong> avec les autres systèmes techniques, la <strong>capacité d\'arrêt manuel</strong> et la <strong>gestion autonome</strong> via le système BACS (suivi, alarmes, programmation, pilotage à distance).</p><p>L\'intégration du DRV dans la GTB Buildy permet de superviser chaque unité intérieure (mode, consigne, état, alarmes) et de transmettre les commandes correspondantes.</p>',
+  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de climatisation</strong> comme la combinaison des composantes nécessaires pour assurer un traitement de l\'air intérieur permettant le contrôle ou l\'abaissement de la température. Un système DRV/VRV/VRF entre dans cette définition, et combine également la fonction de chauffage (§1) sur une même boucle frigorifique réversible.</p><p>Le décret impose <strong>l\'interopérabilité</strong> avec les autres systèmes techniques, la <strong>capacité d\'arrêt manuel</strong> et la <strong>gestion autonome</strong> via le système BACS (suivi, alarmes, programmation, pilotage à distance).</p><p>L\'intégration du DRV dans la solution Buildy permet de superviser chaque unité intérieure (mode, consigne, état, alarmes) et de transmettre les commandes correspondantes.</p>',
   preferred_protocols: 'BACnet/IP,Modbus TCP',
   icon_kind: 'fa',
   icon_value: 'fa-snowflake',
   icon_color: '#06b6d4',
   description_html: `
-<p><strong>Un système DRV/VRV/VRF est concerné par le décret BACS au titre des systèmes de chauffage (R175-1 §1) et de climatisation (§2).</strong></p>
-<p>Un système à débit de réfrigérant variable assure le conditionnement thermique d\'unités intérieures multiples (chaud et/ou froid) à partir d\'une ou plusieurs unités extérieures. <strong>La régulation du système DRV est assurée par l\'équipement lui-même</strong>, via la régulation native du fabricant qui pilote la puissance frigorifique, le basculement chaud/froid, la modulation et les sécurités de la boucle frigorifique. La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure depuis l\'application Hyperveez.</p>
+<p>Un système à débit de réfrigérant variable assure le conditionnement thermique d\'unités intérieures multiples (chaud et/ou froid) à partir d\'une ou plusieurs unités extérieures.</p>
+
+<p>À ce titre, il est <strong>concerné par le décret BACS au titre des systèmes de chauffage</strong> (R175-1 §1) <strong>et de climatisation</strong> (§2).</p>
+
+<p><strong>La régulation du système DRV est assurée par l\'équipement lui-même</strong>, via la régulation native du fabricant qui pilote la puissance frigorifique, le basculement chaud/froid, la modulation et les sécurités de la boucle frigorifique.</p>
+
+<p>La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure.</p>
 `.trim(),
   points: [
     { slug: 'etat.unite_int', label: 'État unité intérieure (marche/arrêt)', dataType: 'État', direction: 'read', position: 10 },

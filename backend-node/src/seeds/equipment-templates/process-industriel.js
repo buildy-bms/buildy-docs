@@ -11,7 +11,11 @@ module.exports = {
   icon_value: 'fa-industry',
   icon_color: '#475569',
   description_html: `
-<p>Cette catégorie couvre les équipements de process spécifiques au métier du site (compresseurs, lignes de production, fours, machines spéciales). <strong>La régulation et la sécurité du process sont assurées par l\'équipement lui-même</strong>, via l\'automate process dédié, généralement portée par l\'intégrateur process selon les exigences métier du site. La solution Buildy supervise les états, les compteurs de production et les défauts pour permettre l\'analyse énergétique et la corrélation avec les autres systèmes du bâtiment, sans intervenir sur le pilotage du process.</p>
+<p>Cette catégorie couvre les équipements de process spécifiques au métier du site : compresseurs, lignes de production, fours, machines spéciales.</p>
+
+<p><strong>La régulation et la sécurité du process sont assurées par l\'équipement lui-même</strong>, via l\'automate process dédié — généralement porté par l\'intégrateur process selon les exigences métier du site.</p>
+
+<p>La solution Buildy supervise les états, les compteurs de production et les défauts pour permettre l\'analyse énergétique et la corrélation avec les autres systèmes du bâtiment, <strong>sans intervenir sur le pilotage du process</strong>.</p>
 `.trim(),
   points: [
     { slug: 'etat.fonctionnement', label: 'État de fonctionnement', dataType: 'État', direction: 'read', position: 10 },

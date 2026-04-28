@@ -5,14 +5,19 @@ module.exports = {
   name: 'Rooftop',
   category: 'climatisation',
   bacs_articles: 'R175-1 §1, §2, §3',
-  bacs_justification: '<p>Un rooftop combine dans un seul équipement compact les <strong>trois fonctions définies par l\'article R175-1</strong> : ventilation (§3), chauffage (§1) et climatisation (§2). Il est donc pleinement concerné par le décret BACS, à plusieurs titres.</p><p>Le décret impose que cet équipement soit <strong>interopérable</strong> avec les autres systèmes techniques du bâtiment, qu\'il puisse être <strong>arrêté manuellement</strong> et qu\'il soit <strong>géré de manière autonome</strong> via le système BACS, avec un suivi continu et la remontée des alarmes.</p><p>L\'intégration du rooftop dans la GTB Buildy permet de superviser les températures, les puissances frigorifique et calorifique, l\'encrassement des filtres et tous les défauts, et de transmettre les commandes et consignes nécessaires.</p>',
+  bacs_justification: '<p>Un rooftop combine dans un seul équipement compact les <strong>trois fonctions définies par l\'article R175-1</strong> : ventilation (§3), chauffage (§1) et climatisation (§2). Il est donc pleinement concerné par le décret BACS, à plusieurs titres.</p><p>Le décret impose que cet équipement soit <strong>interopérable</strong> avec les autres systèmes techniques du bâtiment, qu\'il puisse être <strong>arrêté manuellement</strong> et qu\'il soit <strong>géré de manière autonome</strong> via le système BACS, avec un suivi continu et la remontée des alarmes.</p><p>L\'intégration du rooftop dans la solution Buildy permet de superviser les températures, les puissances frigorifique et calorifique, l\'encrassement des filtres et tous les défauts, et de transmettre les commandes et consignes nécessaires.</p>',
   preferred_protocols: 'BACnet/IP,Modbus TCP',
   icon_kind: 'fa',
   icon_value: 'fa-building',
   icon_color: '#0ea5e9',
   description_html: `
-<p><strong>Un rooftop est concerné par le décret BACS au titre de la ventilation (R175-1 §3), du chauffage (§1) et de la climatisation (§2).</strong></p>
-<p>Un rooftop est une centrale autonome installée en toiture qui assure le renouvellement d\'air, le chauffage et la climatisation. <strong>La régulation du rooftop est assurée par l\'équipement lui-même</strong>, via l\'automate intégré fourni par le fabricant qui pilote la séquence chaud/froid, la modulation, le mode économique, le free cooling et les sécurités. La solution Buildy supervise les températures, les états des composants frigorifiques et de chauffe, les alarmes et les compteurs, et porte les logiques applicatives (programmations horaires, scénarios par usage) en transmettant les commandes et consignes appropriées.</p>
+<p>Un rooftop est une centrale autonome installée en toiture qui assure le renouvellement d\'air, le chauffage et la climatisation.</p>
+
+<p>À ce titre, il est <strong>concerné par le décret BACS au titre de la ventilation</strong> (R175-1 §3), <strong>du chauffage</strong> (§1) <strong>et de la climatisation</strong> (§2).</p>
+
+<p><strong>La régulation du rooftop est assurée par l\'équipement lui-même</strong>, via l\'automate intégré fourni par le fabricant qui pilote la séquence chaud/froid, la modulation, le mode économique, le free cooling et les sécurités.</p>
+
+<p>La solution Buildy supervise les températures, les états des composants frigorifiques et de chauffe, les alarmes et les compteurs. Elle porte les logiques applicatives transverses (programmations horaires, scénarios par usage) en transmettant les commandes et consignes appropriées.</p>
 `.trim(),
   points: [
     { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },

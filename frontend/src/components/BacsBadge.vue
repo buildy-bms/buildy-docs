@@ -11,7 +11,7 @@ const props = defineProps({
   // 'equipment'        → "Système concerné par le décret BACS"
   context: { type: String, default: 'section' },
   // Explication métier propre à l'équipement / la section : pourquoi le décret
-  // s'applique ici, comment la GTB Buildy y répond. Affichée en haut de la modale.
+  // s'applique ici, comment la solution Buildy y répond. Affichée en haut de la modale.
   contextExplanation: { type: String, default: null },
 })
 

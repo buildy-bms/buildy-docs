@@ -15,19 +15,24 @@ module.exports = {
   name: 'Centrale de traitement d\'air (CTA)',
   category: 'ventilation',
   bacs_articles: 'R175-1 §1, §2, §3',
-  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l\'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et qu\'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p><p>L\'intégration de la CTA dans la GTB Buildy permet de répondre à ces obligations en supervisant les températures, les débits, les états des composants et en exposant les commandes nécessaires au pilotage à distance.</p>',
+  bacs_justification: '<p>L\'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l\'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et qu\'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p><p>L\'intégration de la CTA dans la solution Buildy permet de répondre à ces obligations en supervisant les températures, les débits, les états des composants et en exposant les commandes nécessaires au pilotage à distance.</p>',
   preferred_protocols: 'Modbus TCP,BACnet/IP',
   icon_kind: 'fa',
   icon_value: 'fa-fan',
   icon_color: '#3b82f6',
   description_html: `
-<p><strong>Une CTA est concernée par une ou plusieurs des définitions suivantes selon sa configuration :</strong></p>
+<p>Une centrale de traitement d'air assure le renouvellement, le filtrage et le conditionnement de l'air insufflé dans le bâtiment.</p>
+
+<p>Selon sa configuration, une CTA peut être concernée par une ou plusieurs définitions du décret BACS :</p>
 <ul>
 <li>Système de ventilation (R175-1 §3) — dans tous les cas</li>
 <li>Système de chauffage (R175-1 §1) — si la CTA intègre une batterie de chauffe</li>
 <li>Système de climatisation (R175-1 §2) — si la CTA intègre une batterie de froid</li>
 </ul>
-<p>Une centrale de traitement d'air assure le renouvellement, le filtrage et le conditionnement de l'air insufflé dans le bâtiment. <strong>La régulation de la CTA est assurée par l'équipement lui-même</strong>, via le système de régulation embarqué fourni par le fabricant ou via une régulation portée par l'intégrateur lors de la mise en service. Elle gère en autonomie l'ensemble de la logique de fonctionnement bas niveau (séquences chaud/froid, modulation, sécurités). La solution Buildy supervise la CTA en lisant ses états et mesures, et en lui transmettant des commandes et consignes depuis l'application Hyperveez.</p>
+
+<p><strong>La régulation de la CTA est assurée par l'équipement lui-même</strong>, via la régulation embarquée fournie par le fabricant ou via une régulation portée par l'intégrateur du lot CVC (frigoriste, intégrateur ventilation) lors de la mise en service. Cette régulation gère en autonomie la logique de fonctionnement bas niveau : séquences chaud/froid, modulation, sécurités.</p>
+
+<p>La solution Buildy intervient en aval, en interconnectant la CTA aux autres systèmes du bâtiment. Elle supervise les états et mesures, transmet les commandes et consignes nécessaires, et porte les logiques applicatives transverses (programmations horaires, scénarios par usage, mise en cohérence multi-systèmes).</p>
 `.trim(),
   points: [
     // ── Donnees lues ──

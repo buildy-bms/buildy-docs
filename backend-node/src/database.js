@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 16;
+const TARGET_VERSION = 17;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -643,6 +643,31 @@ function runMigrations() {
     if (cleared > 0) log.info(`Migration 16 : ${cleared} description_html vidées (régulation équipement = fabricant/intégrateur)`);
     db.pragma('user_version = 16');
     log.info('Migration 16 appliquee : reset descriptions pour mention regulation fabricant/integrateur');
+  }
+
+  if (current < 17) {
+    // Reset des descriptions équipement pour reseed avec :
+    // - texte aéré en plusieurs paragraphes courts
+    // - "GTB Buildy" → "solution Buildy" partout (positionnement Buildy non-GTB)
+    // - "intégrateur" précisé (pas Buildy : chaufferiste, frigoriste, électricien…)
+    const SLUGS = [
+      'cta', 'chaudiere', 'aerotherme', 'destratificateur', 'drv', 'rooftop',
+      'ventilation-generique', 'ecs', 'eclairage-interieur', 'eclairage-exterieur',
+      'prises-pilotees', 'production-electricite', 'volets', 'stores',
+      'process-industriel', 'equipement-generique',
+      'compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories', 'qai',
+    ];
+    let cleared = 0, justifCleared = 0;
+    for (const slug of SLUGS) {
+      const r = db.prepare('UPDATE equipment_templates SET description_html = NULL WHERE slug = ?').run(slug);
+      cleared += r.changes;
+    }
+    // Vide aussi les bacs_justification (refonte "GTB Buildy" → "solution Buildy")
+    const r2 = db.prepare("UPDATE equipment_templates SET bacs_justification = NULL WHERE bacs_justification LIKE '%GTB Buildy%'").run();
+    justifCleared = r2.changes;
+    log.info(`Migration 17 : ${cleared} description_html + ${justifCleared} bacs_justification vidées (positionnement Buildy + aération)`);
+    db.pragma('user_version = 17');
+    log.info('Migration 17 appliquee : reset descriptions + justifications pour positionnement Buildy non-GTB');
   }
 
   if (current > TARGET_VERSION) {
