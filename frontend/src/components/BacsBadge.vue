@@ -22,15 +22,19 @@ const labelPrefix = props.context === 'equipment'
 const showModal = ref(false)
 const bacsData = ref(null)
 
-// Parse la référence en liste { code, paragraphs[] }
+// Parse la référence en liste { code, paragraphs[] }.
+// Ajoute systématiquement R175-3 §1, §3, §4 (obligations BACS communes) en
+// complément des références propres à l'équipement, parce que le bandeau
+// "Pourquoi le décret s'applique ici" cite ces obligations (interopérabilité,
+// arrêt manuel, gestion autonome, suivi continu) — les extraits justificatifs
+// correspondants doivent suivre.
 const articleRefs = computed(() => {
   if (!props.reference) return []
   const parts = props.reference.split(/[;,]/).map(s => s.trim()).filter(Boolean)
-  // Regroupe par code (R175-X)
   const map = new Map()
   let lastCode = null
   for (const p of parts) {
-    const codeMatch = p.match(/R175-\d+/)
+    const codeMatch = p.match(/R175-\d+(-\d+)?/)
     const paraMatches = [...p.matchAll(/§\s*(\d+)/g)].map(m => m[1])
     const code = codeMatch ? codeMatch[0] : lastCode
     if (!code) continue
@@ -38,6 +42,17 @@ const articleRefs = computed(() => {
     if (!map.has(code)) map.set(code, new Set())
     paraMatches.forEach(pp => map.get(code).add(pp))
   }
+
+  // Auto-ajout des exigences BACS communes (R175-3) pour les équipements
+  // référençant le décret. R175-3 §1 = suivi continu / §3 = interopérabilité /
+  // §4 = arrêt manuel + gestion autonome.
+  if (map.size > 0 && !map.has('R175-3')) {
+    map.set('R175-3', new Set(['1', '3', '4']))
+  } else if (map.has('R175-3')) {
+    const existing = map.get('R175-3')
+    ;['1', '3', '4'].forEach(p => existing.add(p))
+  }
+
   return [...map.entries()].map(([code, paras]) => ({ code, paragraphs: [...paras] }))
 })
 
