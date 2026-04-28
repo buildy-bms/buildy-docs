@@ -247,7 +247,10 @@ async function routes(fastify) {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // POST /api/afs/:afId/exports/synthesis — tableau de synthese A3 paysage
+  // POST /api/afs/:afId/exports/synthesis — synthese 3 pages
+  //   1. Bilan projet (KPIs + niveau requis vs contracte + ecartes MOA)
+  //   2. Conformite BACS (4 exigences R175-3 → couverture par sections AF)
+  //   3. Matrice systemes (1 ligne par equipement supervise ou ecarte)
   // ═══════════════════════════════════════════════════════════════════
   fastify.post('/afs/:afId/exports/synthesis', async (request, reply) => {
     const afId = parseInt(request.params.afId, 10);
@@ -262,67 +265,174 @@ async function routes(fastify) {
     const user = userId ? db.users.getById(userId) : null;
     const authorName = user?.display_name || user?.email || 'Inconnu';
 
-    // ── Construit les lignes : tous les equipements (kind='equipment') ──
+    // ── Charge toutes les sections de l'AF ──
     const synthExcluded = new Set(body.excluded_section_ids || []);
-    const equipmentSections = db.sections.listByAf(afId).filter(s =>
-      s.kind === 'equipment' && s.included_in_export && !synthExcluded.has(s.id)
-    );
+    const allSections = db.sections.listByAf(afId);
 
-    const FUNCTION_KEYWORDS = {
-      hasProgramming: ['program', 'horaire', 'consigne', 'commande'],
-      hasDrift: ['compteur', 'consommation', 'kwh', 'm3', 'energie'],
-      hasNotif: ['alarme', 'defaut', 'panne'],
-      hasDashboard: ['energie', 'cvc', 'eclairage', 'qualite', 'comptage'],
-    };
+    function isSectionLive(s) {
+      // Une section est consideree "active" pour le calcul si elle est incluse
+      // dans l'export, non ecartee MOA, et non explicitement exclue de la synthese.
+      return s.included_in_export && !s.opted_out_by_moa && !synthExcluded.has(s.id);
+    }
+    const liveSections = allSections.filter(isSectionLive);
+    function findByNumber(num) { return allSections.find(s => s.number === num) || null; }
+    function isLiveByNumber(num) { const s = findByNumber(num); return s ? isSectionLive(s) : false; }
 
-    function matchesAny(text, keywords) {
-      const t = (text || '').toLowerCase();
-      return keywords.some(k => t.includes(k));
+    // ── PAGE 1 : KPIs & verdict niveau ──
+    const equipmentSections = allSections.filter(s => s.kind === 'equipment');
+    const equipmentLive = equipmentSections.filter(isSectionLive);
+    const equipmentOptedOut = equipmentSections.filter(s => s.opted_out_by_moa === 1);
+
+    let instancesTotal = 0;
+    let pointsTotal = 0;
+    const equipmentEnriched = equipmentSections.map(sec => {
+      const points = resolveSectionPoints(sec.id);
+      const instances = db.equipmentInstances.listBySection(sec.id).reduce((a, i) => a + (i.qty || 1), 0);
+      if (isSectionLive(sec)) { instancesTotal += instances; pointsTotal += points.length * instances; }
+      const reads = points.filter(p => p.direction === 'read').length;
+      const writes = points.filter(p => p.direction === 'write').length;
+      const alarms = points.filter(p => p.data_type === 'Alarme').length;
+      const commands = points.filter(p => p.data_type === 'Commande').length;
+      const consignes = points.filter(p => p.data_type === 'Consigne').length;
+      return { sec, points, instances, reads, writes, alarms, commands, consignes };
+    });
+
+    const { resolveAfLevel } = require('../lib/service-level-resolver');
+    const required = resolveAfLevel(liveSections);
+    const RANK = { E: 0, S: 1, P: 2 };
+    const LEVEL_LABELS = { E: 'Essentials', S: 'Smart', P: 'Premium' };
+
+    const contractLevel = af.service_level || null;
+    const requiredLevel = required.level || null;
+    let levelVerdict;
+    if (!requiredLevel) {
+      levelVerdict = { kind: 'none', text: 'Aucun calcul possible.' };
+    } else if (!contractLevel) {
+      levelVerdict = { kind: 'no-contract', text: `Niveau de contrat requis : ${LEVEL_LABELS[requiredLevel]}. Aucun niveau contractuel fixé — à arbitrer au bon de commande.` };
+    } else if (RANK[requiredLevel] > RANK[contractLevel]) {
+      levelVerdict = { kind: 'shortfall', text: `Le contrat actuel (${LEVEL_LABELS[contractLevel]}) ne couvre pas le périmètre décrit dans cette AF, qui requiert un niveau ${LEVEL_LABELS[requiredLevel]}.` };
+    } else if (RANK[requiredLevel] < RANK[contractLevel]) {
+      levelVerdict = { kind: 'over', text: `Le contrat actuel (${LEVEL_LABELS[contractLevel]}) couvre largement le périmètre décrit (qui requiert seulement ${LEVEL_LABELS[requiredLevel]}). Marge disponible pour activer d'autres fonctionnalités.` };
+    } else {
+      levelVerdict = { kind: 'ok', text: `Le contrat ${LEVEL_LABELS[contractLevel]} couvre exactement le périmètre décrit dans cette AF.` };
     }
 
-    const rows = equipmentSections.map((sec) => {
-      const points = resolveSectionPoints(sec.id);
-      const instances = db.equipmentInstances.listBySection(sec.id);
-      const counts = { Mesure: 0, 'État': 0, Alarme: 0, Commande: 0, Consigne: 0 };
-      let reads = 0, writes = 0;
-      for (const p of points) {
-        if (counts[p.data_type] !== undefined) counts[p.data_type]++;
-        if (p.direction === 'read') reads++;
-        else if (p.direction === 'write') writes++;
-      }
-      const sl = sec.service_level;
-      const levelClass = sl ? sl.replace(/[^A-Z]/g, '') : '';
-      const sectionText = `${sec.title} ${(points.map(p => p.label).join(' '))}`;
+    const kpis = {
+      systemsCovered: equipmentLive.filter(s => {
+        const en = equipmentEnriched.find(e => e.sec.id === s.id);
+        return en && en.instances > 0;
+      }).length,
+      systemsCatalog: equipmentSections.length,
+      instancesTotal,
+      pointsTotal,
+      contractLevel,
+      contractLevelLabel: contractLevel ? LEVEL_LABELS[contractLevel] : null,
+      requiredLevel,
+      requiredLevelLabel: requiredLevel ? LEVEL_LABELS[requiredLevel] : null,
+      verdict: levelVerdict,
+    };
+
+    const optedOutList = equipmentOptedOut.map(s => ({
+      number: s.number, title: s.title,
+      requiredContract: s.service_level === 'P' ? 'Premium' : (s.service_level === 'S' ? 'Smart' : 'Smart ou Premium'),
+    }));
+
+    // ── PAGE 2 : Conformite BACS R175-3 (4 exigences) ──
+    // Mapping de chaque exigence aux sections de l'AF qui y répondent.
+    const BACS_REQUIREMENTS = [
+      {
+        code: '§1', title: 'Suivi continu et historisation',
+        text: 'Suivi, enregistrement et analyse en continu des données énergétiques par zone fonctionnelle, à pas horaire, conservées 5 ans à l\'échelle mensuelle.',
+        coverNumbers: ['3.1', '3.2', '6.2'],
+        buildyAnswer: 'Acquisition temps réel, historisation longue durée, tableaux de bord énergie. Conformité 5 ans satisfaite à partir du contrat Smart.',
+      },
+      {
+        code: '§2', title: 'Détection des dérives énergétiques',
+        text: 'Comparaison aux valeurs de référence, détection des pertes d\'efficacité, information de l\'exploitant sur les améliorations possibles.',
+        coverNumbers: ['6.3', '5.1', '5.2'],
+        buildyAnswer: 'Seuils paramétrables par compteur (occupation/inoccupation/global) avec alarmes et notifications.',
+      },
+      {
+        code: '§3', title: 'Interopérabilité multi-systèmes',
+        text: 'Capacité d\'interagir avec les différents systèmes techniques du bâtiment, indépendamment du fabricant et du protocole.',
+        coverNumbers: ['1.2', '2'],
+        buildyAnswer: 'Compatibilité multi-protocoles (BACnet, Modbus, KNX, M-Bus, MQTT, LoRaWAN…) et multi-fabricants par conception.',
+      },
+      {
+        code: '§4', title: 'Arrêt manuel et gestion autonome',
+        text: 'Possibilité d\'arrêter manuellement les systèmes techniques et de leur appliquer une gestion autonome (programmations, scénarios).',
+        coverNumbers: ['4.1', '4.2'],
+        buildyAnswer: 'Commandes manuelles depuis Hyperveez (marche/arrêt, consignes) + programmations horaires centralisées.',
+      },
+    ];
+    const bacsConformity = BACS_REQUIREMENTS.map(req => {
+      const coverSections = req.coverNumbers
+        .map(n => allSections.find(s => s.number === n))
+        .filter(Boolean);
+      const liveCover = coverSections.filter(isSectionLive);
+      let status;
+      if (coverSections.length === 0) status = 'non-applicable';
+      else if (liveCover.length === coverSections.length) status = 'covered';
+      else if (liveCover.length > 0) status = 'partial';
+      else status = 'not-covered';
       return {
-        name: sec.title,
-        bacs: sec.bacs_articles,
-        levelLabel: formatLevelFull(sl),
-        levelClass,
-        instances: instances.length,
-        mesures: counts.Mesure,
-        etats: counts['État'],
-        alarmes: counts.Alarme,
-        commandes: counts.Commande,
-        consignes: counts.Consigne,
-        readsTotal: reads,
-        writesTotal: writes,
-        hasProgramming: counts.Commande > 0 || counts.Consigne > 0,
-        hasDrift: matchesAny(sectionText, FUNCTION_KEYWORDS.hasDrift),
-        hasNotif: counts.Alarme > 0,
-        hasDashboard: matchesAny(sectionText, FUNCTION_KEYWORDS.hasDashboard),
+        ...req,
+        sections: coverSections.map(s => ({
+          number: s.number,
+          title: s.title,
+          live: isSectionLive(s),
+          opted_out: !!s.opted_out_by_moa,
+          excluded: !s.included_in_export,
+        })),
+        status,
+        statusLabel: { covered: 'Couvert', partial: 'Partiellement couvert', 'not-covered': 'Non couvert', 'non-applicable': 'Non applicable' }[status],
       };
     });
 
-    const totals = rows.reduce((acc, r) => ({
-      instances: acc.instances + r.instances,
-      mesures: acc.mesures + r.mesures,
-      etats: acc.etats + r.etats,
-      alarmes: acc.alarmes + r.alarmes,
-      commandes: acc.commandes + r.commandes,
-      consignes: acc.consignes + r.consignes,
-      reads: acc.reads + r.readsTotal,
-      writes: acc.writes + r.writesTotal,
-    }), { instances: 0, mesures: 0, etats: 0, alarmes: 0, commandes: 0, consignes: 0, reads: 0, writes: 0 });
+    // ── PAGE 3 : Matrice systemes (filtree) ──
+    // Ne garde que les equipements qui ont une instance, OU sont concernes par BACS, OU sont ecartes MOA.
+    const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
+      instances > 0 || (sec.bacs_articles && sec.bacs_articles.trim()) || sec.opted_out_by_moa
+    );
+    const COMPTAGE_KEYWORDS = ['compteur', 'comptage', 'consommation'];
+    function isCountingSystem(sec) {
+      const t = (sec.title || '').toLowerCase();
+      return COMPTAGE_KEYWORDS.some(k => t.includes(k));
+    }
+    const systemsMatrix = relevantEquipment.map(({ sec, points, instances, reads, writes, alarms, commands, consignes }) => {
+      const isOptedOut = sec.opted_out_by_moa === 1;
+      const isExcluded = !sec.included_in_export;
+      let status, statusClass;
+      if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
+      else if (isExcluded) { status = 'Exclue de l\'export'; statusClass = 'excluded'; }
+      else if (instances === 0) { status = 'Non instanciée à ce jour'; statusClass = 'not-instanced'; }
+      else { status = 'Couverte'; statusClass = 'covered'; }
+
+      // Couverture fonctionnelle
+      const hasMonitoring = reads > 0;
+      const hasCommand = (commands + consignes) > 0;
+      const hasAlarms = alarms > 0;
+      const hasReporting = isCountingSystem(sec) || (sec.bacs_articles || '').includes('R175-1 §4');
+
+      const sl = sec.service_level;
+      return {
+        number: sec.number,
+        title: sec.title,
+        bacs: sec.bacs_articles || null,
+        levelLabel: sl ? formatLevelFull(sl) : null,
+        levelClass: sl ? sl.replace(/[^A-Z]/g, '') : '',
+        instances,
+        pointsCount: points.length,
+        status, statusClass,
+        isOptedOut, isExcluded,
+        hasMonitoring, hasCommand, hasAlarms, hasReporting,
+      };
+    });
+
+    const totalsMatrix = systemsMatrix.reduce((acc, r) => ({
+      instances: acc.instances + (r.isOptedOut || r.isExcluded ? 0 : r.instances),
+      points: acc.points + (r.isOptedOut || r.isExcluded ? 0 : r.pointsCount * r.instances),
+    }), { instances: 0, points: 0 });
 
     const previousCount = db.db.prepare(`
       SELECT COUNT(*) AS c FROM exports WHERE af_id = ? AND kind = 'pdf-synthesis'
@@ -337,7 +447,7 @@ async function routes(fastify) {
       af, authorName, exportDate, version,
       motif: body.motif,
       logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-      rows, totals,
+      kpis, optedOutList, bacsConformity, systemsMatrix, totalsMatrix,
     };
 
     const exportsDir = path.resolve(config.exportsDir);
@@ -352,9 +462,9 @@ async function routes(fastify) {
         styles: 'styles-synthesis',
         data,
         outputPath,
-        pageFormat: 'A3',
-        pdfOptions: { landscape: true },
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
+        pageFormat: 'A4',
+        pdfOptions: { landscape: true, margin: { top: '14mm', bottom: '12mm', left: '14mm', right: '14mm' } },
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: false, opacity: 0.025 },
       });
     } catch (err) {
       log.error(`PDF synthesis render failed: ${err.message}`);
@@ -369,14 +479,14 @@ async function routes(fastify) {
       VALUES (?, 'pdf-af', ?, ?, ?, ?, ?, ?, ?)
     `).run(
       afId, result.path,
-      JSON.stringify({ rows: rows.length, totals }),
-      JSON.stringify({ version, format: 'A3-landscape-synthesis' }),
+      JSON.stringify({ systems: systemsMatrix.length, totals: totalsMatrix, requiredLevel, contractLevel }),
+      JSON.stringify({ version, format: 'A4-landscape-synthesis-3p' }),
       body.motif, version, userId || null, result.sizeBytes
     );
 
     db.auditLog.add({
       afId, userId, action: 'export.synthesis',
-      payload: { version, motif: body.motif, rows: rows.length },
+      payload: { version, motif: body.motif, systems: systemsMatrix.length, requiredLevel, contractLevel },
     });
     log.info(`PDF synthesis exported: AF #${afId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB)`);
     await commitExportSilently(afId, `${version} : ${body.motif}`, version, request.authUser);
@@ -386,8 +496,9 @@ async function routes(fastify) {
       version,
       file_size_bytes: result.sizeBytes,
       download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
-      rows_count: rows.length,
-      totals,
+      systems_count: systemsMatrix.length,
+      totals: totalsMatrix,
+      kpis,
     };
   });
 

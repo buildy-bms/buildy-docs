@@ -2,98 +2,213 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Tableau de synthèse — {{af.client_name}} — {{af.project_name}}</title>
+<title>Synthèse — {{af.client_name}} — {{af.project_name}}</title>
 <style>{{{styles}}}</style>
 </head>
 <body>
 
-{{!-- ═══════════ Page de garde compacte ═══════════ --}}
-<header class="header">
-  <div class="header-left">
-    <img class="header-logo" src="{{logoDataUrl}}" alt="Buildy" />
-    <div>
-      <p class="header-doc-type">Tableau de synthèse — Analyse fonctionnelle</p>
-      <h1 class="header-title">{{af.client_name}} — {{af.project_name}}</h1>
-      {{#if af.site_address}}<p class="header-address">{{af.site_address}}</p>{{/if}}
+{{!-- ═══════════════════ Header commun (chaque page) ═══════════════════ --}}
+{{!-- Pas un vrai header Puppeteer : juste un header HTML repete en haut de chaque section --}}
+
+{{!-- ═══════════════════ PAGE 1 — Bilan projet ═══════════════════ --}}
+<section class="page">
+  <header class="page-header">
+    <div class="page-header-left">
+      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
+      <div>
+        <p class="page-doctype">Synthèse de l'analyse fonctionnelle</p>
+        <h1 class="page-title">{{af.client_name}} — {{af.project_name}}</h1>
+        {{#if af.site_address}}<p class="page-subtitle">{{af.site_address}}</p>{{/if}}
+      </div>
+    </div>
+    <div class="page-header-right">
+      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
+      <p class="page-meta"><span class="meta-label">Date</span> {{exportDate}}</p>
+      <p class="page-meta"><span class="meta-label">Auteur</span> {{authorName}}</p>
+    </div>
+  </header>
+
+  <h2 class="section-h">1. Bilan du projet</h2>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <p class="kpi-value">{{kpis.systemsCovered}}<span class="kpi-value-sub">/{{kpis.systemsCatalog}}</span></p>
+      <p class="kpi-label">Systèmes supervisés</p>
+      <p class="kpi-hint">catégories d'équipement avec instances</p>
+    </div>
+    <div class="kpi-card">
+      <p class="kpi-value">{{kpis.instancesTotal}}</p>
+      <p class="kpi-label">Instances déclarées</p>
+      <p class="kpi-hint">références d'équipements réels sur site</p>
+    </div>
+    <div class="kpi-card">
+      <p class="kpi-value">{{kpis.pointsTotal}}</p>
+      <p class="kpi-label">Points contractuels</p>
+      <p class="kpi-hint">total points × instances</p>
+    </div>
+    <div class="kpi-card kpi-level kpi-level-{{kpis.verdict.kind}}">
+      <p class="kpi-value">{{#if kpis.requiredLevelLabel}}{{kpis.requiredLevelLabel}}{{else}}—{{/if}}</p>
+      <p class="kpi-label">Niveau Buildy requis</p>
+      <p class="kpi-hint">{{#if kpis.contractLevelLabel}}contrat actuel : {{kpis.contractLevelLabel}}{{else}}contrat à définir{{/if}}</p>
     </div>
   </div>
-  <div class="header-right">
-    <p class="header-meta"><span class="header-meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-    <p class="header-meta"><span class="header-meta-label">Date</span> {{exportDate}}</p>
-    <p class="header-meta"><span class="header-meta-label">Auteur</span> {{authorName}}</p>
-    {{#if motif}}<p class="header-motif">{{motif}}</p>{{/if}}
+
+  <div class="verdict verdict-{{kpis.verdict.kind}}">
+    <p class="verdict-title">
+      {{#if (eq kpis.verdict.kind 'ok')}}✓ Couverture cohérente avec le contrat{{/if}}
+      {{#if (eq kpis.verdict.kind 'over')}}ⓘ Marge contractuelle disponible{{/if}}
+      {{#if (eq kpis.verdict.kind 'shortfall')}}⚠ Niveau de contrat insuffisant{{/if}}
+      {{#if (eq kpis.verdict.kind 'no-contract')}}ⓘ Niveau de contrat à arbitrer{{/if}}
+      {{#if (eq kpis.verdict.kind 'none')}}ⓘ Aucun calcul possible{{/if}}
+    </p>
+    <p class="verdict-text">{{kpis.verdict.text}}</p>
   </div>
-</header>
 
-{{!-- ═══════════ Tableau matriciel ═══════════ --}}
-<table class="synth">
-  <thead>
-    <tr>
-      <th class="col-cat" rowspan="2">Système / Équipement</th>
-      <th class="col-bacs" rowspan="2">Exigé par le décret BACS</th>
-      <th class="col-level" rowspan="2">Niveau service</th>
-      <th class="col-instances" rowspan="2">Instances</th>
-      <th colspan="5" class="col-group">Données</th>
-      <th class="col-rw" rowspan="2">Lectures</th>
-      <th class="col-rw" rowspan="2">Écritures</th>
-      <th colspan="4" class="col-group">Fonctions</th>
-    </tr>
-    <tr>
-      <th class="col-type">Mesures</th>
-      <th class="col-type">États</th>
-      <th class="col-type">Alarmes</th>
-      <th class="col-type">Commandes</th>
-      <th class="col-type">Consignes</th>
-      <th class="col-fn">Programmation horaire</th>
-      <th class="col-fn">Détection dérives</th>
-      <th class="col-fn">Notifications push</th>
-      <th class="col-fn">Tableau de bord</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{#each rows}}
-    <tr>
-      <td class="cell-cat">{{name}}</td>
-      <td class="cell-bacs">{{#if bacs}}<span class="badge-bacs">{{bacs}}</span>{{else}}—{{/if}}</td>
-      <td class="cell-level">{{#if levelLabel}}<span class="badge-level lvl-{{levelClass}}">{{levelLabel}}</span>{{else}}—{{/if}}</td>
-      <td class="cell-num">{{#if instances}}<strong>{{instances}}</strong>{{else}}<span class="muted">0</span>{{/if}}</td>
-      <td class="cell-num cell-type">{{#if mesures}}<span class="check t-mesure">{{mesures}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-type">{{#if etats}}<span class="check t-etat">{{etats}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-type">{{#if alarmes}}<span class="check t-alarme">{{alarmes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-type">{{#if commandes}}<span class="check t-commande">{{commandes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-type">{{#if consignes}}<span class="check t-consigne">{{consignes}}</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num"><strong>{{readsTotal}}</strong></td>
-      <td class="cell-num"><strong>{{writesTotal}}</strong></td>
-      <td class="cell-num cell-fn">{{#if hasProgramming}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-fn">{{#if hasDrift}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-fn">{{#if hasNotif}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-      <td class="cell-num cell-fn">{{#if hasDashboard}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
-    </tr>
-    {{/each}}
-  </tbody>
-  <tfoot>
-    <tr class="totals">
-      <td colspan="3">Total ({{rows.length}} systèmes)</td>
-      <td class="cell-num"><strong>{{totals.instances}}</strong></td>
-      <td class="cell-num">{{totals.mesures}}</td>
-      <td class="cell-num">{{totals.etats}}</td>
-      <td class="cell-num">{{totals.alarmes}}</td>
-      <td class="cell-num">{{totals.commandes}}</td>
-      <td class="cell-num">{{totals.consignes}}</td>
-      <td class="cell-num"><strong>{{totals.reads}}</strong></td>
-      <td class="cell-num"><strong>{{totals.writes}}</strong></td>
-      <td colspan="4"></td>
-    </tr>
-  </tfoot>
-</table>
+  {{#if optedOutList.length}}
+  <div class="opted-block">
+    <h3 class="opted-title">Fonctionnalités écartées par la maîtrise d'ouvrage ({{optedOutList.length}})</h3>
+    <p class="opted-intro">Ces fonctionnalités ne seront pas disponibles à la livraison. Pour les activer ultérieurement, un contrat adapté devra être conclu entre Buildy et l'exploitant du bâtiment.</p>
+    <ul class="opted-list">
+      {{#each optedOutList}}
+      <li><strong>§{{number}} {{title}}</strong> <span class="opted-contract">→ contrat {{requiredContract}} requis</span></li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
+</section>
 
-<p class="legend">
-  <strong>Lecture des colonnes :</strong> Décret BACS = articles R175-1 §x applicables ·
-  Niveau service = niveau Buildy minimum requis pour cet équipement ·
-  Instances = nombre de références réelles déclarées sur le site ·
-  Mesures/États/Alarmes/Commandes/Consignes = nombre de points par type (par instance) ·
-  Programmation horaire / Détection dérives / Notifications push / Tableau de bord = fonctions Hyperveez applicables au système.
-</p>
+{{!-- ═══════════════════ PAGE 2 — Conformité décret BACS ═══════════════════ --}}
+<section class="page">
+  <header class="page-header">
+    <div class="page-header-left">
+      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
+      <div>
+        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
+        <h1 class="page-title">2. Conformité au décret BACS (R175-3)</h1>
+      </div>
+    </div>
+    <div class="page-header-right">
+      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
+    </div>
+  </header>
+
+  <p class="section-intro">L'article R175-3 du Code de la construction et de l'habitation définit les <strong>4 exigences fonctionnelles</strong> auxquelles doit répondre tout système d'automatisation et de contrôle des bâtiments (BACS). Ce tableau récapitule la couverture de chaque exigence par les fonctions Buildy décrites dans cette analyse fonctionnelle.</p>
+
+  <table class="bacs-table">
+    <thead>
+      <tr>
+        <th class="bacs-col-art">Article</th>
+        <th class="bacs-col-text">Exigence du décret</th>
+        <th class="bacs-col-resp">Réponse Buildy</th>
+        <th class="bacs-col-sec">Sections de l'AF qui couvrent</th>
+        <th class="bacs-col-sta">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each bacsConformity}}
+      <tr>
+        <td class="bacs-col-art">
+          <span class="bacs-code">R175-3 {{code}}</span>
+          <p class="bacs-title">{{title}}</p>
+        </td>
+        <td class="bacs-col-text">{{text}}</td>
+        <td class="bacs-col-resp">{{buildyAnswer}}</td>
+        <td class="bacs-col-sec">
+          {{#if sections.length}}
+          <ul class="bacs-sec-list">
+            {{#each sections}}
+            <li class="{{#unless live}}sec-inactive{{/unless}}">
+              <code>§{{number}}</code> {{title}}
+              {{#if opted_out}}<span class="sec-tag tag-opted">écartée</span>{{/if}}
+              {{#if excluded}}<span class="sec-tag tag-excluded">exclue</span>{{/if}}
+            </li>
+            {{/each}}
+          </ul>
+          {{else}}—{{/if}}
+        </td>
+        <td class="bacs-col-sta">
+          <span class="bacs-status status-{{status}}">{{statusLabel}}</span>
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <p class="legal-note">
+    <strong>R175-5-1</strong> — Cette analyse fonctionnelle constitue le document examiné lors de l'inspection
+    périodique obligatoire du système d'automatisation et de contrôle. Elle doit être conservée par le propriétaire
+    pendant 10 ans.
+  </p>
+</section>
+
+{{!-- ═══════════════════ PAGE 3 — Matrice des systèmes ═══════════════════ --}}
+<section class="page">
+  <header class="page-header">
+    <div class="page-header-left">
+      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
+      <div>
+        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
+        <h1 class="page-title">3. Matrice des systèmes supervisés</h1>
+      </div>
+    </div>
+    <div class="page-header-right">
+      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
+    </div>
+  </header>
+
+  <p class="section-intro">Vue par catégorie d'équipement. Une catégorie apparaît dans ce tableau si elle est <strong>instanciée sur le site</strong>, <strong>concernée par le décret BACS</strong>, ou <strong>écartée par la maîtrise d'ouvrage</strong>. Les colonnes Monitoring / Commande / Alarmes / Reporting indiquent les fonctions Buildy applicables au système.</p>
+
+  <table class="matrix-table">
+    <thead>
+      <tr>
+        <th class="m-cat">Système</th>
+        <th class="m-bacs">Décret BACS</th>
+        <th class="m-level">Niveau requis</th>
+        <th class="m-num">Inst.</th>
+        <th class="m-num">Points</th>
+        <th class="m-fn">Monitoring</th>
+        <th class="m-fn">Commande</th>
+        <th class="m-fn">Alarmes</th>
+        <th class="m-fn">Reporting</th>
+        <th class="m-status">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each systemsMatrix}}
+      <tr class="status-row-{{statusClass}}">
+        <td class="m-cat">
+          <span class="m-num-prefix">§{{number}}</span> {{title}}
+        </td>
+        <td class="m-bacs">{{#if bacs}}<span class="m-bacs-tag">{{bacs}}</span>{{else}}—{{/if}}</td>
+        <td class="m-level">{{#if levelLabel}}<span class="level-pill lvl-{{levelClass}}">{{levelLabel}}</span>{{else}}—{{/if}}</td>
+        <td class="m-num">{{#if instances}}<strong>{{instances}}</strong>{{else}}<span class="muted">0</span>{{/if}}</td>
+        <td class="m-num">{{pointsCount}}</td>
+        <td class="m-fn">{{#if hasMonitoring}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+        <td class="m-fn">{{#if hasCommand}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+        <td class="m-fn">{{#if hasAlarms}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+        <td class="m-fn">{{#if hasReporting}}<span class="ok">✓</span>{{else}}<span class="dash">—</span>{{/if}}</td>
+        <td class="m-status"><span class="status-pill status-{{statusClass}}">{{status}}</span></td>
+      </tr>
+      {{/each}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Total des systèmes actifs</td>
+        <td class="m-num"><strong>{{totalsMatrix.instances}}</strong></td>
+        <td class="m-num"><strong>{{totalsMatrix.points}}</strong></td>
+        <td colspan="5"></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <p class="legal-note">
+    <em>Lecture des colonnes :</em>
+    <strong>Niveau requis</strong> = niveau Buildy minimum nécessaire pour activer ce système.
+    <strong>Inst.</strong> = nombre d'instances réelles déclarées (×qty).
+    <strong>Points</strong> = nombre de points par instance (la liste contractuelle complète figure dans l'export A3 dédié).
+    <strong>Monitoring</strong> = lectures, <strong>Commande</strong> = écritures, <strong>Alarmes</strong> = points type Alarme, <strong>Reporting</strong> = système éligible aux tableaux de bord énergie/QAI.
+  </p>
+</section>
 
 </body>
 </html>
