@@ -348,6 +348,11 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   margin: 0;
   line-height: 1.5;
 }
+.bacs-context-text p { margin: 0 0 1.5mm; line-height: 1.5; }
+.bacs-context-text p:last-child { margin-bottom: 0; }
+.bacs-context-text strong { color: #1f2937; font-weight: 600; }
+.bacs-context-text ul { padding-left: 4mm; margin: 1mm 0; list-style-type: disc; }
+.bacs-context-text li { margin: 0.5mm 0; line-height: 1.45; }
 
 /* Bandeau protocoles préférés (Lot 18) */
 .protocols-bar {

@@ -543,6 +543,7 @@ async function routes(fastify) {
         outputPath,
         populateToc: true,
         pageFormat: 'A4',
+        skipFirstPageHeaderFooter: true,
         pdfOptions: {
           displayHeaderFooter: true,
           margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' },

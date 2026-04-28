@@ -133,7 +133,13 @@ function getBrowser() {
  * @param {boolean} opts.populateToc — true pour injecter les n° de page dans la TOC
  * @param {string} opts.pageFormat — 'A4' | 'A3' (pour calcul hauteur page)
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait' }) {
+/**
+ * Si skipFirstPageHeaderFooter=true, on rend deux PDFs et on les merge :
+ *   - page 1 (cover) sans header/footer
+ *   - pages 2..N avec header/footer
+ * Necessite displayHeaderFooter=true dans pdfOptions, sinon ignore.
+ */
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -192,19 +198,41 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-    const finalPdfOptions = {
+    const baseOptions = {
       printBackground: true,
       preferCSSPageSize: true,
       ...pdfOptions,
-      path: outputPath,
     };
-    await page.pdf(finalPdfOptions);
+
+    if (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter) {
+      // Double rendu : cover sans HF, body avec HF, puis merge.
+      const coverBuf = await page.pdf({ ...baseOptions, displayHeaderFooter: false, pageRanges: '1', path: undefined });
+      const bodyBuf = await page.pdf({ ...baseOptions, displayHeaderFooter: true, pageRanges: '2-', path: undefined });
+      await mergeAndWritePdf(coverBuf, bodyBuf, outputPath);
+    } else {
+      await page.pdf({ ...baseOptions, path: outputPath });
+    }
   } finally {
     await page.close().catch(() => {});
   }
 
   const stats = fs.statSync(outputPath);
   return { path: outputPath, sizeBytes: stats.size };
+}
+
+async function mergeAndWritePdf(coverBuf, bodyBuf, outputPath) {
+  const { PDFDocument } = require('pdf-lib');
+  const merged = await PDFDocument.create();
+  const cover = await PDFDocument.load(coverBuf);
+  const body = await PDFDocument.load(bodyBuf);
+  const coverPages = await merged.copyPages(cover, cover.getPageIndices());
+  for (const p of coverPages) merged.addPage(p);
+  const bodyPages = await merged.copyPages(body, body.getPageIndices());
+  for (const p of bodyPages) merged.addPage(p);
+  const out = await merged.save();
+  const dir = path.dirname(outputPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(outputPath, out);
 }
 
 async function shutdown() {
