@@ -251,30 +251,27 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
     if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
   }
 
-  // 2. Filigrane Buildy — taille la plus grande qui rentre dans
-  // (widthRatio x page_width) ET (heightRatio x page_height) tout
-  // en preservant l'aspect natif de l'image.
+  // 2. Filigrane Buildy — etire pour couvrir widthRatio x heightRatio
+  // de la page (l'image est deformee pour remplir les deux dimensions
+  // independamment ; > 1 = l'image deborde et est rognee aux bords).
   if (watermark) {
     const {
       imagePath,
       skipFirstPage = false,
-      widthRatio = 0.75,
-      heightRatio = 0.75,
+      widthRatio = 1.5,
+      heightRatio = 1.5,
       opacity = 0.05,
     } = watermark;
     const imageBytes = fs.readFileSync(imagePath);
     const img = imagePath.toLowerCase().endsWith('.png')
       ? await doc.embedPng(imageBytes)
       : await doc.embedJpg(imageBytes);
-    const aspect = img.height / img.width;
     const startIdx = skipFirstPage ? 1 : 0;
     for (let i = startIdx; i < pages.length; i++) {
       const p = pages[i];
       const { width: pw, height: ph } = p.getSize();
-      const wByWidth = pw * widthRatio;
-      const wByHeight = (ph * heightRatio) / aspect;
-      const wPt = Math.min(wByWidth, wByHeight);
-      const hPt = wPt * aspect;
+      const wPt = pw * widthRatio;
+      const hPt = ph * heightRatio;
       const x = (pw - wPt) / 2;
       const y = (ph - hPt) / 2;
       p.drawImage(img, { x, y, width: wPt, height: hPt, opacity });

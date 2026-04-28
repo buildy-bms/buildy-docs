@@ -13,7 +13,7 @@ const gitLib = require('../lib/git');
 
 // Filigrane Buildy (favicon) applique sur tous les exports PDF
 const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
-const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.75, heightRatio: 0.75, opacity: 0.05 };
+const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 1.5, heightRatio: 1.5, opacity: 0.05 };
 
 async function commitExportSilently(afId, message, tag, user) {
   try {
