@@ -256,20 +256,22 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
     const {
       imagePath,
       skipFirstPage = false,
-      widthMm = 50,
-      opacity = 0.08,
+      widthMm,           // largeur fixe en mm (prioritaire)
+      widthRatio = 0.8,  // sinon : ratio de la largeur de la page (80% par defaut)
+      opacity = 0.07,
       position = 'center', // 'center' | 'bottom-right'
     } = watermark;
     const imageBytes = fs.readFileSync(imagePath);
     const img = imagePath.toLowerCase().endsWith('.png')
       ? await doc.embedPng(imageBytes)
       : await doc.embedJpg(imageBytes);
-    const wPt = mmToPt(widthMm);
-    const hPt = wPt * (img.height / img.width);
+    const aspect = img.height / img.width;
     const startIdx = skipFirstPage ? 1 : 0;
     for (let i = startIdx; i < pages.length; i++) {
       const p = pages[i];
       const { width: pw, height: ph } = p.getSize();
+      const wPt = widthMm ? mmToPt(widthMm) : pw * widthRatio;
+      const hPt = wPt * aspect;
       let x, y;
       if (position === 'bottom-right') {
         x = pw - wPt - mmToPt(15);
