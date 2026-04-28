@@ -297,6 +297,14 @@ async function routes(fastify) {
       return { sec, points, instances, reads, writes, alarms, commands, consignes };
     });
 
+    // Detection comptage (utilise par P2 BACS et P4 matrice)
+    const COMPTEUR_SLUGS_SET = new Set(['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories']);
+    function isMeteringSystem(sec) {
+      if (!sec.equipment_template_id) return false;
+      const tpl = db.equipmentTemplates.getById(sec.equipment_template_id);
+      return tpl ? COMPTEUR_SLUGS_SET.has(tpl.slug) : false;
+    }
+
     const { resolveAfLevel } = require('../lib/service-level-resolver');
     const required = resolveAfLevel(liveSections);
     const RANK = { E: 0, S: 1, P: 2 };
@@ -498,22 +506,10 @@ async function routes(fastify) {
     kpis.coverage = coverageTotals;
 
     // ── PAGE 4 : Matrice systemes (filtree strict) ──
-    // Ne garde que les equipements vraiment dans le scope du chantier :
-    //   - soit instancies (instance >= 1)
-    //   - soit ecartes par la MOA (decision documentee, doit rester visible)
-    // Les autres equipements du catalogue (pas instancies + non ecartes) ne sont pas
-    // affiches mais comptes pour la note de transparence en bas du tableau.
     const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
       instances > 0 || sec.opted_out_by_moa
     );
     const offCatalogCount = equipmentSections.length - relevantEquipment.length;
-    const COMPTEUR_SLUGS_SET = new Set(['compteur-electrique', 'compteur-gaz', 'compteur-eau', 'compteur-calories']);
-    function isMeteringSystem(sec) {
-      // Detection : la section pointe vers un equipment_template de comptage
-      if (!sec.equipment_template_id) return false;
-      const tpl = db.equipmentTemplates.getById(sec.equipment_template_id);
-      return tpl ? COMPTEUR_SLUGS_SET.has(tpl.slug) : false;
-    }
     const systemsMatrix = relevantEquipment.map(({ sec, points, instances }) => {
       const isOptedOut = sec.opted_out_by_moa === 1;
       const isExcluded = !sec.included_in_export;
