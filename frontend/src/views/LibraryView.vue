@@ -53,6 +53,14 @@ const filteredSorted = computed(() => {
 })
 const loading = ref(false)
 
+const TYPE_COLORS = {
+  Mesure:   { bg: 'bg-blue-50',     text: 'text-blue-700' },
+  'État':   { bg: 'bg-gray-100',    text: 'text-gray-700' },
+  Alarme:   { bg: 'bg-red-50',      text: 'text-red-700' },
+  Commande: { bg: 'bg-emerald-50',  text: 'text-emerald-700' },
+  Consigne: { bg: 'bg-amber-50',    text: 'text-amber-700' },
+}
+
 const grouped = computed(() => {
   const groups = {}
   for (const t of templates.value) {
@@ -289,14 +297,16 @@ onMounted(refresh)
             </thead>
             <tbody>
               <tr v-for="p in selected.points.filter(p => p.direction === 'read')" :key="p.id" class="border-t border-gray-100">
-                <td class="px-4 py-2">{{ p.label }}</td>
+                <td class="px-4 py-2 text-gray-800">{{ p.label }}</td>
                 <td class="px-4 py-2 text-xs">
-                  <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">{{ p.tech_name }}</code>
+                  <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                   <span v-else class="text-gray-300 italic">—</span>
                 </td>
-                <td class="px-4 py-2 text-gray-600">{{ p.data_type }}</td>
-                <td class="px-4 py-2 text-gray-500 text-xs">{{ p.nature || '—' }}</td>
-                <td class="px-4 py-2 text-gray-500">{{ p.unit || '—' }}</td>
+                <td class="px-4 py-2">
+                  <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+                </td>
+                <td class="px-4 py-2 text-gray-500 text-xs italic">{{ p.nature || '—' }}</td>
+                <td class="px-4 py-2 text-gray-500 text-center font-variant-numeric tabular-nums">{{ p.unit || '—' }}</td>
               </tr>
             </tbody>
           </table>
@@ -322,14 +332,16 @@ onMounted(refresh)
             </thead>
             <tbody>
               <tr v-for="p in selected.points.filter(p => p.direction === 'write')" :key="p.id" class="border-t border-gray-100">
-                <td class="px-4 py-2">{{ p.label }}</td>
+                <td class="px-4 py-2 text-gray-800">{{ p.label }}</td>
                 <td class="px-4 py-2 text-xs">
-                  <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px]">{{ p.tech_name }}</code>
+                  <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                   <span v-else class="text-gray-300 italic">—</span>
                 </td>
-                <td class="px-4 py-2 text-gray-600">{{ p.data_type }}</td>
-                <td class="px-4 py-2 text-gray-500 text-xs">{{ p.nature || '—' }}</td>
-                <td class="px-4 py-2 text-gray-500">{{ p.unit || '—' }}</td>
+                <td class="px-4 py-2">
+                  <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
+                </td>
+                <td class="px-4 py-2 text-gray-500 text-xs italic">{{ p.nature || '—' }}</td>
+                <td class="px-4 py-2 text-gray-500 text-center font-variant-numeric tabular-nums">{{ p.unit || '—' }}</td>
               </tr>
             </tbody>
           </table>
