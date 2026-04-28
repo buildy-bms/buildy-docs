@@ -144,13 +144,13 @@ h1, h2, h3, h4, h5 {
   text-align: justify;
 }
 
-/* Mention legale (sous le disclaimer, plus discrete encore) */
+/* Mention legale (meme couleur que .cover-disclaimer) */
 .cover-legal {
   margin-top: 4mm;
   padding: 0 5mm;
-  font-size: 7pt;
+  font-size: 7.5pt;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.65);
   text-align: justify;
 }
 

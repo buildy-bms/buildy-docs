@@ -952,6 +952,25 @@ const sectionTemplates = {
     `).run(newBodyHtml, newVersion, templateId, oldBodyHtml);
     return r.changes;
   },
+  // Propage le nouveau bacs_articles aux sections AF non personnalisees.
+  propagateBacsUnchanged(templateId, oldBacs, newBacs, newVersion) {
+    const r = db.prepare(`
+      UPDATE sections
+         SET bacs_articles = ?, section_template_version = ?
+       WHERE section_template_id = ?
+         AND bacs_articles IS ?
+    `).run(newBacs, newVersion, templateId, oldBacs);
+    return r.changes;
+  },
+  // Le niveau de service est une meta non editable a la section : toujours synchroniser.
+  syncServiceLevel(templateId, newLevel, newVersion) {
+    const r = db.prepare(`
+      UPDATE sections
+         SET service_level = ?, section_template_version = ?
+       WHERE section_template_id = ?
+    `).run(newLevel, newVersion, templateId);
+    return r.changes;
+  },
 };
 
 // ── AFs ──────────────────────────────────────────────────────────────

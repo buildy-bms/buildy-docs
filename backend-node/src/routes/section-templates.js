@@ -41,10 +41,16 @@ async function routes(fastify) {
     const propagate = String(request.query.propagate_unchanged || '') === '1';
     const userId = request.authUser?.id;
 
-    // Capture l'ancien body avant la mise à jour pour propagation
+    // Snapshots avant update pour propagation
     const oldBody = tpl.body_html;
+    const oldBacs = tpl.bacs_articles;
+    const oldLevel = tpl.service_level;
     const newBody = body.body_html === undefined ? oldBody : body.body_html;
+    const newBacs = body.bacs_articles === undefined ? oldBacs : body.bacs_articles;
+    const newLevel = body.service_level === undefined ? oldLevel : body.service_level;
     const bodyChanged = body.body_html !== undefined && newBody !== oldBody;
+    const bacsChanged = body.bacs_articles !== undefined && newBacs !== oldBacs;
+    const levelChanged = body.service_level !== undefined && newLevel !== oldLevel;
 
     db.sectionTemplates.update(id, {
       title: body.title,
@@ -55,23 +61,34 @@ async function routes(fastify) {
     });
 
     let propagatedCount = 0;
-    if (bodyChanged) {
+    let levelSynced = 0;
+    let bacsSynced = 0;
+    if (bodyChanged || bacsChanged || levelChanged) {
       db.sectionTemplates.bumpVersion(id);
       const newVersion = db.sectionTemplates.getById(id).current_version;
       if (propagate) {
-        propagatedCount = db.sectionTemplates.propagateUnchanged(id, oldBody, newBody, newVersion);
-        log.info(`Section template #${id} propagee a ${propagatedCount} section(s) AF (user #${userId})`);
+        if (bodyChanged) {
+          propagatedCount = db.sectionTemplates.propagateUnchanged(id, oldBody, newBody, newVersion);
+        }
+        if (bacsChanged) {
+          bacsSynced = db.sectionTemplates.propagateBacsUnchanged(id, oldBacs, newBacs, newVersion);
+        }
+        if (levelChanged) {
+          // Le niveau est une meta, jamais editee par section : toujours synchroniser.
+          levelSynced = db.sectionTemplates.syncServiceLevel(id, newLevel, newVersion);
+        }
+        log.info(`Section template #${id} : ${propagatedCount} body, ${bacsSynced} BACS, ${levelSynced} niveau(x) propages (user #${userId})`);
       }
     }
 
     db.auditLog.add({
       userId,
       action: 'section_template.update',
-      payload: { id, fields: Object.keys(body), propagated: propagatedCount, body_changed: bodyChanged },
+      payload: { id, fields: Object.keys(body), body_propagated: propagatedCount, bacs_propagated: bacsSynced, level_synced: levelSynced },
     });
 
     const updated = db.sectionTemplates.getById(id);
-    return { ...updated, propagated_count: propagatedCount };
+    return { ...updated, propagated_count: propagatedCount + bacsSynced + levelSynced };
   });
 }
 
