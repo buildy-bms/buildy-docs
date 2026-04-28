@@ -40,6 +40,18 @@ const editor = useEditor({
       class: 'prose prose-sm max-w-none focus:outline-none px-3 py-2 rich-prose',
       style: `min-height: ${props.minHeight}`,
     },
+    // Si on colle du HTML brut sous forme de texte (cas typique : sortie Claude
+    // copiee depuis claude.ai), detecter les balises et l'interpreter comme HTML.
+    handlePaste: (view, event) => {
+      const text = event.clipboardData?.getData('text/plain') || ''
+      const looksLikeHtml = /^\s*<(p|div|ul|ol|h[1-6]|strong|em|br|table|blockquote)[\s>]/i.test(text)
+      if (looksLikeHtml && text.includes('</')) {
+        event.preventDefault()
+        editor.value?.chain().focus().insertContent(text, { parseOptions: { preserveWhitespace: false } }).run()
+        return true
+      }
+      return false
+    },
   },
   onUpdate: ({ editor }) => {
     emit('update:modelValue', editor.getHTML())
