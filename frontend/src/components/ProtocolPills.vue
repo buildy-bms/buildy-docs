@@ -7,15 +7,19 @@ const props = defineProps({
   // Affiche le préfixe "Protocoles exigés :" (utile dans la fiche template,
   // inutile dans une cellule de tableau dont l'en-tête le dit déjà)
   showLabel: { type: Boolean, default: true },
+  // Limite l'affichage aux N premiers + "+N" en pilule grise (0 = illimité)
+  max: { type: Number, default: 0 },
 })
 
-const list = computed(() => {
+const allList = computed(() => {
   if (!props.protocols) return []
   const arr = Array.isArray(props.protocols)
     ? props.protocols
     : props.protocols.split(',').map(s => s.trim()).filter(Boolean)
   return arr
 })
+const list = computed(() => props.max > 0 ? allList.value.slice(0, props.max) : allList.value)
+const overflow = computed(() => props.max > 0 ? Math.max(0, allList.value.length - props.max) : 0)
 
 // Couleurs par famille de protocole (cohérent avec le style Buildy)
 const COLORS = {
@@ -37,7 +41,7 @@ function colorFor(p) {
 </script>
 
 <template>
-  <div v-if="list.length" class="flex items-center gap-1 flex-wrap">
+  <div v-if="list.length" :class="['flex items-center gap-1', max > 0 ? 'flex-nowrap' : 'flex-wrap']">
     <span v-if="showLabel" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1 whitespace-nowrap">Protocoles exigés :</span>
     <span
       v-for="p in list"
@@ -45,6 +49,13 @@ function colorFor(p) {
       :class="['inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border whitespace-nowrap', colorFor(p)]"
     >
       {{ p }}
+    </span>
+    <span
+      v-if="overflow > 0"
+      :title="allList.slice(max).join(', ')"
+      class="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border bg-gray-100 text-gray-600 border-gray-200 whitespace-nowrap"
+    >
+      +{{ overflow }}
     </span>
   </div>
 </template>

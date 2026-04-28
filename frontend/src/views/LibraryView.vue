@@ -6,6 +6,7 @@ import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
+import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -273,8 +274,8 @@ onMounted(async () => {
                   <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                 </span>
               </td>
-              <td class="px-4 py-2">
-                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" />
+              <td class="px-4 py-2 whitespace-nowrap">
+                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
                 <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
               </td>
               <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
@@ -534,6 +535,7 @@ onMounted(async () => {
             <tr>
               <th class="text-left px-4 py-2.5 w-20">Numéro</th>
               <th class="text-left px-4 py-2.5">Titre</th>
+              <th class="text-left px-4 py-2.5 w-32">Niveau</th>
               <th class="text-left px-4 py-2.5 w-48">BACS</th>
               <th class="text-center px-4 py-2.5 w-32">AFs concernées</th>
               <th class="text-center px-4 py-2.5 w-24">Version</th>
@@ -546,6 +548,10 @@ onMounted(async () => {
                 @click="openSectionTplEditor(t)">
               <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ t.number || '—' }}</td>
               <td class="px-4 py-2 font-medium text-gray-800">{{ t.title }}</td>
+              <td class="px-4 py-2">
+                <ServiceLevelBadge v-if="t.service_level" :level="t.service_level" />
+                <span v-else class="text-gray-300 italic text-xs">—</span>
+              </td>
               <td class="px-4 py-2">
                 <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
                 <span v-else class="text-gray-300 italic text-xs">—</span>
@@ -562,7 +568,7 @@ onMounted(async () => {
               </td>
             </tr>
             <tr v-if="!filteredSectionTemplates.length">
-              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ sectionTplSearch ? `Aucune section type ne correspond à « ${sectionTplSearch} ».` : 'Aucune section type.' }}
               </td>
             </tr>
