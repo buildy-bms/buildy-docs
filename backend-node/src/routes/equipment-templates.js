@@ -47,14 +47,40 @@ async function routes(fastify) {
     }));
   });
 
-  // GET /api/equipment-templates/:id — detail + points
+  // GET /api/equipment-templates/:id — detail + points + sections types liees
   fastify.get('/equipment-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const template = db.equipmentTemplates.getById(id);
     if (!template) return reply.code(404).send({ detail: 'Template non trouvé' });
+
+    // Sections types qui referencent ce modele (kind=equipment).
+    // On reconstitue le chemin parent ("2.2 Ventilation › CTA") cote serveur
+    // pour que le client n'ait qu'a afficher.
+    const allTemplates = db.sectionTemplates.list({});
+    const byId = new Map(allTemplates.map(t => [t.id, t]));
+    function pathOf(t) {
+      const parts = [];
+      let cur = t;
+      while (cur) {
+        parts.unshift(cur.title);
+        cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null;
+      }
+      return parts.join(' › ');
+    }
+    const linkedSections = allTemplates
+      .filter(t => t.kind === 'equipment' && t.equipment_template_id === id)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        slug: t.slug,
+        parent_template_id: t.parent_template_id,
+        path: pathOf(t),
+      }));
+
     return {
       ...template,
       points: db.equipmentTemplatePoints.listByTemplate(id),
+      linked_sections: linkedSections,
     };
   });
 

@@ -10,7 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { SparklesIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { SparklesIcon, TrashIcon, ChevronDownIcon, LinkIcon, BookmarkIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -23,7 +23,14 @@ const ALL_FA_NAMES = [...new Set(
     .filter(i => i && i.iconName && i.icon)
     .map(i => i.iconName)
 )].sort()
-import { createEquipmentTemplate, updateEquipmentTemplate, deleteEquipmentTemplate } from '@/api'
+import {
+  createEquipmentTemplate,
+  updateEquipmentTemplate,
+  deleteEquipmentTemplate,
+  getEquipmentTemplate,
+  listSectionTemplates,
+  createSectionTemplate,
+} from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
@@ -106,6 +113,77 @@ watch(() => props.template, (t) => {
     }
   }
 }, { immediate: true })
+
+// === Sections types liees ============================================
+// On charge les sections deja liees (kind=equipment, equipment_template_id=template.id)
+// + l'arbre des sections types pour proposer une parente lors d'un nouveau lien.
+const linkedSections = ref([])
+const allSectionTemplates = ref([])
+const newLinkParentId = ref(null)
+const linking = ref(false)
+
+async function reloadLinks() {
+  if (!isEdit.value) { linkedSections.value = []; return }
+  try {
+    const { data } = await getEquipmentTemplate(props.template.id)
+    linkedSections.value = data.linked_sections || []
+  } catch { /* silencieux : la modale doit rester utilisable */ }
+}
+async function loadAllSectionTemplates() {
+  try {
+    const { data } = await listSectionTemplates({})
+    allSectionTemplates.value = data || []
+  } catch { allSectionTemplates.value = [] }
+}
+onMounted(() => {
+  reloadLinks()
+  loadAllSectionTemplates()
+})
+
+// Options pour le picker "Section parente" : on exclut les feuilles equipment
+// (elles ne peuvent pas avoir d'enfants), on ajoute "—" pour racine.
+const parentOptions = computed(() => {
+  const opts = [{ id: null, label: '— (racine)', depth: 0 }]
+  const byParent = new Map()
+  for (const t of allSectionTemplates.value) {
+    const k = t.parent_template_id || 0
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(t)
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  }
+  function visit(parentId, depth) {
+    for (const t of (byParent.get(parentId) || [])) {
+      if (t.kind === 'equipment') continue
+      opts.push({ id: t.id, label: '— '.repeat(depth) + t.title, depth })
+      visit(t.id, depth + 1)
+    }
+  }
+  visit(0, 1)
+  return opts
+})
+
+async function linkToSection() {
+  if (!isEdit.value || !form.value.name.trim()) return
+  linking.value = true
+  try {
+    await createSectionTemplate({
+      title: form.value.name.trim(),
+      kind: 'equipment',
+      parent_template_id: newLinkParentId.value || null,
+      equipment_template_id: props.template.id,
+    })
+    success('Section type créée et liée à ce modèle')
+    newLinkParentId.value = null
+    await reloadLinks()
+    await loadAllSectionTemplates()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la création de la section type')
+  } finally {
+    linking.value = false
+  }
+}
 
 function toggleProtocol(p) {
   const idx = form.value.preferred_protocols.indexOf(p)
@@ -300,6 +378,42 @@ async function destroy() {
           min-height="120px"
         />
         <p class="text-[10px] text-gray-400 mt-1">Affiché dans l'encart « Pourquoi le décret BACS s'applique ici » au-dessus du badge.</p>
+      </div>
+
+      <!-- Sections types liees (uniquement en mode edition) -->
+      <div v-if="isEdit" class="border-t border-gray-200 pt-4">
+        <label class="block text-xs font-medium text-gray-700 mb-1.5">
+          Sections types liées
+          <span class="text-gray-400 font-normal">— où ce modèle apparaît dans l'arbre canonique</span>
+        </label>
+        <div v-if="linkedSections.length" class="space-y-1 mb-2">
+          <div v-for="s in linkedSections" :key="s.id"
+               class="flex items-center gap-2 px-2 py-1.5 bg-indigo-50 border border-indigo-100 text-xs">
+            <BookmarkIcon class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span class="text-gray-700 truncate">{{ s.path }}</span>
+          </div>
+        </div>
+        <p v-else class="text-[11px] text-gray-400 italic mb-2">
+          Ce modèle n'est référencé par aucune section type. Lie-le à une section parente pour qu'il apparaisse automatiquement dans toutes les nouvelles AFs.
+        </p>
+
+        <div class="flex items-end gap-2">
+          <div class="flex-1">
+            <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Lier à une section parente</label>
+            <select v-model="newLinkParentId"
+                    class="w-full px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option v-for="o in parentOptions" :key="o.id ?? 'root'" :value="o.id">{{ o.label }}</option>
+            </select>
+          </div>
+          <button type="button" @click="linkToSection" :disabled="linking"
+                  class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1">
+            <LinkIcon class="w-3.5 h-3.5" />
+            {{ linking ? 'Liaison…' : 'Créer la section liée' }}
+          </button>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-1">
+          Crée une nouvelle section type « {{ form.name || '…' }} » sous le parent choisi, qui pointera vers ce modèle.
+        </p>
       </div>
     </form>
 
