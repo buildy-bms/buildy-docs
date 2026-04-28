@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 23;
+const TARGET_VERSION = 24;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -783,6 +783,24 @@ function runMigrations() {
     log.info('Migration 23 appliquee : equipment_instance_categories (categories par instance)');
   }
 
+  if (current < 24) {
+    // Lot 32 — Catalogue editable des categories de systemes (avec icone + couleur)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS system_categories_db (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL,
+        bacs TEXT,
+        slugs TEXT,
+        icon_value TEXT DEFAULT 'fa-cube',
+        icon_color TEXT DEFAULT '#6b7280',
+        position INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+    db.pragma('user_version = 24');
+    log.info('Migration 24 appliquee : system_categories_db (catalogue editable)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1302,6 +1320,50 @@ const equipmentInstances = {
   },
 };
 
+// ── Catalogue editable des categories de systemes (Lot 32) ──
+const systemCategoriesDb = {
+  list() {
+    return db.prepare('SELECT * FROM system_categories_db ORDER BY position, id').all().map(r => ({
+      ...r,
+      slugs: r.slugs ? JSON.parse(r.slugs) : [],
+    }));
+  },
+  getByKey(key) {
+    const r = db.prepare('SELECT * FROM system_categories_db WHERE key = ?').get(key);
+    if (!r) return null;
+    return { ...r, slugs: r.slugs ? JSON.parse(r.slugs) : [] };
+  },
+  getById(id) {
+    const r = db.prepare('SELECT * FROM system_categories_db WHERE id = ?').get(id);
+    if (!r) return null;
+    return { ...r, slugs: r.slugs ? JSON.parse(r.slugs) : [] };
+  },
+  create({ key, label, bacs, slugs, iconValue, iconColor, position }) {
+    const result = db.prepare(`
+      INSERT INTO system_categories_db (key, label, bacs, slugs, icon_value, icon_color, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(key, label, bacs || null, JSON.stringify(slugs || []),
+            iconValue || 'fa-cube', iconColor || '#6b7280', position || 0);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, { label, bacs, slugs, iconValue, iconColor, position }) {
+    const fields = [], params = [];
+    if (label !== undefined) { fields.push('label = ?'); params.push(label); }
+    if (bacs !== undefined) { fields.push('bacs = ?'); params.push(bacs); }
+    if (slugs !== undefined) { fields.push('slugs = ?'); params.push(JSON.stringify(slugs)); }
+    if (iconValue !== undefined) { fields.push('icon_value = ?'); params.push(iconValue); }
+    if (iconColor !== undefined) { fields.push('icon_color = ?'); params.push(iconColor); }
+    if (position !== undefined) { fields.push('position = ?'); params.push(position); }
+    if (!fields.length) return this.getById(id);
+    params.push(id);
+    db.prepare(`UPDATE system_categories_db SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return this.getById(id);
+  },
+  delete(id) {
+    db.prepare('DELETE FROM system_categories_db WHERE id = ?').run(id);
+  },
+};
+
 // ── Categories d'usage par instance (Lot 32) — multi-valeurs par instance ──
 const instanceCategories = {
   listForInstance(instanceId) {
@@ -1489,6 +1551,7 @@ module.exports = {
   equipmentInstances,
   instanceZones,
   instanceCategories,
+  systemCategoriesDb,
   attachments,
   afZones,
   afPermissions,

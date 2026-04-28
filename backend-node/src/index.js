@@ -19,6 +19,8 @@ async function main() {
   require('./lib/seeder').backfillSectionTemplateLinks();
   // Lot 31 — Backfill : insert les nouvelles sections du plan dans les AFs existantes
   require('./lib/seeder').backfillNewPlanSections();
+  // Lot 32 — Seed catalogue editable des categories de systemes (icone + couleur)
+  require('./lib/seeder').seedSystemCategoriesOnBoot();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {

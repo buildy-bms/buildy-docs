@@ -35,4 +35,20 @@ function candidateCategoriesForSlug(slug) {
   return SYSTEM_CATEGORIES.filter(c => c.slugs.includes(slug)).map(c => c.key);
 }
 
-module.exports = { SYSTEM_CATEGORIES, normalizeText, candidateCategoriesForSlug };
+// Lecture des categories effectives depuis la DB (Lot 32). Fallback sur le
+// constant SYSTEM_CATEGORIES si la DB n'a pas encore ete seedee (premier boot).
+function loadCategoriesFromDb() {
+  try {
+    const db = require('../database');
+    const rows = db.systemCategoriesDb.list();
+    if (rows.length === 0) return SYSTEM_CATEGORIES;
+    return rows.map(r => ({
+      key: r.key, label: r.label, bacs: r.bacs, slugs: r.slugs,
+      icon_value: r.icon_value, icon_color: r.icon_color,
+    }));
+  } catch {
+    return SYSTEM_CATEGORIES;
+  }
+}
+
+module.exports = { SYSTEM_CATEGORIES, normalizeText, candidateCategoriesForSlug, loadCategoriesFromDb };

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, PencilIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, listSectionTemplates } from '@/api'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, listSectionTemplates, listSystemCategories } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
@@ -9,11 +9,25 @@ import BacsBadge from '@/components/BacsBadge.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
+import SystemCategoryEditor from '@/components/SystemCategoryEditor.vue'
 import { useRouter, useRoute } from 'vue-router'
 
 // Lot 30 — Onglets Bibliothèque
 const tab = ref(localStorage.getItem('library-tab') || 'equipment')
 function setTab(t) { tab.value = t; localStorage.setItem('library-tab', t); selected.value = null }
+
+// Catégories de systèmes
+const systemCategories = ref([])
+const editingCategory = ref(null)
+const showCategoryCreate = ref(false)
+async function refreshSystemCategories() {
+  const { data } = await listSystemCategories()
+  systemCategories.value = data
+}
+function openCategoryCreate() { editingCategory.value = null; showCategoryCreate.value = true }
+function openCategoryEdit(c) { editingCategory.value = c; showCategoryCreate.value = true }
+async function onCategorySaved() { showCategoryCreate.value = false; editingCategory.value = null; await refreshSystemCategories() }
+async function onCategoryDeleted() { showCategoryCreate.value = false; editingCategory.value = null; await refreshSystemCategories() }
 
 // Sections types
 const sectionTemplates = ref([])
@@ -158,7 +172,7 @@ async function openTemplate(t) {
 }
 
 onMounted(async () => {
-  await Promise.all([refresh(), refreshSectionTemplates()])
+  await Promise.all([refresh(), refreshSectionTemplates(), refreshSystemCategories()])
   // Ouverture directe via ?open=<slug> (utilisée par EquipmentDescriptionPanel)
   if (route.query.open) {
     const t = templates.value.find(x => x.slug === route.query.open)
@@ -169,13 +183,16 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-screen-2xl mx-auto">
-    <!-- Toggle Equipements / Sections types (Lot 30) -->
+    <!-- Toggle Equipements / Sections types / Categories -->
     <div class="mb-5 inline-flex items-center border border-gray-300 rounded overflow-hidden text-sm">
       <button @click="setTab('equipment')" :class="['px-4 py-1.5', tab === 'equipment' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
         Équipements
       </button>
       <button @click="setTab('section')" :class="['px-4 py-1.5 border-l border-gray-300', tab === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
         Sections types
+      </button>
+      <button @click="setTab('category')" :class="['px-4 py-1.5 border-l border-gray-300', tab === 'category' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
+        Catégories de systèmes
       </button>
     </div>
 
@@ -577,6 +594,64 @@ onMounted(async () => {
       </div>
     </template>
 
+    <!-- ════════════════ Onglet CATEGORIES DE SYSTEMES ════════════════ -->
+    <template v-if="tab === 'category'">
+      <div class="mb-6 flex items-end justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-800">Catégories de systèmes</h1>
+          <p class="text-sm text-gray-500 mt-1">
+            {{ systemCategories.length }} catégorie{{ systemCategories.length > 1 ? 's' : '' }}.
+            Utilisées pour la matrice « Zones × Catégories » du tableau de synthèse.
+            Chaque instance d'équipement choisit ses catégories d'usage parmi celles dont son template est candidat.
+          </p>
+        </div>
+        <button @click="openCategoryCreate"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded">
+          <PlusIcon class="w-4 h-4" /> Nouvelle catégorie
+        </button>
+      </div>
+
+      <div class="bg-white border border-gray-200">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
+            <tr>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Libellé</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Key</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Article BACS</th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap">Templates candidats</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in systemCategories" :key="c.id"
+                class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
+                @click="openCategoryEdit(c)">
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: c.icon_value, icon_color: c.icon_color }" size="md" />
+              </td>
+              <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ c.label }}</td>
+              <td class="px-4 py-2 whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ c.key }}</code></td>
+              <td class="px-4 py-2 whitespace-nowrap">
+                <span v-if="c.bacs" class="inline-block px-2 py-0.5 bg-violet-100 text-violet-700 rounded text-[11px] font-semibold">⚖️ {{ c.bacs }}</span>
+                <span v-else class="text-gray-300 italic text-xs">—</span>
+              </td>
+              <td class="px-4 py-2 text-xs text-gray-600">
+                <span v-if="c.slugs.length" class="flex flex-wrap gap-1">
+                  <span v-for="s in c.slugs" :key="s" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[10px]">{{ s }}</span>
+                </span>
+                <span v-else class="text-gray-300 italic">aucun</span>
+              </td>
+            </tr>
+            <tr v-if="!systemCategories.length">
+              <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                Aucune catégorie définie. Cliquez « Nouvelle catégorie » pour commencer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
     <!-- Modale création / édition de template équipement -->
     <EquipmentTemplateEditor
       v-if="showEditor"
@@ -584,6 +659,15 @@ onMounted(async () => {
       @close="showEditor = false"
       @saved="onSaved"
       @deleted="onDeleted"
+    />
+
+    <!-- Modale création / édition de catégorie système -->
+    <SystemCategoryEditor
+      v-if="showCategoryCreate"
+      :category="editingCategory"
+      @close="showCategoryCreate = false"
+      @saved="onCategorySaved"
+      @deleted="onCategoryDeleted"
     />
 
     <!-- Modale édition section type (Lot 30) -->

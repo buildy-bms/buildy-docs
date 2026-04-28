@@ -310,10 +310,38 @@ async function routes(fastify) {
     return { ok: true, category_keys: keys };
   });
 
-  // GET /api/system-categories — catalogue complet (pour le picker UI)
+  // GET /api/system-categories — catalogue complet (DB-backed, Lot 32)
   fastify.get('/system-categories', async () => {
-    const { SYSTEM_CATEGORIES } = require('../lib/system-categories');
-    return SYSTEM_CATEGORIES.map(c => ({ key: c.key, label: c.label, bacs: c.bacs, slugs: c.slugs }));
+    return db.systemCategoriesDb.list();
+  });
+
+  // POST /api/system-categories — creer
+  fastify.post('/system-categories', async (request, reply) => {
+    const b = request.body || {};
+    if (!b.key || !b.label) return reply.code(400).send({ detail: 'key + label requis' });
+    if (db.systemCategoriesDb.getByKey(b.key)) return reply.code(409).send({ detail: 'Cette key existe deja' });
+    const created = db.systemCategoriesDb.create({
+      key: b.key, label: b.label, bacs: b.bacs, slugs: b.slugs,
+      iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
+    });
+    return created;
+  });
+
+  // PATCH /api/system-categories/:id — modifier
+  fastify.patch('/system-categories/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    if (!db.systemCategoriesDb.getById(id)) return reply.code(404).send({ detail: 'Categorie non trouvee' });
+    const b = request.body || {};
+    return db.systemCategoriesDb.update(id, {
+      label: b.label, bacs: b.bacs, slugs: b.slugs,
+      iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
+    });
+  });
+
+  // DELETE /api/system-categories/:id
+  fastify.delete('/system-categories/:id', async (request) => {
+    db.systemCategoriesDb.delete(parseInt(request.params.id, 10));
+    return { ok: true };
   });
 
   // GET /api/afs/:afId/zones — toutes les zones de l'AF (utilise par le picker)
@@ -331,7 +359,8 @@ async function routes(fastify) {
   // de son template (legacy / nouvelles instances pas encore configurees).
   fastify.get('/afs/:afId/zones-matrix', async (request) => {
     const afId = parseInt(request.params.afId, 10);
-    const { SYSTEM_CATEGORIES, normalizeText } = require('../lib/system-categories');
+    const { loadCategoriesFromDb, normalizeText } = require('../lib/system-categories');
+    const SYSTEM_CATEGORIES = loadCategoriesFromDb();
     const allSections = db.sections.listByAf(afId);
     const zonesSection = allSections.find(s => s.kind === 'zones');
     const zones = zonesSection ? db.afZones.listBySection(zonesSection.id) : [];

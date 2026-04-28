@@ -506,7 +506,8 @@ async function routes(fastify) {
     kpis.coverage = coverageTotals;
 
     // ── Synthèse zones × catégories ──
-    const { SYSTEM_CATEGORIES, normalizeText: normalize } = require('../lib/system-categories');
+    const { loadCategoriesFromDb, normalizeText: normalize } = require('../lib/system-categories');
+    const SYSTEM_CATEGORIES = loadCategoriesFromDb();
 
     // Charge toutes les zones de l'AF (depuis la section kind='zones')
     const zonesSection = allSections.find(s => s.kind === 'zones');

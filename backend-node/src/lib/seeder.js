@@ -361,4 +361,40 @@ function backfillSectionTemplateLinks() {
   if (linked > 0) log.info(`Backfill section templates : ${linked} section(s) rattachee(s)`);
 }
 
-module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, backfillNewPlanSections, seedAfStructure };
+/**
+ * Lot 32 — Seed des categories de systemes en DB depuis le catalogue par defaut.
+ * Idempotent : insere uniquement les categories absentes par key.
+ */
+function seedSystemCategoriesOnBoot() {
+  const { SYSTEM_CATEGORIES } = require('./system-categories');
+  // Icones par defaut suggerees par categorie (FA Solid Pro)
+  const ICONS = {
+    chauffage:     { icon: 'fa-fire',          color: '#dc2626' },
+    climatisation: { icon: 'fa-snowflake',     color: '#0ea5e9' },
+    ventilation:   { icon: 'fa-fan',           color: '#3b82f6' },
+    ecs:           { icon: 'fa-faucet-drip',   color: '#0284c7' },
+    pv:            { icon: 'fa-solar-panel',   color: '#facc15' },
+    eclairage_int: { icon: 'fa-lightbulb',     color: '#eab308' },
+    eclairage_ext: { icon: 'fa-lightbulb',     color: '#a16207' },
+    prises:        { icon: 'fa-plug',          color: '#a855f7' },
+    comptage:      { icon: 'fa-gauge',         color: '#22c55e' },
+    qai:           { icon: 'fa-leaf',          color: '#16a34a' },
+    occultation:   { icon: 'fa-window-maximize', color: '#64748b' },
+    process:       { icon: 'fa-industry',      color: '#475569' },
+    autres:        { icon: 'fa-cube',          color: '#6b7280' },
+  };
+  let created = 0;
+  for (let i = 0; i < SYSTEM_CATEGORIES.length; i++) {
+    const c = SYSTEM_CATEGORIES[i];
+    if (db.systemCategoriesDb.getByKey(c.key)) continue;
+    const icon = ICONS[c.key] || { icon: 'fa-cube', color: '#6b7280' };
+    db.systemCategoriesDb.create({
+      key: c.key, label: c.label, bacs: c.bacs, slugs: c.slugs,
+      iconValue: icon.icon, iconColor: icon.color, position: i * 10,
+    });
+    created++;
+  }
+  if (created > 0) log.info(`Seed system_categories_db : ${created} categorie(s) creee(s)`);
+}
+
+module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure };
