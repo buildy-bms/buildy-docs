@@ -465,6 +465,7 @@ function runMigrations() {
     //   * pour chaque AF existante : ajouter une section kind='zones' en début de plan
     db.pragma('foreign_keys = OFF');
     db.exec(`
+      DROP TABLE IF EXISTS sections_new;
       CREATE TABLE sections_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
@@ -490,7 +491,17 @@ function runMigrations() {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_by INTEGER REFERENCES users(id)
       );
-      INSERT INTO sections_new SELECT * FROM sections;
+      INSERT INTO sections_new
+        (id, af_id, parent_id, position, number, title, service_level, service_level_source,
+         bacs_articles, bacs_justification, body_html, body_yjs, kind, included_in_export,
+         generic_note, fact_check_status, equipment_template_id, equipment_template_version,
+         hyperveez_page_slug, created_at, updated_at, updated_by)
+      SELECT
+        id, af_id, parent_id, position, number, title, service_level, service_level_source,
+        bacs_articles, bacs_justification, body_html, body_yjs, kind, included_in_export,
+        generic_note, fact_check_status, equipment_template_id, equipment_template_version,
+        hyperveez_page_slug, created_at, updated_at, updated_by
+      FROM sections;
       DROP TABLE sections;
       ALTER TABLE sections_new RENAME TO sections;
       CREATE INDEX IF NOT EXISTS idx_sections_af_parent ON sections(af_id, parent_id, position);
