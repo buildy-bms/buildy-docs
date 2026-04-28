@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onBeforeUnmount, computed } from 'vue'
+import { ref, watch, onBeforeUnmount, computed, inject } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -23,6 +23,13 @@ const props = defineProps({
   section: { type: Object, required: true },
 })
 const emit = defineEmits(['updated'])
+
+// Numerotation auto fournie par AfDetailView ; fallback section.number
+// (legacy AFs).
+const liveNumbering = inject('liveSectionNumbering', null)
+const displayedNumber = computed(() => {
+  return liveNumbering?.value?.get(props.section.id) || props.section.number || ''
+})
 
 // Titre éditable
 const title = ref(props.section.title)
@@ -199,8 +206,8 @@ function setLink() {
   <div class="bg-white rounded-none border border-gray-200">
     <!-- Header section : numéro + titre éditable + badges + autosave -->
     <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <span v-if="section.number" class="text-sm font-semibold text-gray-400 shrink-0">
-        {{ section.number }}
+      <span v-if="displayedNumber" class="text-sm font-semibold text-gray-400 shrink-0">
+        {{ displayedNumber }}
       </span>
       <input
         v-model="title"

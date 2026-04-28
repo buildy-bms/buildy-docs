@@ -13,7 +13,7 @@ import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import { useNotification } from '@/composables/useNotification'
 
 const { error: notifyError } = useNotification()
-const sectionTemplates = ref([])
+const items = ref([])
 const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
@@ -21,8 +21,8 @@ const tbodyRef = ref(null)
 let sortable = null
 
 async function refresh() {
-  const { data } = await listSectionTemplates({ kind: 'standard' })
-  sectionTemplates.value = data
+  const { data } = await listSectionTemplates({ kind: 'functionality' })
+  items.value = data
 }
 function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
@@ -38,15 +38,13 @@ async function onDeleted() {
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
-  if (!q) return sectionTemplates.value
-  return sectionTemplates.value.filter(t =>
+  if (!q) return items.value
+  return items.value.filter(t =>
     (t.title || '').toLowerCase().includes(q) ||
     (t.bacs_articles || '').toLowerCase().includes(q)
   )
 })
 
-// Drag-and-drop : actif uniquement quand on n'est pas en mode recherche
-// (le tri par recherche n'est pas l'ordre canonique).
 function setupSortable() {
   if (sortable) { sortable.destroy(); sortable = null }
   if (!tbodyRef.value || search.value.trim()) return
@@ -58,10 +56,10 @@ function setupSortable() {
     dragClass: 'sortable-drag',
     onEnd: async (evt) => {
       if (evt.oldIndex === evt.newIndex) return
-      const [moved] = sectionTemplates.value.splice(evt.oldIndex, 1)
-      sectionTemplates.value.splice(evt.newIndex, 0, moved)
+      const [moved] = items.value.splice(evt.oldIndex, 1)
+      items.value.splice(evt.newIndex, 0, moved)
       try {
-        await reorderSectionTemplates(sectionTemplates.value.map(t => t.id))
+        await reorderSectionTemplates(items.value.map(t => t.id))
       } catch {
         notifyError('Échec de la réorganisation')
         refresh()
@@ -70,7 +68,7 @@ function setupSortable() {
   })
 }
 
-watch([sectionTemplates, search], async () => {
+watch([items, search], async () => {
   await nextTick()
   setupSortable()
 }, { deep: false })
@@ -87,15 +85,15 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
   <div class="max-w-screen-2xl mx-auto">
     <div class="mb-6 flex items-end justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque de sections types</h1>
+        <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque de fonctionnalités</h1>
         <p class="text-sm text-gray-500 mt-1">
-          {{ sectionTemplates.length }} section{{ sectionTemplates.length > 1 ? 's' : '' }} type{{ sectionTemplates.length > 1 ? 's' : '' }}.
-          Glisser-déposer pour réorganiser — la numérotation se calcule automatiquement dans chaque AF.
+          {{ items.length }} fonctionnalité{{ items.length > 1 ? 's' : '' }} Buildy.
+          Glisser-déposer pour réorganiser. Le PDF de synthèse liste ces fonctionnalités dans cet ordre, avec leur niveau de contrat minimum.
         </p>
       </div>
       <button @click="openCreate"
               class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded">
-        <PlusIcon class="w-4 h-4" /> Nouvelle section type
+        <PlusIcon class="w-4 h-4" /> Nouvelle fonctionnalité
       </button>
     </div>
 
@@ -153,7 +151,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           </tr>
           <tr v-if="!filtered.length">
             <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
-              {{ search ? `Aucune section type ne correspond à « ${search} ».` : 'Aucune section type.' }}
+              {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
             </td>
           </tr>
         </tbody>
@@ -163,7 +161,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
     <SectionTemplateEditor
       v-if="editing"
       :template="editing"
-      mode="standard"
+      mode="functionality"
       @close="editing = null"
       @saved="onSaved"
       @deleted="onDeleted"
@@ -172,7 +170,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
     <SectionTemplateEditor
       v-if="showCreate"
       :template="{}"
-      mode="standard"
+      mode="functionality"
       @close="showCreate = false"
       @saved="onSaved"
     />

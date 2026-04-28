@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -30,6 +30,34 @@ const router = useRouter()
 const af = ref(null)
 const sections = ref([])
 const selectedSection = ref(null)
+
+// Numerotation auto des sections (1, 1.1, 1.2, 2…) calculee depuis l'arbre
+// (parent_id + position). Remplace le `section.number` figé en DB pour
+// l'affichage UI ; les anciennes AFs continuent d'avoir leur number stocké
+// (utilisé par les PDFs et deep-links via le fallback).
+const liveSectionNumbering = computed(() => {
+  const map = new Map()
+  const byParent = new Map()
+  for (const s of sections.value) {
+    const k = s.parent_id || 'root'
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(s)
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  }
+  function walk(parentKey, prefix) {
+    const arr = byParent.get(parentKey) || []
+    arr.forEach((s, i) => {
+      const num = prefix ? `${prefix}.${i + 1}` : String(i + 1)
+      map.set(s.id, num)
+      walk(s.id, num)
+    })
+  }
+  walk('root', '')
+  return map
+})
+provide('liveSectionNumbering', liveSectionNumbering)
 const selectedId = ref(null)
 const loading = ref(true)
 const showActivity = ref(false)

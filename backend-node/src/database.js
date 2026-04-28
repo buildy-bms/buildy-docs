@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 24;
+const TARGET_VERSION = 25;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -801,6 +801,45 @@ function runMigrations() {
     log.info('Migration 24 appliquee : system_categories_db (catalogue editable)');
   }
 
+  if (current < 25) {
+    // Lot 33 — Sections types : flag is_functionality + position pour drag-drop.
+    // Les "fonctionnalites" sont separees des "sections types" et affichees
+    // dans une page dediee. La numerotation devient automatique dans les AFs.
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN is_functionality INTEGER NOT NULL DEFAULT 0'); } catch (e) { /* deja presente */ }
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN position INTEGER NOT NULL DEFAULT 0'); } catch (e) { /* deja presente */ }
+
+    // Marquer les fonctionnalites a partir de la liste figee historique
+    // (cf. ancienne constante FUNCTIONALITY_NUMBERS de export.js).
+    const FUNCTIONALITY_NUMBERS = [
+      '1.5', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3',
+      '5.1', '5.2', '5.3', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6',
+      '7', '8', '9', '11.1', '11.2', '11.3',
+    ];
+    const placeholders = FUNCTIONALITY_NUMBERS.map(() => '?').join(',');
+    db.prepare(`UPDATE section_templates SET is_functionality = 1 WHERE number IN (${placeholders})`).run(...FUNCTIONALITY_NUMBERS);
+
+    // Backfill position : tri stable par decoupage numerique du number
+    // (mirroir de la logique de tri dans list()).
+    const rows = db.prepare('SELECT id, number FROM section_templates').all();
+    rows.sort((a, b) => {
+      const pa = (a.number || '').split('.').map(n => parseInt(n, 10) || 0);
+      const pb = (b.number || '').split('.').map(n => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const da = pa[i] || 0, dbb = pb[i] || 0;
+        if (da !== dbb) return da - dbb;
+      }
+      return a.id - b.id;
+    });
+    const updatePos = db.prepare('UPDATE section_templates SET position = ? WHERE id = ?');
+    db.transaction(() => {
+      rows.forEach((r, i) => updatePos.run((i + 1) * 10, r.id));
+    })();
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_section_templates_position ON section_templates(position)');
+    db.pragma('user_version = 25');
+    log.info('Migration 25 appliquee : section_templates is_functionality + position');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -977,7 +1016,14 @@ const equipmentTemplatePoints = {
 
 // ── Section templates (Lot 30 : contenu canonique des sections standard) ───
 const sectionTemplates = {
-  list() {
+  list({ kind } = {}) {
+    const where = [];
+    const params = [];
+    // Filtre is_functionality. kind='functionality' => 1, kind='standard' => 0,
+    // kind absent => pas de filtre (compat).
+    if (kind === 'functionality') { where.push('st.is_functionality = 1'); }
+    else if (kind === 'standard') { where.push('st.is_functionality = 0'); }
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     return db.prepare(`
       SELECT st.*,
              (SELECT COUNT(*) FROM sections s
@@ -988,10 +1034,9 @@ const sectionTemplates = {
                 WHERE s.section_template_id = st.id AND a.deleted_at IS NULL
                   AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)) AS outdated_count
       FROM section_templates st
-      ORDER BY
-        CAST(SUBSTR(st.number, 1, INSTR(st.number || '.', '.') - 1) AS INTEGER),
-        st.number
-    `).all();
+      ${whereClause}
+      ORDER BY st.position, st.id
+    `).all(...params);
   },
   getById(id) {
     return db.prepare('SELECT * FROM section_templates WHERE id = ?').get(id);
@@ -999,15 +1044,34 @@ const sectionTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features }) {
+  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality }) {
+    const maxRow = db.prepare('SELECT COALESCE(MAX(position), 0) AS m FROM section_templates').get();
+    const position = (maxRow?.m || 0) + 10;
     const result = db.prepare(`
       INSERT INTO section_templates
-        (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source, features)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source, features, is_functionality, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, number || null, title, kind || 'standard', bodyHtml || null,
             bacsArticles || null, serviceLevel || null, serviceLevelSource || null,
-            features ? JSON.stringify(features) : null);
+            features ? JSON.stringify(features) : null, isFunctionality ? 1 : 0, position);
     return this.getById(result.lastInsertRowid);
+  },
+  delete(id) {
+    db.prepare('DELETE FROM section_templates WHERE id = ?').run(id);
+  },
+  reorder(orderedIds) {
+    const stmt = db.prepare('UPDATE section_templates SET position = ? WHERE id = ?');
+    db.transaction(() => {
+      orderedIds.forEach((id, i) => stmt.run((i + 1) * 10, id));
+    })();
+  },
+  countAffectedAfs(id) {
+    const r = db.prepare(`
+      SELECT COUNT(*) AS c FROM sections s
+        JOIN afs a ON a.id = s.af_id
+       WHERE s.section_template_id = ? AND a.deleted_at IS NULL
+    `).get(id);
+    return r?.c || 0;
   },
   update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy }) {
     const fields = [], params = [];

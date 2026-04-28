@@ -1,7 +1,11 @@
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, inject } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+
+// Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
+// (sections seedees avant le passage en numerotation auto).
+const liveNumbering = inject('liveSectionNumbering', null)
 
 defineOptions({ name: 'SectionTreeNode' })
 
@@ -15,6 +19,10 @@ const props = defineProps({
   search: { type: String, default: '' },
 })
 const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out'])
+
+const displayedNumber = computed(() =>
+  (liveNumbering?.value && liveNumbering.value.get(props.node.id)) || props.node.number || ''
+)
 
 const excluded = computed(() => props.node.included_in_export === 0)
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
@@ -99,8 +107,9 @@ const titleHtml = computed(() => {
 
       <component :is="Icon" :class="['w-3.5 h-3.5 shrink-0', isSelected ? 'text-indigo-600' : 'text-gray-400']" />
 
-      <span v-if="node.number" :class="['text-[11px] shrink-0', isSelected ? 'text-indigo-700 font-bold' : numberClasses]">
-        {{ node.number }}
+      <span v-if="displayedNumber"
+            :class="['text-[11px] shrink-0', isSelected ? 'text-indigo-700 font-bold' : numberClasses]">
+        {{ displayedNumber }}
       </span>
 
       <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '']" v-html="titleHtml"></span>

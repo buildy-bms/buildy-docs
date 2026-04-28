@@ -49,6 +49,12 @@ const routes = [
     component: () => import('@/views/LibrarySectionsView.vue'),
   },
   {
+    path: '/library/functionalities',
+    name: 'library-functionalities',
+    meta: { title: 'Bibliothèque fonctionnalités' },
+    component: () => import('@/views/LibraryFunctionalitiesView.vue'),
+  },
+  {
     path: '/library/categories',
     name: 'library-categories',
     meta: { title: 'Catégories de systèmes' },

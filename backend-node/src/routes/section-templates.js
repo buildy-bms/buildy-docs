@@ -1,11 +1,12 @@
 'use strict';
 
 /**
- * Lot 30 — Bibliothèque "Sections types".
+ * Bibliothèque "Sections types" + "Fonctionnalités".
  *
- * CRUD restreint (pas de POST ni DELETE en V1) sur les contenus canoniques
- * des sections standard / zones du plan AF. Édition + propagation auto aux
- * AFs existantes où le contenu n'a pas été personnalisé.
+ * Sections types et fonctionnalités partagent la même table mais sont
+ * séparées par le flag `is_functionality`. Listing filtrable via `?kind=`.
+ * Édition + propagation auto aux AFs existantes où le contenu n'a pas
+ * été personnalisé.
  */
 
 const { z } = require('zod');
@@ -19,14 +20,108 @@ const updateSchema = z.object({
   service_level: z.string().nullable().optional(),
 });
 
+const createSchema = z.object({
+  title: z.string().min(1, 'Titre requis'),
+  slug: z.string().optional(),
+  kind: z.enum(['standard', 'equipment', 'synthesis', 'hyperveez_page']).optional(),
+  body_html: z.string().nullable().optional(),
+  bacs_articles: z.string().nullable().optional(),
+  service_level: z.string().nullable().optional(),
+  is_functionality: z.boolean().optional(),
+});
+
+const reorderSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
+});
+
+function slugify(s) {
+  return (s || '')
+    .toString()
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'section';
+}
+
 async function routes(fastify) {
-  fastify.get('/section-templates', async () => db.sectionTemplates.list());
+  fastify.get('/section-templates', async (request) => {
+    const kind = String(request.query?.kind || '').toLowerCase();
+    return db.sectionTemplates.list(
+      kind === 'functionality' || kind === 'standard' ? { kind } : {}
+    );
+  });
 
   fastify.get('/section-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const tpl = db.sectionTemplates.getById(id);
     if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
     return tpl;
+  });
+
+  fastify.post('/section-templates', async (request, reply) => {
+    let body;
+    try { body = createSchema.parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+
+    let slug = body.slug ? slugify(body.slug) : slugify(body.title);
+    // Garantir l'unicite du slug (suffixe numerique si collision).
+    let candidate = slug;
+    let suffix = 2;
+    while (db.sectionTemplates.getBySlug(candidate)) {
+      candidate = `${slug}-${suffix++}`;
+    }
+
+    const created = db.sectionTemplates.create({
+      slug: candidate,
+      title: body.title,
+      kind: body.kind || 'standard',
+      bodyHtml: body.body_html || null,
+      bacsArticles: body.bacs_articles || null,
+      serviceLevel: body.service_level || null,
+      isFunctionality: body.is_functionality === true,
+    });
+
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'section_template.create',
+      payload: { id: created.id, slug: created.slug, is_functionality: created.is_functionality },
+    });
+
+    return reply.code(201).send(created);
+  });
+
+  fastify.delete('/section-templates/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tpl = db.sectionTemplates.getById(id);
+    if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
+
+    const affected = db.sectionTemplates.countAffectedAfs(id);
+    if (affected > 0) {
+      return reply.code(409).send({ detail: `${affected} AF(s) utilisent cette section type — suppression refusée.` });
+    }
+
+    db.sectionTemplates.delete(id);
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'section_template.delete',
+      payload: { id, slug: tpl.slug },
+    });
+    return reply.code(204).send();
+  });
+
+  fastify.patch('/section-templates/reorder', async (request, reply) => {
+    let body;
+    try { body = reorderSchema.parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+
+    db.sectionTemplates.reorder(body.ids);
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'section_template.reorder',
+      payload: { count: body.ids.length },
+    });
+    return { ok: true, count: body.ids.length };
   });
 
   fastify.patch('/section-templates/:id', async (request, reply) => {

@@ -585,8 +585,13 @@ async function routes(fastify) {
     }
 
     // ── Synthèse fonctionnalités ──
-    // Toutes les sections kind=standard (hors chapitre 2 perimetre equipements et 12 synthese)
-    const FUNCTIONALITY_NUMBERS = ['1.5', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3', '5.1', '5.2', '5.3', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '7', '8', '9', '11.1', '11.2', '11.3'];
+    // La liste des sections "fonctionnalités" est gerée en DB via le flag
+    // is_functionality sur section_templates (cf. migration 25). Resolu en
+    // numbers pour matcher contre allSections (qui sont les sections de cette
+    // AF avec leur number stocké au seed).
+    const FUNCTIONALITY_NUMBERS = db.db.prepare(
+      'SELECT number FROM section_templates WHERE is_functionality = 1 AND number IS NOT NULL ORDER BY position, id'
+    ).all().map(r => r.number);
     // Niveau MINIMUM requis (libre de S/P → S = Smart est le min)
     function minRequiredLevel(lvl) {
       if (!lvl) return 'E'; // pas de service_level défini = compatible Essentials (toujours vendu)

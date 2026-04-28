@@ -8,6 +8,7 @@ import {
   RectangleStackIcon,
   BookmarkIcon,
   Squares2X2Icon,
+  SparklesIcon,
   MagnifyingGlassIcon,
   CogIcon,
   Bars3Icon,
@@ -35,6 +36,7 @@ const nav = [
   { section: 'Bibliotheque' },
   { name: 'Équipements', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
+  { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
   { name: 'Catégories de systèmes', to: '/library/categories', icon: Squares2X2Icon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
