@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
-  RocketLaunchIcon,
+  RocketLaunchIcon, PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
 import api, {
@@ -30,6 +30,38 @@ const exportMotif = ref('')
 const exportIncludeBacs = ref(false)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
+
+// Lot 29 — édition des métadonnées AF
+const showEdit = ref(false)
+const editForm = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
+function openEdit() {
+  editForm.value = {
+    client_name: props.af.client_name,
+    project_name: props.af.project_name,
+    site_address: props.af.site_address || '',
+    service_level: props.af.service_level || null,
+  }
+  showEdit.value = true
+}
+async function submitEdit() {
+  if (!editForm.value.client_name.trim() || !editForm.value.project_name.trim()) return
+  submitting.value = true
+  try {
+    const { data } = await updateAf(props.af.id, {
+      client_name: editForm.value.client_name.trim(),
+      project_name: editForm.value.project_name.trim(),
+      site_address: editForm.value.site_address.trim() || null,
+      service_level: editForm.value.service_level,
+    })
+    success('AF mise à jour')
+    showEdit.value = false
+    emit('updated', data)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de la mise à jour')
+  } finally {
+    submitting.value = false
+  }
+}
 
 // Lot 21 — sélecteur de sections à inclure
 const exportSections = ref([])
@@ -229,12 +261,16 @@ const exportDescription = computed(() => {
       <ArrowLeftIcon class="w-4 h-4" />
     </button>
     <div class="min-w-0 flex-1">
-      <h2 class="text-sm font-semibold text-gray-800 truncate">
+      <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-1.5">
         {{ af.client_name }} — {{ af.project_name }}
+        <button @click="openEdit" class="text-gray-300 hover:text-indigo-600 shrink-0" title="Éditer client / projet / contrat">
+          <PencilSquareIcon class="w-3.5 h-3.5" />
+        </button>
       </h2>
       <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
     </div>
-    <ServiceLevelBadge :level="af.service_level" />
+    <ServiceLevelBadge v-if="af.service_level" :level="af.service_level" />
+    <span v-else class="text-[10px] text-gray-400 italic px-2 py-0.5 border border-dashed border-gray-300 rounded">contrat à définir</span>
     <StatusBadge :status="af.status" />
     <div class="w-px h-6 bg-gray-200"></div>
     <button
@@ -495,6 +531,57 @@ const exportDescription = computed(() => {
       <button @click="confirmTransition" :disabled="submitting || !transitionMotif.trim()"
               :class="['px-3 py-1.5 text-xs text-white disabled:opacity-50', transitionTo === 'livree' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700']">
         {{ submitting ? 'En cours…' : (transitionTo === 'livree' ? 'Livrer le DOE' : 'Valider l\'AF') }}
+      </button>
+    </template>
+  </BaseModal>
+
+  <!-- Modale édition métadonnées AF (Lot 29) -->
+  <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="md" @close="showEdit = false">
+    <form @submit.prevent="submitEdit" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Client *</label>
+        <input v-model="editForm.client_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Projet *</label>
+        <input v-model="editForm.project_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Adresse du site</label>
+        <input v-model="editForm.site_address" type="text" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 mb-1">Niveau de contrat Buildy</label>
+        <div class="grid grid-cols-4 gap-2">
+          <label
+            v-for="opt in [
+              { value: null, label: 'À déterminer' },
+              { value: 'E', label: 'Essentials' },
+              { value: 'S', label: 'Smart' },
+              { value: 'P', label: 'Premium' },
+            ]"
+            :key="opt.value || 'none'"
+            :class="[
+              'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
+              editForm.service_level === opt.value
+                ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            ]"
+          >
+            <input v-model="editForm.service_level" :value="opt.value" type="radio" class="sr-only" />
+            {{ opt.label }}
+          </label>
+        </div>
+      </div>
+    </form>
+    <template #footer>
+      <button @click="showEdit = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+      <button @click="submitEdit" :disabled="submitting || !editForm.client_name.trim() || !editForm.project_name.trim()"
+              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
     </template>
   </BaseModal>
