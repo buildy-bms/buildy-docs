@@ -33,9 +33,9 @@ const overrideSchema = z.object({
 
 const instanceSchema = z.object({
   reference: z.string().min(1),
-  location: z.string().optional(),
+  location: z.string().nullable().optional(),
   qty: z.number().int().positive().optional(),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
   position: z.number().optional(),
 });
 
