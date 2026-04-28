@@ -161,27 +161,27 @@ onMounted(async () => {
 
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
-      <!-- Vue tableau (par défaut) -->
-      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-none overflow-hidden">
-        <table class="w-full text-sm">
+      <!-- Vue tableau (par défaut) — auto-width, no-wrap, scroll horizontal si nécessaire -->
+      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-none overflow-x-auto">
+        <table class="w-auto min-w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
-              <th class="text-center px-4 py-2.5 w-12"></th>
-              <th class="text-center px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('category')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('category')">
                 Catégorie {{ sortBy === 'category' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 w-32">Slug</th>
-              <th class="text-center px-4 py-2.5 w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap">Slug</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')">
                 AFs {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
-              <th class="text-center px-4 py-2.5 w-44">Protocoles exigés</th>
-              <th class="text-center px-4 py-2.5 w-16 cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap">Protocoles exigés</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
                 Version {{ sortBy === 'current_version' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
             </tr>
@@ -193,23 +193,23 @@ onMounted(async () => {
               class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
               @click="openTemplate(t)"
             >
-              <td class="px-4 py-2 text-center"><EquipmentIcon :template="t" size="sm" /></td>
-              <td class="px-4 py-2 text-center text-gray-600 text-xs uppercase tracking-wider">{{ CATEGORY_LABELS[t.category] || t.category || '—' }}</td>
-              <td class="px-4 py-2 font-semibold text-gray-800">{{ t.name }}</td>
-              <td class="px-4 py-2 text-center"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
-              <td class="px-4 py-2 text-center">
+              <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="t" size="sm" /></td>
+              <td class="px-4 py-2 text-center text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">{{ CATEGORY_LABELS[t.category] || t.category || '—' }}</td>
+              <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ t.name }}</td>
+              <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#1b2842] text-white text-xs font-bold tabular-nums">{{ t.points_count }}</span>
               </td>
-              <td class="px-4 py-2 text-center">
+              <td class="px-4 py-2 text-center whitespace-nowrap">
                 <span class="inline-flex items-center gap-1 text-xs text-gray-500">
                   <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                 </span>
               </td>
-              <td class="px-4 py-2">
-                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" />
+              <td class="px-4 py-2 whitespace-nowrap">
+                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" />
                 <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
               </td>
-              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono">v{{ t.current_version }}</td>
+              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
             </tr>
             <tr v-if="!filteredSorted.length">
               <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">

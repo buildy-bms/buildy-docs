@@ -4,6 +4,9 @@ import { computed } from 'vue'
 const props = defineProps({
   // CSV : "Modbus TCP,BACnet/IP" ou tableau
   protocols: { type: [String, Array, null], default: null },
+  // Affiche le préfixe "Protocoles exigés :" (utile dans la fiche template,
+  // inutile dans une cellule de tableau dont l'en-tête le dit déjà)
+  showLabel: { type: Boolean, default: true },
 })
 
 const list = computed(() => {
@@ -34,12 +37,12 @@ function colorFor(p) {
 </script>
 
 <template>
-  <div v-if="list.length" class="flex items-center gap-1.5 flex-wrap">
-    <span class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1">Protocoles exigés :</span>
+  <div v-if="list.length" :class="['flex items-center gap-1.5', showLabel ? 'flex-wrap' : 'flex-nowrap']">
+    <span v-if="showLabel" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mr-1 whitespace-nowrap">Protocoles exigés :</span>
     <span
       v-for="p in list"
       :key="p"
-      :class="['inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border', colorFor(p)]"
+      :class="['inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border whitespace-nowrap', colorFor(p)]"
     >
       {{ p }}
     </span>
