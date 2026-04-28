@@ -206,7 +206,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pageOrientation: 'landscape',
-        watermark: BUILDY_WATERMARK,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
       });
     } catch (err) {
       log.error(`PDF render failed: ${err.message}`);
@@ -354,7 +354,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pdfOptions: { landscape: true },
-        watermark: BUILDY_WATERMARK,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
       });
     } catch (err) {
       log.error(`PDF synthesis render failed: ${err.message}`);

@@ -31,17 +31,20 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; }
 .cover {
   width: 420mm;
   height: 297mm;
-  padding: 22mm 24mm;
+  padding: 22mm 28mm;
   background: #1b2842;
   color: white;
   page-break-after: always;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 14mm;
   position: relative;
+  box-sizing: border-box;
 }
+.cover-top { display: flex; flex-direction: column; }
 .cover-logo {
   width: 50mm;
-  margin-bottom: 12mm;
+  margin-bottom: 10mm;
   filter: brightness(0) invert(1);
 }
 .cover-doc-type {
@@ -53,23 +56,66 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; }
   font-weight: 500;
 }
 .cover-title {
-  font-size: 32pt;
+  font-size: 36pt;
   font-weight: 700;
   margin: 0 0 4mm;
   letter-spacing: -0.01em;
+  line-height: 1.1;
 }
 .cover-client {
-  font-size: 16pt;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 18pt;
+  color: rgba(255, 255, 255, 0.88);
   font-weight: 500;
   margin: 0 0 2mm;
 }
 .cover-address {
-  font-size: 10pt;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 11pt;
+  color: rgba(255, 255, 255, 0.55);
   margin: 0;
 }
-.cover-meta { margin-top: auto; padding-top: 18mm; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm 16mm; }
+
+/* Bloc Totaux — visuel central de la couverture */
+.cover-totals {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24mm;
+  background: rgba(0, 205, 146, 0.08);
+  border: 1px solid rgba(0, 205, 146, 0.25);
+  border-radius: 2mm;
+  padding: 12mm 20mm;
+  align-self: center;
+}
+.cover-totals-item { text-align: center; }
+.cover-totals-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 56pt;
+  font-weight: 700;
+  color: #00cd92;
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.cover-totals-label {
+  font-size: 11pt;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 3mm 0 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.cover-totals-sep {
+  width: 1px;
+  height: 32mm;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cover-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4mm 12mm;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 8mm;
+}
 .cover-meta-row { display: flex; flex-direction: column; }
 .cover-meta-label {
   font-size: 7.5pt;
@@ -93,16 +139,23 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; }
   color: rgba(255, 255, 255, 0.65);
   font-style: italic;
 }
+.cover-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 6mm;
+}
 .cover-disclaimer {
-  position: absolute;
-  bottom: 18mm;
-  left: 24mm;
-  right: 24mm;
   font-size: 8pt;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.65);
   line-height: 1.55;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  padding-top: 4mm;
+  margin: 0 0 3mm;
+  text-align: justify;
+}
+.cover-legal {
+  font-size: 7.5pt;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+  margin: 0;
+  text-align: justify;
 }
 
 /* ── Tableau principal — full width, fixed layout, no-wrap ────── */
@@ -116,18 +169,19 @@ table.points {
   font-size: 7.5pt;
 }
 /* Largeurs calibrées pour A3 paysage 400mm utile (420 - 2×10mm)
-   Total : 38 + 30 + 40 + 38 + 80 + 22 + 14 + 24 + 16 + 98 = 400 mm */
+   Total : 50 + 32 + 36 + 36 + 76 + 22 + 14 + 22 + 16 + 96 = 400 mm
+   Cat elargie a 50mm pour absorber "Centrale de traitement d'air (CTA)" sans truncation. */
 table.points col, /* fallback */
-table.points th.col-cat,         table.points td.col-cat         { width: 38mm; }
-table.points th.col-ref,         table.points td.col-ref         { width: 30mm; }
-table.points th.col-loc,         table.points td.col-loc         { width: 40mm; }
-table.points th.col-tech,        table.points td.col-tech        { width: 38mm; }
-table.points th.col-label,       table.points td.col-label       { width: 80mm; }
+table.points th.col-cat,         table.points td.col-cat         { width: 50mm; }
+table.points th.col-ref,         table.points td.col-ref         { width: 32mm; }
+table.points th.col-loc,         table.points td.col-loc         { width: 36mm; }
+table.points th.col-tech,        table.points td.col-tech        { width: 36mm; }
+table.points th.col-label,       table.points td.col-label       { width: 76mm; }
 table.points th.col-type,        table.points td.col-type        { width: 22mm; }
 table.points th.col-dir,         table.points td.col-dir         { width: 14mm; }
-table.points th.col-nature,      table.points td.col-nature      { width: 24mm; }
+table.points th.col-nature,      table.points td.col-nature      { width: 22mm; }
 table.points th.col-unit,        table.points td.col-unit        { width: 16mm; }
-table.points th.col-commentaire, table.points td.col-commentaire { width: 98mm; }
+table.points th.col-commentaire, table.points td.col-commentaire { width: 96mm; }
 
 table.points thead { display: table-header-group; } /* répétition headers sur chaque page */
 table.points tr { page-break-inside: avoid; }
@@ -217,35 +271,41 @@ table.points td.col-unit { text-align: center; color: #4b5563; font-variant-nume
   page-break-before: always;
 }
 .summary h2 {
-  font-size: 14pt;
+  font-size: 16pt;
   color: #1b2842;
-  margin: 0 0 4mm;
-  font-weight: 600;
+  margin: 0 0 6mm;
+  font-weight: 700;
+  letter-spacing: -0.005em;
 }
 table.summary-table {
-  width: 70%;
+  width: 100%;
+  max-width: 200mm;
   border-collapse: collapse;
-  font-size: 9pt;
+  font-size: 10pt;
 }
 table.summary-table th {
-  background: #f1f3f6;
-  color: #1b2842;
+  background: #1b2842;
+  color: white;
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 7.5pt;
-  letter-spacing: 0.05em;
-  padding: 2mm 3mm;
+  font-size: 8pt;
+  letter-spacing: 0.06em;
+  padding: 3mm 4mm;
   text-align: left;
   border-bottom: 0.6mm solid #1b2842;
 }
 table.summary-table td {
-  padding: 2mm 3mm;
+  padding: 2.5mm 4mm;
   border-bottom: 0.3mm solid #e8ebf0;
+  vertical-align: middle;
 }
-table.summary-table .summary-num { text-align: right; font-variant-numeric: tabular-nums; }
+table.summary-table tbody tr:nth-child(even) td { background: #fafbfc; }
+table.summary-table .summary-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
 table.summary-table tfoot td {
   font-weight: 700;
   background: #f8fafc;
   border-top: 0.6mm solid #1b2842;
   border-bottom: none;
+  font-size: 11pt;
+  color: #1b2842;
 }

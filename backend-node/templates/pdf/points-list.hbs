@@ -9,11 +9,25 @@
 
 {{!-- ═══════════ Page de garde ═══════════ --}}
 <section class="cover">
-  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
-  <p class="cover-doc-type">Liste de points contractuelle</p>
-  <h1 class="cover-title">{{af.project_name}}</h1>
-  <p class="cover-client">{{af.client_name}}</p>
-  {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
+  <div class="cover-top">
+    <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <p class="cover-doc-type">Liste de points contractuelle</p>
+    <h1 class="cover-title">{{af.project_name}}</h1>
+    <p class="cover-client">{{af.client_name}}</p>
+    {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
+  </div>
+
+  <div class="cover-totals">
+    <div class="cover-totals-item">
+      <p class="cover-totals-value">{{totals.instances}}</p>
+      <p class="cover-totals-label">instance{{#if (gt totals.instances 1)}}s{{/if}} d'équipement</p>
+    </div>
+    <div class="cover-totals-sep"></div>
+    <div class="cover-totals-item">
+      <p class="cover-totals-value">{{totals.points}}</p>
+      <p class="cover-totals-label">point{{#if (gt totals.points 1)}}s{{/if}} de donnée attendu{{#if (gt totals.points 1)}}s{{/if}}</p>
+    </div>
+  </div>
 
   <div class="cover-meta">
     <div class="cover-meta-row">
@@ -33,18 +47,20 @@
       <span class="cover-meta-label">Niveau de service</span>
       <span class="cover-meta-value">{{serviceLevelLabel}}</span>
     </div>
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Total</span>
-      <span class="cover-meta-value">{{totals.instances}} instance{{#if (gt totals.instances 1)}}s{{/if}} · {{totals.points}} point{{#if (gt totals.points 1)}}s{{/if}}</span>
-    </div>
   </div>
 
-  <p class="cover-disclaimer">
-    <em>Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
-    Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
-    La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
-    en avant-projet ou validés par Buildy avant mise en production.</em>
-  </p>
+  <div class="cover-bottom">
+    <p class="cover-disclaimer">
+      <em>Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
+      Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
+      La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
+      en avant-projet ou validés par Buildy avant mise en production.</em>
+    </p>
+    <p class="cover-legal">
+      © Buildy SAS — Document confidentiel. Toute reproduction, transmission ou diffusion à des tiers, même partielle,
+      est interdite sans autorisation écrite préalable.
+    </p>
+  </div>
 </section>
 
 {{!-- ═══════════ Tableau global de tous les points ═══════════ --}}
