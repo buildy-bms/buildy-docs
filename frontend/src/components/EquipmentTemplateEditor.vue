@@ -9,8 +9,8 @@
  *   close → fermer sans rien faire
  *   saved (template) → fermer et rafraîchir le parent
  */
-import { ref, computed, watch } from 'vue'
-import { SparklesIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { SparklesIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -35,17 +35,17 @@ const { success, error: notifyError } = useNotification()
 const isEdit = computed(() => !!props.template?.id)
 
 const CATEGORIES = [
-  { value: 'ventilation', label: 'Ventilation' },
-  { value: 'chauffage', label: 'Chauffage' },
-  { value: 'climatisation', label: 'Climatisation' },
-  { value: 'ecs', label: 'Eau chaude sanitaire' },
-  { value: 'eclairage', label: 'Éclairage' },
-  { value: 'electricite', label: 'Électricité' },
-  { value: 'comptage', label: 'Comptage énergétique' },
-  { value: 'qai', label: 'Qualité de l\'air' },
-  { value: 'occultation', label: 'Occultation' },
-  { value: 'process', label: 'Process industriel' },
-  { value: 'autres', label: 'Autres équipements' },
+  { value: 'ventilation',   label: 'Ventilation',          icon: 'fa-fan',             color: '#3b82f6' },
+  { value: 'chauffage',     label: 'Chauffage',            icon: 'fa-fire',            color: '#dc2626' },
+  { value: 'climatisation', label: 'Climatisation',        icon: 'fa-snowflake',       color: '#0ea5e9' },
+  { value: 'ecs',           label: 'Eau chaude sanitaire', icon: 'fa-faucet-drip',     color: '#0284c7' },
+  { value: 'eclairage',     label: 'Éclairage',            icon: 'fa-lightbulb',       color: '#eab308' },
+  { value: 'electricite',   label: 'Électricité',          icon: 'fa-bolt',            color: '#a855f7' },
+  { value: 'comptage',      label: 'Comptage énergétique', icon: 'fa-gauge',           color: '#22c55e' },
+  { value: 'qai',           label: 'Qualité de l\'air',    icon: 'fa-leaf',            color: '#16a34a' },
+  { value: 'occultation',   label: 'Occultation',          icon: 'fa-window-maximize', color: '#64748b' },
+  { value: 'process',       label: 'Process industriel',   icon: 'fa-industry',        color: '#475569' },
+  { value: 'autres',        label: 'Autres équipements',   icon: 'fa-cube',            color: '#6b7280' },
 ]
 
 const PROTOCOLS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']
@@ -69,6 +69,17 @@ const form = ref({
   icon_value: 'fa-cube',
   icon_color: '#6b7280',
 })
+
+const selectedCategory = computed(() => CATEGORIES.find(c => c.value === form.value.category) || CATEGORIES[CATEGORIES.length - 1])
+const categoryOpen = ref(false)
+const categoryRef = ref(null)
+function toggleCategory() { categoryOpen.value = !categoryOpen.value }
+function pickCategory(value) { form.value.category = value; categoryOpen.value = false }
+function onDocClick(e) {
+  if (categoryRef.value && !categoryRef.value.contains(e.target)) categoryOpen.value = false
+}
+onMounted(() => document.addEventListener('mousedown', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
 const submitting = ref(false)
 const showClaudePrompt = ref(false)
@@ -178,9 +189,23 @@ async function destroy() {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Catégorie</label>
-          <select v-model="form.category" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-          </select>
+          <div ref="categoryRef" class="relative">
+            <button type="button" @click="toggleCategory"
+                    class="w-full flex items-center gap-2 px-3 py-2 border border-gray-300 text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: selectedCategory.icon, icon_color: selectedCategory.color }" size="sm" />
+              <span class="flex-1 text-left text-gray-800 truncate">{{ selectedCategory.label }}</span>
+              <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0" :class="categoryOpen ? 'rotate-180' : ''" />
+            </button>
+            <div v-if="categoryOpen"
+                 class="absolute z-20 mt-1 w-full bg-white border border-gray-200 shadow-lg max-h-72 overflow-y-auto">
+              <button v-for="c in CATEGORIES" :key="c.value" type="button" @click="pickCategory(c.value)"
+                      :class="['w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-indigo-50',
+                               form.category === c.value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700']">
+                <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: c.icon, icon_color: c.color }" size="sm" />
+                <span class="truncate">{{ c.label }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
