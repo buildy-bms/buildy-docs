@@ -182,7 +182,7 @@ onMounted(async () => {
 
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
-      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-lg">
+      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
