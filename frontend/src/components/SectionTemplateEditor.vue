@@ -129,6 +129,12 @@ const selectedEquipmentName = computed(() => {
   return t ? t.name : null
 })
 
+// Champs conditionnels :
+// - BACS s'applique aux sections texte et aux sections d'equipement
+// - Niveau de contrat n'a de sens que pour les fonctionnalites
+const showBacs = computed(() => form.value.kind === 'standard' || form.value.kind === 'equipment')
+const showServiceLevel = computed(() => props.mode === 'functionality')
+
 watch(() => props.template, (t) => {
   form.value = {
     title: (t && t.title) || '',
@@ -204,86 +210,88 @@ async function destroy() {
 
 <template>
   <BaseModal :title="modalTitle" size="lg" @close="emit('close')">
-    <form @submit.prevent="submit" class="space-y-4">
+    <form @submit.prevent="submit" class="space-y-3">
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Titre *</label>
         <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
-               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Type de section</label>
+      <!-- Pour les fonctionnalites, kind est toujours 'standard' (texte) : on cache le picker -->
+      <div :class="['grid gap-3', mode === 'functionality' ? 'grid-cols-1' : 'grid-cols-2']">
+        <div v-if="mode !== 'functionality'">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Type de section</label>
           <select v-model="form.kind"
-                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
             <option v-for="o in KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Section parente</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Section parente</label>
           <select v-model="form.parent_template_id"
-                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
             <option v-for="o in parentOptions" :key="o.id ?? 'root'" :value="o.id">{{ o.label }}</option>
           </select>
-          <p class="text-[10px] text-gray-400 mt-1">Drag-drop dans l'arbre permet aussi de déplacer.</p>
         </div>
       </div>
 
-      <!-- Equipment template picker, visible uniquement quand kind=equipment -->
+      <!-- Picker du modele d'equipement : uniquement pour kind=equipment -->
       <div v-if="form.kind === 'equipment'">
-        <label class="block text-xs font-medium text-gray-700 mb-1">Modèle d'équipement</label>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Modèle d'équipement</label>
         <button type="button" @click="showEquipmentPicker = true"
-                class="w-full text-left px-3 py-2 border border-gray-200 text-sm hover:bg-gray-50">
+                class="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
           <span v-if="form.equipment_template_id" class="text-gray-800">
-            {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }} — cliquer pour changer
+            {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }}
+            <span class="text-gray-400 text-xs">— cliquer pour changer</span>
           </span>
           <span v-else class="text-gray-400 italic">Aucun équipement choisi — cliquer pour sélectionner</span>
         </button>
-        <p class="text-[10px] text-gray-400 mt-1">
-          Lien vers la bibliothèque d'équipements. Toute instance ajoutée à cette section dans une AF utilisera ce modèle.
-        </p>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Articles BACS applicables</label>
+      <!-- Articles BACS : pertinent pour kind=standard et kind=equipment uniquement -->
+      <!-- Niveau de contrat : pertinent uniquement pour les fonctionnalites -->
+      <div v-if="showBacs || showServiceLevel" :class="['grid gap-3', showBacs && showServiceLevel ? 'grid-cols-2' : 'grid-cols-1']">
+        <div v-if="showBacs">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Articles BACS applicables</label>
           <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="Ex : R175-3 §1, §2 ; R175-5-1"
-                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <p class="text-[10px] text-gray-400 mt-1">Format : <code>R175-1 §1, §2 ; R175-3 §4</code>.</p>
+                 class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <p class="text-[11px] text-gray-400 mt-1">Format : <code class="bg-gray-100 px-1 rounded">R175-1 §1, §2</code>. Vide si non visé.</p>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau de contrat requis</label>
+        <div v-if="showServiceLevel">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Niveau de contrat requis</label>
           <select v-model="form.service_level"
-                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
             <option v-for="o in SERVICE_LEVEL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
+          <p class="text-[11px] text-gray-400 mt-1">Niveau Buildy minimum requis pour couvrir cette fonctionnalité.</p>
         </div>
       </div>
 
-      <div v-if="form.kind !== 'equipment' && form.kind !== 'synthesis'">
+      <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
+      <div v-if="form.kind === 'standard'">
         <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-medium text-gray-700">
+          <label class="block text-xs font-medium text-gray-600">
             Contenu canonique
             <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
           </label>
           <button type="button" @click="showClaudePrompt = true"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-300 hover:bg-violet-50 rounded">
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-200 hover:bg-violet-50 rounded-lg transition">
             <SparklesIcon class="w-3 h-3" />
-            Générer avec Claude Desktop
+            Générer avec Claude
           </button>
         </div>
         <RichTextEditor
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
-          min-height="280px"
+          min-height="180px"
         />
       </div>
 
-      <label v-if="isEdit && form.kind !== 'equipment' && form.kind !== 'synthesis'"
-             class="flex items-start gap-2 text-xs text-gray-700 bg-amber-50 border border-amber-200 p-3 rounded">
-        <input v-model="propagate" type="checkbox" class="mt-0.5" />
+      <label v-if="isEdit && form.kind === 'standard'"
+             class="flex items-start gap-2.5 text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+        <input v-model="propagate" type="checkbox" class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500/30" />
         <span>
           <strong class="font-medium">Appliquer aussi aux AFs existantes</strong> où le contenu n'a pas été modifié.
           Les AFs où la section a été personnalisée ne seront pas écrasées (un bandeau "nouvelle version" s'affichera dans l'éditeur).
@@ -293,12 +301,15 @@ async function destroy() {
 
     <template #footer>
       <button v-if="isEdit" @click="destroy" :disabled="deleting"
-              class="mr-auto px-3 py-1.5 text-xs text-red-600 hover:text-red-800 inline-flex items-center gap-1 disabled:opacity-50">
-        <TrashIcon class="w-3.5 h-3.5" /> {{ deleting ? 'Suppression…' : 'Supprimer' }}
+              class="mr-auto px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50">
+        <TrashIcon class="w-4 h-4" /> {{ deleting ? 'Suppression…' : 'Supprimer' }}
       </button>
-      <button @click="emit('close')" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+      <button @click="emit('close')"
+              class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
+        Annuler
+      </button>
       <button @click="submit" :disabled="submitting || !form.title.trim()"
-              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+              class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
         {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer' : 'Créer') }}
       </button>
     </template>
