@@ -5,6 +5,9 @@ import { listSystemCategories } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import SystemCategoryEditor from '@/components/SystemCategoryEditor.vue'
 
+// Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
+defineProps({ embedded: { type: Boolean, default: false } })
+
 const systemCategories = ref([])
 const editing = ref(null)
 const showEditor = ref(false)
@@ -24,7 +27,7 @@ onMounted(refresh)
 <template>
   <div class="max-w-screen-2xl mx-auto">
     <div class="mb-6 flex items-end justify-between gap-3">
-      <div>
+      <div v-if="!embedded">
         <h1 class="text-2xl font-semibold text-gray-800">Catégories de systèmes</h1>
         <p class="text-sm text-gray-500 mt-1">
           {{ systemCategories.length }} catégorie{{ systemCategories.length > 1 ? 's' : '' }}.
@@ -32,6 +35,9 @@ onMounted(refresh)
           Chaque instance d'équipement choisit ses catégories d'usage parmi celles dont son template est candidat.
         </p>
       </div>
+      <p v-else class="text-sm text-gray-500">
+        {{ systemCategories.length }} catégorie{{ systemCategories.length > 1 ? 's' : '' }} regroupent les modèles. Les articles BACS sont définis ici et hérités par tous les équipements de la catégorie.
+      </p>
       <button @click="openCreate"
               class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
         <PlusIcon class="w-4 h-4" /> Nouvelle catégorie

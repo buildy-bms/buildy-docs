@@ -1,5 +1,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+
+// Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
+defineProps({ embedded: { type: Boolean, default: false } })
+
 import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
@@ -139,13 +143,16 @@ onMounted(async () => {
     <!-- Vue liste -->
     <template v-if="!selected">
       <div class="mb-6 flex items-end justify-between gap-3">
-        <div>
+        <div v-if="!embedded">
           <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque d'équipements</h1>
           <p class="text-sm text-gray-500 mt-1">
             {{ templates.length }} template{{ templates.length > 1 ? 's' : '' }} partagé{{ templates.length > 1 ? 's' : '' }}
             entre toutes les AFs. Édite un template pour propager les changements.
           </p>
         </div>
+        <p v-else class="text-sm text-gray-500">
+          {{ templates.length }} modèle{{ templates.length > 1 ? 's' : '' }} d'équipement partagé{{ templates.length > 1 ? 's' : '' }}.
+        </p>
         <button @click="openCreate"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" />

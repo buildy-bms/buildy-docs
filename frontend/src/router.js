@@ -34,13 +34,7 @@ const routes = [
   },
   {
     path: '/library',
-    redirect: '/library/equipments',
-  },
-  {
-    path: '/library/equipments',
-    name: 'library-equipments',
-    meta: { title: 'Bibliothèque équipements' },
-    component: () => import('@/views/LibraryEquipmentView.vue'),
+    redirect: '/library/sections',
   },
   {
     path: '/library/sections',
@@ -49,16 +43,21 @@ const routes = [
     component: () => import('@/views/LibrarySectionsView.vue'),
   },
   {
+    path: '/library/equipments',
+    name: 'library-systems',
+    meta: { title: 'Systèmes techniques' },
+    component: () => import('@/views/LibrarySystemsView.vue'),
+  },
+  {
     path: '/library/functionalities',
     name: 'library-functionalities',
     meta: { title: 'Bibliothèque fonctionnalités' },
     component: () => import('@/views/LibraryFunctionalitiesView.vue'),
   },
   {
+    // Compat retro : ancienne URL des categories -> onglet du wrapper
     path: '/library/categories',
-    name: 'library-categories',
-    meta: { title: 'Catégories de systèmes' },
-    component: () => import('@/views/LibraryCategoriesView.vue'),
+    redirect: '/library/equipments?tab=categories',
   },
 ]
 

@@ -7,7 +7,6 @@ import {
   DocumentTextIcon,
   RectangleStackIcon,
   BookmarkIcon,
-  Squares2X2Icon,
   SparklesIcon,
   MagnifyingGlassIcon,
   CogIcon,
@@ -34,10 +33,9 @@ const paletteRef = ref(null)
 const nav = [
   { name: 'Mes AFs', to: '/', icon: DocumentTextIcon },
   { section: 'Bibliotheque' },
-  { name: 'Équipements', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
+  { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
-  { name: 'Catégories de systèmes', to: '/library/categories', icon: Squares2X2Icon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 const cmdKey = isMac ? '⌘' : 'Ctrl'
