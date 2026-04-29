@@ -13,6 +13,7 @@ import { updateSection, getSectionTemplate } from '@/api'
 import { useAutosave } from '@/composables/useAutosave'
 import { useClaudeDraft } from '@/composables/useClaudeDraft'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import AutosaveStatus from './AutosaveStatus.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import BaseModal from '@/components/BaseModal.vue'
@@ -50,23 +51,29 @@ async function checkSectionTemplateVersion() {
 }
 checkSectionTemplateVersion()
 
-function applySectionTplBody() {
+async function applySectionTplBody() {
   if (!newSectionTplVersion.value || !editor.value) return
-  if (!confirm('Remplacer le contenu de cette section par la dernière version canonique ? Tes modifications locales seront perdues.')) return
+  const ok = await confirm({
+    title: 'Remplacer le contenu ?',
+    message: 'Le contenu actuel de cette section sera remplacé par la dernière version canonique. Tes modifications locales seront perdues.',
+    confirmLabel: 'Remplacer',
+    danger: true,
+  })
+  if (!ok) return
   const newBody = newSectionTplVersion.value.body_html || ''
   editor.value.commands.setContent(newBody)
   bodyAutosave.schedule(editor.value.getHTML())
   // Note : l'autosave met à jour body_html ; le bump de version pinnée est fait côté
   // backend via PATCH /sections/:id (updateSection accepte section_template_version).
   updateSection(props.section.id, { section_template_version: newSectionTplVersion.value.current_version })
-    .catch(() => {})
+    .catch((e) => notifyError(e?.response?.data?.detail || 'Échec de la synchronisation de version'))
   newSectionTplVersion.value = null
 }
 function dismissSectionTplBanner() {
   if (!newSectionTplVersion.value) return
   // Pin local sans changer le contenu : l'utilisateur garde sa version mais ne sera plus alerté.
   updateSection(props.section.id, { section_template_version: newSectionTplVersion.value.current_version })
-    .catch(() => {})
+    .catch((e) => notifyError(e?.response?.data?.detail || 'Échec de la synchronisation de version'))
   newSectionTplVersion.value = null
 }
 
@@ -78,8 +85,13 @@ watch(() => props.section.id, () => {
   checkSectionTemplateVersion()
 })
 
+const presentationMode = inject('presentationMode', null)
+const isReadOnly = computed(() => presentationMode?.value === true)
+watch(isReadOnly, (v) => editor.value?.setEditable(!v))
+
 const editor = useEditor({
   content: props.section.body_html || '',
+  editable: !(presentationMode?.value === true),
   extensions: [
     StarterKit.configure({
       heading: { levels: [2, 3, 4] },
@@ -122,6 +134,8 @@ async function flushAll() {
   await Promise.all([bodyAutosave.flush(), titleAutosave.flush()])
 }
 
+defineExpose({ flushAll })
+
 // Status global = priorité error > saving > pending > saved > idle
 const globalState = computed(() => {
   const states = [bodyAutosave.state.value, titleAutosave.state.value]
@@ -130,6 +144,14 @@ const globalState = computed(() => {
   if (states.includes('pending')) return 'pending'
   if (states.includes('saved')) return 'saved'
   return 'idle'
+})
+// Toast en cas d'erreur reseau pendant l'autosave : sans ca, l'utilisateur
+// voit juste un picto rouge dans le header et croit que la sauvegarde a
+// reussi. On ne notifie qu'une fois par transition idle/saving -> error.
+watch(globalState, (newS, oldS) => {
+  if (newS === 'error' && oldS !== 'error') {
+    notifyError('Sauvegarde impossible — vérifiez votre connexion et réessayez')
+  }
 })
 const globalLastSaved = computed(() => {
   const dates = [bodyAutosave.lastSaved.value, titleAutosave.lastSaved.value].filter(Boolean)
@@ -144,6 +166,7 @@ onBeforeUnmount(() => {
 // ── Assistant Claude ──
 const claudeStream = useClaudeDraft()
 const { error: notifyError, success: notifySuccess } = useNotification()
+const { confirm } = useConfirm()
 const showClaudeModal = ref(false)
 const claudeInstruction = ref('')
 const claudePreview = ref('')
@@ -214,11 +237,13 @@ function setLink() {
         @input="onTitleInput"
         type="text"
         placeholder="Titre de la section"
+        :readonly="isReadOnly"
         class="flex-1 min-w-0 text-base font-semibold text-gray-800 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
       />
       <ServiceLevelBadge :level="section.service_level" />
       <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
       <AutosaveStatus
+        v-if="!isReadOnly"
         :state="globalState"
         :last-saved="globalLastSaved"
         :error="bodyAutosave.lastError.value || titleAutosave.lastError.value"
@@ -232,8 +257,8 @@ function setLink() {
       <span v-if="section.updated_at"> · {{ formatUpdatedAt(section.updated_at) }}</span>
     </div>
 
-    <!-- Toolbar Tiptap -->
-    <div v-if="editor" class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50">
+    <!-- Toolbar Tiptap (cachee en mode presentation) -->
+    <div v-if="editor && !isReadOnly" class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50">
       <button @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Titre niveau 2"><H2Icon class="w-4 h-4" /></button>

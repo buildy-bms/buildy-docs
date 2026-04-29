@@ -12,6 +12,7 @@ import {
   reorderAttachments, deleteAttachment,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   sectionId: { type: Number, required: true },
@@ -19,6 +20,7 @@ const props = defineProps({
 })
 
 const { error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 const attachments = ref([])
 const loading = ref(false)
 const isDragging = ref(false)
@@ -30,9 +32,25 @@ const gridRef = ref(null)
 let sortable = null
 
 // Cache-buster basé sur l'id + un nonce de retry pour bypass un échec antérieur.
+// L'API renvoie url_path déjà calculé qui tient compte de la source
+// (section / section_template / equipment_template).
 function urlFor(att) {
   const retry = retryCount.get(att.id) || 0
-  return `/attachments/${props.afId}/${att.filename}?v=${att.id}${retry ? `&r=${retry}` : ''}`
+  const base = att.url_path || `/attachments/${props.afId}/${att.filename}`
+  return `${base}?v=${att.id}${retry ? `&r=${retry}` : ''}`
+}
+function isInherited(att) {
+  return att.source === 'section_template' || att.source === 'equipment_template'
+}
+// Drag d'une card vers l'arbre des sections (= deplacement vers une autre
+// section). On utilise un MIME type custom pour que SectionTreeNode puisse
+// distinguer ce drag des autres (fichiers OS, etc.). Sortable.js intercepte
+// son propre dragstart pour le reorder interne ; ce handler s'execute en
+// parallele et ajoute une donnee custom au DataTransfer.
+function onCardDragStart(e, att) {
+  if (isInherited(att)) return
+  e.dataTransfer?.setData('application/x-buildy-attachment', String(att.id))
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
 }
 
 function onImgError(att, e) {
@@ -112,7 +130,8 @@ async function saveCaption(att) {
 }
 
 async function removeAttachment(att) {
-  if (!confirm(`Supprimer la capture "${att.original_name}" ?`)) return
+  const ok = await confirm({ title: 'Supprimer la capture ?', message: `« ${att.original_name} »`, confirmLabel: 'Supprimer', danger: true })
+  if (!ok) return
   try {
     await deleteAttachment(att.id)
     refresh()
@@ -140,13 +159,22 @@ function setupSortable() {
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
+    // Les captures heritees du modele ne sont pas re-ordonnables au niveau
+    // de la section AF — elles ont leur ordre defini au niveau du template.
+    filter: '[data-inherited="true"]',
+    preventOnFilter: false,
     onEnd: async (evt) => {
       if (evt.oldIndex === evt.newIndex) return
-      // Réordonne le tableau local (Sortable a déjà déplacé le DOM)
+      // Reordre LOCAL (Sortable a deja deplace le DOM). Pour la persistance,
+      // on n'envoie au backend QUE les captures specifiques (source='section'),
+      // dans leur nouvel ordre relatif.
       const [moved] = attachments.value.splice(evt.oldIndex, 1)
       attachments.value.splice(evt.newIndex, 0, moved)
       try {
-        await reorderAttachments(props.sectionId, attachments.value.map(a => a.id))
+        const ownIds = attachments.value
+          .filter(a => a.source === 'section' || !a.source)
+          .map(a => a.id)
+        await reorderAttachments(props.sectionId, ownIds)
       } catch {
         notifyError('Échec de la réorganisation')
         refresh()
@@ -214,7 +242,13 @@ onBeforeUnmount(() => {
       <div
         v-for="att in attachments"
         :key="att.id"
-        class="att-card group relative bg-gray-50 border border-gray-200 overflow-hidden cursor-move"
+        :class="[
+          'att-card group relative bg-gray-50 border overflow-hidden',
+          isInherited(att) ? 'border-indigo-200 cursor-default' : 'border-gray-200 cursor-move',
+        ]"
+        :data-inherited="isInherited(att) ? 'true' : null"
+        :draggable="!isInherited(att)"
+        @dragstart="(e) => onCardDragStart(e, att)"
       >
         <!-- Image OK -->
         <img
@@ -242,7 +276,17 @@ onBeforeUnmount(() => {
           <p class="text-[10px] text-indigo-600">Cliquer pour réessayer</p>
         </div>
 
+        <!-- Badge "héritée du modèle" pour les captures heritees -->
+        <span
+          v-if="isInherited(att)"
+          class="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-semibold rounded-md inline-flex items-center gap-1 z-10"
+          :title="att.source === 'section_template' ? 'Capture héritée du modèle de fonctionnalité' : 'Capture héritée du modèle d\'équipement'"
+        >
+          📎 Modèle
+        </span>
+
         <button
+          v-if="!isInherited(att)"
           @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
           title="Supprimer"
@@ -251,6 +295,7 @@ onBeforeUnmount(() => {
         </button>
 
         <input
+          v-if="!isInherited(att)"
           v-model="att.caption"
           @blur="saveCaption(att)"
           @click.stop
@@ -258,6 +303,13 @@ onBeforeUnmount(() => {
           placeholder="Légende…"
           class="relative z-10 w-full px-2 py-1 text-xs bg-white border-t border-gray-200 focus:outline-none focus:bg-indigo-50 cursor-text"
         />
+        <div
+          v-else
+          class="relative z-10 w-full px-2 py-1 text-xs bg-indigo-50/40 border-t border-indigo-200 text-indigo-900 truncate"
+          :title="att.caption || 'Légende héritée du modèle'"
+        >
+          {{ att.caption || 'Légende héritée du modèle' }}
+        </div>
       </div>
     </div>
 

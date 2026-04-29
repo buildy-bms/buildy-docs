@@ -12,6 +12,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
+import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import EquipmentTemplatePicker from './EquipmentTemplatePicker.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
@@ -23,6 +24,7 @@ import {
   listEquipmentTemplates,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   template: { type: Object, default: () => ({}) },
@@ -31,6 +33,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'saved', 'deleted'])
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const isEdit = computed(() => !!props.template?.id)
 const labelEntity = computed(() => props.mode === 'functionality' ? 'fonctionnalité' : 'section type')
@@ -223,7 +226,8 @@ async function submit() {
 
 async function destroy() {
   if (!isEdit.value) return
-  if (!confirm(`Supprimer « ${props.template.title} » ?`)) return
+  const ok = await confirm({ title: 'Supprimer ?', message: `« ${props.template.title} »`, confirmLabel: 'Supprimer', danger: true })
+  if (!ok) return
   deleting.value = true
   try {
     await deleteSectionTemplate(props.template.id)
@@ -233,11 +237,13 @@ async function destroy() {
     // 409 : des AFs utilisent encore la section. On propose le cascade.
     if (e.response?.status === 409) {
       const n = e.response.data?.affected_count || 0
-      const ok = confirm(
-        `${n} AF${n > 1 ? 's' : ''} utilise${n > 1 ? 'nt' : ''} encore cette ${labelEntity.value}.\n\n` +
-        `Supprimer quand même ? Les sections correspondantes seront retirées de ces AFs (le contenu personnalisé sera perdu).`
-      )
-      if (ok) {
+      const ok2 = await confirm({
+        title: `Forcer la suppression ?`,
+        message: `${n} AF${n > 1 ? 's' : ''} utilise${n > 1 ? 'nt' : ''} encore cette ${labelEntity.value}.\n\nLes sections correspondantes seront retirées de ces AFs et le contenu personnalisé sera perdu.`,
+        confirmLabel: 'Forcer',
+        danger: true,
+      })
+      if (ok2) {
         try {
           const { data } = await deleteSectionTemplate(props.template.id, { force: true })
           success(`Supprimée — retirée de ${data?.cascade_count || 0} AF${(data?.cascade_count || 0) > 1 ? 's' : ''}`)
@@ -361,6 +367,11 @@ async function destroy() {
           Les AFs où la section a été personnalisée ne seront pas écrasées (un bandeau "nouvelle version" s'affichera dans l'éditeur).
         </span>
       </label>
+
+      <!-- Captures du modele : automatiquement heritees par les AFs -->
+      <div v-if="isEdit">
+        <TemplateAttachmentsGrid template-kind="section" :template-id="props.template.id" />
+      </div>
     </form>
 
     <template #footer>

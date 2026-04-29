@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { TrashIcon, UserCircleIcon, EyeIcon, PencilIcon } from '@heroicons/vue/24/outline'
 import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from './BaseModal.vue'
 
 const props = defineProps({
@@ -10,6 +11,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['close'])
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const data = ref({ owner_id: null, grants: [] })
 const allUsers = ref([])
@@ -57,7 +59,13 @@ async function changeRole(grant) {
 }
 
 async function revoke(grant) {
-  if (!confirm(`Retirer l'accès de ${grant.user_display_name || grant.user_email} ?`)) return
+  const ok = await confirm({
+    title: 'Retirer l\'accès ?',
+    message: `${grant.user_display_name || grant.user_email}`,
+    confirmLabel: 'Retirer',
+    danger: true,
+  })
+  if (!ok) return
   try { await revokeAfPermission(props.afId, grant.user_id); await refresh() }
   catch (e) { notifyError('Échec') }
 }

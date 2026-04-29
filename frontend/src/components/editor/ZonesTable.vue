@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { PlusCircleIcon, TrashIcon, BuildingOfficeIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import api, { getAfZonesMatrix } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
@@ -16,6 +17,7 @@ async function refreshMatrix() {
   catch { matrix.value = null }
 }
 const { error: notifyError, success: notifySuccess } = useNotification()
+const { confirm } = useConfirm()
 
 const zones = ref([])
 const loading = ref(false)
@@ -84,7 +86,13 @@ async function submitEdit() {
 }
 
 async function deleteZone(zone) {
-  if (!confirm(`Supprimer la zone "${zone.name}" ?\nLes liens avec les instances d'équipements seront aussi supprimés.`)) return
+  const ok = await confirm({
+    title: 'Supprimer la zone ?',
+    message: `« ${zone.name} »\n\nLes liens avec les instances d'équipements seront aussi supprimés.`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try { await api.delete(`/zones/${zone.id}`); await refresh() }
   catch (e) { notifyError('Échec suppression') }
 }

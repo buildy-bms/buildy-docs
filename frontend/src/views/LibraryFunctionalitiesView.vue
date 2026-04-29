@@ -230,10 +230,11 @@ onBeforeUnmount(teardownSortables)
                 <span v-else class="text-gray-300 italic text-xs">—</span>
               </td>
               <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
-                  {{ t.outdated_count }} / {{ t.affected_afs_count }}
+                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" title="AFs utilisant cette fonctionnalité / AFs avec mise à jour en attente">
+                  {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
                 </span>
-                <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
+                <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
+                <span v-else class="text-gray-300 italic" title="Jamais utilisée — candidate au nettoyage">∅</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
                 <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />

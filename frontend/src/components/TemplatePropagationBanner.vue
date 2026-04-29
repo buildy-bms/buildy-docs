@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { ArrowPathIcon, XMarkIcon, CheckIcon, ChevronRightIcon, ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
 import { getAfTemplateUpdates, applySectionTemplateUpdate, dismissSectionTemplateUpdate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
@@ -11,6 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['updated'])
 
 const { success: notifySuccess, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const updates = ref([])
 const loading = ref(false)
@@ -71,7 +73,12 @@ async function dismiss(item) {
 }
 
 async function applyAll() {
-  if (!confirm(`Appliquer les ${updates.value.length} mises à jour ? Le contenu actuel des sections n'est pas modifié — seul le pointeur de version est synchronisé.`)) return
+  const ok = await confirm({
+    title: `Appliquer ${updates.value.length} mise(s) à jour ?`,
+    message: 'Le contenu actuel des sections n\'est pas modifié — seul le pointeur de version est synchronisé.',
+    confirmLabel: 'Appliquer',
+  })
+  if (!ok) return
   for (const u of [...updates.value]) await apply(u)
   showModal.value = false
 }

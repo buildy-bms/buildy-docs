@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import {
   CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
@@ -7,6 +7,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
+import AddressAutocomplete from './AddressAutocomplete.vue'
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
@@ -14,6 +15,7 @@ import api, {
 } from '@/api'
 import SectionPickerTree from './SectionPickerTree.vue'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from './BaseModal.vue'
 import StatusBadge from './StatusBadge.vue'
 import ServiceLevelBadge from './ServiceLevelBadge.vue'
@@ -21,9 +23,12 @@ import ServiceLevelBadge from './ServiceLevelBadge.vue'
 const props = defineProps({
   af: { type: Object, required: true },
 })
-const emit = defineEmits(['updated', 'back', 'toggle-activity', 'goto-section'])
+const emit = defineEmits(['updated', 'back', 'toggle-activity', 'toggle-presentation', 'goto-section'])
+import { inject } from 'vue'
+const presentationMode = inject('presentationMode', null)
 
 const { success, error } = useNotification()
+const { confirm } = useConfirm()
 const router = useRouter()
 const submitting = ref(false)
 const showExport = ref(false)
@@ -39,6 +44,36 @@ const showInstances = ref(false)
 
 // Lot 29 — édition des métadonnées AF
 const showEdit = ref(false)
+// Inline rename du nom de projet (raccourci edition rapide P6.4) — evite
+// d'avoir a ouvrir la modale complete juste pour corriger une typo. Le
+// pencil icon a cote ouvre toujours la modale pour les autres champs.
+const inlineEdit = ref(false)
+const inlineProjectName = ref('')
+const inlineInputRef = ref(null)
+function startInlineEdit() {
+  inlineProjectName.value = props.af.project_name || ''
+  inlineEdit.value = true
+  nextTick(() => inlineInputRef.value?.focus())
+}
+async function saveInlineEdit() {
+  const next = inlineProjectName.value.trim()
+  inlineEdit.value = false
+  if (!next || next === props.af.project_name) return
+  try {
+    const { data } = await updateAf(props.af.id, { project_name: next })
+    success('Nom du projet mis à jour')
+    emit('updated', data)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec mise à jour')
+  }
+}
+function cancelInlineEdit() {
+  inlineEdit.value = false
+}
+function onInlineKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveInlineEdit() }
+  else if (e.key === 'Escape') { e.preventDefault(); cancelInlineEdit() }
+}
 const editForm = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
 function openEdit() {
   editForm.value = {
@@ -120,19 +155,26 @@ const showTransitionModal = ref(false)
 const transitionTo = ref(null)
 const transitionMotif = ref('')
 const transitionNotes = ref('')
+const transitionWarnings = ref([])
 
 function openPhaseMenu() { showPhaseMenu.value = !showPhaseMenu.value }
 
-function startTransition(target) {
+async function startTransition(target) {
   showPhaseMenu.value = false
   transitionTo.value = target
   transitionMotif.value = ''
   transitionNotes.value = ''
+  transitionWarnings.value = []
   // Validee + livree : modale obligatoire (snapshot figé)
   if (target === 'validee' || target === 'livree') {
+    // Pre-check : remonte les avertissements (sections vides, equipements
+    // sans instance, etc.) avant que l'utilisateur ne confirme.
+    try {
+      const { data } = await api.get(`/afs/${props.af.id}/transition-checks`, { params: { to: target } })
+      transitionWarnings.value = data.warnings || []
+    } catch { /* check informatif, on ouvre quand meme la modale */ }
     showTransitionModal.value = true
   } else {
-    // Bascule simple
     confirmTransition()
   }
 }
@@ -167,7 +209,12 @@ async function rollbackPhase() {
   const idx = PHASE_FLOW.indexOf(props.af.status)
   if (idx <= 0) return
   const prev = PHASE_FLOW[idx - 1]
-  if (!confirm(`Revenir à "${PHASE_LABELS[prev]}" ? Cela lève le verrou doux et permet à nouveau toutes les modifications.`)) return
+  const ok = await confirm({
+    title: `Revenir à « ${PHASE_LABELS[prev]} » ?`,
+    message: 'Cela lève le verrou doux et permet à nouveau toutes les modifications.',
+    confirmLabel: 'Revenir en arrière',
+  })
+  if (!ok) return
   submitting.value = true
   try {
     const { data } = await api.post(`/afs/${props.af.id}/transition`, { to: prev })
@@ -268,7 +315,26 @@ const exportDescription = computed(() => {
     </button>
     <div class="min-w-0 flex-1">
       <h2 class="text-sm font-semibold text-gray-800 truncate flex items-center gap-1.5">
-        {{ af.client_name }} — {{ af.project_name }}
+        <span class="text-gray-500">{{ af.client_name }} —</span>
+        <input
+          v-if="inlineEdit"
+          ref="inlineInputRef"
+          v-model="inlineProjectName"
+          @blur="saveInlineEdit"
+          @keydown="onInlineKeydown"
+          type="text"
+          autocomplete="off"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          data-lpignore="true"
+          class="flex-1 min-w-0 text-sm font-semibold text-gray-800 bg-indigo-50 border-0 rounded px-1 py-0 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+        />
+        <span
+          v-else
+          @click="startInlineEdit"
+          class="cursor-text hover:bg-gray-100 rounded px-1 -mx-1"
+          title="Cliquer pour renommer rapidement (Entrée valide, Esc annule)"
+        >{{ af.project_name }}</span>
         <button @click="openEdit" class="text-gray-300 hover:text-indigo-600 shrink-0" title="Éditer client / projet / contrat">
           <PencilSquareIcon class="w-3.5 h-3.5" />
         </button>
@@ -287,14 +353,24 @@ const exportDescription = computed(() => {
       <DocumentArrowDownIcon class="w-4 h-4" />
       AF (A4)
     </button>
-    <button
-      @click="openExport('points-list')"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
-      title="Exporter la liste de points contractuelle en PDF A3"
-    >
-      <TableCellsIcon class="w-4 h-4" />
-      Points (A3)
-    </button>
+    <div class="inline-flex rounded-lg overflow-hidden">
+      <button
+        @click="openExport('points-list')"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
+        title="Exporter la liste de points contractuelle en PDF A3"
+      >
+        <TableCellsIcon class="w-4 h-4" />
+        Points (A3)
+      </button>
+      <a
+        :href="`/api/afs/${af.id}/exports/points-list.xlsx`"
+        download
+        class="inline-flex items-center px-2.5 py-1.5 bg-indigo-700 text-white text-xs font-medium hover:bg-indigo-800 border-l border-indigo-500"
+        title="Télécharger la liste de points en Excel (XLSX, intégrateur GTB)"
+      >
+        XLSX
+      </a>
+    </div>
     <button
       @click="openExport('synthesis')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
@@ -326,6 +402,18 @@ const exportDescription = computed(() => {
     >
       <ClockIcon class="w-4 h-4" />
       Activité
+    </button>
+    <button
+      @click="emit('toggle-presentation')"
+      :class="[
+        'inline-flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium rounded-lg',
+        presentationMode?.value
+          ? 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'
+          : 'border-gray-200 text-gray-700 hover:bg-gray-50',
+      ]"
+      title="Mode présentation : masque les boutons d'édition (utile en réunion)"
+    >
+      👁️ {{ presentationMode?.value ? 'Quitter présentation' : 'Présentation' }}
     </button>
     <button
       @click="router.push(`/afs/${af.id}/versions`)"
@@ -536,6 +624,30 @@ const exportDescription = computed(() => {
           et faire basculer l'AF en mode "Projet livré".
         </template>
       </p>
+
+      <!-- Avertissements pre-transition (3.3) -->
+      <div v-if="transitionWarnings.length" class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+        <p class="text-xs font-semibold text-amber-900 inline-flex items-center gap-1.5">
+          <span class="text-base leading-none">⚠️</span>
+          Vérifications avant transition
+        </p>
+        <ul class="space-y-2">
+          <li v-for="w in transitionWarnings" :key="w.code" class="text-[11px] leading-relaxed">
+            <p :class="w.severity === 'error' ? 'text-red-700 font-semibold' : 'text-amber-800 font-medium'">
+              {{ w.severity === 'error' ? '🛑' : '•' }} {{ w.label }}
+            </p>
+            <ul v-if="w.details && w.details.length" class="mt-1 ml-4 space-y-0.5">
+              <li v-for="d in w.details" :key="d.id" class="text-gray-600">
+                <button type="button" @click="emit('goto-section', { id: d.id, number: d.number })" class="hover:text-indigo-600 hover:underline cursor-pointer text-left">
+                  <code class="font-mono text-gray-500">§{{ d.number || '?' }}</code> {{ d.title }}
+                </button>
+              </li>
+              <li v-if="w.moreCount > 0" class="text-gray-400 italic">+{{ w.moreCount }} autres</li>
+            </ul>
+          </li>
+        </ul>
+        <p class="text-[11px] text-amber-800 italic">Vous pouvez confirmer malgré ces avertissements ; ils sont consignés dans l'audit.</p>
+      </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Motif (obligatoire) *</label>
         <input v-model="transitionMotif" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
@@ -562,51 +674,70 @@ const exportDescription = computed(() => {
   <AfInstancesModal v-if="showInstances" :af-id="af.id" @close="showInstances = false" @goto-section="(id) => emit('goto-section', id)" />
 
   <!-- Modale édition métadonnées AF (Lot 29) -->
-  <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="md" @close="showEdit = false">
-    <form @submit.prevent="submitEdit" class="space-y-4">
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Client *</label>
-        <input v-model="editForm.client_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Projet *</label>
-        <input v-model="editForm.project_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Adresse du site</label>
-        <input v-model="editForm.site_address" type="text" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-gray-700 mb-1">Niveau de contrat Buildy</label>
+  <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="lg" @close="showEdit = false">
+    <form @submit.prevent="submitEdit" class="space-y-6">
+      <!-- ── Identité du chantier ─────────────────────────────────── -->
+      <section class="space-y-3">
+        <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Identité du chantier</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1.5">Client <span class="text-red-500">*</span></label>
+            <input v-model="editForm.client_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                   placeholder="Ex : Acme SAS"
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1.5">Projet <span class="text-red-500">*</span></label>
+            <input v-model="editForm.project_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                   placeholder="Ex : Lyon Part-Dieu"
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1.5">Adresse du site</label>
+          <AddressAutocomplete v-model="editForm.site_address" placeholder="Rechercher une adresse française…" />
+        </div>
+      </section>
+
+      <!-- ── Engagement contractuel ────────────────────────────────── -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Engagement contractuel</h3>
+          <span v-if="editForm.service_level" class="text-[11px] text-gray-400">Niveau visé pour ce projet</span>
+          <span v-else class="text-[11px] text-amber-600">Aucun niveau fixé — à arbitrer au bon de commande</span>
+        </div>
         <div class="grid grid-cols-4 gap-2">
           <label
             v-for="opt in [
-              { value: null, label: 'À déterminer' },
-              { value: 'E', label: 'Essentials' },
-              { value: 'S', label: 'Smart' },
-              { value: 'P', label: 'Premium' },
+              { value: null, label: 'À déterminer', sub: 'Décision plus tard', dot: 'bg-gray-300', selected: 'border-gray-500 bg-gray-50 text-gray-800' },
+              { value: 'E', label: 'Essentials', sub: 'Baseline garantie', dot: 'bg-gray-400', selected: 'border-gray-600 bg-gray-50 text-gray-800' },
+              { value: 'S', label: 'Smart', sub: 'Pilotage avancé', dot: 'bg-blue-500', selected: 'border-blue-600 bg-blue-50 text-blue-900' },
+              { value: 'P', label: 'Premium', sub: 'Tout inclus', dot: 'bg-emerald-500', selected: 'border-emerald-600 bg-emerald-50 text-emerald-900' },
             ]"
             :key="opt.value || 'none'"
             :class="[
-              'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
+              'cursor-pointer rounded-lg border-2 px-3 py-2.5 transition-all',
               editForm.service_level === opt.value
-                ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                ? opt.selected + ' shadow-sm'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
             ]"
           >
             <input v-model="editForm.service_level" :value="opt.value" type="radio" class="sr-only" />
-            {{ opt.label }}
+            <div class="flex items-center gap-1.5 mb-0.5">
+              <span :class="['w-2 h-2 rounded-full', opt.dot]"></span>
+              <span class="text-sm font-semibold">{{ opt.label }}</span>
+            </div>
+            <p class="text-[11px] text-gray-500 leading-tight">{{ opt.sub }}</p>
           </label>
         </div>
-      </div>
+      </section>
     </form>
     <template #footer>
-      <button @click="showEdit = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+      <button @click="showEdit = false" class="px-4 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
+        Annuler
+      </button>
       <button @click="submitEdit" :disabled="submitting || !editForm.client_name.trim() || !editForm.project_name.trim()"
-              class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+              class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
         {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
     </template>

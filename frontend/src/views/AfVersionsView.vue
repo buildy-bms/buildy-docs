@@ -4,11 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeftIcon, TagIcon, ArrowsRightLeftIcon, ArrowUturnLeftIcon, BookmarkIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { getAf, listAfVersions, getAfVersionsDiff, restoreAfVersion, checkpointAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const af = ref(null)
 const commits = ref([])
@@ -65,7 +67,13 @@ async function compareDiff() {
 }
 
 async function restore(sha) {
-  if (!confirm(`Restaurer la version ${sha.slice(0, 7)} ? Cela va écraser les sections actuelles avec leur contenu d'alors. Un nouveau commit "Restauration de ${sha.slice(0, 7)}" sera créé pour garder la trace.`)) return
+  const ok = await confirm({
+    title: `Restaurer la version ${sha.slice(0, 7)} ?`,
+    message: `Cela va écraser les sections actuelles avec leur contenu d'alors. Un nouveau commit « Restauration de ${sha.slice(0, 7)} » sera créé pour garder la trace.`,
+    confirmLabel: 'Restaurer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     const { data } = await restoreAfVersion(route.params.id, sha)
     success(`Restauration : ${data.touched} sections mises à jour, ${data.missing} introuvables`)

@@ -38,6 +38,14 @@ export default defineConfig({
         target: backendUrl,
         secure: false,
       },
+      // Sans ce proxy, /attachments/... part au dev server Vite qui sert
+      // le SPA index.html en text/html → les <img> recoivent du HTML et
+      // affichent une miniature cassee en silence (meme bug que commit
+      // 9937b1e cote Fastify).
+      '/attachments': {
+        target: backendUrl,
+        secure: false,
+      },
     },
   },
   build: {

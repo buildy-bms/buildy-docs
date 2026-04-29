@@ -77,6 +77,35 @@ export const updateAttachment = (id, data) => api.patch(`/attachments/${id}`, da
 export const reorderAttachments = (sectionId, order) =>
   api.post(`/sections/${sectionId}/attachments/reorder`, { order })
 export const deleteAttachment = (id) => api.delete(`/attachments/${id}`)
+export const moveAttachment = (id, targetSectionId) =>
+  api.post(`/attachments/${id}/move`, { section_id: targetSectionId })
+
+// Captures rattachees a un section_template (heritees automatiquement par
+// toutes les sections AF qui referencent ce template).
+export const listSectionTemplateAttachments = (id) => api.get(`/section-templates/${id}/attachments`)
+export const uploadSectionTemplateAttachment = (id, file, onProgress) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post(`/section-templates/${id}/attachments`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
+  })
+}
+export const reorderSectionTemplateAttachments = (id, order) =>
+  api.post(`/section-templates/${id}/attachments/reorder`, { order })
+
+// Captures rattachees a un equipment_template.
+export const listEquipmentTemplateAttachments = (id) => api.get(`/equipment-templates/${id}/attachments`)
+export const uploadEquipmentTemplateAttachment = (id, file, onProgress) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post(`/equipment-templates/${id}/attachments`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
+  })
+}
+export const reorderEquipmentTemplateAttachments = (id, order) =>
+  api.post(`/equipment-templates/${id}/attachments/reorder`, { order })
 
 // ── Exports ──
 export const listAfExports = (afId) => api.get(`/afs/${afId}/exports`)

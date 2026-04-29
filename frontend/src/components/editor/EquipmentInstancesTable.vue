@@ -8,6 +8,7 @@ import {
   getEquipmentTemplate,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
@@ -17,6 +18,7 @@ const props = defineProps({
 })
 
 const { error: notifyError, success: notifySuccess } = useNotification()
+const { confirm } = useConfirm()
 const instances = ref([])
 const zonesAll = ref([])
 const instanceZonesMap = ref(new Map()) // instance_id → [zone, ...]
@@ -134,7 +136,8 @@ function toggleCategory(key) {
 }
 
 async function removeInstance(inst) {
-  if (!confirm(`Supprimer l'instance "${inst.reference}" ?`)) return
+  const ok = await confirm({ title: 'Supprimer l\'instance ?', message: `« ${inst.reference} »`, confirmLabel: 'Supprimer', danger: true })
+  if (!ok) return
   try {
     await deleteInstance(inst.id)
     await refresh()

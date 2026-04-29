@@ -55,59 +55,48 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <div v-if="data && data.required" class="border border-gray-200 rounded-lg bg-white shadow-xs">
-    <div class="px-5 py-4">
-      <div class="flex items-start justify-between gap-4 mb-3">
-        <div class="flex-1 min-w-0">
-          <p class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
-            Niveau de contrat Buildy nécessaire pour couvrir cette AF
-          </p>
-          <div class="flex items-center gap-3 flex-wrap">
-            <span :class="['inline-flex items-center px-3 py-1 text-sm font-bold rounded-full border', LEVEL_COLOR[data.required]]">
-              {{ LEVEL_LABEL[data.required] }}
-            </span>
-            <template v-if="verdict?.kind === 'shortfall'">
-              <span class="inline-flex items-center gap-1.5 text-xs text-red-700 font-medium">
-                <ExclamationTriangleIcon class="w-4 h-4" />
-                Dépasse le contrat actuel ({{ LEVEL_LABEL[verdict.contract] }}) — à arbitrer commercialement.
-              </span>
-            </template>
-            <template v-else-if="verdict?.kind === 'ok'">
-              <span class="inline-flex items-center gap-1.5 text-xs text-emerald-700">
-                <CheckCircleIcon class="w-4 h-4" />
-                Cohérent avec le contrat actuel ({{ LEVEL_LABEL[verdict.contract] }}).
-              </span>
-            </template>
-            <template v-else-if="verdict?.kind === 'no-contract'">
-              <span class="text-xs text-gray-500 italic">Aucun niveau de contrat fixé — à choisir au moment du bon de commande.</span>
-            </template>
-          </div>
-        </div>
-        <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1" title="Recalculer">
-          <ArrowPathIcon :class="['w-4 h-4', loading && 'animate-spin']" />
-        </button>
-      </div>
+  <div v-if="data && data.required" class="border border-gray-200 rounded-lg bg-white shadow-xs px-4 py-2.5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0">Niveau requis</p>
+      <span :class="['inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full border', LEVEL_COLOR[data.required]]">
+        {{ LEVEL_LABEL[data.required] }}
+      </span>
+      <template v-if="verdict?.kind === 'shortfall'">
+        <span class="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
+          <ExclamationTriangleIcon class="w-3.5 h-3.5" />
+          Dépasse le contrat ({{ LEVEL_LABEL[verdict.contract] }}) — à arbitrer.
+        </span>
+      </template>
+      <template v-else-if="verdict?.kind === 'ok'">
+        <span class="inline-flex items-center gap-1 text-xs text-emerald-700">
+          <CheckCircleIcon class="w-3.5 h-3.5" />
+          Cohérent avec le contrat ({{ LEVEL_LABEL[verdict.contract] }}).
+        </span>
+      </template>
+      <template v-else-if="verdict?.kind === 'no-contract'">
+        <span class="text-xs text-gray-500 italic">Aucun contrat fixé — à choisir au bon de commande.</span>
+      </template>
 
-      <div v-if="data.justifications.length" class="pt-3 border-t border-gray-100">
-        <p class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Sections justifiant ce niveau</p>
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <button
-            v-for="j in data.justifications.slice(0, 6)"
-            :key="(j.number || '?') + j.title"
-            type="button"
-            @click="emit('goto-section', { number: j.number, id: j.section_id })"
-            class="inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
-            title="Aller à cette section dans l'arbre"
-          >
-            <code class="font-mono text-gray-500">§{{ j.number || '?' }}</code>
-            <span class="text-gray-700 font-medium">{{ j.title }}</span>
-            <span :class="['inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full', LEVEL_COLOR[j.level]]">{{ LEVEL_LABEL[j.level] || j.level }}</span>
-          </button>
-          <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic px-1">
-            +{{ data.justifications.length - 6 }} autres
-          </span>
-        </div>
-      </div>
+      <span v-if="data.justifications.length" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold ml-2 shrink-0">Justifié par</span>
+      <button
+        v-for="j in data.justifications.slice(0, 6)"
+        :key="(j.number || '?') + j.title"
+        type="button"
+        @click="emit('goto-section', { number: j.number, id: j.section_id })"
+        class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
+        title="Aller à cette section"
+      >
+        <code class="font-mono text-gray-500">§{{ j.number || '?' }}</code>
+        <span class="text-gray-700 font-medium">{{ j.title }}</span>
+        <span :class="['inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full', LEVEL_COLOR[j.level]]">{{ LEVEL_LABEL[j.level] || j.level }}</span>
+      </button>
+      <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic">
+        +{{ data.justifications.length - 6 }} autres
+      </span>
+
+      <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1 ml-auto" title="Recalculer">
+        <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
+      </button>
     </div>
   </div>
 </template>

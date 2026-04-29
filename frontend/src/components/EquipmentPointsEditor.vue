@@ -20,6 +20,7 @@ import {
   deleteTemplatePoint, reorderTemplatePoints,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   templateId: { type: Number, required: true },
@@ -27,6 +28,7 @@ const props = defineProps({
 const emit = defineEmits(['updated'])
 
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const points = ref([])
 const loading = ref(false)
@@ -209,7 +211,8 @@ async function submitAdd() {
 }
 
 async function removePoint(point) {
-  if (!confirm(`Supprimer le point « ${point.label} » ?`)) return
+  const ok = await confirm({ title: 'Supprimer le point ?', message: `« ${point.label} »`, confirmLabel: 'Supprimer', danger: true })
+  if (!ok) return
   try {
     await deleteTemplatePoint(props.templateId, point.id)
     await refresh()

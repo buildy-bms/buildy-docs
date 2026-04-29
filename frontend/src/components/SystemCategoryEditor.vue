@@ -12,6 +12,7 @@ import BacsArticlesPicker from './BacsArticlesPicker.vue'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 import { createSystemCategory, updateSystemCategory, deleteSystemCategory, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 
 const ALL_FA_NAMES = [...new Set(
   Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon).map(i => i.iconName)
@@ -22,6 +23,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'saved', 'deleted'])
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const isEdit = computed(() => !!props.category?.id)
 
@@ -100,7 +102,13 @@ async function submit() {
 
 async function destroy() {
   if (!isEdit.value) return
-  if (!confirm(`Supprimer la catégorie « ${props.category.label} » ?\nLes instances qui l'avaient sélectionnée la perdent.`)) return
+  const ok = await confirm({
+    title: 'Supprimer la catégorie ?',
+    message: `« ${props.category.label} »\n\nLes instances qui l'avaient sélectionnée la perdent.`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteSystemCategory(props.category.id)
     success('Catégorie supprimée')

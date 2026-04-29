@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { PlusCircleIcon, TrashIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 import { getSectionPoints, addSectionOverride, deleteSectionOverride, getEquipmentTemplate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 
 const props = defineProps({
@@ -11,6 +12,7 @@ const props = defineProps({
 })
 
 const { error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 const points = ref([])
 const loading = ref(false)
 const showAdd = ref(false)
@@ -58,12 +60,17 @@ async function refresh() {
 async function removePoint(p) {
   try {
     if (p.source === 'template') {
-      // Créer un override 'remove' pour masquer le point template
-      if (!confirm(`Retirer "${p.label}" de cette section ?\n(Le template d'origine n'est pas modifié.)`)) return
+      const ok = await confirm({
+        title: 'Retirer ce point ?',
+        message: `« ${p.label} »\n\nLe template d'origine n'est pas modifié.`,
+        confirmLabel: 'Retirer',
+        danger: true,
+      })
+      if (!ok) return
       await addSectionOverride(props.sectionId, { action: 'remove', base_point_id: p.base_point_id })
     } else {
-      // Supprimer l'override directement
-      if (!confirm(`Retirer "${p.label}" ?`)) return
+      const ok = await confirm({ title: 'Retirer ce point ?', message: `« ${p.label} »`, confirmLabel: 'Retirer', danger: true })
+      if (!ok) return
       await deleteSectionOverride(props.sectionId, p.override_id)
     }
     await refresh()

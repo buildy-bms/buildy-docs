@@ -11,7 +11,7 @@ import { computed } from 'vue'
 import {
   RectangleStackIcon, GlobeAltIcon, ChartBarSquareIcon, DocumentTextIcon,
   Squares2X2Icon, SparklesIcon, ChevronRightIcon, ChevronDownIcon,
-  Bars3Icon, PencilIcon,
+  Bars3Icon, PencilIcon, BookmarkIcon,
 } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from './ServiceLevelBadge.vue'
 import BacsBadge from './BacsBadge.vue'
@@ -70,8 +70,17 @@ const isFunctionality = computed(() => props.node.is_functionality === 1)
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
       <BacsBadge v-if="node.bacs_articles" :reference="node.bacs_articles" />
 
-      <span v-if="node.affected_afs_count > 0" class="text-[11px] text-gray-400 tabular-nums shrink-0">
-        {{ node.affected_afs_count }} AF{{ node.affected_afs_count > 1 ? 's' : '' }}
+      <span
+        v-if="node.affected_afs_count > 0"
+        class="text-[11px] text-gray-500 tabular-nums shrink-0 inline-flex items-center gap-0.5"
+        :title="`Utilisée dans ${node.affected_afs_count} AF${node.affected_afs_count > 1 ? 's' : ''}` + (node.outdated_count > 0 ? ` — ${node.outdated_count} avec maj en attente` : '')"
+      >
+        <BookmarkIcon class="w-3 h-3" />
+        {{ node.affected_afs_count }}
+        <span v-if="node.outdated_count > 0" class="text-amber-600">↻{{ node.outdated_count }}</span>
+      </span>
+      <span v-else class="text-[11px] text-gray-300 italic shrink-0" title="Jamais utilisée — candidate au nettoyage">
+        ∅ inutilisée
       </span>
 
       <PencilIcon class="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-600 shrink-0" />

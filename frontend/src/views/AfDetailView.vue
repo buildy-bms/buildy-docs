@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates } from '@/api'
+import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates, moveAttachment } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
@@ -16,6 +17,21 @@ const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
   minWidth: 220,
   maxWidth: 720,
 })
+
+// Mode compact : sous 1280px, l'arbre des sections devient un drawer overlay
+// declenche par un bouton (sinon les 3 colonnes deviennent illisibles sur
+// laptop 13").
+const isCompact = ref(false)
+let mql = null
+function updateCompact(e) { isCompact.value = e.matches }
+if (typeof window !== 'undefined') {
+  mql = window.matchMedia('(max-width: 1279px)')
+  isCompact.value = mql.matches
+  mql.addEventListener('change', updateCompact)
+}
+const treeDrawerOpen = ref(false)
+// Garde le bandeau d'icone pour montrer comment ouvrir le drawer
+const treeOpen = computed(() => !isCompact.value || treeDrawerOpen.value)
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -58,12 +74,91 @@ const liveSectionNumbering = computed(() => {
   return map
 })
 provide('liveSectionNumbering', liveSectionNumbering)
+
+// Mode presentation (lecture seule) — toggle via query param ?readonly=1.
+// Les composants enfants peuvent injecter `presentationMode` pour adapter
+// leur UI (cacher les boutons d'edition, desactiver les inputs).
+const presentationMode = computed(() => route.query.readonly === '1')
+provide('presentationMode', presentationMode)
+function togglePresentation() {
+  router.replace({
+    path: route.path,
+    query: presentationMode.value ? {} : { ...route.query, readonly: '1' },
+  })
+}
 const selectedId = ref(null)
 const loading = ref(true)
 const showActivity = ref(false)
 const activityRef = ref(null)
+const sectionEditorRef = ref(null)
 const requiredLevelKey = ref(0) // bumpé pour forcer un recalcul du niveau requis
 const { success: notifySuccess, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
+
+// Liste plate triee selon l'ordre d'affichage dans l'arbre (parent + position)
+// Utilisee pour la navigation clavier flèches haut/bas entre sections.
+const orderedSections = computed(() => {
+  const byParent = new Map()
+  for (const s of sections.value) {
+    const k = s.parent_id || 'root'
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(s)
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  }
+  const out = []
+  function walk(parentKey) {
+    for (const s of byParent.get(parentKey) || []) {
+      out.push(s)
+      walk(s.id)
+    }
+  }
+  walk('root')
+  return out
+})
+
+function isEditableTarget(el) {
+  if (!el) return false
+  const tag = el.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (el.isContentEditable) return true
+  return false
+}
+
+async function onKeydown(e) {
+  // Cmd/Ctrl + S : flush autosave + toast (marche meme dans l'editeur)
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault()
+    try {
+      await sectionEditorRef.value?.flushAll?.()
+      notifySuccess('Sauvegardé')
+    } catch (err) {
+      notifyError('Échec de sauvegarde')
+    }
+    return
+  }
+  // Pour les autres raccourcis : ignorer si on est dans un champ editable
+  if (isEditableTarget(e.target)) return
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const list = orderedSections.value
+    if (!list.length) return
+    const idx = list.findIndex(s => s.id === selectedId.value)
+    let next
+    if (e.key === 'ArrowDown') next = list[Math.min(list.length - 1, idx + 1)]
+    else next = list[Math.max(0, idx - 1)]
+    if (next && next.id !== selectedId.value) {
+      e.preventDefault()
+      selectSection(next.id)
+    }
+  } else if (e.key === 'Delete') {
+    if (selectedSection.value) {
+      e.preventDefault()
+      handleDeleteSection(selectedSection.value)
+    }
+  }
+}
 
 // Modale ajout section (Lot 16)
 const showAddModal = ref(false)
@@ -101,10 +196,16 @@ async function submitAddSection() {
 
 async function handleDeleteSection(node) {
   const childCount = sections.value.filter(s => s.parent_id === node.id).length
-  const msg = childCount > 0
-    ? `Supprimer "${node.title}" ET ses ${childCount} sous-section(s) ?\nCela supprimera aussi tous les overrides, instances et captures associés.`
-    : `Supprimer la section "${node.title}" ?`
-  if (!confirm(msg)) return
+  const message = childCount > 0
+    ? `« ${node.title} » contient ${childCount} sous-section(s).\nCela supprimera aussi tous les overrides, instances et captures associés.`
+    : `« ${node.title} »`
+  const ok = await confirm({
+    title: 'Supprimer la section ?',
+    message,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteSection(node.id)
     notifySuccess('Section supprimée')
@@ -115,6 +216,23 @@ async function handleDeleteSection(node) {
     await refreshSections()
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec suppression')
+  }
+}
+
+async function handleAttachmentDrop({ attachmentId, sectionId }) {
+  // Pas de move si on drop sur la section actuelle (deja la, no-op).
+  if (selectedSection.value?.id === sectionId) return
+  try {
+    await moveAttachment(attachmentId, sectionId)
+    notifySuccess('Capture déplacée')
+    // Refresh la section courante (capture retiree) — le composant
+    // AttachmentsGrid se rafraichira via watch de sectionId.
+    if (selectedSection.value) {
+      const { data } = await getSection(selectedSection.value.id)
+      selectedSection.value = data
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du déplacement')
   }
 }
 
@@ -179,6 +297,8 @@ async function selectSection(id) {
   selectedId.value = id
   const { data } = await getSection(id)
   selectedSection.value = data
+  // En mode compact, fermer automatiquement le drawer apres selection
+  if (isCompact.value) treeDrawerOpen.value = false
 }
 
 function onSectionUpdated(updated) {
@@ -207,6 +327,12 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  window.addEventListener('keydown', onKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  if (mql) mql.removeEventListener('change', updateCompact)
 })
 
 watch(() => route.params.id, async () => {
@@ -225,19 +351,53 @@ watch(() => route.params.id, async () => {
   <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
   <div v-else-if="af" class="-mx-5 lg:-mx-6 -mt-4 lg:-mt-5 h-[calc(100vh-1rem)] flex flex-col">
-    <!-- Bandeau cycle de vie (en haut, full-width) -->
-    <div class="px-5 lg:px-6 pt-4 space-y-2">
-      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @goto-section="selectSection" />
+    <!-- Bandeau mode presentation (lecture seule pour reunions client) -->
+    <div v-if="presentationMode" class="bg-amber-100 border-b-2 border-amber-300 px-5 lg:px-6 py-2 flex items-center justify-between">
+      <p class="text-xs font-semibold text-amber-900 inline-flex items-center gap-2">
+        <span>👁️</span> Mode présentation — lecture seule
+      </p>
+      <button
+        @click="togglePresentation"
+        class="text-xs text-amber-900 hover:text-amber-700 underline"
+      >Quitter le mode présentation</button>
+    </div>
+
+    <!-- Bandeau cycle de vie (en haut, full-width). pb-5 = même rythme
+         vertical (20px) que le gap-5 entre les cards de l'editeur. -->
+    <div class="px-5 lg:px-6 pt-4 pb-5 space-y-2">
+      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @toggle-presentation="togglePresentation" @goto-section="selectSection" />
       <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" @goto-section="onGotoSection" />
       <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
     </div>
 
+    <!-- Bouton mobile pour ouvrir l'arbre (visible uniquement en mode compact) -->
+    <div v-if="isCompact" class="px-5 lg:px-6 pb-2">
+      <button
+        @click="treeDrawerOpen = !treeDrawerOpen"
+        class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 inline-flex items-center gap-2"
+      >
+        <span class="i-heroicons-bars-3 w-4 h-4">☰</span>
+        {{ treeDrawerOpen ? 'Masquer' : 'Afficher' }} l'arbre des sections ({{ sections.length }})
+      </button>
+    </div>
+
     <!-- Layout split : arbre 320px + éditeur flex -->
-    <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4">
-      <!-- Sidebar arbre des sections (redimensionnable) -->
+    <div class="flex-1 min-h-0 flex gap-4 px-5 lg:px-6 pb-4 relative">
+      <!-- Backdrop pour fermer le drawer en mode compact -->
+      <div
+        v-if="isCompact && treeDrawerOpen"
+        class="fixed inset-0 bg-black/30 z-30"
+        @click="treeDrawerOpen = false"
+      ></div>
+
+      <!-- Sidebar arbre des sections (redimensionnable, drawer en compact) -->
       <aside
+        v-show="treeOpen"
         :style="{ width: treeWidth + 'px' }"
-        class="shrink-0 bg-white rounded-lg border border-gray-200 overflow-y-auto relative"
+        :class="[
+          'shrink-0 bg-white rounded-lg border border-gray-200 overflow-y-auto relative',
+          isCompact ? 'fixed left-3 top-3 bottom-3 z-40 shadow-2xl' : '',
+        ]"
       >
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -260,20 +420,25 @@ watch(() => route.params.id, async () => {
             @delete="handleDeleteSection"
             @toggle-include="handleToggleInclude"
             @toggle-opt-out="handleToggleOptOut"
+            @attachment-drop="handleAttachmentDrop"
           />
         </div>
-        <!-- Poignée de drag-resize -->
+        <!-- Poignée de drag-resize (cachee en compact) -->
         <div
+          v-if="!isCompact"
           @mousedown="onTreeResize"
           class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-indigo-300 transition-colors z-20"
           title="Glisser pour redimensionner"
         ></div>
       </aside>
 
-      <!-- Éditeur principal (scrollable) -->
-      <div class="flex-1 min-w-0 overflow-y-auto pr-1 space-y-4">
+      <!-- Éditeur principal (scrollable). flex+gap garantit un espacement
+           uniforme entre toutes les cards, robuste aux v-if conditionnels
+           qui laissent des markers de commentaire (space-y-* peut s'y faire piéger). -->
+      <div class="flex-1 min-w-0 overflow-y-auto pr-1 flex flex-col gap-5">
         <template v-if="selectedSection">
           <SectionEditor
+            ref="sectionEditorRef"
             :key="selectedSection.id"
             :section="selectedSection"
             @updated="onSectionUpdated"
@@ -314,13 +479,40 @@ watch(() => route.params.id, async () => {
             :af-id="af.id"
           />
         </template>
-        <div v-else class="bg-white rounded-lg border border-gray-200 p-12 text-center text-sm text-gray-400">
-          Sélectionne une section dans l'arbre à gauche pour commencer.
+        <div v-else class="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div class="max-w-md mx-auto space-y-3">
+            <div class="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-indigo-500"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-800">
+              {{ sections.length ? 'Sélectionne une section' : 'Aucune section pour cette AF' }}
+            </h3>
+            <p class="text-sm text-gray-500 leading-relaxed">
+              <template v-if="sections.length">
+                Choisis une section dans l'arbre à gauche pour commencer la rédaction.<br>
+                Astuce : tu peux naviguer entre sections avec les flèches <kbd class="px-1.5 py-0.5 bg-gray-100 rounded font-mono text-xs">↑ ↓</kbd>.
+              </template>
+              <template v-else>
+                Le plan AF Buildy n'a pas encore été seedé. Vérifie que la création de l'AF a bien déclenché le seed canonique.
+              </template>
+            </p>
+            <button
+              v-if="sections.length"
+              @click="openAddSection(null)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-50 rounded-lg border border-indigo-200"
+            >+ Ajouter une section racine</button>
+          </div>
         </div>
       </div>
 
-      <!-- Sidebar activité (collapsible) -->
-      <aside v-if="showActivity" class="w-72 shrink-0 relative">
+      <!-- Sidebar activité (collapsible, overlay en compact) -->
+      <aside
+        v-if="showActivity"
+        :class="[
+          'shrink-0 relative',
+          isCompact ? 'fixed right-3 top-3 bottom-3 w-72 z-40 shadow-2xl bg-white rounded-lg' : 'w-72',
+        ]"
+      >
         <button
           @click="showActivity = false"
           class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10"
@@ -328,6 +520,11 @@ watch(() => route.params.id, async () => {
         >✕</button>
         <ActivityPanel ref="activityRef" :af-id="af.id" />
       </aside>
+      <div
+        v-if="isCompact && showActivity"
+        class="fixed inset-0 bg-black/30 z-30"
+        @click="showActivity = false"
+      ></div>
     </div>
   </div>
 

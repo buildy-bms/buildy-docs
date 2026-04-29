@@ -1,8 +1,33 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { MagnifyingGlassIcon, DocumentTextIcon, CubeIcon, BookOpenIcon } from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, DocumentTextIcon, CubeIcon, BookOpenIcon, ClockIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { search } from '@/api'
+
+// ── Historique des recherches recentes (5 dernieres) ────────────
+const HISTORY_KEY = 'af-cmdk-history'
+const HISTORY_MAX = 5
+const recentSearches = ref([])
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    recentSearches.value = raw ? JSON.parse(raw).slice(0, HISTORY_MAX) : []
+  } catch { recentSearches.value = [] }
+}
+function pushHistory(query) {
+  const trimmed = (query || '').trim()
+  if (trimmed.length < 2) return
+  const next = [trimmed, ...recentSearches.value.filter(x => x !== trimmed)].slice(0, HISTORY_MAX)
+  recentSearches.value = next
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch { /* quota plein */ }
+}
+function clearHistory() {
+  recentSearches.value = []
+  try { localStorage.removeItem(HISTORY_KEY) } catch { /* ignore */ }
+}
+function reuseSearch(query) {
+  q.value = query
+}
 
 const router = useRouter()
 const open = ref(false)
@@ -44,6 +69,7 @@ async function runSearch() {
     const { data } = await search(q.value)
     results.value = data.items || []
     activeIndex.value = 0
+    if (results.value.length) pushHistory(q.value)
   } catch (e) {
     results.value = []
   } finally {
@@ -55,6 +81,7 @@ function openPalette() {
   open.value = true
   q.value = ''
   results.value = []
+  loadHistory()
   nextTick(() => inputEl.value?.focus())
 }
 
@@ -112,8 +139,28 @@ defineExpose({ openPalette, closePalette })
         <div class="flex-1 min-h-0 overflow-y-auto">
           <div v-if="loading" class="px-4 py-6 text-center text-xs text-gray-400">Recherche…</div>
 
-          <div v-else-if="q.length < 2" class="px-4 py-6 text-center text-xs text-gray-400">
-            Tape au moins 2 caractères pour lancer la recherche.
+          <div v-else-if="q.length < 2">
+            <div v-if="recentSearches.length" class="py-2">
+              <div class="px-4 py-1.5 flex items-center justify-between text-[11px] uppercase tracking-wider font-semibold text-gray-500">
+                <span class="inline-flex items-center gap-1.5">
+                  <ClockIcon class="w-3.5 h-3.5" />
+                  Recherches récentes
+                </span>
+                <button @click="clearHistory" class="text-gray-400 hover:text-gray-700 normal-case tracking-normal">Effacer</button>
+              </div>
+              <button
+                v-for="r in recentSearches"
+                :key="r"
+                @click="reuseSearch(r)"
+                class="w-full text-left px-4 py-1.5 text-sm hover:bg-gray-50 inline-flex items-center gap-2 text-gray-700"
+              >
+                <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400" />
+                {{ r }}
+              </button>
+            </div>
+            <div v-else class="px-4 py-6 text-center text-xs text-gray-400">
+              Tape au moins 2 caractères pour lancer la recherche.
+            </div>
           </div>
 
           <div v-else-if="!results.length" class="px-4 py-6 text-center text-xs text-gray-400">

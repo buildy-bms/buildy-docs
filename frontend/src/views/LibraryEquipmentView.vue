@@ -235,9 +235,10 @@ onMounted(async () => {
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span class="inline-flex items-center gap-1 text-xs text-gray-500">
+                <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" :title="`Utilisé dans ${t.sections_using_count} section(s) AF`">
                   <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                 </span>
+                <span v-else class="text-[11px] text-gray-300 italic" title="Jamais utilisé — candidat au nettoyage">∅ inutilisé</span>
               </td>
               <td class="px-4 py-2 whitespace-nowrap">
                 <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />

@@ -15,6 +15,7 @@ import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import EquipmentPointsEditor from './EquipmentPointsEditor.vue'
+import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 
 // Liste exhaustive des noms d'icones FA Solid Pro, déduplique les alias.
@@ -34,12 +35,14 @@ import {
   deleteSectionTemplate,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   template: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'saved', 'deleted'])
 const { success, error: notifyError } = useNotification()
+const { confirm } = useConfirm()
 
 const isEdit = computed(() => !!props.template?.id)
 
@@ -57,7 +60,22 @@ const CATEGORIES = [
   { value: 'autres',        label: 'Autres équipements',   icon: 'fa-cube',            color: '#6b7280' },
 ]
 
-const PROTOCOLS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']
+const PROTOCOLS_PRESETS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']
+// Liste affichee = presets + tout protocole custom deja sur le template
+// (pour qu'il reste visible et toggleable). dedupe.
+const allProtocols = computed(() => {
+  const set = new Set([...PROTOCOLS_PRESETS, ...(form.value.preferred_protocols || [])])
+  return [...set]
+})
+const customProtocol = ref('')
+function addCustomProtocol() {
+  const v = customProtocol.value.trim()
+  if (!v) return
+  if (!form.value.preferred_protocols.includes(v)) {
+    form.value.preferred_protocols.push(v)
+  }
+  customProtocol.value = ''
+}
 
 // Palette de couleurs Buildy pour le pastillage des icônes
 const COLOR_PRESETS = [
@@ -281,7 +299,13 @@ async function submit() {
 
 async function destroy() {
   if (!isEdit.value) return
-  if (!confirm(`Supprimer le modèle « ${props.template.name} » ?\nLes sections AF qui l'utilisent ne pourront plus en hériter.`)) return
+  const ok = await confirm({
+    title: 'Supprimer le modèle ?',
+    message: `« ${props.template.name} »\n\nLes sections AF qui l'utilisent ne pourront plus en hériter.`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteEquipmentTemplate(props.template.id)
     success('Modèle supprimé')
@@ -428,11 +452,30 @@ async function destroy() {
 
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1.5">Protocoles exigés</label>
-        <div class="flex flex-wrap gap-1.5">
-          <button v-for="p in PROTOCOLS" :key="p" type="button" @click="toggleProtocol(p)"
+        <div class="flex flex-wrap gap-1.5 items-center">
+          <button v-for="p in allProtocols" :key="p" type="button" @click="toggleProtocol(p)"
                   :class="['px-2.5 py-0.5 text-xs rounded-full border transition', form.preferred_protocols.includes(p) ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50']">
             {{ p }}
           </button>
+          <!-- Ajout d'un protocole personnalise (absent de la liste predefinie) -->
+          <div class="inline-flex items-center gap-1 ml-1 pl-2 border-l border-gray-200">
+            <input
+              v-model="customProtocol"
+              @keydown.enter.prevent="addCustomProtocol"
+              type="text"
+              autocomplete="off"
+              data-1p-ignore="true"
+              placeholder="+ Ajouter un protocole…"
+              class="w-44 px-2 py-1 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+            />
+            <button
+              type="button"
+              @click="addCustomProtocol"
+              :disabled="!customProtocol.trim()"
+              class="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Ajouter ce protocole à la liste"
+            >Ajouter</button>
+          </div>
         </div>
       </div>
 
@@ -475,6 +518,11 @@ async function destroy() {
           Liste des informations remontées par cet équipement (lectures) et des actions pilotables (écritures). Cliquer une ligne pour la modifier, glisser-déposer pour réordonner.
         </p>
         <EquipmentPointsEditor :template-id="template.id" @updated="$emit('saved', template)" />
+      </div>
+
+      <!-- Captures du modele : automatiquement heritees par les AFs -->
+      <div v-if="isEdit" class="pt-3 border-t border-gray-100">
+        <TemplateAttachmentsGrid template-kind="equipment" :template-id="template.id" />
       </div>
     </form>
 

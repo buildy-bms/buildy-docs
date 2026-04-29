@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   DocumentPlusIcon,
@@ -13,15 +13,19 @@ import {
   Squares2X2Icon,
   MagnifyingGlassIcon,
   XMarkIcon,
+  BookmarkIcon,
 } from '@heroicons/vue/24/outline'
 import { listAfs, getAfsStats, createAf, cloneAf, deleteAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+import AddressAutocomplete from '@/components/AddressAutocomplete.vue'
 
 const router = useRouter()
 const { success, error } = useNotification()
+const { confirm } = useConfirm()
 
 const afs = ref([])
 const stats = ref({ redaction: 0, validee: 0, commissioning: 0, commissioned: 0, livree: 0, total: 0 })
@@ -71,6 +75,19 @@ const filteredSorted = computed(() => {
   })
   return list
 })
+
+// Pagination cote client : on rend les premiers N items, l'utilisateur peut
+// charger la suite en cliquant. Filtrage/tri continue d'operer sur la liste
+// complete (les recherches restent globales). Reset auto quand le filtre
+// ou le tri change (sinon "page 5" sur 1000 elements = panier vide apres
+// filtrage). Suffisant pour quelques centaines d'AFs ; on basculera sur
+// pagination serveur si on depasse 1000.
+const PAGE_SIZE = 50
+const displayedCount = ref(PAGE_SIZE)
+watch([searchQuery, sortBy, sortDir], () => { displayedCount.value = PAGE_SIZE })
+const visibleAfs = computed(() => filteredSorted.value.slice(0, displayedCount.value))
+const hasMore = computed(() => filteredSorted.value.length > displayedCount.value)
+function loadMore() { displayedCount.value += PAGE_SIZE }
 
 const newAf = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
@@ -144,7 +161,13 @@ async function submitClone() {
 }
 
 async function confirmDelete(af) {
-  if (!confirm(`Supprimer l'AF "${af.client_name} — ${af.project_name}" ?\n(Soft delete : récupérable côté DB)`)) return
+  const ok = await confirm({
+    title: 'Supprimer l\'AF ?',
+    message: `« ${af.client_name} — ${af.project_name} »\n\nL'AF est archivée (récupérable côté DB).`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
   try {
     await deleteAf(af.id)
     success('AF supprimée')
@@ -222,12 +245,20 @@ onMounted(refresh)
       v-else-if="!afs.length"
       class="bg-white rounded-lg border border-gray-200 p-12 text-center"
     >
-      <DocumentTextIcon class="w-16 h-16 mx-auto text-gray-300" />
-      <h2 class="mt-4 text-base font-medium text-gray-800">Aucune AF pour l'instant</h2>
-      <p class="mt-2 text-sm text-gray-500 max-w-md mx-auto">
-        Démarrez votre premier projet en cliquant sur « Nouvelle AF ». Le plan complet
+      <div class="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mx-auto">
+        <DocumentTextIcon class="w-9 h-9 text-indigo-500" />
+      </div>
+      <h2 class="mt-4 text-base font-semibold text-gray-800">Aucune AF pour l'instant</h2>
+      <p class="mt-2 text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
+        Démarre ton premier projet en cliquant sur « Nouvelle AF ». Le plan complet
         de 12 chapitres et la bibliothèque d'équipements seront automatiquement appliqués.
       </p>
+      <button
+        @click="showCreate = true"
+        class="mt-5 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+      >
+        <DocumentPlusIcon class="w-4 h-4" /> Nouvelle AF
+      </button>
     </div>
 
     <!-- Vue tableau (par défaut, Lot 27) -->
@@ -254,7 +285,7 @@ onMounted(refresh)
           </thead>
           <tbody>
             <tr
-              v-for="af in filteredSorted"
+              v-for="af in visibleAfs"
               :key="af.id"
               class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer group"
               @click="router.push(`/afs/${af.id}`)"
@@ -277,6 +308,9 @@ onMounted(refresh)
               </td>
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                  <button @click.stop="router.push(`/afs/${af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
+                    <BookmarkIcon class="w-4 h-4" />
+                  </button>
                   <button @click.stop="openClone(af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
@@ -287,8 +321,29 @@ onMounted(refresh)
               </td>
             </tr>
             <tr v-if="!filteredSorted.length">
-              <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
-                {{ searchQuery ? `Aucune AF ne correspond à « ${searchQuery} ».` : 'Aucune AF.' }}
+              <td colspan="6" class="px-4 py-10 text-center">
+                <p class="text-sm text-gray-500">
+                  <template v-if="searchQuery">
+                    Aucune AF ne correspond à « <strong>{{ searchQuery }}</strong> ».
+                  </template>
+                  <template v-else>Aucune AF dans ce filtre.</template>
+                </p>
+                <button
+                  v-if="searchQuery"
+                  @click="searchQuery = ''"
+                  class="mt-2 text-xs text-indigo-600 hover:underline"
+                >Effacer la recherche</button>
+              </td>
+            </tr>
+            <tr v-if="hasMore">
+              <td colspan="6" class="px-4 py-3 text-center bg-gray-50 border-t border-gray-200">
+                <button
+                  @click="loadMore"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Charger {{ Math.min(50, filteredSorted.length - visibleAfs.length) }} de plus
+                  <span class="text-gray-400 font-normal ml-1">({{ visibleAfs.length }} / {{ filteredSorted.length }})</span>
+                </button>
               </td>
             </tr>
           </tbody>
@@ -332,6 +387,12 @@ onMounted(refresh)
             </div>
             <div class="flex items-center gap-2 pt-3 border-t border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
+                @click.stop="router.push(`/afs/${af.id}/versions`)"
+                class="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1"
+              >
+                <BookmarkIcon class="w-3.5 h-3.5" /> Versions
+              </button>
+              <button
                 @click.stop="openClone(af)"
                 class="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1"
               >
@@ -374,11 +435,9 @@ onMounted(refresh)
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Adresse du site</label>
-          <input
+          <AddressAutocomplete
             v-model="newAf.site_address"
-            type="text"
             placeholder="ex : 42 rue de la Tête d'Or, 69006 Lyon"
-            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -445,7 +504,7 @@ onMounted(refresh)
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Adresse du site</label>
-          <input v-model="cloneTarget.site_address" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
+          <AddressAutocomplete v-model="cloneTarget.site_address" />
         </div>
       </form>
       <template #footer>

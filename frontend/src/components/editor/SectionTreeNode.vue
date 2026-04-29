@@ -18,7 +18,26 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'attachment-drop'])
+
+// Drag-drop accueille les captures depuis l'editeur. On reagit uniquement
+// si le payload contient 'application/x-buildy-attachment' (l'id de la
+// capture). Ignore tout autre type de drag (ex : fichiers OS, qui sont
+// pris en charge par AttachmentsGrid lui-meme).
+const dragOver = ref(false)
+function onDragOver(e) {
+  if (!e.dataTransfer?.types?.includes('application/x-buildy-attachment')) return
+  e.preventDefault()
+  dragOver.value = true
+}
+function onDragLeave() { dragOver.value = false }
+function onDrop(e) {
+  dragOver.value = false
+  const id = e.dataTransfer?.getData('application/x-buildy-attachment')
+  if (!id) return
+  e.preventDefault()
+  emit('attachment-drop', { attachmentId: parseInt(id, 10), sectionId: props.node.id })
+}
 
 const displayedNumber = computed(() =>
   (liveNumbering?.value && liveNumbering.value.get(props.node.id)) || props.node.number || ''
@@ -91,8 +110,12 @@ const titleHtml = computed(() => {
       :class="[
         'group w-full text-left flex items-center gap-1.5 py-1.5 pr-2 rounded-md transition-colors',
         isSelected ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-gray-100 text-gray-700',
+        dragOver ? 'ring-2 ring-emerald-400 bg-emerald-50' : '',
       ]"
       @click="emit('select', node.id)"
+      @dragover="onDragOver"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
     >
       <button
         v-if="hasChildren"
@@ -181,6 +204,7 @@ const titleHtml = computed(() => {
         @delete="emit('delete', $event)"
         @toggle-include="emit('toggle-include', $event)"
         @toggle-opt-out="emit('toggle-opt-out', $event)"
+        @attachment-drop="emit('attachment-drop', $event)"
       />
     </div>
   </div>
