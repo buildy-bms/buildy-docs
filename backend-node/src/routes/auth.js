@@ -102,6 +102,11 @@ async function routes(fastify) {
     issueAccessToken(fastify, reply, user);
 
     log.info(`OIDC login OK: ${displayName} (${email}) from ${request.ip}`);
+    db.auditLog.add({
+      userId: user.id,
+      action: 'auth.login',
+      payload: { method: 'oidc', email, ip: request.ip, user_agent: request.headers['user-agent'] || null },
+    });
     return reply.redirect(`${config.publicUrl}/`);
   });
 
@@ -123,10 +128,19 @@ async function routes(fastify) {
 
   // POST /auth/logout
   fastify.post('/auth/logout', async (request, reply) => {
+    let userId = null;
     try {
       const decoded = fastify.jwt.verify(request.cookies.af_token);
       if (decoded.jti) db.sessions.revokeByJti(decoded.jti);
+      userId = decoded.id || null;
     } catch { /* token invalide deja */ }
+    if (userId) {
+      db.auditLog.add({
+        userId,
+        action: 'auth.logout',
+        payload: { ip: request.ip, user_agent: request.headers['user-agent'] || null },
+      });
+    }
     reply.clearCookie('af_token', { path: '/' });
     return { ok: true };
   });

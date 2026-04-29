@@ -64,6 +64,7 @@ const filtered = computed(() => {
 
 // Libelles humanises par prefix
 const ACTION_LABELS = {
+  'auth.':               { label: 'Auth',              color: 'bg-rose-50 text-rose-700 border-rose-200' },
   'af.':                 { label: 'AF',                color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   'section.':            { label: 'Section',           color: 'bg-blue-50 text-blue-700 border-blue-200' },
   'section_template.':   { label: 'Section type',      color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -185,7 +186,7 @@ function toggle(id) {
               </tr>
               <tr v-if="expanded.has(r.id)" class="border-t border-gray-100 bg-gray-50">
                 <td colspan="6" class="px-4 py-3">
-                  <pre class="text-[11px] font-mono text-gray-700 whitespace-pre-wrap break-words">{{ formatPayload(r.payload) }}</pre>
+                  <pre class="text-[11px] font-mono text-gray-700 whitespace-pre-wrap wrap-break-word">{{ formatPayload(r.payload) }}</pre>
                 </td>
               </tr>
             </template>
