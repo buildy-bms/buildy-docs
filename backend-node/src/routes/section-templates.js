@@ -164,7 +164,7 @@ async function routes(fastify) {
     if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
 
     const force = String(request.query?.force || '') === '1';
-    const affected = db.sectionTemplates.countAffectedAfs(id);
+    const affected = db.sectionTemplates.countAffectedAfs(id); // AFs vivantes uniquement
 
     if (affected > 0 && !force) {
       // L'UI doit re-poser la question avec ?force=1 si l'utilisateur confirme.
@@ -174,16 +174,13 @@ async function routes(fastify) {
       });
     }
 
-    let cascadeCount = 0;
-    if (force && affected > 0) {
-      // Cascade : retire la section de toutes les AFs vivantes
-      const r = db.db.prepare(`
-        DELETE FROM sections
-         WHERE section_template_id = ?
-           AND af_id IN (SELECT id FROM afs WHERE deleted_at IS NULL)
-      `).run(id);
-      cascadeCount = r.changes;
-    }
+    // Cascade systematique : on retire les sections AVANT de supprimer le template
+    // (sinon FK constraint viole : sections.section_template_id -> section_templates.id).
+    // On retire toutes les sections, y compris celles d'AFs archivees, qui sont
+    // ce qui causait des 500 quand affected_count etait 0 mais qu'il restait des
+    // references "fantomes".
+    const r = db.db.prepare('DELETE FROM sections WHERE section_template_id = ?').run(id);
+    const cascadeCount = r.changes;
 
     db.sectionTemplates.delete(id);
     db.auditLog.add({
