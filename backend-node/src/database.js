@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 27;
+const TARGET_VERSION = 28;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -935,6 +935,18 @@ function runMigrations() {
     `);
     db.pragma('user_version = 27');
     log.info('Migration 27 appliquee : BACS centralise au niveau categorie (equipement) et fonctionnalites');
+  }
+
+  if (current < 28) {
+    // Lot 35 (suite) — Le niveau de contrat (service_level) n'a de sens que
+    // pour les fonctionnalites. On nettoie les sections types narratives.
+    db.exec(`
+      UPDATE section_templates
+         SET service_level = NULL
+       WHERE is_functionality = 0
+    `);
+    db.pragma('user_version = 28');
+    log.info('Migration 28 appliquee : service_level reserve aux fonctionnalites');
   }
 
   if (current > TARGET_VERSION) {

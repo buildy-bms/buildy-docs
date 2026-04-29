@@ -197,14 +197,33 @@ async function submit() {
 
 async function destroy() {
   if (!isEdit.value) return
-  if (!confirm(`Supprimer « ${props.template.title} » ?\nLa suppression sera refusée si des AFs utilisent encore cette ${labelEntity.value}.`)) return
+  if (!confirm(`Supprimer « ${props.template.title} » ?`)) return
   deleting.value = true
   try {
     await deleteSectionTemplate(props.template.id)
     success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} supprimée`)
     emit('deleted', props.template.id)
   } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec de la suppression')
+    // 409 : des AFs utilisent encore la section. On propose le cascade.
+    if (e.response?.status === 409) {
+      const n = e.response.data?.affected_count || 0
+      const ok = confirm(
+        `${n} AF${n > 1 ? 's' : ''} utilise${n > 1 ? 'nt' : ''} encore cette ${labelEntity.value}.\n\n` +
+        `Supprimer quand même ? Les sections correspondantes seront retirées de ces AFs (le contenu personnalisé sera perdu).`
+      )
+      if (ok) {
+        try {
+          const { data } = await deleteSectionTemplate(props.template.id, { force: true })
+          success(`Supprimée — retirée de ${data?.cascade_count || 0} AF${(data?.cascade_count || 0) > 1 ? 's' : ''}`)
+          emit('deleted', props.template.id)
+          return
+        } catch (e2) {
+          notifyError(e2.response?.data?.detail || 'Échec de la suppression')
+        }
+      }
+    } else {
+      notifyError(e.response?.data?.detail || 'Échec de la suppression')
+    }
   } finally {
     deleting.value = false
   }

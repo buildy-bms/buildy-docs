@@ -130,18 +130,35 @@ async function routes(fastify) {
     const tpl = db.sectionTemplates.getById(id);
     if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
 
+    const force = String(request.query?.force || '') === '1';
     const affected = db.sectionTemplates.countAffectedAfs(id);
-    if (affected > 0) {
-      return reply.code(409).send({ detail: `${affected} AF(s) utilisent cette section type — suppression refusée.` });
+
+    if (affected > 0 && !force) {
+      // L'UI doit re-poser la question avec ?force=1 si l'utilisateur confirme.
+      return reply.code(409).send({
+        detail: `${affected} AF(s) utilisent cette section type. Confirmer pour la supprimer dans toutes les AFs.`,
+        affected_count: affected,
+      });
+    }
+
+    let cascadeCount = 0;
+    if (force && affected > 0) {
+      // Cascade : retire la section de toutes les AFs vivantes
+      const r = db.db.prepare(`
+        DELETE FROM sections
+         WHERE section_template_id = ?
+           AND af_id IN (SELECT id FROM afs WHERE deleted_at IS NULL)
+      `).run(id);
+      cascadeCount = r.changes;
     }
 
     db.sectionTemplates.delete(id);
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.delete',
-      payload: { id, slug: tpl.slug },
+      payload: { id, slug: tpl.slug, cascade: cascadeCount },
     });
-    return reply.code(204).send();
+    return reply.code(200).send({ ok: true, cascade_count: cascadeCount });
   });
 
   fastify.patch('/section-templates/reorder', async (request, reply) => {

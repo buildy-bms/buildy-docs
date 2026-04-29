@@ -140,7 +140,8 @@ export const getSectionTemplate = (id) => api.get(`/section-templates/${id}`)
 export const createSectionTemplate = (data) => api.post('/section-templates', data)
 export const updateSectionTemplate = (id, data, { propagateUnchanged = false } = {}) =>
   api.patch(`/section-templates/${id}`, data, { params: propagateUnchanged ? { propagate_unchanged: 1 } : {} })
-export const deleteSectionTemplate = (id) => api.delete(`/section-templates/${id}`)
+export const deleteSectionTemplate = (id, { force = false } = {}) =>
+  api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
 // reorder({ ids, parent_template_id? }). parent_template_id si re-parenting drag-drop.
 export const reorderSectionTemplates = ({ ids, parent_template_id } = {}) =>
   api.patch('/section-templates/reorder', { ids, ...(parent_template_id !== undefined ? { parent_template_id } : {}) })
