@@ -10,7 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { SparklesIcon, TrashIcon, ChevronDownIcon, LinkIcon, BookmarkIcon } from '@heroicons/vue/24/outline'
+import { SparklesIcon, TrashIcon, ChevronDownIcon, LinkIcon, BookmarkIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -30,6 +30,8 @@ import {
   getEquipmentTemplate,
   listSectionTemplates,
   createSectionTemplate,
+  updateSectionTemplate,
+  deleteSectionTemplate,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -185,6 +187,32 @@ async function linkToSection() {
   }
 }
 
+// Re-parenter une section liee existante (PATCH parent_template_id).
+async function moveLinkedSection(sectionId, newParentId) {
+  try {
+    await updateSectionTemplate(sectionId, { parent_template_id: newParentId || null })
+    success('Section déplacée')
+    await reloadLinks()
+    await loadAllSectionTemplates()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du déplacement')
+    await reloadLinks() // remet l'UI a l'etat serveur si le PATCH a echoue
+  }
+}
+
+// Supprimer une liaison = supprimer le section_template (refuse si utilise par des AFs).
+async function unlinkSection(section) {
+  if (!confirm(`Délier ce modèle de « ${section.path} » ?\nLa section type sera supprimée. Refusé si des AFs l'utilisent encore.`)) return
+  try {
+    await deleteSectionTemplate(section.id)
+    success('Liaison supprimée')
+    await reloadLinks()
+    await loadAllSectionTemplates()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Suppression refusée — des AFs utilisent encore cette section')
+  }
+}
+
 function toggleProtocol(p) {
   const idx = form.value.preferred_protocols.indexOf(p)
   if (idx >= 0) form.value.preferred_protocols.splice(idx, 1)
@@ -266,24 +294,34 @@ async function destroy() {
           </span>
         </div>
         <p class="text-xs text-gray-500 mb-3">
-          Où ce modèle apparaît dans l'arbre canonique des AFs.
+          Où ce modèle apparaît dans l'arbre canonique des AFs. Change la section parente pour le déplacer dans l'arbre.
         </p>
 
-        <div v-if="linkedSections.length" class="space-y-1.5 mb-3">
+        <div v-if="linkedSections.length" class="space-y-2 mb-3">
           <div v-for="s in linkedSections" :key="s.id"
-               class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+               class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg">
             <BookmarkIcon class="w-4 h-4 text-indigo-600 shrink-0" />
-            <span class="text-gray-700 truncate">{{ s.path }}</span>
+            <span class="text-sm text-gray-700 truncate flex-1" :title="s.path">{{ s.title }}</span>
+            <select :value="s.parent_template_id"
+                    @change="moveLinkedSection(s.id, $event.target.value ? Number($event.target.value) : null)"
+                    class="px-2.5 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition max-w-[18rem]">
+              <option v-for="o in parentOptions" :key="o.id ?? 'root'" :value="o.id ?? ''">{{ o.label }}</option>
+            </select>
+            <button type="button" @click="unlinkSection(s)"
+                    class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition"
+                    title="Délier (supprime la section type)">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
           </div>
         </div>
         <p v-else class="text-xs text-gray-500 italic mb-3">
           Aucune section type liée pour le moment.
         </p>
 
-        <div class="flex items-end gap-2">
+        <div class="flex items-end gap-2 pt-2 border-t border-indigo-100">
           <div class="flex-1">
             <label class="block text-[11px] uppercase tracking-wide font-medium text-gray-500 mb-1.5">
-              Lier à une section parente
+              Ajouter une nouvelle liaison
             </label>
             <select v-model="newLinkParentId"
                     class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
