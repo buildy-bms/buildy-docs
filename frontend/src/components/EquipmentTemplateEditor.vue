@@ -10,7 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { SparklesIcon, TrashIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { SparklesIcon, TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -116,21 +116,21 @@ watch(() => props.template, (t) => {
   }
 }, { immediate: true })
 
-// === Section parente dans l'arbre canonique ==========================
-// Une seule liste deroulante. La section_template kind=equipment qui pointe
-// vers ce modele est creee/deplacee/supprimee automatiquement selon la valeur.
+// === Sections parentes dans l'arbre canonique ========================
+// Multi-select : un equipement peut etre liee a N sections (chacune = un
+// section_template kind=equipment avec equipment_template_id = ce modele).
 const linkedSections = ref([])
 const allSectionTemplates = ref([])
-const parentSectionId = ref(null) // valeur du select (null = pas liee)
-const savingParent = ref(false)
+const savingLink = ref(false)
+const addOpen = ref(false)
+const addSearch = ref('')
+const addRef = ref(null)
 
 async function reloadLinks() {
-  if (!isEdit.value) { linkedSections.value = []; parentSectionId.value = null; return }
+  if (!isEdit.value) { linkedSections.value = []; return }
   try {
     const { data } = await getEquipmentTemplate(props.template.id)
     linkedSections.value = data.linked_sections || []
-    // Si une seule liaison existe, on prend son parent comme valeur initiale.
-    parentSectionId.value = linkedSections.value[0]?.parent_template_id ?? null
   } catch { /* silencieux */ }
 }
 async function loadAllSectionTemplates() {
@@ -144,63 +144,94 @@ onMounted(() => {
   loadAllSectionTemplates()
 })
 
-// Options du select : "non liée" (null) + tous les section_templates non-equipment.
+// Tous les parents possibles (section_templates non-equipment) — avec chemin
+// hierarchique pour l'autocomplete et indentation visuelle.
 const parentOptions = computed(() => {
-  const opts = [{ id: null, label: '— Non liée' }]
+  const opts = []
   const byParent = new Map()
+  const byId = new Map()
   for (const t of allSectionTemplates.value) {
     const k = t.parent_template_id || 0
     if (!byParent.has(k)) byParent.set(k, [])
     byParent.get(k).push(t)
+    byId.set(t.id, t)
   }
   for (const arr of byParent.values()) {
     arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
   }
+  function pathOf(t) {
+    const parts = []
+    let cur = t
+    while (cur) {
+      parts.unshift(cur.title)
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
+    }
+    return parts.join(' › ')
+  }
   function visit(parentId, depth) {
     for (const t of (byParent.get(parentId) || [])) {
       if (t.kind === 'equipment') continue
-      opts.push({ id: t.id, label: '— '.repeat(depth) + t.title })
+      opts.push({ id: t.id, depth, title: t.title, path: pathOf(t) })
       visit(t.id, depth + 1)
     }
   }
-  visit(0, 1)
+  visit(0, 0)
   return opts
 })
 
-// Auto-save : create / move / delete selon la valeur choisie et l'etat actuel.
-async function saveParentSection() {
+// Filtre options : exclut les parents deja utilises + filtre par recherche.
+const usedParentIds = computed(() => new Set(linkedSections.value.map(s => s.parent_template_id)))
+const filteredAddOptions = computed(() => {
+  const q = addSearch.value.trim().toLowerCase()
+  return parentOptions.value.filter(o => {
+    if (usedParentIds.value.has(o.id)) return false
+    if (!q) return true
+    return o.path.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
+  })
+})
+
+async function addParent(parentId) {
   if (!isEdit.value) return
-  savingParent.value = true
+  savingLink.value = true
   try {
-    const existing = linkedSections.value[0] || null
-    const target = parentSectionId.value
-    if (!existing && target) {
-      // Pas de lien existant + parent choisi → creer la section
-      await createSectionTemplate({
-        title: form.value.name.trim() || `Équipement #${props.template.id}`,
-        kind: 'equipment',
-        parent_template_id: target,
-        equipment_template_id: props.template.id,
-      })
-      success('Section parente définie')
-    } else if (existing && target && target !== existing.parent_template_id) {
-      // Lien existant + nouveau parent → re-parenter
-      await updateSectionTemplate(existing.id, { parent_template_id: target })
-      success('Section déplacée')
-    } else if (existing && !target) {
-      // Lien existant + "non liée" → supprimer la section
-      await deleteSectionTemplate(existing.id)
-      success('Section déliée')
-    }
+    await createSectionTemplate({
+      title: form.value.name.trim() || `Équipement #${props.template.id}`,
+      kind: 'equipment',
+      parent_template_id: parentId,
+      equipment_template_id: props.template.id,
+    })
+    addOpen.value = false
+    addSearch.value = ''
     await reloadLinks()
     await loadAllSectionTemplates()
   } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec — la section est peut-être utilisée par des AFs')
-    await reloadLinks() // remet l'UI a l'etat serveur si l'op a echoue
+    notifyError(e.response?.data?.detail || 'Échec de la liaison')
   } finally {
-    savingParent.value = false
+    savingLink.value = false
   }
 }
+
+async function removeParent(section) {
+  savingLink.value = true
+  try {
+    await deleteSectionTemplate(section.id)
+    await reloadLinks()
+    await loadAllSectionTemplates()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Suppression refusée — des AFs utilisent peut-être encore cette section')
+  } finally {
+    savingLink.value = false
+  }
+}
+
+function onAddDocClick(e) {
+  if (addRef.value && !addRef.value.contains(e.target)) {
+    addOpen.value = false
+    addSearch.value = ''
+  }
+}
+onMounted(() => document.addEventListener('mousedown', onAddDocClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onAddDocClick))
 
 function toggleProtocol(p) {
   const idx = form.value.preferred_protocols.indexOf(p)
@@ -272,20 +303,49 @@ async function destroy() {
   <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="lg" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-3">
 
-      <!-- Section parente : juste une liste deroulante -->
-      <div v-if="isEdit" class="grid grid-cols-3 gap-3 items-end">
-        <div class="col-span-3">
-          <label class="block text-xs font-medium text-gray-600 mb-1">
-            Section parente dans l'arbre AF
-            <span class="text-gray-400 font-normal">— sauvegarde automatique</span>
-          </label>
-          <select v-model="parentSectionId" @change="saveParentSection" :disabled="savingParent"
-                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
-            <option v-for="o in parentOptions" :key="o.id ?? 'none'" :value="o.id">{{ o.label }}</option>
-          </select>
-          <p v-if="linkedSections.length > 1" class="text-[11px] text-amber-600 mt-1">
-            ⚠ Ce modèle est lié à {{ linkedSections.length }} sections — éditer les autres dans Sections types.
-          </p>
+      <!-- Sections parentes : multi-select chips + popover de recherche -->
+      <div v-if="isEdit">
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          Sections parentes dans l'arbre AF
+          <span class="text-gray-400 font-normal">— où ce modèle apparaît dans les AFs</span>
+        </label>
+        <div class="flex flex-wrap items-center gap-1.5 px-2 py-1.5 min-h-10 bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500 transition">
+          <span v-for="s in linkedSections" :key="s.id"
+                class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs">
+            <span class="truncate max-w-[24rem]" :title="s.path">{{ s.path }}</span>
+            <button type="button" @click="removeParent(s)" :disabled="savingLink"
+                    class="inline-flex items-center justify-center w-4 h-4 text-indigo-400 hover:text-white hover:bg-indigo-500 rounded-full transition disabled:opacity-50"
+                    title="Délier">
+              <XMarkIcon class="w-3 h-3" />
+            </button>
+          </span>
+
+          <div ref="addRef" class="relative">
+            <button type="button" @click="addOpen = !addOpen"
+                    class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-full transition">
+              <PlusIcon class="w-3.5 h-3.5" />
+              {{ linkedSections.length ? 'Ajouter' : 'Choisir une section parente' }}
+            </button>
+            <div v-if="addOpen" class="absolute z-30 left-0 mt-1 w-96 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+              <div class="px-3 py-2 border-b border-gray-100">
+                <input v-model="addSearch" type="text" autocomplete="off" data-1p-ignore="true"
+                       placeholder="Rechercher une section…"
+                       class="w-full px-2 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white transition"
+                       @click.stop />
+              </div>
+              <div class="max-h-72 overflow-y-auto py-1">
+                <button v-for="o in filteredAddOptions" :key="o.id" type="button"
+                        @click="addParent(o.id)"
+                        class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 transition flex items-baseline gap-2">
+                  <span class="text-gray-300 text-xs tabular-nums shrink-0" v-if="o.depth > 0">{{ '·'.repeat(o.depth) }}</span>
+                  <span class="truncate">{{ o.path }}</span>
+                </button>
+                <p v-if="!filteredAddOptions.length" class="px-3 py-3 text-xs text-gray-400 italic text-center">
+                  {{ addSearch ? 'Aucune section ne correspond.' : 'Toutes les sections sont déjà liées.' }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
