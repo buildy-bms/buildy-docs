@@ -21,21 +21,23 @@ const collapsed = ref(new Set())
 const rootRef = ref(null)
 const sortables = []           // Sortable instances per <ul>
 
-// Filtre les feuilles equipment de l'arbre : leur source d'autorite est la
-// page Bibliotheque > Equipements (chaque modele expose son placement dans
-// l'arbre via le multi-select chips). Les afficher ici creait une redondance.
-function stripEquipmentLeaves(nodes) {
+// Filtre l'arbre :
+// - feuilles equipment : leur source d'autorite est la page Equipements
+//   (chaque modele expose son placement via multi-select chips)
+// - fonctionnalites (is_functionality=true) : page Fonctionnalites dediee
+// Les masquer ici evite la redondance entre les trois pages.
+function stripNonStructural(nodes) {
   return nodes
-    .filter(n => n.kind !== 'equipment')
-    .map(n => ({ ...n, children: stripEquipmentLeaves(n.children || []) }))
+    .filter(n => n.kind !== 'equipment' && !n.is_functionality)
+    .map(n => ({ ...n, children: stripNonStructural(n.children || []) }))
 }
 
 async function refresh() {
   const { data: t } = await listSectionTemplates({ tree: true })
-  tree.value = stripEquipmentLeaves(t)
-  // Aussi liste plate pour la recherche / count (sans les equipments)
+  tree.value = stripNonStructural(t)
+  // Liste plate pour la recherche / count, alignee sur le meme filtre
   const { data: list } = await listSectionTemplates({})
-  flat.value = list.filter(n => n.kind !== 'equipment')
+  flat.value = list.filter(n => n.kind !== 'equipment' && !n.is_functionality)
   await nextTick()
   setupSortables()
 }
