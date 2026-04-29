@@ -7,8 +7,9 @@ import Placeholder from '@tiptap/extension-placeholder'
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon,
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
-  SparklesIcon, StopIcon,
+  SparklesIcon, StopIcon, ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
+import { useRouter } from 'vue-router'
 import { updateSection, getSectionTemplate } from '@/api'
 import { useAutosave } from '@/composables/useAutosave'
 import { useClaudeDraft } from '@/composables/useClaudeDraft'
@@ -163,6 +164,36 @@ onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
+// ── Lien rapide vers le modele source (P6.5) ──
+// Section equipement → modele d'equipement (page Systemes techniques).
+// Section autre rattachee a un section_template → page Sections types
+// ou Fonctionnalites selon is_functionality.
+const router = useRouter()
+const templateLink = computed(() => {
+  const s = props.section
+  if (s.equipment_template_slug) {
+    return {
+      kind: 'equipment',
+      slug: s.equipment_template_slug,
+      label: s.equipment_template_name || s.equipment_template_slug,
+      path: '/library/equipments',
+    }
+  }
+  if (s.section_template_slug) {
+    return {
+      kind: 'section',
+      slug: s.section_template_slug,
+      label: s.section_template_title || s.section_template_slug,
+      path: s.section_template_is_functionality ? '/library/functionalities' : '/library/sections',
+    }
+  }
+  return null
+})
+function openTemplate() {
+  if (!templateLink.value) return
+  router.push({ path: templateLink.value.path, query: { open: templateLink.value.slug } })
+}
+
 // ── Assistant Claude ──
 const claudeStream = useClaudeDraft()
 const { error: notifyError, success: notifySuccess } = useNotification()
@@ -240,6 +271,18 @@ function setLink() {
         :readonly="isReadOnly"
         class="flex-1 min-w-0 text-base font-semibold text-gray-800 bg-transparent border-0 focus:outline-none focus:ring-0 px-0"
       />
+      <!-- Lien rapide vers le modele source (P6.5) — visible si la section
+           est rattachee a un equipment_template ou a un section_template. -->
+      <button
+        v-if="templateLink"
+        @click="openTemplate"
+        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-md shrink-0"
+        :title="`Ouvrir le modèle « ${templateLink.label} » dans la bibliothèque`"
+      >
+        <span>📎</span>
+        <span class="truncate max-w-32">{{ templateLink.label }}</span>
+        <ArrowTopRightOnSquareIcon class="w-3 h-3" />
+      </button>
       <ServiceLevelBadge :level="section.service_level" />
       <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
       <AutosaveStatus

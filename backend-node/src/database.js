@@ -1428,9 +1428,14 @@ const sections = {
   },
   getById(id) {
     return db.prepare(`
-      SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email
+      SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email,
+             eqt.slug AS equipment_template_slug, eqt.name AS equipment_template_name,
+             stt.slug AS section_template_slug, stt.title AS section_template_title,
+             stt.is_functionality AS section_template_is_functionality
       FROM sections s
       LEFT JOIN users u ON u.id = s.updated_by
+      LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+      LEFT JOIN section_templates stt ON stt.id = s.section_template_id
       WHERE s.id = ?
     `).get(id);
   },

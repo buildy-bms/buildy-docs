@@ -162,7 +162,15 @@ function setupSortables() {
 
 watch(search, () => nextTick(setupSortables))
 
-onMounted(refresh)
+import { useRoute } from 'vue-router'
+const route = useRoute()
+onMounted(async () => {
+  await refresh()
+  if (route.query.open) {
+    const target = flat.value.find(t => t.slug === route.query.open)
+    if (target) openEditor(target)
+  }
+})
 onBeforeUnmount(teardownSortables)
 </script>
 

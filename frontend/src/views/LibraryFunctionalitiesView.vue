@@ -148,8 +148,14 @@ watch([groupedItems, search], async () => {
   setupSortables()
 }, { deep: false })
 
+import { useRoute } from 'vue-router'
+const route = useRoute()
 onMounted(async () => {
   await refresh()
+  if (route.query.open) {
+    const target = items.value.find(t => t.slug === route.query.open)
+    if (target) openEditor(target)
+  }
   await nextTick()
   setupSortables()
 })
