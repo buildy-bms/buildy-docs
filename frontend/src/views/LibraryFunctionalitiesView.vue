@@ -1,13 +1,17 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import Sortable from 'sortablejs'
 import {
-  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon,
+  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon,
 } from '@heroicons/vue/24/outline'
 import {
-  listSectionTemplates,
+  listSectionTemplates, reorderSectionTemplates,
 } from '@/api'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
+import { useNotification } from '@/composables/useNotification'
+
+const { error: notifyError } = useNotification()
 
 // Statuts visuels pour la matrice de disponibilite
 const AVAIL_STYLES = {
@@ -93,7 +97,63 @@ const groupedItems = computed(() => {
     return (a.parent_path || '').localeCompare(b.parent_path || '', 'fr')
   })
 })
-onMounted(refresh)
+// Drag-drop : un Sortable par <tbody> de groupe (ref dynamique). Le drag
+// au sein d'un groupe (meme parent) reorganise via reorderSectionTemplates.
+const groupRefs = new Map()
+const sortables = []
+function setGroupRef(groupId) {
+  return (el) => {
+    if (el) groupRefs.set(groupId, el)
+    else groupRefs.delete(groupId)
+  }
+}
+function teardownSortables() {
+  while (sortables.length) {
+    try { sortables.pop().destroy() } catch { /* ignore */ }
+  }
+}
+function setupSortables() {
+  teardownSortables()
+  if (search.value.trim()) return // pas de drag-drop pendant la recherche
+  for (const g of groupedItems.value) {
+    const el = groupRefs.get(g.id)
+    if (!el) continue
+    const parentId = g.id === 'orphans' ? null : g.id
+    const s = Sortable.create(el, {
+      animation: 150,
+      handle: '.drag-handle',
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      onEnd: async (evt) => {
+        if (evt.oldIndex === evt.newIndex) return
+        const ids = Array.from(el.children)
+          .map(li => parseInt(li.getAttribute('data-id'), 10))
+          .filter(Boolean)
+        try {
+          await reorderSectionTemplates({ ids, parent_template_id: parentId })
+          await refresh()
+        } catch {
+          notifyError('Échec de la réorganisation')
+          await refresh()
+        }
+      },
+    })
+    sortables.push(s)
+  }
+}
+
+watch([groupedItems, search], async () => {
+  await nextTick()
+  setupSortables()
+}, { deep: false })
+
+onMounted(async () => {
+  await refresh()
+  await nextTick()
+  setupSortables()
+})
+onBeforeUnmount(teardownSortables)
 </script>
 
 <template>
@@ -126,6 +186,7 @@ onMounted(refresh)
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
+            <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Essentials</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
@@ -135,19 +196,26 @@ onMounted(refresh)
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
-        <tbody>
-          <template v-for="g in groupedItems" :key="g.id">
-            <!-- Ligne de groupe : section parente -->
-            <tr class="bg-indigo-50/60 border-t border-indigo-100 sticky-group">
-              <td colspan="7" class="px-4 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-indigo-700">
+        <template v-for="g in groupedItems" :key="g.id">
+          <!-- En-tete de groupe (tbody dedie pour rester hors du drag-drop) -->
+          <tbody>
+            <tr class="bg-indigo-50/60 border-t border-indigo-100">
+              <td colspan="8" class="px-4 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-indigo-700">
                 <span v-if="g.id === 'orphans'" class="text-gray-500">Sans section parente</span>
                 <span v-else>{{ g.parent_path }}</span>
                 <span class="ml-2 text-gray-400 normal-case font-normal">· {{ g.items.length }}</span>
               </td>
             </tr>
-            <tr v-for="t in g.items" :key="t.id"
+          </tbody>
+          <!-- Lignes data du groupe (sortable par groupe) -->
+          <tbody :ref="setGroupRef(g.id)">
+            <tr v-for="t in g.items" :key="t.id" :data-id="t.id"
                 class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
                 @click="openEditor(t)">
+              <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
+                  @click.stop>
+                <Bars3Icon class="w-4 h-4 inline-block" />
+              </td>
               <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
               <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
                   class="px-3 py-2 text-center whitespace-nowrap">
@@ -171,9 +239,11 @@ onMounted(refresh)
                 <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
               </td>
             </tr>
-          </template>
-          <tr v-if="!groupedItems.length">
-            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+          </tbody>
+        </template>
+        <tbody v-if="!groupedItems.length">
+          <tr>
+            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
             </td>
           </tr>
@@ -199,3 +269,8 @@ onMounted(refresh)
     />
   </div>
 </template>
+
+<style scoped>
+.sortable-ghost { opacity: 0.4; background: #eef2ff; }
+.sortable-chosen { background: #eef2ff; }
+</style>
