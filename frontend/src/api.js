@@ -146,6 +146,10 @@ export const deleteSectionTemplate = (id, { force = false } = {}) =>
 export const reorderSectionTemplates = ({ ids, parent_template_id } = {}) =>
   api.patch('/section-templates/reorder', { ids, ...(parent_template_id !== undefined ? { parent_template_id } : {}) })
 
+// ── Audit trail (logs globaux d'activite) ──
+export const listAuditLog = (params) => api.get('/audit-log', { params })
+export const listAuditActions = () => api.get('/audit-log/actions')
+
 // ── Claude (assistant redaction bibliotheque) ──
 // payload : { mode, kind, title?, html?, parent_path?, category_label?,
 //             bacs_articles?, avail_e?, avail_s?, avail_p? }

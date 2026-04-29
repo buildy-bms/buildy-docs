@@ -59,6 +59,12 @@ const routes = [
     path: '/library/categories',
     redirect: '/library/equipments?tab=categories',
   },
+  {
+    path: '/audit',
+    name: 'audit-trail',
+    meta: { title: 'Audit trail' },
+    component: () => import('@/views/AuditTrailView.vue'),
+  },
 ]
 
 const router = createRouter({

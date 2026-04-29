@@ -1809,6 +1809,31 @@ const auditLog = {
       LIMIT ?
     `).all(afId, limit);
   },
+  // Liste globale paginee + filtres (vue Audit trail)
+  listAll({ limit = 100, offset = 0, action = null, userId = null, afId = null } = {}) {
+    const where = [];
+    const params = [];
+    if (action) { where.push('a.action LIKE ?'); params.push(`${action}%`); }
+    if (userId) { where.push('a.user_id = ?'); params.push(userId); }
+    if (afId)   { where.push('a.af_id = ?');   params.push(afId); }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const rows = db.prepare(`
+      SELECT a.*, u.display_name AS user_display_name, u.email AS user_email,
+             af.client_name AS af_client_name, af.project_name AS af_project_name
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN afs af ON af.id = a.af_id
+      ${whereSql}
+      ORDER BY a.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+    const totalRow = db.prepare(`SELECT COUNT(*) AS c FROM audit_log a ${whereSql}`).get(...params);
+    return { rows, total: totalRow?.c || 0 };
+  },
+  // Liste des actions distinctes pour les filtres
+  distinctActions() {
+    return db.prepare(`SELECT DISTINCT action FROM audit_log ORDER BY action`).all().map(r => r.action);
+  },
 };
 
 module.exports = {

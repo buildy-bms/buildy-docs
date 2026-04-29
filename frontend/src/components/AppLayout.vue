@@ -14,6 +14,7 @@ import {
   XMarkIcon,
   ArrowRightStartOnRectangleIcon,
   UserCircleIcon,
+  ClockIcon,
 } from '@heroicons/vue/24/outline'
 import CommandPalette from './CommandPalette.vue'
 
@@ -36,6 +37,8 @@ const nav = [
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
   { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
+  { section: 'Système' },
+  { name: 'Audit trail', to: '/audit', icon: ClockIcon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
 const cmdKey = isMac ? '⌘' : 'Ctrl'
