@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 28;
+const TARGET_VERSION = 29;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -949,6 +949,41 @@ function runMigrations() {
     log.info('Migration 28 appliquee : service_level reserve aux fonctionnalites');
   }
 
+  if (current < 29) {
+    // Lot 36 — Disponibilite par niveau de contrat. Une fonctionnalite peut
+    // etre 'included' / 'paid_option' / NULL (pas dispo) a chacun des niveaux
+    // E / S / P, independamment. Le service_level reste comme le niveau
+    // minimum ou la feature est INCLUSE (cohesion ascendante).
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN avail_e TEXT'); } catch { /* deja la */ }
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN avail_s TEXT'); } catch { /* deja la */ }
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN avail_p TEXT'); } catch { /* deja la */ }
+
+    // Backfill depuis service_level pour les fonctionnalites :
+    // E ou E/S/P -> incluse partout
+    // S ou S/P  -> incluse a S et P, indispo a E
+    // P         -> incluse a P seulement
+    db.exec(`
+      UPDATE section_templates
+         SET avail_e = 'included', avail_s = 'included', avail_p = 'included'
+       WHERE is_functionality = 1
+         AND service_level IN ('E', 'E/S/P')
+    `);
+    db.exec(`
+      UPDATE section_templates
+         SET avail_s = 'included', avail_p = 'included'
+       WHERE is_functionality = 1
+         AND service_level IN ('S', 'S/P')
+    `);
+    db.exec(`
+      UPDATE section_templates
+         SET avail_p = 'included'
+       WHERE is_functionality = 1
+         AND service_level = 'P'
+    `);
+    db.pragma('user_version = 29');
+    log.info('Migration 29 appliquee : avail_e/s/p (matrice disponibilite par niveau)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1153,7 +1188,7 @@ const sectionTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality, parentTemplateId, equipmentTemplateId }) {
+  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality, parentTemplateId, equipmentTemplateId, availE, availS, availP }) {
     // Position : derniere de la fratrie (parent_template_id donne).
     const maxRow = db.prepare(
       'SELECT COALESCE(MAX(position), 0) AS m FROM section_templates WHERE parent_template_id IS ?'
@@ -1162,12 +1197,14 @@ const sectionTemplates = {
     const result = db.prepare(`
       INSERT INTO section_templates
         (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source,
-         features, is_functionality, position, parent_template_id, equipment_template_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         features, is_functionality, position, parent_template_id, equipment_template_id,
+         avail_e, avail_s, avail_p)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, number || null, title, kind || 'standard', bodyHtml || null,
             bacsArticles || null, serviceLevel || null, serviceLevelSource || null,
             features ? JSON.stringify(features) : null, isFunctionality ? 1 : 0, position,
-            parentTemplateId || null, equipmentTemplateId || null);
+            parentTemplateId || null, equipmentTemplateId || null,
+            availE || null, availS || null, availP || null);
     return this.getById(result.lastInsertRowid);
   },
   delete(id) {
@@ -1208,7 +1245,7 @@ const sectionTemplates = {
     }
     return false;
   },
-  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId }) {
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP }) {
     const fields = [], params = [];
     if (title !== undefined) { fields.push('title = ?'); params.push(title); }
     if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
@@ -1217,6 +1254,9 @@ const sectionTemplates = {
     if (kind !== undefined) { fields.push('kind = ?'); params.push(kind); }
     if (parentTemplateId !== undefined) { fields.push('parent_template_id = ?'); params.push(parentTemplateId); }
     if (equipmentTemplateId !== undefined) { fields.push('equipment_template_id = ?'); params.push(equipmentTemplateId); }
+    if (availE !== undefined) { fields.push('avail_e = ?'); params.push(availE); }
+    if (availS !== undefined) { fields.push('avail_s = ?'); params.push(availS); }
+    if (availP !== undefined) { fields.push('avail_p = ?'); params.push(availP); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
     if (!fields.length) return this.getById(id);
     fields.push('updated_at = CURRENT_TIMESTAMP');

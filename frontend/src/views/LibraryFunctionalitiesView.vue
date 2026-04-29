@@ -8,8 +8,17 @@ import {
   listSectionTemplates, reorderSectionTemplates,
 } from '@/api'
 import BacsBadge from '@/components/BacsBadge.vue'
-import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
+
+// Statuts visuels pour la matrice de disponibilite
+const AVAIL_STYLES = {
+  included:    { icon: '✓', label: 'Inclus',         cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  paid_option: { icon: '€', label: 'Option payante', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+}
+function availCell(value) {
+  if (!value) return null
+  return AVAIL_STYLES[value] || null
+}
 import { useNotification } from '@/composables/useNotification'
 
 const { error: notifyError } = useNotification()
@@ -114,10 +123,11 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           <tr>
             <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap">Niveau</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap">Essentials</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap">Premium</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
-            <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs concernées</th>
-            <th class="text-center px-4 py-2.5 whitespace-nowrap">Version</th>
+            <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
@@ -130,9 +140,13 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
               <Bars3Icon class="w-4 h-4 inline-block" />
             </td>
             <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
-            <td class="px-4 py-2 whitespace-nowrap">
-              <ServiceLevelBadge v-if="t.service_level" :level="t.service_level" />
-              <span v-else class="text-gray-300 italic text-xs">—</span>
+            <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
+                class="px-3 py-2 text-center whitespace-nowrap">
+              <span v-if="availCell(t[lvl])"
+                    :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border', availCell(t[lvl]).cls]">
+                {{ availCell(t[lvl]).icon }} {{ availCell(t[lvl]).label }}
+              </span>
+              <span v-else class="text-gray-300 text-xs">—</span>
             </td>
             <td class="px-4 py-2 whitespace-nowrap">
               <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
@@ -140,17 +154,16 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
             </td>
             <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
               <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
-                {{ t.outdated_count }} en retard / {{ t.affected_afs_count }}
+                {{ t.outdated_count }} / {{ t.affected_afs_count }}
               </span>
               <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
             </td>
-            <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
             <td class="px-4 py-2 text-center whitespace-nowrap">
               <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
             </td>
           </tr>

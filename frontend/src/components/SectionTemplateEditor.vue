@@ -61,7 +61,26 @@ const form = ref({
   kind: 'standard',
   parent_template_id: null,
   equipment_template_id: null,
+  // Disponibilite par niveau de contrat (Lot 36) : null = pas dispo,
+  // 'included' = inclus dans le contrat, 'paid_option' = option payante
+  avail_e: null,
+  avail_s: null,
+  avail_p: null,
 })
+
+// Niveaux de contrat avec leurs labels affiches
+const CONTRACT_LEVELS = [
+  { code: 'E', label: 'Essentials', field: 'avail_e' },
+  { code: 'S', label: 'Smart',      field: 'avail_s' },
+  { code: 'P', label: 'Premium',    field: 'avail_p' },
+]
+
+// 3 statuts possibles par cellule
+const AVAIL_OPTIONS = [
+  { value: null,           label: 'Non disponible',    icon: '❌', color: 'bg-gray-100 text-gray-500 border-gray-200' },
+  { value: 'included',     label: 'Inclus',            icon: '✓',  color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  { value: 'paid_option',  label: 'Option payante',    icon: '€',  color: 'bg-amber-100 text-amber-800 border-amber-300' },
+]
 
 const propagate = ref(true)
 const submitting = ref(false)
@@ -131,12 +150,12 @@ const selectedEquipmentName = computed(() => {
   return t ? t.name : null
 })
 
-// Champs conditionnels (Lot 35 — centralisation BACS) :
-// - BACS et niveau de contrat n'ont de sens que pour les fonctionnalites.
-//   Les sections types narratives n'ont plus de BACS (les equipements
-//   l'heritent de leur categorie).
+// Champs conditionnels :
+// - BACS pour les fonctionnalites uniquement (pour les equipements c'est
+//   herite de la categorie ; pour les sections narratives c'est sans objet)
+// - Matrice de disponibilite par niveau (Lot 36) pour les fonctionnalites
 const showBacs = computed(() => props.mode === 'functionality')
-const showServiceLevel = computed(() => props.mode === 'functionality')
+const showAvailability = computed(() => props.mode === 'functionality')
 
 watch(() => props.template, (t) => {
   form.value = {
@@ -147,6 +166,9 @@ watch(() => props.template, (t) => {
     kind: (t && t.kind) || 'standard',
     parent_template_id: (t && t.parent_template_id) || null,
     equipment_template_id: (t && t.equipment_template_id) || null,
+    avail_e: (t && t.avail_e) || null,
+    avail_s: (t && t.avail_s) || null,
+    avail_p: (t && t.avail_p) || null,
   }
 }, { immediate: true })
 
@@ -165,12 +187,18 @@ async function submit() {
       title: form.value.title.trim(),
       bacs_articles: form.value.bacs_articles.trim() || null,
       body_html: form.value.body_html || null,
-      service_level: form.value.service_level || null,
       kind: form.value.kind || 'standard',
       parent_template_id: form.value.parent_template_id ?? null,
       equipment_template_id: form.value.kind === 'equipment'
         ? (form.value.equipment_template_id || null)
         : null,
+    }
+    // Pour les fonctionnalites : on envoie la matrice de disponibilite,
+    // le backend en derive automatiquement le service_level.
+    if (props.mode === 'functionality') {
+      payload.avail_e = form.value.avail_e || null
+      payload.avail_s = form.value.avail_s || null
+      payload.avail_p = form.value.avail_p || null
     }
     if (isEdit.value) {
       const { data } = await updateSectionTemplate(props.template.id, payload, { propagateUnchanged: propagate.value })
@@ -271,21 +299,39 @@ async function destroy() {
         </button>
       </div>
 
-      <!-- Articles BACS : pertinent pour kind=standard et kind=equipment uniquement -->
-      <!-- Niveau de contrat : pertinent uniquement pour les fonctionnalites -->
-      <div v-if="showBacs || showServiceLevel" :class="['grid gap-3', showBacs && showServiceLevel ? 'grid-cols-2' : 'grid-cols-1']">
-        <div v-if="showBacs">
-          <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
-          <BacsArticlesPicker v-model="form.bacs_articles" />
+      <!-- BACS (multi-select) : uniquement pour les fonctionnalites -->
+      <div v-if="showBacs">
+        <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
+        <BacsArticlesPicker v-model="form.bacs_articles" />
+      </div>
+
+      <!-- Matrice de disponibilite par niveau de contrat (Lot 36) -->
+      <div v-if="showAvailability">
+        <label class="block text-xs font-medium text-gray-600 mb-1.5">
+          Disponibilité par niveau de contrat
+          <span class="text-gray-400 font-normal">— pour chaque niveau, choisir le statut</span>
+        </label>
+        <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+          <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code" class="flex items-center gap-3 px-3 py-2">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-sm shrink-0">
+              {{ lvl.code }}
+            </span>
+            <span class="text-sm text-gray-700 w-24 shrink-0">{{ lvl.label }}</span>
+            <div class="flex flex-wrap gap-1.5 ml-auto">
+              <button v-for="o in AVAIL_OPTIONS" :key="String(o.value)" type="button"
+                      @click="form[lvl.field] = o.value"
+                      :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition',
+                               form[lvl.field] === o.value
+                                 ? o.color + ' shadow-sm'
+                                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
+                <span class="font-medium">{{ o.icon }}</span> {{ o.label }}
+              </button>
+            </div>
+          </div>
         </div>
-        <div v-if="showServiceLevel">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Niveau de contrat requis</label>
-          <select v-model="form.service_level"
-                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
-            <option v-for="o in SERVICE_LEVEL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-          <p class="text-[11px] text-gray-400 mt-1">Niveau Buildy minimum requis pour couvrir cette fonctionnalité.</p>
-        </div>
+        <p class="text-[11px] text-gray-400 mt-1.5">
+          ✓ inclus = couvert par le contrat · € option payante = facturé en sus · ❌ non disponible
+        </p>
       </div>
 
       <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->

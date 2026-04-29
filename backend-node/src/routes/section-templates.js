@@ -13,11 +13,16 @@ const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
 
+const availEnum = z.enum(['included', 'paid_option']).nullable().optional();
+
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   body_html: z.string().nullable().optional(),
   bacs_articles: z.string().nullable().optional(),
   service_level: z.string().nullable().optional(),
+  avail_e: availEnum,
+  avail_s: availEnum,
+  avail_p: availEnum,
   kind: z.enum(['standard', 'equipment', 'synthesis', 'zones', 'hyperveez_page']).optional(),
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
@@ -30,10 +35,30 @@ const createSchema = z.object({
   body_html: z.string().nullable().optional(),
   bacs_articles: z.string().nullable().optional(),
   service_level: z.string().nullable().optional(),
+  avail_e: availEnum,
+  avail_s: availEnum,
+  avail_p: availEnum,
   is_functionality: z.boolean().optional(),
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
 });
+
+// Service level derive de la matrice avail_e/s/p :
+// - inclus a E -> 'E' (couvre tout le monde)
+// - inclus a S et/ou P, pas a E -> 'S/P' ou 'P'
+// - aucun niveau ne l'inclut -> NULL
+function deriveServiceLevel({ avail_e, avail_s, avail_p }) {
+  const e = avail_e === 'included';
+  const s = avail_s === 'included';
+  const p = avail_p === 'included';
+  if (e && s && p) return 'E/S/P';
+  if (e && (s || p)) return 'E/S/P';
+  if (e) return 'E';
+  if (s && p) return 'S/P';
+  if (s) return 'S';
+  if (p) return 'P';
+  return null;
+}
 
 const reorderSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1),
@@ -104,13 +129,21 @@ async function routes(fastify) {
       candidate = `${slug}-${suffix++}`;
     }
 
+    const availProvided = body.avail_e !== undefined || body.avail_s !== undefined || body.avail_p !== undefined;
+    const derivedLevel = availProvided
+      ? deriveServiceLevel({ avail_e: body.avail_e, avail_s: body.avail_s, avail_p: body.avail_p })
+      : (body.service_level || null);
+
     const created = db.sectionTemplates.create({
       slug: candidate,
       title: body.title,
       kind: body.kind || 'standard',
       bodyHtml: body.body_html || null,
       bacsArticles: body.bacs_articles || null,
-      serviceLevel: body.service_level || null,
+      serviceLevel: derivedLevel,
+      availE: body.avail_e || null,
+      availS: body.avail_s || null,
+      availP: body.avail_p || null,
       isFunctionality: body.is_functionality === true,
       parentTemplateId: body.parent_template_id ?? null,
       equipmentTemplateId: body.equipment_template_id ?? null,
@@ -212,10 +245,20 @@ async function routes(fastify) {
     const oldLevel = tpl.service_level;
     const newBody = body.body_html === undefined ? oldBody : body.body_html;
     const newBacs = body.bacs_articles === undefined ? oldBacs : body.bacs_articles;
-    const newLevel = body.service_level === undefined ? oldLevel : body.service_level;
+
+    // Si avail_* est fourni, on derive service_level. Sinon on garde la
+    // valeur explicite envoyee (compat ascendante).
+    const availProvided = body.avail_e !== undefined || body.avail_s !== undefined || body.avail_p !== undefined;
+    const newAvailE = body.avail_e !== undefined ? body.avail_e : tpl.avail_e;
+    const newAvailS = body.avail_s !== undefined ? body.avail_s : tpl.avail_s;
+    const newAvailP = body.avail_p !== undefined ? body.avail_p : tpl.avail_p;
+    const derivedLevel = availProvided
+      ? deriveServiceLevel({ avail_e: newAvailE, avail_s: newAvailS, avail_p: newAvailP })
+      : (body.service_level !== undefined ? body.service_level : oldLevel);
+    const newLevel = derivedLevel;
     const bodyChanged = body.body_html !== undefined && newBody !== oldBody;
     const bacsChanged = body.bacs_articles !== undefined && newBacs !== oldBacs;
-    const levelChanged = body.service_level !== undefined && newLevel !== oldLevel;
+    const levelChanged = newLevel !== oldLevel;
 
     db.sectionTemplates.update(id, {
       title: body.title,
@@ -224,7 +267,11 @@ async function routes(fastify) {
       kind: body.kind,
       parentTemplateId: body.parent_template_id,
       equipmentTemplateId: body.equipment_template_id,
-      serviceLevel: body.service_level,
+      availE: body.avail_e,
+      availS: body.avail_s,
+      availP: body.avail_p,
+      // Service level : derive de avail_* si fourni, sinon valeur explicite
+      serviceLevel: availProvided ? derivedLevel : body.service_level,
       updatedBy: userId || null,
     });
 
