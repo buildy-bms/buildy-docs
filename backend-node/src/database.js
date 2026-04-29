@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 30;
+const TARGET_VERSION = 31;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -996,6 +996,14 @@ function runMigrations() {
     `);
     db.pragma('user_version = 30');
     log.info('Migration 30 appliquee : tombstones de slugs supprimes (anti-reseed)');
+  }
+
+  if (current < 31) {
+    // Renommage de la valeur 'Chaîne' -> 'Chaîne de caractères' pour la
+    // colonne nature des points (alignement libelle complet).
+    db.exec(`UPDATE equipment_template_points SET nature = 'Chaîne de caractères' WHERE nature = 'Chaîne'`);
+    db.pragma('user_version = 31');
+    log.info('Migration 31 appliquee : nature Chaîne -> Chaîne de caractères');
   }
 
   if (current > TARGET_VERSION) {

@@ -56,7 +56,7 @@ module.exports = {
     { slug: 'alarme.incendie', label: 'Alarme incendie', dataType: 'Alarme', direction: 'read', position: 160, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.defaut_echangeur', label: 'Défaut échangeur', dataType: 'Alarme', direction: 'read', position: 170, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.defaut_sonde_qai', label: 'Défaut sonde qualité d\'air', dataType: 'Alarme', direction: 'read', position: 180, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
-    { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 190, isOptional: true, techName: 'Error_Code_R', nature: 'Chaîne' },
+    { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 190, isOptional: true, techName: 'Error_Code_R', nature: 'Chaîne de caractères' },
 
     // ── Donnees ecrites ──
     // On garde les slugs commande.* historiques pour ne pas creer de doublons

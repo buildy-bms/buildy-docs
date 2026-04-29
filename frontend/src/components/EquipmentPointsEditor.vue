@@ -39,7 +39,7 @@ const NATURES = [
   { value: 'Booléen',   label: 'Booléen' },
   { value: 'Numérique', label: 'Numérique' },
   { value: 'Enum',      label: 'Enum' },
-  { value: 'Chaîne',    label: 'Chaîne' },
+  { value: 'Chaîne de caractères',    label: 'Chaîne de caractères' },
 ]
 
 // Couleurs par data_type (palette Buildy)
@@ -48,7 +48,7 @@ const NATURE_COLORS = {
   'Booléen':   'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Numérique': 'bg-violet-50 text-violet-700 border-violet-200',
   'Enum':      'bg-orange-50 text-orange-700 border-orange-200',
-  'Chaîne':    'bg-gray-100 text-gray-700 border-gray-200',
+  'Chaîne de caractères':    'bg-gray-100 text-gray-700 border-gray-200',
 }
 
 const TYPE_COLORS = {
@@ -74,8 +74,53 @@ onMounted(refresh)
 
 watch(() => props.templateId, refresh)
 
-const reads = computed(() => points.value.filter(p => p.direction === 'read'))
-const writes = computed(() => points.value.filter(p => p.direction === 'write'))
+// Filtrage texte + tri par colonne (par direction)
+const filterText = ref('')
+const sortBy = ref({ read: 'position', write: 'position' })
+const sortDir = ref({ read: 'asc', write: 'asc' })
+
+function toggleSort(direction, col) {
+  if (sortBy.value[direction] === col) {
+    sortDir.value[direction] = sortDir.value[direction] === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value[direction] = col
+    sortDir.value[direction] = 'asc'
+  }
+}
+
+function applyFilterSort(list, direction) {
+  const q = filterText.value.trim().toLowerCase()
+  let r = q
+    ? list.filter(p =>
+        (p.slug || '').toLowerCase().includes(q) ||
+        (p.label || '').toLowerCase().includes(q) ||
+        (p.tech_name || '').toLowerCase().includes(q) ||
+        (p.unit || '').toLowerCase().includes(q) ||
+        (p.data_type || '').toLowerCase().includes(q) ||
+        (p.nature || '').toLowerCase().includes(q)
+      )
+    : list
+  const key = sortBy.value[direction]
+  const dir = sortDir.value[direction] === 'asc' ? 1 : -1
+  r = [...r].sort((a, b) => {
+    let av = a[key], bv = b[key]
+    if (key === 'is_optional') { av = av ? 1 : 0; bv = bv ? 1 : 0 }
+    if (typeof av === 'string') av = av.toLowerCase()
+    if (typeof bv === 'string') bv = bv.toLowerCase()
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (av < bv) return -1 * dir
+    if (av > bv) return  1 * dir
+    return 0
+  })
+  return r
+}
+
+const reads = computed(() => applyFilterSort(points.value.filter(p => p.direction === 'read'), 'read'))
+const writes = computed(() => applyFilterSort(points.value.filter(p => p.direction === 'write'), 'write'))
+
+// Drag-drop disponible uniquement quand on n'est pas en train de filtrer/trier
+const dragEnabled = computed(() => !filterText.value.trim() && sortBy.value.read === 'position' && sortBy.value.write === 'position')
 
 // Brouillon edition d'une ligne existante
 function startEdit(p) {
@@ -186,6 +231,7 @@ function teardownSortables() {
 }
 function setupSortables() {
   teardownSortables()
+  if (!dragEnabled.value) return // pas de drag-drop si filtre/tri actif
   for (const [el, getter] of [
     [readsBodyRef.value, () => reads.value],
     [writesBodyRef.value, () => writes.value],
@@ -215,7 +261,7 @@ function setupSortables() {
     sortables.push(s)
   }
 }
-watch([points], async () => {
+watch([points, dragEnabled], async () => {
   await nextTick()
   setupSortables()
 }, { deep: false })
@@ -224,6 +270,15 @@ onBeforeUnmount(teardownSortables)
 
 <template>
   <div class="space-y-4">
+    <!-- Filtre global (s'applique aux 2 tableaux) -->
+    <div class="relative max-w-md">
+      <input v-model="filterText" type="text" placeholder="Filtrer (identifiant, nom, nom technique, unité…)"
+             autocomplete="off"
+             class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+      <button v-if="filterText" @click="filterText = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs">×</button>
+    </div>
+
     <!-- ── Donnees lues ── -->
     <section>
       <div class="flex items-center justify-between mb-2">
@@ -242,13 +297,27 @@ onBeforeUnmount(teardownSortables)
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium">Identifiant</th>
-              <th class="text-left px-3 py-2 font-medium">Nom technique</th>
-              <th class="text-left px-3 py-2 font-medium">Nom</th>
-              <th class="text-left px-3 py-2 font-medium w-24">Type</th>
-              <th class="text-left px-3 py-2 font-medium w-20">Unité</th>
-              <th class="text-left px-3 py-2 font-medium w-24">Nature</th>
-              <th class="text-center px-3 py-2 font-medium w-20">Optionnel</th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'slug')">
+                Identifiant {{ sortBy['read'] === 'slug' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'tech_name')">
+                Nom technique {{ sortBy['read'] === 'tech_name' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'label')">
+                Nom {{ sortBy['read'] === 'label' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'data_type')">
+                Type {{ sortBy['read'] === 'data_type' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'unit')">
+                Unité {{ sortBy['read'] === 'unit' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'nature')">
+                Nature {{ sortBy['read'] === 'nature' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'is_optional')">
+                Optionnel {{ sortBy['read'] === 'is_optional' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
               <th class="w-16"></th>
             </tr>
           </thead>
@@ -409,13 +478,27 @@ onBeforeUnmount(teardownSortables)
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium">Identifiant</th>
-              <th class="text-left px-3 py-2 font-medium">Nom technique</th>
-              <th class="text-left px-3 py-2 font-medium">Nom</th>
-              <th class="text-left px-3 py-2 font-medium w-24">Type</th>
-              <th class="text-left px-3 py-2 font-medium w-20">Unité</th>
-              <th class="text-left px-3 py-2 font-medium w-24">Nature</th>
-              <th class="text-center px-3 py-2 font-medium w-20">Optionnel</th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'slug')">
+                Identifiant {{ sortBy['write'] === 'slug' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'tech_name')">
+                Nom technique {{ sortBy['write'] === 'tech_name' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'label')">
+                Nom {{ sortBy['write'] === 'label' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'data_type')">
+                Type {{ sortBy['write'] === 'data_type' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'unit')">
+                Unité {{ sortBy['write'] === 'unit' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-left px-3 py-2 font-medium w-24 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'nature')">
+                Nature {{ sortBy['write'] === 'nature' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-center px-3 py-2 font-medium w-20 cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'is_optional')">
+                Optionnel {{ sortBy['write'] === 'is_optional' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
+              </th>
               <th class="w-16"></th>
             </tr>
           </thead>

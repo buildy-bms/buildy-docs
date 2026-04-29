@@ -31,7 +31,7 @@ const pointSchema = z.object({
   notes: z.string().nullable().optional(),
   is_optional: z.boolean().optional(),
   tech_name: z.string().nullable().optional(),
-  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne']).nullable().optional(),
+  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne de caractères']).nullable().optional(),
 });
 
 // Heritage BACS depuis la categorie : un equipment_template n'a plus son

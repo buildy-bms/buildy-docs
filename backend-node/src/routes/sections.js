@@ -28,7 +28,7 @@ const overrideSchema = z.object({
   unit: z.string().nullable().optional(),
   is_optional: z.boolean().optional(),
   tech_name: z.string().nullable().optional(),
-  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne']).nullable().optional(),
+  nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne de caractères']).nullable().optional(),
 });
 
 const instanceSchema = z.object({

@@ -90,7 +90,7 @@ const NATURE_COLORS = {
   'Booléen':   'bg-emerald-50 text-emerald-700 border-emerald-200',
   'Numérique': 'bg-violet-50 text-violet-700 border-violet-200',
   'Enum':      'bg-orange-50 text-orange-700 border-orange-200',
-  'Chaîne':    'bg-gray-100 text-gray-700 border-gray-200',
+  'Chaîne de caractères':    'bg-gray-100 text-gray-700 border-gray-200',
 }
 
 const grouped = computed(() => {

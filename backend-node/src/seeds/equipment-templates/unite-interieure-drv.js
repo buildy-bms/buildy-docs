@@ -29,7 +29,7 @@ module.exports = {
     { slug: 'etat.niveau_ventilation', label: 'Niveau de ventilation', dataType: 'État', direction: 'read', position: 60, techName: 'Fan_Level_R', nature: 'Enum' },
     { slug: 'mesure.vitesse_ventilation', label: 'Vitesse ventilation effective', dataType: 'Mesure', direction: 'read', unit: '%', position: 70, isOptional: true, nature: 'Numérique', techName: 'Fan_Speed_R' },
     { slug: 'alarme.defaut', label: 'Défaut unité intérieure', dataType: 'Alarme', direction: 'read', position: 80, techName: 'System_Fault_R', nature: 'Booléen' },
-    { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true, techName: 'Error_Code_R', nature: 'Chaîne' },
+    { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true, techName: 'Error_Code_R', nature: 'Chaîne de caractères' },
     { slug: 'alarme.encrassement_filtre', label: 'Encrassement filtre', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true, techName: 'Filter_Fault_R', nature: 'Booléen' },
 
     // ── Donnees ecrites ──
