@@ -58,10 +58,7 @@ loadTemplates()
 const iconSearch = ref('')
 const filteredIcons = computed(() => {
   const q = iconSearch.value.trim().toLowerCase()
-  if (!q) {
-    const defaults = ['fire', 'snowflake', 'fan', 'faucet-drip', 'solar-panel', 'lightbulb', 'plug', 'gauge', 'leaf', 'window-maximize', 'industry', 'cube', 'building', 'temperature-half', 'wind', 'gear', 'bolt']
-    return defaults.filter(n => ALL_FA_NAMES.includes(n))
-  }
+  if (!q) return [] // grille masquee tant qu'on ne tape rien (gain de place)
   return ALL_FA_NAMES.filter(n => n.includes(q)).slice(0, 60)
 })
 
@@ -141,28 +138,31 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Icône & couleur</label>
-        <div class="flex items-center gap-2 mb-1.5">
-          <span class="inline-flex items-center justify-center w-9 h-9 border-2 border-gray-200 rounded">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Icône & couleur</label>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-200 rounded-lg shrink-0">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
           </span>
           <input v-model="iconSearch" type="text" autocomplete="off"
                  placeholder="Rechercher une icône (fire, snowflake, fan…)"
-                 class="flex-1 px-2 py-1.5 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
-        <div class="border border-gray-200 rounded p-1 max-h-32 overflow-y-auto grid grid-cols-10 gap-0.5">
+        <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
-                  :class="['inline-flex items-center justify-center w-7 h-7 rounded transition-all', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
+                  :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
                   :title="name">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
           </button>
+          <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
+            Aucune icône.
+          </p>
         </div>
-        <div class="flex items-center gap-1 mt-1.5">
-          <span class="text-[10px] text-gray-500 mr-1">Couleur :</span>
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
           <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
-                  :class="['w-4 h-4 rounded-full border transition-all', form.icon_color === c ? 'border-gray-700 scale-125' : 'border-gray-200']"
+                  :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
                   :style="{ background: c }" :title="c"></button>
-          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1" />
+          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" />
         </div>
       </div>
 
