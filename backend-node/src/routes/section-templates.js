@@ -128,6 +128,9 @@ async function routes(fastify) {
     while (db.sectionTemplates.getBySlug(candidate)) {
       candidate = `${slug}-${suffix++}`;
     }
+    // Si on recree un slug qui etait tombstone (anti-reseed), on leve le
+    // tombstone pour que le seed normal le respecte de nouveau ulterieurement.
+    db.deletedSectionTemplateSlugs.remove(candidate);
 
     const availProvided = body.avail_e !== undefined || body.avail_s !== undefined || body.avail_p !== undefined;
     const derivedLevel = availProvided
@@ -183,6 +186,9 @@ async function routes(fastify) {
     const cascadeCount = r.changes;
 
     db.sectionTemplates.delete(id);
+    // Tombstone : empeche la recreation au prochain boot par seedSectionTemplates.
+    db.deletedSectionTemplateSlugs.add(tpl.slug);
+
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.delete',

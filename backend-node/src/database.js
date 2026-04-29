@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 29;
+const TARGET_VERSION = 30;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -984,6 +984,20 @@ function runMigrations() {
     log.info('Migration 29 appliquee : avail_e/s/p (matrice disponibilite par niveau)');
   }
 
+  if (current < 30) {
+    // Lot 37 — Tombstones de slugs supprimes par l'utilisateur. Empeche le
+    // seedSectionTemplatesOnBoot de recreer un template qu'on a explicitement
+    // supprime. Solution au bug "redeploy = retour des sections supprimees".
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS deleted_section_template_slugs (
+        slug TEXT PRIMARY KEY,
+        deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    db.pragma('user_version = 30');
+    log.info('Migration 30 appliquee : tombstones de slugs supprimes (anti-reseed)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1758,6 +1772,22 @@ const afInspections = {
   },
 };
 
+// ── Tombstones de slugs supprimes (anti-reseed au boot) ────────────────
+const deletedSectionTemplateSlugs = {
+  has(slug) {
+    if (!slug) return false;
+    return !!db.prepare('SELECT 1 FROM deleted_section_template_slugs WHERE slug = ?').get(slug);
+  },
+  add(slug) {
+    if (!slug) return;
+    db.prepare('INSERT OR IGNORE INTO deleted_section_template_slugs (slug) VALUES (?)').run(slug);
+  },
+  remove(slug) {
+    if (!slug) return;
+    db.prepare('DELETE FROM deleted_section_template_slugs WHERE slug = ?').run(slug);
+  },
+};
+
 // ── Audit log ────────────────────────────────────────────────────────
 const auditLog = {
   add({ afId, sectionId, templateId, userId, action, payload }) {
@@ -1789,6 +1819,7 @@ module.exports = {
   equipmentTemplatePoints,
   equipmentTemplateVersions,
   sectionTemplates,
+  deletedSectionTemplateSlugs,
   sectionPointOverrides,
   equipmentInstances,
   instanceZones,

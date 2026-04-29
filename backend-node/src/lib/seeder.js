@@ -156,9 +156,12 @@ function seedSectionTemplatesOnBoot() {
     const slug = sectionTemplateSlug(node);
     let id = null;
     const existing = slug ? db.sectionTemplates.getBySlug(slug) : null;
+    // Anti-reseed : si l'utilisateur a explicitement supprime ce slug, on
+    // ne le recree pas. Le tombstone le protege a travers les redeploys.
+    const tombstoned = slug ? db.deletedSectionTemplateSlugs.has(slug) : false;
     if (existing) {
       id = existing.id;
-    } else if (slug) {
+    } else if (slug && !tombstoned) {
       const serviceLevel = node.features
         ? formatServiceLevel(node.features)
         : (node.service_level || null);
