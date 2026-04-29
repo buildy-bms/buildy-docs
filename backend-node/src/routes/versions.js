@@ -2,6 +2,7 @@
 
 const db = require('../database');
 const gitLib = require('../lib/git');
+const { assertWrite } = require('../lib/af-permissions');
 
 async function routes(fastify) {
   // GET /api/afs/:id/versions — historique des commits Git de l'AF
@@ -28,6 +29,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
     const { sha } = request.body || {};
     if (!sha) return reply.code(400).send({ detail: 'sha requis' });
     try {
@@ -43,6 +45,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
     const { message, tag } = request.body || {};
     try {
       const sha = await gitLib.commitAf(id, message || 'Checkpoint manuel', {

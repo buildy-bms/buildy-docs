@@ -5,6 +5,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { uniqueSlug } = require('../lib/slug');
 const { seedAfStructure } = require('../lib/seeder');
+const { assertWrite } = require('../lib/af-permissions');
 
 // ── Zod schemas ──────────────────────────────────────────────────────
 const createAfSchema = z.object({
@@ -108,6 +109,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
 
     let body;
     try {
@@ -139,6 +141,93 @@ async function routes(fastify) {
     return updated;
   });
 
+  // GET /api/afs/:id/transition-checks?to=<status> — verifications pre-transition.
+  // Retourne une liste d'avertissements pour donner le contexte au redacteur
+  // avant qu'il ne confirme une bascule de phase. Ne BLOQUE pas la transition
+  // (V1 : informatif seulement, le redacteur peut passer outre).
+  fastify.get('/afs/:id/transition-checks', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+
+    const to = request.query.to;
+    if (!['validee', 'livree'].includes(to)) {
+      return { warnings: [] }; // pas de check pour les phases retour ou techniques
+    }
+
+    const allSections = db.sections.listByAf(id);
+    const liveSections = allSections.filter(s => s.included_in_export && !s.opted_out_by_moa);
+
+    const warnings = [];
+
+    // 1. Sections texte/équipement/zones live SANS contenu (body_html vide ou
+    //    placeholder). On exclut synthesis (auto-genere) et hyperveez_page
+    //    (description par defaut suffit).
+    const HTML_EMPTY_RE = /<[^>]*>/g;
+    const emptyNarratives = liveSections.filter(s => {
+      if (s.kind === 'synthesis' || s.kind === 'hyperveez_page') return false;
+      const text = (s.body_html || '').replace(HTML_EMPTY_RE, '').trim();
+      return text.length === 0;
+    });
+    if (emptyNarratives.length) {
+      warnings.push({
+        code: 'empty_sections',
+        severity: 'warn',
+        label: `${emptyNarratives.length} section(s) sans contenu rédigé`,
+        details: emptyNarratives.slice(0, 8).map(s => ({ id: s.id, number: s.number, title: s.title })),
+        moreCount: Math.max(0, emptyNarratives.length - 8),
+      });
+    }
+
+    // 2. Sections equipement live SANS instances declarees.
+    const equipmentNoInstances = [];
+    for (const s of liveSections) {
+      if (s.kind !== 'equipment') continue;
+      const count = db.db.prepare('SELECT COUNT(*) AS c FROM equipment_instances WHERE section_id = ?').get(s.id).c;
+      if (count === 0) equipmentNoInstances.push(s);
+    }
+    if (equipmentNoInstances.length) {
+      warnings.push({
+        code: 'equipment_no_instances',
+        severity: 'warn',
+        label: `${equipmentNoInstances.length} section(s) équipement sans instance déclarée`,
+        details: equipmentNoInstances.slice(0, 8).map(s => ({ id: s.id, number: s.number, title: s.title })),
+        moreCount: Math.max(0, equipmentNoInstances.length - 8),
+      });
+    }
+
+    // 3. Sections kind='zones' live SANS zone declaree.
+    const zonesNoZone = [];
+    for (const s of liveSections) {
+      if (s.kind !== 'zones') continue;
+      const zones = db.afZones.listBySection(s.id);
+      if (!zones.length) zonesNoZone.push(s);
+    }
+    if (zonesNoZone.length) {
+      warnings.push({
+        code: 'zones_no_declared',
+        severity: 'warn',
+        label: `${zonesNoZone.length} section(s) Zones fonctionnelles sans zone déclarée`,
+        details: zonesNoZone.slice(0, 8).map(s => ({ id: s.id, number: s.number, title: s.title })),
+        moreCount: 0,
+      });
+    }
+
+    // 4. Pour livraison : niveau de contrat doit etre fixe (sinon impossible
+    //    de figer le perimetre commercial dans le DOE).
+    if (to === 'livree' && !af.service_level) {
+      warnings.push({
+        code: 'no_contract_level',
+        severity: 'error',
+        label: 'Aucun niveau de contrat Buildy défini sur l\'AF',
+        details: [],
+        moreCount: 0,
+      });
+    }
+
+    return { warnings, target: to };
+  });
+
   // POST /api/afs/:id/transition — bascule de statut avec gestion snapshots/milestones
   // body : { to: 'redaction'|'validee'|'commissioning'|'commissioned'|'livree', motif?, notes? }
   // Pour 'validee' et 'livree' : génère un PDF AF horodaté + tag Git + entrée milestone.
@@ -146,6 +235,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
 
     const validTargets = ['redaction', 'validee', 'commissioning', 'commissioned', 'livree'];
     const { to, motif, notes } = request.body || {};
@@ -220,6 +310,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
 
     db.afs.softDelete(id);
     db.auditLog.add({ afId: id, userId: request.authUser?.id, action: 'af.delete' });

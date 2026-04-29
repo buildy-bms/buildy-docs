@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 31;
+const TARGET_VERSION = 32;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1006,6 +1006,52 @@ function runMigrations() {
     log.info('Migration 31 appliquee : nature Chaîne -> Chaîne de caractères');
   }
 
+  if (current < 32) {
+    // Captures attachees aux templates (section_template ou equipment_template)
+    // en plus des sections d'AF. La table attachments existe deja avec une
+    // FK section_id NOT NULL ; on l'assouplit en NULLABLE et on ajoute deux
+    // FKs optionnelles vers section_templates et equipment_templates. Une
+    // attachment est rattachee a EXACTEMENT un parent (section, section_tpl
+    // ou equipment_tpl) — verifie par CHECK.
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        CREATE TABLE attachments_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          section_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+          section_template_id INTEGER REFERENCES section_templates(id) ON DELETE CASCADE,
+          equipment_template_id INTEGER REFERENCES equipment_templates(id) ON DELETE CASCADE,
+          filename TEXT NOT NULL,
+          original_name TEXT,
+          caption TEXT,
+          position INTEGER NOT NULL DEFAULT 0,
+          width INTEGER,
+          height INTEGER,
+          uploaded_by INTEGER REFERENCES users(id),
+          uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          CHECK (
+            (section_id IS NOT NULL) + (section_template_id IS NOT NULL) + (equipment_template_id IS NOT NULL) = 1
+          )
+        );
+        INSERT INTO attachments_new
+          (id, section_id, filename, original_name, caption, position, width, height, uploaded_by, uploaded_at)
+          SELECT id, section_id, filename, original_name, caption, position, width, height, uploaded_by, uploaded_at
+            FROM attachments;
+        DROP TABLE attachments;
+        ALTER TABLE attachments_new RENAME TO attachments;
+        CREATE INDEX idx_att_section ON attachments(section_id, position);
+        CREATE INDEX idx_att_section_tpl ON attachments(section_template_id, position);
+        CREATE INDEX idx_att_equip_tpl ON attachments(equipment_template_id, position);
+      `);
+      db.pragma('user_version = 32');
+      db.exec('COMMIT');
+      log.info('Migration 32 appliquee : attachments peuvent cibler section_templates et equipment_templates');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1478,16 +1524,78 @@ const attachments = {
       ORDER BY position, id
     `).all(sectionId);
   },
+  // Liste effective pour une section AF : captures de la section + celles
+  // heritees du section_template (s'il existe) + de l'equipment_template
+  // (s'il existe). Chaque ligne a un champ `source` :
+  //   'section' (specifique a cette AF, editable)
+  //   'section_template' / 'equipment_template' (heritee, lecture seule
+  //   pour cette AF — il faut editer le template a la source).
+  listEffectiveForSection(sectionId) {
+    const sec = db.prepare('SELECT id, section_template_id, equipment_template_id FROM sections WHERE id = ?').get(sectionId);
+    if (!sec) return [];
+    const fromTplSection = sec.section_template_id
+      ? db.prepare(`
+          SELECT a.*, u.display_name AS uploaded_by_name, 'section_template' AS source
+          FROM attachments a
+          LEFT JOIN users u ON u.id = a.uploaded_by
+          WHERE a.section_template_id = ?
+          ORDER BY a.position, a.id
+        `).all(sec.section_template_id)
+      : [];
+    const fromTplEquip = sec.equipment_template_id
+      ? db.prepare(`
+          SELECT a.*, u.display_name AS uploaded_by_name, 'equipment_template' AS source
+          FROM attachments a
+          LEFT JOIN users u ON u.id = a.uploaded_by
+          WHERE a.equipment_template_id = ?
+          ORDER BY a.position, a.id
+        `).all(sec.equipment_template_id)
+      : [];
+    const fromAfSection = db.prepare(`
+      SELECT a.*, u.display_name AS uploaded_by_name, 'section' AS source
+      FROM attachments a
+      LEFT JOIN users u ON u.id = a.uploaded_by
+      WHERE a.section_id = ?
+      ORDER BY a.position, a.id
+    `).all(sectionId);
+    // Heritage en tete (ordre stable pour PDF), specifiques apres.
+    return [...fromTplSection, ...fromTplEquip, ...fromAfSection];
+  },
+  listBySectionTemplate(templateId) {
+    return db.prepare(`
+      SELECT a.*, u.display_name AS uploaded_by_name
+      FROM attachments a
+      LEFT JOIN users u ON u.id = a.uploaded_by
+      WHERE section_template_id = ?
+      ORDER BY position, id
+    `).all(templateId);
+  },
+  listByEquipmentTemplate(templateId) {
+    return db.prepare(`
+      SELECT a.*, u.display_name AS uploaded_by_name
+      FROM attachments a
+      LEFT JOIN users u ON u.id = a.uploaded_by
+      WHERE equipment_template_id = ?
+      ORDER BY position, id
+    `).all(templateId);
+  },
   getById(id) {
     return db.prepare('SELECT * FROM attachments WHERE id = ?').get(id);
   },
-  create(sectionId, { filename, originalName, caption, position, width, height, uploadedBy }) {
+  // Crée un attachment lié à exactement UN parent : passer { sectionId } OU
+  // { sectionTemplateId } OU { equipmentTemplateId }. Le CHECK constraint
+  // SQL s'assure que les autres restent NULL.
+  create({ sectionId, sectionTemplateId, equipmentTemplateId,
+           filename, originalName, caption, position, width, height, uploadedBy }) {
     const result = db.prepare(`
       INSERT INTO attachments
-        (section_id, filename, original_name, caption, position, width, height, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sectionId, filename, originalName || null, caption || null, position || 0,
-            width || null, height || null, uploadedBy || null);
+        (section_id, section_template_id, equipment_template_id,
+         filename, original_name, caption, position, width, height, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sectionId || null, sectionTemplateId || null, equipmentTemplateId || null,
+      filename, originalName || null, caption || null, position || 0,
+      width || null, height || null, uploadedBy || null);
     return this.getById(result.lastInsertRowid);
   },
   update(id, { caption, position }) {

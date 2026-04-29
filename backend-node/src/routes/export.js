@@ -6,6 +6,7 @@ const { z } = require('zod');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
+const { assertWrite } = require('../lib/af-permissions');
 // Helpers Handlebars (gt, eq) sont enregistres au require de pdf.js.
 const Handlebars = require('handlebars');
 const { renderPdf, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
@@ -61,6 +62,39 @@ const exportSchema = z.object({
   excluded_section_ids: z.array(z.number()).optional(),
 });
 
+// Resout le BACS d'une section depuis la categorie LIVE plutot que depuis le
+// snapshot sec.bacs_articles (qui peut dater du jour ou la section a ete
+// creee). Pour une section equipement, on retrouve sa categorie via le slug
+// de son template, et on prend bacs depuis system_categories_db. Fallback :
+// la valeur snapshot stockee sur la section (pour les sections non-equipement
+// ou si la categorie n'a pas de bacs defini).
+function buildLiveBacsResolver() {
+  const cats = db.systemCategoriesDb.list();
+  const slugToBacs = new Map();
+  for (const cat of cats) {
+    const bacs = (cat.bacs || '').trim() || null;
+    for (const slug of cat.slugs || []) {
+      if (!slugToBacs.has(slug)) slugToBacs.set(slug, bacs);
+    }
+  }
+  const tplCache = new Map();
+  function tplOf(id) {
+    if (tplCache.has(id)) return tplCache.get(id);
+    const t = id ? db.equipmentTemplates.getById(id) : null;
+    tplCache.set(id, t);
+    return t;
+  }
+  return function resolveLiveBacs(sec) {
+    if (sec.equipment_template_id) {
+      const tpl = tplOf(sec.equipment_template_id);
+      if (tpl?.slug && slugToBacs.has(tpl.slug)) {
+        return slugToBacs.get(tpl.slug) || sec.bacs_articles || null;
+      }
+    }
+    return sec.bacs_articles || null;
+  };
+}
+
 async function routes(fastify) {
   // GET /api/afs/:afId/exports — historique des exports
   fastify.get('/afs/:afId/exports', async (request) => {
@@ -93,6 +127,7 @@ async function routes(fastify) {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, afId)) return;
 
     let body;
     try { body = exportSchema.parse(request.body); }
@@ -112,6 +147,8 @@ async function routes(fastify) {
     const equipmentSections = allSections.filter(s =>
       s.kind === 'equipment' && s.included_in_export && !excludedSet.has(s.id)
     );
+
+    const resolveLiveBacs = buildLiveBacsResolver();
 
     // (Lot 19) On produit aussi une liste à plat `rows` pour le tableau global
     // A3 paysage : une ligne par (instance × point), avec marquage isFirstOfInstance
@@ -155,7 +192,7 @@ async function routes(fastify) {
 
       return {
         name: sec.title,
-        bacsArticles: sec.bacs_articles,
+        bacsArticles: resolveLiveBacs(sec),
         instances: instancesWithPoints,
         instancesCount: instances.length,
         pointsPerInstance: points.length,
@@ -206,6 +243,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pageOrientation: 'landscape',
+        coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
       });
     } catch (err) {
@@ -247,6 +285,100 @@ async function routes(fastify) {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // GET /api/afs/:afId/exports/points-list.xlsx — meme donnees que le PDF
+  // points-list mais en XLSX, pour permettre aux integrateurs GTB de les
+  // copier-coller dans leur outil de configuration. Pas de motif, pas de
+  // git tag, pas de commit : c'est une vue technique alternative du même
+  // contenu, generee a la demande.
+  // ═══════════════════════════════════════════════════════════════════
+  fastify.get('/afs/:afId/exports/points-list.xlsx', async (request, reply) => {
+    const afId = parseInt(request.params.afId, 10);
+    const af = db.afs.getById(afId);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+
+    const allSections = db.sections.listByAf(afId);
+    const equipmentSections = allSections.filter(s =>
+      s.kind === 'equipment' && s.included_in_export
+    );
+    const resolveLiveBacs = buildLiveBacsResolver();
+
+    const rows = [];
+    for (const sec of equipmentSections) {
+      const instances = db.equipmentInstances.listBySection(sec.id);
+      const points = resolveSectionPoints(sec.id);
+      const bacs = resolveLiveBacs(sec) || '';
+      for (const inst of instances) {
+        for (const p of points) {
+          rows.push({
+            category: sec.title,
+            bacs,
+            reference: inst.reference,
+            location: inst.location || '',
+            qty: inst.qty || 1,
+            point_label: p.label,
+            data_type: p.data_type || '',
+            unit: p.unit || '',
+            tech_name: p.tech_name || '',
+            nature: p.nature || '',
+            direction: p.direction === 'read' ? 'Lecture' : 'Écriture',
+          });
+        }
+      }
+    }
+
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Buildy AF';
+    wb.created = new Date();
+    const ws = wb.addWorksheet('Liste de points', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+
+    ws.columns = [
+      { header: 'Catégorie', key: 'category', width: 30 },
+      { header: 'BACS', key: 'bacs', width: 14 },
+      { header: 'Repère', key: 'reference', width: 18 },
+      { header: 'Localisation', key: 'location', width: 24 },
+      { header: 'Qté', key: 'qty', width: 6 },
+      { header: 'Point', key: 'point_label', width: 36 },
+      { header: 'Type', key: 'data_type', width: 14 },
+      { header: 'Unité', key: 'unit', width: 10 },
+      { header: 'Nom technique', key: 'tech_name', width: 30 },
+      { header: 'Nature', key: 'nature', width: 18 },
+      { header: 'Direction', key: 'direction', width: 12 },
+    ];
+
+    for (const row of rows) ws.addRow(row);
+
+    const headerRow = ws.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2842' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+    headerRow.height = 22;
+
+    if (rows.length > 0) {
+      ws.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: rows.length + 1, column: ws.columns.length },
+      };
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${af.slug}-points-list-${ts}.xlsx`;
+
+    db.auditLog.add({
+      afId, userId: request.authUser?.id, action: 'export.points-list.xlsx',
+      payload: { rows: rows.length, instances: rows.length ? new Set(rows.map(r => r.reference)).size : 0 },
+    });
+
+    return reply
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .send(Buffer.from(buffer));
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   // POST /api/afs/:afId/exports/synthesis — synthese 3 pages
   //   1. Bilan projet (KPIs + niveau requis vs contracte + ecartes MOA)
   //   2. Conformite BACS (4 exigences R175-3 → couverture par sections AF)
@@ -256,6 +388,7 @@ async function routes(fastify) {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, afId)) return;
 
     let body;
     try { body = exportSchema.parse(request.body); }
@@ -277,6 +410,8 @@ async function routes(fastify) {
     const liveSections = allSections.filter(isSectionLive);
     function findByNumber(num) { return allSections.find(s => s.number === num) || null; }
     function isLiveByNumber(num) { const s = findByNumber(num); return s ? isSectionLive(s) : false; }
+
+    const resolveLiveBacs = buildLiveBacsResolver();
 
     // ── PAGE 1 : KPIs & verdict niveau ──
     const equipmentSections = allSections.filter(s => s.kind === 'equipment');
@@ -388,9 +523,10 @@ async function routes(fastify) {
       if (reqCode === '§1' || reqCode === '§2') {
         return instanced.filter(e => {
           const isMet = isMeteringSystem(e.sec);
-          const hasEnergyBacs = bacsHasParagraph(e.sec.bacs_articles, '1') ||
-                                 bacsHasParagraph(e.sec.bacs_articles, '2') ||
-                                 bacsHasParagraph(e.sec.bacs_articles, '4');
+          const liveBacs = resolveLiveBacs(e.sec);
+          const hasEnergyBacs = bacsHasParagraph(liveBacs, '1') ||
+                                 bacsHasParagraph(liveBacs, '2') ||
+                                 bacsHasParagraph(liveBacs, '4');
           return isMet || hasEnergyBacs;
         });
       }
@@ -586,12 +722,20 @@ async function routes(fastify) {
 
     // ── Synthèse fonctionnalités ──
     // La liste des sections "fonctionnalités" est gerée en DB via le flag
-    // is_functionality sur section_templates (cf. migration 25). Resolu en
-    // numbers pour matcher contre allSections (qui sont les sections de cette
-    // AF avec leur number stocké au seed).
-    const FUNCTIONALITY_NUMBERS = db.db.prepare(
-      'SELECT number FROM section_templates WHERE is_functionality = 1 AND number IS NOT NULL ORDER BY position, id'
-    ).all().map(r => r.number);
+    // is_functionality sur section_templates (cf. migration 25). On charge
+    // aussi avail_e/avail_s/avail_p (matrice de disponibilite par niveau,
+    // migration 29) pour valoriser correctement les options payantes par
+    // niveau de contrat.
+    const functionalityTemplates = db.db.prepare(
+      `SELECT number, avail_e, avail_s, avail_p
+         FROM section_templates
+        WHERE is_functionality = 1 AND number IS NOT NULL
+        ORDER BY position, id`
+    ).all();
+    const FUNCTIONALITY_NUMBERS = functionalityTemplates.map(r => r.number);
+    const availByNumber = new Map(
+      functionalityTemplates.map(r => [r.number, { E: r.avail_e, S: r.avail_s, P: r.avail_p }])
+    );
     // Niveau MINIMUM requis (libre de S/P → S = Smart est le min)
     function minRequiredLevel(lvl) {
       if (!lvl) return 'E'; // pas de service_level défini = compatible Essentials (toujours vendu)
@@ -611,37 +755,57 @@ async function routes(fastify) {
       const sec = allSections.find(s => s.number === num);
       if (!sec) return null;
       const requiredMin = minRequiredLevel(sec.service_level);
-      const requiredRank = RANK[requiredMin];
       const isOptedOut = sec.opted_out_by_moa === 1;
       const isExcluded = !sec.included_in_export;
+      const avail = availByNumber.get(num) || { E: null, S: null, P: null };
 
-      // Logique d'inclusion :
-      // - Si exclue de l'export → ✗ "Section retirée de l'AF"
-      // - Si écartée par la MOA → ✗ "Écartée par la MOA"
-      // - Si AF a un niveau cible → comparer requis vs contracté
-      // - Si AF n'a PAS de niveau cible → considerer Essentials (toujours vendu) comme baseline
-      let included = true;
+      // Disponibilite par niveau pour cette fonctionnalite (migration 29).
+      // 'included' = Inclus, 'paid_option' = Option payante, null = Non dispo.
+      const availMatrix = {
+        E: avail.E || null,
+        S: avail.S || null,
+        P: avail.P || null,
+      };
+
+      // Statut effectif dans l'AF, qui combine matrice + niveau de contrat
+      // visé + opt-out MOA + exclusion. 5 valeurs possibles :
+      //   'included'      → inclus dans l'offre choisie (ou Essentials par défaut)
+      //   'paid_option'   → option payante au niveau choisi (vendable en upsell)
+      //   'unavailable'   → pas disponible au niveau choisi
+      //   'opted_out'     → écartée par la MOA
+      //   'excluded'      → retirée de l'AF par l'auteur
+      let statusInAf = 'included';
       let reason = null;
       if (isExcluded) {
-        included = false;
+        statusInAf = 'excluded';
         reason = 'Section retirée de l\'AF par l\'auteur';
       } else if (isOptedOut) {
-        included = false;
+        statusInAf = 'opted_out';
         reason = `Écartée par la MOA — nécessite un contrat ${levelToLabel(requiredMin)} pour être activée`;
-      } else if (contractLevel) {
-        // Niveau cible défini : comparaison stricte
-        const contractR = RANK[contractLevel];
-        if (requiredRank > contractR) {
-          included = false;
-          reason = `Le contrat ${levelToLabel(contractLevel)} actuellement visé ne couvre pas cette fonctionnalité (requiert ${levelToLabel(requiredMin)})`;
-        }
       } else {
-        // Pas de niveau cible défini → seul Essentials est garanti à la livraison
-        if (requiredMin !== 'E') {
-          included = false;
-          reason = `Aucun niveau de contrat n'est encore fixé pour cette AF — seules les fonctionnalités Essentials sont garanties à la livraison ; un contrat ${levelToLabel(requiredMin)} devra être conclu pour activer celle-ci`;
+        // Niveau effectif retenu : contrat visé sinon Essentials (baseline garantie)
+        const effective = contractLevel || 'E';
+        const cell = availMatrix[effective];
+        if (cell === 'included') {
+          statusInAf = 'included';
+        } else if (cell === 'paid_option') {
+          statusInAf = 'paid_option';
+          reason = contractLevel
+            ? `Option payante au niveau ${levelToLabel(contractLevel)} — à arbitrer commercialement.`
+            : `Option payante en Essentials — à arbitrer commercialement.`;
+        } else {
+          statusInAf = 'unavailable';
+          if (contractLevel) {
+            reason = `Le contrat ${levelToLabel(contractLevel)} ne couvre pas cette fonctionnalité (requiert ${levelToLabel(requiredMin)}).`;
+          } else {
+            reason = `Aucun niveau de contrat fixé — seul Essentials est garanti ; un contrat ${levelToLabel(requiredMin)} devra être conclu pour activer celle-ci.`;
+          }
         }
       }
+
+      // included = booleen d'integration "ferme" dans l'offre actuelle.
+      // paid_option n'est PAS compté comme inclus (vendu séparément).
+      const included = statusInAf === 'included';
 
       return {
         number: sec.number,
@@ -650,10 +814,15 @@ async function routes(fastify) {
         requiredMinLabel: levelToLabel(requiredMin),
         levelClass: requiredMin,
         included,
+        statusInAf,
+        availE: availMatrix.E,
+        availS: availMatrix.S,
+        availP: availMatrix.P,
         reason,
       };
     }).filter(Boolean);
     const functionalitiesIncluded = functionalities.filter(f => f.included).length;
+    const functionalitiesPaidOption = functionalities.filter(f => f.statusInAf === 'paid_option').length;
 
     // ── Synthèse systèmes (toutes les sections equipement listées) ──
     const systemsSummary = equipmentEnriched.map(e => {
@@ -668,7 +837,8 @@ async function routes(fastify) {
       else if (e.instances === 0) { status = 'Aucune instance'; statusClass = 'no-instance'; }
       else { status = 'Couverte'; statusClass = 'covered'; }
 
-      const bacsRequired = !!(sec.bacs_articles && sec.bacs_articles.trim());
+      const liveBacs = resolveLiveBacs(sec);
+      const bacsRequired = !!(liveBacs && liveBacs.trim());
       // Alerte rouge pale : système exigé par BACS, instancié, mais exclu de l'AF
       // (incoherence reglementaire potentielle a remonter au lecteur).
       const bacsAlert = bacsRequired && e.instances > 0 && (isExcluded || isOptedOut);
@@ -677,7 +847,7 @@ async function routes(fastify) {
         number: sec.number,
         title: sec.title,
         bacsRequired,
-        bacs: sec.bacs_articles || null,
+        bacs: liveBacs,
         isMetering: isMeteringSystem(sec),
         instances: e.instances,
         totalReads,
@@ -711,7 +881,7 @@ async function routes(fastify) {
       return {
         number: sec.number,
         title: sec.title,
-        bacs: sec.bacs_articles || null,
+        bacs: resolveLiveBacs(sec),
         isMetering: isMeteringSystem(sec),
         instances,
         pointsPerInstance: points.length,
@@ -743,7 +913,7 @@ async function routes(fastify) {
       // Nouveau modele tabulaire :
       systemCategories: SYSTEM_CATEGORIES,
       zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
-      functionalities, functionalitiesIncluded,
+      functionalities, functionalitiesIncluded, functionalitiesPaidOption,
       systemsSummary, systemsTotals,
     };
 
@@ -761,6 +931,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         pageOrientation: 'landscape',
+        coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
       });
     } catch (err) {
@@ -806,6 +977,7 @@ async function routes(fastify) {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, afId)) return;
 
     let body;
     try { body = exportSchema.parse(request.body); }
@@ -820,14 +992,26 @@ async function routes(fastify) {
     const allSections = db.sections.listByAf(afId).filter(s =>
       s.included_in_export && !afExcludedSet.has(s.id)
     );
+    const resolveLiveBacs = buildLiveBacsResolver();
 
-    // Charge attachments + equipment data pour chaque section
+    // Charge attachments + equipment data pour chaque section.
+    // listEffectiveForSection inclut les captures heritees des templates
+    // (section_template + equipment_template) en plus de celles propres a
+    // l'AF, pour que le PDF reflete tout ce qui est attendu sans duplication
+    // manuelle dans chaque AF.
     const sectionData = new Map();
     for (const sec of allSections) {
-      const attachments = db.attachments.listBySection(sec.id).map((a) => ({
-        ...a,
-        dataUrl: loadFileAsDataUrl(path.join(config.attachmentsDir, String(afId), a.filename)),
-      })).filter((a) => a.dataUrl);
+      const attachments = db.attachments.listEffectiveForSection(sec.id).map((a) => {
+        let diskPath;
+        if (a.source === 'section_template') {
+          diskPath = path.join(config.attachmentsDir, '_tpl', 'section', a.filename);
+        } else if (a.source === 'equipment_template') {
+          diskPath = path.join(config.attachmentsDir, '_tpl', 'equipment', a.filename);
+        } else {
+          diskPath = path.join(config.attachmentsDir, String(afId), a.filename);
+        }
+        return { ...a, dataUrl: loadFileAsDataUrl(diskPath) };
+      }).filter((a) => a.dataUrl);
 
       let zones = [];
       if (sec.kind === 'zones') {
@@ -867,6 +1051,7 @@ async function routes(fastify) {
           const synthesisHtml = s.kind === 'synthesis'
             ? renderSynthesisTable({ rows: SYNTHESIS_ROWS })
             : null;
+          const liveBacs = resolveLiveBacs(s);
           return {
             id: s.id,
             number: s.number || '',
@@ -874,9 +1059,9 @@ async function routes(fastify) {
             service_level: sl, // brut pour CSS class
             service_level_label: formatLevelFull(sl), // libelle complet
             badgeClass: badgeClass || 'ESP',
-            bacs_articles: s.bacs_articles,
-            bacs_articles_label: s.bacs_articles
-              ? `${s.kind === 'equipment' ? 'Système concerné par le décret BACS' : 'Exigé par le décret BACS'} · ${s.bacs_articles}`
+            bacs_articles: liveBacs,
+            bacs_articles_label: liveBacs
+              ? `${s.kind === 'equipment' ? 'Système concerné par le décret BACS' : 'Exigé par le décret BACS'} · ${liveBacs}`
               : null,
             // Justification BACS : priorité au texte de la section, sinon hérite du template équipement
             bacs_justification: s.bacs_justification || data.equipment?.bacs_justification || null,
@@ -959,6 +1144,7 @@ async function routes(fastify) {
         populateToc: true,
         pageFormat: 'A4',
         skipFirstPageHeaderFooter: true,
+        coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
         pdfOptions: {
           displayHeaderFooter: true,

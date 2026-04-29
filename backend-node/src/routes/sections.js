@@ -5,6 +5,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { resolveSectionPoints } = require('../lib/points-resolver');
 const { diffSectionVsTemplate } = require('../lib/template-propagation');
+const { assertWrite } = require('../lib/af-permissions');
 
 const updateSectionSchema = z.object({
   title: z.string().min(1).optional(),
@@ -74,6 +75,7 @@ async function routes(fastify) {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, afId)) return;
 
     let body;
     try { body = createSectionSchema.parse(request.body); }
@@ -132,6 +134,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
 
     // SQLite cascades sur sections (parent), section_point_overrides, equipment_instances,
     // attachments via ON DELETE CASCADE déjà déclarés dans la migration v2.
@@ -157,6 +160,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
 
     let body;
     try { body = updateSectionSchema.parse(request.body); }
@@ -203,6 +207,7 @@ async function routes(fastify) {
     const sectionId = parseInt(request.params.id, 10);
     const section = db.sections.getById(sectionId);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
 
     let body;
     try { body = overrideSchema.parse(request.body); }
@@ -229,11 +234,13 @@ async function routes(fastify) {
   });
 
   // DELETE /api/sections/:id/overrides/:overrideId
-  fastify.delete('/sections/:id/overrides/:overrideId', async (request) => {
+  fastify.delete('/sections/:id/overrides/:overrideId', async (request, reply) => {
     const sectionId = parseInt(request.params.id, 10);
     const overrideId = parseInt(request.params.overrideId, 10);
-    db.sectionPointOverrides.delete(overrideId);
     const section = db.sections.getById(sectionId);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
+    db.sectionPointOverrides.delete(overrideId);
     db.auditLog.add({
       afId: section?.af_id, sectionId, userId: request.authUser?.id,
       action: 'section.override.remove', payload: { overrideId },
@@ -252,6 +259,7 @@ async function routes(fastify) {
     const sectionId = parseInt(request.params.id, 10);
     const section = db.sections.getById(sectionId);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
 
     let body;
     try { body = instanceSchema.parse(request.body); }
@@ -268,6 +276,10 @@ async function routes(fastify) {
   // PATCH /api/instances/:id — update instance
   fastify.patch('/instances/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
+    const inst = db.db.prepare('SELECT section_id FROM equipment_instances WHERE id = ?').get(id);
+    if (!inst) return reply.code(404).send({ detail: 'Instance non trouvée' });
+    const section = db.sections.getById(inst.section_id);
+    if (!assertWrite(request, reply, section.af_id)) return;
     let body;
     try { body = instanceSchema.partial().parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
@@ -277,8 +289,13 @@ async function routes(fastify) {
   });
 
   // DELETE /api/instances/:id
-  fastify.delete('/instances/:id', async (request) => {
-    db.equipmentInstances.delete(parseInt(request.params.id, 10));
+  fastify.delete('/instances/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const inst = db.db.prepare('SELECT section_id FROM equipment_instances WHERE id = ?').get(id);
+    if (!inst) return { ok: true };
+    const section = db.sections.getById(inst.section_id);
+    if (!assertWrite(request, reply, section.af_id)) return;
+    db.equipmentInstances.delete(id);
     return { ok: true };
   });
 
@@ -463,6 +480,7 @@ async function routes(fastify) {
     const sectionId = parseInt(request.params.id, 10);
     const section = db.sections.getById(sectionId);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
     let body;
     try { body = zoneSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
@@ -482,6 +500,11 @@ async function routes(fastify) {
 
   fastify.patch('/zones/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
+    const zoneRow = db.db.prepare('SELECT section_id FROM af_zones WHERE id = ?').get(id);
+    if (zoneRow) {
+      const sec = db.sections.getById(zoneRow.section_id);
+      if (sec && !assertWrite(request, reply, sec.af_id)) return;
+    }
     let body;
     try { body = zoneSchema.partial().parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
@@ -499,8 +522,14 @@ async function routes(fastify) {
     return updated;
   });
 
-  fastify.delete('/zones/:id', async (request) => {
-    db.afZones.delete(parseInt(request.params.id, 10));
+  fastify.delete('/zones/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const zoneRow = db.db.prepare('SELECT section_id FROM af_zones WHERE id = ?').get(id);
+    if (zoneRow) {
+      const sec = db.sections.getById(zoneRow.section_id);
+      if (sec && !assertWrite(request, reply, sec.af_id)) return;
+    }
+    db.afZones.delete(id);
     return { ok: true };
   });
 

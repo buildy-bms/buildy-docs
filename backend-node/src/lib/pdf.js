@@ -149,7 +149,7 @@ function getBrowser() {
  *   - pages 2..N avec header/footer
  * Necessite displayHeaderFooter=true dans pdfOptions, sinon ignore.
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null }) {
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -216,6 +216,42 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
 
     await page.pdf({ ...baseOptions, path: outputPath });
 
+    // Cover plein-bord en deux passes : Chromium ne respecte pas fiablement
+    // @page :first { margin: 0 } en paysage avec preferCSSPageSize. On
+    // injecte un override CSS qui force @page { margin: 0; size: A4/A3 landscape },
+    // re-rend la page 1, puis remplace la page 1 du PDF principal.
+    if (coverFullBleed) {
+      const coverTmpPath = outputPath.replace(/\.pdf$/i, '.cover-tmp.pdf');
+      const sizeRule = pageOrientation === 'landscape'
+        ? `${pageFormat} landscape`
+        : `${pageFormat} portrait`;
+      const overrideStyleId = await page.evaluate((size) => {
+        const id = '__cover_fullbleed_override__';
+        const style = document.createElement('style');
+        style.id = id;
+        // Surcharge tous les @page (y compris @page :first et named pages)
+        // avec margin 0 et la taille demandee.
+        style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }`;
+        document.head.appendChild(style);
+        return id;
+      }, sizeRule);
+      await page.pdf({
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+        pageRanges: '1',
+        path: coverTmpPath,
+      });
+      // Retire l'override pour que le PDF principal (deja genere) ne soit
+      // pas affecte si une autre passe arrive.
+      await page.evaluate((id) => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }, overrideStyleId);
+      await replaceFirstPage(outputPath, coverTmpPath);
+      try { fs.unlinkSync(coverTmpPath); } catch { /* ignore */ }
+    }
+
     // Post-processing pdf-lib en une seule passe (charge/save) :
     //   - Masque header/footer de la page 1 si demande (preserve liens TOC).
     //   - Applique le filigrane Buildy sur les pages demandees.
@@ -239,6 +275,18 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
 }
 
 const mmToPt = (mm) => parseFloat(mm) * 2.83465;
+
+async function replaceFirstPage(mainPath, coverPath) {
+  const { PDFDocument } = require('pdf-lib');
+  const mainBytes = fs.readFileSync(mainPath);
+  const coverBytes = fs.readFileSync(coverPath);
+  const mainDoc = await PDFDocument.load(mainBytes);
+  const coverDoc = await PDFDocument.load(coverBytes);
+  const [coverPage] = await mainDoc.copyPages(coverDoc, [0]);
+  mainDoc.removePage(0);
+  mainDoc.insertPage(0, coverPage);
+  fs.writeFileSync(mainPath, await mainDoc.save());
+}
 
 async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
   const { PDFDocument, rgb } = require('pdf-lib');
