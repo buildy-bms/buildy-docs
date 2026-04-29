@@ -147,7 +147,9 @@ export const reorderSectionTemplates = ({ ids, parent_template_id } = {}) =>
   api.patch('/section-templates/reorder', { ids, ...(parent_template_id !== undefined ? { parent_template_id } : {}) })
 
 // ── Claude (assistant redaction bibliotheque) ──
-export const reformulateWithClaude = ({ html, context, instruction } = {}) =>
-  api.post('/claude/reformulate', { html, context, instruction })
+// payload : { mode, kind, title?, html?, parent_path?, category_label?,
+//             bacs_articles?, avail_e?, avail_s?, avail_p? }
+export const claudeLibraryAssist = (payload) =>
+  api.post('/claude/library-assist', payload)
 
 export default api

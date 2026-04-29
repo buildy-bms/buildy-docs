@@ -10,9 +10,8 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { SparklesIcon, TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
-import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
@@ -91,13 +90,6 @@ onMounted(() => document.addEventListener('mousedown', onDocClick))
 onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
 const submitting = ref(false)
-const showClaudePrompt = ref(false)
-const claudeMode = ref('description') // 'description' | 'justification'
-
-function openClaudeFor(mode) {
-  claudeMode.value = mode
-  showClaudePrompt.value = true
-}
 
 watch(() => props.template, (t) => {
   if (t) {
@@ -444,40 +436,34 @@ async function destroy() {
       </div>
 
       <div>
-        <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-medium text-gray-600">
-            Description fonctionnelle
-          </label>
-          <button type="button" @click="openClaudeFor('description')"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-200 hover:bg-violet-50 rounded-lg transition">
-            <SparklesIcon class="w-3 h-3" />
-            Générer avec Claude
-          </button>
-        </div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          Description fonctionnelle
+        </label>
         <RichTextEditor
           v-model="form.description_html"
           placeholder="Ce que fait l'équipement, son rapport au décret BACS, qui assure sa régulation, et comment Buildy intervient en aval…"
           min-height="120px"
-          enable-reformulate
-          :reformulate-context="`Modèle d'équipement — ${form.name || 'sans nom'} (description fonctionnelle)`"
+          :assist-context="{
+            kind: 'equipment_description',
+            title: form.name || null,
+            category_label: selectedCategory.label,
+            bacs_articles: template?.bacs_articles || null,
+          }"
         />
       </div>
 
       <div>
-        <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-medium text-gray-600">Justification BACS</label>
-          <button type="button" @click="openClaudeFor('justification')"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-200 hover:bg-violet-50 rounded-lg transition">
-            <SparklesIcon class="w-3 h-3" />
-            Générer avec Claude
-          </button>
-        </div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Justification BACS</label>
         <RichTextEditor
           v-model="form.bacs_justification"
           placeholder="L'article R175-X définit… Le décret impose… La solution Buildy permet…"
           min-height="90px"
-          enable-reformulate
-          :reformulate-context="`Modèle d'équipement — ${form.name || 'sans nom'} (justification BACS)`"
+          :assist-context="{
+            kind: 'equipment_bacs_justification',
+            title: form.name || null,
+            category_label: selectedCategory.label,
+            bacs_articles: template?.bacs_articles || null,
+          }"
         />
       </div>
     </form>
@@ -497,6 +483,4 @@ async function destroy() {
       </button>
     </template>
   </BaseModal>
-
-  <ClaudePromptModal v-if="showClaudePrompt" :template="{ ...form, preferred_protocols: form.preferred_protocols.join(',') }" :mode="claudeMode" @close="showClaudePrompt = false" />
 </template>

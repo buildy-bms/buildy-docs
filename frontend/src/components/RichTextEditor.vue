@@ -15,42 +15,53 @@ import Placeholder from '@tiptap/extension-placeholder'
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon, LinkIcon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
-import { reformulateWithClaude } from '@/api'
+import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: 'Commencez à écrire…' },
   minHeight: { type: String, default: '180px' },
-  // Active le bouton "Reformuler avec Claude" dans la toolbar (editeurs
-  // de la bibliotheque uniquement, pas dans les AFs)
-  enableReformulate: { type: Boolean, default: false },
-  // Contexte transmis au prompt Claude (ex: "Section type / Bibliothèque")
-  reformulateContext: { type: String, default: '' },
+  // Active le bouton Claude dans la toolbar (bibliotheque uniquement).
+  // Si assistContext est fourni, le bouton adapte son libelle :
+  //   - editeur vide  -> "Générer avec Claude" (mode=generate)
+  //   - editeur rempli -> "Reformuler avec Claude" (mode=reformulate)
+  // Le contexte (kind, title, parent_path, etc.) est transmis tel quel
+  // au backend qui construit un prompt structure.
+  assistContext: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue'])
 const { success, error: notifyError } = useNotification()
-const reformulating = ref(false)
+const assisting = ref(false)
 
-async function reformulate() {
-  if (!editor.value) return
+const isEmpty = ref(true)
+function recomputeEmpty() {
+  const html = editor.value?.getHTML() || ''
+  isEmpty.value = !html.replace(/<[^>]*>/g, '').trim()
+}
+
+async function callClaude() {
+  if (!editor.value || !props.assistContext) return
   const html = editor.value.getHTML()
-  if (!html || !html.replace(/<[^>]*>/g, '').trim()) {
-    notifyError('Rédige un brouillon avant de demander à Claude de le reformuler')
-    return
-  }
-  reformulating.value = true
+  const empty = !html.replace(/<[^>]*>/g, '').trim()
+  const mode = empty ? 'generate' : 'reformulate'
+  assisting.value = true
   try {
-    const { data } = await reformulateWithClaude({ html, context: props.reformulateContext })
+    const { data } = await claudeLibraryAssist({
+      mode,
+      ...props.assistContext,
+      html: empty ? undefined : html,
+    })
     if (data?.html) {
       editor.value.commands.setContent(data.html, false)
       emit('update:modelValue', data.html)
-      success('Texte reformulé')
+      recomputeEmpty()
+      success(empty ? 'Brouillon généré' : 'Texte reformulé')
     }
   } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec de la reformulation')
+    notifyError(e.response?.data?.detail || 'Échec de la requête Claude')
   } finally {
-    reformulating.value = false
+    assisting.value = false
   }
 }
 
@@ -86,7 +97,9 @@ const editor = useEditor({
   },
   onUpdate: ({ editor }) => {
     emit('update:modelValue', editor.getHTML())
+    recomputeEmpty()
   },
+  onCreate: () => recomputeEmpty(),
 })
 
 // Sync externe → éditeur (par exemple quand on charge un nouveau template)
@@ -131,12 +144,13 @@ function setLink() {
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Lien"><LinkIcon class="w-3.5 h-3.5" /></button>
 
-      <span v-if="enableReformulate" class="w-px h-4 bg-gray-300 mx-0.5"></span>
-      <button v-if="enableReformulate" type="button" @click="reformulate" :disabled="reformulating"
+      <button v-if="assistContext" type="button" @click="callClaude" :disabled="assisting"
               class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-md transition"
-              title="Reformuler avec Claude">
-        <SparklesIcon class="w-3.5 h-3.5" :class="reformulating ? 'animate-pulse' : ''" />
-        {{ reformulating ? 'Reformulation…' : 'Reformuler avec Claude' }}
+              :title="isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude'">
+        <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
+        {{ assisting
+            ? (isEmpty ? 'Génération…' : 'Reformulation…')
+            : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
       </button>
     </div>
     <EditorContent :editor="editor" />

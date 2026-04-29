@@ -10,9 +10,8 @@
  * de la vue arbre permet aussi de re-parenter visuellement.
  */
 import { ref, computed, watch, onMounted } from 'vue'
-import { SparklesIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
-import ClaudePromptModal from './ClaudePromptModal.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import EquipmentTemplatePicker from './EquipmentTemplatePicker.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
@@ -85,7 +84,6 @@ const AVAIL_OPTIONS = [
 const propagate = ref(true)
 const submitting = ref(false)
 const deleting = ref(false)
-const showClaudePrompt = ref(false)
 const showEquipmentPicker = ref(false)
 
 // Liste des parents possibles (toutes les sections types non-feuilles + le
@@ -336,23 +334,22 @@ async function destroy() {
 
       <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
       <div v-if="form.kind === 'standard'">
-        <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-medium text-gray-600">
-            Contenu canonique
-            <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
-          </label>
-          <button type="button" @click="showClaudePrompt = true"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-violet-700 hover:text-violet-900 border border-violet-200 hover:bg-violet-50 rounded-lg transition">
-            <SparklesIcon class="w-3 h-3" />
-            Générer avec Claude
-          </button>
-        </div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          Contenu canonique
+          <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
+        </label>
         <RichTextEditor
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
           min-height="180px"
-          enable-reformulate
-          :reformulate-context="`Bibliothèque ${mode === 'functionality' ? 'Fonctionnalités' : 'Sections types'} — ${form.title || 'sans titre'}`"
+          :assist-context="{
+            kind: mode === 'functionality' ? 'functionality' : 'narrative_section',
+            title: form.title || null,
+            bacs_articles: form.bacs_articles || null,
+            avail_e: form.avail_e,
+            avail_s: form.avail_s,
+            avail_p: form.avail_p,
+          }"
         />
       </div>
 
@@ -381,8 +378,6 @@ async function destroy() {
       </button>
     </template>
   </BaseModal>
-
-  <ClaudePromptModal v-if="showClaudePrompt" :template="{ ...form }" mode="standard-section" @close="showClaudePrompt = false" />
 
   <BaseModal v-if="showEquipmentPicker" title="Choisir un modèle d'équipement" size="lg" @close="showEquipmentPicker = false">
     <EquipmentTemplatePicker

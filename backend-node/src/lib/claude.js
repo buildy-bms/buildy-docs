@@ -138,45 +138,115 @@ async function streamSection(sectionId, { instruction, onText, onError, onDone }
   }
 }
 
+// ── Assistant redaction bibliotheque (generate / reformulate) ───────────
+
+const AVAIL_LABEL = {
+  included:    'Inclus',
+  paid_option: 'Option payante',
+};
+
+// System prompt v2 — reflete le modele a jour (sections narratives sans
+// BACS, equipements avec BACS herite de la categorie, fonctionnalites
+// avec matrice de disponibilite E/S/P inclus|paid_option|non_disponible).
+const SYSTEM_PROMPT_LIBRARY = [
+  `Tu es l'assistant de redaction Buildy AF, specialise dans les analyses fonctionnelles GTB (Gestion Technique du Batiment).`,
+  ``,
+  `=== CONTEXTE BUILDY ===`,
+  `Buildy est une plateforme de supervision et d'hypervision multi-sites, agnostique des marques d'automates et de capteurs. Buildy ne remplace pas les systemes terrain (CTA, regulateurs, GTC) : il les supervise et les expose dans une UI unifiee.`,
+  `Trois niveaux d'offre commerciale : Essentials (E), Smart (S), Premium (P).`,
+  `L'AF (Analyse Fonctionnelle) est un livrable DOE remis aux integrateurs GTB et clients.`,
+  ``,
+  `=== MODELE DE DONNEES BIBLIOTHEQUE ===`,
+  `1) Sections types narratives : chapitres redacteurs du document (titre + texte). Pas de BACS, pas de niveau de contrat. Servent a structurer le document : preambule, perimetre, glossaire, etc.`,
+  `2) Modeles d'equipement : CTA, chaudiere, eclairage, comptage, etc. Possedent une description fonctionnelle + une justification BACS contextualisee. Les articles BACS sont edites au niveau de la CATEGORIE (Ventilation, Chauffage...) et herites par tous les equipements de la categorie.`,
+  `3) Fonctionnalites : features du systeme Buildy AF. Possedent :`,
+  `   - des articles BACS applicables (R175-1 a R175-6)`,
+  `   - une matrice de disponibilite par niveau de contrat :`,
+  `     • Essentials / Smart / Premium chacun -> Inclus | Option payante | Non disponible`,
+  `   Les options payantes sont des features facturees en sus du contrat (revenu additionnel).`,
+  ``,
+  `=== STYLE OBLIGATOIRE ===`,
+  `- Francais professionnel, technique, precis. Tous les accents corrects (e aigu, e grave, c cedille, a circonflexe, etc.).`,
+  `- Phrases concises et structurees. Pas de superlatifs marketing ("revolutionnaire", "incroyable"). Pas de generalites molles.`,
+  `- Vocabulaire metier GTB et IoT : supervision, anomalie, derive, trame, point, MQTT, Modbus TCP, BACnet, KNX, M-Bus, R175-1, niveau de service, regulation, consigne, alarme, courbe de chauffe, etc.`,
+  `- Pas d'invention : si une info manque, ne la fabrique pas.`,
+  `- Buildy supervise, ne pilote pas. Ne pas decrire un automate terrain ou un integrateur GTB comme si c'etait Buildy.`,
+  `- Pas de description de zones/locaux (parties communes, etage 2...) : la bibliotheque est agnostique des sites.`,
+  ``,
+  `=== FORMAT DE SORTIE OBLIGATOIRE ===`,
+  `- HTML compatible Tiptap : <p>, <ul>, <ol>, <li>, <strong>, <em>, <h3>, <blockquote>.`,
+  `- Aucune classe CSS, aucun <div>, aucun <html>/<body>, aucun markdown (pas de **gras**, pas de # titres).`,
+  `- Reponds UNIQUEMENT par le HTML demande. Pas de preambule "Voici...", pas de conclusion, pas d'explication.`,
+].join('\n');
+
+// Construit la partie USER du prompt selon le type d'entite et le mode
+function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p }) {
+  const lines = [];
+  // Bloc d'identification de l'entite
+  lines.push(`=== ENTITE A REDIGER ===`);
+  if (kind === 'narrative_section')          lines.push(`Type : section type narrative (chapitre du document)`);
+  else if (kind === 'functionality')         lines.push(`Type : fonctionnalite Buildy`);
+  else if (kind === 'equipment_description') lines.push(`Type : modele d'equipement — description fonctionnelle`);
+  else if (kind === 'equipment_bacs_justification') lines.push(`Type : modele d'equipement — justification BACS contextualisee`);
+
+  if (title)         lines.push(`Titre : ${title}`);
+  if (parent_path)   lines.push(`Section parente : ${parent_path}`);
+  if (category_label) lines.push(`Categorie : ${category_label}`);
+  if (bacs_articles)  lines.push(`Articles BACS applicables : ${bacs_articles}`);
+
+  // Matrice de disponibilite (fonctionnalites uniquement)
+  if (kind === 'functionality') {
+    const fmt = (v) => v ? AVAIL_LABEL[v] || v : 'Non disponible';
+    lines.push(`Disponibilite par niveau de contrat :`);
+    lines.push(`  - Essentials : ${fmt(avail_e)}`);
+    lines.push(`  - Smart      : ${fmt(avail_s)}`);
+    lines.push(`  - Premium    : ${fmt(avail_p)}`);
+  }
+  lines.push('');
+
+  // Texte source (mode reformulate) ou rien (mode generate)
+  if (mode === 'reformulate' && html?.trim()) {
+    lines.push(`=== TEXTE ACTUEL A REFORMULER ===`);
+    lines.push(html.trim());
+    lines.push('');
+    lines.push(`Reformule ce texte en respectant le sens et en ameliorant clarte, concision, vocabulaire GTB. Garde la structure (paragraphes / listes) si elle est pertinente.`);
+  } else {
+    lines.push(`=== INSTRUCTION ===`);
+    if (kind === 'narrative_section') {
+      lines.push(`Redige le contenu de cette section narrative en 2 a 4 paragraphes courts. Style sobre, technique, precis. Pas de redondance avec le titre.`);
+    } else if (kind === 'functionality') {
+      lines.push(`Decris cette fonctionnalite Buildy : ce qu'elle apporte fonctionnellement au client, pourquoi (lien BACS si applicable), comment elle se distingue selon le niveau de contrat. 2 a 4 paragraphes courts.`);
+    } else if (kind === 'equipment_description') {
+      lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier) : son role dans le batiment, ce que la solution Buildy apporte en supervision en aval. 2 a 3 paragraphes courts. Pas de zones/locaux.`);
+    } else if (kind === 'equipment_bacs_justification') {
+      lines.push(`Redige une justification courte (1 a 2 paragraphes) qui explique pourquoi cet equipement est concerne par le decret BACS, en citant les articles applicables. Style juridique-technique sobre.`);
+    } else {
+      lines.push(`Redige le contenu HTML demande dans le style Buildy.`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 /**
- * Reformule un fragment HTML en gardant le sens et le format Tiptap-friendly.
- * Utilise par les editeurs de la bibliotheque (sections types, fonctionnalites,
- * modeles d'equipement). Non-streaming : l'API renvoie le HTML reformule complet.
+ * Assistant unique de la bibliotheque (mode generate ou reformulate).
+ * Retourne le HTML produit + usage de tokens.
  */
-async function reformulate(html, { context, instruction } = {}) {
-  if (!html || !html.trim()) throw new Error('Texte a reformuler vide');
-
-  const system = [
-    `Tu es un assistant de redaction Buildy AF, specialise dans les analyses fonctionnelles GTB.`,
-    `Style :`,
-    `- Francais professionnel, technique, precis. Accents corrects (e accent aigu, e accent grave, c cedille, etc.)`,
-    `- Phrases concises, structure logique. Pas de superlatifs marketing. Pas de bullshit.`,
-    `- Vocabulaire metier GTB : CTA, BACS, niveau de service, supervision, anomalie, derive, etc.`,
-    ``,
-    `Format de sortie :`,
-    `- HTML simple compatible Tiptap : <p>, <ul>/<li>, <strong>, <em>, <h3>, <blockquote>.`,
-    `- Pas de classes CSS, pas de <div>, pas de <html>/<body>, pas de markdown.`,
-    `- Conserve la structure (paragraphes / listes) du texte d'origine si elle est pertinente.`,
-    `- Reponds UNIQUEMENT par le HTML reformule, sans introduction ni explication.`,
-  ].join('\n');
-
-  const user = [
-    context ? `Contexte de la bibliotheque : ${context}` : null,
-    instruction ? `Instruction specifique : ${instruction}` : null,
-    ``,
-    `Reformule le texte HTML suivant en respectant le sens et en ameliorant la formulation (clarte, concision, vocabulaire GTB precis) :`,
-    ``,
-    html.trim(),
-  ].filter(Boolean).join('\n');
+async function assistLibrary({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p } = {}) {
+  if (mode === 'reformulate' && (!html || !html.trim())) {
+    throw new Error('Texte a reformuler vide');
+  }
+  const userPrompt = buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p });
 
   const resp = await client().messages.create({
     model: config.claudeModel,
     max_tokens: 2048,
-    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: user }],
+    // Cache_control sur le SYSTEM (invariant entre tous les appels biblio
+    // -> economies de tokens et latence reduite sur les appels successifs).
+    system: [{ type: 'text', text: SYSTEM_PROMPT_LIBRARY, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userPrompt }],
   });
 
-  // L'API renvoie un tableau de content blocks ; on concatene les blocs texte.
   const text = (resp.content || [])
     .filter(b => b.type === 'text')
     .map(b => b.text)
@@ -185,4 +255,4 @@ async function reformulate(html, { context, instruction } = {}) {
   return { html: text, usage: resp.usage };
 }
 
-module.exports = { streamSection, buildPrompts, reformulate };
+module.exports = { streamSection, buildPrompts, assistLibrary };

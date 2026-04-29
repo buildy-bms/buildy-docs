@@ -3,7 +3,7 @@
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
-const { streamSection, reformulate } = require('../lib/claude');
+const { streamSection, assistLibrary } = require('../lib/claude');
 
 async function routes(fastify) {
   // GET /api/claude/health
@@ -12,30 +12,41 @@ async function routes(fastify) {
     model: config.claudeModel,
   }));
 
-  // POST /api/claude/reformulate  body: { html, context?, instruction? }
-  // Reformule un fragment HTML pour les editeurs de la bibliotheque (sections
-  // types, fonctionnalites, modeles d'equipement). Renvoie { html, usage }.
-  fastify.post('/claude/reformulate', async (request, reply) => {
+  // POST /api/claude/library-assist
+  // body: {
+  //   mode: 'generate' | 'reformulate',
+  //   kind: 'narrative_section' | 'functionality' | 'equipment_description' | 'equipment_bacs_justification',
+  //   title?, html?, parent_path?, category_label?, bacs_articles?,
+  //   avail_e?, avail_s?, avail_p?
+  // }
+  // Renvoie { html, usage }. Couvre les editeurs de la bibliotheque uniquement
+  // (sections types narratives, fonctionnalites, modeles d'equipement).
+  fastify.post('/claude/library-assist', async (request, reply) => {
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ detail: 'Assistant Claude non configuré (ANTHROPIC_API_KEY manquant)' });
     }
-    const html = (request.body?.html || '').toString();
-    if (!html.trim()) return reply.code(400).send({ detail: 'Aucun texte à reformuler' });
+    const body = request.body || {};
+    if (!['generate', 'reformulate'].includes(body.mode)) {
+      return reply.code(400).send({ detail: 'mode requis : generate ou reformulate' });
+    }
+    if (body.mode === 'reformulate' && !(body.html || '').trim()) {
+      return reply.code(400).send({ detail: 'Aucun texte à reformuler' });
+    }
 
     try {
-      const { html: reformulated, usage } = await reformulate(html, {
-        context: request.body?.context,
-        instruction: request.body?.instruction,
-      });
+      const { html: out, usage } = await assistLibrary(body);
       db.auditLog.add({
         userId: request.authUser?.id,
-        action: 'claude.reformulate',
-        payload: { context: request.body?.context, length_in: html.length, length_out: reformulated.length, usage },
+        action: 'claude.library-assist',
+        payload: {
+          mode: body.mode, kind: body.kind, title: body.title,
+          length_in: (body.html || '').length, length_out: out.length, usage,
+        },
       });
-      return { html: reformulated, usage };
+      return { html: out, usage };
     } catch (err) {
-      log.error(`Claude reformulate error: ${err.message}`);
-      return reply.code(500).send({ detail: err.message || 'Échec de la reformulation' });
+      log.error(`Claude library-assist error: ${err.message}`);
+      return reply.code(500).send({ detail: err.message || 'Échec de la requête Claude' });
     }
   });
 
