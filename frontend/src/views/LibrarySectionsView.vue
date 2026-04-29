@@ -176,15 +176,15 @@ onBeforeUnmount(teardownSortables)
           Glisser-déposer pour réorganiser ou re-parenter — chaque AF nouvellement créée suit cette structure et la numérotation se calcule automatiquement.
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <button @click="expandAll" class="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1">
+      <div class="flex items-center gap-2 shrink-0">
+        <button @click="expandAll" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg whitespace-nowrap transition">
           <ChevronDoubleDownIcon class="w-3.5 h-3.5" /> Tout déplier
         </button>
-        <button @click="collapseAll" class="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1">
+        <button @click="collapseAll" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg whitespace-nowrap transition">
           <ChevronDoubleUpIcon class="w-3.5 h-3.5" /> Tout replier
         </button>
         <button @click="openCreate"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded">
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" /> Nouvelle section type
         </button>
       </div>

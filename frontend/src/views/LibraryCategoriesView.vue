@@ -33,7 +33,7 @@ onMounted(refresh)
         </p>
       </div>
       <button @click="openCreate"
-              class="inline-flex items-center gap-1.5 px-3 py-2 text-sm bg-indigo-600 text-white hover:bg-indigo-700 rounded">
+              class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
         <PlusIcon class="w-4 h-4" /> Nouvelle catégorie
       </button>
     </div>
