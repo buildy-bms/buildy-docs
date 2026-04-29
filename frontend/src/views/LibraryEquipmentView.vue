@@ -320,8 +320,11 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in selected.points.filter(p => p.direction === 'read')" :key="p.id" class="border-t border-gray-100">
-                <td class="px-4 py-2 text-gray-800">{{ p.label }}</td>
+              <tr v-for="p in selected.points.filter(p => p.direction === 'read')" :key="p.id" class="border-t border-gray-100" :class="p.is_optional ? 'bg-gray-50/50' : ''">
+                <td class="px-4 py-2" :class="p.is_optional ? 'text-gray-500 italic' : 'text-gray-800'">
+                  {{ p.label }}
+                  <span v-if="p.is_optional" class="ml-1 text-[10px] text-gray-400 not-italic">(optionnel)</span>
+                </td>
                 <td class="px-4 py-2 text-xs">
                   <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                   <span v-else class="text-gray-300 italic">—</span>
@@ -354,8 +357,11 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="p in selected.points.filter(p => p.direction === 'write')" :key="p.id" class="border-t border-gray-100">
-                <td class="px-4 py-2 text-gray-800">{{ p.label }}</td>
+              <tr v-for="p in selected.points.filter(p => p.direction === 'write')" :key="p.id" class="border-t border-gray-100" :class="p.is_optional ? 'bg-gray-50/50' : ''">
+                <td class="px-4 py-2" :class="p.is_optional ? 'text-gray-500 italic' : 'text-gray-800'">
+                  {{ p.label }}
+                  <span v-if="p.is_optional" class="ml-1 text-[10px] text-gray-400 not-italic">(optionnel)</span>
+                </td>
                 <td class="px-4 py-2 text-xs">
                   <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
                   <span v-else class="text-gray-300 italic">—</span>

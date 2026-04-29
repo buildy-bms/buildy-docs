@@ -128,8 +128,13 @@ export const updateEquipmentTemplate = (id, data) => api.patch(`/equipment-templ
 export const deleteEquipmentTemplate = (id) => api.delete(`/equipment-templates/${id}`)
 export const addTemplatePoint = (templateId, data) =>
   api.post(`/equipment-templates/${templateId}/points`, data)
+export const updateTemplatePoint = (templateId, pointId, data) =>
+  api.patch(`/equipment-templates/${templateId}/points/${pointId}`, data)
 export const deleteTemplatePoint = (templateId, pointId) =>
   api.delete(`/equipment-templates/${templateId}/points/${pointId}`)
+// reorderTemplatePoints({ ids: [...] }) — reordonne dans une direction
+export const reorderTemplatePoints = (templateId, ids) =>
+  api.patch(`/equipment-templates/${templateId}/points/reorder`, { ids })
 export const getTemplateVersions = (id) => api.get(`/equipment-templates/${id}/versions`)
 export const getTemplateAffectedAfs = (id) => api.get(`/equipment-templates/${id}/affected-afs`)
 

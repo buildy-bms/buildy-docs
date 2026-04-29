@@ -20,14 +20,16 @@ module.exports = {
 <p>La solution Buildy supervise les états et niveaux d\'éclairage et porte l\'ensemble des logiques applicatives transverses : programmations horaires, scénarios par usage, mise en cohérence avec la détection de présence et les apports solaires.</p>
 `.trim(),
   points: [
+    // L'on/off est obligatoire ; la gradation et le reste sont optionnels
+    // (couvre les eclairages on/off purs sans gradation).
     { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20 },
-    { slug: 'mesure.luminosite_ambiante', label: 'Luminosité ambiante mesurée', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30 },
-    { slug: 'etat.detection_presence', label: 'Détection de présence', dataType: 'État', direction: 'read', position: 40 },
-    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50 },
-    { slug: 'alarme.defaut_luminaire', label: 'Défaut luminaire', dataType: 'Alarme', direction: 'read', position: 60 },
+    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20, isOptional: true },
+    { slug: 'mesure.luminosite_ambiante', label: 'Luminosité ambiante mesurée', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30, isOptional: true },
+    { slug: 'etat.detection_presence', label: 'Détection de présence', dataType: 'État', direction: 'read', position: 40, isOptional: true },
+    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50, isOptional: true },
+    { slug: 'alarme.defaut_luminaire', label: 'Défaut luminaire (DALI/driver)', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
     { slug: 'cmd.allumage', label: 'Commande allumage / extinction', dataType: 'Commande', direction: 'write', position: 100 },
-    { slug: 'cmd.gradation', label: 'Commande niveau de gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110 },
-    { slug: 'cmd.scenario', label: 'Commande scénario', dataType: 'Commande', direction: 'write', position: 120 },
+    { slug: 'cmd.gradation', label: 'Commande niveau de gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110, isOptional: true },
+    { slug: 'cmd.scenario', label: 'Commande scénario', dataType: 'Commande', direction: 'write', position: 120, isOptional: true },
   ],
 };

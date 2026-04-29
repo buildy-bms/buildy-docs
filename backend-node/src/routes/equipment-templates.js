@@ -222,6 +222,81 @@ async function routes(fastify) {
     return { ok: true };
   });
 
+  // PATCH /api/equipment-templates/:id/points/:pointId — modifier un point
+  // Tous les champs sont optionnels : on ne met a jour que ce qui est passe.
+  // Bump de version unique (vs delete+create qui en ferait 2).
+  fastify.patch('/equipment-templates/:id/points/:pointId', async (request, reply) => {
+    const pointId = parseInt(request.params.pointId, 10);
+    const templateId = parseInt(request.params.id, 10);
+    const tpl = db.equipmentTemplates.getById(templateId);
+    if (!tpl) return reply.code(404).send({ detail: 'Template non trouvé' });
+
+    let body;
+    try { body = pointSchema.partial().parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+
+    const old = db.db.prepare(
+      'SELECT * FROM equipment_template_points WHERE id = ? AND template_id = ?'
+    ).get(pointId, templateId);
+    if (!old) return reply.code(404).send({ detail: 'Point non trouvé' });
+
+    // Mapping camelCase -> colonnes DB
+    const fields = [];
+    const params = [];
+    if (body.slug !== undefined)        { fields.push('slug = ?');         params.push(body.slug); }
+    if (body.label !== undefined)       { fields.push('label = ?');        params.push(body.label); }
+    if (body.data_type !== undefined)   { fields.push('data_type = ?');    params.push(body.data_type); }
+    if (body.direction !== undefined)   { fields.push('direction = ?');    params.push(body.direction); }
+    if (body.unit !== undefined)        { fields.push('unit = ?');         params.push(body.unit || null); }
+    if (body.notes !== undefined)       { fields.push('notes = ?');        params.push(body.notes || null); }
+    if (body.is_optional !== undefined) { fields.push('is_optional = ?');  params.push(body.is_optional ? 1 : 0); }
+    if (body.position !== undefined)    { fields.push('position = ?');     params.push(body.position); }
+    if (body.tech_name !== undefined)   { fields.push('tech_name = ?');    params.push(body.tech_name || null); }
+    if (body.nature !== undefined)      { fields.push('nature = ?');       params.push(body.nature || null); }
+    if (!fields.length) return old;
+
+    params.push(pointId);
+    try {
+      db.db.prepare(`UPDATE equipment_template_points SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    } catch (err) {
+      if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        return reply.code(409).send({ detail: `Slug "${body.slug}" déjà présent dans ce template` });
+      }
+      throw err;
+    }
+
+    const labelForChangelog = body.label || old.label;
+    snapshotAndBump(templateId, { changelog: `Modification point "${labelForChangelog}"`, authorId: request.authUser?.id });
+    db.auditLog.add({
+      templateId, userId: request.authUser?.id, action: 'template.point.update',
+      payload: { pointId, fields: Object.keys(body) },
+    });
+    return db.db.prepare('SELECT * FROM equipment_template_points WHERE id = ?').get(pointId);
+  });
+
+  // PATCH /api/equipment-templates/:id/points/reorder — body { ids: [pointId, ...] }
+  // Reorganisation des positions dans une direction (lectures ou ecritures).
+  // Cosmetique : pas de bump de version, pas d'audit lourd.
+  fastify.patch('/equipment-templates/:id/points/reorder', async (request, reply) => {
+    const templateId = parseInt(request.params.id, 10);
+    const tpl = db.equipmentTemplates.getById(templateId);
+    if (!tpl) return reply.code(404).send({ detail: 'Template non trouvé' });
+
+    const ids = Array.isArray(request.body?.ids) ? request.body.ids.map(n => parseInt(n, 10)).filter(Boolean) : [];
+    if (!ids.length) return reply.code(400).send({ detail: 'ids vide' });
+
+    const stmt = db.db.prepare('UPDATE equipment_template_points SET position = ? WHERE id = ? AND template_id = ?');
+    db.db.transaction(() => {
+      ids.forEach((id, i) => stmt.run((i + 1) * 10, id, templateId));
+    })();
+
+    db.auditLog.add({
+      templateId, userId: request.authUser?.id, action: 'template.point.reorder',
+      payload: { count: ids.length },
+    });
+    return { ok: true, count: ids.length };
+  });
+
   // GET /api/equipment-templates/:id/versions — historique des versions
   fastify.get('/equipment-templates/:id/versions', async (request, reply) => {
     const id = parseInt(request.params.id, 10);

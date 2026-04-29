@@ -14,6 +14,7 @@ import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon } from '@her
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
+import EquipmentPointsEditor from './EquipmentPointsEditor.vue'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 
 // Liste exhaustive des noms d'icones FA Solid Pro, déduplique les alias.
@@ -292,7 +293,7 @@ async function destroy() {
 </script>
 
 <template>
-  <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="lg" @close="emit('close')">
+  <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-3">
 
       <!-- Sections parentes : multi-select chips + popover de recherche -->
@@ -465,6 +466,15 @@ async function destroy() {
             bacs_articles: template?.bacs_articles || null,
           }"
         />
+      </div>
+
+      <!-- Donnees lues / ecrites — disponible uniquement en mode edition -->
+      <div v-if="isEdit" class="pt-3 border-t border-gray-100">
+        <h3 class="text-sm font-medium text-gray-800 mb-1">Données typiques</h3>
+        <p class="text-xs text-gray-500 mb-3">
+          Liste des informations remontées par cet équipement (lectures) et des actions pilotables (écritures). Cliquer une ligne pour la modifier, glisser-déposer pour réordonner.
+        </p>
+        <EquipmentPointsEditor :template-id="template.id" @updated="$emit('saved', template)" />
       </div>
     </form>
 

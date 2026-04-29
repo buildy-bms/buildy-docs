@@ -18,6 +18,8 @@ module.exports = {
 <p><strong>La régulation du système DRV est assurée par l\'équipement lui-même</strong>, via la régulation native du fabricant qui pilote la puissance frigorifique, le basculement chaud/froid, la modulation et les sécurités de la boucle frigorifique.</p>
 
 <p>La solution Buildy supervise l\'état des unités, les températures de consigne effectives, les modes de fonctionnement et les défauts, et peut transmettre des commandes par unité intérieure.</p>
+
+<p>Pour représenter chaque tête en pièce individuellement, utiliser plutôt le modèle <em>« Unité intérieure DRV »</em>.</p>
 `.trim(),
   points: [
     { slug: 'etat.unite_int', label: 'État unité intérieure (marche/arrêt)', dataType: 'État', direction: 'read', position: 10 },

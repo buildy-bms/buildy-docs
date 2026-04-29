@@ -41,24 +41,31 @@ module.exports = {
     { slug: 'temp.air_neuf', label: 'Température air neuf', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
     { slug: 'temp.air_soufflage', label: 'Température air soufflage', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
     { slug: 'temp.air_reprise', label: 'Température air reprise', dataType: 'Mesure', direction: 'read', unit: '°C', position: 50 },
-    { slug: 'temp.air_rejet', label: 'Température air rejet', dataType: 'Mesure', direction: 'read', unit: '°C', position: 60 },
+    { slug: 'temp.air_rejet', label: 'Température air rejet', dataType: 'Mesure', direction: 'read', unit: '°C', position: 60, isOptional: true },
     { slug: 'debit.soufflage', label: 'Débit soufflage', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 70 },
-    { slug: 'debit.reprise', label: 'Débit reprise', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 80 },
+    { slug: 'debit.reprise', label: 'Débit reprise', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 80, isOptional: true },
     { slug: 'consigne.soufflage_effective', label: 'Consigne de température de soufflage effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 90 },
+    { slug: 'mesure.co2', label: 'Concentration CO2', dataType: 'Mesure', direction: 'read', unit: 'ppm', position: 95, isOptional: true },
     { slug: 'etat.filtre_soufflage_encrasse', label: 'État encrassement filtre soufflage', dataType: 'État', direction: 'read', position: 100 },
-    { slug: 'etat.filtre_reprise_encrasse', label: 'État encrassement filtre reprise', dataType: 'État', direction: 'read', position: 110 },
-    { slug: 'etat.post_ventilation_active', label: 'État post-ventilation active', dataType: 'État', direction: 'read', position: 120 },
+    { slug: 'etat.filtre_reprise_encrasse', label: 'État encrassement filtre reprise', dataType: 'État', direction: 'read', position: 110, isOptional: true },
+    { slug: 'etat.post_ventilation_active', label: 'État post-ventilation active', dataType: 'État', direction: 'read', position: 120, isOptional: true },
     { slug: 'alarme.defaut_communication', label: 'Défaut communication avec l\'automate CTA', dataType: 'Alarme', direction: 'read', position: 130 },
-    { slug: 'alarme.manque_debit_air', label: 'Alarme manque de débit d\'air', dataType: 'Alarme', direction: 'read', position: 140 },
-    { slug: 'alarme.batterie_postchauffage', label: 'Alarme batterie de postchauffage', dataType: 'Alarme', direction: 'read', position: 150 },
-    { slug: 'alarme.incendie', label: 'Alarme incendie', dataType: 'Alarme', direction: 'read', position: 160 },
-    { slug: 'alarme.defaut_echangeur', label: 'Défaut échangeur', dataType: 'Alarme', direction: 'read', position: 170 },
-    { slug: 'alarme.defaut_sonde_qai', label: 'Défaut sonde qualité d\'air', dataType: 'Alarme', direction: 'read', position: 180 },
+    { slug: 'alarme.manque_debit_air', label: 'Alarme manque de débit d\'air', dataType: 'Alarme', direction: 'read', position: 140, isOptional: true },
+    { slug: 'alarme.batterie_postchauffage', label: 'Alarme batterie de postchauffage', dataType: 'Alarme', direction: 'read', position: 150, isOptional: true },
+    { slug: 'alarme.antigel', label: 'Alarme antigel batterie', dataType: 'Alarme', direction: 'read', position: 155, isOptional: true },
+    { slug: 'alarme.incendie', label: 'Alarme incendie', dataType: 'Alarme', direction: 'read', position: 160, isOptional: true },
+    { slug: 'alarme.defaut_echangeur', label: 'Défaut échangeur', dataType: 'Alarme', direction: 'read', position: 170, isOptional: true },
+    { slug: 'alarme.defaut_sonde_qai', label: 'Défaut sonde qualité d\'air', dataType: 'Alarme', direction: 'read', position: 180, isOptional: true },
+    { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 190, isOptional: true },
 
     // ── Donnees ecrites ──
+    // On garde les slugs commande.* historiques pour ne pas creer de doublons
+    // en prod : le seeder n'updatera pas les slugs existants, donc renommer
+    // creerait deux points (l'ancien commande.X reste, le nouveau cmd.X est
+    // ajoute). L'harmonisation eventuelle sera faite via une migration ciblee.
     { slug: 'commande.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 10 },
-    { slug: 'commande.mode_auto_manuel', label: 'Mode auto/manuel', dataType: 'Commande', direction: 'write', position: 20 },
-    { slug: 'commande.mode_chauffage_clim', label: 'Mode chauffage/climatisation', dataType: 'Commande', direction: 'write', position: 30 },
+    { slug: 'commande.mode_auto_manuel', label: 'Mode auto/manuel', dataType: 'Commande', direction: 'write', position: 20, isOptional: true },
+    { slug: 'commande.mode_chauffage_clim', label: 'Mode chauffage/climatisation', dataType: 'Commande', direction: 'write', position: 30, isOptional: true },
     { slug: 'consigne.soufflage', label: 'Consigne de température de soufflage', dataType: 'Consigne', direction: 'write', unit: '°C', position: 40 },
   ],
 };

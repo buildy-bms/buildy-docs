@@ -20,16 +20,17 @@ module.exports = {
 <p>La solution Buildy lit la puissance instantanée, l\'énergie produite, l\'état de fonctionnement et les défauts pour permettre l\'analyse de production et l\'autoconsommation.</p>
 `.trim(),
   points: [
-    { slug: 'etat.production', label: 'État production', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'mesure.puissance_instantanee', label: 'Puissance instantanée produite', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 20 },
-    { slug: 'energie.produite_jour', label: 'Énergie produite (jour)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30 },
-    { slug: 'energie.produite_total', label: 'Énergie totale produite', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40 },
-    { slug: 'energie.injectee_reseau', label: 'Énergie injectée au réseau', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50 },
-    { slug: 'mesure.tension_dc', label: 'Tension DC', dataType: 'Mesure', direction: 'read', unit: 'V', position: 60 },
-    { slug: 'mesure.courant_dc', label: 'Courant DC', dataType: 'Mesure', direction: 'read', unit: 'A', position: 70 },
-    { slug: 'mesure.rendement', label: 'Rendement instantané', dataType: 'Mesure', direction: 'read', unit: '%', position: 80 },
-    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 90 },
-    { slug: 'alarme.defaut_isolation', label: 'Défaut isolation', dataType: 'Alarme', direction: 'read', position: 100 },
-    { slug: 'alarme.deconnexion_reseau', label: 'Déconnexion réseau', dataType: 'Alarme', direction: 'read', position: 110 },
+    // L'index d'energie produite reste obligatoire ; le reste est optionnel.
+    { slug: 'energie.produite_total', label: 'Énergie totale produite (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', techName: 'E_PRODUCED', nature: 'Numérique', position: 10 },
+    { slug: 'etat.production', label: 'État production', dataType: 'État', direction: 'read', position: 20, isOptional: true },
+    { slug: 'mesure.puissance_instantanee', label: 'Puissance instantanée produite', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 30, isOptional: true },
+    { slug: 'energie.produite_jour', label: 'Énergie produite (jour)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40, isOptional: true },
+    { slug: 'energie.injectee_reseau', label: 'Énergie injectée au réseau', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50, isOptional: true },
+    { slug: 'mesure.tension_dc', label: 'Tension DC', dataType: 'Mesure', direction: 'read', unit: 'V', position: 60, isOptional: true },
+    { slug: 'mesure.courant_dc', label: 'Courant DC', dataType: 'Mesure', direction: 'read', unit: 'A', position: 70, isOptional: true },
+    { slug: 'mesure.rendement', label: 'Rendement instantané', dataType: 'Mesure', direction: 'read', unit: '%', position: 80, isOptional: true },
+    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true },
+    { slug: 'alarme.defaut_isolation', label: 'Défaut isolation', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true },
+    { slug: 'alarme.deconnexion_reseau', label: 'Déconnexion réseau', dataType: 'Alarme', direction: 'read', position: 110, isOptional: true },
   ],
 };

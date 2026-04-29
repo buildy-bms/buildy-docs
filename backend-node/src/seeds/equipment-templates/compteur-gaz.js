@@ -20,11 +20,13 @@ module.exports = {
 <p>La solution Buildy lit l\'index et le débit instantané pour alimenter les tableaux de bord énergétiques et la détection de dérives.</p>
 `.trim(),
   points: [
-    { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 10 },
-    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20 },
-    { slug: 'energie.totale', label: 'Énergie totale consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30 },
-    { slug: 'mesure.debit_instantane', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 40 },
-    { slug: 'mesure.pression', label: 'Pression', dataType: 'Mesure', direction: 'read', unit: 'mbar', position: 50 },
-    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60 },
+    // Seul l'index volume est obligatoire. Les autres restent disponibles
+    // mais marques optionnels (decoche par defaut a l'instance).
+    { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', techName: 'V_TOTAL', nature: 'Numérique', position: 10 },
+    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20, isOptional: true },
+    { slug: 'energie.totale', label: 'Énergie totale consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30, isOptional: true },
+    { slug: 'mesure.debit_instantane', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 40, isOptional: true },
+    { slug: 'mesure.pression', label: 'Pression', dataType: 'Mesure', direction: 'read', unit: 'mbar', position: 50, isOptional: true },
+    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
   ],
 };
