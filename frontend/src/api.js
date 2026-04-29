@@ -146,4 +146,8 @@ export const deleteSectionTemplate = (id, { force = false } = {}) =>
 export const reorderSectionTemplates = ({ ids, parent_template_id } = {}) =>
   api.patch('/section-templates/reorder', { ids, ...(parent_template_id !== undefined ? { parent_template_id } : {}) })
 
+// ── Claude (assistant redaction bibliotheque) ──
+export const reformulateWithClaude = ({ html, context, instruction } = {}) =>
+  api.post('/claude/reformulate', { html, context, instruction })
+
 export default api

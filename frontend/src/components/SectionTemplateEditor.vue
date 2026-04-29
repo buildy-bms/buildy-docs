@@ -351,6 +351,8 @@ async function destroy() {
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
           min-height="180px"
+          enable-reformulate
+          :reformulate-context="`Bibliothèque ${mode === 'functionality' ? 'Fonctionnalités' : 'Sections types'} — ${form.title || 'sans titre'}`"
         />
       </div>
 

@@ -458,6 +458,8 @@ async function destroy() {
           v-model="form.description_html"
           placeholder="Ce que fait l'équipement, son rapport au décret BACS, qui assure sa régulation, et comment Buildy intervient en aval…"
           min-height="120px"
+          enable-reformulate
+          :reformulate-context="`Modèle d'équipement — ${form.name || 'sans nom'} (description fonctionnelle)`"
         />
       </div>
 
@@ -474,6 +476,8 @@ async function destroy() {
           v-model="form.bacs_justification"
           placeholder="L'article R175-X définit… Le décret impose… La solution Buildy permet…"
           min-height="90px"
+          enable-reformulate
+          :reformulate-context="`Modèle d'équipement — ${form.name || 'sans nom'} (justification BACS)`"
         />
       </div>
     </form>

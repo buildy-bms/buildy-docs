@@ -8,20 +8,51 @@
  * pour ça avec autosave). Idéal pour les champs courts comme description
  * fonctionnelle d'un template ou justification BACS.
  */
-import { watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import {
-  BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon, LinkIcon,
+  BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon, LinkIcon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
+import { reformulateWithClaude } from '@/api'
+import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: 'Commencez à écrire…' },
   minHeight: { type: String, default: '180px' },
+  // Active le bouton "Reformuler avec Claude" dans la toolbar (editeurs
+  // de la bibliotheque uniquement, pas dans les AFs)
+  enableReformulate: { type: Boolean, default: false },
+  // Contexte transmis au prompt Claude (ex: "Section type / Bibliothèque")
+  reformulateContext: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue'])
+const { success, error: notifyError } = useNotification()
+const reformulating = ref(false)
+
+async function reformulate() {
+  if (!editor.value) return
+  const html = editor.value.getHTML()
+  if (!html || !html.replace(/<[^>]*>/g, '').trim()) {
+    notifyError('Rédige un brouillon avant de demander à Claude de le reformuler')
+    return
+  }
+  reformulating.value = true
+  try {
+    const { data } = await reformulateWithClaude({ html, context: props.reformulateContext })
+    if (data?.html) {
+      editor.value.commands.setContent(data.html, false)
+      emit('update:modelValue', data.html)
+      success('Texte reformulé')
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la reformulation')
+  } finally {
+    reformulating.value = false
+  }
+}
 
 const editor = useEditor({
   content: props.modelValue || '',
@@ -99,6 +130,14 @@ function setLink() {
       <button type="button" @click="setLink"
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Lien"><LinkIcon class="w-3.5 h-3.5" /></button>
+
+      <span v-if="enableReformulate" class="w-px h-4 bg-gray-300 mx-0.5"></span>
+      <button v-if="enableReformulate" type="button" @click="reformulate" :disabled="reformulating"
+              class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-md transition"
+              title="Reformuler avec Claude">
+        <SparklesIcon class="w-3.5 h-3.5" :class="reformulating ? 'animate-pulse' : ''" />
+        {{ reformulating ? 'Reformulation…' : 'Reformuler avec Claude' }}
+      </button>
     </div>
     <EditorContent :editor="editor" />
   </div>

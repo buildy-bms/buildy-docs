@@ -138,4 +138,51 @@ async function streamSection(sectionId, { instruction, onText, onError, onDone }
   }
 }
 
-module.exports = { streamSection, buildPrompts };
+/**
+ * Reformule un fragment HTML en gardant le sens et le format Tiptap-friendly.
+ * Utilise par les editeurs de la bibliotheque (sections types, fonctionnalites,
+ * modeles d'equipement). Non-streaming : l'API renvoie le HTML reformule complet.
+ */
+async function reformulate(html, { context, instruction } = {}) {
+  if (!html || !html.trim()) throw new Error('Texte a reformuler vide');
+
+  const system = [
+    `Tu es un assistant de redaction Buildy AF, specialise dans les analyses fonctionnelles GTB.`,
+    `Style :`,
+    `- Francais professionnel, technique, precis. Accents corrects (e accent aigu, e accent grave, c cedille, etc.)`,
+    `- Phrases concises, structure logique. Pas de superlatifs marketing. Pas de bullshit.`,
+    `- Vocabulaire metier GTB : CTA, BACS, niveau de service, supervision, anomalie, derive, etc.`,
+    ``,
+    `Format de sortie :`,
+    `- HTML simple compatible Tiptap : <p>, <ul>/<li>, <strong>, <em>, <h3>, <blockquote>.`,
+    `- Pas de classes CSS, pas de <div>, pas de <html>/<body>, pas de markdown.`,
+    `- Conserve la structure (paragraphes / listes) du texte d'origine si elle est pertinente.`,
+    `- Reponds UNIQUEMENT par le HTML reformule, sans introduction ni explication.`,
+  ].join('\n');
+
+  const user = [
+    context ? `Contexte de la bibliotheque : ${context}` : null,
+    instruction ? `Instruction specifique : ${instruction}` : null,
+    ``,
+    `Reformule le texte HTML suivant en respectant le sens et en ameliorant la formulation (clarte, concision, vocabulaire GTB precis) :`,
+    ``,
+    html.trim(),
+  ].filter(Boolean).join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 2048,
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: user }],
+  });
+
+  // L'API renvoie un tableau de content blocks ; on concatene les blocs texte.
+  const text = (resp.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('')
+    .trim();
+  return { html: text, usage: resp.usage };
+}
+
+module.exports = { streamSection, buildPrompts, reformulate };

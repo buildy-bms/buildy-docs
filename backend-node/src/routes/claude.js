@@ -3,7 +3,7 @@
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
-const { streamSection } = require('../lib/claude');
+const { streamSection, reformulate } = require('../lib/claude');
 
 async function routes(fastify) {
   // GET /api/claude/health
@@ -11,6 +11,33 @@ async function routes(fastify) {
     enabled: !!config.anthropicApiKey,
     model: config.claudeModel,
   }));
+
+  // POST /api/claude/reformulate  body: { html, context?, instruction? }
+  // Reformule un fragment HTML pour les editeurs de la bibliotheque (sections
+  // types, fonctionnalites, modeles d'equipement). Renvoie { html, usage }.
+  fastify.post('/claude/reformulate', async (request, reply) => {
+    if (!config.anthropicApiKey) {
+      return reply.code(503).send({ detail: 'Assistant Claude non configuré (ANTHROPIC_API_KEY manquant)' });
+    }
+    const html = (request.body?.html || '').toString();
+    if (!html.trim()) return reply.code(400).send({ detail: 'Aucun texte à reformuler' });
+
+    try {
+      const { html: reformulated, usage } = await reformulate(html, {
+        context: request.body?.context,
+        instruction: request.body?.instruction,
+      });
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'claude.reformulate',
+        payload: { context: request.body?.context, length_in: html.length, length_out: reformulated.length, usage },
+      });
+      return { html: reformulated, usage };
+    } catch (err) {
+      log.error(`Claude reformulate error: ${err.message}`);
+      return reply.code(500).send({ detail: err.message || 'Échec de la reformulation' });
+    }
+  });
 
   // POST /api/sections/:id/claude/draft  body: { instruction? }
   // Repond en SSE : data: {"text": "..."} pour chaque chunk, puis data: {"done": true}.
