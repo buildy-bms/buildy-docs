@@ -8,6 +8,7 @@ import { ref, computed, watch } from 'vue'
 import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
+import BacsArticlesPicker from './BacsArticlesPicker.vue'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 import { createSystemCategory, updateSystemCategory, deleteSystemCategory, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -132,10 +133,11 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Article BACS (R175-1 §X) si applicable</label>
-        <input v-model="form.bacs" type="text" autocomplete="off"
-               placeholder="Ex : R175-1 §1 (laisser vide si hors décret)"
-               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <label class="block text-xs font-medium text-gray-600 mb-1.5">
+          Articles BACS applicables
+          <span class="text-gray-400 font-normal">— hérités par tous les équipements de la catégorie</span>
+        </label>
+        <BacsArticlesPicker v-model="form.bacs" />
       </div>
 
       <div>

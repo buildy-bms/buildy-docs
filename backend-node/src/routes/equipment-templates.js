@@ -34,14 +34,25 @@ const pointSchema = z.object({
   nature: z.enum(['Booléen', 'Numérique', 'Enum', 'Chaîne']).nullable().optional(),
 });
 
+// Heritage BACS depuis la categorie : un equipment_template n'a plus son
+// propre bacs_articles depuis le Lot 35 — il l'herite de sa categorie.
+function inheritBacsFromCategory(template, categoriesByKey) {
+  const cat = template.category ? categoriesByKey.get(template.category) : null;
+  return {
+    ...template,
+    bacs_articles: cat?.bacs || null,
+    bacs_inherited_from: cat ? { key: cat.key, label: cat.label } : null,
+  };
+}
+
 async function routes(fastify) {
   // GET /api/equipment-templates — liste de la bibliothèque
   fastify.get('/equipment-templates', async (request) => {
     const { category } = request.query;
     const templates = db.equipmentTemplates.list({ category });
-    // Enrichi avec compteurs de points
+    const categoriesByKey = new Map(db.systemCategoriesDb.list().map(c => [c.key, c]));
     return templates.map(t => ({
-      ...t,
+      ...inheritBacsFromCategory(t, categoriesByKey),
       points_count: db.db.prepare('SELECT COUNT(*) AS c FROM equipment_template_points WHERE template_id = ?').get(t.id).c,
       sections_using_count: db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE equipment_template_id = ? AND af_id IN (SELECT id FROM afs WHERE deleted_at IS NULL)').get(t.id).c,
     }));
@@ -77,8 +88,9 @@ async function routes(fastify) {
         path: pathOf(t),
       }));
 
+    const categoriesByKey = new Map(db.systemCategoriesDb.list().map(c => [c.key, c]));
     return {
-      ...template,
+      ...inheritBacsFromCategory(template, categoriesByKey),
       points: db.equipmentTemplatePoints.listByTemplate(id),
       linked_sections: linkedSections,
     };
@@ -100,7 +112,7 @@ async function routes(fastify) {
       slug,
       name: body.name,
       category: body.category,
-      bacsArticles: body.bacs_articles,
+      // bacs_articles : herite de la categorie depuis le Lot 35 (jamais ecrit ici)
       bacsJustification: body.bacs_justification,
       descriptionHtml: body.description_html,
       iconKind: body.icon_kind,
@@ -128,7 +140,7 @@ async function routes(fastify) {
     const updated = db.equipmentTemplates.update(id, {
       name: body.name,
       category: body.category,
-      bacsArticles: body.bacs_articles,
+      // bacs_articles : herite de la categorie depuis le Lot 35 (jamais ecrit ici)
       bacsJustification: body.bacs_justification,
       descriptionHtml: body.description_html,
       iconKind: body.icon_kind,

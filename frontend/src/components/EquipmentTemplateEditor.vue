@@ -10,8 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { SparklesIcon, TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon } from '@heroicons/vue/24/outline'
-import BacsArticlesPicker from './BacsArticlesPicker.vue'
+import { SparklesIcon, TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -387,9 +386,20 @@ async function destroy() {
                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
 
-      <div>
+      <!-- BACS herite de la categorie : lecture seule, edite via la page Categories -->
+      <div v-if="isEdit && (template.bacs_articles || template.bacs_inherited_from)">
         <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
-        <BacsArticlesPicker v-model="form.bacs_articles" />
+        <div class="flex items-start gap-2 px-3 py-2 bg-purple-50/50 border border-purple-200 rounded-lg text-xs">
+          <ScaleIcon class="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+          <div class="min-w-0">
+            <p class="text-gray-700">
+              <span class="font-medium">{{ template.bacs_articles || '— (catégorie sans BACS)' }}</span>
+            </p>
+            <p v-if="template.bacs_inherited_from" class="text-[11px] text-gray-500 mt-0.5">
+              Hérité de la catégorie « {{ template.bacs_inherited_from.label }} » — édité dans Catégories de systèmes.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div>

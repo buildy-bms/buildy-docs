@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 26;
+const TARGET_VERSION = 27;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -919,6 +919,22 @@ function runMigrations() {
     db.exec('CREATE INDEX IF NOT EXISTS idx_section_templates_parent ON section_templates(parent_template_id, position)');
     db.pragma('user_version = 26');
     log.info('Migration 26 appliquee : section_templates parent_template_id + equipment_template_id (bootstrap depuis PLAN_AF)');
+  }
+
+  if (current < 27) {
+    // Lot 35 — Centralisation BACS au niveau categorie. Les equipment_templates
+    // n'ont plus leur propre bacs_articles (heritage depuis system_categories_db).
+    // Les sections types narratives (kind=standard, !is_functionality) non plus.
+    // On vide les colonnes pour que le source unique soit categorie / fonctionnalite.
+    db.exec(`UPDATE equipment_templates SET bacs_articles = NULL`);
+    db.exec(`
+      UPDATE section_templates
+         SET bacs_articles = NULL
+       WHERE is_functionality = 0
+         AND kind != 'equipment'
+    `);
+    db.pragma('user_version = 27');
+    log.info('Migration 27 appliquee : BACS centralise au niveau categorie (equipement) et fonctionnalites');
   }
 
   if (current > TARGET_VERSION) {

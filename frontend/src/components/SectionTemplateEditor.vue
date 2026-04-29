@@ -131,10 +131,11 @@ const selectedEquipmentName = computed(() => {
   return t ? t.name : null
 })
 
-// Champs conditionnels :
-// - BACS s'applique aux sections texte et aux sections d'equipement
-// - Niveau de contrat n'a de sens que pour les fonctionnalites
-const showBacs = computed(() => form.value.kind === 'standard' || form.value.kind === 'equipment')
+// Champs conditionnels (Lot 35 — centralisation BACS) :
+// - BACS et niveau de contrat n'ont de sens que pour les fonctionnalites.
+//   Les sections types narratives n'ont plus de BACS (les equipements
+//   l'heritent de leur categorie).
+const showBacs = computed(() => props.mode === 'functionality')
 const showServiceLevel = computed(() => props.mode === 'functionality')
 
 watch(() => props.template, (t) => {
