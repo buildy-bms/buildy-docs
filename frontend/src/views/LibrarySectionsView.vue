@@ -21,12 +21,21 @@ const collapsed = ref(new Set())
 const rootRef = ref(null)
 const sortables = []           // Sortable instances per <ul>
 
+// Filtre les feuilles equipment de l'arbre : leur source d'autorite est la
+// page Bibliotheque > Equipements (chaque modele expose son placement dans
+// l'arbre via le multi-select chips). Les afficher ici creait une redondance.
+function stripEquipmentLeaves(nodes) {
+  return nodes
+    .filter(n => n.kind !== 'equipment')
+    .map(n => ({ ...n, children: stripEquipmentLeaves(n.children || []) }))
+}
+
 async function refresh() {
   const { data: t } = await listSectionTemplates({ tree: true })
-  tree.value = t
-  // Aussi liste plate pour la recherche / count
+  tree.value = stripEquipmentLeaves(t)
+  // Aussi liste plate pour la recherche / count (sans les equipments)
   const { data: list } = await listSectionTemplates({})
-  flat.value = list
+  flat.value = list.filter(n => n.kind !== 'equipment')
   await nextTick()
   setupSortables()
 }

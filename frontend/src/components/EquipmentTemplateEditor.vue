@@ -11,6 +11,7 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { SparklesIcon, TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import BacsArticlesPicker from './BacsArticlesPicker.vue'
 import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
@@ -386,43 +387,39 @@ async function destroy() {
                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Articles BACS applicables</label>
-          <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
-                 placeholder="Ex : R175-1 §1, §2, §3"
-                 class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-          <p class="text-[11px] text-gray-400 mt-1">Format : <code class="bg-gray-100 px-1 rounded">R175-1 §1, §2</code>. Vide si non visé.</p>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
+        <BacsArticlesPicker v-model="form.bacs_articles" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Icône & couleur</label>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-200 rounded-lg shrink-0">
+            <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
+          </span>
+          <input v-model="iconSearch" type="text" autocomplete="off" data-1p-ignore="true"
+                 placeholder="Rechercher (fire, water…)"
+                 class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Icône & couleur</label>
-          <div class="flex items-center gap-2">
-            <span class="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-200 rounded-lg shrink-0">
-              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
-            </span>
-            <input v-model="iconSearch" type="text" autocomplete="off" data-1p-ignore="true"
-                   placeholder="Rechercher (fire, water…)"
-                   class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-          </div>
 
-          <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
-            <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
-                    :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
-                    :title="name">
-              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
-            </button>
-            <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
-              Aucune icône.
-            </p>
-          </div>
+        <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
+          <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
+                  :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
+                  :title="name">
+            <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
+          </button>
+          <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
+            Aucune icône.
+          </p>
+        </div>
 
-          <div class="flex items-center gap-1.5 mt-1.5">
-            <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
-            <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
-                    :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
-                    :style="{ background: c }" :title="c"></button>
-            <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" title="Couleur personnalisée" />
-          </div>
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
+          <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
+                  :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
+                  :style="{ background: c }" :title="c"></button>
+          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" title="Couleur personnalisée" />
         </div>
       </div>
 

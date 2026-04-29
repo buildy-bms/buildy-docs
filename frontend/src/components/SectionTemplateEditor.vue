@@ -15,6 +15,7 @@ import BaseModal from './BaseModal.vue'
 import ClaudePromptModal from './ClaudePromptModal.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import EquipmentTemplatePicker from './EquipmentTemplatePicker.vue'
+import BacsArticlesPicker from './BacsArticlesPicker.vue'
 import {
   createSectionTemplate,
   updateSectionTemplate,
@@ -35,9 +36,10 @@ const { success, error: notifyError } = useNotification()
 const isEdit = computed(() => !!props.template?.id)
 const labelEntity = computed(() => props.mode === 'functionality' ? 'fonctionnalité' : 'section type')
 
+// kind=equipment retire de l'editeur : les equipements se gerent depuis la
+// page Bibliotheque > Equipements (multi-select des sections parentes).
 const KIND_OPTIONS = [
   { value: 'standard',   label: 'Texte (chapitre / paragraphe rédigé)' },
-  { value: 'equipment',  label: 'Équipement (lié à un modèle de la bibliothèque)' },
   { value: 'zones',      label: 'Zones fonctionnelles (matrice de zones)' },
   { value: 'synthesis',  label: 'Tableau de synthèse (auto-généré)' },
 ]
@@ -253,11 +255,8 @@ async function destroy() {
       <!-- Niveau de contrat : pertinent uniquement pour les fonctionnalites -->
       <div v-if="showBacs || showServiceLevel" :class="['grid gap-3', showBacs && showServiceLevel ? 'grid-cols-2' : 'grid-cols-1']">
         <div v-if="showBacs">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Articles BACS applicables</label>
-          <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
-                 placeholder="Ex : R175-3 §1, §2 ; R175-5-1"
-                 class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-          <p class="text-[11px] text-gray-400 mt-1">Format : <code class="bg-gray-100 px-1 rounded">R175-1 §1, §2</code>. Vide si non visé.</p>
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
+          <BacsArticlesPicker v-model="form.bacs_articles" />
         </div>
         <div v-if="showServiceLevel">
           <label class="block text-xs font-medium text-gray-600 mb-1">Niveau de contrat requis</label>
