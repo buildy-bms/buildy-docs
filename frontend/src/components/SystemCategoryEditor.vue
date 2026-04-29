@@ -121,13 +121,13 @@ async function destroy() {
           <label class="block text-xs font-medium text-gray-700 mb-1">Libellé *</label>
           <input v-model="form.label" type="text" required autocomplete="off"
                  placeholder="Ex : Chauffage"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Key (interne) *</label>
           <input v-model="form.key" type="text" required :disabled="isEdit" autocomplete="off"
                  placeholder="chauffage"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500" />
         </div>
       </div>
 
@@ -135,18 +135,18 @@ async function destroy() {
         <label class="block text-xs font-medium text-gray-700 mb-1">Article BACS (R175-1 §X) si applicable</label>
         <input v-model="form.bacs" type="text" autocomplete="off"
                placeholder="Ex : R175-1 §1 (laisser vide si hors décret)"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
 
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Icône & couleur</label>
         <div class="flex items-center gap-2 mb-1.5">
-          <span class="inline-flex items-center justify-center w-9 h-9 border-2 border-gray-300 rounded">
+          <span class="inline-flex items-center justify-center w-9 h-9 border-2 border-gray-200 rounded">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
           </span>
           <input v-model="iconSearch" type="text" autocomplete="off"
                  placeholder="Rechercher une icône (fire, snowflake, fan…)"
-                 class="flex-1 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="flex-1 px-2 py-1.5 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div class="border border-gray-200 rounded p-1 max-h-32 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"

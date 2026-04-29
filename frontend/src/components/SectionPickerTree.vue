@@ -79,7 +79,7 @@ const totalExcluded = computed(() => props.excluded.size)
 </script>
 
 <template>
-  <div class="border border-gray-200 rounded-none bg-white">
+  <div class="border border-gray-200 rounded-lg bg-white">
     <div class="px-3 py-2 border-b border-gray-100 flex items-center justify-between text-xs">
       <span class="text-gray-700">
         <strong>{{ totalIncluded }}</strong> incluse{{ totalIncluded > 1 ? 's' : '' }}

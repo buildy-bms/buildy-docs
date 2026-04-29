@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    :class="['bg-white rounded-none border border-gray-200 transition-colors', isDragging ? 'border-indigo-500 ring-4 ring-indigo-100' : '']"
+    :class="['bg-white rounded-lg border border-gray-200 transition-colors', isDragging ? 'border-indigo-500 ring-4 ring-indigo-100' : '']"
     @dragover.prevent="isDragging = true"
     @dragleave.prevent="(e) => { if (!e.currentTarget.contains(e.relatedTarget)) isDragging = false }"
     @drop.prevent="onDrop"

@@ -99,7 +99,7 @@ watch(() => props.justification, () => { editing.value = false })
                     :placeholder="context === 'equipment'
                       ? 'Ex : Cet équipement combine ventilation (§3) et chauffage (§1) — le décret impose pour ces systèmes l\'automatisation, la supervision continue et la capacité de pilotage.'
                       : 'Ex : Cette section répond à l\'exigence du décret BACS en encadrant la liste des points exposés et leurs natures techniques.'"
-                    class="w-full px-2 py-1.5 text-xs border border-gray-300 focus:outline-none focus:ring-1 focus:ring-purple-500"></textarea>
+                    class="w-full px-2 py-1.5 text-xs border border-gray-200 focus:outline-none focus:ring-1 focus:ring-purple-500"></textarea>
           <div class="flex items-center gap-2">
             <button @click="save" :disabled="saving" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50">
               <CheckIcon class="w-3 h-3" /> Enregistrer

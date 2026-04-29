@@ -89,7 +89,7 @@ function gotoSection(sectionId) {
         <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input v-model="search" type="text" placeholder="Rechercher (repère, localisation, équipement, section)…" autocomplete="off"
                data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
           <XMarkIcon class="w-4 h-4" />
         </button>

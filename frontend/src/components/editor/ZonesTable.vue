@@ -94,7 +94,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="bg-white rounded-none border border-gray-200">
+  <div class="bg-white rounded-lg border border-gray-200">
     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
       <h3 class="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5">
         <BuildingOfficeIcon class="w-4 h-4 text-gray-500" />
@@ -107,10 +107,10 @@ onMounted(refresh)
 
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
       <input v-model="draft.name" type="text" required placeholder="Nom de la zone (ex : Open-space N1 Est)" autocomplete="off" data-1p-ignore="true"
-             class="flex-1 min-w-60 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+             class="flex-1 min-w-60 px-2 py-1.5 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       <input v-model.number="draft.surface_m2" type="number" min="0" step="1" placeholder="Surface m²" autocomplete="off"
-             class="w-24 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <select v-model="draft.occupation_type" class="w-44 px-2 py-1.5 border border-gray-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+             class="w-24 px-2 py-1.5 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <select v-model="draft.occupation_type" class="w-44 px-2 py-1.5 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
         <option value="">Type d'occupation…</option>
         <option v-for="t in OCCUPATION_TYPES" :key="t">{{ t }}</option>
       </select>
@@ -194,7 +194,7 @@ onMounted(refresh)
             </tr>
           </tbody>
           <tfoot>
-            <tr class="border-t-2 border-gray-300 bg-gray-100">
+            <tr class="border-t-2 border-gray-200 bg-gray-100">
               <td class="px-4 py-2 font-bold text-gray-900 sticky left-0 bg-gray-100">Total catégorie</td>
               <td v-for="(n, i) in matrix.totalsByCategory" :key="i" class="text-center px-3 py-2 font-bold text-gray-900 tabular-nums">{{ n }}</td>
               <td class="text-center px-3 py-2 bg-emerald-100 text-emerald-900 font-bold tabular-nums">
@@ -214,16 +214,16 @@ onMounted(refresh)
         <div class="col-span-2">
           <label class="block text-xs font-medium text-gray-700 mb-1">Nom *</label>
           <input v-model="editForm.name" type="text" required autocomplete="off" data-1p-ignore="true"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Surface (m²)</label>
           <input v-model.number="editForm.surface_m2" type="number" min="0" step="1"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type d'occupation</label>
-          <select v-model="editForm.occupation_type" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select v-model="editForm.occupation_type" class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">—</option>
             <option v-for="t in OCCUPATION_TYPES" :key="t">{{ t }}</option>
           </select>

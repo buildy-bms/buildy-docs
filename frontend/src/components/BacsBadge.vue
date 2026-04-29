@@ -147,7 +147,7 @@ onMounted(() => {
         Extraits du décret n° 2023-259 du 7 avril 2023 (articles R175-1 à R175-6 du Code de la construction et de l'habitation).
       </p>
 
-      <article v-for="(item, idx) in articlesToShow" :key="idx" class="border border-purple-100 rounded-none">
+      <article v-for="(item, idx) in articlesToShow" :key="idx" class="border border-purple-100 rounded-lg">
         <header class="px-5 py-3 bg-purple-50 border-b border-purple-100">
           <p class="font-semibold text-purple-900 text-sm">
             Article {{ item.code }} — {{ item.article.title }}

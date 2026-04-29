@@ -34,7 +34,7 @@ function openInLibrary() {
 </script>
 
 <template>
-  <div v-if="template" class="bg-white border border-gray-200 rounded-none">
+  <div v-if="template" class="bg-white border border-gray-200 rounded-lg">
     <div class="flex items-center justify-between px-5 py-2 border-b border-gray-100 bg-gray-50">
       <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
         Description fonctionnelle de l'équipement <span class="text-gray-400 normal-case font-normal">(héritée de la bibliothèque)</span>

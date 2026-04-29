@@ -158,12 +158,12 @@ onMounted(async () => {
           <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input v-model="searchQuery" type="text" placeholder="Rechercher (nom, slug, catégorie, protocole)…"
                  autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-                 class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
-        <div class="inline-flex items-center border border-gray-300 rounded overflow-hidden text-xs">
+        <div class="inline-flex items-center border border-gray-200 rounded overflow-hidden text-xs">
           <button @click="setViewMode('table')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
             <TableCellsIcon class="w-3.5 h-3.5" /> Tableau
           </button>
@@ -175,7 +175,7 @@ onMounted(async () => {
 
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
-      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-none">
+      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-lg">
         <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
@@ -236,7 +236,7 @@ onMounted(async () => {
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button v-for="t in items" :key="t.id" @click="openTemplate(t)"
-                  class="text-left bg-white rounded-none border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group">
+                  class="text-left bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group">
             <div class="flex items-center justify-between mb-2">
               <EquipmentIcon :template="t" size="lg" />
               <span class="text-[10px] text-gray-400">v{{ t.current_version }}</span>
@@ -272,7 +272,7 @@ onMounted(async () => {
           </div>
         </div>
         <button @click="openEdit"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 rounded shrink-0">
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 text-gray-700 hover:bg-gray-50 rounded shrink-0">
           <PencilSquareIcon class="w-3.5 h-3.5" />
           Éditer le modèle
         </button>
@@ -291,8 +291,8 @@ onMounted(async () => {
 
       <div class="mb-6">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Description fonctionnelle</h3>
-        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-none p-6 equipment-desc"></div>
-        <div v-else class="bg-white border border-dashed border-gray-300 rounded-none p-5 text-sm text-gray-400 italic">
+        <div v-if="selected.description_html" v-html="selected.description_html" class="prose prose-sm max-w-none text-gray-700 bg-white border border-gray-200 rounded-lg p-6 equipment-desc"></div>
+        <div v-else class="bg-white border border-dashed border-gray-200 rounded-lg p-5 text-sm text-gray-400 italic">
           Pas encore de description rédigée pour ce template. Édite-le depuis une AF puis promeus tes modifications dans la bibliothèque.
         </div>
       </div>
@@ -301,7 +301,7 @@ onMounted(async () => {
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           Données typiquement lues ({{ selected.points.filter(p => p.direction === 'read').length }})
         </h3>
-        <div v-if="selected.points.filter(p => p.direction === 'read').length" class="bg-white border border-gray-200 rounded-none overflow-hidden">
+        <div v-if="selected.points.filter(p => p.direction === 'read').length" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
@@ -335,7 +335,7 @@ onMounted(async () => {
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           Données typiquement écrites ({{ selected.points.filter(p => p.direction === 'write').length }})
         </h3>
-        <div v-if="selected.points.filter(p => p.direction === 'write').length" class="bg-white border border-gray-200 rounded-none overflow-hidden">
+        <div v-if="selected.points.filter(p => p.direction === 'write').length" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
@@ -369,7 +369,7 @@ onMounted(async () => {
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           Historique des versions ({{ versions.length }})
         </h3>
-        <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
@@ -398,7 +398,7 @@ onMounted(async () => {
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
           AFs qui utilisent ce template ({{ affectedAfs.length }})
         </h3>
-        <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>

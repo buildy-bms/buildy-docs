@@ -209,21 +209,21 @@ async function destroy() {
         <label class="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
         <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type de section</label>
           <select v-model="form.kind"
-                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option v-for="o in KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Section parente</label>
           <select v-model="form.parent_template_id"
-                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option v-for="o in parentOptions" :key="o.id ?? 'root'" :value="o.id">{{ o.label }}</option>
           </select>
           <p class="text-[10px] text-gray-400 mt-1">Drag-drop dans l'arbre permet aussi de déplacer.</p>
@@ -234,7 +234,7 @@ async function destroy() {
       <div v-if="form.kind === 'equipment'">
         <label class="block text-xs font-medium text-gray-700 mb-1">Modèle d'équipement</label>
         <button type="button" @click="showEquipmentPicker = true"
-                class="w-full text-left px-3 py-2 border border-gray-300 text-sm hover:bg-gray-50">
+                class="w-full text-left px-3 py-2 border border-gray-200 text-sm hover:bg-gray-50">
           <span v-if="form.equipment_template_id" class="text-gray-800">
             {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }} — cliquer pour changer
           </span>
@@ -250,13 +250,13 @@ async function destroy() {
           <label class="block text-xs font-medium text-gray-700 mb-1">Articles BACS applicables</label>
           <input v-model="form.bacs_articles" type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="Ex : R175-3 §1, §2 ; R175-5-1"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <p class="text-[10px] text-gray-400 mt-1">Format : <code>R175-1 §1, §2 ; R175-3 §4</code>.</p>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Niveau de contrat requis</label>
           <select v-model="form.service_level"
-                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option v-for="o in SERVICE_LEVEL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>

@@ -75,7 +75,7 @@ function select(t) { emit('update:modelValue', t.id) }
           'px-2 py-0.5 text-[11px] rounded-full border transition-colors',
           selectedCategory === cat
             ? 'bg-indigo-600 text-white border-indigo-600'
-            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
         ]"
       >
         {{ cat === 'all' ? `Tous (${templates.length})` : CATEGORY_LABELS[cat] || cat }}

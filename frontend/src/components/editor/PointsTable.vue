@@ -119,7 +119,7 @@ function tableFor(direction) {
 </script>
 
 <template>
-  <div class="bg-white rounded-none border border-gray-200">
+  <div class="bg-white rounded-lg border border-gray-200">
     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
       <h3 class="text-sm font-semibold text-gray-700">
         Points attendus pour cet équipement
@@ -144,19 +144,19 @@ function tableFor(direction) {
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
       <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
         <input v-model="draftPoint.label" type="text" required placeholder="Libellé du point (ex : Pression filtre)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="flex-1 min-w-[180px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <select v-model="draftPoint.data_type" class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+               class="flex-1 min-w-[180px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <select v-model="draftPoint.data_type" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option>Mesure</option><option>État</option><option>Alarme</option><option>Commande</option><option>Consigne</option>
         </select>
-        <select v-model="draftPoint.direction" class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <select v-model="draftPoint.direction" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="read">Lecture</option>
           <option value="write">Écriture</option>
         </select>
         <input v-model="draftPoint.unit" type="text" placeholder="Unité" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-20 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <input v-model="draftPoint.tech_name" type="text" placeholder="Nom technique (T_AIR_NEUF…)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-44 px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <select v-model="draftPoint.nature" class="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+               class="w-44 px-2 py-1.5 border border-gray-200 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <select v-model="draftPoint.nature" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">Nature…</option>
           <option>Booléen</option><option>Numérique</option><option>Enum</option><option>Chaîne</option>
         </select>

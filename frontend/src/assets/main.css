@@ -46,13 +46,22 @@
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Border-radius global sur les form controls pour cohérence visuelle.
-     Les overrides par classe Tailwind (rounded-lg, rounded-none, rounded-full…)
-     gagnent grâce à leur spécificité plus haute. */
+  /* Border-radius global sur les form controls — style moderne (rounded-lg).
+     Les overrides Tailwind (rounded-md, rounded-full…) gagnent par spécificité. */
   input:not([type='checkbox']):not([type='radio']),
   select,
   textarea {
-    border-radius: 0.25rem;
+    border-radius: 0.5rem;
+  }
+
+  /* Focus ring doux + bordure pleine partout, sans devoir le reecrire dans
+     chaque composant. Les composants peuvent l'override via des classes. */
+  input:not([type='checkbox']):not([type='radio']):focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: var(--color-indigo-500);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-indigo-500) 30%, transparent);
   }
 }
 

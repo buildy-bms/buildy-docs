@@ -198,13 +198,13 @@ onMounted(refresh)
           data-1p-ignore="true"
           data-bwignore="true"
           data-lpignore="true"
-          class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
-      <div class="inline-flex items-center border border-gray-300 rounded overflow-hidden text-xs">
+      <div class="inline-flex items-center border border-gray-200 rounded overflow-hidden text-xs">
         <button @click="setViewMode('table')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
           <TableCellsIcon class="w-3.5 h-3.5" /> Tableau
         </button>
@@ -220,7 +220,7 @@ onMounted(refresh)
     <!-- Empty state -->
     <div
       v-else-if="!afs.length"
-      class="bg-white rounded-none border border-gray-200 p-12 text-center"
+      class="bg-white rounded-lg border border-gray-200 p-12 text-center"
     >
       <DocumentTextIcon class="w-16 h-16 mx-auto text-gray-300" />
       <h2 class="mt-4 text-base font-medium text-gray-800">Aucune AF pour l'instant</h2>
@@ -232,7 +232,7 @@ onMounted(refresh)
 
     <!-- Vue tableau (par défaut, Lot 27) -->
     <template v-else-if="viewMode === 'table'">
-      <div class="bg-white border border-gray-200 rounded-none overflow-hidden">
+      <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
@@ -307,7 +307,7 @@ onMounted(refresh)
           <div
             v-for="af in items"
             :key="af.id"
-            class="bg-white rounded-none border border-gray-200 p-4 hover:shadow-md transition-shadow group cursor-pointer"
+            class="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow group cursor-pointer"
             @click="router.push(`/afs/${af.id}`)"
           >
             <div class="flex items-start justify-between mb-2">
@@ -359,7 +359,7 @@ onMounted(refresh)
             type="text"
             required
             placeholder="ex : Acme SAS"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -369,7 +369,7 @@ onMounted(refresh)
             type="text"
             required
             placeholder="ex : Lyon Part-Dieu — Bâtiment B"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -378,7 +378,7 @@ onMounted(refresh)
             v-model="newAf.site_address"
             type="text"
             placeholder="ex : 42 rue de la Tête d'Or, 69006 Lyon"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <div>
@@ -399,7 +399,7 @@ onMounted(refresh)
                 'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
                 newAf.service_level === opt.value
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
               ]"
             >
               <input v-model="newAf.service_level" :value="opt.value" type="radio" class="sr-only" />
@@ -437,15 +437,15 @@ onMounted(refresh)
         </p>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Client *</label>
-          <input v-model="cloneTarget.client_name" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
+          <input v-model="cloneTarget.client_name" type="text" required class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Projet *</label>
-          <input v-model="cloneTarget.project_name" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
+          <input v-model="cloneTarget.project_name" type="text" required class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Adresse du site</label>
-          <input v-model="cloneTarget.site_address" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
+          <input v-model="cloneTarget.site_address" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" />
         </div>
       </form>
       <template #footer>

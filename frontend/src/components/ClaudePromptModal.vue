@@ -288,7 +288,7 @@ async function copyPrompt() {
           :value="prompt"
           readonly
           rows="14"
-          class="w-full px-3 py-2 border border-gray-300 text-[11px] font-mono leading-snug focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+          class="w-full px-3 py-2 border border-gray-200 text-[11px] font-mono leading-snug focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
         ></textarea>
       </div>
     </div>

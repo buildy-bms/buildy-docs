@@ -101,14 +101,14 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
       <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
       <input v-model="search" type="text" placeholder="Rechercher (titre, BACS)…"
              autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-             class="w-full pl-9 pr-9 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+             class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       <button v-if="search" @click="search = ''"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
         <XMarkIcon class="w-4 h-4" />
       </button>
     </div>
 
-    <div class="bg-white border border-gray-200 rounded-none overflow-x-auto">
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>

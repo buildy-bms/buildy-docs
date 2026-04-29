@@ -23,7 +23,7 @@ const loading = ref(false)
 
 const LEVEL_LABEL = { E: 'Essentials', S: 'Smart', P: 'Premium' }
 const LEVEL_COLOR = {
-  E: 'bg-gray-100 text-gray-800 border-gray-300',
+  E: 'bg-gray-100 text-gray-800 border-gray-200',
   S: 'bg-blue-100 text-blue-800 border-blue-300',
   P: 'bg-emerald-100 text-emerald-800 border-emerald-300',
 }

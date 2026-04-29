@@ -81,7 +81,7 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <div v-if="updates.length > 0" class="bg-amber-50 border border-amber-200 rounded-none px-4 py-2.5 flex items-center justify-between gap-3">
+  <div v-if="updates.length > 0" class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
     <div class="flex items-center gap-2 min-w-0">
       <ArrowPathIcon class="w-4 h-4 text-amber-700 shrink-0" />
       <p class="text-xs text-amber-900 truncate">
@@ -106,7 +106,7 @@ defineExpose({ refresh })
         explicitement la mise à jour pour cette section.
       </p>
 
-      <div v-for="item in updates" :key="item.section_id" class="border border-gray-200 rounded-none">
+      <div v-for="item in updates" :key="item.section_id" class="border border-gray-200 rounded-lg">
         <div class="px-4 py-3 flex items-center justify-between gap-3 bg-gray-50">
           <button @click="toggle(item.section_id)" class="flex items-center gap-2 min-w-0 text-left">
             <ChevronRightIcon :class="['w-4 h-4 text-gray-400 transition-transform', expanded.has(item.section_id) && 'rotate-90']" />

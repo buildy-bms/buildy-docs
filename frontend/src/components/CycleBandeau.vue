@@ -276,7 +276,7 @@ const exportDescription = computed(() => {
       <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
     </div>
     <ServiceLevelBadge v-if="af.service_level" :level="af.service_level" />
-    <span v-else class="text-[10px] text-gray-400 italic px-2 py-0.5 border border-dashed border-gray-300 rounded">contrat à définir</span>
+    <span v-else class="text-[10px] text-gray-400 italic px-2 py-0.5 border border-dashed border-gray-200 rounded">contrat à définir</span>
     <StatusBadge :status="af.status" />
     <div class="w-px h-6 bg-gray-200"></div>
     <button
@@ -305,7 +305,7 @@ const exportDescription = computed(() => {
     </button>
     <button
       @click="showInstances = true"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Vue tableau de toutes les instances d'équipements de l'AF"
     >
       <ListBulletIcon class="w-4 h-4" />
@@ -313,7 +313,7 @@ const exportDescription = computed(() => {
     </button>
     <button
       @click="showShare = true"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Partager cette AF avec d'autres utilisateurs"
     >
       <UserGroupIcon class="w-4 h-4" />
@@ -321,7 +321,7 @@ const exportDescription = computed(() => {
     </button>
     <button
       @click="emit('toggle-activity')"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Panneau d'activité"
     >
       <ClockIcon class="w-4 h-4" />
@@ -329,7 +329,7 @@ const exportDescription = computed(() => {
     </button>
     <button
       @click="router.push(`/afs/${af.id}/versions`)"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
       title="Historique des versions Git"
     >
       <ClockIcon class="w-4 h-4" />
@@ -347,7 +347,7 @@ const exportDescription = computed(() => {
         Faire avancer la phase
         <ChevronDownIcon class="w-3 h-3" />
       </button>
-      <div v-if="showPhaseMenu" class="absolute right-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg rounded-none z-30">
+      <div v-if="showPhaseMenu" class="absolute right-0 mt-1 w-72 bg-white border border-gray-200 shadow-lg rounded-lg z-30">
         <button
           @click="startTransition(nextPhase)"
           class="w-full text-left px-4 py-2.5 hover:bg-emerald-50 text-sm border-b border-gray-100"
@@ -401,7 +401,7 @@ const exportDescription = computed(() => {
           data-bwignore="true"
           data-lpignore="true"
           placeholder="ex : Jean Dupont — Bureau Veritas"
-          class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
       <div>
@@ -412,7 +412,7 @@ const exportDescription = computed(() => {
           autocomplete="off"
           data-1p-ignore="true"
           placeholder="Observations particulières ou contexte de l'inspection"
-          class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         ></textarea>
       </div>
       <div v-if="lastInspection" class="p-3 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
@@ -452,7 +452,7 @@ const exportDescription = computed(() => {
           data-bwignore="true"
           data-lpignore="true"
           placeholder="ex : version initiale transmise au bureau d'études"
-          class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <p class="text-[11px] text-gray-400 mt-1">
           Apparaîtra sur la page de garde du PDF + dans l'historique des exports.
@@ -489,7 +489,7 @@ const exportDescription = computed(() => {
           v-model="exportIncludeBacs"
           type="checkbox"
           id="bacs-annex"
-          class="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          class="mt-0.5 w-4 h-4 rounded border-gray-200 text-indigo-600 focus:ring-indigo-500"
         />
         <label for="bacs-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
           Inclure l'<strong>annexe Décret BACS</strong> (R175-1 à R175-6)
@@ -540,12 +540,12 @@ const exportDescription = computed(() => {
         <label class="block text-xs font-semibold text-gray-700 mb-1">Motif (obligatoire) *</label>
         <input v-model="transitionMotif" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                :placeholder="transitionTo === 'livree' ? 'Ex : Livraison DOE finale Acme Lyon' : 'Ex : Validation pour démarrage chantier'"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Notes (optionnel)</label>
         <textarea v-model="transitionNotes" rows="2" autocomplete="off" data-1p-ignore="true"
-                  class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
       </div>
     </form>
     <template #footer>
@@ -567,17 +567,17 @@ const exportDescription = computed(() => {
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Client *</label>
         <input v-model="editForm.client_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Projet *</label>
         <input v-model="editForm.project_name" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Adresse du site</label>
         <input v-model="editForm.site_address" type="text" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Niveau de contrat Buildy</label>
@@ -594,7 +594,7 @@ const exportDescription = computed(() => {
               'cursor-pointer text-center py-2 rounded-lg border text-sm font-semibold',
               editForm.service_level === opt.value
                 ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
             ]"
           >
             <input v-model="editForm.service_level" :value="opt.value" type="radio" class="sr-only" />

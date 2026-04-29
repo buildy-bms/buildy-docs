@@ -348,7 +348,7 @@ async function destroy() {
           <label class="block text-xs font-medium text-gray-600 mb-1.5">Catégorie</label>
           <div ref="categoryRef" class="relative">
             <button type="button" @click="toggleCategory"
-                    class="w-full flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
+                    class="w-full flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
               <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: selectedCategory.icon, icon_color: selectedCategory.color }" size="sm" />
               <span class="flex-1 text-left text-gray-800 truncate">{{ selectedCategory.label }}</span>
               <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="categoryOpen ? 'rotate-180' : ''" />
@@ -417,7 +417,7 @@ async function destroy() {
         <label class="block text-xs font-medium text-gray-600 mb-2">Protocoles exigés</label>
         <div class="flex flex-wrap gap-1.5">
           <button v-for="p in PROTOCOLS" :key="p" type="button" @click="toggleProtocol(p)"
-                  :class="['px-3 py-1 text-xs rounded-full border transition', form.preferred_protocols.includes(p) ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50']">
+                  :class="['px-3 py-1 text-xs rounded-full border transition', form.preferred_protocols.includes(p) ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-200 hover:bg-gray-50']">
             {{ p }}
           </button>
         </div>

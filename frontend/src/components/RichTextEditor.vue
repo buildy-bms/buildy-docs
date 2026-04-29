@@ -80,7 +80,7 @@ function setLink() {
 </script>
 
 <template>
-  <div class="border border-gray-300 rounded bg-white">
+  <div class="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
     <div v-if="editor" class="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50">
       <button type="button" @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"

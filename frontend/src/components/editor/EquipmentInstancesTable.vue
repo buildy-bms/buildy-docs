@@ -148,7 +148,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="bg-white rounded-none border border-gray-200">
+  <div class="bg-white rounded-lg border border-gray-200">
     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
       <div>
         <h3 class="text-sm font-semibold text-gray-700">
@@ -171,10 +171,10 @@ onMounted(refresh)
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
       <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
         <input v-model="draft.reference" type="text" required placeholder="Référence (ex : CTA-N1-EST)" autocomplete="off" data-1p-ignore="true"
-               class="w-44 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-44 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <input v-model="draft.location" type="text" placeholder="Localisation libre" autocomplete="off" data-1p-ignore="true"
-               class="flex-1 min-w-40 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="flex-1 min-w-40 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
         <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
       </form>
@@ -247,19 +247,19 @@ onMounted(refresh)
           <div class="col-span-2">
             <label class="block text-xs font-medium text-gray-700 mb-1">Référence *</label>
             <input v-model="editForm.reference" type="text" required autocomplete="off" data-1p-ignore="true"
-                   class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                   class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Quantité</label>
             <input v-model.number="editForm.qty" type="number" min="1"
-                   class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                   class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Localisation libre</label>
           <input v-model="editForm.location" type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="Texte libre — utile en complément des zones structurées"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div v-if="candidateCategories.length">
           <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -296,7 +296,7 @@ onMounted(refresh)
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
           <textarea v-model="editForm.notes" rows="2" autocomplete="off"
-                    class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
         </div>
       </form>
       <template #footer>

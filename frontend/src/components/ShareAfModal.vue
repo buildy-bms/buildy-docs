@@ -115,8 +115,8 @@ onMounted(refresh)
         <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Ajouter un utilisateur</p>
         <div class="flex items-center gap-2 mb-2">
           <input v-model="search" type="text" placeholder="Rechercher par nom ou email…" autocomplete="off" data-1p-ignore="true"
-                 class="flex-1 px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <select v-model="newRole" class="px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 class="flex-1 px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <select v-model="newRole" class="px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="read">Lecture</option>
             <option value="write">Écriture</option>
           </select>

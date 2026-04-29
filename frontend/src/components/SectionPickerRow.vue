@@ -25,7 +25,7 @@ const checkboxClass = computed(() => state.value === 'on'
   ? 'bg-indigo-600 border-indigo-600 text-white'
   : state.value === 'partial'
     ? 'bg-amber-200 border-amber-400 text-amber-900'
-    : 'bg-white border-gray-300')
+    : 'bg-white border-gray-200')
 const checkSymbol = computed(() => state.value === 'on' ? '✓' : state.value === 'partial' ? '–' : '')
 const titleClass = computed(() => state.value === 'off' ? 'line-through text-gray-400' : 'text-gray-800')
 const fontWeight = computed(() => props.level === 0 ? 'font-bold' : props.level === 1 ? 'font-semibold' : 'font-normal')

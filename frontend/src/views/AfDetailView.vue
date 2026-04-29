@@ -237,7 +237,7 @@ watch(() => route.params.id, async () => {
       <!-- Sidebar arbre des sections (redimensionnable) -->
       <aside
         :style="{ width: treeWidth + 'px' }"
-        class="shrink-0 bg-white rounded-none border border-gray-200 overflow-y-auto relative"
+        class="shrink-0 bg-white rounded-lg border border-gray-200 overflow-y-auto relative"
       >
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -314,7 +314,7 @@ watch(() => route.params.id, async () => {
             :af-id="af.id"
           />
         </template>
-        <div v-else class="bg-white rounded-none border border-gray-200 p-12 text-center text-sm text-gray-400">
+        <div v-else class="bg-white rounded-lg border border-gray-200 p-12 text-center text-sm text-gray-400">
           Sélectionne une section dans l'arbre à gauche pour commencer.
         </div>
       </div>
@@ -339,11 +339,11 @@ watch(() => route.params.id, async () => {
           <label class="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
           <input v-model="addForm.title" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                  placeholder="Ex : Architecture réseau, Schéma de principe…"
-                 class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type de section</label>
-          <select v-model="addForm.kind" class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <select v-model="addForm.kind" class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="standard">Texte standard</option>
             <option value="equipment">Équipement (rattaché à un template)</option>
           </select>

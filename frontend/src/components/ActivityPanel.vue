@@ -74,7 +74,7 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <div class="bg-white rounded-none border border-gray-200">
+  <div class="bg-white rounded-lg border border-gray-200">
     <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
       <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 inline-flex items-center gap-1.5">
         <ClockIcon class="w-3.5 h-3.5" /> Activité récente

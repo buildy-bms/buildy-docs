@@ -203,7 +203,7 @@ function setLink() {
 </script>
 
 <template>
-  <div class="bg-white rounded-none border border-gray-200">
+  <div class="bg-white rounded-lg border border-gray-200">
     <!-- Header section : numéro + titre éditable + badges + autosave -->
     <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
       <span v-if="displayedNumber" class="text-sm font-semibold text-gray-400 shrink-0">
@@ -318,7 +318,7 @@ function setLink() {
         <label class="block text-xs font-semibold text-gray-700 mb-1">Instruction spécifique (optionnel)</label>
         <input v-model="claudeInstruction" type="text" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
                placeholder="Ex : insiste sur la traçabilité des dérives, mentionne le tableau de bord QAI…"
-               class="w-full px-3 py-2 border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+               class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
 
       <div class="flex items-center gap-3 text-xs">
@@ -331,7 +331,7 @@ function setLink() {
         </label>
       </div>
 
-      <div class="border border-gray-200 rounded-none min-h-50 max-h-[40vh] overflow-y-auto bg-gray-50">
+      <div class="border border-gray-200 rounded-lg min-h-50 max-h-[40vh] overflow-y-auto bg-gray-50">
         <div v-if="!claudePreview && !claudeStream.streaming.value" class="p-6 text-center text-xs text-gray-400 italic">
           Le brouillon de Claude apparaîtra ici en streaming.
         </div>
@@ -356,7 +356,7 @@ function setLink() {
         <SparklesIcon class="w-3.5 h-3.5" /> Lancer Claude
       </button>
       <template v-else>
-        <button @click="runClaude" class="px-3 py-1.5 text-xs border border-gray-300 hover:bg-gray-50">
+        <button @click="runClaude" class="px-3 py-1.5 text-xs border border-gray-200 hover:bg-gray-50">
           Régénérer
         </button>
         <button @click="applyClaude" class="px-3 py-1.5 text-xs bg-emerald-600 text-white hover:bg-emerald-700">
