@@ -1,11 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import Sortable from 'sortablejs'
+import { ref, computed, onMounted } from 'vue'
 import {
-  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon,
+  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon,
 } from '@heroicons/vue/24/outline'
 import {
-  listSectionTemplates, reorderSectionTemplates,
+  listSectionTemplates,
 } from '@/api'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
@@ -19,20 +18,11 @@ function availCell(value) {
   if (!value) return null
   return AVAIL_STYLES[value] || null
 }
-import { useNotification } from '@/composables/useNotification'
-
-const { error: notifyError } = useNotification()
 const items = ref([])
+const allTemplates = ref([])
 const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
-const tbodyRef = ref(null)
-let sortable = null
-
-async function refresh() {
-  const { data } = await listSectionTemplates({ kind: 'functionality' })
-  items.value = data
-}
 function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
 async function onSaved() {
@@ -45,49 +35,65 @@ async function onDeleted() {
   await refresh()
 }
 
-const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  if (!q) return items.value
-  return items.value.filter(t =>
-    (t.title || '').toLowerCase().includes(q) ||
-    (t.bacs_articles || '').toLowerCase().includes(q)
-  )
-})
-
-function setupSortable() {
-  if (sortable) { sortable.destroy(); sortable = null }
-  if (!tbodyRef.value || search.value.trim()) return
-  sortable = Sortable.create(tbodyRef.value, {
-    animation: 150,
-    handle: '.drag-handle',
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    dragClass: 'sortable-drag',
-    onEnd: async (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
-      const [moved] = items.value.splice(evt.oldIndex, 1)
-      items.value.splice(evt.newIndex, 0, moved)
-      try {
-        await reorderSectionTemplates({ ids: items.value.map(t => t.id) })
-      } catch {
-        notifyError('Échec de la réorganisation')
-        refresh()
-      }
-    },
-  })
+async function refresh() {
+  const [funcs, all] = await Promise.all([
+    listSectionTemplates({ kind: 'functionality' }),
+    listSectionTemplates({}),
+  ])
+  items.value = funcs.data
+  allTemplates.value = all.data
 }
 
-watch([items, search], async () => {
-  await nextTick()
-  setupSortable()
-}, { deep: false })
-
-onMounted(async () => {
-  await refresh()
-  await nextTick()
-  setupSortable()
+// Carte parent_id -> { title, path } pour afficher la section parente
+// avec son chemin (ex: "Bibliothèque › Application Hyperveez").
+const parentInfoById = computed(() => {
+  const byId = new Map(allTemplates.value.map(t => [t.id, t]))
+  function pathOf(t) {
+    const parts = []
+    let cur = t
+    while (cur) {
+      parts.unshift(cur.title)
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
+    }
+    return parts.join(' › ')
+  }
+  const map = new Map()
+  for (const t of allTemplates.value) {
+    map.set(t.id, { title: t.title, path: pathOf(t) })
+  }
+  return map
 })
-onBeforeUnmount(() => { if (sortable) sortable.destroy() })
+
+// Items enrichis du parent_title + path pour affichage et regroupement
+const enrichedItems = computed(() => items.value.map(t => {
+  const p = t.parent_template_id ? parentInfoById.value.get(t.parent_template_id) : null
+  return { ...t, parent_title: p?.title || null, parent_path: p?.path || null }
+}))
+
+// Groupes : key = parent_template_id || 'orphelins', valeur = liste de fonctionnalites
+const groupedItems = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const filtered = q
+    ? enrichedItems.value.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.bacs_articles || '').toLowerCase().includes(q) ||
+        (t.parent_title || '').toLowerCase().includes(q)
+      )
+    : enrichedItems.value
+  const groups = new Map()
+  for (const t of filtered) {
+    const key = t.parent_template_id || 'orphans'
+    if (!groups.has(key)) groups.set(key, { id: key, parent_path: t.parent_path, items: [] })
+    groups.get(key).items.push(t)
+  }
+  // Ordre des groupes : par parent_path alphabetiquement, orphelins a la fin
+  return [...groups.values()].sort((a, b) => {
+    if (a.id === 'orphans') return 1
+    if (b.id === 'orphans') return -1
+    return (a.parent_path || '').localeCompare(b.parent_path || '', 'fr')
+  })
+})
+onMounted(refresh)
 </script>
 
 <template>
@@ -96,8 +102,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
       <div>
         <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque de fonctionnalités</h1>
         <p class="text-sm text-gray-500 mt-1">
-          {{ items.length }} fonctionnalité{{ items.length > 1 ? 's' : '' }} Buildy.
-          Glisser-déposer pour réorganiser. Le PDF de synthèse liste ces fonctionnalités dans cet ordre, avec leur niveau de contrat minimum.
+          {{ items.length }} fonctionnalité{{ items.length > 1 ? 's' : '' }} Buildy, regroupées par section parente.
         </p>
       </div>
       <button @click="openCreate"
@@ -121,7 +126,6 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
-            <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Essentials</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
@@ -131,39 +135,45 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
-        <tbody ref="tbodyRef">
-          <tr v-for="t in filtered" :key="t.id"
-              class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
-              @click="openEditor(t)">
-            <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
-                @click.stop>
-              <Bars3Icon class="w-4 h-4 inline-block" />
-            </td>
-            <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
-            <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
-                class="px-3 py-2 text-center whitespace-nowrap">
-              <span v-if="availCell(t[lvl])"
-                    :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border', availCell(t[lvl]).cls]">
-                {{ availCell(t[lvl]).icon }} {{ availCell(t[lvl]).label }}
-              </span>
-              <span v-else class="text-gray-300 text-xs">—</span>
-            </td>
-            <td class="px-4 py-2 whitespace-nowrap">
-              <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
-              <span v-else class="text-gray-300 italic text-xs">—</span>
-            </td>
-            <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
-                {{ t.outdated_count }} / {{ t.affected_afs_count }}
-              </span>
-              <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
-            </td>
-            <td class="px-4 py-2 text-center whitespace-nowrap">
-              <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
-            </td>
-          </tr>
-          <tr v-if="!filtered.length">
-            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+        <tbody>
+          <template v-for="g in groupedItems" :key="g.id">
+            <!-- Ligne de groupe : section parente -->
+            <tr class="bg-indigo-50/60 border-t border-indigo-100 sticky-group">
+              <td colspan="7" class="px-4 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-indigo-700">
+                <span v-if="g.id === 'orphans'" class="text-gray-500">Sans section parente</span>
+                <span v-else>{{ g.parent_path }}</span>
+                <span class="ml-2 text-gray-400 normal-case font-normal">· {{ g.items.length }}</span>
+              </td>
+            </tr>
+            <tr v-for="t in g.items" :key="t.id"
+                class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
+                @click="openEditor(t)">
+              <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
+              <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
+                  class="px-3 py-2 text-center whitespace-nowrap">
+                <span v-if="availCell(t[lvl])"
+                      :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border', availCell(t[lvl]).cls]">
+                  {{ availCell(t[lvl]).icon }} {{ availCell(t[lvl]).label }}
+                </span>
+                <span v-else class="text-gray-300 text-xs">—</span>
+              </td>
+              <td class="px-4 py-2 whitespace-nowrap">
+                <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
+                <span v-else class="text-gray-300 italic text-xs">—</span>
+              </td>
+              <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
+                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
+                  {{ t.outdated_count }} / {{ t.affected_afs_count }}
+                </span>
+                <span v-else class="text-gray-500">{{ t.affected_afs_count || 0 }}</span>
+              </td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
+              </td>
+            </tr>
+          </template>
+          <tr v-if="!groupedItems.length">
+            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
             </td>
           </tr>
@@ -189,8 +199,3 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
     />
   </div>
 </template>
-
-<style scoped>
-.sortable-ghost { opacity: 0.4; background: #eef2ff; }
-.sortable-chosen { background: #eef2ff; }
-</style>

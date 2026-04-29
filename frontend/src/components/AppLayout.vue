@@ -67,10 +67,11 @@ async function logout() {
     </div>
 
     <div class="flex">
-      <!-- Sidebar -->
+      <!-- Sidebar : largeur auto en desktop (s'adapte a l'entree la plus large),
+           largeur fixe en mobile (drawer overlay) pour ne pas etre tronquee. -->
       <aside
         :class="[
-          'fixed inset-y-0 left-0 z-30 w-52 h-screen bg-indigo-600 flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0',
+          'fixed inset-y-0 left-0 z-30 w-60 lg:w-auto lg:min-w-48 lg:max-w-72 h-screen bg-indigo-600 flex flex-col transform transition-transform lg:translate-x-0 lg:sticky lg:top-0 shrink-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         ]"
       >
@@ -105,11 +106,11 @@ async function logout() {
               :to="item.to"
               @click="sidebarOpen = false"
               :class="[
-                'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
                 isActive(item.to) ? 'bg-white/15 text-white' : 'text-white/60 hover:bg-white/8 hover:text-white/90',
               ]"
             >
-              <component :is="item.icon" class="w-4.5 h-4.5" />
+              <component :is="item.icon" class="w-4.5 h-4.5 shrink-0" />
               {{ item.name }}
             </RouterLink>
           </template>
