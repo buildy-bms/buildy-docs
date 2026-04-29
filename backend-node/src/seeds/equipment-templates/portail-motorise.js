@@ -18,8 +18,8 @@ module.exports = {
 <p>La solution Buildy expose la commande d'ouverture automatique pour les scénarios applicatifs (intégration avec le contrôle d'accès, ouverture sur événement caméra, programmation horaire).</p>
 `.trim(),
   points: [
-    { slug: 'etat.ouverture', label: 'État ouverture (ouvert / fermé / en mouvement)', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'alarme.defaut', label: 'Défaut motorisation', dataType: 'Alarme', direction: 'read', position: 20, isOptional: true },
-    { slug: 'cmd.ouverture', label: 'Commande ouverture automatique', dataType: 'Commande', direction: 'write', position: 100 },
+    { slug: 'etat.ouverture', label: 'État ouverture (ouvert / fermé / en mouvement)', dataType: 'État', direction: 'read', position: 10, techName: 'Auto_Open_R', nature: 'Booléen' },
+    { slug: 'alarme.defaut', label: 'Défaut motorisation', dataType: 'Alarme', direction: 'read', position: 20, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
+    { slug: 'cmd.ouverture', label: 'Commande ouverture automatique', dataType: 'Commande', direction: 'write', position: 100, techName: 'Auto_Open_W', nature: 'Booléen' },
   ],
 };

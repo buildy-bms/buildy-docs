@@ -18,6 +18,6 @@ module.exports = {
 <p>La solution Buildy expose cette alarme pour notification immédiate à l'exploitant et corrélation avec les autres systèmes du tableau électrique.</p>
 `.trim(),
   points: [
-    { slug: 'alarme.sd', label: 'Signalisation défaut SD', dataType: 'Alarme', direction: 'read', position: 10 },
+    { slug: 'alarme.sd', label: 'Signalisation défaut SD', dataType: 'Alarme', direction: 'read', position: 10, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

@@ -18,12 +18,12 @@ module.exports = {
 <p>La solution Buildy supervise les états et la consommation par circuit, et porte l\'ensemble des logiques applicatives de déclenchement : calendrier, horloge astronomique, mesure crépusculaire, scénarios par usage.</p>
 `.trim(),
   points: [
-    { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20 },
-    { slug: 'mesure.luminosite_crepusculaire', label: 'Mesure crépusculaire', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30 },
-    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40 },
-    { slug: 'alarme.defaut_circuit', label: 'Défaut circuit / disjonction', dataType: 'Alarme', direction: 'read', position: 50 },
-    { slug: 'cmd.allumage', label: 'Commande allumage / extinction', dataType: 'Commande', direction: 'write', position: 100 },
-    { slug: 'cmd.gradation', label: 'Commande gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110 },
+    { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20, techName: 'Lighting_Value_R', nature: 'Numérique' },
+    { slug: 'mesure.luminosite_crepusculaire', label: 'Mesure crépusculaire', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30, nature: 'Numérique' },
+    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40, nature: 'Numérique' },
+    { slug: 'alarme.defaut_circuit', label: 'Défaut circuit / disjonction', dataType: 'Alarme', direction: 'read', position: 50, nature: 'Booléen' },
+    { slug: 'cmd.allumage', label: 'Commande allumage / extinction', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
+    { slug: 'cmd.gradation', label: 'Commande gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110, techName: 'Lighting_Value_W', nature: 'Numérique' },
   ],
 };

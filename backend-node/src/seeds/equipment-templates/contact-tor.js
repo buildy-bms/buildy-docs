@@ -18,6 +18,6 @@ module.exports = {
 <p>La solution Buildy lit l'état du contact pour déclencher les alertes ou intégrer cette information dans les scénarios applicatifs.</p>
 `.trim(),
   points: [
-    { slug: 'etat.contact', label: 'État du contact', dataType: 'État', direction: 'read', position: 10 },
+    { slug: 'etat.contact', label: 'État du contact', dataType: 'État', direction: 'read', position: 10, nature: 'Booléen' },
   ],
 };

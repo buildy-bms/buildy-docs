@@ -23,17 +23,17 @@ module.exports = {
 `.trim(),
   points: [
     // ── Donnees lues ──
-    { slug: 'temp.exterieure', label: 'Température extérieure', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10 },
-    { slug: 'etat.mode_chaud_froid', label: 'Mode global chaud/froid', dataType: 'État', direction: 'read', position: 20 },
-    { slug: 'etat.mode_vacances', label: 'Mode vacances / jour férié', dataType: 'État', direction: 'read', position: 30 },
-    { slug: 'alarme.defaut_general', label: 'Défaut général chaufferie', dataType: 'Alarme', direction: 'read', position: 40 },
-    { slug: 'alarme.manque_eau', label: 'Alarme manque d\'eau', dataType: 'Alarme', direction: 'read', position: 50 },
-    { slug: 'temp.depart_general', label: 'Température départ général', dataType: 'Mesure', direction: 'read', unit: '°C', position: 60, isOptional: true },
-    { slug: 'temp.retour_general', label: 'Température retour général', dataType: 'Mesure', direction: 'read', unit: '°C', position: 70, isOptional: true },
+    { slug: 'temp.exterieure', label: 'Température extérieure', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10, techName: 'Outside_Air_Temp_R', nature: 'Numérique' },
+    { slug: 'etat.mode_chaud_froid', label: 'Mode global chaud/froid', dataType: 'État', direction: 'read', position: 20, techName: 'Heat_Cool_Mode_R', nature: 'Booléen' },
+    { slug: 'etat.mode_vacances', label: 'Mode vacances / jour férié', dataType: 'État', direction: 'read', position: 30, techName: 'Holiday_Mode_R', nature: 'Booléen' },
+    { slug: 'alarme.defaut_general', label: 'Défaut général chaufferie', dataType: 'Alarme', direction: 'read', position: 40, techName: 'System_Fault_R', nature: 'Booléen' },
+    { slug: 'alarme.manque_eau', label: 'Alarme manque d\'eau', dataType: 'Alarme', direction: 'read', position: 50, techName: 'Water_Lack_Fault_R', nature: 'Booléen' },
+    { slug: 'temp.depart_general', label: 'Température départ général', dataType: 'Mesure', direction: 'read', unit: '°C', position: 60, isOptional: true, techName: 'Supply_Water_Temp_R', nature: 'Numérique' },
+    { slug: 'temp.retour_general', label: 'Température retour général', dataType: 'Mesure', direction: 'read', unit: '°C', position: 70, isOptional: true, techName: 'Return_Water_Temp_R', nature: 'Numérique' },
 
     // ── Donnees ecrites ──
-    { slug: 'cmd.mode_chaud_froid', label: 'Commande mode global chaud/froid', dataType: 'Commande', direction: 'write', position: 200 },
-    { slug: 'cmd.mode_vacances', label: 'Commande mode vacances', dataType: 'Commande', direction: 'write', position: 210 },
-    { slug: 'consigne.temperature_depart', label: 'Consigne température départ', dataType: 'Consigne', direction: 'write', unit: '°C', position: 220, isOptional: true },
+    { slug: 'cmd.mode_chaud_froid', label: 'Commande mode global chaud/froid', dataType: 'Commande', direction: 'write', position: 200, techName: 'Heat_Cool_Mode_W', nature: 'Booléen' },
+    { slug: 'cmd.mode_vacances', label: 'Commande mode vacances', dataType: 'Commande', direction: 'write', position: 210, techName: 'Holiday_Mode_W', nature: 'Booléen' },
+    { slug: 'consigne.temperature_depart', label: 'Consigne température départ', dataType: 'Consigne', direction: 'write', unit: '°C', position: 220, isOptional: true, techName: 'Setpoint_Temp_W', nature: 'Numérique' },
   ],
 };

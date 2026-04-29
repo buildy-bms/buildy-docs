@@ -20,15 +20,15 @@ module.exports = {
   points: [
     // Le triplet de base CO2 / Temperature / Humidite est obligatoire.
     // Le reste est optionnel et activable selon ce que le capteur fournit.
-    { slug: 'mesure.co2', label: 'Concentration CO₂', dataType: 'Mesure', direction: 'read', unit: 'ppm', position: 10 },
-    { slug: 'mesure.temperature', label: 'Température ambiante', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
-    { slug: 'mesure.humidite', label: 'Humidité relative', dataType: 'Mesure', direction: 'read', unit: '%', position: 30 },
-    { slug: 'mesure.cov', label: 'COV totaux', dataType: 'Mesure', direction: 'read', unit: 'ppb', position: 40, isOptional: true },
-    { slug: 'mesure.pression', label: 'Pression atmosphérique', dataType: 'Mesure', direction: 'read', unit: 'hPa', position: 50, isOptional: true },
-    { slug: 'mesure.pm25', label: 'Particules fines PM2.5', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 60, isOptional: true },
-    { slug: 'mesure.pm10', label: 'Particules fines PM10', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 70, isOptional: true },
-    { slug: 'mesure.formaldehyde', label: 'Formaldéhyde (HCHO)', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 80, isOptional: true },
-    { slug: 'alarme.seuil_co2', label: 'Dépassement seuil CO₂', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true },
-    { slug: 'alarme.defaut_capteur', label: 'Défaut capteur', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true },
+    { slug: 'mesure.co2', label: 'Concentration CO₂', dataType: 'Mesure', direction: 'read', unit: 'ppm', position: 10, techName: 'CO2_R', nature: 'Numérique' },
+    { slug: 'mesure.temperature', label: 'Température ambiante', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20, techName: 'Ambient_Temp_R', nature: 'Numérique' },
+    { slug: 'mesure.humidite', label: 'Humidité relative', dataType: 'Mesure', direction: 'read', unit: '%', position: 30, techName: 'Humidite_R', nature: 'Numérique' },
+    { slug: 'mesure.cov', label: 'COV totaux', dataType: 'Mesure', direction: 'read', unit: 'ppb', position: 40, isOptional: true, techName: 'COV_R', nature: 'Numérique' },
+    { slug: 'mesure.pression', label: 'Pression atmosphérique', dataType: 'Mesure', direction: 'read', unit: 'hPa', position: 50, isOptional: true, techName: 'Pressure_R', nature: 'Numérique' },
+    { slug: 'mesure.pm25', label: 'Particules fines PM2.5', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 60, isOptional: true, nature: 'Numérique' },
+    { slug: 'mesure.pm10', label: 'Particules fines PM10', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 70, isOptional: true, nature: 'Numérique' },
+    { slug: 'mesure.formaldehyde', label: 'Formaldéhyde (HCHO)', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 80, isOptional: true, nature: 'Numérique' },
+    { slug: 'alarme.seuil_co2', label: 'Dépassement seuil CO₂', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.defaut_capteur', label: 'Défaut capteur', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

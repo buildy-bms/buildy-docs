@@ -22,13 +22,13 @@ module.exports = {
   points: [
     // Index thermique obligatoire ; reste optionnel pour les sites qui veulent
     // le detail de l'echange thermique.
-    { slug: 'energie.totale', label: 'Énergie thermique totale (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', techName: 'E_THERMAL', nature: 'Numérique', position: 10 },
-    { slug: 'mesure.puissance', label: 'Puissance instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 20, isOptional: true },
-    { slug: 'mesure.debit', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 30, isOptional: true },
-    { slug: 'temp.depart', label: 'Température départ', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40, isOptional: true },
-    { slug: 'temp.retour', label: 'Température retour', dataType: 'Mesure', direction: 'read', unit: '°C', position: 50, isOptional: true },
-    { slug: 'temp.delta', label: 'Écart de température (Δt)', dataType: 'Mesure', direction: 'read', unit: 'K', position: 60, isOptional: true },
-    { slug: 'volume.total', label: 'Volume total circulé', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 70, isOptional: true },
-    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 80, isOptional: true },
+    { slug: 'energie.totale', label: 'Énergie thermique totale (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 10, techName: 'Thermal_Energy_Index_R', nature: 'Numérique' },
+    { slug: 'mesure.puissance', label: 'Puissance instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 20, isOptional: true, nature: 'Numérique' },
+    { slug: 'mesure.debit', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 30, isOptional: true, nature: 'Numérique' },
+    { slug: 'temp.depart', label: 'Température départ', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40, isOptional: true, techName: 'Supply_Water_Temp_R', nature: 'Numérique' },
+    { slug: 'temp.retour', label: 'Température retour', dataType: 'Mesure', direction: 'read', unit: '°C', position: 50, isOptional: true, techName: 'Return_Water_Temp_R', nature: 'Numérique' },
+    { slug: 'temp.delta', label: 'Écart de température (Δt)', dataType: 'Mesure', direction: 'read', unit: 'K', position: 60, isOptional: true, nature: 'Numérique' },
+    { slug: 'volume.total', label: 'Volume total circulé', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 70, isOptional: true, techName: 'Volume_Index_R', nature: 'Numérique' },
+    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 80, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

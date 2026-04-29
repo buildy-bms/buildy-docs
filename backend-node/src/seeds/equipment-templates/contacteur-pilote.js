@@ -18,7 +18,7 @@ module.exports = {
 <p><strong>La fonction est portée par le contacteur lui-même</strong> ; la solution Buildy expose la commande et l'état pour les scénarios horaires et la cohérence multi-systèmes (asservissement à la présence, à l'occupation, à un autre système).</p>
 `.trim(),
   points: [
-    { slug: 'etat.alimentation', label: 'État alimentation', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'cmd.alimentation', label: 'Commande alimentation', dataType: 'Commande', direction: 'write', position: 100 },
+    { slug: 'etat.alimentation', label: 'État alimentation', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'cmd.alimentation', label: 'Commande alimentation', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
   ],
 };

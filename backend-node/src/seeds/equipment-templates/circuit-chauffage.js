@@ -21,13 +21,13 @@ module.exports = {
 `.trim(),
   points: [
     // ── Donnees lues ──
-    { slug: 'temp.depart', label: 'Température départ d\'eau', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10 },
-    { slug: 'temp.retour', label: 'Température retour d\'eau', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
-    { slug: 'etat.pompe1', label: 'État pompe 1 (marche/arrêt)', dataType: 'État', direction: 'read', position: 30 },
-    { slug: 'etat.pompe2', label: 'État pompe 2 secours (marche/arrêt)', dataType: 'État', direction: 'read', position: 40, isOptional: true },
-    { slug: 'alarme.defaut_pompe1', label: 'Défaut pompe 1', dataType: 'Alarme', direction: 'read', position: 50 },
-    { slug: 'alarme.defaut_pompe2', label: 'Défaut pompe 2 secours', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
-    { slug: 'mesure.position_v3v', label: 'Position vanne 3 voies', dataType: 'Mesure', direction: 'read', unit: '%', position: 70 },
-    { slug: 'alarme.manque_eau', label: 'Alarme manque d\'eau', dataType: 'Alarme', direction: 'read', position: 80 },
+    { slug: 'temp.depart', label: 'Température départ d\'eau', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10, techName: 'Supply_Water_Temp_R', nature: 'Numérique' },
+    { slug: 'temp.retour', label: 'Température retour d\'eau', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20, techName: 'Return_Water_Temp_R', nature: 'Numérique' },
+    { slug: 'etat.pompe1', label: 'État pompe 1 (marche/arrêt)', dataType: 'État', direction: 'read', position: 30, techName: 'Pump1_On_Off_R', nature: 'Booléen' },
+    { slug: 'etat.pompe2', label: 'État pompe 2 secours (marche/arrêt)', dataType: 'État', direction: 'read', position: 40, isOptional: true, techName: 'Pump2_On_Off_R', nature: 'Booléen' },
+    { slug: 'alarme.defaut_pompe1', label: 'Défaut pompe 1', dataType: 'Alarme', direction: 'read', position: 50, techName: 'Pump1_Fault_R', nature: 'Booléen' },
+    { slug: 'alarme.defaut_pompe2', label: 'Défaut pompe 2 secours', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true, techName: 'Pump2_Fault_R', nature: 'Booléen' },
+    { slug: 'mesure.position_v3v', label: 'Position vanne 3 voies', dataType: 'Mesure', direction: 'read', unit: '%', position: 70, techName: '3Way_Valve_Position_R', nature: 'Numérique' },
+    { slug: 'alarme.manque_eau', label: 'Alarme manque d\'eau', dataType: 'Alarme', direction: 'read', position: 80, techName: 'Water_Lack_Fault_R', nature: 'Booléen' },
   ],
 };

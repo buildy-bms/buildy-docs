@@ -21,17 +21,17 @@ module.exports = {
 `.trim(),
   points: [
     // ── Donnees lues ──
-    { slug: 'mesure.temperature', label: 'Température mesurée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10 },
-    { slug: 'consigne.temperature_effective', label: 'Consigne température effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
-    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 30 },
-    { slug: 'etat.mode_chaud_froid', label: 'Mode chaud/froid', dataType: 'État', direction: 'read', position: 40, isOptional: true },
-    { slug: 'etat.mode_hvac', label: 'Mode HVAC (auto/éco/confort/...)', dataType: 'État', direction: 'read', position: 50, nature: 'Enum', isOptional: true },
-    { slug: 'alarme.defaut', label: 'Défaut thermostat', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
+    { slug: 'mesure.temperature', label: 'Température mesurée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 10, techName: 'Ambient_Temp_R', nature: 'Numérique' },
+    { slug: 'consigne.temperature_effective', label: 'Consigne température effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20, techName: 'Setpoint_Temp_R', nature: 'Numérique' },
+    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 30, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'etat.mode_chaud_froid', label: 'Mode chaud/froid', dataType: 'État', direction: 'read', position: 40, isOptional: true, techName: 'Heat_Cool_Mode_R', nature: 'Booléen' },
+    { slug: 'etat.mode_hvac', label: 'Mode HVAC (auto/éco/confort/...)', dataType: 'État', direction: 'read', position: 50, isOptional: true, techName: 'HVAC_Control_Mode_R', nature: 'Enum' },
+    { slug: 'alarme.defaut', label: 'Défaut thermostat', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
 
     // ── Donnees ecrites ──
-    { slug: 'consigne.temperature', label: 'Consigne température', dataType: 'Consigne', direction: 'write', unit: '°C', position: 200 },
-    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 210 },
-    { slug: 'cmd.mode_chaud_froid', label: 'Commande mode chaud/froid', dataType: 'Commande', direction: 'write', position: 220, isOptional: true },
-    { slug: 'cmd.mode_hvac', label: 'Commande mode HVAC', dataType: 'Commande', direction: 'write', position: 230, nature: 'Enum', isOptional: true },
+    { slug: 'consigne.temperature', label: 'Consigne température', dataType: 'Consigne', direction: 'write', unit: '°C', position: 200, techName: 'Setpoint_Temp_W', nature: 'Numérique' },
+    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 210, techName: 'On_Off_W', nature: 'Booléen' },
+    { slug: 'cmd.mode_chaud_froid', label: 'Commande mode chaud/froid', dataType: 'Commande', direction: 'write', position: 220, isOptional: true, techName: 'Heat_Cool_Mode_W', nature: 'Booléen' },
+    { slug: 'cmd.mode_hvac', label: 'Commande mode HVAC', dataType: 'Commande', direction: 'write', position: 230, isOptional: true, techName: 'HVAC_Control_Mode_W', nature: 'Enum' },
   ],
 };

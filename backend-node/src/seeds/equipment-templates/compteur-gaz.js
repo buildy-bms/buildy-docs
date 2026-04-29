@@ -22,11 +22,10 @@ module.exports = {
   points: [
     // Seul l'index volume est obligatoire. Les autres restent disponibles
     // mais marques optionnels (decoche par defaut a l'instance).
-    { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', techName: 'V_TOTAL', nature: 'Numérique', position: 10 },
-    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20, isOptional: true },
-    { slug: 'energie.totale', label: 'Énergie totale consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30, isOptional: true },
-    { slug: 'mesure.debit_instantane', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 40, isOptional: true },
-    { slug: 'mesure.pression', label: 'Pression', dataType: 'Mesure', direction: 'read', unit: 'mbar', position: 50, isOptional: true },
-    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
+    { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 10, techName: 'Volume_Index_R', nature: 'Numérique' },
+    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20, isOptional: true, nature: 'Numérique' },
+    { slug: 'mesure.debit_instantane', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 40, isOptional: true, nature: 'Numérique' },
+    { slug: 'mesure.pression', label: 'Pression', dataType: 'Mesure', direction: 'read', unit: 'mbar', position: 50, isOptional: true, techName: 'Pressure_R', nature: 'Numérique' },
+    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

@@ -22,14 +22,14 @@ module.exports = {
   points: [
     // L'on/off est obligatoire ; la gradation et le reste sont optionnels
     // (couvre les eclairages on/off purs sans gradation).
-    { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20, isOptional: true },
-    { slug: 'mesure.luminosite_ambiante', label: 'Luminosité ambiante mesurée', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30, isOptional: true },
-    { slug: 'etat.detection_presence', label: 'Détection de présence', dataType: 'État', direction: 'read', position: 40, isOptional: true },
-    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50, isOptional: true },
-    { slug: 'alarme.defaut_luminaire', label: 'Défaut luminaire (DALI/driver)', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true },
-    { slug: 'cmd.allumage', label: 'Commande allumage / extinction', dataType: 'Commande', direction: 'write', position: 100 },
-    { slug: 'cmd.gradation', label: 'Commande niveau de gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110, isOptional: true },
-    { slug: 'cmd.scenario', label: 'Commande scénario', dataType: 'Commande', direction: 'write', position: 120, isOptional: true },
+    { slug: 'etat.allume', label: 'État allumé / éteint', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'mesure.niveau_gradation', label: 'Niveau de gradation effectif', dataType: 'Mesure', direction: 'read', unit: '%', position: 20, isOptional: true, techName: 'Lighting_Value_R', nature: 'Numérique' },
+    { slug: 'mesure.luminosite_ambiante', label: 'Luminosité ambiante mesurée', dataType: 'Mesure', direction: 'read', unit: 'lux', position: 30, isOptional: true, nature: 'Numérique' },
+    { slug: 'etat.detection_presence', label: 'Détection de présence', dataType: 'État', direction: 'read', position: 40, isOptional: true, nature: 'Booléen' },
+    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 50, isOptional: true, nature: 'Numérique' },
+    { slug: 'alarme.defaut_luminaire', label: 'Défaut luminaire (DALI/driver)', dataType: 'Alarme', direction: 'read', position: 60, isOptional: true, techName: 'DALI_Fault_R', nature: 'Booléen' },
+    { slug: 'cmd.allumage', label: 'Commande allumage / extinction', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
+    { slug: 'cmd.gradation', label: 'Commande niveau de gradation', dataType: 'Commande', direction: 'write', unit: '%', position: 110, isOptional: true, techName: 'Lighting_Value_W', nature: 'Numérique' },
+    { slug: 'cmd.scenario', label: 'Commande scénario', dataType: 'Commande', direction: 'write', position: 120, isOptional: true, nature: 'Booléen' },
   ],
 };

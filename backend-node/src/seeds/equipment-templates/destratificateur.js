@@ -20,12 +20,12 @@ module.exports = {
 <p>La solution Buildy supervise son état et peut transmettre une commande marche/arrêt et une consigne d\'écart de déclenchement.</p>
 `.trim(),
   points: [
-    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'temp.haute', label: 'Température air en hauteur', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20 },
-    { slug: 'temp.basse', label: 'Température air en partie basse', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
-    { slug: 'mesure.ecart', label: 'Écart de température mesuré', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
-    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50 },
-    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100 },
-    { slug: 'consigne.ecart_declenchement', label: 'Consigne écart de déclenchement', dataType: 'Consigne', direction: 'write', unit: '°C', position: 110 },
+    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'temp.haute', label: 'Température air en hauteur', dataType: 'Mesure', direction: 'read', unit: '°C', position: 20, nature: 'Numérique' },
+    { slug: 'temp.basse', label: 'Température air en partie basse', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30, nature: 'Numérique' },
+    { slug: 'mesure.ecart', label: 'Écart de température mesuré', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40, nature: 'Numérique' },
+    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50, techName: 'System_Fault_R', nature: 'Booléen' },
+    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
+    { slug: 'consigne.ecart_declenchement', label: 'Consigne écart de déclenchement', dataType: 'Consigne', direction: 'write', unit: '°C', position: 110, nature: 'Numérique' },
   ],
 };

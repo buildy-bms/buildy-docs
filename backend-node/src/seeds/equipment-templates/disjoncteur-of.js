@@ -18,6 +18,6 @@ module.exports = {
 <p>La solution Buildy supervise cet état pour la cohérence du tableau de bord électrique et la détection d'anomalies.</p>
 `.trim(),
   points: [
-    { slug: 'etat.of', label: 'État OF (ouvert / fermé)', dataType: 'État', direction: 'read', position: 10 },
+    { slug: 'etat.of', label: 'État OF (ouvert / fermé)', dataType: 'État', direction: 'read', position: 10, techName: 'Breaker_Status_R', nature: 'Booléen' },
   ],
 };

@@ -20,14 +20,14 @@ module.exports = {
 <p>La solution Buildy supervise l\'aérotherme en lisant son état, sa consigne effective et ses éventuels défauts, et peut transmettre une commande marche/arrêt et une consigne de température.</p>
 `.trim(),
   points: [
-    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10 },
-    { slug: 'etat.vitesse_ventilation', label: 'Vitesse de ventilation effective', dataType: 'État', direction: 'read', position: 20 },
-    { slug: 'temp.ambiance', label: 'Température d\'ambiance mesurée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30 },
-    { slug: 'consigne.effective', label: 'Consigne de température effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40 },
-    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50 },
-    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60 },
-    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100 },
-    { slug: 'cmd.vitesse_ventilation', label: 'Commande vitesse de ventilation', dataType: 'Commande', direction: 'write', position: 110 },
-    { slug: 'consigne.temperature', label: 'Consigne de température', dataType: 'Consigne', direction: 'write', unit: '°C', position: 120 },
+    { slug: 'etat.marche_arret', label: 'État marche/arrêt', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
+    { slug: 'etat.vitesse_ventilation', label: 'Vitesse de ventilation effective', dataType: 'État', direction: 'read', position: 20, techName: 'Fan_Level_R', nature: 'Enum' },
+    { slug: 'temp.ambiance', label: 'Température d\'ambiance mesurée', dataType: 'Mesure', direction: 'read', unit: '°C', position: 30, techName: 'Ambient_Temp_R', nature: 'Numérique' },
+    { slug: 'consigne.effective', label: 'Consigne de température effective', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40, techName: 'Setpoint_Temp_R', nature: 'Numérique' },
+    { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50, techName: 'System_Fault_R', nature: 'Booléen' },
+    { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60, techName: 'System_Fault_R', nature: 'Booléen' },
+    { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
+    { slug: 'cmd.vitesse_ventilation', label: 'Commande vitesse de ventilation', dataType: 'Commande', direction: 'write', position: 110, techName: 'Fan_Level_W', nature: 'Enum' },
+    { slug: 'consigne.temperature', label: 'Consigne de température', dataType: 'Consigne', direction: 'write', unit: '°C', position: 120, techName: 'Setpoint_Temp_W', nature: 'Numérique' },
   ],
 };
