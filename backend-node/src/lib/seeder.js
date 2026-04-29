@@ -42,6 +42,7 @@ function seedLibraryOnBoot() {
   let createdCount = 0;
   let enrichedCount = 0;
   let pointsCreated = 0;
+  let pointsEnriched = 0;
 
   for (const tpl of ALL_TEMPLATES) {
     const existing = db.equipmentTemplates.getBySlug(tpl.slug);
@@ -80,19 +81,43 @@ function seedLibraryOnBoot() {
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
 
-      // Points : on n'ajoute QUE ceux dont le slug n'existe pas déjà
-      const existingSlugs = new Set(db.equipmentTemplatePoints.listByTemplate(existing.id).map(p => p.slug));
+      // Points : on n'ajoute QUE ceux dont le slug n'existe pas déjà.
+      // Pour les points existants, on enrichit uniquement les meta absentes
+      // (tech_name, nature) sans toucher au reste : preserve les modifs user
+      // tout en remontant les valeurs canoniques absentes (cas typique :
+      // points seedes avant l'introduction de tech_name/nature).
+      const existingPoints = db.equipmentTemplatePoints.listByTemplate(existing.id);
+      const existingBySlug = new Map(existingPoints.map(p => [p.slug, p]));
       for (const p of (tpl.points || [])) {
-        if (existingSlugs.has(p.slug)) continue;
-        try {
-          db.equipmentTemplatePoints.create(existing.id, {
-            slug: p.slug, position: p.position, label: p.label,
-            dataType: p.dataType, direction: p.direction, unit: p.unit,
-            techName: p.techName, nature: p.nature,
-          });
-          pointsCreated++;
-          changed = true;
-        } catch { /* ignore unique conflict */ }
+        const existingPt = existingBySlug.get(p.slug);
+        if (!existingPt) {
+          try {
+            db.equipmentTemplatePoints.create(existing.id, {
+              slug: p.slug, position: p.position, label: p.label,
+              dataType: p.dataType, direction: p.direction, unit: p.unit,
+              techName: p.techName, nature: p.nature, isOptional: p.isOptional,
+            });
+            pointsCreated++;
+            changed = true;
+          } catch { /* ignore unique conflict */ }
+        } else {
+          // Enrichissement non-destructif : on remplit techName / nature
+          // SI ils sont vides en DB ET qu'on en a une valeur dans le seed.
+          const updates = [];
+          const params = [];
+          if (!existingPt.tech_name && p.techName) {
+            updates.push('tech_name = ?'); params.push(p.techName);
+          }
+          if (!existingPt.nature && p.nature) {
+            updates.push('nature = ?'); params.push(p.nature);
+          }
+          if (updates.length) {
+            params.push(existingPt.id);
+            db.db.prepare(`UPDATE equipment_template_points SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+            pointsEnriched++;
+            changed = true;
+          }
+        }
       }
 
       if (changed) {
@@ -105,6 +130,7 @@ function seedLibraryOnBoot() {
   if (createdCount > 0) log.info(`Seed library: ${createdCount} template(s) crees`);
   if (enrichedCount > 0) log.info(`Seed library: ${enrichedCount} template(s) enrichis (Lot 20)`);
   if (pointsCreated > 0) log.info(`Seed library: ${pointsCreated} point(s) seeds`);
+  if (pointsEnriched > 0) log.info(`Seed library: ${pointsEnriched} point(s) enrichis (techName/nature)`);
 
   // Filet de securite : tout template doit avoir un snapshot pour sa version
   // courante (necessaire au diff de propagation Lot 9). Idempotent.
