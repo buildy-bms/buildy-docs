@@ -19,11 +19,11 @@ module.exports = {
 `.trim(),
   points: [
     { slug: 'mesure.position', label: 'Position effective', dataType: 'Mesure', direction: 'read', unit: '%', position: 10, techName: 'Position_R', nature: 'Numérique' },
-    { slug: 'etat.deplacement', label: 'État en cours de déplacement', dataType: 'État', direction: 'read', position: 20, nature: 'Booléen' },
-    { slug: 'alarme.defaut_moteur', label: 'Défaut moteur', dataType: 'Alarme', direction: 'read', position: 30, nature: 'Booléen' },
+    { slug: 'etat.deplacement', label: 'État en cours de déplacement', dataType: 'État', direction: 'read', position: 20, nature: 'Booléen', techName: 'Up_Down_R' },
+    { slug: 'alarme.defaut_moteur', label: 'Défaut moteur', dataType: 'Alarme', direction: 'read', position: 30, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'cmd.ouverture', label: 'Commande ouverture', dataType: 'Commande', direction: 'write', position: 100, techName: 'Auto_Open_W', nature: 'Booléen' },
-    { slug: 'cmd.fermeture', label: 'Commande fermeture', dataType: 'Commande', direction: 'write', position: 110, nature: 'Booléen' },
-    { slug: 'cmd.stop', label: 'Commande stop', dataType: 'Commande', direction: 'write', position: 120, nature: 'Booléen' },
+    { slug: 'cmd.fermeture', label: 'Commande fermeture', dataType: 'Commande', direction: 'write', position: 110, nature: 'Booléen', techName: 'Up_Down_W' },
+    { slug: 'cmd.stop', label: 'Commande stop', dataType: 'Commande', direction: 'write', position: 120, nature: 'Booléen', techName: 'Stop_W' },
     { slug: 'cmd.position', label: 'Commande position cible', dataType: 'Commande', direction: 'write', unit: '%', position: 130, techName: 'Position_W', nature: 'Numérique' },
   ],
 };

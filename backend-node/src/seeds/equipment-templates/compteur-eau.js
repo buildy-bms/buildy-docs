@@ -20,9 +20,9 @@ module.exports = {
   points: [
     // Index obligatoire, autres mesures optionnelles.
     { slug: 'volume.total', label: 'Volume total consommé (index)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 10, techName: 'Volume_Index_R', nature: 'Numérique' },
-    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20, isOptional: true, nature: 'Numérique' },
+    { slug: 'volume.partiel', label: 'Volume partiel (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'm³', position: 20, isOptional: true, nature: 'Numérique', techName: 'Volume_Index_R' },
     { slug: 'mesure.debit_instantane', label: 'Débit instantané', dataType: 'Mesure', direction: 'read', unit: 'm³/h', position: 30, isOptional: true, nature: 'Numérique' },
-    { slug: 'alarme.fuite_potentielle', label: 'Alarme fuite potentielle (consommation continue)', dataType: 'Alarme', direction: 'read', position: 40, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.fuite_potentielle', label: 'Alarme fuite potentielle (consommation continue)', dataType: 'Alarme', direction: 'read', position: 40, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 50, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

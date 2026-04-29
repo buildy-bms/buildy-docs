@@ -26,7 +26,7 @@ module.exports = {
     { slug: 'etat.autorisation', label: 'État autorisation de fonctionnement', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
     { slug: 'energie.delivree', label: 'Énergie délivrée (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 20, techName: 'Active_Energy_Index_R', nature: 'Numérique' },
     { slug: 'mesure.puissance', label: 'Puissance instantanée délivrée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 30, isOptional: true, nature: 'Numérique' },
-    { slug: 'etat.session_active', label: 'Session de recharge en cours', dataType: 'État', direction: 'read', position: 40, isOptional: true, nature: 'Booléen' },
+    { slug: 'etat.session_active', label: 'Session de recharge en cours', dataType: 'État', direction: 'read', position: 40, isOptional: true, nature: 'Booléen', techName: 'On_Off_R' },
     { slug: 'alarme.defaut', label: 'Défaut borne', dataType: 'Alarme', direction: 'read', position: 50, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
     { slug: 'cmd.autorisation', label: 'Commande autorisation', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
     { slug: 'consigne.puissance_max', label: 'Consigne puissance maximale', dataType: 'Consigne', direction: 'write', unit: 'kW', position: 110, isOptional: true, nature: 'Numérique' },

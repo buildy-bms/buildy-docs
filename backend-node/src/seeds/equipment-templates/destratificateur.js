@@ -26,6 +26,6 @@ module.exports = {
     { slug: 'mesure.ecart', label: 'Écart de température mesuré', dataType: 'Mesure', direction: 'read', unit: '°C', position: 40, nature: 'Numérique' },
     { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50, techName: 'System_Fault_R', nature: 'Booléen' },
     { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
-    { slug: 'consigne.ecart_declenchement', label: 'Consigne écart de déclenchement', dataType: 'Consigne', direction: 'write', unit: '°C', position: 110, nature: 'Numérique' },
+    { slug: 'consigne.ecart_declenchement', label: 'Consigne écart de déclenchement', dataType: 'Consigne', direction: 'write', unit: '°C', position: 110, nature: 'Numérique', techName: 'Setpoint_Temp_W' },
   ],
 };

@@ -28,7 +28,7 @@ module.exports = {
     { slug: 'mesure.pm25', label: 'Particules fines PM2.5', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 60, isOptional: true, nature: 'Numérique' },
     { slug: 'mesure.pm10', label: 'Particules fines PM10', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 70, isOptional: true, nature: 'Numérique' },
     { slug: 'mesure.formaldehyde', label: 'Formaldéhyde (HCHO)', dataType: 'Mesure', direction: 'read', unit: 'µg/m³', position: 80, isOptional: true, nature: 'Numérique' },
-    { slug: 'alarme.seuil_co2', label: 'Dépassement seuil CO₂', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.seuil_co2', label: 'Dépassement seuil CO₂', dataType: 'Alarme', direction: 'read', position: 90, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.defaut_capteur', label: 'Défaut capteur', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true, techName: 'System_Fault_R', nature: 'Booléen' },
   ],
 };

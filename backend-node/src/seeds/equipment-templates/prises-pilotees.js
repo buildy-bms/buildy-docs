@@ -20,8 +20,8 @@ module.exports = {
   points: [
     { slug: 'etat.alimentation', label: 'État alimentation', dataType: 'État', direction: 'read', position: 10, techName: 'On_Off_R', nature: 'Booléen' },
     { slug: 'mesure.puissance_instantanee', label: 'Puissance instantanée', dataType: 'Mesure', direction: 'read', unit: 'W', position: 20, nature: 'Numérique' },
-    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30, nature: 'Numérique' },
-    { slug: 'alarme.surconsommation', label: 'Alarme surconsommation', dataType: 'Alarme', direction: 'read', position: 40, nature: 'Booléen' },
+    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 30, nature: 'Numérique', techName: 'Active_Energy_Index_R' },
+    { slug: 'alarme.surconsommation', label: 'Alarme surconsommation', dataType: 'Alarme', direction: 'read', position: 40, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'cmd.alimentation', label: 'Commande alimentation (ON/OFF)', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
   ],
 };

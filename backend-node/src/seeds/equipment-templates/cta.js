@@ -50,12 +50,12 @@ module.exports = {
     { slug: 'etat.filtre_reprise_encrasse', label: 'État encrassement filtre reprise', dataType: 'État', direction: 'read', position: 110, isOptional: true, techName: 'Filter_Fault_R', nature: 'Booléen' },
     { slug: 'etat.post_ventilation_active', label: 'État post-ventilation active', dataType: 'État', direction: 'read', position: 120, isOptional: true, nature: 'Booléen' },
     { slug: 'alarme.defaut_communication', label: 'Défaut communication avec l\'automate CTA', dataType: 'Alarme', direction: 'read', position: 130, techName: 'System_Fault_R', nature: 'Booléen' },
-    { slug: 'alarme.manque_debit_air', label: 'Alarme manque de débit d\'air', dataType: 'Alarme', direction: 'read', position: 140, isOptional: true, nature: 'Booléen' },
-    { slug: 'alarme.batterie_postchauffage', label: 'Alarme batterie de postchauffage', dataType: 'Alarme', direction: 'read', position: 150, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.manque_debit_air', label: 'Alarme manque de débit d\'air', dataType: 'Alarme', direction: 'read', position: 140, isOptional: true, nature: 'Booléen', techName: 'Filter_Fault_R' },
+    { slug: 'alarme.batterie_postchauffage', label: 'Alarme batterie de postchauffage', dataType: 'Alarme', direction: 'read', position: 150, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.antigel', label: 'Alarme antigel batterie', dataType: 'Alarme', direction: 'read', position: 155, isOptional: true, techName: 'Antifreeze_Fault_R', nature: 'Booléen' },
-    { slug: 'alarme.incendie', label: 'Alarme incendie', dataType: 'Alarme', direction: 'read', position: 160, isOptional: true, nature: 'Booléen' },
-    { slug: 'alarme.defaut_echangeur', label: 'Défaut échangeur', dataType: 'Alarme', direction: 'read', position: 170, isOptional: true, nature: 'Booléen' },
-    { slug: 'alarme.defaut_sonde_qai', label: 'Défaut sonde qualité d\'air', dataType: 'Alarme', direction: 'read', position: 180, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.incendie', label: 'Alarme incendie', dataType: 'Alarme', direction: 'read', position: 160, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
+    { slug: 'alarme.defaut_echangeur', label: 'Défaut échangeur', dataType: 'Alarme', direction: 'read', position: 170, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
+    { slug: 'alarme.defaut_sonde_qai', label: 'Défaut sonde qualité d\'air', dataType: 'Alarme', direction: 'read', position: 180, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
     { slug: 'alarme.code_erreur', label: 'Code erreur constructeur', dataType: 'Alarme', direction: 'read', position: 190, isOptional: true, techName: 'Error_Code_R', nature: 'Chaîne' },
 
     // ── Donnees ecrites ──

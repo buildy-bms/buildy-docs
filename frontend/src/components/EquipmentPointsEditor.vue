@@ -43,6 +43,13 @@ const NATURES = [
 ]
 
 // Couleurs par data_type (palette Buildy)
+const NATURE_COLORS = {
+  'Booléen':   'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'Numérique': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Enum':      'bg-violet-50 text-violet-700 border-violet-200',
+  'Chaîne':    'bg-orange-50 text-orange-700 border-orange-200',
+}
+
 const TYPE_COLORS = {
   Mesure:   'bg-blue-50 text-blue-700 border-blue-200',
   'État':   'bg-gray-100 text-gray-700 border-gray-200',
@@ -234,7 +241,7 @@ onBeforeUnmount(teardownSortables)
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium">Identifiant</th>
+              <th class="text-left px-3 py-2 font-medium">Identifiant<br><span class="font-normal text-gray-400 normal-case">+ nom technique</span></th>
               <th class="text-left px-3 py-2 font-medium">Nom</th>
               <th class="text-left px-3 py-2 font-medium w-24">Type</th>
               <th class="text-left px-3 py-2 font-medium w-20">Unité</th>
@@ -253,7 +260,11 @@ onBeforeUnmount(teardownSortables)
                     @click.stop>
                   <Bars3Icon class="w-4 h-4 inline-block" />
                 </td>
-                <td class="px-3 py-1.5 text-xs font-mono text-gray-500">{{ p.slug }}</td>
+                <td class="px-3 py-1.5">
+                  <div class="text-xs font-mono text-gray-700">{{ p.slug }}</div>
+                  <div v-if="p.tech_name" class="text-[10px] font-mono text-gray-400 mt-0.5">{{ p.tech_name }}</div>
+                  <div v-else class="text-[10px] text-gray-300 italic mt-0.5">pas de nom technique</div>
+                </td>
                 <td class="px-3 py-1.5 text-gray-800" :class="p.is_optional ? 'italic text-gray-500' : ''">
                   {{ p.label }}
                   <span v-if="p.is_optional" class="text-[10px] text-gray-400 ml-1">(optionnel)</span>
@@ -264,7 +275,12 @@ onBeforeUnmount(teardownSortables)
                   </span>
                 </td>
                 <td class="px-3 py-1.5 text-xs text-gray-600 tabular-nums">{{ p.unit || '—' }}</td>
-                <td class="px-3 py-1.5 text-xs text-gray-500 italic">{{ p.nature || '—' }}</td>
+                <td class="px-3 py-1.5">
+                  <span v-if="p.nature" :class="['inline-flex items-center px-2 py-0.5 text-[10px] rounded-full border', NATURE_COLORS[p.nature] || 'bg-gray-50 text-gray-600 border-gray-200']">
+                    {{ p.nature }}
+                  </span>
+                  <span v-else class="text-gray-300 text-xs">—</span>
+                </td>
                 <td class="px-3 py-1.5 text-center">
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
@@ -277,9 +293,11 @@ onBeforeUnmount(teardownSortables)
               <!-- Ligne edition -->
               <tr v-else :data-id="p.id" class="border-t border-gray-100 bg-indigo-50/40">
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
-                <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].slug" type="text"
+                <td class="px-2 py-1.5 space-y-1">
+                  <input v-model="editing[p.id].slug" type="text" placeholder="identifiant interne"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                  <input v-model="editing[p.id].tech_name" type="text" placeholder="nom technique (passerelle)"
+                         class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-[10px] font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
                   <input v-model="editing[p.id].label" type="text"
@@ -318,9 +336,11 @@ onBeforeUnmount(teardownSortables)
             <!-- Ligne ajout -->
             <tr v-if="adding === 'read'" class="border-t border-gray-100 bg-emerald-50/40">
               <td class="px-2 text-center text-emerald-400"><PlusIcon class="w-4 h-4 inline-block" /></td>
-              <td class="px-2 py-1.5">
-                <input v-model="addDraft.slug" type="text" placeholder="ex: temp.depart_eau"
+              <td class="px-2 py-1.5 space-y-1">
+                <input v-model="addDraft.slug" type="text" placeholder="identifiant interne (ex: temp.depart_eau)"
                        class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input v-model="addDraft.tech_name" type="text" placeholder="nom technique passerelle (ex: Supply_Water_Temp_R)"
+                       class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-[10px] font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5">
                 <input v-model="addDraft.label" type="text" placeholder="ex: Température départ d'eau"
@@ -383,7 +403,7 @@ onBeforeUnmount(teardownSortables)
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
               <th class="w-8"></th>
-              <th class="text-left px-3 py-2 font-medium">Identifiant</th>
+              <th class="text-left px-3 py-2 font-medium">Identifiant<br><span class="font-normal text-gray-400 normal-case">+ nom technique</span></th>
               <th class="text-left px-3 py-2 font-medium">Nom</th>
               <th class="text-left px-3 py-2 font-medium w-24">Type</th>
               <th class="text-left px-3 py-2 font-medium w-20">Unité</th>
@@ -401,7 +421,11 @@ onBeforeUnmount(teardownSortables)
                     @click.stop>
                   <Bars3Icon class="w-4 h-4 inline-block" />
                 </td>
-                <td class="px-3 py-1.5 text-xs font-mono text-gray-500">{{ p.slug }}</td>
+                <td class="px-3 py-1.5">
+                  <div class="text-xs font-mono text-gray-700">{{ p.slug }}</div>
+                  <div v-if="p.tech_name" class="text-[10px] font-mono text-gray-400 mt-0.5">{{ p.tech_name }}</div>
+                  <div v-else class="text-[10px] text-gray-300 italic mt-0.5">pas de nom technique</div>
+                </td>
                 <td class="px-3 py-1.5 text-gray-800" :class="p.is_optional ? 'italic text-gray-500' : ''">
                   {{ p.label }}
                   <span v-if="p.is_optional" class="text-[10px] text-gray-400 ml-1">(optionnel)</span>
@@ -412,7 +436,12 @@ onBeforeUnmount(teardownSortables)
                   </span>
                 </td>
                 <td class="px-3 py-1.5 text-xs text-gray-600 tabular-nums">{{ p.unit || '—' }}</td>
-                <td class="px-3 py-1.5 text-xs text-gray-500 italic">{{ p.nature || '—' }}</td>
+                <td class="px-3 py-1.5">
+                  <span v-if="p.nature" :class="['inline-flex items-center px-2 py-0.5 text-[10px] rounded-full border', NATURE_COLORS[p.nature] || 'bg-gray-50 text-gray-600 border-gray-200']">
+                    {{ p.nature }}
+                  </span>
+                  <span v-else class="text-gray-300 text-xs">—</span>
+                </td>
                 <td class="px-3 py-1.5 text-center">
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
@@ -424,9 +453,11 @@ onBeforeUnmount(teardownSortables)
               </tr>
               <tr v-else :data-id="p.id" class="border-t border-gray-100 bg-indigo-50/40">
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
-                <td class="px-2 py-1.5">
-                  <input v-model="editing[p.id].slug" type="text"
+                <td class="px-2 py-1.5 space-y-1">
+                  <input v-model="editing[p.id].slug" type="text" placeholder="identifiant interne"
                          class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                  <input v-model="editing[p.id].tech_name" type="text" placeholder="nom technique (passerelle)"
+                         class="w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-[10px] font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5">
                   <input v-model="editing[p.id].label" type="text"

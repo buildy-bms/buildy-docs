@@ -10,6 +10,7 @@ import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
+import EquipmentPointsEditor from '@/components/EquipmentPointsEditor.vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -84,6 +85,14 @@ const TYPE_COLORS = {
   Consigne: { bg: 'bg-amber-50',    text: 'text-amber-700' },
 }
 
+// Pilules nature (alignees BT) : couleur selon le type primitif
+const NATURE_COLORS = {
+  'Booléen':   'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'Numérique': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'Enum':      'bg-violet-50 text-violet-700 border-violet-200',
+  'Chaîne':    'bg-orange-50 text-orange-700 border-orange-200',
+}
+
 const grouped = computed(() => {
   const groups = {}
   for (const t of templates.value) {
@@ -127,6 +136,14 @@ async function openTemplate(t) {
   selected.value = tplRes.data
   versions.value = verRes.data.versions || []
   affectedAfs.value = afsRes.data.afs || []
+}
+
+// Recharge le modele courant apres une modif inline des points (depuis
+// le composant EquipmentPointsEditor).
+async function refreshSelected() {
+  if (!selected.value?.id) return
+  const { data } = await getEquipmentTemplate(selected.value.id)
+  selected.value = data
 }
 
 onMounted(async () => {
@@ -304,47 +321,15 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Edition inline des points (lectures + ecritures) directement
+           depuis la vue detail, plus besoin d'ouvrir la modale d'edition -->
       <div class="mb-6">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-          Données typiquement lues ({{ selected.points.filter(p => p.direction === 'read').length }})
-        </h3>
-        <div v-if="selected.points.filter(p => p.direction === 'read').length" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
-              <tr>
-                <th class="text-left px-4 py-2 font-medium">Donnée</th>
-                <th class="text-left px-4 py-2 font-medium w-44">Nom technique</th>
-                <th class="text-left px-4 py-2 font-medium w-28">Type</th>
-                <th class="text-left px-4 py-2 font-medium w-24">Nature</th>
-                <th class="text-left px-4 py-2 font-medium w-20">Unité</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in selected.points.filter(p => p.direction === 'read')" :key="p.id" class="border-t border-gray-100" :class="p.is_optional ? 'bg-gray-50/50' : ''">
-                <td class="px-4 py-2" :class="p.is_optional ? 'text-gray-500 italic' : 'text-gray-800'">
-                  {{ p.label }}
-                  <span v-if="p.is_optional" class="ml-1 text-[10px] text-gray-400 not-italic">(optionnel)</span>
-                </td>
-                <td class="px-4 py-2 text-xs">
-                  <code v-if="p.tech_name" class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-gray-700">{{ p.tech_name }}</code>
-                  <span v-else class="text-gray-300 italic">—</span>
-                </td>
-                <td class="px-4 py-2">
-                  <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
-                </td>
-                <td class="px-4 py-2 text-gray-500 text-xs italic">{{ p.nature || '—' }}</td>
-                <td class="px-4 py-2 text-gray-500 text-center font-variant-numeric tabular-nums">{{ p.unit || '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-else class="text-sm text-gray-400 italic">Aucun point de lecture défini.</div>
+        <EquipmentPointsEditor :template-id="selected.id" @updated="refreshSelected" />
       </div>
 
-      <div>
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-          Données typiquement écrites ({{ selected.points.filter(p => p.direction === 'write').length }})
-        </h3>
+      <!-- Anciens tableaux read-only conserves uniquement pour les sections
+           qui n'existent pas (placeholder vide quand 0 ecriture). Cache. -->
+      <div v-if="false">
         <div v-if="selected.points.filter(p => p.direction === 'write').length" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs text-gray-500 uppercase">
@@ -369,7 +354,12 @@ onMounted(async () => {
                 <td class="px-4 py-2">
                   <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
                 </td>
-                <td class="px-4 py-2 text-gray-500 text-xs italic">{{ p.nature || '—' }}</td>
+                <td class="px-4 py-2">
+                  <span v-if="p.nature" :class="['inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full border', NATURE_COLORS[p.nature] || 'bg-gray-50 text-gray-600 border-gray-200']">
+                    {{ p.nature }}
+                  </span>
+                  <span v-else class="text-gray-300 text-xs">—</span>
+                </td>
                 <td class="px-4 py-2 text-gray-500 text-center font-variant-numeric tabular-nums">{{ p.unit || '—' }}</td>
               </tr>
             </tbody>

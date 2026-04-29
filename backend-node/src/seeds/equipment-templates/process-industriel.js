@@ -18,13 +18,13 @@ module.exports = {
 <p>La solution Buildy supervise les états, les compteurs de production et les défauts pour permettre l\'analyse énergétique et la corrélation avec les autres systèmes du bâtiment, <strong>sans intervenir sur le pilotage du process</strong>.</p>
 `.trim(),
   points: [
-    { slug: 'etat.fonctionnement', label: 'État de fonctionnement', dataType: 'État', direction: 'read', position: 10, nature: 'Booléen' },
+    { slug: 'etat.fonctionnement', label: 'État de fonctionnement', dataType: 'État', direction: 'read', position: 10, nature: 'Booléen', techName: 'On_Off_R' },
     { slug: 'etat.mode', label: 'Mode (production/maintenance/arrêt)', dataType: 'État', direction: 'read', position: 20, nature: 'Enum' },
     { slug: 'mesure.puissance_electrique', label: 'Puissance électrique consommée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 30, nature: 'Numérique' },
-    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40, nature: 'Numérique' },
+    { slug: 'energie.consommee', label: 'Énergie consommée', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 40, nature: 'Numérique', techName: 'Active_Energy_Index_R' },
     { slug: 'compteur.production', label: 'Compteur de production', dataType: 'Mesure', direction: 'read', position: 50, nature: 'Numérique' },
     { slug: 'compteur.heures_fonctionnement', label: 'Heures de fonctionnement', dataType: 'Mesure', direction: 'read', unit: 'h', position: 60, nature: 'Numérique' },
     { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 70, techName: 'System_Fault_R', nature: 'Booléen' },
-    { slug: 'alarme.arret_urgence', label: 'Arrêt d\'urgence', dataType: 'Alarme', direction: 'read', position: 80, nature: 'Booléen' },
+    { slug: 'alarme.arret_urgence', label: 'Arrêt d\'urgence', dataType: 'Alarme', direction: 'read', position: 80, nature: 'Booléen', techName: 'System_Fault_R' },
   ],
 };

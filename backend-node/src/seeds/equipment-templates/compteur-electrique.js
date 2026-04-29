@@ -24,7 +24,7 @@ module.exports = {
     // Le reste reste disponible mais marque optionnel : decoche par defaut, activable
     // a l'instance pour les sites tertiaires qui ont besoin du detail electrique.
     { slug: 'energie.active_total', label: 'Énergie active totale (index)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 10, techName: 'Active_Energy_Index_R', nature: 'Numérique' },
-    { slug: 'energie.active_partielle', label: 'Énergie active partielle (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 20, isOptional: true, nature: 'Numérique' },
+    { slug: 'energie.active_partielle', label: 'Énergie active partielle (index réinitialisable)', dataType: 'Mesure', direction: 'read', unit: 'kWh', position: 20, isOptional: true, nature: 'Numérique', techName: 'Active_Energy_Index_R' },
     { slug: 'puissance.active', label: 'Puissance active instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 30, isOptional: true, nature: 'Numérique' },
     { slug: 'puissance.reactive', label: 'Puissance réactive instantanée', dataType: 'Mesure', direction: 'read', unit: 'kVAR', position: 40, isOptional: true, nature: 'Numérique' },
     { slug: 'mesure.tension_l1', label: 'Tension phase 1', dataType: 'Mesure', direction: 'read', unit: 'V', position: 50, isOptional: true, nature: 'Numérique' },

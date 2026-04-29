@@ -30,8 +30,8 @@ module.exports = {
     { slug: 'puissance.thermique', label: 'Puissance thermique instantanée', dataType: 'Mesure', direction: 'read', unit: 'kW', position: 70, isOptional: true, nature: 'Numérique' },
     { slug: 'mesure.cop', label: 'COP instantané', dataType: 'Mesure', direction: 'read', position: 80, isOptional: true, nature: 'Numérique' },
     { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 90, techName: 'System_Fault_R', nature: 'Booléen' },
-    { slug: 'alarme.defaut_compresseur', label: 'Défaut compresseur', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true, nature: 'Booléen' },
-    { slug: 'alarme.defaut_circuit_eau', label: 'Défaut circuit d\'eau (manque, gel)', dataType: 'Alarme', direction: 'read', position: 110, isOptional: true, nature: 'Booléen' },
+    { slug: 'alarme.defaut_compresseur', label: 'Défaut compresseur', dataType: 'Alarme', direction: 'read', position: 100, isOptional: true, nature: 'Booléen', techName: 'System_Fault_R' },
+    { slug: 'alarme.defaut_circuit_eau', label: 'Défaut circuit d\'eau (manque, gel)', dataType: 'Alarme', direction: 'read', position: 110, isOptional: true, nature: 'Booléen', techName: 'Water_Lack_Fault_R' },
 
     // ── Donnees ecrites ──
     { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 200, techName: 'On_Off_W', nature: 'Booléen' },

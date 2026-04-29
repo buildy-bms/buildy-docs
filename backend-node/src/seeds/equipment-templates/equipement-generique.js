@@ -25,6 +25,6 @@ module.exports = {
     { slug: 'alarme.defaut_general', label: 'Défaut général', dataType: 'Alarme', direction: 'read', position: 50, techName: 'System_Fault_R', nature: 'Booléen' },
     { slug: 'alarme.defaut_communication', label: 'Défaut communication', dataType: 'Alarme', direction: 'read', position: 60, techName: 'System_Fault_R', nature: 'Booléen' },
     { slug: 'cmd.marche_arret', label: 'Commande marche/arrêt', dataType: 'Commande', direction: 'write', position: 100, techName: 'On_Off_W', nature: 'Booléen' },
-    { slug: 'consigne.principale', label: 'Consigne principale', dataType: 'Consigne', direction: 'write', position: 110, nature: 'Numérique' },
+    { slug: 'consigne.principale', label: 'Consigne principale', dataType: 'Consigne', direction: 'write', position: 110, nature: 'Numérique', techName: 'Setpoint_Temp_W' },
   ],
 };
