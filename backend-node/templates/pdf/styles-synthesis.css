@@ -300,15 +300,45 @@ table.features-table tfoot td {
   background: #1b2842; color: white; font-weight: 700; padding: 3mm;
 }
 
-.ft-num    { width: 22mm; font-family: 'SFMono-Regular', monospace; }
+.ft-num    { width: 18mm; font-family: 'SFMono-Regular', monospace; }
 .ft-num code { font-family: 'SFMono-Regular', monospace; font-size: 8pt; color: #6b7280; }
-.ft-title  { width: 82mm; font-weight: 600; color: #1b2842; }
-.ft-level  { width: 35mm; text-align: center; }
-.ft-include { width: 28mm; text-align: center; }
+.ft-title  { width: 70mm; font-weight: 600; color: #1b2842; }
+.ft-avail  { width: 16mm; text-align: center; }
+.ft-include { width: 32mm; text-align: center; }
 .ft-reason { font-size: 8pt; color: #6b7280; line-height: 1.35; }
 
-.ft-row-out td.ft-title { color: #9ca3af; }
-.ft-row-out td.ft-num code { color: #d1d5db; }
+/* ── Cellule de disponibilite par niveau ─────────────────────── */
+.avail {
+  display: inline-block;
+  width: 6mm; height: 6mm; line-height: 6mm;
+  border-radius: 50%;
+  font-size: 9pt;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+}
+.avail-included { background: #d1fae5; color: #047857; }
+.avail-paid     { background: #fef3c7; color: #b45309; }
+.avail-none     { background: #f1f5f9; color: #94a3b8; font-weight: 400; }
+
+/* ── Pill de statut effectif ─────────────────────────────────── */
+.status-pill {
+  display: inline-block;
+  padding: 0.6mm 2mm;
+  border-radius: 1mm;
+  font-size: 8pt;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.status-included    { background: #d1fae5; color: #065f46; }
+.status-paid        { background: #fef3c7; color: #92400e; }
+.status-unavailable { background: #fee2e2; color: #991b1b; }
+.status-opted-out   { background: #ede9fe; color: #5b21b6; }
+.status-excluded    { background: #f1f5f9; color: #64748b; }
+
+.ft-row.ft-status-excluded td.ft-title,
+.ft-row.ft-status-unavailable td.ft-title { color: #9ca3af; }
+.ft-row.ft-status-excluded td.ft-num code,
+.ft-row.ft-status-unavailable td.ft-num code { color: #d1d5db; }
 
 /* ── PAGE 4 : Tableau systèmes ────────────────────────────────── */
 table.systems-table {

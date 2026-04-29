@@ -232,8 +232,23 @@ table.points td.col-tech code {
 }
 
 table.points td.col-label { font-weight: 500; color: #1f2937; }
-table.points td.col-nature { color: #6b7280; font-style: italic; font-size: 7pt; }
+table.points td.col-nature { font-size: 7pt; }
 table.points td.col-unit { text-align: center; color: #4b5563; font-variant-numeric: tabular-nums; }
+
+/* Pilules de Nature (Boolean / Numerique / Enum / Chaine) — alignees sur l'UI */
+.badge-nature {
+  display: inline-block;
+  padding: 0.4mm 1.8mm;
+  border-radius: 1mm;
+  font-size: 6.8pt;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 0.2mm solid transparent;
+}
+.badge-nature[data-nature="Booléen"]               { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.badge-nature[data-nature="Numérique"]             { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+.badge-nature[data-nature="Enum"]                  { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.badge-nature[data-nature="Chaîne de caractères"]  { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
 
 /* Badges Type (Mesure / État / Alarme / Commande / Consigne) */
 .badge-type {

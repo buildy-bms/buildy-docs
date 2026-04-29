@@ -177,26 +177,34 @@
     </div>
   </header>
 
-  <p class="section-intro">Liste exhaustive des fonctionnalités décrites dans l'AF. La colonne <strong>Niveau d'offre minimum</strong> indique le contrat Buildy nécessaire pour cette fonctionnalité ; <strong>Intégrée au projet</strong> tient compte du niveau de contrat visé, des écartements MOA et des sections retirées.</p>
+  <p class="section-intro">Liste exhaustive des fonctionnalités décrites dans l'AF. Pour chaque fonctionnalité, les colonnes <strong>Essentials / Smart / Premium</strong> indiquent la disponibilité au niveau de contrat correspondant (incluse, option payante ou non disponible). La colonne <strong>Statut dans cette AF</strong> donne le verdict effectif compte tenu du contrat visé, des écartements MOA et des sections retirées.</p>
 
   <table class="features-table compact">
     <thead>
       <tr>
         <th class="ft-num">N°</th>
         <th class="ft-title">Fonctionnalité</th>
-        <th class="ft-level">Niveau d'offre minimum</th>
-        <th class="ft-include">Intégrée au projet</th>
-        <th class="ft-reason">Motif si non intégrée</th>
+        <th class="ft-avail">Essentials</th>
+        <th class="ft-avail">Smart</th>
+        <th class="ft-avail">Premium</th>
+        <th class="ft-include">Statut dans cette AF</th>
+        <th class="ft-reason">Détail</th>
       </tr>
     </thead>
     <tbody>
       {{#each functionalities}}
-      <tr class="ft-row {{#unless included}}ft-row-out{{/unless}}">
+      <tr class="ft-row ft-status-{{statusInAf}}">
         <td class="ft-num"><code>§{{number}}</code></td>
         <td class="ft-title">{{title}}</td>
-        <td class="ft-level"><span class="lvl-pill lvl-{{levelClass}}">{{requiredMinLabel}}</span></td>
+        <td class="ft-avail">{{> _avail-cell value=availE}}</td>
+        <td class="ft-avail">{{> _avail-cell value=availS}}</td>
+        <td class="ft-avail">{{> _avail-cell value=availP}}</td>
         <td class="ft-include">
-          {{#if included}}<span class="check-yes">✓</span>{{else}}<span class="check-no">✗</span>{{/if}}
+          {{#if (eq statusInAf "included")}}<span class="status-pill status-included">✓ Inclus</span>{{/if}}
+          {{#if (eq statusInAf "paid_option")}}<span class="status-pill status-paid">€ Option payante</span>{{/if}}
+          {{#if (eq statusInAf "unavailable")}}<span class="status-pill status-unavailable">✗ Non dispo</span>{{/if}}
+          {{#if (eq statusInAf "opted_out")}}<span class="status-pill status-opted-out">⊘ Écartée MOA</span>{{/if}}
+          {{#if (eq statusInAf "excluded")}}<span class="status-pill status-excluded">— Retirée</span>{{/if}}
         </td>
         <td class="ft-reason">{{#if reason}}<em>{{reason}}</em>{{else}}<span class="muted">—</span>{{/if}}</td>
       </tr>
@@ -204,8 +212,8 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3">Total intégré au projet</td>
-        <td class="ft-include"><strong>{{functionalitiesIncluded}} / {{functionalities.length}}</strong></td>
+        <td colspan="5">Total</td>
+        <td class="ft-include"><strong>{{functionalitiesIncluded}} inclus{{#if functionalitiesPaidOption}} · {{functionalitiesPaidOption}} option(s) payante(s){{/if}} / {{functionalities.length}}</strong></td>
         <td></td>
       </tr>
     </tfoot>

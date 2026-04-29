@@ -123,7 +123,7 @@
             <td>{{label}}</td>
             <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
-            <td class="nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
+            <td class="nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>
             <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
           </tr>
           {{/each}}
@@ -142,7 +142,7 @@
             <td>{{label}}</td>
             <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
-            <td class="nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
+            <td class="nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>
             <td>{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
           </tr>
           {{/each}}

@@ -90,7 +90,7 @@
         <td class="col-label">{{label}}</td>
         <td class="col-type"><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
         <td class="col-dir"><span class="badge-dir dir-{{dirLabel}}">{{dirLabel}}</span></td>
-        <td class="col-nature">{{#if nature}}{{nature}}{{else}}—{{/if}}</td>
+        <td class="col-nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>
         <td class="col-unit">{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
         <td class="col-commentaire"></td>
       </tr>
