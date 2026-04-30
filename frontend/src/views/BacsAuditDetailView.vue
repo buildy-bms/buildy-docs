@@ -16,7 +16,9 @@ import {
   getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
+  getBacsDevices, getBacsPowerSummary,
 } from '@/api'
+import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -36,6 +38,8 @@ const bms = ref({})
 const thermal = ref([])
 const actionItems = ref([])
 const zones = ref([])
+const devices = ref([])
+const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
 
 const ZONE_NATURES = [
   { value: 'shared-office', label: 'Bureau partagé' },
@@ -56,7 +60,7 @@ const ZONE_NATURES = [
   { value: 'logistic-cell', label: 'Cellule logistique' },
   { value: 'stock', label: 'Stock' },
 ]
-const newZone = ref({ name: '', nature: null })
+const newZone = ref({ name: '', nature: null, surface_m2: null })
 
 // Compteurs (R175-3 §1)
 const METER_USAGES = [
@@ -170,6 +174,11 @@ async function refresh() {
       const z = await listZones(d.data.site_id)
       zones.value = z.data
     }
+    const [dev, ps] = await Promise.all([
+      getBacsDevices(docId), getBacsPowerSummary(docId),
+    ])
+    devices.value = dev.data
+    powerSummary.value = ps.data
   } catch (e) {
     error('Échec du chargement de l\'audit BACS')
   } finally {
@@ -179,13 +188,27 @@ async function refresh() {
 
 async function refreshAuditData() {
   // Recharge systems / thermal / action_items apres un changement de zone
-  const [s, t, a] = await Promise.all([
+  const [s, t, a, dev, ps, m] = await Promise.all([
     getBacsSystems(docId), getBacsThermal(docId), getBacsActionItems(docId),
+    getBacsDevices(docId), getBacsPowerSummary(docId), getBacsMeters(docId),
   ])
   systems.value = s.data
   thermal.value = t.data
   actionItems.value = a.data
+  devices.value = dev.data
+  powerSummary.value = ps.data
+  meters.value = m.data
 }
+
+// Devices regroupés par system_id (pour passer au composant SystemDevicesTable)
+const devicesBySystem = computed(() => {
+  const out = {}
+  for (const d of devices.value) {
+    if (!out[d.system_id]) out[d.system_id] = []
+    out[d.system_id].push(d)
+  }
+  return out
+})
 
 async function addZone() {
   if (!newZone.value.name.trim() || !document.value?.site_id) return
@@ -194,6 +217,7 @@ async function addZone() {
       site_id: document.value.site_id,
       name: newZone.value.name.trim(),
       nature: newZone.value.nature,
+      surface_m2: newZone.value.surface_m2 ?? null,
     })
     // Recharge zones puis resync l'audit (pre-remplit systems + thermal pour la nouvelle zone)
     const z = await listZones(document.value.site_id)
@@ -420,7 +444,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto pb-12">
+  <div class="max-w-screen-2xl mx-auto pb-12">
     <!-- Header -->
     <div class="flex items-start justify-between mb-6">
       <div>
@@ -443,17 +467,17 @@ onMounted(refresh)
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
-          <ArrowPathIcon class="w-4 h-4" /> Régénérer le plan
+        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <ArrowPathIcon class="w-4 h-4 shrink-0" /> Régénérer le plan
         </button>
-        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
-          <DocumentArrowDownIcon class="w-4 h-4" /> CSV pour devis
+        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-4 h-4 shrink-0" /> CSV pour devis
         </button>
-        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60">
-          <DocumentArrowDownIcon class="w-4 h-4" /> {{ exporting ? 'Génération…' : 'Exporter PDF' }}
+        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-4 h-4 shrink-0" /> {{ exporting ? 'Génération…' : 'Exporter PDF' }}
         </button>
-        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60">
-          <CheckCircleIcon class="w-4 h-4" /> {{ delivering ? 'Livraison…' : 'Livrer l\'audit' }}
+        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
+          <CheckCircleIcon class="w-4 h-4 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer l\'audit' }}
         </button>
       </div>
     </div>
@@ -546,6 +570,7 @@ onMounted(refresh)
             <tr>
               <th class="text-left px-5 py-2">Nom</th>
               <th class="text-left py-2 w-48">Nature</th>
+              <th class="text-left py-2 w-24">Surface (m²)</th>
               <th class="text-left px-5 py-2">Notes</th>
               <th class="text-right px-5 py-2 w-12"></th>
             </tr>
@@ -564,6 +589,11 @@ onMounted(refresh)
                   <option :value="null">—</option>
                   <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
+              </td>
+              <td class="py-2">
+                <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
+                       @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
               </td>
               <td class="px-5 py-2">
                 <input type="text" :value="z.notes" placeholder="—"
@@ -589,6 +619,10 @@ onMounted(refresh)
                   <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
               </td>
+              <td class="py-2">
+                <input v-model.number="newZone.surface_m2" type="number" min="0" step="1" placeholder="m²"
+                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+              </td>
               <td colspan="2" class="px-5 py-2">
                 <button @click="addZone" :disabled="!newZone.name.trim()"
                         class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -602,53 +636,58 @@ onMounted(refresh)
 
       <!-- Systemes par zone (R175-1 §4) -->
       <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
-          <BoltIcon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">3. Systèmes techniques par zone</h2>
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 flex-wrap">
+          <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
+          <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
           <span class="text-xs text-gray-500">R175-1 §4</span>
+          <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
+            Total chauffage + clim :
+            <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
+          </span>
         </header>
         <div class="divide-y divide-gray-100">
           <div v-for="g in systemsByZone" :key="g.zone_name" class="px-5 py-3">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex items-center gap-2 mb-3">
               <MapPinIcon class="w-4 h-4 text-gray-400" />
               <span class="font-medium text-sm text-gray-800">{{ g.zone_name }}</span>
               <span v-if="g.zone_nature" class="text-[11px] text-gray-500">{{ g.zone_nature }}</span>
             </div>
-            <table class="w-full text-sm">
-              <thead class="text-xs uppercase text-gray-500 tracking-wider">
-                <tr>
-                  <th class="text-left py-1.5">Catégorie</th>
-                  <th class="text-left py-1.5 w-28">Présent ?</th>
-                  <th class="text-left py-1.5 w-44">Communication</th>
-                  <th class="text-left py-1.5">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in g.items" :key="s.id" class="border-t border-gray-100">
-                  <td class="py-1.5 text-gray-700">{{ SYSTEM_LABEL[s.system_category] || s.system_category }}</td>
-                  <td class="py-1.5">
+            <div class="space-y-3">
+              <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
+                <!-- En-tête système : présent? + communication + notes -->
+                <div class="px-3 py-2 flex items-center gap-3 bg-white">
+                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45">
+                    {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
+                  </span>
+                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
                     <input type="checkbox" :checked="!!s.present"
                            @change="e => patchSystem(s, { present: e.target.checked })"
                            class="rounded border-gray-300" />
-                  </td>
-                  <td class="py-1.5">
-                    <select :value="s.communication"
-                            @change="e => patchSystem(s, { communication: e.target.value || null })"
-                            class="text-xs px-2 py-1 border border-gray-200 rounded">
-                      <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                    </select>
-                  </td>
-                  <td class="py-1.5">
-                    <input type="text" :value="s.notes" placeholder="—"
-                           @blur="e => patchSystem(s, { notes: e.target.value || null })"
-                           class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <span class="text-gray-700">Présent</span>
+                  </label>
+                  <select :value="s.communication" :disabled="!s.present"
+                          @change="e => patchSystem(s, { communication: e.target.value || null })"
+                          class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30 w-44">
+                    <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+                  </select>
+                  <input type="text" :value="s.notes" placeholder="Notes" :disabled="!s.present"
+                         @blur="e => e.target.value !== (s.notes || '') && patchSystem(s, { notes: e.target.value || null })"
+                         class="flex-1 text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30" />
+                </div>
+                <!-- Sous-table devices + cases R175-3 §3/§4 (visible uniquement si système présent) -->
+                <SystemDevicesTable
+                  v-if="s.present"
+                  :system="s"
+                  :devices="devicesBySystem[s.id] || []"
+                  :system-label="SYSTEM_LABEL[s.system_category] || s.system_category"
+                  @changed="refreshAuditData"
+                  @system-updated="patch => patchSystem(s, patch)"
+                />
+              </div>
+            </div>
           </div>
           <div v-if="!systemsByZone.length" class="px-5 py-6 text-center text-sm text-gray-500">
-            Aucune zone définie pour ce site. Ajoute-en depuis la fiche site.
+            Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.
           </div>
         </div>
       </section>
@@ -835,10 +874,53 @@ onMounted(refresh)
                      @input="saveBmsDebounced"
                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
             </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Localisation</label>
+              <input v-model="bms.location" type="text" placeholder="ex : Local technique sous-sol"
+                     @input="saveBmsDebounced"
+                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Référence modèle</label>
+              <input v-model="bms.model_reference" type="text" placeholder="ex : JACE 8000"
+                     @input="saveBmsDebounced"
+                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
           </div>
 
           <div class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-3 — 4 exigences fonctionnelles</h3>
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
+            <div class="grid grid-cols-5 gap-2 text-sm">
+              <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" v-model="bms.manages_heating" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                Chauffage
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" v-model="bms.manages_cooling" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                Refroidissement
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" v-model="bms.manages_ventilation" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                Ventilation
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" v-model="bms.manages_dhw" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                ECS
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <input type="checkbox" v-model="bms.manages_lighting" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                Éclairage
+              </label>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-3">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+              R175-3 — Capacités de la solution de supervision
+              <span class="font-normal normal-case text-gray-500 text-[10px]" title="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
+                ⓘ P3 et P4 sont au niveau des systèmes (section 3)
+              </span>
+            </h3>
             <div class="space-y-2 text-sm">
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="bms.meets_r175_3_p1" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
@@ -847,14 +929,6 @@ onMounted(refresh)
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="bms.meets_r175_3_p2" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span><strong>P2.</strong> Détection des pertes d'efficacité</span>
-              </label>
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.meets_r175_3_p3" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span><strong>P3.</strong> Interopérabilité multi-systèmes (BACnet / Modbus / KNX / M-Bus / MQTT)</span>
-              </label>
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.meets_r175_3_p4" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span><strong>P4.</strong> Arrêt manuel + gestion autonome ensuite</span>
               </label>
             </div>
           </div>
@@ -896,50 +970,50 @@ onMounted(refresh)
             Vue commerciale plein écran →
           </button>
         </header>
-        <table class="w-full text-sm">
+        <table class="w-full text-sm" style="table-layout: fixed">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
-              <th class="text-left px-3 py-2 w-24">Sévérité</th>
-              <th class="text-left py-2 w-24">Article</th>
-              <th class="text-left py-2">Action</th>
-              <th class="text-left py-2 w-28">Zone</th>
-              <th class="text-left py-2 w-28">Effort</th>
-              <th class="text-left py-2 w-28">Statut</th>
-              <th class="text-left px-3 py-2 w-56">Notes commerciales</th>
+              <th class="text-left px-3 py-2 w-24 whitespace-nowrap">Sévérité</th>
+              <th class="text-left py-2 w-24 whitespace-nowrap">Article</th>
+              <th class="text-left py-2 min-w-70">Action</th>
+              <th class="text-left py-2 w-32 whitespace-nowrap">Zone</th>
+              <th class="text-left py-2 w-24 whitespace-nowrap">Effort</th>
+              <th class="text-left py-2 w-32 whitespace-nowrap">Statut</th>
+              <th class="text-left px-3 py-2 w-64">Notes commerciales</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="it in actionItems" :key="it.id"
                 :class="['transition', it.status === 'done' || it.status === 'declined' ? 'opacity-50' : '']">
-              <td class="px-3 py-2">
-                <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border', SEVERITY_LABEL[it.severity].cls]">
+              <td class="px-3 py-2 align-top">
+                <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', SEVERITY_LABEL[it.severity].cls]">
                   {{ SEVERITY_LABEL[it.severity].label }}
                 </span>
               </td>
-              <td class="py-2 text-[11px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</td>
-              <td class="py-2">
-                <div class="text-gray-800">{{ it.title }}</div>
-                <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5">{{ it.description }}</div>
+              <td class="py-2 text-[11px] text-gray-500 font-mono align-top whitespace-nowrap">{{ it.r175_article || '—' }}</td>
+              <td class="py-2 align-top pr-2">
+                <div class="text-gray-800 line-clamp-2" :title="it.title">{{ it.title }}</div>
+                <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 line-clamp-2" :title="it.description">{{ it.description }}</div>
               </td>
-              <td class="py-2 text-xs text-gray-600">{{ it.zone_name || '—' }}</td>
-              <td class="py-2">
+              <td class="py-2 text-xs text-gray-600 align-top truncate" :title="it.zone_name">{{ it.zone_name || '—' }}</td>
+              <td class="py-2 align-top">
                 <select :value="it.estimated_effort"
                         @change="e => patchActionItem(it, { estimated_effort: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded">
+                        class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
                   <option :value="null">—</option>
                   <option value="low">Faible</option>
                   <option value="medium">Moyen</option>
                   <option value="high">Élevé</option>
                 </select>
               </td>
-              <td class="py-2">
+              <td class="py-2 align-top">
                 <select :value="it.status"
                         @change="e => patchActionItem(it, { status: e.target.value })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded">
+                        class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
                   <option v-for="(label, val) in STATUS_LABEL" :key="val" :value="val">{{ label }}</option>
                 </select>
               </td>
-              <td class="px-3 py-2">
+              <td class="px-3 py-2 align-top">
                 <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
                        @blur="e => patchActionItem(it, { commercial_notes: e.target.value || null })"
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />

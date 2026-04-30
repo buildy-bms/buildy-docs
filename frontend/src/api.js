@@ -218,6 +218,38 @@ export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pd
 export const deliverBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/deliver`)
 export const resyncBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/resync`)
 
+// ── Audit BACS — devices (multi-systèmes par catégorie x zone) ──
+export const getBacsDevices = (docId) => api.get(`/bacs-audit/${docId}/devices`)
+export const createBacsDevice = (systemId, data) =>
+  api.post(`/bacs-audit/systems/${systemId}/devices`, data)
+export const updateBacsDevice = (id, data) => api.patch(`/bacs-audit/devices/${id}`, data)
+export const deleteBacsDevice = (id) => api.delete(`/bacs-audit/devices/${id}`)
+export const reorderBacsDevices = (systemId, ids) =>
+  api.post(`/bacs-audit/systems/${systemId}/devices/reorder`, { ids })
+export const reorderBacsZones = (docId, ids) =>
+  api.post(`/bacs-audit/${docId}/zones/reorder`, { ids })
+export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
+
+// ── Site documents (DOE) ──
+export const listSiteDocuments = (siteUuid, params) =>
+  api.get(`/sites/${siteUuid}/documents`, { params })
+export const uploadSiteDocument = (siteUuid, formData, params) =>
+  api.post(`/sites/${siteUuid}/documents`, formData, {
+    params,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const updateSiteDocument = (id, data) => api.patch(`/site-documents/${id}`, data)
+export const deleteSiteDocument = (id) => api.delete(`/site-documents/${id}`)
+export const getSiteDocumentDownloadUrl = (id) => `/api/site-documents/${id}/download`
+
+// ── Site credentials ──
+export const listSiteCredentials = (siteUuid) => api.get(`/sites/${siteUuid}/credentials`)
+export const createSiteCredential = (siteUuid, data) =>
+  api.post(`/sites/${siteUuid}/credentials`, data)
+export const updateSiteCredential = (id, data) => api.patch(`/site-credentials/${id}`, data)
+export const deleteSiteCredential = (id) => api.delete(`/site-credentials/${id}`)
+export const revealSiteCredential = (id) => api.get(`/site-credentials/${id}/reveal`)
+
 // ── Site-zones (locales Buildy Docs, attachees a un site) ──
 // Note : namespace `/site-zones` plutot que `/zones` car les routes /zones
 // sont deja prises par les af_zones legacy (routes/sections.js). Sera
