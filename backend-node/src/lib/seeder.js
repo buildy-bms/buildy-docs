@@ -463,4 +463,121 @@ function seedSystemCategoriesOnBoot() {
   if (created > 0) log.info(`Seed system_categories_db : ${created} categorie(s) creee(s)`);
 }
 
-module.exports = { seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks, backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure };
+// ── Seed referentiel BACS : matrice nature_zone -> categories attendues ──
+// Idempotent : ne touche pas les lignes deja presentes (l'utilisateur a peut-etre
+// affine la matrice). Pour forcer un refresh, supprimer la ligne avant boot.
+function seedBacsRequirementsOnBoot() {
+  const matrix = require('../seeds/bacs-requirements');
+  const get = db.db.prepare('SELECT 1 FROM bacs_requirements_by_zone_nature WHERE zone_nature = ?');
+  const ins = db.db.prepare(`
+    INSERT INTO bacs_requirements_by_zone_nature (zone_nature, required_categories)
+    VALUES (?, ?)
+  `);
+  let created = 0;
+  for (const row of matrix) {
+    if (get.get(row.zone_nature)) continue;
+    ins.run(row.zone_nature, JSON.stringify(row.required_categories));
+    created++;
+  }
+  if (created > 0) log.info(`Seed bacs_requirements_by_zone_nature : ${created} ligne(s) creee(s)`);
+}
+
+// ── Seed structure d'un audit BACS pour un site donne ──
+// Cree les sections de plan (1. Identification, 2. Zones, 3. Systemes par
+// zone, 4. Compteurs, 5. Regulation thermique, 6. GTB, 7. Synthese, 8. Plan
+// d'action), pre-remplit bacs_audit_systems pour chaque (zone × categorie
+// requise selon zone.nature), pre-remplit bacs_audit_thermal_regulation par
+// zone, et insere une ligne 1-1 vide dans bacs_audit_bms.
+//
+// Retourne { sections_count, systems_count, thermal_count } pour audit.
+function seedBacsAuditStructure(documentId, siteId) {
+  const af = db.afs.getById(documentId);
+  if (!af || af.kind !== 'bacs_audit') {
+    throw new Error(`Document #${documentId} introuvable ou n'est pas un audit BACS`);
+  }
+  const site = db.sites.getById(siteId);
+  if (!site) throw new Error(`Site #${siteId} introuvable`);
+
+  const zones = db.zones.listBySite(siteId);
+
+  // 1) Plan canonique : 8 chapitres + sous-sections principales
+  const PLAN = [
+    { number: '1', title: 'Identification du site', kind: 'standard',
+      body_html: '<p>Donnees generales du site (nom, client, adresse, occupation), societe de maintenance, applicabilite BACS R175-2 (date butoir et puissance cumulee chauffage+clim).</p>' },
+    { number: '2', title: 'Zones fonctionnelles (R175-1 §6)', kind: 'standard',
+      body_html: '<p>Decoupage zonal du site selon usage homogene. Chaque zone porte ses categories BACS attendues selon sa nature.</p>' },
+    { number: '3', title: 'Systemes techniques par zone (R175-1 §4)', kind: 'standard',
+      body_html: '<p>Pour chaque zone, presence et communication des systemes BACS attendus (chauffage, refroidissement, ventilation, ECS, eclairage, production electrique).</p>' },
+    { number: '4', title: 'Compteurs et mesurage (R175-3 §1)', kind: 'standard',
+      body_html: '<p>Matrice usage × zone : compteurs requis vs presents vs communicants. Retention 5 ans minimum exigee par R175-3 §1.</p>' },
+    { number: '5', title: 'Regulation thermique automatique (R175-6)', kind: 'standard',
+      body_html: '<p>Pour chaque zone : presence d\'une regulation par piece ou par zone. Type de generateur. Exemption explicite des appareils independants de chauffage au bois.</p>' },
+    { number: '6', title: 'Solution GTB / GTC (R175-3, R175-4, R175-5)', kind: 'standard',
+      body_html: '<p>Evaluation de la solution de supervision en place : 4 criteres R175-3 (suivi 5 ans, detection derives, interoperabilite, arret manuel), consignes maintenance R175-4, formation exploitant R175-5.</p>' },
+    { number: '7', title: 'Synthese de conformite', kind: 'standard',
+      body_html: '<p>Etat global compliant / partial / non_compliant, sommaire des ecarts par article R175.</p>' },
+    { number: '8', title: 'Plan de mise en conformite', kind: 'standard',
+      body_html: '<p>Liste consolidee des actions correctives auto-generees + items manuels. Triable par severite (blocking / major / minor) et par categorie. Base de devis pour l\'equipe commerciale.</p>' },
+  ];
+
+  let sectionsCount = 0;
+  for (let i = 0; i < PLAN.length; i++) {
+    const p = PLAN[i];
+    db.sections.create({
+      afId: documentId,
+      parentId: null,
+      position: (i + 1) * 100,
+      number: p.number,
+      title: p.title,
+      kind: p.kind,
+      bodyHtml: p.body_html,
+    });
+    sectionsCount++;
+  }
+
+  // 2) Pre-remplir bacs_audit_systems pour chaque zone du site, selon les
+  //    categories requises de zone_nature (matrice seedee).
+  const reqByNature = {};
+  for (const r of db.db.prepare('SELECT zone_nature, required_categories FROM bacs_requirements_by_zone_nature').all()) {
+    try { reqByNature[r.zone_nature] = JSON.parse(r.required_categories); }
+    catch { reqByNature[r.zone_nature] = []; }
+  }
+
+  const insertSystem = db.db.prepare(`
+    INSERT OR IGNORE INTO bacs_audit_systems (document_id, zone_id, system_category, present)
+    VALUES (?, ?, ?, 0)
+  `);
+  let systemsCount = 0;
+  for (const z of zones) {
+    const cats = z.nature ? (reqByNature[z.nature] || []) : [];
+    for (const cat of cats) {
+      const r = insertSystem.run(documentId, z.zone_id, cat);
+      if (r.changes) systemsCount++;
+    }
+  }
+
+  // 3) Pre-remplir bacs_audit_thermal_regulation : 1 ligne par zone (R175-6)
+  const insertThermal = db.db.prepare(`
+    INSERT OR IGNORE INTO bacs_audit_thermal_regulation (document_id, zone_id, has_automatic_regulation)
+    VALUES (?, ?, 0)
+  `);
+  let thermalCount = 0;
+  for (const z of zones) {
+    const r = insertThermal.run(documentId, z.zone_id);
+    if (r.changes) thermalCount++;
+  }
+
+  // 4) Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)
+  db.db.prepare(`
+    INSERT OR IGNORE INTO bacs_audit_bms (document_id) VALUES (?)
+  `).run(documentId);
+
+  log.info(`Seed audit BACS #${documentId} (site #${siteId}) : ${sectionsCount} sections, ${systemsCount} systems, ${thermalCount} thermal_regulation`);
+  return { sections_count: sectionsCount, systems_count: systemsCount, thermal_count: thermalCount };
+}
+
+module.exports = {
+  seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks,
+  backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure,
+  seedBacsRequirementsOnBoot, seedBacsAuditStructure,
+};

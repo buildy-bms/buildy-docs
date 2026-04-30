@@ -4,7 +4,7 @@ const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { uniqueSlug } = require('../lib/slug');
-const { seedAfStructure } = require('../lib/seeder');
+const { seedAfStructure, seedBacsAuditStructure } = require('../lib/seeder');
 const { assertWrite } = require('../lib/af-permissions');
 
 // ── Zod schemas ──────────────────────────────────────────────────────
@@ -125,8 +125,10 @@ async function routes(fastify) {
     let sectionsCount = 0;
     if (body.kind === 'af') {
       sectionsCount = seedAfStructure(af.id);
+    } else if (body.kind === 'bacs_audit') {
+      const seedResult = seedBacsAuditStructure(af.id, body.site_id);
+      sectionsCount = seedResult.sections_count;
     }
-    // Phase 2 : if (body.kind === 'bacs_audit') seedBacsAuditStructure(af.id, body.site_id);
 
     db.auditLog.add({
       afId: af.id, userId, action: `${body.kind}.create`,

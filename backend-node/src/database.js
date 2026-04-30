@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 34;
+const TARGET_VERSION = 35;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1197,6 +1197,166 @@ function runMigrations() {
       db.pragma('user_version = 34');
       db.exec('COMMIT');
       log.info('Migration 34 appliquee : multi-domaines Buildy Docs (sites/zones/equipments + kind/site_id/bacs_*)');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  if (current < 35) {
+    // Tables specifiques aux audits BACS (decret R175). Cinq tables de
+    // donnees + un referentiel seede (matrice nature_zone -> categories
+    // BACS attendues).
+    //
+    // Toutes les FK pointent encore vers `afs(id)` ; au rename m36 elles
+    // suivront automatiquement (les FK sont par nom de table en SQLite).
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        -- R175-1 §4 : systemes techniques par zone (chauffage, refroidissement,
+        -- ventilation, ECS, eclairage int/ext, production electrique).
+        CREATE TABLE IF NOT EXISTS bacs_audit_systems (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+          system_category TEXT NOT NULL
+            CHECK (system_category IN
+              ('heating','cooling','ventilation','dhw',
+               'lighting_indoor','lighting_outdoor','electricity_production')),
+          equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
+          present INTEGER NOT NULL DEFAULT 0,
+          communication TEXT
+            CHECK (communication IS NULL OR communication IN
+              ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+               'knx','mbus','mqtt','autre','non_communicant','absent')),
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(document_id, zone_id, system_category)
+        );
+        CREATE INDEX IF NOT EXISTS idx_bacs_systems_doc ON bacs_audit_systems(document_id);
+        CREATE INDEX IF NOT EXISTS idx_bacs_systems_zone ON bacs_audit_systems(zone_id);
+
+        -- R175-3 §1 : matrice usage x zone des compteurs requis vs presents.
+        CREATE TABLE IF NOT EXISTS bacs_audit_meters (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          zone_id INTEGER REFERENCES zones(zone_id) ON DELETE CASCADE,
+          usage TEXT NOT NULL
+            CHECK (usage IN ('heating','cooling','dhw','pv','lighting','other')),
+          meter_type TEXT NOT NULL
+            CHECK (meter_type IN
+              ('electric','electric_production','gas','water','thermal')),
+          equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
+          required INTEGER NOT NULL DEFAULT 1,
+          present_actual INTEGER NOT NULL DEFAULT 0,
+          communicating INTEGER NOT NULL DEFAULT 0,
+          communication_protocol TEXT,
+          notes TEXT,
+          recommendation TEXT
+            CHECK (recommendation IS NULL OR recommendation IN
+              ('to_add','to_replace','to_connect','compliant')),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_bacs_meters_doc ON bacs_audit_meters(document_id);
+        CREATE INDEX IF NOT EXISTS idx_bacs_meters_zone ON bacs_audit_meters(zone_id);
+
+        -- R175-3 / R175-4 / R175-5 : evaluation de la solution GTB en place.
+        -- 1-1 avec le document (donc PK = document_id, pas d'autoincrement).
+        CREATE TABLE IF NOT EXISTS bacs_audit_bms (
+          document_id INTEGER PRIMARY KEY REFERENCES afs(id) ON DELETE CASCADE,
+          existing_solution TEXT,
+          existing_solution_brand TEXT,
+          -- R175-3 : 4 exigences fonctionnelles
+          meets_r175_3_p1 INTEGER, -- suivi continu / pas horaire / retention 5 ans
+          meets_r175_3_p2 INTEGER, -- detection pertes d'efficacite
+          meets_r175_3_p3 INTEGER, -- interoperabilite
+          meets_r175_3_p4 INTEGER, -- arret manuel + autonome
+          notes_p1 TEXT,
+          notes_p2 TEXT,
+          notes_p3 TEXT,
+          notes_p4 TEXT,
+          -- R175-4 : verifications periodiques
+          has_maintenance_procedures INTEGER,
+          notes_maintenance TEXT,
+          -- R175-5 : formation de l'exploitant
+          operator_trained INTEGER,
+          operator_training_date TEXT,
+          notes_training TEXT,
+          -- Synthese
+          overall_compliance TEXT
+            CHECK (overall_compliance IS NULL OR overall_compliance IN
+              ('compliant','partial','non_compliant')),
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- R175-6 : regulation thermique automatique par piece ou par zone.
+        CREATE TABLE IF NOT EXISTS bacs_audit_thermal_regulation (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+          has_automatic_regulation INTEGER NOT NULL DEFAULT 0,
+          regulation_type TEXT
+            CHECK (regulation_type IS NULL OR regulation_type IN
+              ('per_room','per_zone','central_only','none')),
+          generator_type TEXT
+            CHECK (generator_type IS NULL OR generator_type IN
+              ('gas','electric','heat_pump','wood_appliance','district_heating','other')),
+          generator_age_years INTEGER,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(document_id, zone_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_bacs_thermal_doc ON bacs_audit_thermal_regulation(document_id);
+
+        -- Plan de mise en conformite : actions correctives consolidees.
+        -- Mix d'items auto-generes (depuis systems/meters/bms) et manuels.
+        CREATE TABLE IF NOT EXISTS bacs_audit_action_items (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          category TEXT NOT NULL
+            CHECK (category IN
+              ('meter_addition','meter_replacement','meter_connection',
+               'system_addition','system_replacement','communication_upgrade',
+               'bms_upgrade','bms_replacement','bms_addition',
+               'data_retention_upgrade','training','documentation',
+               'thermal_regulation','thermal_regulation_upgrade','other')),
+          severity TEXT NOT NULL
+            CHECK (severity IN ('blocking','major','minor')),
+          r175_article TEXT,
+          title TEXT NOT NULL,
+          description TEXT,
+          zone_id INTEGER REFERENCES zones(zone_id) ON DELETE SET NULL,
+          equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
+          source_table TEXT
+            CHECK (source_table IS NULL OR source_table IN
+              ('systems','meters','bms','thermal_regulation')),
+          source_id INTEGER,
+          auto_generated INTEGER NOT NULL DEFAULT 1,
+          commercial_notes TEXT,
+          estimated_effort TEXT
+            CHECK (estimated_effort IS NULL OR estimated_effort IN ('low','medium','high')),
+          status TEXT NOT NULL DEFAULT 'open'
+            CHECK (status IN ('open','quoted','in_progress','done','declined')),
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_bacs_actions_doc ON bacs_audit_action_items(document_id, severity, position);
+        CREATE INDEX IF NOT EXISTS idx_bacs_actions_source ON bacs_audit_action_items(document_id, source_table, source_id);
+
+        -- Referentiel : matrice nature_zone -> categories BACS attendues.
+        -- Seede au boot par seedBacsRequirements() dans seeder.js.
+        CREATE TABLE IF NOT EXISTS bacs_requirements_by_zone_nature (
+          zone_nature TEXT PRIMARY KEY,
+          required_categories TEXT NOT NULL -- JSON array of system_category values
+        );
+      `);
+      db.pragma('user_version = 35');
+      db.exec('COMMIT');
+      log.info('Migration 35 appliquee : tables audit BACS (systems/meters/bms/thermal_regulation/action_items + referentiel)');
     } catch (e) {
       db.exec('ROLLBACK');
       throw e;

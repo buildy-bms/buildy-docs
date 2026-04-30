@@ -21,6 +21,8 @@ async function main() {
   require('./lib/seeder').backfillNewPlanSections();
   // Lot 32 — Seed catalogue editable des categories de systemes (icone + couleur)
   require('./lib/seeder').seedSystemCategoriesOnBoot();
+  // Phase 2 audit BACS — referentiel matrice nature_zone -> categories attendues
+  require('./lib/seeder').seedBacsRequirementsOnBoot();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {
