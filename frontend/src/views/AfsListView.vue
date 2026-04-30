@@ -183,7 +183,7 @@ async function submitCreate() {
     newAf.value = { kind: 'af', site_id: null, client_name: '', project_name: '', site_address: '', service_level: null }
     selectedSite.value = null
     refresh()
-    router.push(`/afs/${data.id}`)
+    router.push(routeForDoc(data))
   } catch (e) {
     error(e.response?.data?.detail || 'Erreur lors de la création')
   } finally {
@@ -238,6 +238,12 @@ function formatDate(s) {
   return new Date(s.replace(' ', 'T')).toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'short', year: 'numeric'
   })
+}
+
+// Dispatcher vers la bonne vue selon le kind du document
+function routeForDoc(doc) {
+  if (doc.kind === 'bacs_audit') return `/bacs-audit/${doc.id}`
+  return `/afs/${doc.id}`
 }
 
 onMounted(refresh)
@@ -351,7 +357,7 @@ onMounted(refresh)
             <tr
               v-else
               class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer group"
-              @click="router.push(`/afs/${row.af.id}`)"
+              @click="router.push(routeForDoc(row.af))"
             >
               <td class="px-4 py-2.5 font-semibold text-gray-800">{{ row.af.client_name }}</td>
               <td class="px-4 py-2.5 text-gray-700">

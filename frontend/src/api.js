@@ -192,6 +192,29 @@ export const createSite = (data) => api.post('/sites', data)
 export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
 
+// ── Audit BACS — donnees structurees ──
+export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
+export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
+export const getBacsMeters = (docId) => api.get(`/bacs-audit/${docId}/meters`)
+export const createBacsMeter = (docId, data) => api.post(`/bacs-audit/${docId}/meters`, data)
+export const updateBacsMeter = (id, data) => api.patch(`/bacs-audit/meters/${id}`, data)
+export const deleteBacsMeter = (id) => api.delete(`/bacs-audit/meters/${id}`)
+export const getBacsBms = (docId) => api.get(`/bacs-audit/${docId}/bms`)
+export const updateBacsBms = (docId, data) => api.put(`/bacs-audit/${docId}/bms`, data)
+export const getBacsThermal = (docId) => api.get(`/bacs-audit/${docId}/thermal-regulation`)
+export const updateBacsThermal = (id, data) => api.patch(`/bacs-audit/thermal-regulation/${id}`, data)
+export const getBacsActionItems = (docId, params) =>
+  api.get(`/bacs-audit/${docId}/action-items`, { params })
+export const createBacsActionItem = (docId, data) =>
+  api.post(`/bacs-audit/${docId}/action-items`, data)
+export const updateBacsActionItem = (id, data) =>
+  api.patch(`/bacs-audit/action-items/${id}`, data)
+export const deleteBacsActionItem = (id) => api.delete(`/bacs-audit/action-items/${id}`)
+export const regenerateBacsActionItems = (docId) =>
+  api.post(`/bacs-audit/${docId}/action-items/regenerate`)
+export const getBacsActionItemsCsvUrl = (docId) =>
+  `/api/bacs-audit/${docId}/action-items/export.csv`
+
 // ── Site-zones (locales Buildy Docs, attachees a un site) ──
 // Note : namespace `/site-zones` plutot que `/zones` car les routes /zones
 // sont deja prises par les af_zones legacy (routes/sections.js). Sera
