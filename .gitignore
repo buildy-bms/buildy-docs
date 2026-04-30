@@ -16,6 +16,9 @@ data/repos/
 **/buildy_af.db
 **/buildy_af.db-shm
 **/buildy_af.db-wal
+**/data/exports/
+**/data/attachments/
+**/data/repos/
 
 # Certs HTTPS (auto-generes en dev)
 certs/*.crt
