@@ -10,9 +10,14 @@
  * - `serializeSite(site)` : forme du payload sur le wire.
  */
 
+const { Agent } = require('undici');
 const config = require('../config');
 const db = require('../database');
 const log = require('./logger').system;
+
+// Fleet Manager utilise un certificat auto-signe en prod (acces NetBird).
+// On accepte les certs auto-signes car le canal est limite a NetBird/loopback.
+const INSECURE_DISPATCHER = new Agent({ connect: { rejectUnauthorized: false } });
 
 function serializeSite(site) {
   return {
@@ -44,6 +49,7 @@ async function pushSite(site) {
       body: JSON.stringify(payload),
       // Timeout court : on prefere requeue plutot que bloquer la requete user
       signal: AbortSignal.timeout(5000),
+      dispatcher: INSECURE_DISPATCHER,
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
