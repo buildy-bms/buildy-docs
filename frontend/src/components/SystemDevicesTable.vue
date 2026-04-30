@@ -66,6 +66,12 @@ const newDevice = ref({
   location: '', notes: '',
 })
 
+// Classes CSS partagees pour coherence visuelle (inputs + selects)
+const inputCls = 'w-full px-1.5 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition bg-white'
+const selectCls = 'w-full px-1.5 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center transition bg-white'
+const inputAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 placeholder:italic placeholder:text-gray-400'
+const selectAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center'
+
 const totalPowerKw = computed(() =>
   props.devices.reduce((s, d) => s + (Number(d.power_kw) || 0), 0)
 )
@@ -138,140 +144,143 @@ async function removeDevice(d) {
     </div>
 
     <!-- Table devices -->
-    <table class="w-full text-xs">
-      <thead v-if="devices.length" class="text-[10px] uppercase text-gray-500 tracking-wider">
+    <table class="w-full text-xs border-collapse">
+      <thead v-if="devices.length" class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
-          <th class="text-center py-1 whitespace-nowrap">Nom</th>
-          <th class="text-center py-1 whitespace-nowrap">Marque</th>
-          <th class="text-center py-1 whitespace-nowrap">Référence</th>
-          <th class="text-center py-1 whitespace-nowrap w-28">Énergie</th>
-          <th class="text-center py-1 whitespace-nowrap w-24">Puissance (kW)</th>
-          <th class="text-center py-1 whitespace-nowrap w-28">Nature</th>
-          <th class="text-center py-1 whitespace-nowrap w-32">Communication</th>
-          <th class="text-center py-1 whitespace-nowrap w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
-          <th class="text-center py-1 whitespace-nowrap w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
-          <th class="text-center py-1 whitespace-nowrap">Localisation</th>
-          <th class="text-center py-1 whitespace-nowrap">Notes</th>
-          <th class="text-center py-1 whitespace-nowrap w-20" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
-          <th class="text-center py-1 w-8"></th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Nom</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Marque</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Référence</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Énergie</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-24">Puissance&nbsp;(kW)</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Nature</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-36">Communication</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-40">Notes</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-12" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
+          <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-8"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200">
-        <tr v-for="d in devices" :key="d.id" class="group">
-          <td class="py-1 pr-2">
+      <tbody>
+        <tr v-for="d in devices" :key="d.id"
+            class="group border-b border-gray-100 hover:bg-gray-50/60 transition"
+            :class="d.out_of_service ? 'opacity-50' : ''">
+          <td class="py-1 px-1">
             <input type="text" :value="d.name" placeholder="Nom"
                    @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
           </td>
-          <td class="py-1 pr-2">
+          <td class="py-1 px-1">
             <input type="text" :value="d.brand" placeholder="Marque"
                    @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
           </td>
-          <td class="py-1 pr-2">
+          <td class="py-1 px-1">
             <input type="text" :value="d.model_reference" placeholder="Référence"
                    @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1">
             <select :value="d.energy_source"
                     @change="e => patchDevice(d, { energy_source: e.target.value || null })"
-                    class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+                    :class="selectCls">
               <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1">
             <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
                    @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded text-center" />
+                   :class="inputCls" class="text-center placeholder:text-gray-400" />
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1">
             <select :value="d.device_role"
                     @change="e => patchDevice(d, { device_role: e.target.value || null })"
-                    class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+                    :class="selectCls">
               <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1">
+            <input type="text" :value="d.location" placeholder="Localisation"
+                   @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
+                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
+          </td>
+          <td class="py-1 px-1">
             <select :value="d.communication_protocol"
                     @change="e => patchDevice(d, { communication_protocol: e.target.value || null })"
-                    class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+                    :class="selectCls">
               <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1 text-center">
             <input type="checkbox" :checked="!!d.meets_r175_3_p4"
                    @change="e => patchDevice(d, { meets_r175_3_p4: e.target.checked })"
                    class="rounded border-gray-300" />
           </td>
-          <td class="py-1 pr-2 text-center">
+          <td class="py-1 px-1 text-center">
             <input type="checkbox" :checked="!!d.meets_r175_3_p4_autonomous"
                    @change="e => patchDevice(d, { meets_r175_3_p4_autonomous: e.target.checked })"
                    class="rounded border-gray-300" />
           </td>
-          <td class="py-1 pr-2">
-            <input type="text" :value="d.location" placeholder="Localisation"
-                   @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-          </td>
-          <td class="py-1 pr-2">
+          <td class="py-1 px-1">
             <input type="text" :value="d.notes" placeholder="Notes"
                    @blur="e => e.target.value !== (d.notes || '') && patchDevice(d, { notes: e.target.value || null })"
-                   class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
           </td>
-          <td class="py-1 text-center">
+          <td class="py-1 px-1 text-center">
             <input type="checkbox" :checked="!!d.out_of_service"
                    @change="e => patchDevice(d, { out_of_service: e.target.checked })"
-                   class="rounded border-gray-300" :class="d.out_of_service ? 'accent-red-500' : ''" />
+                   class="rounded border-gray-300 accent-red-500" />
           </td>
-          <td class="py-1 text-center">
+          <td class="py-1 px-1 text-center">
             <button @click="removeDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition" title="Supprimer">
               <TrashIcon class="w-3.5 h-3.5" />
             </button>
           </td>
         </tr>
         <!-- Ligne d'ajout inline -->
-        <tr class="bg-indigo-50/40">
-          <td class="py-1 pr-2">
-            <input v-model="newDevice.name" type="text" placeholder="Nom"
-                   class="w-full px-1.5 py-0.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500/30" />
+        <tr class="bg-indigo-50/30 border-t border-indigo-100">
+          <td class="py-1.5 px-1">
+            <input v-model="newDevice.name" type="text" placeholder="Nom *"
+                   @keydown.enter="addDevice"
+                   :class="inputAddCls" />
           </td>
-          <td class="py-1 pr-2">
-            <input v-model="newDevice.brand" type="text" placeholder="Marque"
-                   class="w-full px-1.5 py-0.5 border border-gray-200 rounded" />
+          <td class="py-1.5 px-1">
+            <input v-model="newDevice.brand" type="text" placeholder="Marque" :class="inputAddCls" />
           </td>
-          <td class="py-1 pr-2">
-            <input v-model="newDevice.model_reference" type="text" placeholder="Référence"
-                   class="w-full px-1.5 py-0.5 border border-gray-200 rounded" />
+          <td class="py-1.5 px-1">
+            <input v-model="newDevice.model_reference" type="text" placeholder="Référence" :class="inputAddCls" />
           </td>
-          <td class="py-1 pr-2">
-            <select v-model="newDevice.energy_source" class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+          <td class="py-1.5 px-1">
+            <select v-model="newDevice.energy_source" :class="selectAddCls">
               <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2">
+          <td class="py-1.5 px-1">
             <input v-model.number="newDevice.power_kw" type="number" min="0" step="0.1" placeholder="kW"
-                   class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center" />
+                   :class="inputAddCls" class="text-center" />
           </td>
-          <td class="py-1 pr-2">
-            <select v-model="newDevice.device_role" class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+          <td class="py-1.5 px-1">
+            <select v-model="newDevice.device_role" :class="selectAddCls">
               <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2">
-            <select v-model="newDevice.communication_protocol" class="w-full px-1.5 py-0.5 border border-gray-200 rounded text-center">
+          <td class="py-1.5 px-1">
+            <input v-model="newDevice.location" type="text" placeholder="Localisation" :class="inputAddCls" />
+          </td>
+          <td class="py-1.5 px-1">
+            <select v-model="newDevice.communication_protocol" :class="selectAddCls">
               <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
-          <td class="py-1 pr-2 text-center text-gray-300 italic text-[10px]">—</td>
-          <td class="py-1 pr-2 text-center text-gray-300 italic text-[10px]">—</td>
-          <td class="py-1 pr-2">
-            <input v-model="newDevice.location" type="text" placeholder="Localisation"
-                   class="w-full px-1.5 py-0.5 border border-gray-200 rounded" />
+          <td class="py-1.5 px-1 text-center text-gray-300 text-[10px]">—</td>
+          <td class="py-1.5 px-1 text-center text-gray-300 text-[10px]">—</td>
+          <td class="py-1.5 px-1">
+            <input v-model="newDevice.notes" type="text" placeholder="Notes" :class="inputAddCls" />
           </td>
-          <td colspan="3" class="py-1 pr-2 text-center">
-            <button @click="addDevice"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 whitespace-nowrap">
+          <td colspan="2" class="py-1.5 px-1 text-center">
+            <button @click="addDevice" :disabled="!newDevice.name && !newDevice.brand && !newDevice.model_reference"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
               <PlusIcon class="w-3 h-3" /> Ajouter
             </button>
           </td>
