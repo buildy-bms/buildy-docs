@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 40;
+const TARGET_VERSION = 41;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1676,6 +1676,44 @@ function runMigrations() {
       db.pragma('user_version = 40');
       db.exec('COMMIT');
       log.info('Migration 40 appliquee : audit BACS v2.1 (devices.name + communication_protocol/LoRaWAN, R175-3 §4 split, managed_by_bms, matrice meters videe)');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  if (current < 41) {
+    // Backfill des notes auto-generees des compteurs : remplace les libelles
+    // anglais (heritage des anciennes versions du seeder) par leurs equivalents
+    // francais avec accents. Idempotent : les notes utilisateur ne sont pas
+    // touchees (seules les patterns connus sont remplaces).
+    db.exec('BEGIN');
+    try {
+      // Compteurs generaux
+      db.prepare("UPDATE bacs_audit_meters SET notes = 'Compteur général électrique du bâtiment' WHERE notes = 'Compteur general electrique du batiment'").run();
+      db.prepare("UPDATE bacs_audit_meters SET notes = 'Compteur général gaz du bâtiment' WHERE notes = 'Compteur general gaz du batiment'").run();
+      db.prepare("UPDATE bacs_audit_meters SET notes = 'Compteur général fioul du bâtiment' WHERE notes = 'Compteur general fioul du batiment'").run();
+      db.prepare("UPDATE bacs_audit_meters SET notes = 'Compteur général thermique (réseau de chaleur)' WHERE notes = 'Compteur general thermique (reseau de chaleur)'").run();
+      // Compteurs zonaux : fix les types et usages anglais dans les notes
+      db.exec(`
+        UPDATE bacs_audit_meters
+        SET notes = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(notes,
+          'Compteur gas en', 'Compteur gaz en'),
+          'Compteur electric en', 'Compteur électrique en'),
+          'Compteur electric_production en', 'Compteur électrique de production en'),
+          'Compteur thermal en', 'Compteur thermique en'),
+          'Compteur water en', 'Compteur eau en'),
+          '(heating)', '(chauffage)'),
+          '(cooling)', '(refroidissement)'),
+          '(dhw)', '(ECS)'),
+          '(lighting)', '(éclairage)'),
+          '(pv)', '(production PV)'),
+          '(other)', '(général)')
+        WHERE notes LIKE 'Compteur % en zone %';
+      `);
+      db.pragma('user_version = 41');
+      db.exec('COMMIT');
+      log.info('Migration 41 appliquee : notes compteurs auto traduites en FR');
     } catch (e) {
       db.exec('ROLLBACK');
       throw e;

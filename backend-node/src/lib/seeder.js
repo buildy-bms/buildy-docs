@@ -627,22 +627,42 @@ function resyncBacsAuditDataForZones(documentId, zones) {
 function resyncBacsAuditMetersForZones(documentId, zones) {
   let inserted = 0;
 
-  // Mapping energie -> usage du compteur
-  const ENERGY_TO_USAGE = {
-    gas: { meter_type: 'gas', usage: 'heating' },          // gaz = chaudiere/chauffage
-    electric: { meter_type: 'electric', usage: 'heating' }, // electrique en chauffage = effet Joule, en cooling = clim
-    heat_pump: { meter_type: 'electric', usage: 'heating' },
-    wood: { meter_type: 'other', usage: 'heating' },
-    biomass: { meter_type: 'other', usage: 'heating' },
-    fuel_oil: { meter_type: 'other', usage: 'heating' },
-    district_heating: { meter_type: 'thermal', usage: 'heating' },
-    solar: { meter_type: 'electric_production', usage: 'pv' },
+  // Mapping energie -> meter_type (le type physique du compteur)
+  const ENERGY_TO_METER_TYPE = {
+    gas: 'gas',
+    electric: 'electric',
+    heat_pump: 'electric',
+    wood: 'other',
+    biomass: 'other',
+    fuel_oil: 'other',
+    district_heating: 'thermal',
+    solar: 'electric_production',
   };
-  // Mapping general (compteur energie primaire au niveau batiment)
+  // Mapping system_category -> usage du compteur (l'usage est porte par la
+  // categorie, pas par l'energie). Couvre toutes les valeurs possibles.
+  const CATEGORY_TO_USAGE = {
+    heating: 'heating',
+    cooling: 'cooling',
+    ventilation: 'other',
+    dhw: 'dhw',
+    lighting_indoor: 'lighting',
+    lighting_outdoor: 'lighting',
+    electricity_production: 'pv',
+  };
+  // Mapping general (compteur energie primaire au niveau batiment) — libelles FR
   const ENERGY_TO_GENERAL = {
-    gas: { meter_type: 'gas', notes: 'Compteur general gaz du batiment' },
-    fuel_oil: { meter_type: 'other', notes: 'Compteur general fioul du batiment' },
-    district_heating: { meter_type: 'thermal', notes: 'Compteur general thermique (reseau de chaleur)' },
+    gas: { meter_type: 'gas', notes: 'Compteur général gaz du bâtiment' },
+    fuel_oil: { meter_type: 'other', notes: 'Compteur général fioul du bâtiment' },
+    district_heating: { meter_type: 'thermal', notes: 'Compteur général thermique (réseau de chaleur)' },
+  };
+  // Labels FR pour les notes auto-generes
+  const METER_TYPE_FR = {
+    electric: 'électrique', electric_production: 'électrique de production',
+    gas: 'gaz', water: 'eau', thermal: 'thermique', other: 'autre',
+  };
+  const USAGE_FR = {
+    heating: 'chauffage', cooling: 'refroidissement', dhw: 'ECS',
+    pv: 'production PV', lighting: 'éclairage', other: 'général',
   };
 
   const findExistingZonal = db.db.prepare(`
@@ -676,21 +696,19 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // 1. Compteurs zonaux : 1 par (zone, meter_type, usage) selon les devices
   const zonalSeen = new Set();
   for (const d of devices) {
-    const map = ENERGY_TO_USAGE[d.energy_source];
-    if (!map || !d.zone_id) continue;
-    // Force usage par categorie de systeme (heating/cooling/dhw/lighting/pv/other)
-    const usage = ['heating','cooling','dhw','lighting','electricity_production'].includes(d.system_category)
-      ? (d.system_category === 'electricity_production' ? 'pv' :
-         d.system_category === 'lighting_indoor' || d.system_category === 'lighting_outdoor' ? 'lighting' :
-         d.system_category)
-      : map.usage;
-    const key = `${d.zone_id}:${usage}:${map.meter_type}`;
+    const meterType = ENERGY_TO_METER_TYPE[d.energy_source];
+    if (!meterType || !d.zone_id) continue;
+    // L'usage est porte par la categorie du systeme parent du device
+    const usage = CATEGORY_TO_USAGE[d.system_category] || 'other';
+    const key = `${d.zone_id}:${usage}:${meterType}`;
     if (zonalSeen.has(key)) continue;
     zonalSeen.add(key);
-    if (findExistingZonal.get(documentId, d.zone_id, usage, map.meter_type)) continue;
+    if (findExistingZonal.get(documentId, d.zone_id, usage, meterType)) continue;
+    const typeFr = METER_TYPE_FR[meterType] || meterType;
+    const usageFr = USAGE_FR[usage] || usage;
     insZonal.run(
-      documentId, d.zone_id, usage, map.meter_type,
-      `Compteur ${map.meter_type} en zone « ${d.zone_name || '?'} » (${usage})`,
+      documentId, d.zone_id, usage, meterType,
+      `Compteur ${typeFr} en zone « ${d.zone_name || '?'} » (${usageFr})`,
     );
     inserted++;
   }
@@ -701,7 +719,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // (ou si AU MOINS 1 device tout court pour respecter la regle "compteur
   // general electrique toujours obligatoire des qu'il y a un audit serieux")
   if (devices.length > 0 && !findExistingGeneral.get(documentId, 'other', 'electric')) {
-    insGeneral.run(documentId, 'electric', 'Compteur general electrique du batiment');
+    insGeneral.run(documentId, 'electric', 'Compteur général électrique du bâtiment');
     inserted++;
   }
   for (const energy of generalEnergies) {
