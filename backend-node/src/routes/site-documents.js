@@ -42,7 +42,7 @@ async function routes(fastify) {
   fastify.get('/sites/:uuid/documents', async (request, reply) => {
     const site = db.sites.getByUuid(request.params.uuid);
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
-    const { category, bacs_audit_system_id } = request.query;
+    const { category, bacs_audit_system_id, bacs_audit_device_id } = request.query;
     let sql = `
       SELECT d.*, u.display_name AS uploaded_by_name
       FROM site_documents d
@@ -55,6 +55,10 @@ async function routes(fastify) {
       sql += ' AND d.bacs_audit_system_id = ?';
       args.push(parseInt(bacs_audit_system_id, 10));
     }
+    if (bacs_audit_device_id) {
+      sql += ' AND d.bacs_audit_device_id = ?';
+      args.push(parseInt(bacs_audit_device_id, 10));
+    }
     sql += ' ORDER BY d.uploaded_at DESC';
     return db.db.prepare(sql).all(...args);
   });
@@ -66,7 +70,7 @@ async function routes(fastify) {
     const site = db.sites.getByUuid(request.params.uuid);
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
 
-    const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id } = request.query;
+    const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id } = request.query;
     if (!title) return reply.code(400).send({ detail: 'Title requis (query string)' });
     if (!category || !CATEGORIES.includes(category)) {
       return reply.code(400).send({ detail: 'Categorie invalide' });
@@ -115,12 +119,13 @@ async function routes(fastify) {
     const r = db.db.prepare(`
       INSERT INTO site_documents
         (site_id, title, category, filename, original_name, size_bytes, mime_type,
-         bacs_audit_system_id, bacs_audit_bms_document_id, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       site.site_id, title, category, filename, file.filename, sizeBytes, file.mimetype,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
       bacs_audit_bms_document_id ? parseInt(bacs_audit_bms_document_id, 10) : null,
+      bacs_audit_device_id ? parseInt(bacs_audit_device_id, 10) : null,
       userId || null,
     );
     db.auditLog.add({ userId, action: 'site_document.upload',
@@ -155,6 +160,7 @@ async function routes(fastify) {
       category: z.enum(CATEGORIES).optional(),
       bacs_audit_system_id: z.number().int().nullable().optional(),
       bacs_audit_bms_document_id: z.number().int().nullable().optional(),
+      bacs_audit_device_id: z.number().int().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }

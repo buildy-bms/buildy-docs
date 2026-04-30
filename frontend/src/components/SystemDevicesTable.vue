@@ -1,8 +1,10 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, onMounted, watch } from 'vue'
+import { TrashIcon, PlusIcon, CameraIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice,
+  listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
+  getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -20,6 +22,7 @@ const props = defineProps({
   system: { type: Object, required: true },
   devices: { type: Array, required: true, default: () => [] },
   systemLabel: { type: String, required: true },
+  siteUuid: { type: String, default: null },
 })
 const emit = defineEmits(['changed', 'system-updated'])
 
@@ -65,6 +68,68 @@ const newDevice = ref({
   energy_source: null, device_role: null, communication_protocol: null,
   location: '', notes: '',
 })
+
+// Photos par device (charge depuis site_documents filtre par bacs_audit_device_id)
+const photosByDevice = ref({})  // device_id -> [doc, ...]
+async function refreshPhotos() {
+  if (!props.siteUuid) return
+  try {
+    const { data } = await listSiteDocuments(props.siteUuid)
+    const out = {}
+    for (const doc of data) {
+      if (!doc.bacs_audit_device_id) continue
+      if (!out[doc.bacs_audit_device_id]) out[doc.bacs_audit_device_id] = []
+      out[doc.bacs_audit_device_id].push(doc)
+    }
+    photosByDevice.value = out
+  } catch { /* silencieux */ }
+}
+const fileInputs = ref({})
+function pickPhotoFor(deviceId) {
+  fileInputs.value[deviceId]?.click()
+}
+async function onPhotoSelected(d, e) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  if (!props.siteUuid) {
+    error('Audit non rattaché à un site, impossible d\'uploader des photos')
+    return
+  }
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const title = `Photo ${d.name || d.brand || `équipement #${d.id}`} — ${file.name}`
+    await uploadSiteDocument(props.siteUuid, fd, {
+      title,
+      category: 'autre',
+      bacs_audit_system_id: d.system_id,
+      bacs_audit_device_id: d.id,
+    })
+    success('Photo ajoutée')
+    refreshPhotos()
+  } catch (err) {
+    error(err.response?.data?.detail || 'Upload impossible')
+  }
+}
+async function removePhoto(photo) {
+  const ok = await confirm({
+    title: 'Supprimer cette photo ?',
+    message: photo.title,
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteSiteDocument(photo.id)
+    refreshPhotos()
+  } catch {
+    error('Suppression impossible')
+  }
+}
+
+watch(() => props.siteUuid, refreshPhotos)
+watch(() => props.devices.length, refreshPhotos)
+onMounted(refreshPhotos)
 
 // Classes CSS partagees pour coherence visuelle (inputs + selects)
 const inputCls = 'w-full px-1.5 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition bg-white'
@@ -159,6 +224,7 @@ async function removeDevice(d) {
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-40">Notes</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-12" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
+          <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-12" title="Photos rattachées à cet équipement">📷</th>
           <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-8"></th>
         </tr>
       </thead>
@@ -233,6 +299,19 @@ async function removeDevice(d) {
                    class="rounded border-gray-300 accent-red-500" />
           </td>
           <td class="py-1 px-1 text-center">
+            <input type="file" accept="image/*" class="hidden"
+                   :ref="el => { if (el) fileInputs[d.id] = el }"
+                   @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
+            <button @click="pickPhotoFor(d.id)"
+                    class="inline-flex items-center gap-1 text-gray-500 hover:text-indigo-600 transition"
+                    :title="`Ajouter une photo (${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''})`">
+              <CameraIcon class="w-3.5 h-3.5" />
+              <span v-if="(photosByDevice[d.id] || []).length" class="text-[10px] font-mono">
+                {{ (photosByDevice[d.id] || []).length }}
+              </span>
+            </button>
+          </td>
+          <td class="py-1 px-1 text-center">
             <button @click="removeDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition" title="Supprimer">
               <TrashIcon class="w-3.5 h-3.5" />
             </button>
@@ -278,7 +357,7 @@ async function removeDevice(d) {
           <td class="py-1.5 px-1">
             <input v-model="newDevice.notes" type="text" placeholder="Notes" :class="inputAddCls" />
           </td>
-          <td colspan="2" class="py-1.5 px-1 text-center">
+          <td colspan="3" class="py-1.5 px-1 text-center">
             <button @click="addDevice" :disabled="!newDevice.name && !newDevice.brand && !newDevice.model_reference"
                     class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
               <PlusIcon class="w-3 h-3" /> Ajouter

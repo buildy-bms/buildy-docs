@@ -81,17 +81,13 @@ function computeTargetActions(documentId) {
 
     // Système absent → R175-1 §4 (plusieurs sources_id par paire systemId pour
     // ne pas se recouvrir avec les autres règles ci-dessous)
-    if (!s.present) {
-      addTarget({
-        source_table: 'systems', source_id: s.id, source_subtype: 'absent',
-        category: 'system_addition', severity: 'major',
-        r175_article: 'R175-1 §4',
-        title: `Ajouter un système de ${catFr}${zoneStr}`,
-        description: `Cette zone devrait disposer d'un système de ${catFr} selon le périmètre R175-1 §4. Aucun système n'a été identifié à l'audit.`,
-        zone_id: s.zone_id, equipment_id: null,
-      });
-      continue; // pas de p3/p4 si le système n'est pas présent
-    }
+    // NE PLUS générer d'action "Ajouter un système de X" si la catégorie
+    // n'est pas marquée présente : la matrice nature_zone est purement
+    // indicative, pas prescriptive. Un audit ne génère d'action que sur
+    // ce qui a été observé en panne (cf retour Kevin v2.7).
+    // Si l'auditeur veut signaler une absence problématique, il ajoute
+    // une action manuelle via la vue commerciale.
+    if (!s.present) continue;
 
     // Système présent + non communicant (legacy : on garde la règle communication=non_communicant)
     if (s.communication === 'non_communicant') {

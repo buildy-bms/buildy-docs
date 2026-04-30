@@ -706,6 +706,7 @@ onMounted(refresh)
                   :system="s"
                   :devices="devicesBySystem[s.id] || []"
                   :system-label="SYSTEM_LABEL[s.system_category] || s.system_category"
+                  :site-uuid="document?.site_uuid"
                   @changed="refreshAuditData"
                   @system-updated="patch => patchSystem(s, patch)"
                 />
@@ -1084,12 +1085,50 @@ onMounted(refresh)
         </div>
       </section>
 
+      <!-- 9. Documents du site (DOE) -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
+          <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
+          <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
+        </header>
+        <div class="px-5 py-4">
+          <SiteDocumentsManager
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :systems="systems"
+          />
+          <p v-else class="text-sm text-gray-500 italic text-center py-4">
+            L'audit n'est rattaché à aucun site.
+          </p>
+        </div>
+      </section>
+
+      <!-- 10. Credentials du site (accès) -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
+          <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
+          <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
+        </header>
+        <div class="px-5 py-4">
+          <SiteCredentialsManager
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :systems="systems"
+          />
+          <p v-else class="text-sm text-gray-500 italic text-center py-4">
+            L'audit n'est rattaché à aucun site.
+          </p>
+        </div>
+      </section>
+
       <!-- Plan de mise en conformité -->
       <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
-            <h2 class="text-base font-semibold text-gray-800">8. Plan de mise en conformité</h2>
+            <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
             <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
           </div>
           <button
@@ -1157,44 +1196,6 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
-      </section>
-
-      <!-- 9. Documents du site (DOE) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
-          <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
-          <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
-          <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
-        </header>
-        <div class="px-5 py-4">
-          <SiteDocumentsManager
-            v-if="document?.site_uuid"
-            :site-uuid="document.site_uuid"
-            :systems="systems"
-          />
-          <p v-else class="text-sm text-gray-500 italic text-center py-4">
-            L'audit n'est rattaché à aucun site.
-          </p>
-        </div>
-      </section>
-
-      <!-- 10. Credentials du site (accès) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
-          <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
-          <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
-          <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
-        </header>
-        <div class="px-5 py-4">
-          <SiteCredentialsManager
-            v-if="document?.site_uuid"
-            :site-uuid="document.site_uuid"
-            :systems="systems"
-          />
-          <p v-else class="text-sm text-gray-500 italic text-center py-4">
-            L'audit n'est rattaché à aucun site.
-          </p>
-        </div>
       </section>
     </div>
   </div>

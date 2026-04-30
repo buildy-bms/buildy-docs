@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 45;
+const TARGET_VERSION = 46;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1832,6 +1832,21 @@ function runMigrations() {
     `);
     db.pragma('user_version = 45');
     log.info('Migration 45 appliquee : bms_integration_out_of_service sur devices + meters');
+  }
+
+  if (current < 46) {
+    // Cf retour Kevin v2.7 : permettre d'ajouter des photos directement
+    // depuis la ligne d'un device (et qu'elles apparaissent dans la liste
+    // des fichiers du site / de l'audit). Ajout de bacs_audit_device_id
+    // sur site_documents.
+    db.exec(`
+      ALTER TABLE site_documents ADD COLUMN bacs_audit_device_id INTEGER
+        REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_site_documents_device
+        ON site_documents(bacs_audit_device_id);
+    `);
+    db.pragma('user_version = 46');
+    log.info('Migration 46 appliquee : site_documents.bacs_audit_device_id');
   }
 
   if (current > TARGET_VERSION) {
