@@ -13,18 +13,38 @@
   <p class="cover-doc-type">Audit BACS — Décret R175</p>
   <h1 class="cover-title">{{document.project_name}}</h1>
   <p class="cover-client">{{document.client_name}}</p>
+  {{#if site.name}}<p class="cover-project">Site : {{site.name}}</p>{{/if}}
   {{#if site.address}}<p class="cover-address">{{site.address}}</p>{{/if}}
 
   {{#if applicabilityLabel}}
-  <div class="cover-deadline">
-    Échéance R175-2 applicable
-    <strong>{{applicabilityLabel}}</strong>
+  <div class="cover-deadline-block">
+    <p class="cover-deadline-label">Applicabilité R175-2</p>
+    <p class="cover-deadline-value">{{applicabilityLabel}}</p>
+    {{#if document.bacs_total_power_kw}}
+    <p class="cover-deadline-detail">
+      Puissance nominale utile cumulée chauffage + climatisation : <strong>{{document.bacs_total_power_kw}} kW</strong>
+    </p>
+    {{/if}}
   </div>
   {{/if}}
 
   <div class="cover-meta">
-    Audit réalisé le {{exportDate}} par {{authorName}}<br/>
-    Version {{version}}
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Date d'audit</span>
+      <span class="cover-meta-value">{{exportDate}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Auteur</span>
+      <span class="cover-meta-value">{{authorName}}</span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Version</span>
+      <span class="cover-meta-value"><span class="cover-version-tag">{{version}}</span></span>
+    </div>
+    <div class="cover-meta-row">
+      <span class="cover-meta-label">Type de document</span>
+      <span class="cover-meta-value">Audit de conformité BACS</span>
+    </div>
   </div>
 </section>
 

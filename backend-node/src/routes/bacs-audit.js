@@ -203,27 +203,35 @@ async function routes(fastify) {
   fastify.put('/bacs-audit/:documentId/bms', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(documentId, reply)) return;
+    // Helper : accepte boolean, 0/1, true/false (string ou number) et null
+    const boolish = z.preprocess((v) => {
+      if (v === null || v === undefined) return v;
+      if (typeof v === 'boolean') return v;
+      if (v === 1 || v === '1' || v === 'true') return true;
+      if (v === 0 || v === '0' || v === 'false') return false;
+      return v;
+    }, z.boolean().nullable().optional());
     const schema = z.object({
       existing_solution: z.string().nullable().optional(),
       existing_solution_brand: z.string().nullable().optional(),
       location: z.string().nullable().optional(),
       model_reference: z.string().nullable().optional(),
-      manages_heating: z.boolean().nullable().optional(),
-      manages_cooling: z.boolean().nullable().optional(),
-      manages_ventilation: z.boolean().nullable().optional(),
-      manages_dhw: z.boolean().nullable().optional(),
-      manages_lighting: z.boolean().nullable().optional(),
-      meets_r175_3_p1: z.boolean().nullable().optional(),
-      meets_r175_3_p2: z.boolean().nullable().optional(),
+      manages_heating: boolish,
+      manages_cooling: boolish,
+      manages_ventilation: boolish,
+      manages_dhw: boolish,
+      manages_lighting: boolish,
+      meets_r175_3_p1: boolish,
+      meets_r175_3_p2: boolish,
       notes_p1: z.string().nullable().optional(),
       notes_p2: z.string().nullable().optional(),
-      has_maintenance_procedures: z.boolean().nullable().optional(),
+      has_maintenance_procedures: boolish,
       notes_maintenance: z.string().nullable().optional(),
-      operator_trained: z.boolean().nullable().optional(),
+      operator_trained: boolish,
       operator_training_date: z.string().nullable().optional(),
       notes_training: z.string().nullable().optional(),
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
-      out_of_service: z.boolean().nullable().optional(),
+      out_of_service: boolish,
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -461,7 +469,7 @@ async function routes(fastify) {
     // Labels d'enums (pour eviter les codes anglais bruts dans le PDF)
     const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
       dhw:'Eau chaude sanitaire', lighting_indoor:'Éclairage intérieur',
-      lighting_outdoor:'Éclairage extérieur', electricity_production:'Production électrique' };
+      lighting_outdoor:'Éclairage extérieur', electricity_production:'Production photovoltaïque' };
     const COMM_LABEL = { modbus_tcp:'Modbus TCP', modbus_rtu:'Modbus RTU', bacnet_ip:'BACnet IP',
       bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT', lorawan:'LoRaWAN',
       autre:'Autre', non_communicant:'Non communicant', absent:'Absent' };
@@ -616,6 +624,10 @@ async function routes(fastify) {
     const filename = `${af.slug}-bacs-audit-${version}-${ts}.pdf`;
     const outputPath = path.join(exportsDir, String(documentId), filename);
 
+    const logoSmall = loadAssetDataUrl('logo-buildy.svg');
+    const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
+    const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.85, heightRatio: 0.85, opacity: 0.03 };
+
     let result;
     try {
       result = await renderPdf({
@@ -624,7 +636,22 @@ async function routes(fastify) {
         data,
         outputPath,
         pageFormat: 'A4',
+        skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
+        pdfOptions: {
+          displayHeaderFooter: true,
+          margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' },
+          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; justify-content:space-between;">
+            <span>${af.client_name} — ${af.project_name}</span>
+            <span>Audit BACS ${version}</span>
+          </div>`,
+          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; align-items:center; gap:6mm;">
+            <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
+            <span style="flex:1;">Audit BACS Buildy · décret R175 · confidentiel</span>
+            <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
+          </div>`,
+        },
       });
     } catch (err) {
       log.error(`PDF audit BACS render failed: ${err.message}`);

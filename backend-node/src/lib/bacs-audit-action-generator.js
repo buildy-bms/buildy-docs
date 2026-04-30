@@ -29,7 +29,7 @@ const SYSTEM_LABEL_FR = {
   dhw: 'eau chaude sanitaire',
   lighting_indoor: 'éclairage intérieur',
   lighting_outdoor: 'éclairage extérieur',
-  electricity_production: 'production électrique',
+  electricity_production: 'production photovoltaïque',
 };
 const METER_TYPE_LABEL_FR = {
   electric: 'électrique',

@@ -148,11 +148,11 @@ async function removeDevice(d) {
       <thead v-if="devices.length" class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Nom</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Nature</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Marque</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Référence</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Énergie</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-24">Puissance&nbsp;(kW)</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Nature</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-36">Communication</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
@@ -170,6 +170,13 @@ async function removeDevice(d) {
             <input type="text" :value="d.name" placeholder="Nom"
                    @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                    :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
+          </td>
+          <td class="py-1 px-1">
+            <select :value="d.device_role"
+                    @change="e => patchDevice(d, { device_role: e.target.value || null })"
+                    :class="selectCls">
+              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+            </select>
           </td>
           <td class="py-1 px-1">
             <input type="text" :value="d.brand" placeholder="Marque"
@@ -192,13 +199,6 @@ async function removeDevice(d) {
             <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
                    @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
                    :class="inputCls" class="text-center placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1">
-            <select :value="d.device_role"
-                    @change="e => patchDevice(d, { device_role: e.target.value || null })"
-                    :class="selectCls">
-              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
           </td>
           <td class="py-1 px-1">
             <input type="text" :value="d.location" placeholder="Localisation"
@@ -246,6 +246,11 @@ async function removeDevice(d) {
                    :class="inputAddCls" />
           </td>
           <td class="py-1.5 px-1">
+            <select v-model="newDevice.device_role" :class="selectAddCls">
+              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+            </select>
+          </td>
+          <td class="py-1.5 px-1">
             <input v-model="newDevice.brand" type="text" placeholder="Marque" :class="inputAddCls" />
           </td>
           <td class="py-1.5 px-1">
@@ -259,11 +264,6 @@ async function removeDevice(d) {
           <td class="py-1.5 px-1">
             <input v-model.number="newDevice.power_kw" type="number" min="0" step="0.1" placeholder="kW"
                    :class="inputAddCls" class="text-center" />
-          </td>
-          <td class="py-1.5 px-1">
-            <select v-model="newDevice.device_role" :class="selectAddCls">
-              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
           </td>
           <td class="py-1.5 px-1">
             <input v-model="newDevice.location" type="text" placeholder="Localisation" :class="inputAddCls" />

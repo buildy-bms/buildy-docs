@@ -90,7 +90,7 @@ const SYSTEM_LABEL = {
   dhw: 'ECS',
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
-  electricity_production: 'Production électrique',
+  electricity_production: 'Production photovoltaïque',
 }
 const COMM_OPTIONS = [
   { value: null, label: '—' },
@@ -314,17 +314,16 @@ function saveDocDebounced(patch) {
 }
 
 async function recomputePowerFromEquipments() {
-  if (!document.value?.site_id) {
-    error('Aucun site rattaché')
-    return
-  }
   try {
-    const { data } = await getBacsPowerCumul(document.value.site_id)
+    // Utilise la somme des devices saisis dans l'audit (chauffage + clim).
+    // Cf retour Kevin : la source de verite est l'audit, pas les equipments
+    // du site qui sont une autre table (peut-etre vide).
+    const { data } = await getBacsPowerSummary(docId)
     saveDocDebounced({
-      bacs_total_power_kw: data.total_power_kw,
+      bacs_total_power_kw: data.heating_cooling_total_kw,
       bacs_total_power_source: 'auto',
     })
-    success(`Puissance recalculée : ${data.total_power_kw} kW`)
+    success(`Puissance recalculée : ${data.heating_cooling_total_kw} kW (chauffage + climatisation)`)
   } catch {
     error('Calcul impossible')
   }
@@ -682,7 +681,7 @@ onMounted(refresh)
             <div class="flex items-center gap-2 mb-3">
               <MapPinIcon class="w-4 h-4 text-gray-400" />
               <span class="font-medium text-sm text-gray-800">{{ g.zone_name }}</span>
-              <span v-if="g.zone_nature" class="text-[11px] text-gray-500">{{ g.zone_nature }}</span>
+              <span v-if="g.zone_nature" class="text-[11px] text-gray-500">{{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
             </div>
             <div class="space-y-3">
               <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
@@ -1068,14 +1067,14 @@ onMounted(refresh)
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" v-model="bms.has_maintenance_procedures" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Consignes écrites de maintenance présentes</span>
+                <span>Consignes écrites des maintenances passées</span>
               </label>
             </div>
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-5 — Formation exploitant</h3>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" v-model="bms.operator_trained" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Exploitant formé au paramétrage</span>
+                <span>Exploitant formé à l'utilisation de la supervision</span>
               </label>
               <p v-if="(bms.existing_solution || '').toLowerCase().includes('buildy')" class="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
                 ✓ Buildy : exigence R175-5 nativement couverte par le support utilisateur intégré
