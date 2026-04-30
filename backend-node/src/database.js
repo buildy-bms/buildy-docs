@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 41;
+const TARGET_VERSION = 43;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1718,6 +1718,44 @@ function runMigrations() {
       db.exec('ROLLBACK');
       throw e;
     }
+  }
+
+  if (current < 42) {
+    // Cf retour Kevin : "Communicant / Arret manuel possible / Fonctionnement
+    // autonome doit s'appliquer a chaque systeme declare". Les checkboxes
+    // descendent du niveau systeme vers le niveau device. Les colonnes au
+    // niveau system (meets_r175_3_p3/p4/p4_autonomous) restent en DB pour
+    // compat ascendante mais ne sont plus utilisees par le generateur.
+    //
+    // "Communicant" est redondant avec la liste deroulante du protocole :
+    // si communication_protocol IS NULL ou ('non_communicant','absent'),
+    // le device est considere non-communicant. Pas besoin de checkbox.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN meets_r175_3_p4 INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN meets_r175_3_p4_autonomous INTEGER DEFAULT 0;
+    `);
+    db.pragma('user_version = 42');
+    log.info('Migration 42 appliquee : R175-3 §4 par device (manual + autonomous), interop inferee du protocole');
+  }
+
+  if (current < 43) {
+    // Cf retour Kevin v2.3 :
+    //  - Systemes integres a la GTB = au niveau device (pas categorie). Mise
+    //    a jour live au fur et a mesure de la declaration des devices.
+    //  - Compteurs integres a la GTB : meme principe (managed_by_bms au
+    //    niveau bacs_audit_meters).
+    //  - Hors-Service partout (devices, meters, bms) : case a cocher qui
+    //    indique que l'equipement est inactif. Quand HS, le generateur
+    //    d'actions ignore l'item (pas d'action corrective genere).
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN managed_by_bms INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN out_of_service INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_meters ADD COLUMN managed_by_bms INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_meters ADD COLUMN out_of_service INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_bms ADD COLUMN out_of_service INTEGER DEFAULT 0;
+    `);
+    db.pragma('user_version = 43');
+    log.info('Migration 43 appliquee : managed_by_bms + out_of_service par device/meter/bms');
   }
 
   if (current > TARGET_VERSION) {

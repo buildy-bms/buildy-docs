@@ -105,40 +105,59 @@ function computeTargetActions(documentId) {
       });
     }
 
-    // R175-3 §3 — interopérabilité par système (saisie explicite via case à cocher)
-    if (s.meets_r175_3_p3 === 0) {
-      addTarget({
-        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p3',
-        category: 'communication_upgrade', severity: 'major',
-        r175_article: 'R175-3 §3',
-        title: `Assurer l'interopérabilité du système de ${catFr}${zoneStr}`,
-        description: `L'auditeur a constaté que ce système ne satisfait pas l'exigence d'interopérabilité (R175-3 §3). Il devrait exposer au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT) pour communiquer avec la GTB et les autres systèmes.`,
-        zone_id: s.zone_id, equipment_id: s.equipment_id,
-      });
-    }
+    // Les criteres R175-3 §3 et §4 sont maintenant evalues PAR DEVICE
+    // (cf retour Kevin v2.2). On boucle sur les devices du systeme.
+    // Les devices Hors-Service sont ignores (pas d'action generee).
+    const sysDevices = db.db.prepare(`
+      SELECT id, name, brand, model_reference, communication_protocol,
+             meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service
+      FROM bacs_audit_system_devices WHERE system_id = ?
+    `).all(s.id);
 
-    // R175-3 §4 — arret manuel par systeme
-    if (s.meets_r175_3_p4 === 0) {
-      addTarget({
-        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p4',
-        category: 'bms_upgrade', severity: 'major',
-        r175_article: 'R175-3 §4',
-        title: `Permettre l'arrêt manuel du ${catFr}${zoneStr}`,
-        description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement le système.`,
-        zone_id: s.zone_id, equipment_id: s.equipment_id,
-      });
-    }
+    for (const d of sysDevices) {
+      if (d.out_of_service) continue;  // skip HS
+      const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
+      const devLabel = `${devName} (${catFr}${zoneStr.replace(' en zone', ' —')})`;
 
-    // R175-3 §4 — fonctionnement autonome par systeme (case distincte)
-    if (s.meets_r175_3_p4_autonomous === 0) {
-      addTarget({
-        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p4_autonomous',
-        category: 'bms_upgrade', severity: 'major',
-        r175_article: 'R175-3 §4',
-        title: `Activer le fonctionnement autonome du ${catFr}${zoneStr}`,
-        description: `R175-3 §4 exige que la GTB reprenne automatiquement la main sur le système après un arrêt manuel et le pilote de manière autonome.`,
-        zone_id: s.zone_id, equipment_id: s.equipment_id,
-      });
+      // R175-3 §3 — interoperabilite : inferee de communication_protocol.
+      // Non-communicant si null, 'non_communicant' ou 'absent'.
+      const isNonCommunicating = !d.communication_protocol ||
+        d.communication_protocol === 'non_communicant' ||
+        d.communication_protocol === 'absent';
+      if (isNonCommunicating) {
+        addTarget({
+          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p3',
+          category: 'communication_upgrade', severity: 'major',
+          r175_article: 'R175-3 §3',
+          title: `Rendre communicant l'équipement « ${devName} »`,
+          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne satisfait pas l'exigence d'interopérabilité (R175-3 §3). Il devrait exposer au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT, LoRaWAN).`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      }
+
+      // R175-3 §4 — arret manuel possible
+      if (d.meets_r175_3_p4 === 0) {
+        addTarget({
+          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p4',
+          category: 'bms_upgrade', severity: 'major',
+          r175_article: 'R175-3 §4',
+          title: `Permettre l'arrêt manuel de « ${devName} »`,
+          description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement chaque équipement. ${catFr}${zoneStr}.`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      }
+
+      // R175-3 §4 — fonctionnement autonome
+      if (d.meets_r175_3_p4_autonomous === 0) {
+        addTarget({
+          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p4_autonomous',
+          category: 'bms_upgrade', severity: 'major',
+          r175_article: 'R175-3 §4',
+          title: `Activer le fonctionnement autonome de « ${devName} »`,
+          description: `R175-3 §4 exige que la GTB reprenne automatiquement la main sur l'équipement après un arrêt manuel. ${catFr}${zoneStr}.`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      }
     }
   }
 
@@ -149,6 +168,7 @@ function computeTargetActions(documentId) {
     WHERE m.document_id = ?
   `).all(documentId);
   for (const m of meters) {
+    if (m.out_of_service) continue;  // skip HS
     const typeFr = METER_TYPE_LABEL_FR[m.meter_type] || m.meter_type;
     const usageFr = METER_USAGE_LABEL_FR[m.usage] || m.usage;
     const zoneStr = m.zone_name ? ` en zone « ${m.zone_name} »` : ' (général bâtiment)';
@@ -175,7 +195,7 @@ function computeTargetActions(documentId) {
 
   // BMS (R175-3 P1-P4, R175-4, R175-5)
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
-  if (bms) {
+  if (bms && !bms.out_of_service) {
     if (bms.meets_r175_3_p1 === 0) {
       addTarget({
         source_table: 'bms', source_id: 1,

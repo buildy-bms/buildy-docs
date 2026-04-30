@@ -126,7 +126,7 @@ async function removeDevice(d) {
 
 <template>
   <div class="bg-gray-50/40 border-l-2 border-indigo-200 ml-3 pl-4 py-2">
-    <!-- Header avec puissance totale + 3 cases R175-3 §3 / §4 (manuel + autonome) -->
+    <!-- Header avec puissance totale -->
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
       <div class="flex items-center gap-3 text-xs text-gray-600">
         <span class="font-semibold text-gray-700">{{ systemLabel }}</span>
@@ -134,29 +134,6 @@ async function removeDevice(d) {
           {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'équipements' : 'équipement' }})
         </span>
         <span v-else class="text-gray-400 italic">aucun équipement saisi</span>
-      </div>
-      <div class="flex items-center gap-3 text-xs">
-        <label class="inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-               title="R175-3 §3 — Communicant via un protocole standard ouvert">
-          <input type="checkbox" :checked="!!system.meets_r175_3_p3"
-                 @change="e => emit('system-updated', { meets_r175_3_p3: e.target.checked })"
-                 class="rounded border-gray-300" />
-          <span class="text-gray-700">Communicant</span>
-        </label>
-        <label class="inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-               title="R175-3 §4 — L'utilisateur peut arrêter manuellement le système">
-          <input type="checkbox" :checked="!!system.meets_r175_3_p4"
-                 @change="e => emit('system-updated', { meets_r175_3_p4: e.target.checked })"
-                 class="rounded border-gray-300" />
-          <span class="text-gray-700">Arrêt manuel possible</span>
-        </label>
-        <label class="inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-               title="R175-3 §4 — La GTB reprend automatiquement la main et pilote de manière autonome">
-          <input type="checkbox" :checked="!!system.meets_r175_3_p4_autonomous"
-                 @change="e => emit('system-updated', { meets_r175_3_p4_autonomous: e.target.checked })"
-                 class="rounded border-gray-300" />
-          <span class="text-gray-700">Fonctionnement autonome</span>
-        </label>
       </div>
     </div>
 
@@ -171,8 +148,11 @@ async function removeDevice(d) {
           <th class="text-center py-1 whitespace-nowrap w-24">Puissance (kW)</th>
           <th class="text-center py-1 whitespace-nowrap w-28">Nature</th>
           <th class="text-center py-1 whitespace-nowrap w-32">Communication</th>
+          <th class="text-center py-1 whitespace-nowrap w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
+          <th class="text-center py-1 whitespace-nowrap w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
           <th class="text-center py-1 whitespace-nowrap">Localisation</th>
           <th class="text-center py-1 whitespace-nowrap">Notes</th>
+          <th class="text-center py-1 whitespace-nowrap w-20" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
           <th class="text-center py-1 w-8"></th>
         </tr>
       </thead>
@@ -219,6 +199,16 @@ async function removeDevice(d) {
               <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
+          <td class="py-1 pr-2 text-center">
+            <input type="checkbox" :checked="!!d.meets_r175_3_p4"
+                   @change="e => patchDevice(d, { meets_r175_3_p4: e.target.checked })"
+                   class="rounded border-gray-300" />
+          </td>
+          <td class="py-1 pr-2 text-center">
+            <input type="checkbox" :checked="!!d.meets_r175_3_p4_autonomous"
+                   @change="e => patchDevice(d, { meets_r175_3_p4_autonomous: e.target.checked })"
+                   class="rounded border-gray-300" />
+          </td>
           <td class="py-1 pr-2">
             <input type="text" :value="d.location" placeholder="Localisation"
                    @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
@@ -228,6 +218,11 @@ async function removeDevice(d) {
             <input type="text" :value="d.notes" placeholder="Notes"
                    @blur="e => e.target.value !== (d.notes || '') && patchDevice(d, { notes: e.target.value || null })"
                    class="w-full px-1.5 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+          </td>
+          <td class="py-1 text-center">
+            <input type="checkbox" :checked="!!d.out_of_service"
+                   @change="e => patchDevice(d, { out_of_service: e.target.checked })"
+                   class="rounded border-gray-300" :class="d.out_of_service ? 'accent-red-500' : ''" />
           </td>
           <td class="py-1 text-center">
             <button @click="removeDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition" title="Supprimer">
@@ -268,11 +263,13 @@ async function removeDevice(d) {
               <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
             </select>
           </td>
+          <td class="py-1 pr-2 text-center text-gray-300 italic text-[10px]">—</td>
+          <td class="py-1 pr-2 text-center text-gray-300 italic text-[10px]">—</td>
           <td class="py-1 pr-2">
             <input v-model="newDevice.location" type="text" placeholder="Localisation"
                    class="w-full px-1.5 py-0.5 border border-gray-200 rounded" />
           </td>
-          <td colspan="2" class="py-1 pr-2 text-center">
+          <td colspan="3" class="py-1 pr-2 text-center">
             <button @click="addDevice"
                     class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 whitespace-nowrap">
               <PlusIcon class="w-3 h-3" /> Ajouter

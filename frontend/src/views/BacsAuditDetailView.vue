@@ -16,11 +16,12 @@ import {
   getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
-  getBacsDevices, getBacsPowerSummary,
+  getBacsDevices, getBacsPowerSummary, updateBacsDevice,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
 import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
+import R175Tooltip from '@/components/R175Tooltip.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -211,6 +212,28 @@ const devicesBySystem = computed(() => {
   }
   return out
 })
+
+// Devices enrichis avec system_category + zone_name (pour la liste GTB)
+const devicesWithMeta = computed(() => {
+  const sysById = new Map(systems.value.map(s => [s.id, s]))
+  return devices.value.map(d => {
+    const sys = sysById.get(d.system_id)
+    return {
+      ...d,
+      system_category: sys?.system_category || '?',
+      zone_name: sys?.zone_name || '?',
+    }
+  })
+})
+
+async function patchDeviceMb(d, patch) {
+  try {
+    const { data } = await updateBacsDevice(d.id, patch)
+    Object.assign(d, data)
+  } catch {
+    error('Sauvegarde impossible')
+  }
+}
 
 async function addZone() {
   if (!newZone.value.name.trim() || !document.value?.site_id) return
@@ -502,6 +525,7 @@ onMounted(refresh)
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
+          <R175Tooltip article="R175-2" />
         </header>
         <div class="px-5 py-4 grid grid-cols-2 gap-4">
           <div>
@@ -565,6 +589,7 @@ onMounted(refresh)
           <MapPinIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
           <span class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
+          <R175Tooltip article="R175-1 §6" />
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
         </header>
         <table class="w-full text-sm">
@@ -641,7 +666,9 @@ onMounted(refresh)
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 flex-wrap">
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
-          <span class="text-xs text-gray-500">R175-1 §4</span>
+          <span class="text-xs text-gray-500">R175-1 §4 / R175-3 §3, §4</span>
+          <R175Tooltip article="R175-1 §4" />
+          <R175Tooltip article="R175-3" />
           <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
             Total chauffage + clim :
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
@@ -695,6 +722,7 @@ onMounted(refresh)
           <BoltIcon class="w-5 h-5 text-emerald-600" />
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
           <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
+          <R175Tooltip article="R175-3 §1" />
         </header>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -707,11 +735,12 @@ onMounted(refresh)
               <th class="text-center py-2 w-24">Communicant</th>
               <th class="text-center py-2 w-32">Protocole</th>
               <th class="text-center px-5 py-2">Notes</th>
+              <th class="text-center py-2 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>
               <th class="text-center px-5 py-2 w-12"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="m in meters" :key="m.id" class="group">
+            <tr v-for="m in meters" :key="m.id" class="group" :class="m.out_of_service ? 'opacity-50' : ''">
               <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
               <td class="py-2 text-gray-700 text-center">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
               <td class="py-2 text-gray-700 text-center">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
@@ -751,6 +780,11 @@ onMounted(refresh)
                        @blur="e => e.target.value !== (m.notes || '') && patchMeter(m, { notes: e.target.value || null })"
                        class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
               </td>
+              <td class="py-2 text-center">
+                <input type="checkbox" :checked="!!m.out_of_service"
+                       @change="e => patchMeter(m, { out_of_service: e.target.checked })"
+                       class="rounded border-gray-300" />
+              </td>
               <td class="px-5 py-2 text-right">
                 <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
                   <TrashIcon class="w-4 h-4" />
@@ -778,7 +812,7 @@ onMounted(refresh)
               <td class="py-2">
                 <input type="checkbox" v-model="newMeter.required" class="rounded border-gray-300" />
               </td>
-              <td colspan="5" class="px-5 py-2">
+              <td colspan="6" class="px-5 py-2">
                 <button @click="addMeter"
                         class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700">
                   + Ajouter un compteur
@@ -801,6 +835,7 @@ onMounted(refresh)
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <FireIcon class="w-5 h-5 text-red-500" />
           <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
+          <R175Tooltip article="R175-6" />
           <span class="text-xs text-gray-500">R175-6</span>
         </header>
         <table class="w-full text-sm">
@@ -857,6 +892,8 @@ onMounted(refresh)
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
           <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
           <span class="text-xs text-gray-500">R175-3 + R175-4 + R175-5</span>
+          <R175Tooltip article="R175-4" />
+          <R175Tooltip article="R175-5" />
         </header>
         <div class="px-5 py-4 space-y-4">
           <div class="grid grid-cols-2 gap-4">
@@ -913,26 +950,61 @@ onMounted(refresh)
           </div>
 
           <div class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-              Systèmes techniques intégrés à la GTB
-              <span class="font-normal normal-case text-gray-500 text-[10px]">— coche les systèmes effectivement raccordés</span>
-            </h3>
-            <div v-if="systems.length" class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <label v-for="s in systems.filter(x => x.present)" :key="s.id"
-                     class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" :checked="!!s.managed_by_bms"
-                       @change="e => patchSystem(s, { managed_by_bms: e.target.checked })"
-                       class="rounded" />
-                <span class="text-gray-700 text-xs">
-                  {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
-                  <span class="text-gray-400">— {{ s.zone_name }}</span>
-                </span>
-              </label>
-              <p v-if="!systems.some(x => x.present)" class="text-xs text-gray-400 italic col-span-2">
-                Aucun système marqué « Présent » pour l'instant.
-              </p>
+            <label class="flex items-center gap-2 cursor-pointer text-sm mb-3">
+              <input type="checkbox" v-model="bms.out_of_service" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+              <span class="text-gray-700 font-medium">GTB Hors-Service</span>
+              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB</span>
+            </label>
+          </div>
+
+          <div class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
+            <div>
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Équipements intégrés à la GTB
+                <span class="font-normal normal-case text-gray-500 text-[10px]">— mis à jour quand tu déclares des équipements</span>
+              </h3>
+              <div class="space-y-1 max-h-64 overflow-y-auto">
+                <label v-for="d in devicesWithMeta" :key="d.id"
+                       class="flex items-center gap-2 cursor-pointer text-xs"
+                       :class="d.out_of_service ? 'opacity-50' : ''">
+                  <input type="checkbox" :checked="!!d.managed_by_bms"
+                         @change="e => patchDeviceMb(d, { managed_by_bms: e.target.checked })"
+                         class="rounded" />
+                  <span class="text-gray-700">
+                    <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
+                    <span class="text-gray-400">
+                      — {{ SYSTEM_LABEL[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
+                    </span>
+                  </span>
+                </label>
+                <p v-if="!devicesWithMeta.length" class="text-xs text-gray-400 italic">
+                  Aucun équipement saisi.
+                </p>
+              </div>
             </div>
-            <p v-else class="text-xs text-gray-400 italic">Pas de système saisi.</p>
+            <div>
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Compteurs intégrés à la GTB
+              </h3>
+              <div class="space-y-1 max-h-64 overflow-y-auto">
+                <label v-for="m in meters" :key="m.id"
+                       class="flex items-center gap-2 cursor-pointer text-xs"
+                       :class="m.out_of_service ? 'opacity-50' : ''">
+                  <input type="checkbox" :checked="!!m.managed_by_bms"
+                         @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
+                         class="rounded" />
+                  <span class="text-gray-700">
+                    <strong>{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</strong>
+                    <span class="text-gray-400">
+                      — {{ m.zone_name || 'général' }} ({{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }})
+                    </span>
+                  </span>
+                </label>
+                <p v-if="!meters.length" class="text-xs text-gray-400 italic">
+                  Aucun compteur listé.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div class="border-t border-gray-100 pt-3">

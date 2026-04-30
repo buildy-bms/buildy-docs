@@ -156,6 +156,8 @@ async function routes(fastify) {
       equipment_id: z.number().int().nullable().optional(),
       recommendation: z.enum(RECOMMENDATIONS).nullable().optional(),
       notes: z.string().nullable().optional(),
+      managed_by_bms: z.boolean().nullable().optional(),
+      out_of_service: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -213,6 +215,7 @@ async function routes(fastify) {
       operator_training_date: z.string().nullable().optional(),
       notes_training: z.string().nullable().optional(),
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
+      out_of_service: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -674,13 +677,20 @@ async function routes(fastify) {
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
+      meets_r175_3_p4: z.boolean().nullable().optional(),
+      meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
+      managed_by_bms: z.boolean().nullable().optional(),
+      out_of_service: z.boolean().nullable().optional(),
     });
     const schema = schemaPatch;
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     const sets = [], args = [];
-    for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
+    for (const [k, v] of Object.entries(body)) {
+      const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
+      sets.push(`${k} = ?`); args.push(val);
+    }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
