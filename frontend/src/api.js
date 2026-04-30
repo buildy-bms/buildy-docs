@@ -144,11 +144,6 @@ export const restoreAfVersion = (afId, sha) =>
 export const checkpointAf = (afId, message, tag) =>
   api.post(`/afs/${afId}/versions/checkpoint`, { message, tag })
 
-// ── Inspections BACS ──
-export const listInspections = (afId) => api.get(`/afs/${afId}/inspections`)
-export const createInspection = (afId, data) =>
-  api.post(`/afs/${afId}/inspections`, data) // { inspector_name, notes? }
-
 // ── Equipment templates (bibliothèque) ──
 export const listEquipmentTemplates = (params) => api.get('/equipment-templates', { params })
 export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`)
@@ -172,8 +167,8 @@ export const listSectionTemplates = ({ kind, tree } = {}) =>
   api.get('/section-templates', { params: { ...(kind ? { kind } : {}), ...(tree ? { tree: 1 } : {}) } })
 export const getSectionTemplate = (id) => api.get(`/section-templates/${id}`)
 export const createSectionTemplate = (data) => api.post('/section-templates', data)
-export const updateSectionTemplate = (id, data, { propagateUnchanged = false } = {}) =>
-  api.patch(`/section-templates/${id}`, data, { params: propagateUnchanged ? { propagate_unchanged: 1 } : {} })
+export const updateSectionTemplate = (id, data) =>
+  api.patch(`/section-templates/${id}`, data)
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
 // reorder({ ids, parent_template_id? }). parent_template_id si re-parenting drag-drop.

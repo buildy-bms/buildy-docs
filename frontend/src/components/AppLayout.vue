@@ -33,7 +33,7 @@ onMounted(async () => {
 const paletteRef = ref(null)
 const nav = [
   { name: 'Mes AFs', to: '/', icon: DocumentTextIcon },
-  { section: 'Bibliotheque' },
+  { section: 'Bibliothèque' },
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
   { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },

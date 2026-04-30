@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates, moveAttachment } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -94,6 +94,22 @@ const sectionEditorRef = ref(null)
 const requiredLevelKey = ref(0) // bumpé pour forcer un recalcul du niveau requis
 const { success: notifySuccess, error: notifyError } = useNotification()
 const { confirm } = useConfirm()
+
+// Fil d'Ariane : chaîne d'ancêtres de la section sélectionnée. Permet à
+// l'utilisateur de remonter rapidement le contexte quand il édite une
+// section profonde (ch. 10.2.4) sans dépendre uniquement de l'arbre.
+const breadcrumbTrail = computed(() => {
+  if (!selectedSection.value) return []
+  const byId = new Map(sections.value.map(s => [s.id, s]))
+  const trail = []
+  let cur = selectedSection.value
+  while (cur) {
+    trail.unshift(cur)
+    cur = cur.parent_id ? byId.get(cur.parent_id) : null
+  }
+  // On retire la section courante (déjà affichée comme titre dans l'éditeur)
+  return trail.slice(0, -1)
+})
 
 // Liste plate triee selon l'ordre d'affichage dans l'arbre (parent + position)
 // Utilisee pour la navigation clavier flèches haut/bas entre sections.
@@ -330,12 +346,59 @@ onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
 })
 
+// Garde anti-perte : si une autosave est en cours / en attente / en erreur,
+// on tente un flush synchrone avant de quitter la route, et on demande
+// confirmation à l'utilisateur si le flush n'a pas pu valider.
+function hasUnsavedWork() {
+  const s = sectionEditorRef.value?.globalState?.value
+  return s === 'pending' || s === 'saving' || s === 'error'
+}
+
+onBeforeRouteLeave(async () => {
+  if (!hasUnsavedWork()) return true
+  try { await sectionEditorRef.value?.flushAll?.() } catch { /* on tombera dans le confirm */ }
+  if (!hasUnsavedWork()) return true
+  return window.confirm(
+    'Des modifications n\'ont pas pu être sauvegardées (connexion ?). Quitter quand même ?'
+  )
+})
+
+function onBeforeUnload(e) {
+  if (!hasUnsavedWork()) return
+  // Tente un flush opportuniste — il peut être interrompu par la fermeture,
+  // mais si le réseau répond vite, ça passe. Le navigateur affichera quand
+  // même le prompt natif.
+  try { sectionEditorRef.value?.flushAll?.() } catch { /* ignore */ }
+  e.preventDefault()
+  e.returnValue = ''
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', onBeforeUnload)
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (mql) mql.removeEventListener('change', updateCompact)
 })
 
-watch(() => route.params.id, async () => {
+watch(() => route.params.id, async (newId, oldId) => {
+  // Si une autosave est en cours pour l'AF qu'on quitte, on flush avant de
+  // basculer. Si ça a échoué, on demande confirmation et on revient en
+  // arrière si l'utilisateur refuse.
+  if (oldId && hasUnsavedWork()) {
+    try { await sectionEditorRef.value?.flushAll?.() } catch { /* ignore */ }
+    if (hasUnsavedWork()) {
+      const ok = window.confirm(
+        'Des modifications n\'ont pas pu être sauvegardées sur l\'AF précédente. Continuer ?'
+      )
+      if (!ok) {
+        router.replace({ params: { id: oldId } })
+        return
+      }
+    }
+  }
   selectedId.value = null
   selectedSection.value = null
   loading.value = true
@@ -414,6 +477,7 @@ watch(() => route.params.id, async () => {
           <SectionTree
             :sections="sections"
             :selected-id="selectedId"
+            :af-id="af?.id"
             @select="selectSection"
             @add-root="openAddSection(null)"
             @add-child="openAddSection"
@@ -437,6 +501,34 @@ watch(() => route.params.id, async () => {
            qui laissent des markers de commentaire (space-y-* peut s'y faire piéger). -->
       <div class="flex-1 min-w-0 overflow-y-auto pr-1 flex flex-col gap-5">
         <template v-if="selectedSection">
+          <!-- Fil d'Ariane des ancêtres : affiché seulement si la section a au
+               moins un parent (sinon la section racine est déjà visible dans le titre). -->
+          <nav
+            v-if="breadcrumbTrail.length"
+            aria-label="Fil d'Ariane"
+            class="flex items-center flex-wrap gap-x-1 gap-y-0.5 text-xs text-gray-500 -mb-2 px-1"
+          >
+            <button
+              type="button"
+              @click="selectSection(sections[0]?.id)"
+              class="hover:text-indigo-700 transition-colors"
+            >
+              {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
+            </button>
+            <template v-for="(ancestor, idx) in breadcrumbTrail" :key="ancestor.id">
+              <span class="text-gray-300">/</span>
+              <button
+                type="button"
+                @click="selectSection(ancestor.id)"
+                class="hover:text-indigo-700 transition-colors truncate max-w-xs"
+                :title="ancestor.title"
+              >
+                <span v-if="ancestor.number" class="font-mono text-gray-400 mr-1">§{{ ancestor.number }}</span>
+                {{ ancestor.title }}
+              </button>
+            </template>
+          </nav>
+
           <SectionEditor
             ref="sectionEditorRef"
             :key="selectedSection.id"
@@ -472,9 +564,10 @@ watch(() => route.params.id, async () => {
             </p>
           </div>
 
-          <!-- Captures (toutes sections sauf synthesis qui est auto-généré) -->
+          <!-- Captures (toutes sections sauf synthesis auto-généré et zones
+               qui n'a pas vocation à porter des captures projet). -->
           <AttachmentsGrid
-            v-if="selectedSection.kind !== 'synthesis'"
+            v-if="!['synthesis', 'zones'].includes(selectedSection.kind)"
             :section-id="selectedSection.id"
             :af-id="af.id"
           />

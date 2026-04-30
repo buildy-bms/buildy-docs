@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch, nextTick } from 'vue'
 import {
-  CheckBadgeIcon, ClipboardDocumentCheckIcon, ArrowLeftIcon,
+  CheckBadgeIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
   RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
 } from '@heroicons/vue/24/outline'
@@ -11,7 +11,7 @@ import AddressAutocomplete from './AddressAutocomplete.vue'
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
-  createInspection, listInspections, listSections, getAfRequiredLevel,
+  listSections, getAfRequiredLevel,
 } from '@/api'
 import SectionPickerTree from './SectionPickerTree.vue'
 import { useNotification } from '@/composables/useNotification'
@@ -130,13 +130,6 @@ async function recalcRequiredLevel() {
 }
 watch(exportExcluded, recalcRequiredLevel, { deep: true })
 
-const showInspection = ref(false)
-const inspectorName = ref('')
-const inspectionNotes = ref('')
-const lastInspection = ref(null)
-
-const canInspect = computed(() => props.af.status === 'livree')
-
 // Workflow d'avancement de phase (Lot 15)
 const PHASE_FLOW = ['redaction', 'validee', 'commissioning', 'commissioned', 'livree']
 const PHASE_LABELS = {
@@ -223,32 +216,6 @@ async function rollbackPhase() {
     emit('updated', data.af)
   } catch (e) {
     error(e.response?.data?.detail || 'Échec')
-  } finally {
-    submitting.value = false
-  }
-}
-
-function prepareInspection() {
-  inspectorName.value = ''
-  inspectionNotes.value = ''
-  lastInspection.value = null
-  showInspection.value = true
-}
-
-async function submitInspection() {
-  if (!inspectorName.value.trim()) return
-  submitting.value = true
-  try {
-    const { data } = await createInspection(props.af.id, {
-      inspector_name: inspectorName.value.trim(),
-      notes: inspectionNotes.value.trim() || undefined,
-    })
-    success(`Inspection BACS générée — PDF avec annexe inclus (${data.sections_total} sections)`)
-    lastInspection.value = data
-    window.open(data.pdf_download_url, '_blank')
-    emit('updated', { ...props.af, last_inspection_at: new Date().toISOString() })
-  } catch (e) {
-    error(e.response?.data?.detail || 'Échec de la préparation d\'inspection')
   } finally {
     submitting.value = false
   }
@@ -458,68 +425,7 @@ const exportDescription = computed(() => {
       <CheckBadgeIcon class="w-4 h-4" />
       Projet livré
     </span>
-    <button
-      v-if="canInspect"
-      @click="prepareInspection"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
-    >
-      <ClipboardDocumentCheckIcon class="w-4 h-4" />
-      Préparer inspection BACS
-    </button>
   </div>
-
-  <!-- Modale Inspection BACS -->
-  <BaseModal v-if="showInspection" title="Préparer une inspection BACS" size="md" @close="showInspection = false">
-    <form @submit.prevent="submitInspection" class="space-y-4">
-      <p class="text-xs text-gray-500 leading-relaxed">
-        Génère un PDF AF horodaté <strong>avec annexe Décret BACS incluse</strong>, à présenter
-        lors de l'inspection périodique obligatoire (Article R175-5-1).
-        Une entrée est créée dans l'historique des inspections de cette AF pour traçabilité.
-      </p>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Nom de l'inspecteur *</label>
-        <input
-          v-model="inspectorName"
-          type="text"
-          required
-          autocomplete="off"
-          autocorrect="off"
-          spellcheck="false"
-          data-1p-ignore="true"
-          data-bwignore="true"
-          data-lpignore="true"
-          placeholder="ex : Jean Dupont — Bureau Veritas"
-          class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Notes (optionnel)</label>
-        <textarea
-          v-model="inspectionNotes"
-          rows="2"
-          autocomplete="off"
-          data-1p-ignore="true"
-          placeholder="Observations particulières ou contexte de l'inspection"
-          class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        ></textarea>
-      </div>
-      <div v-if="lastInspection" class="p-3 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
-        ✓ Inspection enregistrée. PDF téléchargé. Si le téléchargement n'a pas démarré,
-        <a :href="lastInspection.pdf_download_url" target="_blank" class="underline font-medium">cliquer ici</a>.
-      </div>
-    </form>
-    <template #footer>
-      <button @click="showInspection = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Fermer</button>
-      <button
-        @click="submitInspection"
-        :disabled="submitting || !inspectorName.trim()"
-        class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
-      >
-        <ClipboardDocumentCheckIcon class="w-4 h-4" />
-        {{ submitting ? 'Génération…' : 'Générer le PDF d\'inspection' }}
-      </button>
-    </template>
-  </BaseModal>
 
   <!-- Modale export -->
   <BaseModal v-if="showExport" :title="exportTitle" size="md" @close="showExport = false">

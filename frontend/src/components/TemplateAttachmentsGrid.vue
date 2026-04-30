@@ -8,11 +8,12 @@
  * Les captures uploadees ici se retrouvent automatiquement dans toutes
  * les AFs qui referencent ce template (heritage en lecture seule).
  */
-import { ref, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PhotoIcon, TrashIcon, CloudArrowUpIcon, ExclamationCircleIcon, XMarkIcon,
+  PhotoIcon, TrashIcon, CloudArrowUpIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import {
   listSectionTemplateAttachments, uploadSectionTemplateAttachment, reorderSectionTemplateAttachments,
   listEquipmentTemplateAttachments, uploadEquipmentTemplateAttachment, reorderEquipmentTemplateAttachments,
@@ -34,8 +35,7 @@ const loading = ref(false)
 const isDragging = ref(false)
 const uploading = ref(0)
 const fileInput = ref(null)
-const viewerUrl = ref(null)
-const viewerName = ref('')
+const viewerIndex = ref(null)
 const gridRef = ref(null)
 let sortable = null
 
@@ -147,8 +147,14 @@ async function removeAttachment(att) {
   } catch { notifyError('Échec de la suppression') }
 }
 
-function openViewer(att) { viewerUrl.value = urlFor(att); viewerName.value = att.original_name || '' }
-function closeViewer() { viewerUrl.value = null }
+const viewableImages = computed(() => attachments.value
+  .filter(att => !failedIds.value.has(att.id))
+  .map(att => ({ url: urlFor(att), name: att.original_name || '' }))
+)
+function openViewer(att) {
+  const idx = viewableImages.value.findIndex(img => img.url === urlFor(att))
+  if (idx >= 0) viewerIndex.value = idx
+}
 
 function setupSortable() {
   if (sortable) { sortable.destroy(); sortable = null }
@@ -258,13 +264,6 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
       </div>
     </div>
 
-    <Teleport to="body">
-      <div v-if="viewerUrl" class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4" @click.self="closeViewer">
-        <button @click="closeViewer" class="absolute top-3 right-3 text-white/80 hover:text-white" title="Fermer">
-          <XMarkIcon class="w-7 h-7" />
-        </button>
-        <img :src="viewerUrl" :alt="viewerName" class="max-w-full max-h-full" />
-      </div>
-    </Teleport>
+    <ImageLightbox v-model:index="viewerIndex" :images="viewableImages" />
   </div>
 </template>

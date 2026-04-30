@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 32;
+const TARGET_VERSION = 33;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1052,6 +1052,56 @@ function runMigrations() {
     }
   }
 
+  if (current < 33) {
+    // Retrait du workflow d'inspection BACS (hors scope produit : l'app
+    // ne sert qu'a produire l'AF livrable au DOE). On supprime la colonne
+    // afs.last_inspection_at et on purge les enregistrements af_inspections
+    // de kind='inspection_bacs' (les snapshots de transition validation /
+    // commissioning / delivery restent).
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        DELETE FROM af_inspections WHERE kind = 'inspection_bacs';
+
+        CREATE TABLE afs_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL UNIQUE,
+          client_name TEXT NOT NULL,
+          project_name TEXT NOT NULL,
+          site_address TEXT,
+          service_level TEXT,
+          status TEXT NOT NULL DEFAULT 'redaction'
+            CHECK (status IN ('redaction', 'validee', 'commissioning', 'commissioned', 'livree')),
+          delivered_at TEXT,
+          created_by INTEGER REFERENCES users(id),
+          updated_by INTEGER REFERENCES users(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TEXT
+        );
+        INSERT INTO afs_new
+          (id, slug, client_name, project_name, site_address, service_level, status,
+           delivered_at, created_by, updated_by, created_at, updated_at, deleted_at)
+          SELECT
+            id, slug, client_name, project_name, site_address, service_level, status,
+            delivered_at, created_by, updated_by, created_at, updated_at, deleted_at
+          FROM afs;
+        DROP TABLE afs;
+        ALTER TABLE afs_new RENAME TO afs;
+        CREATE INDEX IF NOT EXISTS idx_afs_status ON afs(status, deleted_at);
+      `);
+      db.pragma('foreign_keys = ON');
+      db.pragma('user_version = 33');
+      db.exec('COMMIT');
+      log.info('Migration 33 appliquee : retrait workflow inspection BACS (afs.last_inspection_at + af_inspections kind=inspection_bacs)');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      db.pragma('foreign_keys = ON');
+      throw e;
+    }
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1868,7 +1918,10 @@ const afZones = {
   },
 };
 
-// ── Inspections BACS + Milestones (généralisée Lot 15) ──────────────
+// ── Milestones de transition de phase (snapshots PDF + tag Git) ──────
+// Stocke les snapshots figés lors des transitions validee / commissioning /
+// commissioned / delivery (kind correspondant). La table garde son nom
+// historique af_inspections pour ne pas reécrire les FK existantes.
 const afInspections = {
   listByAf(afId, { kind } = {}) {
     const sql = `
@@ -1883,7 +1936,7 @@ const afInspections = {
     `;
     return kind ? db.prepare(sql).all(afId, kind) : db.prepare(sql).all(afId);
   },
-  create(afId, { inspectorName, gitTag, pdfExportId, notes, createdBy, kind = 'inspection_bacs' }) {
+  create(afId, { inspectorName, gitTag, pdfExportId, notes, createdBy, kind }) {
     const inspectedAt = new Date().toISOString();
     const result = db.prepare(`
       INSERT INTO af_inspections (af_id, inspected_at, inspector_name, git_tag, pdf_export_id, notes, created_by, kind)

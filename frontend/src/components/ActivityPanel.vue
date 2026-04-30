@@ -20,7 +20,6 @@ const ACTION_LABELS = {
   'export.points-list': { label: 'a exporté la liste de points', color: 'text-indigo-700' },
   'export.af': { label: 'a exporté l\'AF (PDF)', color: 'text-indigo-700' },
   'export.synthesis': { label: 'a exporté la synthèse', color: 'text-indigo-700' },
-  'inspection.create': { label: 'a préparé une inspection BACS', color: 'text-blue-700' },
   'af.checkpoint': { label: 'a marqué une version', color: 'text-emerald-700' },
   'af.restore': { label: 'a restauré une version', color: 'text-red-700' },
   'af.delivered': { label: 'a livré l\'AF (DOE)', color: 'text-emerald-700' },
@@ -62,7 +61,6 @@ function summary(entry) {
   if (!p) return null
   if (entry.action.startsWith('export.')) return p.version || p.motif
   if (entry.action === 'section.update') return Array.isArray(p) ? p.join(', ') : null
-  if (entry.action === 'inspection.create') return `Inspecteur : ${p.inspector_name}`
   if (entry.action === 'af.checkpoint') return p.tag || (p.sha ? p.sha.slice(0, 7) : null)
   if (entry.action === 'af.restore') return `vers ${p.sha?.slice(0, 7) || '?'}`
   if (entry.action === 'claude.draft') return p.length ? `${p.length} caractères générés` : null
@@ -86,7 +84,7 @@ defineExpose({ refresh })
 
     <div v-if="loading && !entries.length" class="px-4 py-6 text-center text-xs text-gray-400">Chargement…</div>
     <div v-else-if="!entries.length" class="px-4 py-6 text-center text-xs text-gray-400 italic">
-      Aucune activité encore. Les modifications, exports et inspections apparaîtront ici.
+      Aucune activité encore. Les modifications et exports apparaîtront ici.
     </div>
 
     <ul v-else class="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">

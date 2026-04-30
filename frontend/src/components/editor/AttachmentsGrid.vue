@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PhotoIcon, TrashIcon, CloudArrowUpIcon, XMarkIcon, ExclamationCircleIcon,
+  PhotoIcon, TrashIcon, CloudArrowUpIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 
 const failedIds = ref(new Set())
 const retryCount = new Map()
@@ -26,8 +27,11 @@ const loading = ref(false)
 const isDragging = ref(false)
 const uploading = ref(0)
 const fileInput = ref(null)
-const viewerUrl = ref(null)
-const viewerName = ref('')
+const viewerIndex = ref(null)
+const viewableImages = computed(() => attachments.value
+  .filter(att => !failedIds.value.has(att.id))
+  .map(att => ({ url: urlFor(att), name: att.original_name || att.filename }))
+)
 const gridRef = ref(null)
 let sortable = null
 
@@ -141,14 +145,9 @@ async function removeAttachment(att) {
 }
 
 function openViewer(att) {
-  viewerUrl.value = urlFor(att)
-  viewerName.value = att.original_name || att.filename
+  const idx = viewableImages.value.findIndex(img => img.url === urlFor(att))
+  if (idx >= 0) viewerIndex.value = idx
 }
-function closeViewer() {
-  viewerUrl.value = null
-  viewerName.value = ''
-}
-function onEsc(e) { if (e.key === 'Escape' && viewerUrl.value) closeViewer() }
 
 // SortableJS pour réorganiser : drop entre items (intuitif)
 function setupSortable() {
@@ -191,12 +190,10 @@ watch(attachments, async () => {
 watch(() => props.sectionId, refresh)
 
 onMounted(() => {
-  document.addEventListener('keydown', onEsc)
   refresh()
 })
 onBeforeUnmount(() => {
   if (sortable) sortable.destroy()
-  document.removeEventListener('keydown', onEsc)
 })
 </script>
 
@@ -313,26 +310,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Lightbox -->
-    <Teleport to="body">
-      <div
-        v-if="viewerUrl"
-        class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
-        @click.self="closeViewer"
-      >
-        <button
-          @click="closeViewer"
-          class="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg"
-          title="Fermer (Esc)"
-        >
-          <XMarkIcon class="w-6 h-6" />
-        </button>
-        <div class="max-w-full max-h-full flex flex-col items-center gap-3">
-          <img :src="viewerUrl" :alt="viewerName" class="max-w-full max-h-[85vh] object-contain shadow-2xl" />
-          <p v-if="viewerName" class="text-sm text-white/70 text-center">{{ viewerName }}</p>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Lightbox partagée -->
+    <ImageLightbox v-model:index="viewerIndex" :images="viewableImages" />
   </div>
 </template>
 

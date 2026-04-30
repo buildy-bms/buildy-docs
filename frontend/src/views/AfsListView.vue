@@ -6,11 +6,7 @@ import {
   DocumentDuplicateIcon,
   TrashIcon,
   MapPinIcon,
-  UserCircleIcon,
-  ClockIcon,
   DocumentTextIcon,
-  TableCellsIcon,
-  Squares2X2Icon,
   MagnifyingGlassIcon,
   XMarkIcon,
   BookmarkIcon,
@@ -35,15 +31,19 @@ const showCreate = ref(false)
 const showClone = ref(false)
 const cloneSource = ref(null)
 
-// Lot 27 — vue tableau (par défaut) + recherche client/projet
-const viewMode = ref(localStorage.getItem('afs-view-mode') || 'table') // 'table' | 'grid'
+// Tableau unique avec recherche + tri colonne + groupement optionnel.
+// (Avant : un toggle table/grille avec une grille qui regroupait par statut
+// — friction sans valeur ajoutée. Le groupement est désormais une option du
+// tableau, persistée comme le tri.)
 const searchQuery = ref('')
-const sortBy = ref('updated_at')
-const sortDir = ref('desc') // 'asc' | 'desc'
-function setViewMode(mode) {
-  viewMode.value = mode
-  localStorage.setItem('afs-view-mode', mode)
-}
+const sortBy = ref(localStorage.getItem('afs-sort-by') || 'updated_at')
+const sortDir = ref(localStorage.getItem('afs-sort-dir') || 'desc') // 'asc' | 'desc'
+const groupBy = ref(localStorage.getItem('afs-group-by') || 'none') // 'none' | 'client' | 'status'
+watch([sortBy, sortDir, groupBy], () => {
+  localStorage.setItem('afs-sort-by', sortBy.value)
+  localStorage.setItem('afs-sort-dir', sortDir.value)
+  localStorage.setItem('afs-group-by', groupBy.value)
+})
 function toggleSort(col) {
   if (sortBy.value === col) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   else { sortBy.value = col; sortDir.value = 'asc' }
@@ -93,16 +93,40 @@ const newAf = ref({ client_name: '', project_name: '', site_address: '', service
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
 const submitting = ref(false)
 
-// Groupement par statut pour affichage
-const grouped = computed(() => {
-  const groups = {
-    'En rédaction': afs.value.filter((a) => a.status === 'redaction'),
-    'Validées': afs.value.filter((a) => a.status === 'validee'),
-    'En commissionnement': afs.value.filter((a) => ['commissioning', 'commissioned'].includes(a.status)),
-    'Livrées': afs.value.filter((a) => a.status === 'livree'),
+// Lignes du tableau, groupées si l'utilisateur l'a choisi. Format :
+//   [{ kind: 'header', label, count }, { kind: 'row', af }, ...]
+// Le groupement préserve l'ordre de tri choisi : on collecte les groupes
+// dans l'ordre où ils apparaissent dans `visibleAfs`, ce qui permet par
+// exemple de "trier par dernière modif, grouper par client" sans perdre
+// le tri intra-groupe.
+const STATUS_LABEL = {
+  redaction: 'En rédaction',
+  validee: 'Validées',
+  commissioning: 'En commissionnement',
+  commissioned: 'Commissionnées',
+  livree: 'Livrées',
+}
+const tableRows = computed(() => {
+  if (groupBy.value === 'none') {
+    return visibleAfs.value.map(af => ({ kind: 'row', af }))
   }
-  // Ne renvoie que les groupes non vides
-  return Object.fromEntries(Object.entries(groups).filter(([_, list]) => list.length > 0))
+  const keyFn = groupBy.value === 'client'
+    ? (af) => af.client_name || '—'
+    : (af) => STATUS_LABEL[af.status] || af.status
+  const order = []
+  const buckets = new Map()
+  for (const af of visibleAfs.value) {
+    const k = keyFn(af)
+    if (!buckets.has(k)) { buckets.set(k, []); order.push(k) }
+    buckets.get(k).push(af)
+  }
+  const rows = []
+  for (const k of order) {
+    const list = buckets.get(k)
+    rows.push({ kind: 'header', label: k, count: list.length })
+    for (const af of list) rows.push({ kind: 'row', af })
+  }
+  return rows
 })
 
 async function refresh() {
@@ -227,13 +251,16 @@ onMounted(refresh)
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
-      <div class="inline-flex items-center border border-gray-200 rounded overflow-hidden text-xs">
-        <button @click="setViewMode('table')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          <TableCellsIcon class="w-3.5 h-3.5" /> Tableau
-        </button>
-        <button @click="setViewMode('grid')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          <Squares2X2Icon class="w-3.5 h-3.5" /> Grille
-        </button>
+      <div class="inline-flex items-center gap-2 text-xs">
+        <label class="text-gray-500">Grouper par</label>
+        <select
+          v-model="groupBy"
+          class="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"
+        >
+          <option value="none">Aucun</option>
+          <option value="client">Client</option>
+          <option value="status">Statut</option>
+        </select>
       </div>
     </div>
 
@@ -261,154 +288,99 @@ onMounted(refresh)
       </button>
     </div>
 
-    <!-- Vue tableau (par défaut, Lot 27) -->
-    <template v-else-if="viewMode === 'table'">
-      <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
-            <tr>
-              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('client_name')">
-                Client {{ sortBy === 'client_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('project_name')">
-                Projet {{ sortBy === 'project_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-44" @click="toggleSort('status')">
-                Statut {{ sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="text-left px-4 py-2.5 w-24">Contrat</th>
-              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-40" @click="toggleSort('updated_at')">
-                Dernière modif {{ sortBy === 'updated_at' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="text-right px-4 py-2.5 w-24">Actions</th>
+    <!-- Tableau unique (avec tri colonne + groupement optionnel) -->
+    <div v-else class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
+          <tr>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('client_name')">
+              Client {{ sortBy === 'client_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('project_name')">
+              Projet {{ sortBy === 'project_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-44" @click="toggleSort('status')">
+              Statut {{ sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 w-24">Contrat</th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-40" @click="toggleSort('updated_at')">
+              Dernière modif {{ sortBy === 'updated_at' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-right px-4 py-2.5 w-24">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="(row, idx) in tableRows" :key="idx">
+            <tr v-if="row.kind === 'header'" class="bg-gray-50/60 border-t border-gray-200">
+              <td colspan="6" class="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                {{ row.label }} <span class="text-gray-400 font-normal">· {{ row.count }}</span>
+              </td>
             </tr>
-          </thead>
-          <tbody>
             <tr
-              v-for="af in visibleAfs"
-              :key="af.id"
+              v-else
               class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer group"
-              @click="router.push(`/afs/${af.id}`)"
+              @click="router.push(`/afs/${row.af.id}`)"
             >
-              <td class="px-4 py-2.5 font-semibold text-gray-800">{{ af.client_name }}</td>
+              <td class="px-4 py-2.5 font-semibold text-gray-800">{{ row.af.client_name }}</td>
               <td class="px-4 py-2.5 text-gray-700">
-                {{ af.project_name }}
-                <p v-if="af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
-                  <MapPinIcon class="w-3 h-3 shrink-0" />{{ af.site_address }}
+                {{ row.af.project_name }}
+                <p v-if="row.af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
+                  <MapPinIcon class="w-3 h-3 shrink-0" />{{ row.af.site_address }}
                 </p>
               </td>
-              <td class="px-4 py-2.5"><StatusBadge :status="af.status" /></td>
+              <td class="px-4 py-2.5"><StatusBadge :status="row.af.status" /></td>
               <td class="px-4 py-2.5">
-                <ServiceLevelBadge v-if="af.service_level" :level="af.service_level" />
+                <ServiceLevelBadge v-if="row.af.service_level" :level="row.af.service_level" />
                 <span v-else class="text-[11px] text-gray-400 italic">—</span>
               </td>
               <td class="px-4 py-2.5 text-xs text-gray-500">
-                {{ formatDate(af.updated_at) }}
-                <p v-if="af.updated_by_name" class="text-[10px] text-gray-400 truncate">par {{ af.updated_by_name }}</p>
+                {{ formatDate(row.af.updated_at) }}
+                <p v-if="row.af.updated_by_name" class="text-[10px] text-gray-400 truncate">par {{ row.af.updated_by_name }}</p>
               </td>
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                  <button @click.stop="router.push(`/afs/${af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
+                  <button @click.stop="router.push(`/afs/${row.af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
-                  <button @click.stop="openClone(af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
+                  <button @click.stop="openClone(row.af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
-                  <button @click.stop="confirmDelete(af)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">
+                  <button @click.stop="confirmDelete(row.af)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>
               </td>
             </tr>
-            <tr v-if="!filteredSorted.length">
-              <td colspan="6" class="px-4 py-10 text-center">
-                <p class="text-sm text-gray-500">
-                  <template v-if="searchQuery">
-                    Aucune AF ne correspond à « <strong>{{ searchQuery }}</strong> ».
-                  </template>
-                  <template v-else>Aucune AF dans ce filtre.</template>
-                </p>
-                <button
-                  v-if="searchQuery"
-                  @click="searchQuery = ''"
-                  class="mt-2 text-xs text-indigo-600 hover:underline"
-                >Effacer la recherche</button>
-              </td>
-            </tr>
-            <tr v-if="hasMore">
-              <td colspan="6" class="px-4 py-3 text-center bg-gray-50 border-t border-gray-200">
-                <button
-                  @click="loadMore"
-                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  Charger {{ Math.min(50, filteredSorted.length - visibleAfs.length) }} de plus
-                  <span class="text-gray-400 font-normal ml-1">({{ visibleAfs.length }} / {{ filteredSorted.length }})</span>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </template>
-
-    <!-- Vue grille groupée (legacy) -->
-    <template v-else>
-      <div v-for="(items, group) in grouped" :key="group" class="mb-8">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-          {{ group }} <span class="text-gray-400">· {{ items.length }}</span>
-        </h3>
-        <div v-if="!items.length" class="text-sm text-gray-400 italic">Aucune dans ce groupe.</div>
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="af in items"
-            :key="af.id"
-            class="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow group cursor-pointer"
-            @click="router.push(`/afs/${af.id}`)"
-          >
-            <div class="flex items-start justify-between mb-2">
-              <h4 class="font-semibold text-sm text-gray-900 truncate flex-1 min-w-0 pr-2">
-                {{ af.client_name }}
-              </h4>
-              <div class="flex items-center gap-1">
-                <ServiceLevelBadge :level="af.service_level" />
-                <StatusBadge :status="af.status" />
-              </div>
-            </div>
-            <p class="text-sm text-gray-700 mb-2 truncate">{{ af.project_name }}</p>
-            <div v-if="af.site_address" class="flex items-center gap-1.5 text-xs text-gray-500 mb-2 truncate">
-              <MapPinIcon class="w-3.5 h-3.5 shrink-0" />
-              <span class="truncate">{{ af.site_address }}</span>
-            </div>
-            <div class="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
-              <UserCircleIcon class="w-3.5 h-3.5" />
-              {{ af.updated_by_name || af.created_by_name || 'Inconnu' }}
-              <ClockIcon class="w-3.5 h-3.5 ml-2" />
-              {{ formatDate(af.updated_at) }}
-            </div>
-            <div class="flex items-center gap-2 pt-3 border-t border-gray-100 opacity-0 group-hover:opacity-100 transition-opacity">
+          </template>
+          <tr v-if="!filteredSorted.length">
+            <td colspan="6" class="px-4 py-10 text-center">
+              <p class="text-sm text-gray-500">
+                <template v-if="searchQuery">
+                  Aucune AF ne correspond à « <strong>{{ searchQuery }}</strong> ».
+                </template>
+                <template v-else>Aucune AF dans ce filtre.</template>
+              </p>
               <button
-                @click.stop="router.push(`/afs/${af.id}/versions`)"
-                class="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1"
-              >
-                <BookmarkIcon class="w-3.5 h-3.5" /> Versions
-              </button>
+                v-if="searchQuery"
+                @click="searchQuery = ''"
+                class="mt-2 text-xs text-indigo-600 hover:underline"
+              >Effacer la recherche</button>
+            </td>
+          </tr>
+          <tr v-if="hasMore">
+            <td colspan="6" class="px-4 py-3 text-center bg-gray-50 border-t border-gray-200">
               <button
-                @click.stop="openClone(af)"
-                class="text-xs text-gray-500 hover:text-indigo-600 inline-flex items-center gap-1"
+                @click="loadMore"
+                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                <DocumentDuplicateIcon class="w-3.5 h-3.5" /> Cloner
+                Charger {{ Math.min(50, filteredSorted.length - visibleAfs.length) }} de plus
+                <span class="text-gray-400 font-normal ml-1">({{ visibleAfs.length }} / {{ filteredSorted.length }})</span>
               </button>
-              <button
-                @click.stop="confirmDelete(af)"
-                class="text-xs text-gray-500 hover:text-red-600 inline-flex items-center gap-1 ml-auto"
-              >
-                <TrashIcon class="w-3.5 h-3.5" /> Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- Modal nouvelle AF -->
     <BaseModal v-if="showCreate" title="Nouvelle Analyse Fonctionnelle" size="md" @close="showCreate = false">

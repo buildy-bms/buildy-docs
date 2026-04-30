@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch, nextTick, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+import Tooltip from '@/components/Tooltip.vue'
 
 // Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
 // (sections seedees avant le passage en numerotation auto).
@@ -135,11 +136,28 @@ const titleHtml = computed(() => {
         {{ displayedNumber }}
       </span>
 
-      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '']" v-html="titleHtml"></span>
-
+      <!-- Indicateurs de statut (gauche du titre) : niveau de service +
+           état de vérification + section vide. À gauche pour scan rapide. -->
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
 
-      <span v-if="empty && !excluded" class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Section vide — à rédiger"></span>
+      <Tooltip
+        v-if="node.fact_check_status === 'verified'"
+        text="Section vérifiée"
+      >
+        <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+      </Tooltip>
+      <Tooltip
+        v-else
+        text="À vérifier"
+      >
+        <CheckCircleIcon class="w-3.5 h-3.5 text-gray-300 shrink-0" />
+      </Tooltip>
+
+      <Tooltip v-if="empty && !excluded" text="Section vide — à rédiger" placement="top">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 block"></span>
+      </Tooltip>
+
+      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : ecarter MOA + inclure/exclure + ajouter enfant + supprimer -->
       <span class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">

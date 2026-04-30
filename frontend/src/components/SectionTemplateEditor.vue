@@ -84,7 +84,6 @@ const AVAIL_OPTIONS = [
   { value: 'paid_option',  label: 'Option payante',    icon: '€',  color: 'bg-amber-100 text-amber-800 border-amber-300' },
 ]
 
-const propagate = ref(true)
 const submitting = ref(false)
 const deleting = ref(false)
 const showEquipmentPicker = ref(false)
@@ -202,12 +201,8 @@ async function submit() {
       payload.avail_p = form.value.avail_p || null
     }
     if (isEdit.value) {
-      const { data } = await updateSectionTemplate(props.template.id, payload, { propagateUnchanged: propagate.value })
-      if (data.propagated_count > 0) {
-        success(`Enregistrée — propagée à ${data.propagated_count} AF${data.propagated_count > 1 ? 's' : ''}`)
-      } else {
-        success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} enregistrée`)
-      }
+      const { data } = await updateSectionTemplate(props.template.id, payload)
+      success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} enregistrée`)
       emit('saved', data)
     } else {
       const { data } = await createSectionTemplate({
@@ -359,14 +354,12 @@ async function destroy() {
         />
       </div>
 
-      <label v-if="isEdit && form.kind === 'standard'"
-             class="flex items-start gap-2.5 text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <input v-model="propagate" type="checkbox" class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500/30" />
-        <span>
-          <strong class="font-medium">Appliquer aussi aux AFs existantes</strong> où le contenu n'a pas été modifié.
-          Les AFs où la section a été personnalisée ne seront pas écrasées (un bandeau "nouvelle version" s'affichera dans l'éditeur).
-        </span>
-      </label>
+      <p v-if="isEdit && form.kind === 'standard'"
+         class="text-xs text-gray-500 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg p-3">
+        Les AFs existantes restent figées sur la version actuellement liée. Pour qu'une AF
+        prenne en compte cette modification, ouvre la section concernée — un bandeau
+        « nouvelle version » te proposera de la mettre à jour.
+      </p>
 
       <!-- Captures du modele : automatiquement heritees par les AFs -->
       <div v-if="isEdit">

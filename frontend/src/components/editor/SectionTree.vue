@@ -2,18 +2,24 @@
 import { ref, computed, watch } from 'vue'
 import {
   RectangleStackIcon, GlobeAltIcon, ChartBarSquareIcon, DocumentTextIcon,
-  MagnifyingGlassIcon, PlusIcon, XMarkIcon,
+  MagnifyingGlassIcon, PlusIcon, XMarkIcon, CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import SectionTreeNode from './SectionTreeNode.vue'
+import Tooltip from '@/components/Tooltip.vue'
 
 const props = defineProps({
   sections: { type: Array, required: true }, // liste plate (parent_id pour hierarchie)
   selectedId: { type: Number, default: null },
+  afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
 })
 const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'attachment-drop'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
+
+// Filtre "Non vérifiées uniquement" — masque les sections marquées 'verified'
+// (en gardant les ancêtres pour le contexte d'arbre).
+const onlyUnverified = ref(false)
 
 function normalize(s) {
   return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -27,11 +33,23 @@ const matchedIds = computed(() => {
   ).map(s => s.id))
 })
 
+const unverifiedIds = computed(() => {
+  if (!onlyUnverified.value) return null
+  return new Set(props.sections.filter(s => s.fact_check_status !== 'verified').map(s => s.id))
+})
+
 const visibleIds = computed(() => {
-  if (!matchedIds.value) return null
+  if (!matchedIds.value && !unverifiedIds.value) return null
+  // Intersection des deux filtres si les deux actifs
+  let base = null
+  if (matchedIds.value && unverifiedIds.value) {
+    base = new Set([...matchedIds.value].filter(id => unverifiedIds.value.has(id)))
+  } else {
+    base = matchedIds.value || unverifiedIds.value
+  }
   // Inclut tous les ancêtres des matches pour garder le contexte
-  const set = new Set(matchedIds.value)
-  for (const m of matchedIds.value) {
+  const set = new Set(base)
+  for (const m of base) {
     let cur = props.sections.find(s => s.id === m)
     while (cur?.parent_id) {
       set.add(cur.parent_id)
@@ -40,6 +58,10 @@ const visibleIds = computed(() => {
   }
   return set
 })
+
+const unverifiedCount = computed(() =>
+  props.sections.filter(s => s.fact_check_status !== 'verified').length
+)
 
 // Construction d'un arbre depuis la liste plate
 const tree = computed(() => {
@@ -70,12 +92,35 @@ const tree = computed(() => {
 })
 
 // Etat collapsé (Set des ids fermés). Auto-déplie tout en mode recherche.
-const collapsed = ref(new Set())
+// Persisté en localStorage par AF pour survivre F5 / changement d'onglet.
+const storageKey = computed(() => props.afId ? `af-${props.afId}-collapsed` : null)
+
+function loadCollapsed() {
+  if (!storageKey.value || typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.localStorage.getItem(storageKey.value)
+    if (!raw) return new Set()
+    const arr = JSON.parse(raw)
+    return new Set(Array.isArray(arr) ? arr : [])
+  } catch { return new Set() }
+}
+
+const collapsed = ref(loadCollapsed())
+
+watch(() => props.afId, () => { collapsed.value = loadCollapsed() })
+
+function persistCollapsed() {
+  if (!storageKey.value || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(storageKey.value, JSON.stringify(Array.from(collapsed.value)))
+  } catch { /* quota / private mode → ignore */ }
+}
 
 function toggle(node) {
   if (collapsed.value.has(node.id)) collapsed.value.delete(node.id)
   else collapsed.value.add(node.id)
   collapsed.value = new Set(collapsed.value)
+  persistCollapsed()
 }
 
 const KIND_ICON = {
@@ -97,17 +142,29 @@ watch(() => props.selectedId, (id) => {
   const target = props.sections.find(s => s.id === id)
   if (!target) return
   let parentId = target.parent_id
+  let changed = false
   while (parentId) {
-    collapsed.value.delete(parentId)
+    if (collapsed.value.has(parentId)) { collapsed.value.delete(parentId); changed = true }
     const parent = props.sections.find(s => s.id === parentId)
     parentId = parent?.parent_id
   }
-  collapsed.value = new Set(collapsed.value)
+  if (changed) {
+    collapsed.value = new Set(collapsed.value)
+    persistCollapsed()
+  }
 })
 
-// En mode recherche : tout déplié
+// En mode recherche : tout déplié (transitoire — on ne persiste pas, l'état
+// pré-recherche revient quand l'utilisateur efface la recherche)
+let preSearchCollapsed = null
 watch(matchedIds, (ids) => {
-  if (ids) collapsed.value = new Set()
+  if (ids) {
+    if (!preSearchCollapsed) preSearchCollapsed = new Set(collapsed.value)
+    collapsed.value = new Set()
+  } else if (preSearchCollapsed) {
+    collapsed.value = preSearchCollapsed
+    preSearchCollapsed = null
+  }
 })
 </script>
 
@@ -131,17 +188,38 @@ watch(matchedIds, (ids) => {
           <XMarkIcon class="w-3.5 h-3.5" />
         </button>
       </div>
-      <button
-        @click="emit('add-root')"
-        class="shrink-0 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
-        title="Ajouter une section racine"
+      <Tooltip
+        :text="onlyUnverified
+          ? `Afficher toutes les sections (${unverifiedCount} non vérifiée${unverifiedCount > 1 ? 's' : ''})`
+          : `Afficher uniquement les sections non vérifiées (${unverifiedCount} non vérifiée${unverifiedCount > 1 ? 's' : ''})`"
+        placement="bottom"
       >
-        <PlusIcon class="w-4 h-4" />
-      </button>
+        <button
+          type="button"
+          @click="onlyUnverified = !onlyUnverified"
+          :class="[
+            'shrink-0 p-1.5 rounded transition-colors',
+            onlyUnverified ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700',
+          ]"
+        >
+          <CheckCircleIcon class="w-4 h-4" />
+        </button>
+      </Tooltip>
+      <Tooltip text="Ajouter une section racine" placement="bottom">
+        <button
+          @click="emit('add-root')"
+          class="shrink-0 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
+        >
+          <PlusIcon class="w-4 h-4" />
+        </button>
+      </Tooltip>
     </div>
 
     <p v-if="matchedIds && matchedIds.size === 0" class="text-xs text-gray-400 italic px-3 py-2">
       Aucune section ne correspond à « {{ search }} ».
+    </p>
+    <p v-else-if="onlyUnverified && unverifiedCount === 0" class="text-xs text-emerald-600 italic px-3 py-2">
+      Toutes les sections sont vérifiées. ✓
     </p>
 
     <SectionTreeNode

@@ -7,7 +7,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon,
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
-  SparklesIcon, StopIcon, ArrowTopRightOnSquareIcon,
+  SparklesIcon, StopIcon, ArrowTopRightOnSquareIcon, CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
 import { updateSection, getSectionTemplate } from '@/api'
@@ -18,6 +18,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import AutosaveStatus from './AutosaveStatus.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import LinkInputModal from '@/components/LinkInputModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 
@@ -135,8 +136,6 @@ async function flushAll() {
   await Promise.all([bodyAutosave.flush(), titleAutosave.flush()])
 }
 
-defineExpose({ flushAll })
-
 // Status global = priorité error > saving > pending > saved > idle
 const globalState = computed(() => {
   const states = [bodyAutosave.state.value, titleAutosave.state.value]
@@ -146,12 +145,21 @@ const globalState = computed(() => {
   if (states.includes('saved')) return 'saved'
   return 'idle'
 })
-// Toast en cas d'erreur reseau pendant l'autosave : sans ca, l'utilisateur
-// voit juste un picto rouge dans le header et croit que la sauvegarde a
-// reussi. On ne notifie qu'une fois par transition idle/saving -> error.
-watch(globalState, (newS, oldS) => {
-  if (newS === 'error' && oldS !== 'error') {
-    notifyError('Sauvegarde impossible — vérifiez votre connexion et réessayez')
+
+// Exposé au parent pour que AfDetailView puisse interroger l'état autosave
+// avant une navigation (beforeRouteLeave / beforeunload).
+defineExpose({ flushAll, globalState })
+// Toast d'alerte uniquement quand toutes les tentatives de retry ont
+// échoué (sinon le retry exponentiel ferait clignoter le toast à chaque
+// tentative). Le badge AutosaveStatus reste rouge tant que l'erreur
+// persiste, donc le feedback visuel n'est pas perdu.
+const maxAttempt = computed(() => Math.max(bodyAutosave.attempt.value, titleAutosave.attempt.value))
+watch([globalState, maxAttempt], ([newS, newA], [oldS, oldA]) => {
+  // On notifie au moment où on atteint la dernière tentative en erreur
+  // (newS='error' et le compteur ne progresse plus = retries épuisés).
+  // Heuristique simple : on déclenche dès que attempt atteint 3 ET state='error'.
+  if (newS === 'error' && newA >= 3 && (oldA < 3 || oldS !== 'error')) {
+    notifyError('Sauvegarde impossible après plusieurs tentatives — vérifiez votre connexion')
   }
 })
 const globalLastSaved = computed(() => {
@@ -244,15 +252,37 @@ function formatUpdatedAt(iso) {
 
 // Toolbar helpers
 const isActive = (name, attrs) => editor.value?.isActive(name, attrs) || false
+
+// Workflow fact-check : toggle vérifiée / à vérifier sur la section. La
+// colonne fact_check_status accepte 5 valeurs côté DB mais l'UI ne distingue
+// que 'verified' vs reste (les autres états sont historiques).
+const isVerified = computed(() => props.section.fact_check_status === 'verified')
+async function toggleVerified() {
+  const next = isVerified.value ? 'unverified' : 'verified'
+  try {
+    const { data } = await updateSection(props.section.id, { fact_check_status: next })
+    emit('updated', data)
+    notifySuccess(next === 'verified' ? 'Section marquée vérifiée' : 'Vérification annulée')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la mise à jour')
+  }
+}
+
+// Modale insertion / édition de lien (remplace window.prompt)
+const showLinkModal = ref(false)
+const linkInitialUrl = ref('')
 function setLink() {
-  const previous = editor.value?.getAttributes('link').href || ''
-  const url = window.prompt('URL du lien (vide pour retirer)', previous)
-  if (url === null) return
+  linkInitialUrl.value = editor.value?.getAttributes('link').href || ''
+  showLinkModal.value = true
+}
+function onSaveLink(url) {
+  if (!editor.value) return
   if (url === '') {
     editor.value.chain().focus().extendMarkRange('link').unsetLink().run()
   } else {
     editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
+  showLinkModal.value = false
 }
 </script>
 
@@ -285,11 +315,27 @@ function setLink() {
       </button>
       <ServiceLevelBadge :level="section.service_level" />
       <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
+      <button
+        v-if="!isReadOnly"
+        type="button"
+        @click="toggleVerified"
+        :class="[
+          'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md border shrink-0 transition-colors',
+          isVerified
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+            : 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100',
+        ]"
+        :title="isVerified ? 'Section marquée vérifiée — cliquer pour annuler' : 'Marquer cette section comme vérifiée'"
+      >
+        <CheckCircleIcon class="w-3.5 h-3.5" />
+        {{ isVerified ? 'Vérifiée' : 'À vérifier' }}
+      </button>
       <AutosaveStatus
         v-if="!isReadOnly"
         :state="globalState"
         :last-saved="globalLastSaved"
         :error="bodyAutosave.lastError.value || titleAutosave.lastError.value"
+        :attempt="Math.max(bodyAutosave.attempt.value, titleAutosave.attempt.value)"
         class="ml-2 shrink-0"
       />
     </div>
@@ -433,6 +479,13 @@ function setLink() {
       </template>
     </template>
   </BaseModal>
+
+  <LinkInputModal
+    v-if="showLinkModal"
+    :initial-url="linkInitialUrl"
+    @save="onSaveLink"
+    @close="showLinkModal = false"
+  />
 </template>
 
 <style>

@@ -82,7 +82,6 @@ async function main() {
   await fastify.register(require('./routes/section-templates'), { prefix: '/api' });
   await fastify.register(require('./routes/attachments'), { prefix: '/api' });
   await fastify.register(require('./routes/export'), { prefix: '/api' });
-  await fastify.register(require('./routes/inspections'), { prefix: '/api' });
   await fastify.register(require('./routes/versions'), { prefix: '/api' });
   await fastify.register(require('./routes/search'), { prefix: '/api' });
   await fastify.register(require('./routes/claude'), { prefix: '/api' });

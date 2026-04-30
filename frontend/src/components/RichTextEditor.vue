@@ -17,6 +17,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import LinkInputModal from './LinkInputModal.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -114,12 +115,18 @@ onBeforeUnmount(() => editor.value?.destroy())
 
 const isActive = (name, attrs) => editor.value?.isActive(name, attrs) || false
 
+// Modale insertion / édition de lien (remplace window.prompt)
+const showLinkModal = ref(false)
+const linkInitialUrl = ref('')
 function setLink() {
-  const previous = editor.value?.getAttributes('link').href || ''
-  const url = window.prompt('URL du lien (vide pour retirer)', previous)
-  if (url === null) return
+  linkInitialUrl.value = editor.value?.getAttributes('link').href || ''
+  showLinkModal.value = true
+}
+function onSaveLink(url) {
+  if (!editor.value) return
   if (url === '') editor.value.chain().focus().extendMarkRange('link').unsetLink().run()
   else editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+  showLinkModal.value = false
 }
 </script>
 
@@ -154,6 +161,12 @@ function setLink() {
       </button>
     </div>
     <EditorContent :editor="editor" />
+    <LinkInputModal
+      v-if="showLinkModal"
+      :initial-url="linkInitialUrl"
+      @save="onSaveLink"
+      @close="showLinkModal = false"
+    />
   </div>
 </template>
 
