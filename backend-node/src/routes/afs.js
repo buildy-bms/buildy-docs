@@ -13,6 +13,11 @@ const createAfSchema = z.object({
   project_name: z.string().min(1, 'Nom du projet requis'),
   site_address: z.string().optional(),
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
+  // Multi-domaines (Buildy Docs) : kind + site_id. Pour 'bacs_audit', le site
+  // est obligatoire (le plan canonique pre-rempli a besoin des zones du site).
+  kind: z.enum(['af', 'bacs_audit', 'brochure']).optional().default('af'),
+  site_id: z.number().int().positive().nullable().optional(),
+  title: z.string().optional(),
 });
 
 const updateAfSchema = z.object({
@@ -26,11 +31,17 @@ const updateAfSchema = z.object({
 async function routes(fastify) {
   // GET /api/afs — liste (filtres optionnels)
   fastify.get('/afs', async (request) => {
-    const { status, includeDeleted } = request.query;
-    const items = db.afs.list({
+    const { status, includeDeleted, kind, site_id } = request.query;
+    let items = db.afs.list({
       status: status || undefined,
       includeDeleted: includeDeleted === 'true',
     });
+    // Filtres post-list (le helper db.afs.list ne supporte pas encore kind/site_id)
+    if (kind) items = items.filter(a => (a.kind || 'af') === kind);
+    if (site_id) {
+      const sid = parseInt(site_id, 10);
+      items = items.filter(a => a.site_id === sid);
+    }
     // Enrichit avec auteur display_name
     const userIds = [...new Set(items.flatMap(a => [a.created_by, a.updated_by]).filter(Boolean))];
     const usersById = Object.fromEntries(
@@ -71,13 +82,28 @@ async function routes(fastify) {
     return db.equipmentInstances.listByAf(id);
   });
 
-  // POST /api/afs — creation (declenche le seed du plan AF complet)
+  // POST /api/afs — creation
+  // - kind='af' (defaut) : declenche le seed du plan AF complet (12 chapitres)
+  // - kind='bacs_audit' : site_id obligatoire, pas de seed pour l'instant
+  //   (le plan canonique BACS arrivera en Phase 2 via seedBacsAuditStructure)
+  // - kind='brochure' : pas de seed (Phase 3)
   fastify.post('/afs', async (request, reply) => {
     let body;
     try {
       body = createAfSchema.parse(request.body);
     } catch (err) {
       return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation échouée', errors: err.errors });
+    }
+
+    // Validation specifique aux kinds non-AF
+    if (body.kind === 'bacs_audit' && !body.site_id) {
+      return reply.code(400).send({ detail: 'Un audit BACS doit etre rattache a un site (site_id requis)' });
+    }
+    if (body.site_id) {
+      const site = db.sites.getById(body.site_id);
+      if (!site || site.deleted_at) {
+        return reply.code(404).send({ detail: 'Site introuvable' });
+      }
     }
 
     const slug = uniqueSlug(`${body.client_name}-${body.project_name}`, (s) => !!db.afs.getBySlug(s));
@@ -89,17 +115,24 @@ async function routes(fastify) {
       projectName: body.project_name,
       siteAddress: body.site_address,
       serviceLevel: body.service_level,
+      kind: body.kind,
+      siteId: body.site_id || null,
+      title: body.title || null,
       createdBy: userId,
     });
 
-    // Seed du plan AF complet (12 chapitres + sous-sections + Hyperveez pages)
-    const sectionsCount = seedAfStructure(af.id);
+    // Seed conditionnel selon le kind
+    let sectionsCount = 0;
+    if (body.kind === 'af') {
+      sectionsCount = seedAfStructure(af.id);
+    }
+    // Phase 2 : if (body.kind === 'bacs_audit') seedBacsAuditStructure(af.id, body.site_id);
 
     db.auditLog.add({
-      afId: af.id, userId, action: 'af.create',
-      payload: { slug: af.slug, sections_count: sectionsCount },
+      afId: af.id, userId, action: `${body.kind}.create`,
+      payload: { slug: af.slug, kind: body.kind, site_id: body.site_id, sections_count: sectionsCount },
     });
-    log.info(`AF created: #${af.id} ${af.slug} (${sectionsCount} sections) by user #${userId}`);
+    log.info(`Document created: #${af.id} ${af.slug} (kind=${body.kind}, ${sectionsCount} sections) by user #${userId}`);
 
     return { ...af, sections_count: sectionsCount };
   });

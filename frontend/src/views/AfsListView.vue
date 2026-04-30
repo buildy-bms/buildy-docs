@@ -18,6 +18,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import AddressAutocomplete from '@/components/AddressAutocomplete.vue'
+import SitePicker from '@/components/SitePicker.vue'
 
 const router = useRouter()
 const { success, error } = useNotification()
@@ -89,7 +90,32 @@ const visibleAfs = computed(() => filteredSorted.value.slice(0, displayedCount.v
 const hasMore = computed(() => filteredSorted.value.length > displayedCount.value)
 function loadMore() { displayedCount.value += PAGE_SIZE }
 
-const newAf = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
+const newAf = ref({
+  kind: 'af',
+  site_id: null,
+  client_name: '',
+  project_name: '',
+  site_address: '',
+  service_level: null,
+})
+// Selectionne reactivement (charge depuis SitePicker via @change)
+const selectedSite = ref(null)
+function onSiteChange(site) {
+  selectedSite.value = site
+  if (!site) return
+  // Pre-remplit client + adresse + project depuis le site choisi (editable apres)
+  if (!newAf.value.client_name && site.customer_name) newAf.value.client_name = site.customer_name
+  if (!newAf.value.site_address && site.address) newAf.value.site_address = site.address
+  if (newAf.value.kind === 'bacs_audit' && !newAf.value.project_name) {
+    newAf.value.project_name = `Audit BACS — ${site.name}`
+  }
+}
+function onKindChange() {
+  // Reset le project_name en cas de switch vers bacs_audit pour appliquer le pattern
+  if (newAf.value.kind === 'bacs_audit' && selectedSite.value) {
+    newAf.value.project_name = `Audit BACS — ${selectedSite.value.name}`
+  }
+}
 const cloneTarget = ref({ client_name: '', project_name: '', site_address: '' })
 const submitting = ref(false)
 
@@ -144,12 +170,18 @@ async function refresh() {
 
 async function submitCreate() {
   if (!newAf.value.client_name.trim() || !newAf.value.project_name.trim()) return
+  if (newAf.value.kind === 'bacs_audit' && !newAf.value.site_id) {
+    error('Un audit BACS doit être rattaché à un site')
+    return
+  }
   submitting.value = true
   try {
     const { data } = await createAf(newAf.value)
-    success(`AF créée : ${data.client_name} — ${data.project_name} (${data.sections_count} sections seedées)`)
+    const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS' : data.kind === 'brochure' ? 'Brochure' : 'AF'
+    success(`${kindLabel} créé : ${data.client_name} — ${data.project_name}${data.sections_count ? ` (${data.sections_count} sections seedées)` : ''}`)
     showCreate.value = false
-    newAf.value = { client_name: '', project_name: '', site_address: '', service_level: null }
+    newAf.value = { kind: 'af', site_id: null, client_name: '', project_name: '', site_address: '', service_level: null }
+    selectedSite.value = null
     refresh()
     router.push(`/afs/${data.id}`)
   } catch (e) {
@@ -229,7 +261,7 @@ onMounted(refresh)
         class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-sm"
       >
         <DocumentPlusIcon class="w-4 h-4" />
-        Nouvelle AF
+        Nouveau document
       </button>
     </div>
 
@@ -382,9 +414,62 @@ onMounted(refresh)
       </table>
     </div>
 
-    <!-- Modal nouvelle AF -->
-    <BaseModal v-if="showCreate" title="Nouvelle Analyse Fonctionnelle" size="md" @close="showCreate = false">
+    <!-- Modal nouveau document -->
+    <BaseModal v-if="showCreate" title="Nouveau document" size="md" @close="showCreate = false">
       <form @submit.prevent="submitCreate" class="space-y-4">
+        <!-- Selecteur de kind -->
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Type de document *</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label
+              v-for="opt in [
+                { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
+                { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
+                { value: 'brochure', label: 'Brochure', desc: 'Bientôt', disabled: true },
+              ]"
+              :key="opt.value"
+              :class="[
+                'cursor-pointer text-center py-3 px-2 rounded-lg border text-xs font-semibold transition',
+                opt.disabled ? 'opacity-40 cursor-not-allowed' : '',
+                newAf.kind === opt.value
+                  ? 'bg-indigo-50 border-indigo-500 text-indigo-700'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+              ]"
+            >
+              <input
+                v-model="newAf.kind"
+                :value="opt.value"
+                :disabled="opt.disabled"
+                @change="onKindChange"
+                type="radio"
+                class="sr-only"
+              />
+              <div>{{ opt.label }}</div>
+              <div class="text-[10px] font-normal text-gray-500 mt-0.5">{{ opt.desc }}</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Site (obligatoire pour bacs_audit, optionnel pour af) -->
+        <div v-if="newAf.kind !== 'af'">
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Site *
+            <span class="text-gray-400 font-normal">— les zones et équipements seront partagés avec les autres documents du site</span>
+          </label>
+          <SitePicker
+            v-model="newAf.site_id"
+            :required="newAf.kind === 'bacs_audit'"
+            @change="onSiteChange"
+          />
+        </div>
+        <div v-else>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Site
+            <span class="text-gray-400 font-normal">— optionnel, sinon adresse libre ci-dessous</span>
+          </label>
+          <SitePicker v-model="newAf.site_id" @change="onSiteChange" />
+        </div>
+
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Client *</label>
           <input
@@ -412,7 +497,7 @@ onMounted(refresh)
             placeholder="ex : 42 rue de la Tête d'Or, 69006 Lyon"
           />
         </div>
-        <div>
+        <div v-if="newAf.kind === 'af'">
           <label class="block text-xs font-medium text-gray-700 mb-1">
             Niveau de contrat Buildy
             <span class="text-gray-400 font-normal">— optionnel, à définir plus tard si besoin</span>
@@ -441,20 +526,25 @@ onMounted(refresh)
             Le niveau requis par l'AF sera calculé automatiquement à partir des sections que vous incluez.
           </p>
         </div>
-        <p class="text-xs text-gray-500 leading-relaxed">
+        <p v-if="newAf.kind === 'af'" class="text-xs text-gray-500 leading-relaxed">
           La création va seeder automatiquement les 12 chapitres du plan AF type
           (~93 sections) avec la bibliothèque d'équipements (CTA, chaudière, compteurs…)
           et les pages réelles d'Hyperveez. Tu pourras ensuite éditer chaque section.
+        </p>
+        <p v-else-if="newAf.kind === 'bacs_audit'" class="text-xs text-gray-500 leading-relaxed">
+          L'audit BACS sera rattaché au site choisi. Le plan canonique pré-rempli
+          (zones fonctionnelles, systèmes techniques, compteurs, GTB, régulation thermique)
+          sera disponible en Phase 2.
         </p>
       </form>
       <template #footer>
         <button @click="showCreate = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
         <button
           @click="submitCreate"
-          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim()"
+          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || (newAf.kind === 'bacs_audit' && !newAf.site_id)"
           class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
-          {{ submitting ? 'Création…' : 'Créer l\'AF' }}
+          {{ submitting ? 'Création…' : (newAf.kind === 'bacs_audit' ? 'Créer l\'audit' : newAf.kind === 'brochure' ? 'Créer la brochure' : 'Créer l\'AF') }}
         </button>
       </template>
     </BaseModal>
