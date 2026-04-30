@@ -26,7 +26,37 @@ const updateAfSchema = z.object({
   site_address: z.string().optional(),
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
+  // Audit BACS : applicabilite R175-2
+  bacs_total_power_kw: z.number().nullable().optional(),
+  bacs_total_power_source: z.enum(['auto', 'manual_override']).optional(),
+  bacs_building_permit_date: z.string().nullable().optional(),
 });
+
+/**
+ * Calcule l'applicabilite BACS R175-2 selon la puissance cumulee chauffage+clim
+ * et la date du permis de construire.
+ *
+ * Regles synthetisees :
+ * - puissance < 70 kW => not_subject (hors champ)
+ * - puissance >= 290 kW => subject_2025 (echeance 1er janvier 2025)
+ *   - sauf si PC > 8 avril 2024 => subject_immediate (s'applique a la livraison)
+ * - 70 kW <= puissance < 290 kW => subject_2027 (echeance 1er janvier 2027)
+ *
+ * Retourne { status, deadline } ou null si la puissance n'est pas renseignee.
+ */
+function computeBacsApplicability(powerKw, buildingPermitDate) {
+  if (powerKw == null || isNaN(powerKw)) return null;
+  if (powerKw < 70) {
+    return { status: 'not_subject', deadline: null };
+  }
+  if (powerKw >= 290) {
+    if (buildingPermitDate && Date.parse(buildingPermitDate) >= Date.parse('2024-04-08')) {
+      return { status: 'subject_immediate', deadline: buildingPermitDate };
+    }
+    return { status: 'subject_2025', deadline: '2025-01-01' };
+  }
+  return { status: 'subject_2027', deadline: '2027-01-01' };
+}
 
 async function routes(fastify) {
   // GET /api/afs — liste (filtres optionnels)
@@ -166,6 +196,25 @@ async function routes(fastify) {
     // Transitions de statut auto : si on bascule vers livree, on stamp delivered_at
     if (body.status === 'livree' && af.status !== 'livree') {
       fields.deliveredAt = new Date().toISOString();
+    }
+
+    // Champs BACS : applicabilite R175-2 recalculee si la puissance ou la
+    // date PC est touchee
+    if ('bacs_total_power_kw' in body) fields.bacs_total_power_kw = body.bacs_total_power_kw;
+    if ('bacs_total_power_source' in body) fields.bacs_total_power_source = body.bacs_total_power_source;
+    if ('bacs_building_permit_date' in body) fields.bacs_building_permit_date = body.bacs_building_permit_date;
+    const touchesApplicability = ['bacs_total_power_kw', 'bacs_building_permit_date'].some(k => k in body);
+    if (touchesApplicability) {
+      const powerKw = body.bacs_total_power_kw !== undefined ? body.bacs_total_power_kw : af.bacs_total_power_kw;
+      const pcDate = body.bacs_building_permit_date !== undefined ? body.bacs_building_permit_date : af.bacs_building_permit_date;
+      const applic = computeBacsApplicability(powerKw, pcDate);
+      if (applic) {
+        fields.bacs_applicability_status = applic.status;
+        fields.bacs_applicable_deadline = applic.deadline;
+      } else {
+        fields.bacs_applicability_status = null;
+        fields.bacs_applicable_deadline = null;
+      }
     }
 
     const updated = db.afs.update(id, fields);

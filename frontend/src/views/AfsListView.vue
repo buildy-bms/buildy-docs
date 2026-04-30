@@ -37,6 +37,8 @@ const cloneSource = ref(null)
 // — friction sans valeur ajoutée. Le groupement est désormais une option du
 // tableau, persistée comme le tri.)
 const searchQuery = ref('')
+const kindFilter = ref(localStorage.getItem('afs-kind-filter') || 'all') // 'all' | 'af' | 'bacs_audit'
+watch(kindFilter, () => localStorage.setItem('afs-kind-filter', kindFilter.value))
 const sortBy = ref(localStorage.getItem('afs-sort-by') || 'updated_at')
 const sortDir = ref(localStorage.getItem('afs-sort-dir') || 'desc') // 'asc' | 'desc'
 const groupBy = ref(localStorage.getItem('afs-group-by') || 'none') // 'none' | 'client' | 'status'
@@ -58,6 +60,9 @@ const STATUS_ORDER = { redaction: 0, validee: 1, commissioning: 2, commissioned:
 const filteredSorted = computed(() => {
   const q = normalize(searchQuery.value)
   let list = afs.value
+  if (kindFilter.value !== 'all') {
+    list = list.filter(a => (a.kind || 'af') === kindFilter.value)
+  }
   if (q.length >= 2) {
     list = list.filter(a =>
       normalize(a.client_name).includes(q) ||
@@ -254,7 +259,7 @@ onMounted(refresh)
     <!-- Header -->
     <div class="flex items-start justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-800">Mes Analyses Fonctionnelles</h1>
+        <h1 class="text-2xl font-semibold text-gray-800">Mes documents</h1>
         <p class="text-sm text-gray-500 mt-1">
           {{ stats.total }} AF{{ stats.total > 1 ? 's' : '' }} —
           <span class="text-gray-700">{{ stats.redaction }} en rédaction</span>,
@@ -288,6 +293,17 @@ onMounted(refresh)
         <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
           <XMarkIcon class="w-4 h-4" />
         </button>
+      </div>
+      <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
+        <button
+          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}]"
+          :key="opt.v"
+          @click="kindFilter = opt.v"
+          :class="[
+            'px-2.5 py-1 rounded transition',
+            kindFilter === opt.v ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+          ]"
+        >{{ opt.l }}</button>
       </div>
       <div class="inline-flex items-center gap-2 text-xs">
         <label class="text-gray-500">Grouper par</label>
@@ -361,7 +377,18 @@ onMounted(refresh)
             >
               <td class="px-4 py-2.5 font-semibold text-gray-800">{{ row.af.client_name }}</td>
               <td class="px-4 py-2.5 text-gray-700">
-                {{ row.af.project_name }}
+                <div class="flex items-center gap-2">
+                  <span
+                    v-if="(row.af.kind || 'af') === 'bacs_audit'"
+                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
+                    title="Audit BACS — décret R175"
+                  >BACS</span>
+                  <span
+                    v-else-if="row.af.kind === 'brochure'"
+                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
+                  >Brochure</span>
+                  {{ row.af.project_name }}
+                </div>
                 <p v-if="row.af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
                   <MapPinIcon class="w-3 h-3 shrink-0" />{{ row.af.site_address }}
                 </p>
@@ -377,10 +404,10 @@ onMounted(refresh)
               </td>
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                  <button @click.stop="router.push(`/afs/${row.af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
+                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
-                  <button @click.stop="openClone(row.af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
+                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
                   <button @click.stop="confirmDelete(row.af)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">

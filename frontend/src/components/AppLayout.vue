@@ -33,7 +33,7 @@ onMounted(async () => {
 
 const paletteRef = ref(null)
 const nav = [
-  { name: 'Mes AFs', to: '/', icon: DocumentTextIcon },
+  { name: 'Mes documents', to: '/', icon: DocumentTextIcon },
   { name: 'Mes Sites', to: '/sites', icon: BuildingOffice2Icon },
   { section: 'Bibliothèque' },
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
