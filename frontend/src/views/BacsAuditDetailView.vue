@@ -213,6 +213,9 @@ const devicesBySystem = computed(() => {
   return out
 })
 
+// Compteurs présents uniquement (pour la liste GTB des compteurs intégrés)
+const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
+
 // Devices enrichis avec system_category + zone_name (pour la liste GTB)
 const devicesWithMeta = computed(() => {
   const sysById = new Map(systems.value.map(s => [s.id, s]))
@@ -961,49 +964,83 @@ onMounted(refresh)
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Équipements intégrés à la GTB
-                <span class="font-normal normal-case text-gray-500 text-[10px]">— mis à jour quand tu déclares des équipements</span>
+                <span class="font-normal normal-case text-gray-500 text-[10px]">— "HS liaison" = équipement OK mais GTB ne le voit pas</span>
               </h3>
-              <div class="space-y-1 max-h-64 overflow-y-auto">
-                <label v-for="d in devicesWithMeta" :key="d.id"
-                       class="flex items-center gap-2 cursor-pointer text-xs"
-                       :class="d.out_of_service ? 'opacity-50' : ''">
-                  <input type="checkbox" :checked="!!d.managed_by_bms"
-                         @change="e => patchDeviceMb(d, { managed_by_bms: e.target.checked })"
-                         class="rounded" />
-                  <span class="text-gray-700">
-                    <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
-                    <span class="text-gray-400">
-                      — {{ SYSTEM_LABEL[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
-                    </span>
-                  </span>
-                </label>
-                <p v-if="!devicesWithMeta.length" class="text-xs text-gray-400 italic">
-                  Aucun équipement saisi.
-                </p>
-              </div>
+              <table v-if="devicesWithMeta.length" class="w-full text-xs">
+                <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
+                  <tr>
+                    <th class="text-left px-2 py-1 font-semibold">Équipement</th>
+                    <th class="text-center py-1 font-semibold w-16" title="Intégré à la GTB">Intégré</th>
+                    <th class="text-center py-1 font-semibold w-20" title="Liaison GTB Hors-Service (paramétrage/communication cassé)">HS liaison</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <tr v-for="d in devicesWithMeta" :key="d.id"
+                      :class="d.out_of_service ? 'opacity-50' : ''">
+                    <td class="px-2 py-1 text-gray-700">
+                      <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
+                      <span class="text-gray-400">
+                        — {{ SYSTEM_LABEL[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
+                      </span>
+                    </td>
+                    <td class="py-1 text-center">
+                      <input type="checkbox" :checked="!!d.managed_by_bms"
+                             :disabled="d.out_of_service"
+                             @change="e => patchDeviceMb(d, { managed_by_bms: e.target.checked })"
+                             class="rounded disabled:opacity-30" />
+                    </td>
+                    <td class="py-1 text-center">
+                      <input type="checkbox" :checked="!!d.bms_integration_out_of_service"
+                             :disabled="!d.managed_by_bms"
+                             @change="e => patchDeviceMb(d, { bms_integration_out_of_service: e.target.checked })"
+                             class="rounded accent-red-500 disabled:opacity-30" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="text-xs text-gray-400 italic">Aucun équipement saisi.</p>
             </div>
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Compteurs intégrés à la GTB
+                <span class="font-normal normal-case text-gray-500 text-[10px]">— uniquement les compteurs présents</span>
               </h3>
-              <div class="space-y-1 max-h-64 overflow-y-auto">
-                <label v-for="m in meters" :key="m.id"
-                       class="flex items-center gap-2 cursor-pointer text-xs"
-                       :class="m.out_of_service ? 'opacity-50' : ''">
-                  <input type="checkbox" :checked="!!m.managed_by_bms"
-                         @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
-                         class="rounded" />
-                  <span class="text-gray-700">
-                    <strong>{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</strong>
-                    <span class="text-gray-400">
-                      — {{ m.zone_name || 'général' }} ({{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }})
-                    </span>
-                  </span>
-                </label>
-                <p v-if="!meters.length" class="text-xs text-gray-400 italic">
-                  Aucun compteur listé.
-                </p>
-              </div>
+              <table v-if="metersPresent.length" class="w-full text-xs">
+                <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
+                  <tr>
+                    <th class="text-left px-2 py-1 font-semibold">Compteur</th>
+                    <th class="text-center py-1 font-semibold w-16" title="Intégré à la GTB">Intégré</th>
+                    <th class="text-center py-1 font-semibold w-20" title="Liaison GTB Hors-Service (la GTB ne relève plus le compteur)">HS liaison</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <tr v-for="m in metersPresent" :key="m.id"
+                      :class="m.out_of_service ? 'opacity-50' : ''">
+                    <td class="px-2 py-1 text-gray-700">
+                      <strong>{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</strong>
+                      <span class="text-gray-400">
+                        — {{ m.zone_name || 'général' }} ({{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }})
+                      </span>
+                    </td>
+                    <td class="py-1 text-center">
+                      <input type="checkbox" :checked="!!m.managed_by_bms"
+                             :disabled="m.out_of_service"
+                             @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
+                             class="rounded disabled:opacity-30" />
+                    </td>
+                    <td class="py-1 text-center">
+                      <input type="checkbox" :checked="!!m.bms_integration_out_of_service"
+                             :disabled="!m.managed_by_bms"
+                             @change="e => patchMeter(m, { bms_integration_out_of_service: e.target.checked })"
+                             class="rounded accent-red-500 disabled:opacity-30" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="text-xs text-gray-400 italic">
+                Aucun compteur présent à raccorder.
+                <span v-if="meters.length" class="block mt-1">Coche « Présent » dans la section 4 pour rendre les compteurs disponibles ici.</span>
+              </p>
             </div>
           </div>
 

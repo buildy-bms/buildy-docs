@@ -158,10 +158,18 @@ async function routes(fastify) {
       notes: z.string().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
+      bms_integration_out_of_service: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    // Regle : un compteur non present ne peut pas etre integre a la GTB
+    // (cf retour Kevin v2.5). Auto-decoche managed_by_bms si on passe a non present.
+    if (body.present_actual === false && body.managed_by_bms == null) {
+      body.managed_by_bms = false;
+    }
+
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
@@ -731,6 +739,7 @@ async function routes(fastify) {
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
+      bms_integration_out_of_service: z.boolean().nullable().optional(),
     });
     const schema = schemaPatch;
     let body;

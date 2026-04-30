@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 44;
+const TARGET_VERSION = 45;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1818,6 +1818,20 @@ function runMigrations() {
       db.pragma('foreign_keys = ON');
       throw e;
     }
+  }
+
+  if (current < 45) {
+    // Cf retour Kevin v2.5 : on distingue deux dimensions independantes
+    //  - out_of_service : l'equipement physique est en panne / arrete
+    //  - bms_integration_out_of_service : l'equipement fonctionne mais la
+    //    GTB ne le voit pas (probleme de parametrage, com cassee, etc.)
+    // Un equipement peut etre integre a la GTB mais avec une liaison HS.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN bms_integration_out_of_service INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_meters ADD COLUMN bms_integration_out_of_service INTEGER DEFAULT 0;
+    `);
+    db.pragma('user_version = 45');
+    log.info('Migration 45 appliquee : bms_integration_out_of_service sur devices + meters');
   }
 
   if (current > TARGET_VERSION) {

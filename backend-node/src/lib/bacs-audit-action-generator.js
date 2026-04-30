@@ -110,12 +110,26 @@ function computeTargetActions(documentId) {
     // Les devices Hors-Service sont ignores (pas d'action generee).
     const sysDevices = db.db.prepare(`
       SELECT id, name, brand, model_reference, communication_protocol,
-             meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service
+             meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service,
+             managed_by_bms, bms_integration_out_of_service
       FROM bacs_audit_system_devices WHERE system_id = ?
     `).all(s.id);
 
     for (const d of sysDevices) {
       if (d.out_of_service) continue;  // skip HS
+
+      // Liaison GTB cassee (device fonctionnel mais GTB ne le voit pas)
+      const devName2 = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
+      if (d.managed_by_bms && d.bms_integration_out_of_service) {
+        addTarget({
+          source_table: 'devices', source_id: d.id, source_subtype: 'bms_link_broken',
+          category: 'bms_upgrade', severity: 'major',
+          r175_article: 'R175-3 §3',
+          title: `Rétablir la liaison GTB de « ${devName2} »`,
+          description: `L'équipement est intégré à la GTB mais la liaison est cassée (paramétrage ou communication). À diagnostiquer / reconfigurer.`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      }
       const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
       const devLabel = `${devName} (${catFr}${zoneStr.replace(' en zone', ' —')})`;
 
@@ -188,6 +202,18 @@ function computeTargetActions(documentId) {
         r175_article: 'R175-3 §1',
         title: `Raccorder le compteur ${typeFr}${zoneStr}`,
         description: `Le compteur est présent mais non-communicant. Le suivi à pas horaire et la conservation 5 ans (R175-3 §1) ne sont pas possibles sans remontée automatique.`,
+        zone_id: m.zone_id, equipment_id: m.equipment_id,
+      });
+    }
+    // Liaison GTB du compteur cassee (compteur integre a la GTB mais GTB ne
+    // releve pas correctement)
+    if (m.managed_by_bms && m.bms_integration_out_of_service) {
+      addTarget({
+        source_table: 'meters', source_id: m.id, source_subtype: 'bms_link_broken',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §3',
+        title: `Rétablir la liaison GTB du compteur ${typeFr}${zoneStr}`,
+        description: `Le compteur est intégré à la GTB mais la remontée est cassée (paramétrage, adresse, protocole). À diagnostiquer / reconfigurer.`,
         zone_id: m.zone_id, equipment_id: m.equipment_id,
       });
     }
