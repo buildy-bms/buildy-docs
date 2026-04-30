@@ -33,6 +33,13 @@ const routes = [
     props: true,
   },
   {
+    path: '/bacs-audit/:id/action-items',
+    name: 'bacs-audit-action-items',
+    meta: { title: 'Plan de mise en conformité' },
+    component: () => import('@/views/BacsAuditActionItemsView.vue'),
+    props: true,
+  },
+  {
     path: '/afs/:id/versions',
     name: 'af-versions',
     meta: { title: 'Versions de l\'AF' },

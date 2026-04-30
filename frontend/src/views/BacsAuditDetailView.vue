@@ -887,6 +887,12 @@ onMounted(refresh)
             <h2 class="text-base font-semibold text-gray-800">8. Plan de mise en conformité</h2>
             <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
           </div>
+          <button
+            @click="router.push(`/bacs-audit/${docId}/action-items`)"
+            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            Vue commerciale plein écran →
+          </button>
         </header>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
