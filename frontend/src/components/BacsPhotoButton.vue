@@ -1,22 +1,23 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { CameraIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments,
   uploadSiteDocument,
   deleteSiteDocument,
+  updateSiteDocument,
   getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
 /**
- * Bouton compact (icone camera + compteur) qui ouvre une mini-galerie
- * inline pour ajouter / supprimer / agrandir des photos rattachees a une
- * zone, un compteur, une GTB, un systeme ou un device d'audit BACS.
+ * Bouton compact (icone camera + compteur) qui sert aussi de zone de drop
+ * pour les photos. Au drop / au clic + selection : upload immediat, puis
+ * une modal demande titre/description par photo et affiche la miniature.
  *
- * Toutes les photos passent par site_documents (categorie 'photo') avec le
- * site_uuid + une FK selon attachTo. Le backend resize a 1600px max et
- * convertit en JPEG q=82 (sharp).
+ * Toutes les photos passent par site_documents (categorie 'photo') avec
+ * le site_uuid + une FK selon attachTo. Le backend resize a 1600px max
+ * et convertit en JPEG q=82 (sharp).
  */
 const props = defineProps({
   siteUuid: { type: String, required: true },
@@ -34,6 +35,8 @@ const loading = ref(false)
 const showGallery = ref(false)
 const fileInput = ref(null)
 const uploading = ref(false)
+const isDragOver = ref(false)
+const captionModal = ref({ open: false, photos: [] }) // photos = [{ id, dataUrl, title, notes }]
 
 const filterParams = computed(() => {
   const p = {}
@@ -51,7 +54,7 @@ async function refresh() {
   try {
     const { data } = await listSiteDocuments(props.siteUuid, filterParams.value)
     photos.value = (data || []).filter(d => d.category === 'photo')
-  } catch (err) {
+  } catch {
     notifyError('Erreur chargement photos')
   } finally {
     loading.value = false
@@ -65,23 +68,32 @@ function pickFile() {
   fileInput.value?.click()
 }
 
-async function onFileChosen(e) {
-  const files = Array.from(e.target.files || [])
+async function uploadFiles(files) {
   if (!files.length) return
   uploading.value = true
+  const uploaded = []
   try {
     for (const f of files) {
       const fd = new FormData()
       fd.append('file', f)
-      await uploadSiteDocument(props.siteUuid, fd, {
-        title: f.name.replace(/\.[^.]+$/, ''),
+      const defaultTitle = f.name.replace(/\.[^.]+$/, '')
+      const { data } = await uploadSiteDocument(props.siteUuid, fd, {
+        title: defaultTitle,
         category: 'photo',
         ...filterParams.value,
       })
+      uploaded.push({
+        id: data.id,
+        dataUrl: getSiteDocumentDownloadUrl(data.id),
+        title: defaultTitle,
+        notes: '',
+      })
     }
-    success(files.length > 1 ? `${files.length} photos ajoutees` : 'Photo ajoutee')
+    success(files.length > 1 ? `${files.length} photos televersees` : 'Photo televersee')
     await refresh()
     emit('changed')
+    // On ouvre la modal pour ajouter titre + notes par photo
+    captionModal.value = { open: true, photos: uploaded }
   } catch (err) {
     notifyError(err.response?.data?.detail || 'Echec upload photo')
   } finally {
@@ -90,13 +102,35 @@ async function onFileChosen(e) {
   }
 }
 
+async function onFileChosen(e) {
+  const files = Array.from(e.target.files || [])
+  await uploadFiles(files)
+}
+
+async function onDrop(e) {
+  isDragOver.value = false
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
+  if (!files.length) {
+    notifyError('Glisse uniquement des fichiers image')
+    return
+  }
+  await uploadFiles(files)
+}
+
+function onDragOver(e) {
+  isDragOver.value = true
+}
+function onDragLeave() {
+  isDragOver.value = false
+}
+
 async function removePhoto(p) {
   if (!confirm('Supprimer cette photo ?')) return
   try {
     await deleteSiteDocument(p.id)
     await refresh()
     emit('changed')
-  } catch (err) {
+  } catch {
     notifyError('Echec suppression')
   }
 }
@@ -105,11 +139,32 @@ function thumbUrl(p) {
   return getSiteDocumentDownloadUrl(p.id)
 }
 
+async function saveCaptions() {
+  // Sauvegarde uniquement les photos dont le titre a change ou qui ont des notes
+  try {
+    for (const p of captionModal.value.photos) {
+      const updates = {}
+      if (p.title) updates.title = p.title
+      // Pas de champ 'notes' sur site_documents — on ne propage que le titre.
+      // (les notes du contexte parent sont sur la zone/systeme/etc)
+      if (Object.keys(updates).length) {
+        await updateSiteDocument(p.id, updates)
+      }
+    }
+    captionModal.value.open = false
+    await refresh()
+    success('Photos enregistrees')
+  } catch (err) {
+    notifyError('Sauvegarde des libelles impossible')
+  }
+}
+
 const btnCls = computed(() => {
-  const base = 'inline-flex items-center gap-1 rounded-md border transition'
+  const base = 'inline-flex items-center gap-1 rounded-md border transition-all'
   const size = props.size === 'md'
     ? 'px-2.5 py-1 text-xs'
     : 'px-2 py-0.5 text-[11px]'
+  if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300 scale-105`
   const tone = photos.value.length
     ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
     : 'border-gray-300 text-gray-600 hover:bg-gray-50'
@@ -122,11 +177,16 @@ const btnCls = computed(() => {
     <button
       type="button"
       :class="btnCls"
-      :title="label ? `Photos - ${label}` : 'Photos'"
+      :title="label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos'"
       @click="showGallery = !showGallery"
+      @dragover.prevent="onDragOver"
+      @dragenter.prevent="onDragOver"
+      @dragleave.prevent="onDragLeave"
+      @drop.prevent="onDrop"
     >
       <CameraIcon class="w-4 h-4" />
       <span v-if="photos.length" class="font-medium">{{ photos.length }}</span>
+      <span v-if="isDragOver" class="font-medium text-[10px]">+ deposer</span>
     </button>
 
     <input
@@ -159,12 +219,12 @@ const btnCls = computed(() => {
 
       <div v-if="loading" class="text-center text-xs text-gray-500 py-3">Chargement…</div>
       <div v-else-if="!photos.length" class="text-center text-xs text-gray-500 py-3 italic">
-        Aucune photo. Clique sur <strong>+ Ajouter</strong> pour en prendre / televerser.
+        Aucune photo. Glisse des images sur l'icone ou clique sur <strong>+ Ajouter</strong>.
       </div>
       <div v-else class="grid grid-cols-3 gap-1.5">
         <div v-for="p in photos" :key="p.id" class="relative group">
           <a :href="thumbUrl(p)" target="_blank" class="block">
-            <img :src="thumbUrl(p)" :alt="p.original_name"
+            <img :src="thumbUrl(p)" :alt="p.title || p.original_name"
                  class="w-full h-16 object-cover rounded border border-gray-200" />
           </a>
           <button
@@ -174,6 +234,7 @@ const btnCls = computed(() => {
           >
             <TrashIcon class="w-3 h-3" />
           </button>
+          <p v-if="p.title" class="text-[9px] text-gray-500 truncate mt-0.5" :title="p.title">{{ p.title }}</p>
         </div>
       </div>
 
@@ -181,6 +242,67 @@ const btnCls = computed(() => {
         @click="showGallery = false"
         class="mt-2 w-full text-[11px] text-gray-500 hover:text-gray-700"
       >Fermer</button>
+    </div>
+
+    <!-- Modal captions apres upload -->
+    <div
+      v-if="captionModal.open"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      @click.self="captionModal.open = false"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-semibold text-gray-900">
+              {{ captionModal.photos.length }} photo{{ captionModal.photos.length > 1 ? 's' : '' }} televersee{{ captionModal.photos.length > 1 ? 's' : '' }}
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Ajoute un titre court a chaque photo (visible dans le PDF d'audit).
+              {{ label ? `Contexte : ${label}.` : '' }}
+            </p>
+          </div>
+          <button @click="captionModal.open = false" class="p-1 rounded hover:bg-gray-100 text-gray-500">
+            <XMarkIcon class="w-5 h-5" />
+          </button>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-4">
+          <div
+            v-for="(p, idx) in captionModal.photos"
+            :key="p.id"
+            class="flex items-start gap-4 p-3 border border-gray-200 rounded-lg"
+          >
+            <img :src="p.dataUrl" :alt="p.title"
+                 class="w-32 h-24 object-cover rounded border border-gray-200 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <label class="block text-xs font-medium text-gray-700 mb-1">
+                Titre <span class="text-gray-400">({{ idx + 1 }} / {{ captionModal.photos.length }})</span>
+              </label>
+              <input
+                v-model="p.title"
+                type="text"
+                placeholder="ex : Vue d'ensemble armoire electrique"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <footer class="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2 bg-gray-50">
+          <button
+            @click="captionModal.open = false"
+            class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            Plus tard
+          </button>
+          <button
+            @click="saveCaptions"
+            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition shadow-sm"
+          >
+            Enregistrer
+          </button>
+        </footer>
+      </div>
     </div>
   </div>
 </template>

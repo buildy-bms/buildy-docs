@@ -229,6 +229,8 @@ export const reorderBacsDevices = (systemId, ids) =>
 export const reorderBacsZones = (docId, ids) =>
   api.post(`/bacs-audit/${docId}/zones/reorder`, { ids })
 export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
+export const validateBacsAuditStep = (docId, step, validated) =>
+  api.post(`/bacs-audit/${docId}/validate-step`, { step, validated })
 
 // ── Site documents (DOE) ──
 export const listSiteDocuments = (siteUuid, params) =>

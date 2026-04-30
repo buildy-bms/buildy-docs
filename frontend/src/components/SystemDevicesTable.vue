@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, PlusIcon, CameraIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -24,7 +24,12 @@ const props = defineProps({
   systemLabel: { type: String, required: true },
   siteUuid: { type: String, default: null },
 })
-const emit = defineEmits(['changed', 'system-updated'])
+const emit = defineEmits(['changed', 'system-updated', 'open-device-notes'])
+
+function hasNotes(htmlOrText) {
+  if (!htmlOrText) return false
+  return !!String(htmlOrText).replace(/<[^>]*>/g, '').trim()
+}
 
 const { error } = useNotification()
 const { confirm } = useConfirm()
@@ -288,10 +293,19 @@ async function removeDevice(d) {
                    @change="e => patchDevice(d, { meets_r175_3_p4_autonomous: e.target.checked })"
                    class="rounded border-gray-300" />
           </td>
-          <td class="py-1 px-1">
-            <input type="text" :value="d.notes" placeholder="Notes"
-                   @blur="e => e.target.value !== (d.notes || '') && patchDevice(d, { notes: e.target.value || null })"
-                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
+          <td class="py-1 px-1 text-center">
+            <button
+              type="button"
+              @click="emit('open-device-notes', d)"
+              :class="['inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border transition',
+                hasNotes(d.notes_html || d.notes)
+                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                  : 'border-gray-300 text-gray-500 hover:bg-gray-50']"
+              :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter des notes'"
+            >
+              <PencilSquareIcon class="w-3.5 h-3.5" />
+              {{ hasNotes(d.notes_html || d.notes) ? 'Notes' : '+ Notes' }}
+            </button>
           </td>
           <td class="py-1 px-1 text-center">
             <input type="checkbox" :checked="!!d.out_of_service"

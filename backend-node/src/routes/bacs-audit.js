@@ -981,6 +981,56 @@ async function routes(fastify) {
       pdf_download_url: exportData.download_url,
     };
   });
+
+  // ─── Stepper progression (v2.9) ────────────────────────────────────
+  // 9 etapes manuelles a valider par l'auditeur :
+  //   identification, zones, systems, meters, thermal, bms, documents,
+  //   credentials, review.
+  const AUDIT_STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review'];
+
+  fastify.post('/bacs-audit/:documentId/validate-step', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+    const schema = z.object({
+      step: z.enum(AUDIT_STEPS),
+      validated: z.boolean(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    let progress = {};
+    try { progress = JSON.parse(af.audit_progress || '{}'); }
+    catch { progress = {}; }
+
+    if (body.validated) {
+      progress[body.step] = {
+        validated: true,
+        validated_at: new Date().toISOString(),
+        validated_by: request.authUser?.id || null,
+      };
+    } else {
+      delete progress[body.step];
+    }
+
+    db.db.prepare('UPDATE afs SET audit_progress = ? WHERE id = ?')
+      .run(JSON.stringify(progress), documentId);
+
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: body.validated ? 'bacs_audit.step.validate' : 'bacs_audit.step.invalidate',
+      payload: { document_id: documentId, step: body.step },
+    });
+
+    const validatedCount = AUDIT_STEPS.filter(s => progress[s]?.validated).length;
+    return {
+      audit_progress: progress,
+      validated_count: validatedCount,
+      total_steps: AUDIT_STEPS.length,
+      completion_percent: Math.round((validatedCount / AUDIT_STEPS.length) * 100),
+    };
+  });
 }
 
 module.exports = routes;

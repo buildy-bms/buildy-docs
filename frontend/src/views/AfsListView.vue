@@ -47,6 +47,15 @@ watch([sortBy, sortDir, groupBy], () => {
   localStorage.setItem('afs-sort-dir', sortDir.value)
   localStorage.setItem('afs-group-by', groupBy.value)
 })
+// Progression du stepper BACS (9 etapes a valider) pour la liste
+function bacsProgress(af) {
+  let progress = {}
+  try { progress = JSON.parse(af.audit_progress || '{}') } catch { progress = {} }
+  const STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review']
+  const count = STEPS.filter(s => progress[s]?.validated).length
+  return { count, percent: Math.round((count / STEPS.length) * 100) }
+}
+
 function toggleSort(col) {
   if (sortBy.value === col) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   else { sortBy.value = col; sortDir.value = 'asc' }
@@ -392,6 +401,16 @@ onMounted(refresh)
                 <p v-if="row.af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
                   <MapPinIcon class="w-3 h-3 shrink-0" />{{ row.af.site_address }}
                 </p>
+                <!-- Barre de progression stepper pour les audits BACS -->
+                <div v-if="(row.af.kind || 'af') === 'bacs_audit'" class="mt-1.5 flex items-center gap-2">
+                  <div class="flex-1 max-w-45 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 transition-all"
+                         :style="{ width: bacsProgress(row.af).percent + '%' }"></div>
+                  </div>
+                  <span class="text-[10px] font-medium text-gray-600 whitespace-nowrap">
+                    {{ bacsProgress(row.af).count }} / 9 étapes
+                  </span>
+                </div>
               </td>
               <td class="px-4 py-2.5"><StatusBadge :status="row.af.status" /></td>
               <td class="px-4 py-2.5">

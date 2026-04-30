@@ -17,6 +17,7 @@ import {
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice,
+  validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
@@ -24,6 +25,7 @@ import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import NotesEditorModal from '@/components/NotesEditorModal.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -175,6 +177,8 @@ async function refresh() {
     bms.value = b.data || {}
     thermal.value = t.data
     actionItems.value = a.data
+    try { auditProgress.value = JSON.parse(d.data.audit_progress || '{}') }
+    catch { auditProgress.value = {} }
     if (d.data.site_id) {
       const z = await listZones(d.data.site_id)
       zones.value = z.data
@@ -184,6 +188,8 @@ async function refresh() {
     ])
     devices.value = dev.data
     powerSummary.value = ps.data
+    // Counts pour les etapes 'documents' et 'credentials' du stepper
+    refreshSiteCounts()
   } catch (e) {
     error('Échec du chargement de l\'audit BACS')
   } finally {
@@ -290,6 +296,117 @@ async function removeZone(z) {
     success('Zone supprimée')
   } catch {
     error('Suppression impossible')
+  }
+}
+
+// ── Stepper (9 etapes a valider manuellement) ──
+const auditProgress = ref({})
+const activeStepKey = ref(null)
+const siteDocCounts = ref({ doe: 0, photo: 0 })
+const siteCredCount = ref(0)
+
+async function refreshSiteCounts() {
+  if (!document.value?.site_uuid) return
+  try {
+    const [{ data: docs }, { data: creds }] = await Promise.all([
+      listSiteDocuments(document.value.site_uuid),
+      listSiteCredentials(document.value.site_uuid),
+    ])
+    siteDocCounts.value = {
+      doe: (docs || []).filter(d => d.category !== 'photo').length,
+      photo: (docs || []).filter(d => d.category === 'photo').length,
+    }
+    siteCredCount.value = (creds || []).length
+  } catch { /* silencieux */ }
+}
+
+const STEP_DEFINITIONS = [
+  { key: 'identification',
+    label: 'Identification',
+    description: 'Site et applicabilite R175-2 renseignes.',
+    isComplete: () => !!site.value && !!document.value?.bacs_applicability_status },
+  { key: 'zones',
+    label: 'Zones',
+    description: 'Au moins une zone fonctionnelle saisie.',
+    isComplete: () => zones.value.length > 0 },
+  { key: 'systems',
+    label: 'Systemes',
+    description: 'Au moins un systeme present avec un equipement saisi.',
+    isComplete: () => systems.value.some(s => s.present && devices.value.some(d => d.system_id === s.id)) },
+  { key: 'meters',
+    label: 'Compteurs',
+    description: 'Compteurs requis revus (presents/absents/HS coches).',
+    isComplete: () => meters.value.length > 0 && meters.value.some(m => m.present_actual !== null) },
+  { key: 'thermal',
+    label: 'Régulation thermique',
+    description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
+    isComplete: () => thermal.value.length > 0 },
+  { key: 'bms',
+    label: 'GTB',
+    description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
+    isComplete: () => !!bms.value?.existing_solution },
+  { key: 'documents',
+    label: 'Documents',
+    description: 'Plans, schemas, datasheets et manuels deposes.',
+    isComplete: () => siteDocCounts.value.doe > 0 },
+  { key: 'credentials',
+    label: 'Credentials',
+    description: 'Acces web/SSH/VPN aux GTB et systemes renseignes.',
+    isComplete: () => siteCredCount.value > 0 },
+  { key: 'review',
+    label: 'Plan & livraison',
+    description: 'Plan de mise en conformite relu et annote commercialement.',
+    isComplete: () => actionItems.value.every(a => a.estimated_effort || a.status !== 'open') },
+]
+
+const stepperSteps = computed(() => STEP_DEFINITIONS.map(def => {
+  const p = auditProgress.value?.[def.key] || {}
+  return {
+    key: def.key,
+    label: def.label,
+    description: def.description,
+    complete: def.isComplete(),
+    validated: !!p.validated,
+    validated_at: p.validated_at || null,
+  }
+}))
+
+async function validateStep(stepKey) {
+  try {
+    const { data } = await validateBacsAuditStep(docId, stepKey, true)
+    auditProgress.value = data.audit_progress || {}
+    success(`Etape "${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label}" validee`)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Validation impossible')
+  }
+}
+
+async function invalidateStep(stepKey) {
+  try {
+    const { data } = await validateBacsAuditStep(docId, stepKey, false)
+    auditProgress.value = data.audit_progress || {}
+  } catch (e) {
+    error('Annulation impossible')
+  }
+}
+
+function onStepClick(key) {
+  activeStepKey.value = activeStepKey.value === key ? null : key
+  // Scroll vers la section correspondante
+  const targetId = {
+    identification: 'section-identification',
+    zones: 'section-zones',
+    systems: 'section-systems',
+    meters: 'section-meters',
+    thermal: 'section-thermal',
+    bms: 'section-bms',
+    documents: 'section-documents',
+    credentials: 'section-credentials',
+    review: 'section-review',
+  }[key]
+  if (targetId) {
+    const el = window.document.getElementById(targetId)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -576,6 +693,15 @@ onMounted(refresh)
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
     <div v-else class="space-y-6">
+      <!-- Stepper progression (9 etapes a valider manuellement) -->
+      <BacsAuditStepper
+        :steps="stepperSteps"
+        :active-step-key="activeStepKey"
+        @step-click="onStepClick"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
+
       <!-- Synthese severities -->
       <div class="grid grid-cols-3 gap-3">
         <div v-for="sev in ['blocking','major','minor']" :key="sev"
@@ -587,7 +713,7 @@ onMounted(refresh)
       </div>
 
       <!-- 1. Identification + Applicabilité R175-2 -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-identification" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
@@ -650,7 +776,7 @@ onMounted(refresh)
       </section>
 
       <!-- 2. Zones fonctionnelles (R175-1 §6) — editable in-situ -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-zones" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <MapPinIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
@@ -746,7 +872,7 @@ onMounted(refresh)
       </section>
 
       <!-- Systemes par zone (R175-1 §4) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-systems" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 flex-wrap">
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
@@ -806,6 +932,13 @@ onMounted(refresh)
                   :site-uuid="document?.site_uuid"
                   @changed="refreshAuditData"
                   @system-updated="patch => patchSystem(s, patch)"
+                  @open-device-notes="d => openNotesModal({
+                    title: 'Notes equipement',
+                    contextLabel: (d.name || 'Equipement') + ' - ' + (SYSTEM_LABEL[s.system_category] || s.system_category) + ' / ' + g.zone_name,
+                    entityType: 'device',
+                    entityRef: d,
+                    currentHtml: d.notes_html || d.notes || ''
+                  })"
                 />
               </div>
             </div>
@@ -817,7 +950,7 @@ onMounted(refresh)
       </section>
 
       <!-- 4. Compteurs et mesurage (R175-3 §1) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-meters" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <BoltIcon class="w-5 h-5 text-emerald-600" />
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
@@ -949,7 +1082,7 @@ onMounted(refresh)
       </section>
 
       <!-- Régulation thermique (R175-6) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-thermal" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <FireIcon class="w-5 h-5 text-red-500" />
           <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
@@ -1005,7 +1138,7 @@ onMounted(refresh)
       </section>
 
       <!-- GTB / GTC (R175-3 / R175-4 / R175-5) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-bms" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
           <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
@@ -1222,7 +1355,7 @@ onMounted(refresh)
       </section>
 
       <!-- 9. Documents du site (DOE) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-documents" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
           <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
@@ -1241,7 +1374,7 @@ onMounted(refresh)
       </section>
 
       <!-- 10. Credentials du site (accès) -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-credentials" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
           <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
@@ -1260,7 +1393,7 @@ onMounted(refresh)
       </section>
 
       <!-- Plan de mise en conformité -->
-      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+      <section id="section-review" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />

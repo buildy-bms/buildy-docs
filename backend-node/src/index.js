@@ -63,9 +63,16 @@ async function main() {
   });
 
   await fastify.register(require('@fastify/rate-limit'), {
-    max: 100,
+    max: 300,
     timeWindow: '1 minute',
-    allowList: ['127.0.0.1'],
+    // On exclut les assets statiques (chunks JS/CSS, logo, fonts, /assets/*)
+    // pour eviter de declencher 429 sur le chargement initial de la SPA qui
+    // demande facilement >100 fichiers en une rafale.
+    allowList: (req) => {
+      if (req.ip === '127.0.0.1' || req.ip === '::1') return true;
+      const url = req.url || '';
+      return !url.startsWith('/api/');
+    },
   });
 
   // Health check (no auth)

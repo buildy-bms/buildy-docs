@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 47;
+const TARGET_VERSION = 48;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1876,6 +1876,18 @@ function runMigrations() {
     `);
     db.pragma('user_version = 47');
     log.info('Migration 47 appliquee : notes_html + zone/meter FK sur site_documents');
+  }
+
+  if (current < 48) {
+    // Cf retour Kevin v2.9 : ajout d'un stepper dans la fiche audit BACS
+    // (chaque etape est validee manuellement par l'auditeur). On stocke
+    // l'etat de progression dans une colonne JSON dediee sur la table afs :
+    //   { zones: { validated: true, validated_at: '2026-04-30T...' }, ... }
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN audit_progress TEXT DEFAULT '{}';
+    `);
+    db.pragma('user_version = 48');
+    log.info('Migration 48 appliquee : afs.audit_progress (stepper BACS)');
   }
 
   if (current > TARGET_VERSION) {
