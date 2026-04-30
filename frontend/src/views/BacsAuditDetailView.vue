@@ -58,6 +58,24 @@ const ZONE_NATURES = [
 ]
 const newZone = ref({ name: '', nature: null })
 
+// Compteurs (R175-3 §1)
+const METER_USAGES = [
+  { value: 'heating', label: 'Chauffage' },
+  { value: 'cooling', label: 'Climatisation' },
+  { value: 'dhw', label: 'ECS' },
+  { value: 'pv', label: 'Production PV' },
+  { value: 'lighting', label: 'Éclairage' },
+  { value: 'other', label: 'Autre' },
+]
+const METER_TYPES = [
+  { value: 'electric', label: 'Électrique' },
+  { value: 'electric_production', label: 'Électrique production' },
+  { value: 'gas', label: 'Gaz' },
+  { value: 'water', label: 'Eau' },
+  { value: 'thermal', label: 'Thermique' },
+]
+const newMeter = ref({ zone_id: null, usage: 'heating', meter_type: 'thermal', required: true })
+
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
@@ -269,6 +287,47 @@ async function patchSystem(s, patch) {
     actionItems.value = a.data
   } catch {
     error('Sauvegarde impossible')
+  }
+}
+
+async function addMeter() {
+  if (!newMeter.value.usage || !newMeter.value.meter_type) return
+  try {
+    const { data } = await createBacsMeter(docId, {
+      zone_id: newMeter.value.zone_id || null,
+      usage: newMeter.value.usage,
+      meter_type: newMeter.value.meter_type,
+      required: newMeter.value.required,
+    })
+    meters.value.push({ ...data, zone_name: zones.value.find(z => z.zone_id === data.zone_id)?.name || null })
+    const a = await getBacsActionItems(docId)
+    actionItems.value = a.data
+    newMeter.value = { zone_id: null, usage: 'heating', meter_type: 'thermal', required: true }
+    success('Compteur ajouté')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Création compteur impossible')
+  }
+}
+
+async function patchMeter(m, patch) {
+  try {
+    const { data } = await updateBacsMeter(m.id, patch)
+    Object.assign(m, data)
+    const a = await getBacsActionItems(docId)
+    actionItems.value = a.data
+  } catch {
+    error('Sauvegarde impossible')
+  }
+}
+
+async function removeMeter(m) {
+  try {
+    await deleteBacsMeter(m.id)
+    meters.value = meters.value.filter(x => x.id !== m.id)
+    const a = await getBacsActionItems(docId)
+    actionItems.value = a.data
+  } catch {
+    error('Suppression impossible')
   }
 }
 
@@ -590,6 +649,112 @@ onMounted(refresh)
             Aucune zone définie pour ce site. Ajoute-en depuis la fiche site.
           </div>
         </div>
+      </section>
+
+      <!-- 4. Compteurs et mesurage (R175-3 §1) -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <BoltIcon class="w-5 h-5 text-emerald-600" />
+          <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
+          <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
+        </header>
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
+            <tr>
+              <th class="text-left px-5 py-2 w-44">Zone</th>
+              <th class="text-left py-2 w-32">Usage</th>
+              <th class="text-left py-2 w-40">Type</th>
+              <th class="text-left py-2 w-20">Requis</th>
+              <th class="text-left py-2 w-20">Présent</th>
+              <th class="text-left py-2 w-24">Communicant</th>
+              <th class="text-left py-2 w-32">Protocole</th>
+              <th class="text-left px-5 py-2">Notes</th>
+              <th class="text-right px-5 py-2 w-12"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="m in meters" :key="m.id" class="group">
+              <td class="px-5 py-2 text-gray-700">{{ m.zone_name || 'Compteur général' }}</td>
+              <td class="py-2 text-gray-700">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
+              <td class="py-2 text-gray-700">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
+              <td class="py-2">
+                <input type="checkbox" :checked="!!m.required"
+                       @change="e => patchMeter(m, { required: e.target.checked })"
+                       class="rounded border-gray-300" />
+              </td>
+              <td class="py-2">
+                <input type="checkbox" :checked="!!m.present_actual"
+                       @change="e => patchMeter(m, { present_actual: e.target.checked })"
+                       class="rounded border-gray-300" />
+              </td>
+              <td class="py-2">
+                <input type="checkbox" :checked="!!m.communicating" :disabled="!m.present_actual"
+                       @change="e => patchMeter(m, { communicating: e.target.checked })"
+                       class="rounded border-gray-300 disabled:opacity-30" />
+              </td>
+              <td class="py-2">
+                <select :value="m.communication_protocol" :disabled="!m.communicating"
+                        @change="e => patchMeter(m, { communication_protocol: e.target.value || null })"
+                        class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30">
+                  <option :value="null">—</option>
+                  <option value="modbus_tcp">Modbus TCP</option>
+                  <option value="modbus_rtu">Modbus RTU</option>
+                  <option value="bacnet_ip">BACnet IP</option>
+                  <option value="bacnet_mstp">BACnet MS/TP</option>
+                  <option value="knx">KNX</option>
+                  <option value="mbus">M-Bus</option>
+                  <option value="mqtt">MQTT</option>
+                  <option value="other">Autre</option>
+                </select>
+              </td>
+              <td class="px-5 py-2">
+                <input type="text" :value="m.notes" placeholder="—"
+                       @blur="e => e.target.value !== (m.notes || '') && patchMeter(m, { notes: e.target.value || null })"
+                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+              </td>
+              <td class="px-5 py-2 text-right">
+                <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+            <!-- Ligne d'ajout -->
+            <tr class="bg-indigo-50/30">
+              <td class="px-5 py-2">
+                <select v-model="newMeter.zone_id" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
+                  <option :value="null">Compteur général</option>
+                  <option v-for="z in zones" :key="z.zone_id" :value="z.zone_id">{{ z.name }}</option>
+                </select>
+              </td>
+              <td class="py-2">
+                <select v-model="newMeter.usage" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
+                  <option v-for="u in METER_USAGES" :key="u.value" :value="u.value">{{ u.label }}</option>
+                </select>
+              </td>
+              <td class="py-2">
+                <select v-model="newMeter.meter_type" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
+                  <option v-for="t in METER_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
+                </select>
+              </td>
+              <td class="py-2">
+                <input type="checkbox" v-model="newMeter.required" class="rounded border-gray-300" />
+              </td>
+              <td colspan="5" class="px-5 py-2">
+                <button @click="addMeter"
+                        class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700">
+                  + Ajouter un compteur
+                </button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot v-if="!meters.length">
+            <tr>
+              <td colspan="9" class="px-5 py-6 text-center text-xs text-gray-500">
+                Aucun compteur listé. Renseigne les compteurs requis (R175-3 §1) à mesure de la visite.
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </section>
 
       <!-- Régulation thermique (R175-6) -->
