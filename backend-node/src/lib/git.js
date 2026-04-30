@@ -269,7 +269,114 @@ async function restoreCommit(afId, sha, { userId } = {}) {
   return { touched, missing };
 }
 
+// ─── Audit BACS — snapshot a la livraison ──────────────────────────
+const BACS_SNAPSHOT_FILENAME = 'bacs-audit.json';
+
+/**
+ * Snapshot complet d'un audit BACS pour figer dans Git a la livraison :
+ * - meta document + site
+ * - zones et equipements du site (etat actuel)
+ * - toutes les tables bacs_audit_* (systems, meters, bms, thermal, action_items)
+ *
+ * Le PDF livre est copie en parallele (cf commitBacsAuditDelivery).
+ */
+function buildBacsAuditSnapshot(documentId) {
+  const af = db.afs.getById(documentId);
+  if (!af || af.kind !== 'bacs_audit') return null;
+
+  const site = af.site_id ? db.sites.getById(af.site_id) : null;
+  const zones = af.site_id ? db.zones.listBySite(af.site_id) : [];
+  const equipments = af.site_id ? db.equipments.listBySite(af.site_id) : [];
+
+  const systems = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE document_id = ? ORDER BY id').all(documentId);
+  const meters = db.db.prepare('SELECT * FROM bacs_audit_meters WHERE document_id = ? ORDER BY id').all(documentId);
+  const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
+  const thermal = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE document_id = ? ORDER BY id').all(documentId);
+  const actionItems = db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE document_id = ? ORDER BY id').all(documentId);
+
+  return {
+    schema_version: 1,
+    document: {
+      id: af.id, slug: af.slug, kind: af.kind, status: af.status, title: af.title,
+      client_name: af.client_name, project_name: af.project_name,
+      bacs_total_power_kw: af.bacs_total_power_kw,
+      bacs_applicable_deadline: af.bacs_applicable_deadline,
+      bacs_applicability_status: af.bacs_applicability_status,
+      delivered_at: af.delivered_at,
+    },
+    site,
+    zones,
+    equipments,
+    bacs_audit: { systems, meters, bms, thermal_regulation: thermal, action_items: actionItems },
+    captured_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * A la livraison d'un audit BACS :
+ * 1. Genere le PDF final (deja fait dans la route)
+ * 2. Calcule SHA256 du PDF
+ * 3. Snapshot JSON + copie du PDF dans le repo git (data/repos/<doc-id>/)
+ * 4. Commit + tag annote `bacs-audit-delivered-<YYYY-MM-DD>-<slug>[-vN]`
+ * 5. Retourne { sha256, gitTag, gitSha }
+ *
+ * Idempotent par re-livraison : si le tag existe deja, suffix -v2/-v3.
+ */
+async function commitBacsAuditDelivery(documentId, pdfPath, { author } = {}) {
+  const af = db.afs.getById(documentId);
+  if (!af || af.kind !== 'bacs_audit') {
+    throw new Error(`Document #${documentId} introuvable ou n'est pas un audit BACS`);
+  }
+  const dir = await ensureRepo(documentId);
+  const snapshot = buildBacsAuditSnapshot(documentId);
+  if (!snapshot) throw new Error('Snapshot BACS introuvable');
+
+  // 1. SHA256 du PDF
+  const crypto = require('crypto');
+  const pdfBuf = fs.readFileSync(pdfPath);
+  const sha256 = crypto.createHash('sha256').update(pdfBuf).digest('hex');
+
+  // 2. Snapshot JSON
+  fs.writeFileSync(path.join(dir, BACS_SNAPSHOT_FILENAME), JSON.stringify(snapshot, null, 2));
+  // 3. Copie PDF dans le repo (overwrite si existant)
+  const pdfRepoFilename = 'bacs-audit-delivered.pdf';
+  fs.writeFileSync(path.join(dir, pdfRepoFilename), pdfBuf);
+
+  await git.add({ fs, dir, filepath: BACS_SNAPSHOT_FILENAME });
+  await git.add({ fs, dir, filepath: pdfRepoFilename });
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const baseTag = `bacs-audit-delivered-${dateStr}-${af.slug}`;
+
+  const sha = await git.commit({
+    fs, dir,
+    message: `Livraison audit BACS — ${af.client_name} — ${af.project_name}`,
+    author: {
+      name: author?.name || 'Buildy Docs',
+      email: author?.email || 'noreply@buildy.fr',
+      timestamp: Math.floor(Date.now() / 1000),
+      timezoneOffset: -new Date().getTimezoneOffset(),
+    },
+  });
+
+  // Tag : suffixe v2/v3 si deja existant
+  let tag = baseTag;
+  let suffix = 1;
+  while (true) {
+    try { await git.tag({ fs, dir, ref: tag, object: sha }); break; }
+    catch (e) {
+      suffix++;
+      tag = `${baseTag}-v${suffix}`;
+      if (suffix > 99) throw new Error('Trop de re-livraisons pour le meme jour');
+    }
+  }
+
+  log.info(`Audit BACS #${documentId} livre — tag=${tag}, sha256=${sha256.slice(0, 12)}…`);
+  return { sha256, gitTag: tag, gitSha: sha };
+}
+
 module.exports = {
   ensureRepo, commitAf, listCommits, readSnapshotAt, diffCommits, restoreCommit,
   buildAfSnapshot,
+  buildBacsAuditSnapshot, commitBacsAuditDelivery,
 };

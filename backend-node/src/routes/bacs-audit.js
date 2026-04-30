@@ -8,6 +8,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const gitLib = require('../lib/git');
 const bacsArticlesData = require('../seeds/bacs-articles');
 const bacsAuditMethodology = require('../lib/bacs-audit-methodology');
 const bacsAuditDisclaimers = require('../lib/bacs-audit-disclaimers');
@@ -569,6 +570,69 @@ async function routes(fastify) {
       version,
       file_size_bytes: result.sizeBytes,
       download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
+    };
+  });
+
+  // ─── Livraison de l'audit ──────────────────────────────────────────
+  // Workflow simplifie : draft -> review -> delivered. Au passage delivered :
+  //   1. Genere le PDF final
+  //   2. Calcule SHA256 du PDF -> documents.delivered_pdf_sha256
+  //   3. Snapshot JSON + PDF dans le repo Git du document, tag annote
+  //   4. documents.delivered_at + delivered_git_tag remplis
+  //   5. Audit log
+  // Re-livraison : nouveau tag avec suffixe -v2/-v3 (cf lib/git.js).
+  fastify.post('/bacs-audit/:documentId/deliver', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+    const userId = request.authUser?.id;
+    const user = userId ? db.users.getById(userId) : null;
+
+    // 1. Genere le PDF final via l'endpoint export-pdf interne (re-utilise la
+    // meme logique : on duplique pas la generation, on appelle inject)
+    const pdfRes = await fastify.inject({
+      method: 'POST',
+      url: `/api/bacs-audit/${documentId}/export-pdf`,
+      headers: request.headers, // forward auth
+    });
+    if (pdfRes.statusCode !== 200) {
+      return reply.code(500).send({ detail: `Echec generation PDF : ${pdfRes.body}` });
+    }
+    const exportData = JSON.parse(pdfRes.body);
+    const exportRow = db.db.prepare('SELECT file_path FROM exports WHERE id = ?').get(exportData.id);
+    const pdfPath = exportRow.file_path;
+
+    // 2 + 3 + 4 : SHA256 + snapshot Git + tag
+    let snap;
+    try {
+      snap = await gitLib.commitBacsAuditDelivery(documentId, pdfPath, {
+        author: user ? { name: user.display_name || 'Buildy Docs', email: user.email || 'noreply@buildy.fr' } : undefined,
+      });
+    } catch (e) {
+      log.error(`commitBacsAuditDelivery a echoue pour doc #${documentId} : ${e.message}`);
+      return reply.code(500).send({ detail: `Snapshot Git echoue : ${e.message}` });
+    }
+
+    db.afs.update(documentId, {
+      status: 'livree', // FR temporaire, sera 'delivered' apres rename m37
+      deliveredAt: new Date().toISOString(),
+      deliveredPdfSha256: snap.sha256,
+      deliveredGitTag: snap.gitTag,
+      updatedBy: userId,
+    });
+
+    db.auditLog.add({
+      afId: documentId, userId, action: 'document.delivered',
+      payload: { kind: 'bacs_audit', git_tag: snap.gitTag, sha256: snap.sha256, export_id: exportData.id },
+    });
+    log.info(`Audit BACS #${documentId} livre par user #${userId} — tag=${snap.gitTag}`);
+
+    return {
+      delivered_at: new Date().toISOString(),
+      delivered_pdf_sha256: snap.sha256,
+      delivered_git_tag: snap.gitTag,
+      pdf_export_id: exportData.id,
+      pdf_download_url: exportData.download_url,
     };
   });
 }

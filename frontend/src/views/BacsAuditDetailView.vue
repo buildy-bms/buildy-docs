@@ -13,13 +13,15 @@ import {
   getBacsBms, updateBacsBms,
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
-  getBacsActionItemsCsvUrl,
+  getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
 } from '@/api'
+import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
 const router = useRouter()
 const route = useRoute()
 const { success, error } = useNotification()
+const { confirm } = useConfirm()
 
 const docId = parseInt(route.params.id, 10)
 
@@ -101,6 +103,13 @@ const itemsBySeverity = computed(() => {
   }
   return out
 })
+
+function formatDate(s) {
+  if (!s) return '—'
+  return new Date(s.replace(' ', 'T')).toLocaleDateString('fr-FR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
+}
 
 async function refresh() {
   loading.value = true
@@ -187,6 +196,40 @@ function downloadCsv() {
   window.location.href = getBacsActionItemsCsvUrl(docId)
 }
 
+const exporting = ref(false)
+async function exportPdf() {
+  exporting.value = true
+  try {
+    const { data } = await exportBacsPdf(docId)
+    success(`PDF généré (${(data.file_size_bytes / 1024).toFixed(0)} Ko)`)
+    window.location.href = data.download_url
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de l\'export PDF')
+  } finally {
+    exporting.value = false
+  }
+}
+
+const delivering = ref(false)
+async function deliver() {
+  const ok = await confirm({
+    title: 'Livrer l\'audit BACS ?',
+    message: 'Cette action génère le PDF final, calcule son SHA256 (preuve d\'intégrité) et fige le snapshot Git du document. Une re-livraison ultérieure créera un tag séparé v2/v3 ; l\'historique reste consultable.',
+    confirmLabel: 'Livrer',
+  })
+  if (!ok) return
+  delivering.value = true
+  try {
+    const { data } = await deliverBacsAudit(docId)
+    success(`Audit livré — tag Git ${data.delivered_git_tag}`)
+    refresh()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de la livraison')
+  } finally {
+    delivering.value = false
+  }
+}
+
 onMounted(refresh)
 </script>
 
@@ -208,13 +251,23 @@ onMounted(refresh)
             • Échéance R175 : {{ document.bacs_applicable_deadline }}
           </span>
         </p>
+        <p v-if="document?.delivered_at" class="text-xs text-emerald-700 mt-1 font-mono">
+          ✓ Livré le {{ formatDate(document.delivered_at) }} —
+          <span :title="document.delivered_pdf_sha256">tag {{ document.delivered_git_tag }}</span>
+        </p>
       </div>
       <div class="flex items-center gap-2">
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
           <ArrowPathIcon class="w-4 h-4" /> Régénérer le plan
         </button>
-        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
           <DocumentArrowDownIcon class="w-4 h-4" /> CSV pour devis
+        </button>
+        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60">
+          <DocumentArrowDownIcon class="w-4 h-4" /> {{ exporting ? 'Génération…' : 'Exporter PDF' }}
+        </button>
+        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60">
+          <CheckCircleIcon class="w-4 h-4" /> {{ delivering ? 'Livraison…' : 'Livrer l\'audit' }}
         </button>
       </div>
     </div>

@@ -214,6 +214,8 @@ export const regenerateBacsActionItems = (docId) =>
   api.post(`/bacs-audit/${docId}/action-items/regenerate`)
 export const getBacsActionItemsCsvUrl = (docId) =>
   `/api/bacs-audit/${docId}/action-items/export.csv`
+export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pdf`)
+export const deliverBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/deliver`)
 
 // ── Site-zones (locales Buildy Docs, attachees a un site) ──
 // Note : namespace `/site-zones` plutot que `/zones` car les routes /zones
