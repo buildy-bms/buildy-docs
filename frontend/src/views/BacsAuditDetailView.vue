@@ -19,6 +19,8 @@ import {
   getBacsDevices, getBacsPowerSummary,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
+import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
+import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -568,11 +570,11 @@ onMounted(refresh)
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
-              <th class="text-left px-5 py-2">Nom</th>
-              <th class="text-left py-2 w-48">Nature</th>
-              <th class="text-left py-2 w-24">Surface (m²)</th>
-              <th class="text-left px-5 py-2">Notes</th>
-              <th class="text-right px-5 py-2 w-12"></th>
+              <th class="text-center px-5 py-2">Nom</th>
+              <th class="text-center py-2 w-48">Nature</th>
+              <th class="text-center py-2 w-24">Surface (m²)</th>
+              <th class="text-center px-5 py-2">Notes</th>
+              <th class="text-center px-5 py-2 w-12"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -654,7 +656,7 @@ onMounted(refresh)
             </div>
             <div class="space-y-3">
               <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
-                <!-- En-tête système : présent? + communication + notes -->
+                <!-- En-tête catégorie : présent? + notes (pas de communication ici, c'est au niveau device) -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
                   <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45">
                     {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
@@ -665,12 +667,7 @@ onMounted(refresh)
                            class="rounded border-gray-300" />
                     <span class="text-gray-700">Présent</span>
                   </label>
-                  <select :value="s.communication" :disabled="!s.present"
-                          @change="e => patchSystem(s, { communication: e.target.value || null })"
-                          class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30 w-44">
-                    <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                  </select>
-                  <input type="text" :value="s.notes" placeholder="Notes" :disabled="!s.present"
+                  <input type="text" :value="s.notes" placeholder="Notes catégorie" :disabled="!s.present"
                          @blur="e => e.target.value !== (s.notes || '') && patchSystem(s, { notes: e.target.value || null })"
                          class="flex-1 text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30" />
                 </div>
@@ -702,41 +699,41 @@ onMounted(refresh)
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
-              <th class="text-left px-5 py-2 w-44">Zone</th>
-              <th class="text-left py-2 w-32">Usage</th>
-              <th class="text-left py-2 w-40">Type</th>
-              <th class="text-left py-2 w-20">Requis</th>
-              <th class="text-left py-2 w-20">Présent</th>
-              <th class="text-left py-2 w-24">Communicant</th>
-              <th class="text-left py-2 w-32">Protocole</th>
-              <th class="text-left px-5 py-2">Notes</th>
-              <th class="text-right px-5 py-2 w-12"></th>
+              <th class="text-center px-5 py-2 w-44">Zone</th>
+              <th class="text-center py-2 w-32">Usage</th>
+              <th class="text-center py-2 w-40">Type</th>
+              <th class="text-center py-2 w-20">Requis</th>
+              <th class="text-center py-2 w-20">Présent</th>
+              <th class="text-center py-2 w-24">Communicant</th>
+              <th class="text-center py-2 w-32">Protocole</th>
+              <th class="text-center px-5 py-2">Notes</th>
+              <th class="text-center px-5 py-2 w-12"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="m in meters" :key="m.id" class="group">
-              <td class="px-5 py-2 text-gray-700">{{ m.zone_name || 'Compteur général' }}</td>
-              <td class="py-2 text-gray-700">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
-              <td class="py-2 text-gray-700">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
-              <td class="py-2">
+              <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
+              <td class="py-2 text-gray-700 text-center">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
+              <td class="py-2 text-gray-700 text-center">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
+              <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.required"
                        @change="e => patchMeter(m, { required: e.target.checked })"
                        class="rounded border-gray-300" />
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.present_actual"
                        @change="e => patchMeter(m, { present_actual: e.target.checked })"
                        class="rounded border-gray-300" />
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.communicating" :disabled="!m.present_actual"
                        @change="e => patchMeter(m, { communicating: e.target.checked })"
                        class="rounded border-gray-300 disabled:opacity-30" />
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <select :value="m.communication_protocol" :disabled="!m.communicating"
                         @change="e => patchMeter(m, { communication_protocol: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30">
+                        class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30 text-center">
                   <option :value="null">—</option>
                   <option value="modbus_tcp">Modbus TCP</option>
                   <option value="modbus_rtu">Modbus RTU</option>
@@ -745,6 +742,7 @@ onMounted(refresh)
                   <option value="knx">KNX</option>
                   <option value="mbus">M-Bus</option>
                   <option value="mqtt">MQTT</option>
+                  <option value="lorawan">LoRaWAN</option>
                   <option value="other">Autre</option>
                 </select>
               </td>
@@ -808,40 +806,40 @@ onMounted(refresh)
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
-              <th class="text-left px-5 py-2">Zone</th>
-              <th class="text-left py-2 w-32">Régulation auto ?</th>
-              <th class="text-left py-2 w-40">Type de régulation</th>
-              <th class="text-left py-2 w-44">Type générateur</th>
-              <th class="text-left py-2 w-24">Âge (ans)</th>
-              <th class="text-left px-5 py-2">Notes</th>
+              <th class="text-center px-5 py-2">Zone</th>
+              <th class="text-center py-2 w-32">Régulation auto ?</th>
+              <th class="text-center py-2 w-40">Type de régulation</th>
+              <th class="text-center py-2 w-44">Type générateur</th>
+              <th class="text-center py-2 w-24">Âge (ans)</th>
+              <th class="text-center px-5 py-2">Notes</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="t in thermal" :key="t.id">
-              <td class="px-5 py-2 text-gray-700">{{ t.zone_name }}</td>
-              <td class="py-2">
+              <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
+              <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!t.has_automatic_regulation"
                        @change="e => patchThermal(t, { has_automatic_regulation: e.target.checked })"
                        class="rounded border-gray-300" />
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <select :value="t.regulation_type"
                         @change="e => patchThermal(t, { regulation_type: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded">
+                        class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
                   <option v-for="o in REGULATION_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
                 </select>
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <select :value="t.generator_type"
                         @change="e => patchThermal(t, { generator_type: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded">
+                        class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
                   <option v-for="o in GENERATOR_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
                 </select>
               </td>
-              <td class="py-2">
+              <td class="py-2 text-center">
                 <input type="number" :value="t.generator_age_years" min="0"
                        @blur="e => patchThermal(t, { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                       class="w-16 text-xs px-2 py-1 border border-gray-200 rounded" />
+                       class="w-16 text-xs px-2 py-1 border border-gray-200 rounded text-center" />
               </td>
               <td class="px-5 py-2">
                 <input type="text" :value="t.notes" placeholder="—"
@@ -912,6 +910,29 @@ onMounted(refresh)
                 Éclairage
               </label>
             </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-3">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+              Systèmes techniques intégrés à la GTB
+              <span class="font-normal normal-case text-gray-500 text-[10px]">— coche les systèmes effectivement raccordés</span>
+            </h3>
+            <div v-if="systems.length" class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <label v-for="s in systems.filter(x => x.present)" :key="s.id"
+                     class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" :checked="!!s.managed_by_bms"
+                       @change="e => patchSystem(s, { managed_by_bms: e.target.checked })"
+                       class="rounded" />
+                <span class="text-gray-700 text-xs">
+                  {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
+                  <span class="text-gray-400">— {{ s.zone_name }}</span>
+                </span>
+              </label>
+              <p v-if="!systems.some(x => x.present)" class="text-xs text-gray-400 italic col-span-2">
+                Aucun système marqué « Présent » pour l'instant.
+              </p>
+            </div>
+            <p v-else class="text-xs text-gray-400 italic">Pas de système saisi.</p>
           </div>
 
           <div class="border-t border-gray-100 pt-3">
@@ -1028,6 +1049,44 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <!-- 9. Documents du site (DOE) -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
+          <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
+          <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
+        </header>
+        <div class="px-5 py-4">
+          <SiteDocumentsManager
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :systems="systems"
+          />
+          <p v-else class="text-sm text-gray-500 italic text-center py-4">
+            L'audit n'est rattaché à aucun site.
+          </p>
+        </div>
+      </section>
+
+      <!-- 10. Credentials du site (accès) -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
+          <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
+          <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
+        </header>
+        <div class="px-5 py-4">
+          <SiteCredentialsManager
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :systems="systems"
+          />
+          <p v-else class="text-sm text-gray-500 italic text-center py-4">
+            L'audit n'est rattaché à aucun site.
+          </p>
+        </div>
       </section>
     </div>
   </div>

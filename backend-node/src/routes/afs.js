@@ -96,8 +96,11 @@ async function routes(fastify) {
   fastify.get('/afs/:id', async (request, reply) => {
     const af = db.afs.getById(parseInt(request.params.id, 10));
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const site = af.site_id ? db.sites.getById(af.site_id) : null;
     return {
       ...af,
+      site_uuid: site?.site_uuid || null,
+      site_name: site?.name || null,
       created_by_name: db.users.getById(af.created_by)?.display_name || null,
       updated_by_name: db.users.getById(af.updated_by)?.display_name || null,
       sections_count: db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE af_id = ?').get(af.id).c,

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 39;
+const TARGET_VERSION = 40;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1590,6 +1590,92 @@ function runMigrations() {
       db.pragma('user_version = 39');
       db.exec('COMMIT');
       log.info('Migration 39 appliquee : source_subtype sur bacs_audit_action_items');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  if (current < 40) {
+    // Audit BACS v2.1 — retours terrain :
+    //   - Devices : nom obligatoire (1ere position) + communication_protocol
+    //     (LoRaWAN inclus) car la communication est au niveau equipement, pas
+    //     au niveau categorie de systeme
+    //   - Devices : "regulation" ajoute aux roles possibles
+    //   - Systeme : R175-3 §4 scinde en 2 criteres distincts
+    //     (arret manuel + fonctionnement autonome) decoches par defaut
+    //   - Systeme : managed_by_bms (oui/non) pour cocher dans la GTB les
+    //     systemes effectivement integres
+    //   - Reset valeurs NULL existantes a 0 (= decoche) pour que le bouton
+    //     decoche par defaut soit l'etat de saisie initial
+    //   - Drop matrice bacs_meter_requirements_matrix : compteurs auto
+    //     desormais derives uniquement des devices saisis (energy_source +
+    //     zone du systeme parent)
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        -- 1. Devices : nom + protocole de communication
+        ALTER TABLE bacs_audit_system_devices ADD COLUMN name TEXT;
+        ALTER TABLE bacs_audit_system_devices ADD COLUMN communication_protocol TEXT
+          CHECK (communication_protocol IS NULL OR communication_protocol IN
+            ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+             'knx','mbus','mqtt','lorawan','autre','non_communicant','absent'));
+
+        -- 2. Systeme : 2 nouveaux criteres + managed_by_bms
+        ALTER TABLE bacs_audit_systems ADD COLUMN meets_r175_3_p4_autonomous INTEGER DEFAULT 0;
+        ALTER TABLE bacs_audit_systems ADD COLUMN notes_p4_autonomous TEXT;
+        ALTER TABLE bacs_audit_systems ADD COLUMN managed_by_bms INTEGER DEFAULT 0;
+
+        -- 3. Reset NULL -> 0 pour les criteres R175-3 §3 / §4 existants
+        --    (decoche par defaut, cf retour Kevin)
+        UPDATE bacs_audit_systems SET meets_r175_3_p3 = 0 WHERE meets_r175_3_p3 IS NULL;
+        UPDATE bacs_audit_systems SET meets_r175_3_p4 = 0 WHERE meets_r175_3_p4 IS NULL;
+
+        -- 4. Vide la matrice usage x nature_zone : les compteurs sont
+        --    desormais derives des devices, pas des zones
+        DELETE FROM bacs_meter_requirements_matrix;
+
+        -- 5. Etend device_role avec 'regulation' (recreate table car CHECK
+        --    contraintes ne s'editent pas in-place en SQLite < 3.35).
+        --    Preserve toutes les colonnes ajoutees ci-dessus.
+        CREATE TABLE bacs_audit_system_devices_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL DEFAULT 0,
+          name TEXT,
+          brand TEXT,
+          model_reference TEXT,
+          power_kw REAL,
+          energy_source TEXT
+            CHECK (energy_source IS NULL OR energy_source IN
+              ('gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre')),
+          device_role TEXT
+            CHECK (device_role IS NULL OR device_role IN
+              ('production','distribution','emission','regulation','autre')),
+          communication_protocol TEXT
+            CHECK (communication_protocol IS NULL OR communication_protocol IN
+              ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+               'knx','mbus','mqtt','lorawan','autre','non_communicant','absent')),
+          location TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO bacs_audit_system_devices_new
+          (id, system_id, position, name, brand, model_reference, power_kw,
+           energy_source, device_role, communication_protocol, location, notes,
+           created_at, updated_at)
+          SELECT id, system_id, position, name, brand, model_reference, power_kw,
+                 energy_source, device_role, communication_protocol, location, notes,
+                 created_at, updated_at
+          FROM bacs_audit_system_devices;
+        DROP TABLE bacs_audit_system_devices;
+        ALTER TABLE bacs_audit_system_devices_new RENAME TO bacs_audit_system_devices;
+        CREATE INDEX idx_bacs_devices_system ON bacs_audit_system_devices(system_id, position);
+      `);
+      db.pragma('user_version = 40');
+      db.exec('COMMIT');
+      log.info('Migration 40 appliquee : audit BACS v2.1 (devices.name + communication_protocol/LoRaWAN, R175-3 §4 split, managed_by_bms, matrice meters videe)');
     } catch (e) {
       db.exec('ROLLBACK');
       throw e;

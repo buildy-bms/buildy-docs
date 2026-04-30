@@ -482,20 +482,13 @@ function seedBacsRequirementsOnBoot() {
   if (created > 0) log.info(`Seed bacs_requirements_by_zone_nature : ${created} ligne(s) creee(s)`);
 }
 
-// ── Seed matrice usage x nature_zone -> meter_type (R175-3 §1) ──
-// Idempotent. Vide via migration si modification de la matrice (cf m37 pattern).
+// ── (m38-m40) Matrice usage x nature_zone -> meter_type ──
+// Note : depuis m40 cette matrice est desactivee. Les compteurs sont
+// derives uniquement des devices saisis (energy_source). On garde la
+// fonction comme no-op pour ne pas casser l'appel dans index.js.
 function seedBacsMeterRequirementsOnBoot() {
-  const matrix = require('../seeds/bacs-meter-requirements');
-  const ins = db.db.prepare(`
-    INSERT OR IGNORE INTO bacs_meter_requirements_matrix (zone_nature, usage, meter_type)
-    VALUES (?, ?, ?)
-  `);
-  let created = 0;
-  for (const row of matrix) {
-    const r = ins.run(row.zone_nature, row.usage, row.meter_type);
-    if (r.changes) created++;
-  }
-  if (created > 0) log.info(`Seed bacs_meter_requirements_matrix : ${created} ligne(s) creee(s)`);
+  // No-op depuis m40 — cf bacs-audit-action-generator.js + seeder
+  // resyncBacsAuditMetersFromDevices.
 }
 
 // ── Seed structure d'un audit BACS pour un site donne ──
@@ -611,37 +604,47 @@ function resyncBacsAuditDataForZones(documentId, zones) {
 }
 
 /**
- * Pre-remplit les compteurs requis (bacs_audit_meters) selon :
- *  - matrice bacs_meter_requirements_matrix pour les compteurs zonaux
- *  - compteur general electrique : toujours present (zone_id NULL)
- *  - compteurs generaux gaz/fuel/thermique : derives des energy_source
- *    des devices saisis dans les systemes
+ * Pre-remplit les compteurs auto-generes a partir des devices saisis.
+ * Logique (cf retour terrain Kevin) :
+ *  - Tant qu'aucun device n'est saisi pour un systeme, AUCUN compteur
+ *    n'est cree pour cette zone+categorie (eviter le bruit).
+ *  - Pour chaque device avec energy_source : on derive le meter_type
+ *    correspondant (gas->gas, electric/heat_pump->electric, district_heating
+ *    ->thermal, fuel_oil/wood/biomass->other, solar->electric_production).
+ *  - Compteur zonal : pose dans la zone du systeme parent du device.
+ *  - Compteur general (zone_id NULL) : 1 par energie globale du batiment
+ *    (electrique, gaz, fioul, thermique reseau).
+ *  - Idempotent : INSERT OR IGNORE via SELECT existence sur tuple
+ *    (document, zone, usage, meter_type).
+ *  - Si un device change d'energie : ancien compteur "orphelin" est laisse
+ *    en place avec required=0 (audit log conserve), nouveau compteur ajoute.
+ *    Les compteurs auto-generes n'ont pas de marqueur DB pour eviter de
+ *    purger des saisies utilisateur. Pour purger les orphelins, l'auditeur
+ *    supprime manuellement (DELETE /bacs-audit/meters/:id).
  *
- * Idempotent (INSERT OR IGNORE via tuple unique). Les compteurs ajoutes
- * ont required=1 (default). Les saisies user (present_actual, communicating,
- * notes, recommendation) sont preservees.
+ * Retourne le nombre de compteurs nouvellement inseres.
  */
 function resyncBacsAuditMetersForZones(documentId, zones) {
   let inserted = 0;
 
-  // ─── 1. Compteurs zonaux selon la matrice ──────────────────────────
-  const matrixRows = db.db.prepare(`
-    SELECT zone_nature, usage, meter_type
-    FROM bacs_meter_requirements_matrix
-  `).all();
-  const matrixByNature = new Map();
-  for (const r of matrixRows) {
-    if (!matrixByNature.has(r.zone_nature)) matrixByNature.set(r.zone_nature, []);
-    matrixByNature.get(r.zone_nature).push({ usage: r.usage, meter_type: r.meter_type });
-  }
+  // Mapping energie -> usage du compteur
+  const ENERGY_TO_USAGE = {
+    gas: { meter_type: 'gas', usage: 'heating' },          // gaz = chaudiere/chauffage
+    electric: { meter_type: 'electric', usage: 'heating' }, // electrique en chauffage = effet Joule, en cooling = clim
+    heat_pump: { meter_type: 'electric', usage: 'heating' },
+    wood: { meter_type: 'other', usage: 'heating' },
+    biomass: { meter_type: 'other', usage: 'heating' },
+    fuel_oil: { meter_type: 'other', usage: 'heating' },
+    district_heating: { meter_type: 'thermal', usage: 'heating' },
+    solar: { meter_type: 'electric_production', usage: 'pv' },
+  };
+  // Mapping general (compteur energie primaire au niveau batiment)
+  const ENERGY_TO_GENERAL = {
+    gas: { meter_type: 'gas', notes: 'Compteur general gaz du batiment' },
+    fuel_oil: { meter_type: 'other', notes: 'Compteur general fioul du batiment' },
+    district_heating: { meter_type: 'thermal', notes: 'Compteur general thermique (reseau de chaleur)' },
+  };
 
-  // INSERT OR IGNORE sur (document_id, zone_id, usage, meter_type) — pas de
-  // contrainte UNIQUE sur la table donc on filtre via SELECT existence
-  const insMeter = db.db.prepare(`
-    INSERT INTO bacs_audit_meters
-      (document_id, zone_id, usage, meter_type, required, present_actual, communicating)
-    VALUES (?, ?, ?, ?, 1, 0, 0)
-  `);
   const findExistingZonal = db.db.prepare(`
     SELECT 1 FROM bacs_audit_meters
     WHERE document_id = ? AND zone_id = ? AND usage = ? AND meter_type = ?
@@ -650,47 +653,62 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     SELECT 1 FROM bacs_audit_meters
     WHERE document_id = ? AND zone_id IS NULL AND usage = ? AND meter_type = ?
   `);
+  const insZonal = db.db.prepare(`
+    INSERT INTO bacs_audit_meters
+      (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
+    VALUES (?, ?, ?, ?, 1, 0, 0, ?)
+  `);
+  const insGeneral = db.db.prepare(`
+    INSERT INTO bacs_audit_meters
+      (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
+    VALUES (?, NULL, 'other', ?, 1, 0, 0, ?)
+  `);
 
-  for (const z of zones) {
-    const reqs = z.nature ? (matrixByNature.get(z.nature) || []) : [];
-    for (const r of reqs) {
-      if (findExistingZonal.get(documentId, z.zone_id, r.usage, r.meter_type)) continue;
-      insMeter.run(documentId, z.zone_id, r.usage, r.meter_type);
-      inserted++;
-    }
-  }
+  // Recupere tous les devices avec leur zone parent
+  const devices = db.db.prepare(`
+    SELECT d.id, d.energy_source, s.zone_id, s.system_category, z.name AS zone_name
+    FROM bacs_audit_system_devices d
+    JOIN bacs_audit_systems s ON s.id = d.system_id
+    LEFT JOIN zones z ON z.zone_id = s.zone_id
+    WHERE s.document_id = ? AND d.energy_source IS NOT NULL
+  `).all(documentId);
 
-  // ─── 2. Compteur general electrique (toujours obligatoire) ─────────
-  if (!findExistingGeneral.get(documentId, 'other', 'electric')) {
-    db.db.prepare(`
-      INSERT INTO bacs_audit_meters
-        (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
-      VALUES (?, NULL, 'other', 'electric', 1, 0, 0, ?)
-    `).run(documentId, 'Compteur general electrique du batiment');
+  // 1. Compteurs zonaux : 1 par (zone, meter_type, usage) selon les devices
+  const zonalSeen = new Set();
+  for (const d of devices) {
+    const map = ENERGY_TO_USAGE[d.energy_source];
+    if (!map || !d.zone_id) continue;
+    // Force usage par categorie de systeme (heating/cooling/dhw/lighting/pv/other)
+    const usage = ['heating','cooling','dhw','lighting','electricity_production'].includes(d.system_category)
+      ? (d.system_category === 'electricity_production' ? 'pv' :
+         d.system_category === 'lighting_indoor' || d.system_category === 'lighting_outdoor' ? 'lighting' :
+         d.system_category)
+      : map.usage;
+    const key = `${d.zone_id}:${usage}:${map.meter_type}`;
+    if (zonalSeen.has(key)) continue;
+    zonalSeen.add(key);
+    if (findExistingZonal.get(documentId, d.zone_id, usage, map.meter_type)) continue;
+    insZonal.run(
+      documentId, d.zone_id, usage, map.meter_type,
+      `Compteur ${map.meter_type} en zone « ${d.zone_name || '?'} » (${usage})`,
+    );
     inserted++;
   }
 
-  // ─── 3. Compteurs generaux selon energy_source des devices ─────────
-  const energyToMeter = {
-    gas: { meter_type: 'gas', notes: 'Compteur general gaz du batiment' },
-    fuel_oil: { meter_type: 'other', notes: 'Compteur general fioul du batiment' },
-    district_heating: { meter_type: 'thermal', notes: 'Compteur general thermique (reseau de chaleur)' },
-  };
-  const energyRows = db.db.prepare(`
-    SELECT DISTINCT d.energy_source
-    FROM bacs_audit_system_devices d
-    JOIN bacs_audit_systems s ON s.id = d.system_id
-    WHERE s.document_id = ? AND d.energy_source IS NOT NULL
-  `).all(documentId);
-  for (const r of energyRows) {
-    const map = energyToMeter[r.energy_source];
+  // 2. Compteurs generaux du batiment : 1 par energie primaire
+  const generalEnergies = new Set(devices.map(d => d.energy_source));
+  // Compteur general electrique : si AU MOINS 1 device electrique/PAC/solar
+  // (ou si AU MOINS 1 device tout court pour respecter la regle "compteur
+  // general electrique toujours obligatoire des qu'il y a un audit serieux")
+  if (devices.length > 0 && !findExistingGeneral.get(documentId, 'other', 'electric')) {
+    insGeneral.run(documentId, 'electric', 'Compteur general electrique du batiment');
+    inserted++;
+  }
+  for (const energy of generalEnergies) {
+    const map = ENERGY_TO_GENERAL[energy];
     if (!map) continue;
     if (findExistingGeneral.get(documentId, 'other', map.meter_type)) continue;
-    db.db.prepare(`
-      INSERT INTO bacs_audit_meters
-        (document_id, zone_id, usage, meter_type, required, present_actual, communicating, notes)
-      VALUES (?, NULL, 'other', ?, 1, 0, 0, ?)
-    `).run(documentId, map.meter_type, map.notes);
+    insGeneral.run(documentId, map.meter_type, map.notes);
     inserted++;
   }
 

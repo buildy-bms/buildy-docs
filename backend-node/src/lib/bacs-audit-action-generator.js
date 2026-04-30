@@ -117,14 +117,26 @@ function computeTargetActions(documentId) {
       });
     }
 
-    // R175-3 §4 — arrêt manuel + fonctionnement autonome par système
+    // R175-3 §4 — arret manuel par systeme
     if (s.meets_r175_3_p4 === 0) {
       addTarget({
         source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p4',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §4',
-        title: `Permettre l'arrêt manuel + reprise autonome du ${catFr}${zoneStr}`,
-        description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement le système, et que la GTB reprenne ensuite la main de manière autonome.`,
+        title: `Permettre l'arrêt manuel du ${catFr}${zoneStr}`,
+        description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement le système.`,
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
+
+    // R175-3 §4 — fonctionnement autonome par systeme (case distincte)
+    if (s.meets_r175_3_p4_autonomous === 0) {
+      addTarget({
+        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p4_autonomous',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §4',
+        title: `Activer le fonctionnement autonome du ${catFr}${zoneStr}`,
+        description: `R175-3 §4 exige que la GTB reprenne automatiquement la main sur le système après un arrêt manuel et le pilote de manière autonome.`,
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
     }

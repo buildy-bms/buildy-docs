@@ -63,22 +63,34 @@ async function routes(fastify) {
       notes: z.string().nullable().optional(),
       meets_r175_3_p3: z.boolean().nullable().optional(),
       meets_r175_3_p4: z.boolean().nullable().optional(),
+      meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
       notes_p3: z.string().nullable().optional(),
       notes_p4: z.string().nullable().optional(),
+      notes_p4_autonomous: z.string().nullable().optional(),
+      managed_by_bms: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
 
     const sets = [], args = [];
+    const boolField = (k) => {
+      if (k in body) {
+        sets.push(`${k} = ?`);
+        args.push(body[k] == null ? null : (body[k] ? 1 : 0));
+      }
+    };
     if (body.present !== undefined) { sets.push('present = ?'); args.push(body.present ? 1 : 0); }
     if ('communication' in body) { sets.push('communication = ?'); args.push(body.communication); }
     if ('equipment_id' in body) { sets.push('equipment_id = ?'); args.push(body.equipment_id); }
     if ('notes' in body) { sets.push('notes = ?'); args.push(body.notes); }
-    if ('meets_r175_3_p3' in body) { sets.push('meets_r175_3_p3 = ?'); args.push(body.meets_r175_3_p3 == null ? null : (body.meets_r175_3_p3 ? 1 : 0)); }
-    if ('meets_r175_3_p4' in body) { sets.push('meets_r175_3_p4 = ?'); args.push(body.meets_r175_3_p4 == null ? null : (body.meets_r175_3_p4 ? 1 : 0)); }
+    boolField('meets_r175_3_p3');
+    boolField('meets_r175_3_p4');
+    boolField('meets_r175_3_p4_autonomous');
+    boolField('managed_by_bms');
     if ('notes_p3' in body) { sets.push('notes_p3 = ?'); args.push(body.notes_p3); }
     if ('notes_p4' in body) { sets.push('notes_p4 = ?'); args.push(body.notes_p4); }
+    if ('notes_p4_autonomous' in body) { sets.push('notes_p4_autonomous = ?'); args.push(body.notes_p4_autonomous); }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
@@ -587,7 +599,8 @@ async function routes(fastify) {
 
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
   const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
-  const DEVICE_ROLES = ['production','distribution','emission','autre'];
+  const DEVICE_ROLES = ['production','distribution','emission','regulation','autre'];
+  const DEVICE_COMM = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp','knx','mbus','mqtt','lorawan','autre','non_communicant','absent'];
 
   // GET /bacs-audit/:documentId/devices — tous les devices du document, joints au système
   fastify.get('/bacs-audit/:documentId/devices', async (request, reply) => {
@@ -609,11 +622,13 @@ async function routes(fastify) {
     const sys = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(sysId);
     if (!sys) return reply.code(404).send({ detail: 'Système non trouvé' });
     const schema = z.object({
+      name: z.string().nullable().optional(),
       brand: z.string().nullable().optional(),
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
       device_role: z.enum(DEVICE_ROLES).nullable().optional(),
+      communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
     });
@@ -625,12 +640,14 @@ async function routes(fastify) {
     const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM bacs_audit_system_devices WHERE system_id = ?').get(sysId).p;
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_system_devices
-        (system_id, position, brand, model_reference, power_kw, energy_source, device_role, location, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (system_id, position, name, brand, model_reference, power_kw, energy_source,
+         device_role, communication_protocol, location, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sysId, maxPos + 10,
-      body.brand || null, body.model_reference || null, body.power_kw ?? null,
+      body.name || null, body.brand || null, body.model_reference || null, body.power_kw ?? null,
       body.energy_source || null, body.device_role || null,
+      body.communication_protocol || null,
       body.location || null, body.notes || null,
     );
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
@@ -647,15 +664,18 @@ async function routes(fastify) {
       JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
-    const schema = z.object({
+    const schemaPatch = z.object({
+      name: z.string().nullable().optional(),
       brand: z.string().nullable().optional(),
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
       device_role: z.enum(DEVICE_ROLES).nullable().optional(),
+      communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
     });
+    const schema = schemaPatch;
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
