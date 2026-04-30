@@ -10,8 +10,10 @@ const config = Object.freeze({
   logLevel: process.env.LOG_LEVEL || 'info',
   isProduction: process.env.NODE_ENV === 'production',
 
-  // Database
-  databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../data/buildy_docs.db'),
+  // Database — on garde le filename historique buildy_af.db pour ne pas casser
+  // les deploiements existants. Un script de migration data/ sera fourni si on
+  // souhaite renommer le fichier (DATABASE_PATH override possible via .env).
+  databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../data/buildy_af.db'),
   attachmentsDir: process.env.ATTACHMENTS_DIR || path.resolve(__dirname, '../../data/attachments'),
   exportsDir: process.env.EXPORTS_DIR || path.resolve(__dirname, '../../data/exports'),
   gitReposDir: process.env.GIT_REPOS_DIR || path.resolve(__dirname, '../../data/repos'),

@@ -74,7 +74,7 @@ HTTPS_CERT_PATH=$INSTALL_DIR/certs/server.crt
 HTTPS_KEY_PATH=$INSTALL_DIR/certs/server.key
 
 # Storage
-DATABASE_PATH=$INSTALL_DIR/data/buildy_docs.db
+DATABASE_PATH=$INSTALL_DIR/data/buildy_af.db
 ATTACHMENTS_DIR=$INSTALL_DIR/data/attachments
 EXPORTS_DIR=$INSTALL_DIR/data/exports
 

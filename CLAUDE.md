@@ -35,7 +35,7 @@ pm2 stop buildy-docs             # arret backend
 ## Convention chemins
 - Backend Node : `backend-node/src/{lib,routes,services}/` (meme convention FM)
 - Frontend Vue : `frontend/src/{components,views,composables,stores}/`
-- DB : `data/buildy_docs.db` (WAL)
+- DB : `data/buildy_af.db` (WAL)
 - Captures : `data/attachments/<document-id>/<uuid>.png`
 - Exports : `data/exports/<document-id>/{document,bacs-audit,points-list,brochure}-<ts>.pdf`
 - Repos Git par document : `data/repos/<document-id>/.git`
@@ -69,7 +69,7 @@ Statuts brochure : `'draft' | 'published'`
 - **Identifiants techniques en anglais** : tables, colonnes, fonctions, fichiers, routes API. Les libelles UI restent en francais avec accents.
 - **Accents francais** dans tous les textes UI : Sante, planifiee, creee, desactive, etc. (Note : ce CLAUDE.md est sans accents pour ASCII-safety, mais **le code en a**).
 - **Pas d'invention** : pour decrire Hyperveez, lire le code reel ou demander a Kevin.
-- **Proteger la DB** : `data/buildy_docs.db` est dans `.gitignore`. Jamais de mv/cp/rm pendant que le serveur tourne.
+- **Proteger la DB** : `data/buildy_af.db` est dans `.gitignore`. Jamais de mv/cp/rm pendant que le serveur tourne.
 
 ## Audit BACS — protection juridique Buildy
 - Approche fonctionnelle (R175-3) — pas de certification ISO 52120-1 obligatoire
