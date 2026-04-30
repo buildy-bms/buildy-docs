@@ -367,10 +367,12 @@ async function patchActionItem(item, patch) {
 
 async function regenerate() {
   try {
+    // Resync : ajoute les rows manquantes (systems / thermal) si la matrice
+    // nature_zone a evolue ou si des zones ont ete ajoutees au site
+    await resyncBacsAudit(docId)
     const { data } = await regenerateBacsActionItems(docId)
     success(`Régénération : +${data.added} nouvelles, ${data.updated} synchronisées, ${data.resolved} résolues`)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
+    await refreshAuditData()
   } catch {
     error('Régénération impossible')
   }

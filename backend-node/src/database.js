@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 36;
+const TARGET_VERSION = 37;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1398,6 +1398,22 @@ function runMigrations() {
       db.pragma('foreign_keys = ON');
       throw e;
     }
+  }
+
+  if (current < 37) {
+    // Refonte de la matrice bacs_requirements_by_zone_nature : exhaustive par
+    // defaut pour ne rien oublier sur le terrain. Les 6 categories R175-1 §4
+    // (chauffage, refroidissement, ventilation, ECS, eclairage interieur,
+    // production electrique) sont desormais pre-remplies pour toute zone
+    // interieure ; outdoor garde lighting_outdoor + electricity_production.
+    //
+    // On vide la table pour forcer le re-seed au boot suivant via
+    // seedBacsRequirementsOnBoot. Pour les audits BACS existants, l'auditeur
+    // doit cliquer "Regenerer le plan" (qui appelle resync + regen action
+    // items) pour ajouter les nouvelles rows aux zones deja saisies.
+    db.exec('DELETE FROM bacs_requirements_by_zone_nature');
+    db.pragma('user_version = 37');
+    log.info('Migration 37 appliquee : matrice nature_zone videe (re-seed au boot avec 6 categories par zone interieure)');
   }
 
   if (current > TARGET_VERSION) {
