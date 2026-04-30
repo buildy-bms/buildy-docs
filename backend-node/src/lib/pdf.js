@@ -10,6 +10,13 @@ const log = require('./logger').system;
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
+// boolLabel : 1 -> 'Oui', 0 -> 'Non', null/undefined -> '—'
+Handlebars.registerHelper('boolLabel', (v) => {
+  if (v === 1 || v === true) return 'Oui';
+  if (v === 0 || v === false) return 'Non';
+  return '—';
+});
+
 // Lot 31 — Libelle du contrat requis a partir du service_level d'une section
 Handlebars.registerHelper('requiredContractLabel', (level) => {
   if (!level) return 'Smart ou Premium';

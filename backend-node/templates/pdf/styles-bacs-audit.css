@@ -1,0 +1,116 @@
+/* Styles PDF audit BACS Buildy.
+ * Adopte la meme charte que styles-af.css : Inter sans-serif, indigo Buildy
+ * pour les accents, A4 portrait. */
+
+@page {
+  size: A4;
+  margin: 25mm 18mm 22mm 18mm;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 10.5pt;
+  color: #1f2937;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Page de garde */
+.cover {
+  page-break-after: always;
+  text-align: center;
+  padding: 50mm 0 0 0;
+  margin: -25mm -18mm -22mm -18mm;
+  height: calc(297mm);
+  width: calc(210mm);
+  position: relative;
+  background: white;
+  border-top: 8mm solid #4f46e5;
+}
+.cover-logo { width: 60mm; margin: 0 auto 18mm; display: block; }
+.cover-doc-type {
+  font-size: 11pt; text-transform: uppercase; letter-spacing: 0.18em;
+  color: #4f46e5; margin-bottom: 8mm; font-weight: 600;
+}
+.cover-title { font-size: 26pt; font-weight: 600; margin: 0 0 5mm; line-height: 1.2; color: #1f2937; }
+.cover-client { font-size: 14pt; margin: 0 0 3mm; color: #4b5563; }
+.cover-address { font-size: 11pt; color: #6b7280; margin: 0; }
+.cover-deadline {
+  display: inline-block; margin-top: 18mm;
+  background: #fef3c7; border: 1px solid #fcd34d;
+  padding: 4mm 8mm; border-radius: 3mm;
+  font-size: 11pt; color: #854d0e;
+  text-align: left;
+}
+.cover-deadline strong { display: block; font-size: 14pt; margin-top: 1mm; }
+
+.cover-meta {
+  position: absolute; bottom: 25mm; left: 18mm; right: 18mm;
+  font-size: 9pt; color: #9ca3af; line-height: 1.6;
+}
+
+/* Chapitres */
+h1.chapter {
+  font-size: 18pt; font-weight: 600; color: #4f46e5;
+  margin: 0 0 6mm 0; padding-bottom: 3mm;
+  border-bottom: 2px solid #4f46e5;
+  page-break-before: always;
+}
+h2 { font-size: 13pt; font-weight: 600; color: #374151; margin: 8mm 0 3mm; }
+h3 { font-size: 11pt; font-weight: 600; color: #4b5563; margin: 5mm 0 2mm; }
+
+p { margin: 0 0 3mm 0; }
+.muted { color: #6b7280; font-size: 9.5pt; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm 0; font-size: 9.5pt; }
+table th {
+  background: #f3f4f6; text-align: left; padding: 2mm 3mm;
+  font-weight: 600; text-transform: uppercase; font-size: 8.5pt;
+  letter-spacing: 0.05em; color: #6b7280;
+  border-bottom: 1px solid #d1d5db;
+}
+table td { padding: 2mm 3mm; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+table tr:nth-child(even) td { background: #fafafa; }
+
+/* Severities */
+.sev { display: inline-block; padding: 0.5mm 2mm; border-radius: 1mm;
+  font-size: 8.5pt; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; }
+.sev-blocking { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.sev-major { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+.sev-minor { background: #fef3c7; color: #854d0e; border: 1px solid #fcd34d; }
+
+/* Status pill */
+.status { display: inline-block; padding: 0.3mm 2mm; border-radius: 1mm;
+  font-size: 8.5pt; background: #e5e7eb; color: #374151; }
+.status-compliant { background: #d1fae5; color: #065f46; }
+.status-partial { background: #fef3c7; color: #854d0e; }
+.status-non-compliant { background: #fee2e2; color: #991b1b; }
+
+/* Annexes */
+.annex {
+  page-break-before: always;
+  background: #f9fafb;
+  border-left: 4px solid #4f46e5;
+  padding: 5mm 8mm 5mm 8mm;
+  margin: 0 -3mm;
+}
+.annex h1 { color: #4f46e5; font-size: 16pt; margin-top: 0; border-bottom: none; padding: 0; }
+
+.disclaimer-list { counter-reset: disc; list-style: none; padding: 0; }
+.disclaimer-list li {
+  counter-increment: disc;
+  padding-left: 8mm; position: relative;
+  margin-bottom: 3mm;
+  font-size: 9.5pt; line-height: 1.5;
+}
+.disclaimer-list li::before {
+  content: counter(disc) ".";
+  position: absolute; left: 0;
+  font-weight: 600; color: #4f46e5;
+}
+
+/* Footer (page header/footer geres par puppeteer pageNumberHTML) */

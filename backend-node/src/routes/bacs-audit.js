@@ -1,9 +1,16 @@
 'use strict';
 
+const path = require('path');
+const fs = require('fs');
 const { z } = require('zod');
+const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
+const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const bacsArticlesData = require('../seeds/bacs-articles');
+const bacsAuditMethodology = require('../lib/bacs-audit-methodology');
+const bacsAuditDisclaimers = require('../lib/bacs-audit-disclaimers');
 
 const SYSTEM_CATEGORIES = ['heating','cooling','ventilation','dhw',
   'lighting_indoor','lighting_outdoor','electricity_production'];
@@ -375,6 +382,194 @@ async function routes(fastify) {
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     reply.header('Content-Disposition', `attachment; filename="audit-bacs-${id}-actions.csv"`);
     return rows.join('\n');
+  });
+
+  // ─── Export PDF audit BACS ─────────────────────────────────────────
+  fastify.post('/bacs-audit/:documentId/export-pdf', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+
+    const userId = request.authUser?.id;
+    const user = userId ? db.users.getById(userId) : null;
+
+    // Donnees principales
+    const site = af.site_id ? db.sites.getById(af.site_id) : null;
+    const zones = site ? db.zones.listBySite(site.site_id) : [];
+    const systems = db.db.prepare(`
+      SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
+      FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+      ORDER BY z.position, z.name, s.system_category
+    `).all(documentId);
+    const meters = db.db.prepare(`
+      SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
+      LEFT JOIN zones z ON z.zone_id = m.zone_id
+      WHERE m.document_id = ?
+      ORDER BY z.position NULLS LAST, m.usage
+    `).all(documentId);
+    const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+    const thermalRaw = db.db.prepare(`
+      SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
+      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      WHERE t.document_id = ?
+      ORDER BY z.position, z.name
+    `).all(documentId);
+    const actionItemsRaw = db.db.prepare(`
+      SELECT a.*, z.name AS zone_name FROM bacs_audit_action_items a
+      LEFT JOIN zones z ON z.zone_id = a.zone_id
+      WHERE a.document_id = ? AND a.status NOT IN ('done', 'declined')
+      ORDER BY a.position, a.id
+    `).all(documentId);
+
+    // Labels d'enums (pour eviter les codes anglais bruts dans le PDF)
+    const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
+      dhw:'Eau chaude sanitaire', lighting_indoor:'Eclairage interieur',
+      lighting_outdoor:'Eclairage exterieur', electricity_production:'Production electrique' };
+    const COMM_LABEL = { modbus_tcp:'Modbus TCP', modbus_rtu:'Modbus RTU', bacnet_ip:'BACnet IP',
+      bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT',
+      autre:'Autre', non_communicant:'Non communicant', absent:'Absent' };
+    const REGULATION_LABEL = { per_room:'Par piece', per_zone:'Par zone',
+      central_only:'Centrale uniquement', none:'Aucune' };
+    const GENERATOR_LABEL = { gas:'Gaz', electric:'Effet Joule', heat_pump:'Pompe a chaleur',
+      wood_appliance:'Appareil bois (exempte R175-6)', district_heating:'Reseau de chaleur', other:'Autre' };
+    const APPLICABILITY_LABEL = {
+      subject_immediate: 'Immediate (batiment > 290 kW deja existant)',
+      subject_2025: '1er janvier 2025 (puissance > 290 kW)',
+      subject_2027: '1er janvier 2027 (puissance > 70 kW)',
+      not_subject: 'Non assujetti (puissance < 70 kW)',
+    };
+    const COMPLIANCE_LABEL = { compliant:'Conforme', partial:'Partiellement conforme', non_compliant:'Non conforme' };
+
+    // Enrichit systems et thermal avec labels
+    const enrichedSystems = systems.map(s => ({
+      ...s,
+      categoryLabel: SYSTEM_LABEL[s.system_category] || s.system_category,
+      commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
+    }));
+    // Group systems par zone
+    const systemsByZoneMap = new Map();
+    for (const s of enrichedSystems) {
+      const k = s.zone_id;
+      if (!systemsByZoneMap.has(k)) {
+        systemsByZoneMap.set(k, { zone_name: s.zone_name, zone_nature: s.zone_nature, items: [] });
+      }
+      systemsByZoneMap.get(k).items.push(s);
+    }
+    const systemsByZone = [...systemsByZoneMap.values()];
+
+    const thermal = thermalRaw.map(t => ({
+      ...t,
+      regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
+      generatorLabel: t.generator_type ? (GENERATOR_LABEL[t.generator_type] || t.generator_type) : '—',
+    }));
+
+    // Plan de mise en conformite groupe par severite
+    const actionItems = { blocking: [], major: [], minor: [] };
+    for (const a of actionItemsRaw) actionItems[a.severity]?.push(a);
+    const actionStats = {
+      blocking: actionItems.blocking.length,
+      major: actionItems.major.length,
+      minor: actionItems.minor.length,
+    };
+
+    // Justifications (Annexe C)
+    const justifications = actionItemsRaw.map(a => ({
+      title: a.title,
+      article: a.r175_article || '—',
+      source: a.source_table ? `${a.source_table} (#${a.source_id})` : 'Item manuel',
+      description: a.description || a.title,
+    }));
+
+    // Articles BACS (Annexe A) — adapte au format attendu par le template
+    const bacsArticles = bacsArticlesData.BACS_ARTICLES.map(a => ({
+      code: a.code,
+      title: a.title,
+      html: a.full_html,
+    }));
+
+    // Detection solution Buildy (pour mention R175-5 native)
+    const buildySolution = bms && /buildy/i.test(`${bms.existing_solution || ''} ${bms.existing_solution_brand || ''}`);
+
+    // Version (compteur d'exports BACS pour ce document)
+    const previousCount = db.db.prepare(`
+      SELECT COUNT(*) AS c FROM exports WHERE af_id = ? AND kind = 'pdf-bacs-audit'
+    `).get(documentId).c;
+    const version = `bacs-v${previousCount + 1}`;
+
+    const exportDate = new Date().toLocaleDateString('fr-FR', {
+      day: '2-digit', month: 'long', year: 'numeric',
+    });
+
+    const data = {
+      document: af,
+      site,
+      zones,
+      systemsByZone,
+      meters,
+      thermal,
+      bms,
+      buildySolution,
+      actionItems,
+      actionStats,
+      complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
+      applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
+      bacsArticles,
+      methodology: bacsAuditMethodology,
+      disclaimers: bacsAuditDisclaimers,
+      justifications,
+      authorName: user?.display_name || 'Buildy Docs',
+      exportDate,
+      version,
+      logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    };
+
+    // Genere le PDF
+    const exportsDir = path.resolve(config.exportsDir);
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `${af.slug}-bacs-audit-${version}-${ts}.pdf`;
+    const outputPath = path.join(exportsDir, String(documentId), filename);
+
+    let result;
+    try {
+      result = await renderPdf({
+        template: 'bacs-audit',
+        styles: 'styles-bacs-audit',
+        data,
+        outputPath,
+        pageFormat: 'A4',
+        coverFullBleed: true,
+      });
+    } catch (err) {
+      log.error(`PDF audit BACS render failed: ${err.message}`);
+      return reply.code(500).send({ detail: `Echec generation PDF : ${err.message}` });
+    }
+
+    // Insert dans exports + audit
+    const insertedRow = db.db.prepare(`
+      INSERT INTO exports (af_id, kind, file_path, sections_snapshot, options, motif, exported_by, file_size_bytes)
+      VALUES (?, 'pdf-bacs-audit', ?, ?, ?, ?, ?, ?)
+    `).run(
+      documentId, result.path,
+      JSON.stringify({ systems_count: systems.length, meters_count: meters.length,
+        actions_blocking: actionStats.blocking, actions_major: actionStats.major }),
+      JSON.stringify({ version }),
+      'Export audit BACS',
+      userId || null, result.sizeBytes,
+    );
+
+    db.auditLog.add({
+      afId: documentId, userId, action: 'export.bacs-audit',
+      payload: { version, file_size_bytes: result.sizeBytes, actions_total: actionItemsRaw.length },
+    });
+    log.info(`PDF audit BACS exported: doc #${documentId} → ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+
+    return {
+      id: insertedRow.lastInsertRowid,
+      version,
+      file_size_bytes: result.sizeBytes,
+      download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
+    };
   });
 }
 

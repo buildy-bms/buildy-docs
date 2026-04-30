@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Audit BACS — {{document.client_name}} — {{document.project_name}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Page de garde ═══════════ --}}
+<section class="cover">
+  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+  <p class="cover-doc-type">Audit BACS — Décret R175</p>
+  <h1 class="cover-title">{{document.project_name}}</h1>
+  <p class="cover-client">{{document.client_name}}</p>
+  {{#if site.address}}<p class="cover-address">{{site.address}}</p>{{/if}}
+
+  {{#if applicabilityLabel}}
+  <div class="cover-deadline">
+    Échéance R175-2 applicable
+    <strong>{{applicabilityLabel}}</strong>
+  </div>
+  {{/if}}
+
+  <div class="cover-meta">
+    Audit réalisé le {{exportDate}} par {{authorName}}<br/>
+    Version {{version}}
+  </div>
+</section>
+
+{{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
+<h1 class="chapter">1. Identification du site</h1>
+<table>
+  <tr><th>Site</th><td>{{site.name}}</td></tr>
+  <tr><th>Client</th><td>{{document.client_name}}</td></tr>
+  <tr><th>Adresse</th><td>{{site.address}}</td></tr>
+  {{#if document.bacs_total_power_kw}}
+  <tr><th>Puissance cumulée chauffage + climatisation</th><td>{{document.bacs_total_power_kw}} kW</td></tr>
+  {{/if}}
+  {{#if document.bacs_building_permit_date}}
+  <tr><th>Date de permis de construire</th><td>{{document.bacs_building_permit_date}}</td></tr>
+  {{/if}}
+  {{#if applicabilityLabel}}
+  <tr><th>Applicabilité BACS (R175-2)</th><td>{{applicabilityLabel}}</td></tr>
+  {{/if}}
+</table>
+<p class="muted">
+  À titre informatif : l'article R175-2 prévoit une clause de dispense applicable
+  lorsque le temps de retour sur investissement de la mise en conformité dépasse
+  10 ans. Ce calcul ne relève pas du périmètre du présent audit (cf. Annexe D,
+  point 4).
+</p>
+
+{{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
+<h1 class="chapter">2. Zones fonctionnelles (R175-1 §6)</h1>
+{{#if zones.length}}
+<table>
+  <thead><tr><th>Zone</th><th>Nature</th><th>Notes</th></tr></thead>
+  <tbody>
+    {{#each zones}}
+      <tr><td>{{name}}</td><td>{{nature}}</td><td>{{notes}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">Aucune zone définie.</p>
+{{/if}}
+
+{{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
+<h1 class="chapter">3. Systèmes techniques par zone (R175-1 §4)</h1>
+{{#each systemsByZone}}
+<h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
+<table>
+  <thead><tr><th>Catégorie</th><th>Présent</th><th>Communication</th><th>Notes</th></tr></thead>
+  <tbody>
+    {{#each items}}
+      <tr>
+        <td>{{categoryLabel}}</td>
+        <td>{{#if present}}Oui{{else}}Non{{/if}}</td>
+        <td>{{commLabel}}</td>
+        <td>{{notes}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/each}}
+
+{{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
+<h1 class="chapter">4. Compteurs et mesurage (R175-3 §1)</h1>
+{{#if meters.length}}
+<table>
+  <thead><tr><th>Zone</th><th>Usage</th><th>Type</th><th>Requis</th><th>Présent</th><th>Communicant</th><th>Notes</th></tr></thead>
+  <tbody>
+    {{#each meters}}
+      <tr>
+        <td>{{zone_name}}</td>
+        <td>{{usage}}</td>
+        <td>{{meter_type}}</td>
+        <td>{{#if required}}Oui{{else}}Non{{/if}}</td>
+        <td>{{#if present_actual}}Oui{{else}}Non{{/if}}</td>
+        <td>{{#if communicating}}Oui{{else}}Non{{/if}}</td>
+        <td>{{notes}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">Aucun compteur listé. La matrice usage × zone reste à compléter.</p>
+{{/if}}
+
+{{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
+<h1 class="chapter">5. Régulation thermique automatique (R175-6)</h1>
+{{#if thermal.length}}
+<table>
+  <thead><tr><th>Zone</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Notes</th></tr></thead>
+  <tbody>
+    {{#each thermal}}
+      <tr>
+        <td>{{zone_name}}</td>
+        <td>{{#if has_automatic_regulation}}Oui{{else}}Non{{/if}}</td>
+        <td>{{regulationLabel}}</td>
+        <td>{{generatorLabel}}</td>
+        <td>{{#if generator_age_years}}{{generator_age_years}} ans{{/if}}</td>
+        <td>{{notes}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="muted">Régulation thermique non documentée.</p>
+{{/if}}
+
+{{!-- ═══════════ Chapitre 6 — GTB ═══════════ --}}
+<h1 class="chapter">6. Solution GTB / GTC (R175-3, R175-4, R175-5)</h1>
+{{#if bms}}
+<p>
+  <strong>Solution :</strong> {{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}<span class="muted">Non renseigné</span>{{/if}}
+  {{#if bms.existing_solution_brand}} — {{bms.existing_solution_brand}}{{/if}}
+</p>
+<h3>R175-3 — 4 exigences fonctionnelles</h3>
+<table>
+  <tr><td>P1. Suivi continu, pas horaire, conservation 5 ans</td><td>{{boolLabel bms.meets_r175_3_p1}}</td></tr>
+  <tr><td>P2. Détection des pertes d'efficacité</td><td>{{boolLabel bms.meets_r175_3_p2}}</td></tr>
+  <tr><td>P3. Interopérabilité multi-systèmes</td><td>{{boolLabel bms.meets_r175_3_p3}}</td></tr>
+  <tr><td>P4. Arrêt manuel + gestion autonome</td><td>{{boolLabel bms.meets_r175_3_p4}}</td></tr>
+</table>
+<h3>R175-4 — Vérifications périodiques</h3>
+<p>Consignes écrites de maintenance présentes : <strong>{{boolLabel bms.has_maintenance_procedures}}</strong></p>
+<h3>R175-5 — Formation de l'exploitant</h3>
+<p>Exploitant formé au paramétrage : <strong>{{boolLabel bms.operator_trained}}</strong>{{#if bms.operator_training_date}} (formation : {{bms.operator_training_date}}){{/if}}</p>
+{{#if buildySolution}}
+<p class="muted">
+  La solution déployée est Buildy : l'exigence R175-5 est nativement couverte
+  par le support utilisateur intégré (assistance contextuelle, documentation
+  embarquée, support continu). Cf. Annexe B point 8.
+</p>
+{{/if}}
+{{else}}
+<p class="muted">Évaluation de la GTB non renseignée.</p>
+{{/if}}
+
+{{!-- ═══════════ Chapitre 7 — Synthèse ═══════════ --}}
+<h1 class="chapter">7. Synthèse de conformité</h1>
+{{#if bms.overall_compliance}}
+<p>État global : <span class="status status-{{bms.overall_compliance}}">{{complianceLabel}}</span></p>
+{{/if}}
+<table>
+  <thead><tr><th>Sévérité</th><th>Nombre</th></tr></thead>
+  <tbody>
+    <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td>{{actionStats.blocking}}</td></tr>
+    <tr><td><span class="sev sev-major">Majeures</span></td><td>{{actionStats.major}}</td></tr>
+    <tr><td><span class="sev sev-minor">Mineures</span></td><td>{{actionStats.minor}}</td></tr>
+  </tbody>
+</table>
+
+{{!-- ═══════════ Chapitre 8 — Plan de mise en conformité ═══════════ --}}
+<h1 class="chapter">8. Plan de mise en conformité</h1>
+
+{{#if actionItems.blocking.length}}
+<h2>Actions bloquantes</h2>
+<p class="muted">Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.</p>
+<table>
+  <thead><tr><th>Article</th><th>Action</th><th>Zone</th><th>Description</th></tr></thead>
+  <tbody>
+    {{#each actionItems.blocking}}
+      <tr>
+        <td><span class="muted">{{r175_article}}</span></td>
+        <td>{{title}}</td>
+        <td>{{zone_name}}</td>
+        <td>{{description}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if actionItems.major.length}}
+<h2>Actions majeures</h2>
+<p class="muted">Impact direct sur les exigences fonctionnelles R175-3.</p>
+<table>
+  <thead><tr><th>Article</th><th>Action</th><th>Zone</th><th>Description</th></tr></thead>
+  <tbody>
+    {{#each actionItems.major}}
+      <tr>
+        <td><span class="muted">{{r175_article}}</span></td>
+        <td>{{title}}</td>
+        <td>{{zone_name}}</td>
+        <td>{{description}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#if actionItems.minor.length}}
+<h2>Optimisations</h2>
+<p class="muted">Bonnes pratiques, hors strict décret.</p>
+<table>
+  <thead><tr><th>Article</th><th>Action</th><th>Zone</th></tr></thead>
+  <tbody>
+    {{#each actionItems.minor}}
+      <tr>
+        <td><span class="muted">{{r175_article}}</span></td>
+        <td>{{title}}</td>
+        <td>{{zone_name}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+
+{{#unless actionItems.blocking.length}}
+{{#unless actionItems.major.length}}
+{{#unless actionItems.minor.length}}
+<p>Aucune action corrective à ce stade.</p>
+{{/unless}}
+{{/unless}}
+{{/unless}}
+
+<p style="margin-top: 8mm; padding: 4mm; background: #eef2ff; border-left: 3px solid #4f46e5; border-radius: 1mm; font-size: 10pt;">
+  Pour la mise en conformité, l'équipe commerciale Buildy se tient à votre
+  disposition pour établir un devis chiffré.
+</p>
+
+{{!-- ═══════════ Annexe A — Texte du décret ═══════════ --}}
+<section class="annex">
+  <h1>Annexe A — Décret BACS (R175-1 à R175-6)</h1>
+  {{#each bacsArticles}}
+  <h3>{{code}} — {{title}}</h3>
+  <div class="muted">{{{html}}}</div>
+  {{/each}}
+</section>
+
+{{!-- ═══════════ Annexe B — Méthodologie ═══════════ --}}
+<section class="annex">
+  <h1>Annexe B — Méthodologie et hypothèses retenues par Buildy</h1>
+  {{#each methodology}}
+  <h3>{{title}}</h3>
+  <p>{{body}}</p>
+  {{/each}}
+</section>
+
+{{!-- ═══════════ Annexe C — Justification des préconisations ═══════════ --}}
+<section class="annex">
+  <h1>Annexe C — Justification des préconisations</h1>
+  <p class="muted">Chaque action corrective listée au chapitre 8 a été générée à partir des données saisies pendant l'audit, en référence à un article précis du décret BACS. Cette annexe trace pour chaque item le raisonnement appliqué.</p>
+  {{#each justifications}}
+  <h3>{{title}}</h3>
+  <p><strong>Article visé :</strong> {{article}}</p>
+  <p><strong>Donnée audit :</strong> {{source}}</p>
+  <p><strong>Recommandation :</strong> {{description}}</p>
+  {{/each}}
+  {{#unless justifications.length}}
+  <p class="muted">Aucune action corrective générée — pas de justification à reporter.</p>
+  {{/unless}}
+</section>
+
+{{!-- ═══════════ Annexe D — Disclaimers ═══════════ --}}
+<section class="annex">
+  <h1>Annexe D — Mentions légales et disclaimers</h1>
+  <ol class="disclaimer-list">
+    {{#each disclaimers}}
+    <li>{{this}}</li>
+    {{/each}}
+  </ol>
+</section>
+
+</body>
+</html>

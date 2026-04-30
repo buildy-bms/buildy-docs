@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 35;
+const TARGET_VERSION = 36;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1359,6 +1359,43 @@ function runMigrations() {
       log.info('Migration 35 appliquee : tables audit BACS (systems/meters/bms/thermal_regulation/action_items + referentiel)');
     } catch (e) {
       db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  if (current < 36) {
+    // Etend le CHECK exports.kind pour accepter 'pdf-bacs-audit' (export PDF
+    // d'audit BACS). Recreation de la table car SQLite ne permet pas de
+    // modifier un CHECK in-place. On preserve les exports historiques.
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        CREATE TABLE exports_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          kind TEXT NOT NULL CHECK (kind IN ('pdf-af', 'pdf-points-list', 'pdf-bacs-audit')),
+          file_path TEXT NOT NULL,
+          sections_snapshot TEXT,
+          options TEXT,
+          motif TEXT,
+          git_tag TEXT,
+          exported_by INTEGER REFERENCES users(id),
+          exported_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          file_size_bytes INTEGER
+        );
+        INSERT INTO exports_new SELECT * FROM exports;
+        DROP TABLE exports;
+        ALTER TABLE exports_new RENAME TO exports;
+        CREATE INDEX IF NOT EXISTS idx_exports_af ON exports(af_id, exported_at DESC);
+      `);
+      db.pragma('foreign_keys = ON');
+      db.pragma('user_version = 36');
+      db.exec('COMMIT');
+      log.info('Migration 36 appliquee : exports.kind accepte pdf-bacs-audit');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      db.pragma('foreign_keys = ON');
       throw e;
     }
   }
