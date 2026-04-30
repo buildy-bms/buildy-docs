@@ -16,6 +16,7 @@ const createZoneSchema = z.object({
   name: z.string().min(1, 'Nom requis'),
   nature: z.enum(ZONE_NATURES).nullable().optional(),
   position: z.number().int().optional(),
+  surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -23,6 +24,7 @@ const updateZoneSchema = z.object({
   name: z.string().min(1).optional(),
   nature: z.enum(ZONE_NATURES).nullable().optional(),
   position: z.number().int().optional(),
+  surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 37;
+const TARGET_VERSION = 39;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1416,6 +1416,186 @@ function runMigrations() {
     log.info('Migration 37 appliquee : matrice nature_zone videe (re-seed au boot avec 6 categories par zone interieure)');
   }
 
+  if (current < 38) {
+    // Audit BACS v2 — affinements terrain (cf plan Phase 3) :
+    //   - zones.surface_m2
+    //   - bacs_audit_system_devices : equipements individuels par catégorie x zone
+    //   - bacs_meter_requirements_matrix : matrice usage x nature_zone -> meter_type
+    //   - bacs_audit_systems.meets_r175_3_p3 / p4 (interop + arret manuel par systeme)
+    //   - bacs_audit_bms enrichie (location, model_reference, manages_*) + drop p3/p4
+    //   - site_documents : fichiers DOE par site
+    //   - site_credentials : credentials chiffres par site
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        -- 1. Surface zones (optionnelle)
+        ALTER TABLE zones ADD COLUMN surface_m2 REAL;
+
+        -- 2. Equipements individuels (multi-systemes par categorie x zone)
+        CREATE TABLE IF NOT EXISTS bacs_audit_system_devices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL DEFAULT 0,
+          brand TEXT,
+          model_reference TEXT,
+          power_kw REAL,
+          energy_source TEXT
+            CHECK (energy_source IS NULL OR energy_source IN
+              ('gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre')),
+          device_role TEXT
+            CHECK (device_role IS NULL OR device_role IN
+              ('production','distribution','emission','autre')),
+          location TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_bacs_devices_system ON bacs_audit_system_devices(system_id, position);
+
+        -- 3. Matrice usage x nature_zone -> meter_type (auto-population compteurs)
+        CREATE TABLE IF NOT EXISTS bacs_meter_requirements_matrix (
+          zone_nature TEXT NOT NULL,
+          usage TEXT NOT NULL,
+          meter_type TEXT NOT NULL,
+          PRIMARY KEY (zone_nature, usage, meter_type)
+        );
+
+        -- 4. Critères R175-3 §3 (interop) et §4 (arret manuel) par système
+        ALTER TABLE bacs_audit_systems ADD COLUMN meets_r175_3_p3 INTEGER;
+        ALTER TABLE bacs_audit_systems ADD COLUMN meets_r175_3_p4 INTEGER;
+        ALTER TABLE bacs_audit_systems ADD COLUMN notes_p3 TEXT;
+        ALTER TABLE bacs_audit_systems ADD COLUMN notes_p4 TEXT;
+
+        -- 5. GTB enrichie (location, model_reference, manages_*)
+        ALTER TABLE bacs_audit_bms ADD COLUMN location TEXT;
+        ALTER TABLE bacs_audit_bms ADD COLUMN model_reference TEXT;
+        ALTER TABLE bacs_audit_bms ADD COLUMN manages_heating INTEGER;
+        ALTER TABLE bacs_audit_bms ADD COLUMN manages_cooling INTEGER;
+        ALTER TABLE bacs_audit_bms ADD COLUMN manages_ventilation INTEGER;
+        ALTER TABLE bacs_audit_bms ADD COLUMN manages_dhw INTEGER;
+        ALTER TABLE bacs_audit_bms ADD COLUMN manages_lighting INTEGER;
+
+        -- 6. Drop bacs_audit_bms.meets_r175_3_p3 + p4 + notes_p3 + notes_p4
+        --    (descendus au niveau systeme). SQLite ne supporte pas DROP COLUMN
+        --    < 3.35 → recreate table sans ces colonnes.
+        CREATE TABLE bacs_audit_bms_new (
+          document_id INTEGER PRIMARY KEY REFERENCES afs(id) ON DELETE CASCADE,
+          existing_solution TEXT,
+          existing_solution_brand TEXT,
+          location TEXT,
+          model_reference TEXT,
+          manages_heating INTEGER,
+          manages_cooling INTEGER,
+          manages_ventilation INTEGER,
+          manages_dhw INTEGER,
+          manages_lighting INTEGER,
+          meets_r175_3_p1 INTEGER,
+          meets_r175_3_p2 INTEGER,
+          notes_p1 TEXT,
+          notes_p2 TEXT,
+          has_maintenance_procedures INTEGER,
+          notes_maintenance TEXT,
+          operator_trained INTEGER,
+          operator_training_date TEXT,
+          notes_training TEXT,
+          overall_compliance TEXT
+            CHECK (overall_compliance IS NULL OR overall_compliance IN
+              ('compliant','partial','non_compliant')),
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO bacs_audit_bms_new
+          (document_id, existing_solution, existing_solution_brand,
+           location, model_reference,
+           manages_heating, manages_cooling, manages_ventilation, manages_dhw, manages_lighting,
+           meets_r175_3_p1, meets_r175_3_p2, notes_p1, notes_p2,
+           has_maintenance_procedures, notes_maintenance,
+           operator_trained, operator_training_date, notes_training,
+           overall_compliance, updated_at)
+          SELECT
+           document_id, existing_solution, existing_solution_brand,
+           location, model_reference,
+           manages_heating, manages_cooling, manages_ventilation, manages_dhw, manages_lighting,
+           meets_r175_3_p1, meets_r175_3_p2, notes_p1, notes_p2,
+           has_maintenance_procedures, notes_maintenance,
+           operator_trained, operator_training_date, notes_training,
+           overall_compliance, updated_at
+          FROM bacs_audit_bms;
+        DROP TABLE bacs_audit_bms;
+        ALTER TABLE bacs_audit_bms_new RENAME TO bacs_audit_bms;
+
+        -- 7. Fichiers DOE rattaches au site (partages entre tous documents)
+        CREATE TABLE IF NOT EXISTS site_documents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          site_id INTEGER NOT NULL REFERENCES sites(site_id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          category TEXT NOT NULL
+            CHECK (category IN
+              ('plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
+               'datasheet','manuel_utilisateur','rapport_essais','autre')),
+          filename TEXT NOT NULL,
+          original_name TEXT,
+          size_bytes INTEGER,
+          mime_type TEXT,
+          bacs_audit_system_id INTEGER REFERENCES bacs_audit_systems(id) ON DELETE SET NULL,
+          bacs_audit_bms_document_id INTEGER REFERENCES bacs_audit_bms(document_id) ON DELETE SET NULL,
+          uploaded_by INTEGER REFERENCES users(id),
+          uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_site_documents_site ON site_documents(site_id, category);
+
+        -- 8. Credentials chiffres par site
+        CREATE TABLE IF NOT EXISTS site_credentials (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          site_id INTEGER NOT NULL REFERENCES sites(site_id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          type TEXT NOT NULL
+            CHECK (type IN ('web','ssh','vpn','snmp','rdp','autre')),
+          url TEXT,
+          username TEXT,
+          password_encrypted TEXT,
+          notes TEXT,
+          bacs_audit_system_id INTEGER REFERENCES bacs_audit_systems(id) ON DELETE SET NULL,
+          bacs_audit_bms_document_id INTEGER REFERENCES bacs_audit_bms(document_id) ON DELETE SET NULL,
+          created_by INTEGER REFERENCES users(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_site_credentials_site ON site_credentials(site_id, type);
+      `);
+      db.pragma('foreign_keys = ON');
+      db.pragma('user_version = 38');
+      db.exec('COMMIT');
+      log.info('Migration 38 appliquee : audit BACS v2 (zones.surface_m2 + system_devices + meter_requirements_matrix + R175-3 par systeme + GTB enrichie + site_documents + site_credentials)');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      db.pragma('foreign_keys = ON');
+      throw e;
+    }
+  }
+
+  if (current < 39) {
+    // source_subtype sur bacs_audit_action_items : permet plusieurs items
+    // distincts par paire (source_table, source_id), notamment pour les
+    // systems qui peuvent declencher 'absent' / 'non_communicant' /
+    // 'r175_3_p3' / 'r175_3_p4' independamment.
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        ALTER TABLE bacs_audit_action_items ADD COLUMN source_subtype TEXT;
+        DROP INDEX IF EXISTS idx_bacs_actions_source;
+        CREATE INDEX idx_bacs_actions_source
+          ON bacs_audit_action_items(document_id, source_table, source_id, source_subtype);
+      `);
+      db.pragma('user_version = 39');
+      db.exec('COMMIT');
+      log.info('Migration 39 appliquee : source_subtype sur bacs_audit_action_items');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2399,15 +2579,15 @@ const zones = {
   getById(id) {
     return db.prepare('SELECT * FROM zones WHERE zone_id = ?').get(id);
   },
-  create({ siteId, name, nature, position, notes }) {
+  create({ siteId, name, nature, position, surfaceM2, notes }) {
     const result = db.prepare(`
-      INSERT INTO zones (site_id, name, nature, position, notes)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(siteId, name, nature || null, position || 0, notes || null);
+      INSERT INTO zones (site_id, name, nature, position, surface_m2, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(siteId, name, nature || null, position || 0, surfaceM2 ?? null, notes || null);
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['name', 'nature', 'position', 'notes', 'deleted_at'];
+    const allowed = ['name', 'nature', 'position', 'surface_m2', 'notes', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;

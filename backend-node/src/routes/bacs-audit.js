@@ -61,6 +61,10 @@ async function routes(fastify) {
       communication: z.enum(COMMUNICATION_VALUES).nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
       notes: z.string().nullable().optional(),
+      meets_r175_3_p3: z.boolean().nullable().optional(),
+      meets_r175_3_p4: z.boolean().nullable().optional(),
+      notes_p3: z.string().nullable().optional(),
+      notes_p4: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -71,6 +75,10 @@ async function routes(fastify) {
     if ('communication' in body) { sets.push('communication = ?'); args.push(body.communication); }
     if ('equipment_id' in body) { sets.push('equipment_id = ?'); args.push(body.equipment_id); }
     if ('notes' in body) { sets.push('notes = ?'); args.push(body.notes); }
+    if ('meets_r175_3_p3' in body) { sets.push('meets_r175_3_p3 = ?'); args.push(body.meets_r175_3_p3 == null ? null : (body.meets_r175_3_p3 ? 1 : 0)); }
+    if ('meets_r175_3_p4' in body) { sets.push('meets_r175_3_p4 = ?'); args.push(body.meets_r175_3_p4 == null ? null : (body.meets_r175_3_p4 ? 1 : 0)); }
+    if ('notes_p3' in body) { sets.push('notes_p3 = ?'); args.push(body.notes_p3); }
+    if ('notes_p4' in body) { sets.push('notes_p4 = ?'); args.push(body.notes_p4); }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
@@ -176,14 +184,17 @@ async function routes(fastify) {
     const schema = z.object({
       existing_solution: z.string().nullable().optional(),
       existing_solution_brand: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      model_reference: z.string().nullable().optional(),
+      manages_heating: z.boolean().nullable().optional(),
+      manages_cooling: z.boolean().nullable().optional(),
+      manages_ventilation: z.boolean().nullable().optional(),
+      manages_dhw: z.boolean().nullable().optional(),
+      manages_lighting: z.boolean().nullable().optional(),
       meets_r175_3_p1: z.boolean().nullable().optional(),
       meets_r175_3_p2: z.boolean().nullable().optional(),
-      meets_r175_3_p3: z.boolean().nullable().optional(),
-      meets_r175_3_p4: z.boolean().nullable().optional(),
       notes_p1: z.string().nullable().optional(),
       notes_p2: z.string().nullable().optional(),
-      notes_p3: z.string().nullable().optional(),
-      notes_p4: z.string().nullable().optional(),
       has_maintenance_procedures: z.boolean().nullable().optional(),
       notes_maintenance: z.string().nullable().optional(),
       operator_trained: z.boolean().nullable().optional(),
@@ -572,6 +583,147 @@ async function routes(fastify) {
       file_size_bytes: result.sizeBytes,
       download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
     };
+  });
+
+  // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
+  const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
+  const DEVICE_ROLES = ['production','distribution','emission','autre'];
+
+  // GET /bacs-audit/:documentId/devices — tous les devices du document, joints au système
+  fastify.get('/bacs-audit/:documentId/devices', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.db.prepare(`
+      SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+      ORDER BY z.position, z.name, s.system_category, d.position, d.id
+    `).all(id);
+  });
+
+  // POST /bacs-audit/systems/:id/devices — ajout d'un device au système
+  fastify.post('/bacs-audit/systems/:id/devices', async (request, reply) => {
+    const sysId = parseInt(request.params.id, 10);
+    const sys = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(sysId);
+    if (!sys) return reply.code(404).send({ detail: 'Système non trouvé' });
+    const schema = z.object({
+      brand: z.string().nullable().optional(),
+      model_reference: z.string().nullable().optional(),
+      power_kw: z.number().nullable().optional(),
+      energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
+      device_role: z.enum(DEVICE_ROLES).nullable().optional(),
+      location: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    // Position : derniere + 10
+    const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM bacs_audit_system_devices WHERE system_id = ?').get(sysId).p;
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_system_devices
+        (system_id, position, brand, model_reference, power_kw, energy_source, device_role, location, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      sysId, maxPos + 10,
+      body.brand || null, body.model_reference || null, body.power_kw ?? null,
+      body.energy_source || null, body.device_role || null,
+      body.location || null, body.notes || null,
+    );
+    // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
+    resyncBacsAuditWithSiteZones(sys.document_id);
+    regenerateActionItems(sys.document_id);
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid));
+  });
+
+  // PATCH /bacs-audit/devices/:id
+  fastify.patch('/bacs-audit/devices/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const dev = db.db.prepare(`
+      SELECT d.*, s.document_id FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
+    `).get(id);
+    if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
+    const schema = z.object({
+      brand: z.string().nullable().optional(),
+      model_reference: z.string().nullable().optional(),
+      power_kw: z.number().nullable().optional(),
+      energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
+      device_role: z.enum(DEVICE_ROLES).nullable().optional(),
+      location: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const sets = [], args = [];
+    for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
+    if (sets.length) {
+      sets.push('updated_at = CURRENT_TIMESTAMP');
+      args.push(id);
+      db.db.prepare(`UPDATE bacs_audit_system_devices SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    }
+    // Energy source ou power changeants → recompute meters + actions
+    resyncBacsAuditWithSiteZones(dev.document_id);
+    regenerateActionItems(dev.document_id);
+    return db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id);
+  });
+
+  // DELETE /bacs-audit/devices/:id
+  fastify.delete('/bacs-audit/devices/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const dev = db.db.prepare(`
+      SELECT s.document_id FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
+    `).get(id);
+    if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
+    db.db.prepare('DELETE FROM bacs_audit_system_devices WHERE id = ?').run(id);
+    regenerateActionItems(dev.document_id);
+    return reply.code(204).send();
+  });
+
+  // POST /bacs-audit/systems/:id/devices/reorder { ids: [...] }
+  fastify.post('/bacs-audit/systems/:id/devices/reorder', async (request, reply) => {
+    const sysId = parseInt(request.params.id, 10);
+    const sys = db.db.prepare('SELECT id FROM bacs_audit_systems WHERE id = ?').get(sysId);
+    if (!sys) return reply.code(404).send({ detail: 'Système non trouvé' });
+    const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
+    const upd = db.db.prepare('UPDATE bacs_audit_system_devices SET position = ? WHERE id = ? AND system_id = ?');
+    for (let i = 0; i < ids.length; i++) upd.run((i + 1) * 10, ids[i], sysId);
+    return { ok: true };
+  });
+
+  // POST /bacs-audit/:documentId/zones/reorder { ids: [...] }
+  fastify.post('/bacs-audit/:documentId/zones/reorder', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, reply);
+    if (!af) return;
+    const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
+    const upd = db.db.prepare('UPDATE zones SET position = ? WHERE zone_id = ? AND site_id = ?');
+    for (let i = 0; i < ids.length; i++) upd.run((i + 1) * 10, ids[i], af.site_id);
+    return { ok: true };
+  });
+
+  // GET /bacs-audit/:documentId/power-summary — synthèse puissances
+  fastify.get('/bacs-audit/:documentId/power-summary', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const rows = db.db.prepare(`
+      SELECT s.system_category AS category,
+             COALESCE(SUM(d.power_kw), 0) AS total_kw,
+             COUNT(d.id) AS device_count
+      FROM bacs_audit_systems s
+      LEFT JOIN bacs_audit_system_devices d ON d.system_id = s.id
+      WHERE s.document_id = ?
+      GROUP BY s.system_category
+    `).all(id);
+    const byCategory = {};
+    for (const r of rows) byCategory[r.category] = { total_kw: r.total_kw || 0, device_count: r.device_count };
+    const heatingCooling = (byCategory.heating?.total_kw || 0) + (byCategory.cooling?.total_kw || 0);
+    return { by_category: byCategory, heating_cooling_total_kw: heatingCooling };
   });
 
   // POST /bacs-audit/:documentId/resync — re-synchronise les rows

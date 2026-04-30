@@ -23,6 +23,8 @@ async function main() {
   require('./lib/seeder').seedSystemCategoriesOnBoot();
   // Phase 2 audit BACS — referentiel matrice nature_zone -> categories attendues
   require('./lib/seeder').seedBacsRequirementsOnBoot();
+  // Phase 3 audit BACS — matrice usage x nature_zone -> meter_type
+  require('./lib/seeder').seedBacsMeterRequirementsOnBoot();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {
@@ -94,6 +96,8 @@ async function main() {
   await fastify.register(require('./routes/zones'), { prefix: '/api' });
   await fastify.register(require('./routes/equipments'), { prefix: '/api' });
   await fastify.register(require('./routes/bacs-audit'), { prefix: '/api' });
+  await fastify.register(require('./routes/site-documents'), { prefix: '/api' });
+  await fastify.register(require('./routes/site-credentials'), { prefix: '/api' });
 
   // Sert les captures uploadees sous /attachments/<af-id>/<uuid>.png
   // (auth verifiee par le hook global qui couvre /attachments/*).

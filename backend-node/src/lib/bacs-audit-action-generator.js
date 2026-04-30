@@ -20,6 +20,34 @@
 const db = require('../database');
 const log = require('./logger').system;
 
+// Mappings FR pour les libellés affichés dans les actions correctives
+// (utilisés dans tout le code BACS — détail view, action items view, PDF).
+const SYSTEM_LABEL_FR = {
+  heating: 'chauffage',
+  cooling: 'refroidissement',
+  ventilation: 'ventilation',
+  dhw: 'eau chaude sanitaire',
+  lighting_indoor: 'éclairage intérieur',
+  lighting_outdoor: 'éclairage extérieur',
+  electricity_production: 'production électrique',
+};
+const METER_TYPE_LABEL_FR = {
+  electric: 'électrique',
+  electric_production: 'électrique de production',
+  gas: 'gaz',
+  water: 'eau',
+  thermal: 'thermique',
+  other: 'autre',
+};
+const METER_USAGE_LABEL_FR = {
+  heating: 'chauffage',
+  cooling: 'refroidissement',
+  dhw: 'ECS',
+  pv: 'production PV',
+  lighting: 'éclairage',
+  other: 'général',
+};
+
 /**
  * Helper : si la solution GTB en place contient "buildy" (insensible a la
  * casse), R175-5 (formation) est nativement couverte par le support Buildy
@@ -37,32 +65,66 @@ function isBuildySolution(bms) {
 function computeTargetActions(documentId) {
   const target = new Map();
   function addTarget(item) {
-    target.set(`${item.source_table}:${item.source_id}`, item);
+    const key = `${item.source_table}:${item.source_id}:${item.source_subtype || ''}`;
+    target.set(key, item);
   }
 
-  // Systems (R175-1 §4 + R175-3 §3)
+  // Systems (R175-1 §4 + R175-3 §3 + §4)
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name FROM bacs_audit_systems s
     LEFT JOIN zones z ON z.zone_id = s.zone_id
     WHERE s.document_id = ?
   `).all(documentId);
   for (const s of systems) {
+    const catFr = SYSTEM_LABEL_FR[s.system_category] || s.system_category;
+    const zoneStr = s.zone_name ? ` en zone « ${s.zone_name} »` : '';
+
+    // Système absent → R175-1 §4 (plusieurs sources_id par paire systemId pour
+    // ne pas se recouvrir avec les autres règles ci-dessous)
     if (!s.present) {
       addTarget({
-        source_table: 'systems', source_id: s.id,
+        source_table: 'systems', source_id: s.id, source_subtype: 'absent',
         category: 'system_addition', severity: 'major',
         r175_article: 'R175-1 §4',
-        title: `Ajouter ${s.system_category} en zone « ${s.zone_name || '?'} »`,
-        description: `La zone « ${s.zone_name || '?'} » devrait disposer d'un systeme de ${s.system_category} selon le decoupage R175-1. Aucun systeme n'a ete identifie a l'audit.`,
+        title: `Ajouter un système de ${catFr}${zoneStr}`,
+        description: `Cette zone devrait disposer d'un système de ${catFr} selon le périmètre R175-1 §4. Aucun système n'a été identifié à l'audit.`,
         zone_id: s.zone_id, equipment_id: null,
       });
-    } else if (s.communication === 'non_communicant') {
+      continue; // pas de p3/p4 si le système n'est pas présent
+    }
+
+    // Système présent + non communicant (legacy : on garde la règle communication=non_communicant)
+    if (s.communication === 'non_communicant') {
       addTarget({
-        source_table: 'systems', source_id: s.id,
+        source_table: 'systems', source_id: s.id, source_subtype: 'non_communicant',
         category: 'communication_upgrade', severity: 'major',
         r175_article: 'R175-3 §3',
-        title: `Rendre communicant le ${s.system_category} en zone « ${s.zone_name || '?'} »`,
-        description: `L'interoperabilite (R175-3 §3) requiert que les systemes techniques exposent au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT).`,
+        title: `Rendre communicant le système de ${catFr}${zoneStr}`,
+        description: `L'interopérabilité (R175-3 §3) requiert que les systèmes techniques exposent au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT).`,
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
+
+    // R175-3 §3 — interopérabilité par système (saisie explicite via case à cocher)
+    if (s.meets_r175_3_p3 === 0) {
+      addTarget({
+        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p3',
+        category: 'communication_upgrade', severity: 'major',
+        r175_article: 'R175-3 §3',
+        title: `Assurer l'interopérabilité du système de ${catFr}${zoneStr}`,
+        description: `L'auditeur a constaté que ce système ne satisfait pas l'exigence d'interopérabilité (R175-3 §3). Il devrait exposer au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT) pour communiquer avec la GTB et les autres systèmes.`,
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
+
+    // R175-3 §4 — arrêt manuel + fonctionnement autonome par système
+    if (s.meets_r175_3_p4 === 0) {
+      addTarget({
+        source_table: 'systems', source_id: s.id, source_subtype: 'r175_3_p4',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §4',
+        title: `Permettre l'arrêt manuel + reprise autonome du ${catFr}${zoneStr}`,
+        description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement le système, et que la GTB reprenne ensuite la main de manière autonome.`,
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
     }
@@ -75,13 +137,16 @@ function computeTargetActions(documentId) {
     WHERE m.document_id = ?
   `).all(documentId);
   for (const m of meters) {
+    const typeFr = METER_TYPE_LABEL_FR[m.meter_type] || m.meter_type;
+    const usageFr = METER_USAGE_LABEL_FR[m.usage] || m.usage;
+    const zoneStr = m.zone_name ? ` en zone « ${m.zone_name} »` : ' (général bâtiment)';
     if (m.required && !m.present_actual) {
       addTarget({
         source_table: 'meters', source_id: m.id,
         category: 'meter_addition', severity: 'blocking',
         r175_article: 'R175-3 §1',
-        title: `Ajouter compteur ${m.meter_type}${m.zone_name ? ` en zone « ${m.zone_name} »` : ''} (${m.usage})`,
-        description: `Le suivi continu R175-3 §1 requiert un compteur ${m.meter_type} pour l'usage ${m.usage}.`,
+        title: `Ajouter compteur ${typeFr}${zoneStr} — ${usageFr}`,
+        description: `Le suivi continu R175-3 §1 requiert un compteur ${typeFr} pour l'usage « ${usageFr} ».`,
         zone_id: m.zone_id, equipment_id: null,
       });
     } else if (m.present_actual && !m.communicating) {
@@ -89,8 +154,8 @@ function computeTargetActions(documentId) {
         source_table: 'meters', source_id: m.id,
         category: 'meter_connection', severity: 'major',
         r175_article: 'R175-3 §1',
-        title: `Raccorder le compteur ${m.meter_type}${m.zone_name ? ` en zone « ${m.zone_name} »` : ''}`,
-        description: `Le compteur est present mais non-communicant. Le suivi a pas horaire et la conservation 5 ans (R175-3 §1) ne sont pas possibles sans remontee automatique.`,
+        title: `Raccorder le compteur ${typeFr}${zoneStr}`,
+        description: `Le compteur est présent mais non-communicant. Le suivi à pas horaire et la conservation 5 ans (R175-3 §1) ne sont pas possibles sans remontée automatique.`,
         zone_id: m.zone_id, equipment_id: m.equipment_id,
       });
     }
@@ -113,35 +178,19 @@ function computeTargetActions(documentId) {
         source_table: 'bms', source_id: 2,
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §2',
-        title: 'Activer la detection des pertes d\'efficacite',
-        description: 'La GTB doit detecter les derives de consommation (R175-3 §2). Cette capacite n\'est pas presente dans la solution en place.',
+        title: 'Activer la détection des pertes d\'efficacité',
+        description: 'La GTB doit détecter les dérives de consommation (R175-3 §2). Cette capacité n\'est pas présente dans la solution en place.',
       });
     }
-    if (bms.meets_r175_3_p3 === 0) {
-      addTarget({
-        source_table: 'bms', source_id: 3,
-        category: 'bms_upgrade', severity: 'major',
-        r175_article: 'R175-3 §3',
-        title: 'Assurer l\'interoperabilite multi-systemes de la GTB',
-        description: 'La GTB doit pouvoir communiquer avec l\'ensemble des systemes techniques du batiment (R175-3 §3).',
-      });
-    }
-    if (bms.meets_r175_3_p4 === 0) {
-      addTarget({
-        source_table: 'bms', source_id: 4,
-        category: 'bms_upgrade', severity: 'major',
-        r175_article: 'R175-3 §4',
-        title: 'Permettre l\'arret manuel + gestion autonome',
-        description: 'Les utilisateurs doivent pouvoir arreter manuellement les systemes ; la GTB doit ensuite les gerer de maniere autonome (R175-3 §4).',
-      });
-    }
+    // NOTE : meets_r175_3_p3 et p4 sont désormais gérés au niveau des systèmes
+    // (cf section systems ci-dessus), pas dans la GTB.
     if (bms.has_maintenance_procedures === 0) {
       addTarget({
         source_table: 'bms', source_id: 5,
         category: 'documentation', severity: 'major',
         r175_article: 'R175-4',
-        title: 'Etablir des consignes ecrites de maintenance du BACS',
-        description: 'L\'article R175-4 exige la presence de consignes ecrites encadrant la maintenance du BACS. Aucune procedure documentee n\'a ete identifiee.',
+        title: 'Établir des consignes écrites de maintenance du BACS',
+        description: 'L\'article R175-4 exige la présence de consignes écrites encadrant la maintenance du BACS. Aucune procédure documentée n\'a été identifiée.',
       });
     }
     // R175-5 : formation. Skip si la solution en place est Buildy (support natif).
@@ -150,8 +199,8 @@ function computeTargetActions(documentId) {
         source_table: 'bms', source_id: 6,
         category: 'training', severity: 'major',
         r175_article: 'R175-5',
-        title: 'Former l\'exploitant au parametrage du BACS',
-        description: 'L\'exploitant doit etre forme au parametrage du BACS (R175-5). Aucune formation documentee n\'a ete attestee.',
+        title: 'Former l\'exploitant au paramétrage du BACS',
+        description: 'L\'exploitant doit être formé au paramétrage du BACS (R175-5). Aucune formation documentée n\'a été attestée.',
       });
     }
   }
@@ -169,8 +218,8 @@ function computeTargetActions(documentId) {
         source_table: 'thermal_regulation', source_id: t.id,
         category: 'thermal_regulation', severity: 'major',
         r175_article: 'R175-6',
-        title: `Installer une regulation automatique en zone « ${t.zone_name || '?'} »`,
-        description: 'L\'article R175-6 exige une regulation thermique automatique par piece ou par zone. La zone n\'en dispose pas actuellement.',
+        title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`,
+        description: 'L\'article R175-6 exige une régulation thermique automatique par pièce ou par zone. La zone n\'en dispose pas actuellement.',
         zone_id: t.zone_id,
       });
     }
@@ -196,7 +245,7 @@ function regenerateActionItems(documentId) {
   const target = computeTargetActions(documentId);
 
   const existing = db.db.prepare(`
-    SELECT id, source_table, source_id, status, category, severity, r175_article,
+    SELECT id, source_table, source_id, source_subtype, status, category, severity, r175_article,
            title, description, zone_id, equipment_id
     FROM bacs_audit_action_items
     WHERE document_id = ? AND auto_generated = 1
@@ -205,7 +254,7 @@ function regenerateActionItems(documentId) {
   const existingByKey = new Map();
   for (const e of existing) {
     if (e.source_table && e.source_id != null) {
-      existingByKey.set(`${e.source_table}:${e.source_id}`, e);
+      existingByKey.set(`${e.source_table}:${e.source_id}:${e.source_subtype || ''}`, e);
     }
   }
 
@@ -244,8 +293,9 @@ function regenerateActionItems(documentId) {
   const ins = db.db.prepare(`
     INSERT INTO bacs_audit_action_items
       (document_id, category, severity, r175_article, title, description,
-       zone_id, equipment_id, source_table, source_id, auto_generated, status, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'open', ?)
+       zone_id, equipment_id, source_table, source_id, source_subtype,
+       auto_generated, status, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'open', ?)
   `);
   let pos = 0;
   for (const [key, t] of target) {
@@ -253,7 +303,7 @@ function regenerateActionItems(documentId) {
     ins.run(
       documentId, t.category, t.severity, t.r175_article || null, t.title,
       t.description || null, t.zone_id || null, t.equipment_id || null,
-      t.source_table, t.source_id, pos * 10,
+      t.source_table, t.source_id, t.source_subtype || null, pos * 10,
     );
     added++;
     pos++;
