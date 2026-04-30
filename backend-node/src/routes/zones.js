@@ -27,8 +27,8 @@ const updateZoneSchema = z.object({
 });
 
 async function routes(fastify) {
-  // GET /api/zones?site_id=...
-  fastify.get('/zones', async (request, reply) => {
+  // GET /api/site-zones?site_id=...
+  fastify.get('/site-zones', async (request, reply) => {
     const siteId = parseInt(request.query.site_id, 10);
     if (!siteId) return reply.code(400).send({ detail: 'site_id requis' });
     const site = db.sites.getById(siteId);
@@ -36,15 +36,15 @@ async function routes(fastify) {
     return db.zones.listBySite(siteId);
   });
 
-  // GET /api/zones/:id
-  fastify.get('/zones/:id', async (request, reply) => {
+  // GET /api/site-zones/:id
+  fastify.get('/site-zones/:id', async (request, reply) => {
     const zone = db.zones.getById(parseInt(request.params.id, 10));
     if (!zone || zone.deleted_at) return reply.code(404).send({ detail: 'Zone non trouvee' });
     return zone;
   });
 
-  // POST /api/zones
-  fastify.post('/zones', async (request, reply) => {
+  // POST /api/site-zones
+  fastify.post('/site-zones', async (request, reply) => {
     let body;
     try { body = createZoneSchema.parse(request.body); }
     catch (err) {
@@ -67,8 +67,8 @@ async function routes(fastify) {
     return reply.code(201).send(zone);
   });
 
-  // PATCH /api/zones/:id
-  fastify.patch('/zones/:id', async (request, reply) => {
+  // PATCH /api/site-zones/:id
+  fastify.patch('/site-zones/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const zone = db.zones.getById(id);
     if (!zone || zone.deleted_at) return reply.code(404).send({ detail: 'Zone non trouvee' });
@@ -86,8 +86,8 @@ async function routes(fastify) {
     return updated;
   });
 
-  // DELETE /api/zones/:id
-  fastify.delete('/zones/:id', async (request, reply) => {
+  // DELETE /api/site-zones/:id
+  fastify.delete('/site-zones/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const zone = db.zones.getById(id);
     if (!zone) return reply.code(404).send({ detail: 'Zone non trouvee' });

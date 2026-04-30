@@ -192,12 +192,15 @@ export const createSite = (data) => api.post('/sites', data)
 export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
 
-// ── Zones (locales Buildy Docs, attachees a un site) ──
-export const listZones = (siteId) => api.get('/zones', { params: { site_id: siteId } })
-export const getZone = (id) => api.get(`/zones/${id}`)
-export const createZone = (data) => api.post('/zones', data)
-export const updateZone = (id, data) => api.patch(`/zones/${id}`, data)
-export const deleteZone = (id) => api.delete(`/zones/${id}`)
+// ── Site-zones (locales Buildy Docs, attachees a un site) ──
+// Note : namespace `/site-zones` plutot que `/zones` car les routes /zones
+// sont deja prises par les af_zones legacy (routes/sections.js). Sera
+// renomme en /zones a la migration 35 quand on dropera af_zones.
+export const listZones = (siteId) => api.get('/site-zones', { params: { site_id: siteId } })
+export const getZone = (id) => api.get(`/site-zones/${id}`)
+export const createZone = (data) => api.post('/site-zones', data)
+export const updateZone = (id, data) => api.patch(`/site-zones/${id}`, data)
+export const deleteZone = (id) => api.delete(`/site-zones/${id}`)
 
 // ── Equipements (et compteurs) ──
 export const listEquipments = ({ zoneId, siteId } = {}) =>
