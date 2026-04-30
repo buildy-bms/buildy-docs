@@ -40,6 +40,13 @@ const routes = [
     props: true,
   },
   {
+    path: '/bacs-audit/:id/audit-trail',
+    name: 'bacs-audit-trail',
+    meta: { title: 'Historique audit BACS' },
+    component: () => import('@/views/BacsAuditTrailView.vue'),
+    props: true,
+  },
+  {
     path: '/afs/:id/versions',
     name: 'af-versions',
     meta: { title: 'Versions de l\'AF' },

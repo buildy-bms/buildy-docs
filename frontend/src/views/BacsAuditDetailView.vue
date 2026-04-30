@@ -5,6 +5,7 @@ import {
   ArrowLeftIcon, BuildingOffice2Icon, MapPinIcon, ExclamationTriangleIcon,
   CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, PlusIcon, TrashIcon,
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
+  DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -19,6 +20,7 @@ import {
   getBacsDevices, getBacsPowerSummary, updateBacsDevice,
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
   updateBacsAuditSynthesis, generateBacsAuditSynthesis,
+  duplicateZone, duplicateBacsMeter,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
@@ -29,6 +31,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
@@ -161,6 +164,17 @@ const itemsBySeverity = computed(() => {
   return out
 })
 
+function relativeTime(s) {
+  if (!s) return ''
+  const d = new Date(s)
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
+  if (diffSec < 60) return 'quelques secondes'
+  if (diffSec < 3600) return Math.floor(diffSec / 60) + ' min'
+  if (diffSec < 86400) return Math.floor(diffSec / 3600) + ' h'
+  if (diffSec < 30 * 86400) return Math.floor(diffSec / 86400) + ' j'
+  return Math.floor(diffSec / (30 * 86400)) + ' mois'
+}
+
 function formatDate(s) {
   if (!s) return '—'
   return new Date(s.replace(' ', 'T')).toLocaleDateString('fr-FR', {
@@ -286,6 +300,27 @@ async function patchZone(z, patch) {
   }
 }
 
+async function dupZone(z) {
+  try {
+    const { data } = await duplicateZone(z.zone_id)
+    zones.value.push(data)
+    await refreshAuditData()
+    success(`Zone « ${data.name} » créée`)
+  } catch {
+    error('Duplication impossible')
+  }
+}
+
+async function dupMeter(m) {
+  try {
+    const { data } = await duplicateBacsMeter(m.id)
+    meters.value.push({ ...data, zone_name: zones.value.find(z => z.zone_id === data.zone_id)?.name || null })
+    success('Compteur dupliqué')
+  } catch {
+    error('Duplication impossible')
+  }
+}
+
 async function removeZone(z) {
   const ok = await confirm({
     title: 'Supprimer cette zone ?',
@@ -381,6 +416,7 @@ const stepperSteps = computed(() => STEP_DEFINITIONS.map(def => {
     complete: def.isComplete(),
     validated: !!p.validated,
     validated_at: p.validated_at || null,
+    validated_by_name: p.validated_by_name || null,
   }
 }))
 
@@ -708,12 +744,20 @@ onMounted(refresh)
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2 text-xs text-gray-500 mb-0.5">
+        <div class="flex items-center gap-2 text-xs text-gray-500 mb-0.5 flex-wrap">
           <button @click="router.push('/')" class="hover:text-gray-700 inline-flex items-center gap-1">
             <ArrowLeftIcon class="w-3.5 h-3.5" /> Audits
           </button>
           <span>›</span>
           <span class="text-gray-400">Audit BACS</span>
+          <span v-if="document?.updated_by_name" class="text-gray-400">
+            · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
+            <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
+          </span>
+          <button @click="router.push(`/bacs-audit/${docId}/audit-trail`)"
+                  class="text-indigo-600 hover:text-indigo-800 underline">
+            Historique
+          </button>
           <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700">
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
@@ -768,13 +812,13 @@ onMounted(refresh)
       </div>
 
       <!-- 1. Identification + Applicabilité R175-2 -->
-      <section id="section-identification" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="identification" section-id="section-identification">
+        <template #header>
           <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
           <R175Tooltip article="R175-2" />
           <StepValidateBadge class="ml-auto" :step="stepFor('identification')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <div class="px-5 py-4 grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -799,6 +843,29 @@ onMounted(refresh)
               Source : <span class="font-mono">{{ document?.bacs_total_power_source || 'auto' }}</span>
               <span v-if="document?.bacs_total_power_source === 'manual_override'" class="text-amber-700"> (override manuel)</span>
             </p>
+            <!-- Detail du calcul auto : transparence des devices comptes -->
+            <details v-if="powerSummary?.heating_cooling_breakdown?.length" class="mt-2 group">
+              <summary class="cursor-pointer text-[11px] text-indigo-600 hover:text-indigo-800 font-medium select-none">
+                Détail du calcul auto ({{ powerSummary.heating_cooling_breakdown.length }} équipement{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }} compté{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }})
+              </summary>
+              <div class="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
+                <p class="mb-1.5 italic">Somme des puissances des équipements <strong>chauffage</strong> et <strong>climatisation</strong> saisis dans la section 3 :</p>
+                <ul class="space-y-0.5 font-mono">
+                  <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id" class="flex justify-between gap-2">
+                    <span class="truncate">
+                      <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'">●</span>
+                      {{ d.name || (d.brand ? d.brand : '—') }}{{ d.model_reference ? ' / ' + d.model_reference : '' }}
+                      <span class="text-gray-400">({{ d.zone_name || '—' }})</span>
+                    </span>
+                    <span class="font-semibold whitespace-nowrap">{{ d.power_kw }} kW</span>
+                  </li>
+                </ul>
+                <p class="mt-2 pt-1.5 border-t border-gray-200 flex justify-between font-semibold">
+                  <span>Total chauffage + climatisation :</span>
+                  <span class="font-mono">{{ powerSummary.heating_cooling_total_kw }} kW</span>
+                </p>
+              </div>
+            </details>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Date du permis de construire</label>
@@ -829,18 +896,18 @@ onMounted(refresh)
             (cf. Annexe D, point 4).
           </p>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <!-- 2. Zones fonctionnelles (R175-1 §6) — editable in-situ -->
-      <section id="section-zones" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="zones" section-id="section-zones">
+        <template #header>
           <MapPinIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
           <span class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
           <R175Tooltip article="R175-1 §6" />
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
           <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -894,7 +961,10 @@ onMounted(refresh)
                   :label="z.name"
                 />
               </td>
-              <td class="px-5 py-2 text-right">
+              <td class="px-5 py-2 text-right whitespace-nowrap">
+                <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+                  <DocumentDuplicateIcon class="w-4 h-4" />
+                </button>
                 <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
                   <TrashIcon class="w-4 h-4" />
                 </button>
@@ -926,11 +996,11 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
-      </section>
+      </CollapsibleSection>
 
       <!-- Systemes par zone (R175-1 §4) -->
-      <section id="section-systems" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 flex-wrap">
+      <CollapsibleSection storage-key="systems" section-id="section-systems">
+        <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
           <span class="text-xs text-gray-500">R175-1 §4 / R175-3 §3, §4</span>
@@ -941,7 +1011,7 @@ onMounted(refresh)
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
           </span>
           <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <div class="divide-y divide-gray-100">
           <div v-for="g in systemsByZone" :key="g.zone_name" class="px-5 py-3">
             <div class="flex items-center gap-2 mb-3">
@@ -1005,17 +1075,17 @@ onMounted(refresh)
             Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <!-- 4. Compteurs et mesurage (R175-3 §1) -->
-      <section id="section-meters" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="meters" section-id="section-meters">
+        <template #header>
           <BoltIcon class="w-5 h-5 text-emerald-600" />
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
           <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
           <R175Tooltip article="R175-3 §1" />
           <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -1095,7 +1165,10 @@ onMounted(refresh)
                        @change="e => patchMeter(m, { out_of_service: e.target.checked })"
                        class="rounded border-gray-300" />
               </td>
-              <td class="px-5 py-2 text-right">
+              <td class="px-5 py-2 text-right whitespace-nowrap">
+                <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+                  <DocumentDuplicateIcon class="w-4 h-4" />
+                </button>
                 <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
                   <TrashIcon class="w-4 h-4" />
                 </button>
@@ -1138,17 +1211,17 @@ onMounted(refresh)
             </tr>
           </tfoot>
         </table>
-      </section>
+      </CollapsibleSection>
 
       <!-- Régulation thermique (R175-6) -->
-      <section id="section-thermal" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="thermal" section-id="section-thermal">
+        <template #header>
           <FireIcon class="w-5 h-5 text-red-500" />
           <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
           <R175Tooltip article="R175-6" />
           <span class="text-xs text-gray-500">R175-6</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('thermal')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -1195,11 +1268,11 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
-      </section>
+      </CollapsibleSection>
 
       <!-- GTB / GTC (R175-3 / R175-4 / R175-5) -->
-      <section id="section-bms" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="bms" section-id="section-bms">
+        <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
           <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
           <span class="text-xs text-gray-500">R175-3 + R175-4 + R175-5</span>
@@ -1227,7 +1300,7 @@ onMounted(refresh)
             />
             <StepValidateBadge :step="stepFor('bms')" @validate="validateStep" @invalidate="invalidateStep" />
           </div>
-        </header>
+        </template>
         <div class="px-5 py-4 space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -1413,16 +1486,16 @@ onMounted(refresh)
             </div>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <!-- 9. Documents du site (DOE) -->
-      <section id="section-documents" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="documents" section-id="section-documents">
+        <template #header>
           <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
           <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
           <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('documents')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <div class="px-5 py-4">
           <SiteDocumentsManager
             v-if="document?.site_uuid"
@@ -1433,16 +1506,16 @@ onMounted(refresh)
             L'audit n'est rattaché à aucun site.
           </p>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <!-- 10. Credentials du site (accès) -->
-      <section id="section-credentials" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="credentials" section-id="section-credentials">
+        <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
           <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
           <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('credentials')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <div class="px-5 py-4">
           <SiteCredentialsManager
             v-if="document?.site_uuid"
@@ -1453,26 +1526,22 @@ onMounted(refresh)
             L'audit n'est rattaché à aucun site.
           </p>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <!-- Plan de mise en conformité -->
-      <section id="section-review" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
-            <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
-            <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              @click="router.push(`/bacs-audit/${docId}/action-items`)"
-              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-            >
-              Vue commerciale plein écran →
-            </button>
-            <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
-          </div>
-        </header>
+      <CollapsibleSection storage-key="review" section-id="section-review">
+        <template #header>
+          <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
+          <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
+          <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
+          <button
+            @click.stop="router.push(`/bacs-audit/${docId}/action-items`)"
+            class="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            Vue commerciale →
+          </button>
+          <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
         <table class="w-full text-sm" style="table-layout: fixed">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -1532,19 +1601,19 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
-      </section>
+      </CollapsibleSection>
 
       <!-- 12. Note de synthèse (Claude) -->
-      <section id="section-synthesis" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
-        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+      <CollapsibleSection storage-key="synthesis" section-id="section-synthesis">
+        <template #header>
           <SparklesIcon class="w-5 h-5 text-violet-500" />
           <h2 class="text-base font-semibold text-gray-800">12. Note de synthèse</h2>
           <span class="text-xs text-gray-500">Affichée en tête du PDF d'audit livré au client.</span>
           <span v-if="document?.audit_synthesis_generated_at" class="text-[11px] text-violet-700 italic">
-            ✨ Générée par Claude le {{ new Date(document.audit_synthesis_generated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+            ✨ Générée le {{ new Date(document.audit_synthesis_generated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
           </span>
           <StepValidateBadge class="ml-auto" :step="stepFor('synthesis')" @validate="validateStep" @invalidate="invalidateStep" />
-        </header>
+        </template>
         <div class="px-5 py-4 space-y-3">
           <div class="flex items-center gap-2">
             <button
@@ -1568,7 +1637,7 @@ onMounted(refresh)
             min-height="240px"
           />
         </div>
-      </section>
+      </CollapsibleSection>
     </div>
 
     <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->

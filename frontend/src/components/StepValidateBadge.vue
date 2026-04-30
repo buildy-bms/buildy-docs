@@ -11,12 +11,13 @@ const emit = defineEmits(['validate', 'invalidate'])
 const tooltip = computed(() => {
   if (!props.step) return ''
   if (props.step.validated) {
-    const d = props.step.validated_at
-      ? ` le ${new Date(props.step.validated_at).toLocaleDateString('fr-FR')}`
+    const dateStr = props.step.validated_at
+      ? ` le ${new Date(props.step.validated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}`
       : ''
-    return `Etape validee${d} — clic pour annuler`
+    const byStr = props.step.validated_by_name ? ` par ${props.step.validated_by_name}` : ''
+    return `Étape validée${dateStr}${byStr} — clic pour annuler`
   }
-  return props.step.complete ? 'Valider cette etape' : 'Valider cette etape (conditions automatiques pas encore satisfaites)'
+  return props.step.complete ? 'Valider cette étape' : 'Valider cette étape (conditions automatiques pas encore satisfaites)'
 })
 </script>
 

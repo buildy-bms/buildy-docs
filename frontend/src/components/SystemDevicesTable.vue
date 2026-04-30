@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import {
-  createBacsDevice, updateBacsDevice, deleteBacsDevice,
+  createBacsDevice, updateBacsDevice, deleteBacsDevice, duplicateBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
   getSiteDocumentDownloadUrl,
 } from '@/api'
@@ -184,6 +184,15 @@ async function patchDevice(d, patch) {
   }
 }
 
+async function dupDevice(d) {
+  try {
+    await duplicateBacsDevice(d.id)
+    emit('changed')
+  } catch {
+    error('Duplication impossible')
+  }
+}
+
 async function removeDevice(d) {
   const ok = await confirm({
     title: 'Supprimer cet équipement ?',
@@ -326,6 +335,9 @@ async function removeDevice(d) {
             </button>
           </td>
           <td class="py-1 px-1 text-center">
+            <button @click="dupDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition mr-1" title="Dupliquer">
+              <DocumentDuplicateIcon class="w-3.5 h-3.5" />
+            </button>
             <button @click="removeDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition" title="Supprimer">
               <TrashIcon class="w-3.5 h-3.5" />
             </button>

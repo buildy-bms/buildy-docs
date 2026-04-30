@@ -89,6 +89,30 @@ async function routes(fastify) {
     return updated;
   });
 
+  // POST /api/site-zones/:id/duplicate — duplique une zone (sans rattachements derives)
+  fastify.post('/site-zones/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const zone = db.zones.getById(id);
+    if (!zone || zone.deleted_at) return reply.code(404).send({ detail: 'Zone non trouvee' });
+    const cloned = db.zones.create({
+      siteId: zone.site_id,
+      name: `${zone.name} (copie)`,
+      nature: zone.nature,
+      position: zone.position + 1,
+      surfaceM2: zone.surface_m2,
+      notes: zone.notes,
+    });
+    if (zone.notes_html) {
+      db.zones.update(cloned.zone_id, { notes_html: zone.notes_html });
+    }
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'zone.duplicate',
+      payload: { source_zone_id: id, new_zone_id: cloned.zone_id },
+    });
+    return reply.code(201).send(db.zones.getById(cloned.zone_id));
+  });
+
   // DELETE /api/site-zones/:id
   fastify.delete('/site-zones/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);

@@ -188,6 +188,28 @@ async function routes(fastify) {
     return db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(id);
   });
 
+  // Duplique un compteur (avec ses notes / rattachement device)
+  fastify.post('/bacs-audit/meters/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const m = db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(id);
+    if (!m) return reply.code(404).send({ detail: 'Compteur non trouve' });
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_meters
+        (document_id, zone_id, usage, meter_type, equipment_id, required,
+         present_actual, communicating, communication_protocol, notes, notes_html,
+         managed_by_bms, out_of_service, bms_integration_out_of_service, recommendation)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      m.document_id, m.zone_id, m.usage, m.meter_type, m.equipment_id, m.required,
+      m.present_actual, m.communicating, m.communication_protocol, m.notes, m.notes_html,
+      m.managed_by_bms, m.out_of_service, m.bms_integration_out_of_service, m.recommendation,
+    );
+    regenerateActionItems(m.document_id);
+    db.auditLog.add({ afId: m.document_id, userId: request.authUser?.id,
+      action: 'bacs_meter.duplicate', payload: { source_meter_id: id, new_meter_id: r.lastInsertRowid } });
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(r.lastInsertRowid));
+  });
+
   fastify.delete('/bacs-audit/meters/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT document_id FROM bacs_audit_meters WHERE id = ?').get(id);
@@ -657,6 +679,17 @@ async function routes(fastify) {
       day: '2-digit', month: 'long', year: 'numeric',
     });
 
+    // Detail du calcul auto chauffage + clim (pour transparence dans le PDF)
+    const heatingCoolingBreakdown = devices
+      .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
+      .map(d => ({
+        name: d.name, brand: d.brand, model_reference: d.model_reference,
+        power_kw: d.power_kw, zone_name: d.zone_name,
+        category: d.system_category,
+        categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
+      }));
+    const heatingCoolingTotal = heatingCoolingBreakdown.reduce((s, d) => s + (Number(d.power_kw) || 0), 0);
+
     const data = {
       document: af,
       site,
@@ -671,6 +704,8 @@ async function routes(fastify) {
       actionItems,
       actionStats,
       synthesisHtml: af.audit_synthesis_html || null,
+      heatingCoolingBreakdown,
+      heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
       complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
       applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
       bacsArticles,
@@ -855,6 +890,35 @@ async function routes(fastify) {
   });
 
   // DELETE /bacs-audit/devices/:id
+  // Duplique un device avec toutes ses caracteristiques
+  fastify.post('/bacs-audit/devices/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const dev = db.db.prepare(`
+      SELECT d.*, s.document_id FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
+    `).get(id);
+    if (!dev) return reply.code(404).send({ detail: 'Device non trouve' });
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_system_devices
+        (system_id, position, name, brand, model_reference, power_kw, energy_source,
+         device_role, communication_protocol, location, notes, notes_html,
+         meets_r175_3_p4, meets_r175_3_p4_autonomous, managed_by_bms,
+         out_of_service, bms_integration_out_of_service)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      dev.system_id, (dev.position || 0) + 1,
+      dev.name ? `${dev.name} (copie)` : null,
+      dev.brand, dev.model_reference, dev.power_kw, dev.energy_source,
+      dev.device_role, dev.communication_protocol, dev.location,
+      dev.notes, dev.notes_html, dev.meets_r175_3_p4, dev.meets_r175_3_p4_autonomous,
+      dev.managed_by_bms, dev.out_of_service, dev.bms_integration_out_of_service,
+    );
+    regenerateActionItems(dev.document_id);
+    db.auditLog.add({ afId: dev.document_id, userId: request.authUser?.id,
+      action: 'bacs_device.duplicate', payload: { source_device_id: id, new_device_id: r.lastInsertRowid } });
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid));
+  });
+
   fastify.delete('/bacs-audit/devices/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const dev = db.db.prepare(`
@@ -905,7 +969,19 @@ async function routes(fastify) {
     const byCategory = {};
     for (const r of rows) byCategory[r.category] = { total_kw: r.total_kw || 0, device_count: r.device_count };
     const heatingCooling = (byCategory.heating?.total_kw || 0) + (byCategory.cooling?.total_kw || 0);
-    return { by_category: byCategory, heating_cooling_total_kw: heatingCooling };
+    // Detail des devices comptes pour le total chauffage + clim (transparence)
+    const breakdown = db.db.prepare(`
+      SELECT d.id, d.name, d.brand, d.model_reference, d.power_kw,
+             s.system_category, z.name AS zone_name
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+        AND s.system_category IN ('heating','cooling')
+        AND d.power_kw IS NOT NULL
+      ORDER BY s.system_category, z.name, d.position, d.id
+    `).all(id);
+    return { by_category: byCategory, heating_cooling_total_kw: heatingCooling, heating_cooling_breakdown: breakdown };
   });
 
   // POST /bacs-audit/:documentId/resync — re-synchronise les rows
@@ -1007,10 +1083,12 @@ async function routes(fastify) {
     catch { progress = {}; }
 
     if (body.validated) {
+      const user = request.authUser?.id ? db.users.getById(request.authUser.id) : null;
       progress[body.step] = {
         validated: true,
         validated_at: new Date().toISOString(),
         validated_by: request.authUser?.id || null,
+        validated_by_name: user?.display_name || user?.email || null,
       };
     } else {
       delete progress[body.step];
@@ -1020,9 +1098,10 @@ async function routes(fastify) {
       .run(JSON.stringify(progress), documentId);
 
     db.auditLog.add({
+      afId: documentId,
       userId: request.authUser?.id,
       action: body.validated ? 'bacs_audit.step.validate' : 'bacs_audit.step.invalidate',
-      payload: { document_id: documentId, step: body.step },
+      payload: { step: body.step },
     });
 
     const validatedCount = AUDIT_STEPS.filter(s => progress[s]?.validated).length;
@@ -1180,9 +1259,10 @@ async function routes(fastify) {
         audit_synthesis_generated_at: new Date().toISOString(),
       });
       db.auditLog.add({
+        afId: documentId,
         userId: request.authUser?.id,
         action: 'bacs_audit.synthesis.generate',
-        payload: { document_id: documentId, length: html.length, usage },
+        payload: { length: html.length, usage },
       });
       return { html, usage, generated_at: new Date().toISOString() };
     } catch (err) {

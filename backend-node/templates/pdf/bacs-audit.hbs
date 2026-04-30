@@ -70,6 +70,36 @@
   <tr><th>Applicabilité BACS (R175-2)</th><td>{{applicabilityLabel}}</td></tr>
   {{/if}}
 </table>
+
+{{#if heatingCoolingBreakdown.length}}
+<h3>Détail du calcul automatique de la puissance</h3>
+<p class="muted" style="margin-bottom:2mm">
+  La puissance cumulée chauffage + climatisation est obtenue en additionnant
+  les puissances nominales utiles des équipements saisis dans les catégories
+  <strong>chauffage</strong> et <strong>climatisation</strong> (chapitre 3).
+</p>
+<table>
+  <thead>
+    <tr><th>Équipement</th><th>Marque / référence</th><th>Catégorie</th><th>Zone</th><th>Puissance</th></tr>
+  </thead>
+  <tbody>
+    {{#each heatingCoolingBreakdown}}
+      <tr>
+        <td>{{name}}</td>
+        <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
+        <td>{{categoryLabel}}</td>
+        <td>{{zone_name}}</td>
+        <td><strong>{{power_kw}} kW</strong></td>
+      </tr>
+    {{/each}}
+    <tr style="background:#eef2ff">
+      <td colspan="4" style="text-align:right"><strong>Total chauffage + climatisation</strong></td>
+      <td><strong>{{heatingCoolingTotal}} kW</strong></td>
+    </tr>
+  </tbody>
+</table>
+{{/if}}
+
 <p class="muted">
   À titre informatif : l'article R175-2 prévoit une clause de dispense applicable
   lorsque le temps de retour sur investissement de la mise en conformité dépasse

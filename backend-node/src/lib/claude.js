@@ -297,6 +297,36 @@ const SYSTEM_PROMPT_SYNTHESIS = [
   `marketing : reste sobre.`,
 ].join('\n');
 
+// Post-traitement de la sortie Claude :
+//  - Strip des fences markdown ```html ... ``` ou ```...```
+//  - Si la sortie n'a aucune balise HTML, on enveloppe chaque paragraphe
+//    (separe par double saut de ligne) dans <p>...</p>
+function normalizeSynthesisHtml(raw) {
+  let s = (raw || '').trim();
+  // Strip d'un eventuel fence ```html ... ``` ou ``` ... ```
+  const fenceMatch = s.match(/^```(?:html)?\s*\n([\s\S]*?)\n```$/i);
+  if (fenceMatch) s = fenceMatch[1].trim();
+  // Si ca ressemble deja a du HTML structure (>=2 balises), on garde tel quel
+  const hasHtml = /<\/(p|h[1-6]|ul|ol|li|strong|em|br)>/i.test(s);
+  if (hasHtml) return s;
+  // Sinon, conversion paragraphes plain text -> <p>...</p> avec preservation
+  // simple de **gras** et listes ligne par ligne commencant par - ou *.
+  const blocks = s.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  return blocks.map(block => {
+    // Liste si toutes les lignes commencent par - ou *
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length > 1 && lines.every(l => /^[-*]\s+/.test(l))) {
+      const items = lines.map(l => `<li>${l.replace(/^[-*]\s+/, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    }
+    // Sinon : paragraphe avec gras inline
+    const inline = block
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, ' ');
+    return `<p>${inline}</p>`;
+  }).join('\n');
+}
+
 async function assistAuditSynthesis(auditDump) {
   const userPrompt = [
     `=== AUDIT BACS — DUMP COMPLET ===`,
@@ -307,6 +337,13 @@ async function assistAuditSynthesis(auditDump) {
     `4 a 6 paragraphes courts en HTML Tiptap. Aucun titre marketing. Pas`,
     `d'invention. Termine sur un appel a l'action concret (prise de contact`,
     `Buildy pour planifier les actions correctives prioritaires).`,
+    ``,
+    `IMPORTANT - format de sortie :`,
+    `- Reponse directe en HTML (pas de markdown, pas de fences \`\`\`).`,
+    `- Chaque paragraphe entoure de <p>...</p>.`,
+    `- Mots cles importants en <strong>...</strong>.`,
+    `- Si tu listes des actions, utilise <ul><li>...</li></ul>.`,
+    `- Aucun texte hors balises HTML.`,
   ].join('\n');
 
   const resp = await client().messages.create({
@@ -315,10 +352,10 @@ async function assistAuditSynthesis(auditDump) {
     system: SYSTEM_PROMPT_SYNTHESIS,
     messages: [{ role: 'user', content: userPrompt }],
   });
-  const text = (resp.content || [])
+  const raw = (resp.content || [])
     .filter(b => b.type === 'text')
     .map(b => b.text).join('').trim();
-  return { html: text, usage: resp.usage };
+  return { html: normalizeSynthesisHtml(raw), usage: resp.usage };
 }
 
 module.exports = { streamSection, buildPrompts, assistLibrary, assistAuditSynthesis };
