@@ -452,29 +452,65 @@ async function routes(fastify) {
 
     // Labels d'enums (pour eviter les codes anglais bruts dans le PDF)
     const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
-      dhw:'Eau chaude sanitaire', lighting_indoor:'Eclairage interieur',
-      lighting_outdoor:'Eclairage exterieur', electricity_production:'Production electrique' };
+      dhw:'Eau chaude sanitaire', lighting_indoor:'Éclairage intérieur',
+      lighting_outdoor:'Éclairage extérieur', electricity_production:'Production électrique' };
     const COMM_LABEL = { modbus_tcp:'Modbus TCP', modbus_rtu:'Modbus RTU', bacnet_ip:'BACnet IP',
-      bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT',
+      bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT', lorawan:'LoRaWAN',
       autre:'Autre', non_communicant:'Non communicant', absent:'Absent' };
-    const REGULATION_LABEL = { per_room:'Par piece', per_zone:'Par zone',
+    const ENERGY_LABEL = { gas:'Gaz', electric:'Électrique', wood:'Bois', heat_pump:'PAC',
+      district_heating:'Réseau de chaleur', fuel_oil:'Fioul', solar:'Solaire',
+      biomass:'Biomasse', autre:'Autre' };
+    const ROLE_LABEL = { production:'Production', distribution:'Distribution',
+      emission:'Émission', regulation:'Régulation', autre:'Autre' };
+    const METER_TYPE_LABEL = { electric:'Électrique', electric_production:'Électrique de production',
+      gas:'Gaz', water:'Eau', thermal:'Thermique', other:'Autre' };
+    const METER_USAGE_LABEL = { heating:'Chauffage', cooling:'Refroidissement',
+      dhw:'ECS', pv:'Production PV', lighting:'Éclairage', other:'Général' };
+    const REGULATION_LABEL = { per_room:'Par pièce', per_zone:'Par zone',
       central_only:'Centrale uniquement', none:'Aucune' };
-    const GENERATOR_LABEL = { gas:'Gaz', electric:'Effet Joule', heat_pump:'Pompe a chaleur',
-      wood_appliance:'Appareil bois (exempte R175-6)', district_heating:'Reseau de chaleur', other:'Autre' };
+    const GENERATOR_LABEL = { gas:'Gaz', electric:'Effet Joule', heat_pump:'Pompe à chaleur',
+      wood_appliance:'Appareil bois (exempté R175-6)', district_heating:'Réseau de chaleur', other:'Autre' };
     const APPLICABILITY_LABEL = {
-      subject_immediate: 'Immediate (batiment > 290 kW deja existant)',
+      subject_immediate: 'Immédiate (bâtiment > 290 kW déjà existant)',
       subject_2025: '1er janvier 2025 (puissance > 290 kW)',
       subject_2027: '1er janvier 2027 (puissance > 70 kW)',
       not_subject: 'Non assujetti (puissance < 70 kW)',
     };
     const COMPLIANCE_LABEL = { compliant:'Conforme', partial:'Partiellement conforme', non_compliant:'Non conforme' };
 
-    // Enrichit systems et thermal avec labels
-    const enrichedSystems = systems.map(s => ({
-      ...s,
-      categoryLabel: SYSTEM_LABEL[s.system_category] || s.system_category,
-      commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
-    }));
+    // Charge tous les devices du document (joints au systeme parent)
+    const devices = db.db.prepare(`
+      SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+      ORDER BY z.position, z.name, s.system_category, d.position, d.id
+    `).all(documentId);
+    const devicesBySystem = new Map();
+    for (const d of devices) {
+      d.energyLabel = d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—';
+      d.roleLabel = d.device_role ? (ROLE_LABEL[d.device_role] || d.device_role) : '—';
+      d.commLabel = d.communication_protocol
+        ? (COMM_LABEL[d.communication_protocol] || d.communication_protocol)
+        : 'Non communicant';
+      if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);
+      devicesBySystem.get(d.system_id).push(d);
+    }
+
+    // Enrichit systems avec devices + sums et group par zone
+    const enrichedSystems = systems.map(s => {
+      const devs = devicesBySystem.get(s.id) || [];
+      const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0);
+      return {
+        ...s,
+        categoryLabel: SYSTEM_LABEL[s.system_category] || s.system_category,
+        commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
+        devices: devs,
+        device_count: devs.length,
+        total_power_kw: totalKw,
+      };
+    });
     // Group systems par zone
     const systemsByZoneMap = new Map();
     for (const s of enrichedSystems) {
@@ -485,6 +521,18 @@ async function routes(fastify) {
       systemsByZoneMap.get(k).items.push(s);
     }
     const systemsByZone = [...systemsByZoneMap.values()];
+
+    // Enrichit meters
+    const enrichedMeters = meters.map(m => ({
+      ...m,
+      typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
+      usageLabel: METER_USAGE_LABEL[m.usage] || m.usage,
+      zoneLabel: m.zone_name || 'Général bâtiment',
+    }));
+
+    // Listes GTB integration : devices + meters integres
+    const bmsManagedDevices = devices.filter(d => d.managed_by_bms);
+    const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
 
     const thermal = thermalRaw.map(t => ({
       ...t,
@@ -534,9 +582,11 @@ async function routes(fastify) {
       site,
       zones,
       systemsByZone,
-      meters,
+      meters: enrichedMeters,
       thermal,
       bms,
+      bmsManagedDevices,
+      bmsManagedMeters,
       buildySolution,
       actionItems,
       actionStats,

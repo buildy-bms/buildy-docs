@@ -70,42 +70,77 @@
 <h1 class="chapter">3. Systèmes techniques par zone (R175-1 §4)</h1>
 {{#each systemsByZone}}
 <h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
-<table>
-  <thead><tr><th>Catégorie</th><th>Présent</th><th>Communication</th><th>Notes</th></tr></thead>
-  <tbody>
-    {{#each items}}
-      <tr>
-        <td>{{categoryLabel}}</td>
-        <td>{{#if present}}Oui{{else}}Non{{/if}}</td>
-        <td>{{commLabel}}</td>
-        <td>{{notes}}</td>
-      </tr>
-    {{/each}}
-  </tbody>
-</table>
+{{#each items}}
+  {{#if present}}
+    <h3>{{categoryLabel}}{{#if total_power_kw}} <span class="muted">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
+    {{#if devices.length}}
+      <table>
+        <thead>
+          <tr>
+            <th>Nom</th><th>Marque</th><th>Modèle</th><th>Énergie</th>
+            <th>Puiss. (kW)</th><th>Nature</th><th>Communication</th>
+            <th>Localisation</th><th>Comm. R175-3 §3</th><th>Arrêt manuel</th>
+            <th>Autonome</th><th>HS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each devices}}
+            <tr>
+              <td>{{name}}</td>
+              <td>{{brand}}</td>
+              <td>{{model_reference}}</td>
+              <td>{{energyLabel}}</td>
+              <td>{{power_kw}}</td>
+              <td>{{roleLabel}}</td>
+              <td>{{commLabel}}</td>
+              <td>{{location}}</td>
+              <td>{{#if communication_protocol}}{{#unless (eq communication_protocol "non_communicant")}}{{#unless (eq communication_protocol "absent")}}Oui{{else}}Non{{/unless}}{{else}}Non{{/unless}}{{else}}Non{{/if}}</td>
+              <td>{{boolLabel meets_r175_3_p4}}</td>
+              <td>{{boolLabel meets_r175_3_p4_autonomous}}</td>
+              <td>{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}—{{/if}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{else}}
+      <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
+    {{/if}}
+    {{#if notes}}<p class="muted"><em>Notes catégorie :</em> {{notes}}</p>{{/if}}
+  {{else}}
+    <h3 class="muted">{{categoryLabel}} — non présent</h3>
+  {{/if}}
+{{/each}}
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
 <h1 class="chapter">4. Compteurs et mesurage (R175-3 §1)</h1>
 {{#if meters.length}}
 <table>
-  <thead><tr><th>Zone</th><th>Usage</th><th>Type</th><th>Requis</th><th>Présent</th><th>Communicant</th><th>Notes</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Zone</th><th>Usage</th><th>Type</th>
+      <th>Requis</th><th>Présent</th><th>Communicant</th><th>Intégré GTB</th>
+      <th>Notes</th><th>HS</th>
+    </tr>
+  </thead>
   <tbody>
     {{#each meters}}
       <tr>
-        <td>{{zone_name}}</td>
-        <td>{{usage}}</td>
-        <td>{{meter_type}}</td>
+        <td>{{zoneLabel}}</td>
+        <td>{{usageLabel}}</td>
+        <td>{{typeLabel}}</td>
         <td>{{#if required}}Oui{{else}}Non{{/if}}</td>
         <td>{{#if present_actual}}Oui{{else}}Non{{/if}}</td>
         <td>{{#if communicating}}Oui{{else}}Non{{/if}}</td>
+        <td>{{#if managed_by_bms}}Oui{{else}}Non{{/if}}</td>
         <td>{{notes}}</td>
+        <td>{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}—{{/if}}</td>
       </tr>
     {{/each}}
   </tbody>
 </table>
 {{else}}
-<p class="muted">Aucun compteur listé. La matrice usage × zone reste à compléter.</p>
+<p class="muted">Aucun compteur listé. Saisis les équipements (avec leur énergie) pour générer automatiquement les compteurs requis.</p>
 {{/if}}
 
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
@@ -133,17 +168,35 @@
 {{!-- ═══════════ Chapitre 6 — GTB ═══════════ --}}
 <h1 class="chapter">6. Solution GTB / GTC (R175-3, R175-4, R175-5)</h1>
 {{#if bms}}
-<p>
-  <strong>Solution :</strong> {{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}<span class="muted">Non renseigné</span>{{/if}}
-  {{#if bms.existing_solution_brand}} — {{bms.existing_solution_brand}}{{/if}}
+{{#if bms.out_of_service}}
+<p style="background:#fee2e2;border:1px solid #fca5a5;padding:3mm;border-radius:1mm;color:#991b1b;">
+  <strong>GTB Hors-Service.</strong> Les exigences R175-3, R175-4 et R175-5 ne sont pas évaluées car la GTB n'est pas opérationnelle au moment de l'audit.
 </p>
-<h3>R175-3 — 4 exigences fonctionnelles</h3>
+{{/if}}
+<table>
+  <tr><th>Solution en place</th><td>{{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}<span class="muted">Non renseigné</span>{{/if}}</td></tr>
+  {{#if bms.existing_solution_brand}}<tr><th>Marque / éditeur</th><td>{{bms.existing_solution_brand}}</td></tr>{{/if}}
+  {{#if bms.location}}<tr><th>Localisation</th><td>{{bms.location}}</td></tr>{{/if}}
+  {{#if bms.model_reference}}<tr><th>Référence modèle</th><td>{{bms.model_reference}}</td></tr>{{/if}}
+</table>
+
+<h3>Usages traités par la GTB</h3>
+<p>
+  {{#if bms.manages_heating}}<span style="display:inline-block;padding:1mm 2mm;background:#eef2ff;color:#4338ca;border-radius:1mm;margin:0.5mm">Chauffage</span>{{/if}}
+  {{#if bms.manages_cooling}}<span style="display:inline-block;padding:1mm 2mm;background:#eef2ff;color:#4338ca;border-radius:1mm;margin:0.5mm">Refroidissement</span>{{/if}}
+  {{#if bms.manages_ventilation}}<span style="display:inline-block;padding:1mm 2mm;background:#eef2ff;color:#4338ca;border-radius:1mm;margin:0.5mm">Ventilation</span>{{/if}}
+  {{#if bms.manages_dhw}}<span style="display:inline-block;padding:1mm 2mm;background:#eef2ff;color:#4338ca;border-radius:1mm;margin:0.5mm">ECS</span>{{/if}}
+  {{#if bms.manages_lighting}}<span style="display:inline-block;padding:1mm 2mm;background:#eef2ff;color:#4338ca;border-radius:1mm;margin:0.5mm">Éclairage</span>{{/if}}
+  {{#unless bms.manages_heating}}{{#unless bms.manages_cooling}}{{#unless bms.manages_ventilation}}{{#unless bms.manages_dhw}}{{#unless bms.manages_lighting}}<span class="muted">Aucun usage déclaré.</span>{{/unless}}{{/unless}}{{/unless}}{{/unless}}{{/unless}}
+</p>
+
+<h3>R175-3 — Capacités de supervision</h3>
 <table>
   <tr><td>P1. Suivi continu, pas horaire, conservation 5 ans</td><td>{{boolLabel bms.meets_r175_3_p1}}</td></tr>
   <tr><td>P2. Détection des pertes d'efficacité</td><td>{{boolLabel bms.meets_r175_3_p2}}</td></tr>
-  <tr><td>P3. Interopérabilité multi-systèmes</td><td>{{boolLabel bms.meets_r175_3_p3}}</td></tr>
-  <tr><td>P4. Arrêt manuel + gestion autonome</td><td>{{boolLabel bms.meets_r175_3_p4}}</td></tr>
 </table>
+<p class="muted"><em>Note : R175-3 §3 (interopérabilité) et §4 (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (cf chapitre 3).</em></p>
+
 <h3>R175-4 — Vérifications périodiques</h3>
 <p>Consignes écrites de maintenance présentes : <strong>{{boolLabel bms.has_maintenance_procedures}}</strong></p>
 <h3>R175-5 — Formation de l'exploitant</h3>
@@ -154,6 +207,27 @@
   par le support utilisateur intégré (assistance contextuelle, documentation
   embarquée, support continu). Cf. Annexe B point 8.
 </p>
+{{/if}}
+
+{{#if bmsManagedDevices.length}}
+<h3>Équipements intégrés à la GTB ({{bmsManagedDevices.length}})</h3>
+<ul>
+  {{#each bmsManagedDevices}}
+    <li>
+      <strong>{{name}}</strong>{{#if brand}} — {{brand}}{{/if}}
+      <span class="muted">— zone « {{zone_name}} »{{#if power_kw}}, {{power_kw}} kW{{/if}}</span>
+    </li>
+  {{/each}}
+</ul>
+{{/if}}
+
+{{#if bmsManagedMeters.length}}
+<h3>Compteurs intégrés à la GTB ({{bmsManagedMeters.length}})</h3>
+<ul>
+  {{#each bmsManagedMeters}}
+    <li><strong>{{typeLabel}}</strong> — {{zoneLabel}} ({{usageLabel}})</li>
+  {{/each}}
+</ul>
 {{/if}}
 {{else}}
 <p class="muted">Évaluation de la GTB non renseignée.</p>

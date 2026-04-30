@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 43;
+const TARGET_VERSION = 44;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1756,6 +1756,68 @@ function runMigrations() {
     `);
     db.pragma('user_version = 43');
     log.info('Migration 43 appliquee : managed_by_bms + out_of_service par device/meter/bms');
+  }
+
+  if (current < 44) {
+    // Etend le CHECK source_table pour accepter 'devices' (introduit en m42).
+    // SQLite < 3.35 ne supporte pas DROP CHECK in-place : recreate table.
+    // Preserve toutes les colonnes (m35 + m39 source_subtype) et les donnees.
+    db.pragma('foreign_keys = OFF');
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        CREATE TABLE bacs_audit_action_items_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          category TEXT NOT NULL
+            CHECK (category IN
+              ('meter_addition','meter_replacement','meter_connection',
+               'system_addition','system_replacement','communication_upgrade',
+               'bms_upgrade','bms_replacement','bms_addition',
+               'data_retention_upgrade','training','documentation',
+               'thermal_regulation','thermal_regulation_upgrade','other')),
+          severity TEXT NOT NULL
+            CHECK (severity IN ('blocking','major','minor')),
+          r175_article TEXT,
+          title TEXT NOT NULL,
+          description TEXT,
+          zone_id INTEGER REFERENCES zones(zone_id) ON DELETE SET NULL,
+          equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
+          source_table TEXT
+            CHECK (source_table IS NULL OR source_table IN
+              ('systems','meters','bms','thermal_regulation','devices')),
+          source_id INTEGER,
+          source_subtype TEXT,
+          auto_generated INTEGER NOT NULL DEFAULT 1,
+          commercial_notes TEXT,
+          estimated_effort TEXT
+            CHECK (estimated_effort IS NULL OR estimated_effort IN ('low','medium','high')),
+          status TEXT NOT NULL DEFAULT 'open'
+            CHECK (status IN ('open','quoted','in_progress','done','declined')),
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO bacs_audit_action_items_new
+          SELECT id, document_id, category, severity, r175_article, title, description,
+                 zone_id, equipment_id, source_table, source_id, source_subtype,
+                 auto_generated, commercial_notes, estimated_effort, status, position,
+                 created_at, updated_at
+          FROM bacs_audit_action_items;
+        DROP TABLE bacs_audit_action_items;
+        ALTER TABLE bacs_audit_action_items_new RENAME TO bacs_audit_action_items;
+        CREATE INDEX idx_bacs_actions_doc ON bacs_audit_action_items(document_id, severity, position);
+        CREATE INDEX idx_bacs_actions_source ON bacs_audit_action_items(document_id, source_table, source_id, source_subtype);
+      `);
+      db.pragma('foreign_keys = ON');
+      db.pragma('user_version = 44');
+      db.exec('COMMIT');
+      log.info("Migration 44 appliquee : source_table.CHECK accepte 'devices'");
+    } catch (e) {
+      db.exec('ROLLBACK');
+      db.pragma('foreign_keys = ON');
+      throw e;
+    }
   }
 
   if (current > TARGET_VERSION) {
