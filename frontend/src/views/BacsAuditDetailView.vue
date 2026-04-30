@@ -14,7 +14,8 @@ import {
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
   getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
-  getBacsPowerCumul,
+  getBacsPowerCumul, resyncBacsAudit,
+  listZones, createZone, updateZone, deleteZone,
 } from '@/api'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
@@ -34,6 +35,28 @@ const meters = ref([])
 const bms = ref({})
 const thermal = ref([])
 const actionItems = ref([])
+const zones = ref([])
+
+const ZONE_NATURES = [
+  { value: 'shared-office', label: 'Bureau partagé' },
+  { value: 'private-office', label: 'Bureau privé' },
+  { value: 'open-space', label: 'Open-space' },
+  { value: 'commercial-space', label: 'Espace commercial' },
+  { value: 'meeting-room', label: 'Salle de réunion' },
+  { value: 'workshop', label: 'Atelier' },
+  { value: 'switchboard', label: 'Tableau électrique' },
+  { value: 'technical-area', label: 'Local technique' },
+  { value: 'classroom', label: 'Salle de classe' },
+  { value: 'leasure-space', label: 'Espace loisirs' },
+  { value: 'foyer', label: 'Foyer' },
+  { value: 'corridor', label: 'Couloir' },
+  { value: 'outdoor', label: 'Extérieur' },
+  { value: 'meters', label: 'Local compteurs' },
+  { value: 'shared-space', label: 'Espace partagé' },
+  { value: 'logistic-cell', label: 'Cellule logistique' },
+  { value: 'stock', label: 'Stock' },
+]
+const newZone = ref({ name: '', nature: null })
 
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
@@ -125,10 +148,76 @@ async function refresh() {
     bms.value = b.data || {}
     thermal.value = t.data
     actionItems.value = a.data
+    if (d.data.site_id) {
+      const z = await listZones(d.data.site_id)
+      zones.value = z.data
+    }
   } catch (e) {
     error('Échec du chargement de l\'audit BACS')
   } finally {
     loading.value = false
+  }
+}
+
+async function refreshAuditData() {
+  // Recharge systems / thermal / action_items apres un changement de zone
+  const [s, t, a] = await Promise.all([
+    getBacsSystems(docId), getBacsThermal(docId), getBacsActionItems(docId),
+  ])
+  systems.value = s.data
+  thermal.value = t.data
+  actionItems.value = a.data
+}
+
+async function addZone() {
+  if (!newZone.value.name.trim() || !document.value?.site_id) return
+  try {
+    await createZone({
+      site_id: document.value.site_id,
+      name: newZone.value.name.trim(),
+      nature: newZone.value.nature,
+    })
+    // Recharge zones puis resync l'audit (pre-remplit systems + thermal pour la nouvelle zone)
+    const z = await listZones(document.value.site_id)
+    zones.value = z.data
+    await resyncBacsAudit(docId)
+    await refreshAuditData()
+    newZone.value = { name: '', nature: null }
+    success('Zone ajoutée et plan d\'audit synchronisé')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Création zone impossible')
+  }
+}
+
+async function patchZone(z, patch) {
+  try {
+    const { data } = await updateZone(z.zone_id, patch)
+    Object.assign(z, data)
+    // Si la nature a change, on resync (les categories attendues ont change)
+    if ('nature' in patch) {
+      await resyncBacsAudit(docId)
+      await refreshAuditData()
+    }
+  } catch {
+    error('Sauvegarde zone impossible')
+  }
+}
+
+async function removeZone(z) {
+  const ok = await confirm({
+    title: 'Supprimer cette zone ?',
+    message: `« ${z.name} »\n\nLes systèmes, équipements et lignes d'audit rattachés à cette zone seront aussi supprimés.`,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteZone(z.zone_id)
+    zones.value = zones.value.filter(x => x.zone_id !== z.zone_id)
+    await refreshAuditData()
+    success('Zone supprimée')
+  } catch {
+    error('Suppression impossible')
   }
 }
 
@@ -383,11 +472,78 @@ onMounted(refresh)
         </div>
       </section>
 
+      <!-- 2. Zones fonctionnelles (R175-1 §6) — editable in-situ -->
+      <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <MapPinIcon class="w-5 h-5 text-indigo-600" />
+          <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
+          <span class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
+          <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
+        </header>
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
+            <tr>
+              <th class="text-left px-5 py-2">Nom</th>
+              <th class="text-left py-2 w-48">Nature</th>
+              <th class="text-left px-5 py-2">Notes</th>
+              <th class="text-right px-5 py-2 w-12"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="z in zones" :key="z.zone_id" class="group">
+              <td class="px-5 py-2">
+                <input type="text" :value="z.name"
+                       @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
+                       class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+              </td>
+              <td class="py-2">
+                <select :value="z.nature"
+                        @change="e => patchZone(z, { nature: e.target.value || null })"
+                        class="text-xs px-2 py-1 border border-gray-200 rounded">
+                  <option :value="null">—</option>
+                  <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </td>
+              <td class="px-5 py-2">
+                <input type="text" :value="z.notes" placeholder="—"
+                       @blur="e => e.target.value !== (z.notes || '') && patchZone(z, { notes: e.target.value || null })"
+                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+              </td>
+              <td class="px-5 py-2 text-right">
+                <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+            <!-- Ligne d'ajout -->
+            <tr class="bg-indigo-50/30">
+              <td class="px-5 py-2">
+                <input v-model="newZone.name" type="text" placeholder="Nom de la zone à ajouter…"
+                       @keydown.enter="addZone"
+                       class="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
+              </td>
+              <td class="py-2">
+                <select v-model="newZone.nature" class="text-xs px-2 py-1 border border-gray-200 rounded">
+                  <option :value="null">— nature</option>
+                  <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </td>
+              <td colspan="2" class="px-5 py-2">
+                <button @click="addZone" :disabled="!newZone.name.trim()"
+                        class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                  + Ajouter
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- Systemes par zone (R175-1 §4) -->
       <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <BoltIcon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">Systèmes techniques par zone</h2>
+          <h2 class="text-base font-semibold text-gray-800">3. Systèmes techniques par zone</h2>
           <span class="text-xs text-gray-500">R175-1 §4</span>
         </header>
         <div class="divide-y divide-gray-100">
@@ -440,7 +596,7 @@ onMounted(refresh)
       <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <FireIcon class="w-5 h-5 text-red-500" />
-          <h2 class="text-base font-semibold text-gray-800">Régulation thermique automatique</h2>
+          <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
           <span class="text-xs text-gray-500">R175-6</span>
         </header>
         <table class="w-full text-sm">
@@ -495,7 +651,7 @@ onMounted(refresh)
       <section class="bg-white border border-gray-200 rounded-lg shadow-sm">
         <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
-          <h2 class="text-base font-semibold text-gray-800">Solution GTB / GTC en place</h2>
+          <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
           <span class="text-xs text-gray-500">R175-3 + R175-4 + R175-5</span>
         </header>
         <div class="px-5 py-4 space-y-4">
@@ -563,7 +719,7 @@ onMounted(refresh)
         <header class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
-            <h2 class="text-base font-semibold text-gray-800">Plan de mise en conformité</h2>
+            <h2 class="text-base font-semibold text-gray-800">8. Plan de mise en conformité</h2>
             <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
           </div>
         </header>

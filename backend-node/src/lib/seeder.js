@@ -535,8 +535,25 @@ function seedBacsAuditStructure(documentId, siteId) {
     sectionsCount++;
   }
 
-  // 2) Pre-remplir bacs_audit_systems pour chaque zone du site, selon les
-  //    categories requises de zone_nature (matrice seedee).
+  // 2 + 3 + 4 : pre-remplit les donnees d'audit (systems + thermal + bms 1-1)
+  const dataResult = resyncBacsAuditDataForZones(documentId, zones);
+
+  log.info(`Seed audit BACS #${documentId} (site #${siteId}) : ${sectionsCount} sections, ${dataResult.systems_count} systems, ${dataResult.thermal_count} thermal_regulation`);
+  return { sections_count: sectionsCount, systems_count: dataResult.systems_count, thermal_count: dataResult.thermal_count };
+}
+
+/**
+ * Pre-remplit / re-synchronise les donnees d'audit (systems + thermal + bms
+ * 1-1) pour les zones donnees. Idempotent (INSERT OR IGNORE) : peut etre
+ * appele plusieurs fois sans creer de doublons. Utile :
+ *   1. Au seed initial (depuis seedBacsAuditStructure)
+ *   2. Apres ajout/modification d'une zone (le UI declenche un POST resync)
+ *
+ * Pour une zone dont la nature change : les rows existantes restent (les
+ * categories deja saisies par l'auditeur ne sont pas effacees), seules
+ * les nouvelles categories implied par la nouvelle nature sont ajoutees.
+ */
+function resyncBacsAuditDataForZones(documentId, zones) {
   const reqByNature = {};
   for (const r of db.db.prepare('SELECT zone_nature, required_categories FROM bacs_requirements_by_zone_nature').all()) {
     try { reqByNature[r.zone_nature] = JSON.parse(r.required_categories); }
@@ -556,7 +573,6 @@ function seedBacsAuditStructure(documentId, siteId) {
     }
   }
 
-  // 3) Pre-remplir bacs_audit_thermal_regulation : 1 ligne par zone (R175-6)
   const insertThermal = db.db.prepare(`
     INSERT OR IGNORE INTO bacs_audit_thermal_regulation (document_id, zone_id, has_automatic_regulation)
     VALUES (?, ?, 0)
@@ -567,17 +583,30 @@ function seedBacsAuditStructure(documentId, siteId) {
     if (r.changes) thermalCount++;
   }
 
-  // 4) Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)
+  // Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)
   db.db.prepare(`
     INSERT OR IGNORE INTO bacs_audit_bms (document_id) VALUES (?)
   `).run(documentId);
 
-  log.info(`Seed audit BACS #${documentId} (site #${siteId}) : ${sectionsCount} sections, ${systemsCount} systems, ${thermalCount} thermal_regulation`);
-  return { sections_count: sectionsCount, systems_count: systemsCount, thermal_count: thermalCount };
+  return { systems_count: systemsCount, thermal_count: thermalCount };
+}
+
+/**
+ * Wrapper public : resync les donnees d'un audit BACS avec les zones
+ * actuelles du site rattache. Utilise par l'endpoint POST /bacs-audit/
+ * :id/resync apres ajout d'une zone dans la UI.
+ */
+function resyncBacsAuditWithSiteZones(documentId) {
+  const af = db.afs.getById(documentId);
+  if (!af || af.kind !== 'bacs_audit' || !af.site_id) {
+    throw new Error(`Document #${documentId} introuvable, pas un audit BACS, ou sans site rattache`);
+  }
+  const zones = db.zones.listBySite(af.site_id);
+  return resyncBacsAuditDataForZones(documentId, zones);
 }
 
 module.exports = {
   seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks,
   backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure,
-  seedBacsRequirementsOnBoot, seedBacsAuditStructure,
+  seedBacsRequirementsOnBoot, seedBacsAuditStructure, resyncBacsAuditWithSiteZones,
 };

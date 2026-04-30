@@ -8,6 +8,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const gitLib = require('../lib/git');
 const bacsArticlesData = require('../seeds/bacs-articles');
 const bacsAuditMethodology = require('../lib/bacs-audit-methodology');
@@ -571,6 +572,19 @@ async function routes(fastify) {
       file_size_bytes: result.sizeBytes,
       download_url: `/api/exports/${insertedRow.lastInsertRowid}/download`,
     };
+  });
+
+  // POST /bacs-audit/:documentId/resync — re-synchronise les rows
+  // bacs_audit_systems / thermal_regulation avec les zones actuelles du
+  // site (idempotent). Appele par la UI apres ajout d'une zone.
+  fastify.post('/bacs-audit/:documentId/resync', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    let result;
+    try { result = resyncBacsAuditWithSiteZones(id); }
+    catch (e) { return reply.code(400).send({ detail: e.message }); }
+    regenerateActionItems(id);
+    return result;
   });
 
   // ─── Livraison de l'audit ──────────────────────────────────────────
