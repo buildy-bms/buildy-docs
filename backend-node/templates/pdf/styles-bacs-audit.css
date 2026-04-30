@@ -245,3 +245,55 @@ table tr:nth-child(even) td { background: #fafafa; }
   font-weight: 600;
   color: #1b2842;
 }
+
+/* ── Notes riches & photos par entite (zones / systemes / compteurs / GTB / devices) ── */
+.entity-block {
+  margin: 4mm 0 6mm;
+  padding: 3mm 4mm;
+  background: #fafbfc;
+  border-left: 2.5pt solid #1b2842;
+  border-radius: 0.8mm;
+  page-break-inside: avoid;
+}
+.entity-block h3 {
+  margin: 0 0 2mm;
+  font-size: 10pt;
+  color: #1b2842;
+}
+.rich-notes {
+  font-size: 9.5pt;
+  color: #374151;
+  line-height: 1.5;
+}
+.rich-notes p { margin: 0 0 2mm; }
+.rich-notes p:last-child { margin-bottom: 0; }
+.rich-notes strong { color: #111827; font-weight: 600; }
+.rich-notes ul, .rich-notes ol { padding-left: 6mm; margin: 1.5mm 0; }
+.rich-notes li { margin: 0.5mm 0; }
+.rich-notes a { color: #4f46e5; text-decoration: underline; }
+
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm;
+  margin-top: 3mm;
+  page-break-inside: avoid;
+}
+.photo-grid img {
+  width: 52mm;
+  height: 39mm;
+  object-fit: cover;
+  border-radius: 0.6mm;
+  border: 0.3pt solid #d1d5db;
+  background: #f3f4f6;
+}
+
+.device-notes {
+  margin: 3mm 0 0 4mm;
+  padding-left: 3mm;
+  border-left: 1.5pt solid #cbd5e1;
+  page-break-inside: avoid;
+}
+.device-notes > strong { font-size: 9pt; }
+.device-notes .rich-notes { margin-top: 1mm; font-size: 9pt; }
+.device-notes .photo-grid img { width: 42mm; height: 32mm; }

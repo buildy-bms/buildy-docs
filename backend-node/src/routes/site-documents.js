@@ -3,16 +3,24 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+const sharp = require('sharp');
 const { z } = require('zod');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 
 const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
-  'datasheet','manuel_utilisateur','rapport_essais','autre'];
+  'datasheet','manuel_utilisateur','rapport_essais','photo','autre'];
 
 // 25 MB max — DOE peut contenir des plans lourds
 const MAX_BYTES = 25 * 1024 * 1024;
+
+// Photos : on resize a max 1600px de cote + JPEG quality 82 → typique
+// passage de 4-8 MB iPhone a 200-400 KB. EXIF strippe (privacy).
+const PHOTO_MAX_DIM = 1600;
+const PHOTO_JPEG_QUALITY = 82;
+const IMAGE_MIMES = new Set(['image/jpeg','image/jpg','image/png','image/webp','image/heic','image/heif']);
 
 function siteDocsDir(siteUuid) {
   const dir = path.resolve(config.attachmentsDir, '..', 'site-documents', siteUuid);
@@ -42,7 +50,8 @@ async function routes(fastify) {
   fastify.get('/sites/:uuid/documents', async (request, reply) => {
     const site = db.sites.getByUuid(request.params.uuid);
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
-    const { category, bacs_audit_system_id, bacs_audit_device_id } = request.query;
+    const { category, bacs_audit_system_id, bacs_audit_device_id,
+      bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_bms_document_id } = request.query;
     let sql = `
       SELECT d.*, u.display_name AS uploaded_by_name
       FROM site_documents d
@@ -59,6 +68,18 @@ async function routes(fastify) {
       sql += ' AND d.bacs_audit_device_id = ?';
       args.push(parseInt(bacs_audit_device_id, 10));
     }
+    if (bacs_audit_zone_id) {
+      sql += ' AND d.bacs_audit_zone_id = ?';
+      args.push(parseInt(bacs_audit_zone_id, 10));
+    }
+    if (bacs_audit_meter_id) {
+      sql += ' AND d.bacs_audit_meter_id = ?';
+      args.push(parseInt(bacs_audit_meter_id, 10));
+    }
+    if (bacs_audit_bms_document_id) {
+      sql += ' AND d.bacs_audit_bms_document_id = ?';
+      args.push(parseInt(bacs_audit_bms_document_id, 10));
+    }
     sql += ' ORDER BY d.uploaded_at DESC';
     return db.db.prepare(sql).all(...args);
   });
@@ -70,7 +91,8 @@ async function routes(fastify) {
     const site = db.sites.getByUuid(request.params.uuid);
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
 
-    const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id } = request.query;
+    const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id,
+      bacs_audit_device_id, bacs_audit_zone_id, bacs_audit_meter_id } = request.query;
     if (!title) return reply.code(400).send({ detail: 'Title requis (query string)' });
     if (!category || !CATEGORIES.includes(category)) {
       return reply.code(400).send({ detail: 'Categorie invalide' });
@@ -79,31 +101,46 @@ async function routes(fastify) {
     const file = await request.file({ limits: { fileSize: MAX_BYTES } });
     if (!file) return reply.code(400).send({ detail: 'Aucun fichier recu' });
 
-    const filename = crypto.randomUUID() + extFromMime(file.mimetype, file.filename);
+    const isImage = IMAGE_MIMES.has((file.mimetype || '').toLowerCase());
     const dir = siteDocsDir(site.site_uuid);
+
+    // Pour les images on force JPEG optimise. Pour le reste (PDF/DWG/etc.)
+    // on garde l'extension d'origine et on ecrit le stream tel quel.
+    const filename = crypto.randomUUID() + (isImage ? '.jpg' : extFromMime(file.mimetype, file.filename));
     const fullPath = path.join(dir, filename);
+    let storedMime = isImage ? 'image/jpeg' : (file.mimetype || 'application/octet-stream');
 
     try {
-      await new Promise((resolve, reject) => {
-        const ws = fs.createWriteStream(fullPath);
-        let aborted = false;
-        file.file.pipe(ws);
-        file.file.on('limit', () => {
-          aborted = true;
-          ws.destroy();
-          fs.unlink(fullPath, () => {});
-          reject(new Error('FILE_TOO_LARGE'));
-        });
-        ws.on('error', reject);
-        ws.on('finish', () => {
-          if (aborted) return;
-          fs.open(fullPath, 'r', (err, fd) => {
-            if (err) return resolve();
-            fs.fsync(fd, () => fs.close(fd, () => resolve()));
+      if (isImage) {
+        const transformer = sharp()
+          .rotate()
+          .resize(PHOTO_MAX_DIM, PHOTO_MAX_DIM, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: PHOTO_JPEG_QUALITY, mozjpeg: true });
+        await pipeline(file.file, transformer, fs.createWriteStream(fullPath));
+        if (file.file.truncated) throw new Error('FILE_TOO_LARGE');
+      } else {
+        await new Promise((resolve, reject) => {
+          const ws = fs.createWriteStream(fullPath);
+          let aborted = false;
+          file.file.pipe(ws);
+          file.file.on('limit', () => {
+            aborted = true;
+            ws.destroy();
+            fs.unlink(fullPath, () => {});
+            reject(new Error('FILE_TOO_LARGE'));
+          });
+          ws.on('error', reject);
+          ws.on('finish', () => {
+            if (aborted) return;
+            fs.open(fullPath, 'r', (err, fd) => {
+              if (err) return resolve();
+              fs.fsync(fd, () => fs.close(fd, () => resolve()));
+            });
           });
         });
-      });
+      }
     } catch (err) {
+      try { fs.unlinkSync(fullPath); } catch { /* ignore */ }
       if (err.message === 'FILE_TOO_LARGE') {
         return reply.code(413).send({ detail: `Fichier trop lourd (max ${MAX_BYTES / 1024 / 1024} MB)` });
       }
@@ -119,13 +156,16 @@ async function routes(fastify) {
     const r = db.db.prepare(`
       INSERT INTO site_documents
         (site_id, title, category, filename, original_name, size_bytes, mime_type,
-         bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
+         bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      site.site_id, title, category, filename, file.filename, sizeBytes, file.mimetype,
+      site.site_id, title, category, filename, file.filename, sizeBytes, storedMime,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
       bacs_audit_bms_document_id ? parseInt(bacs_audit_bms_document_id, 10) : null,
       bacs_audit_device_id ? parseInt(bacs_audit_device_id, 10) : null,
+      bacs_audit_zone_id ? parseInt(bacs_audit_zone_id, 10) : null,
+      bacs_audit_meter_id ? parseInt(bacs_audit_meter_id, 10) : null,
       userId || null,
     );
     db.auditLog.add({ userId, action: 'site_document.upload',
@@ -161,6 +201,8 @@ async function routes(fastify) {
       bacs_audit_system_id: z.number().int().nullable().optional(),
       bacs_audit_bms_document_id: z.number().int().nullable().optional(),
       bacs_audit_device_id: z.number().int().nullable().optional(),
+      bacs_audit_zone_id: z.number().int().nullable().optional(),
+      bacs_audit_meter_id: z.number().int().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }

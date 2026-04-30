@@ -75,13 +75,27 @@
 <h1 class="chapter">2. Zones fonctionnelles (R175-1 §6)</h1>
 {{#if zones.length}}
 <table>
-  <thead><tr><th>Zone</th><th>Nature</th><th>Notes</th></tr></thead>
+  <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
   <tbody>
     {{#each zones}}
-      <tr><td>{{name}}</td><td>{{nature}}</td><td>{{notes}}</td></tr>
+      <tr><td>{{name}}</td><td>{{nature}}</td><td>{{surface_m2}}</td></tr>
     {{/each}}
   </tbody>
 </table>
+{{#each zones}}
+  {{#if (or notes_html notes photos.length)}}
+    <div class="entity-block">
+      <h3>{{name}}</h3>
+      {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
+      {{else}}{{#if notes}}<p>{{notes}}</p>{{/if}}{{/if}}
+      {{#if photos.length}}
+        <div class="photo-grid">
+          {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+        </div>
+      {{/if}}
+    </div>
+  {{/if}}
+{{/each}}
 {{else}}
 <p class="muted">Aucune zone définie.</p>
 {{/if}}
@@ -125,7 +139,27 @@
     {{else}}
       <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
     {{/if}}
-    {{#if notes}}<p class="muted"><em>Notes catégorie :</em> {{notes}}</p>{{/if}}
+    {{#if notes_html}}
+      <div class="rich-notes">{{{notes_html}}}</div>
+    {{else}}{{#if notes}}<p class="muted"><em>Notes :</em> {{notes}}</p>{{/if}}{{/if}}
+    {{#if photos.length}}
+      <div class="photo-grid">
+        {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+      </div>
+    {{/if}}
+    {{#each devices}}
+      {{#if (or notes_html photos.length)}}
+        <div class="device-notes">
+          <strong class="muted">{{name}}{{#if brand}} — {{brand}}{{/if}}{{#if model_reference}} {{model_reference}}{{/if}}</strong>
+          {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
+          {{#if photos.length}}
+            <div class="photo-grid">
+              {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+            </div>
+          {{/if}}
+        </div>
+      {{/if}}
+    {{/each}}
   {{else}}
     <h3 class="muted">{{categoryLabel}} — non présent</h3>
   {{/if}}
@@ -139,8 +173,7 @@
   <thead>
     <tr>
       <th>Zone</th><th>Usage</th><th>Type</th>
-      <th>Requis</th><th>Présent</th><th>Communicant</th><th>Intégré GTB</th>
-      <th>Notes</th><th>HS</th>
+      <th>Requis</th><th>Présent</th><th>Communicant</th><th>Intégré GTB</th><th>HS</th>
     </tr>
   </thead>
   <tbody>
@@ -153,12 +186,25 @@
         <td>{{#if present_actual}}Oui{{else}}Non{{/if}}</td>
         <td>{{#if communicating}}Oui{{else}}Non{{/if}}</td>
         <td>{{#if managed_by_bms}}Oui{{else}}Non{{/if}}</td>
-        <td>{{notes}}</td>
         <td>{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}—{{/if}}</td>
       </tr>
     {{/each}}
   </tbody>
 </table>
+{{#each meters}}
+  {{#if (or notes_html notes photos.length)}}
+    <div class="entity-block">
+      <h3>{{zoneLabel}} — {{usageLabel}} ({{typeLabel}})</h3>
+      {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
+      {{else}}{{#if notes}}<p>{{notes}}</p>{{/if}}{{/if}}
+      {{#if photos.length}}
+        <div class="photo-grid">
+          {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+        </div>
+      {{/if}}
+    </div>
+  {{/if}}
+{{/each}}
 {{else}}
 <p class="muted">Aucun compteur listé. Saisis les équipements (avec leur énergie) pour générer automatiquement les compteurs requis.</p>
 {{/if}}
@@ -248,6 +294,21 @@
     <li><strong>{{typeLabel}}</strong> — {{zoneLabel}} ({{usageLabel}})</li>
   {{/each}}
 </ul>
+{{/if}}
+
+{{#if bms.notes_html}}
+<div class="entity-block">
+  <h3>Notes GTB</h3>
+  <div class="rich-notes">{{{bms.notes_html}}}</div>
+</div>
+{{/if}}
+{{#if bms.photos.length}}
+<div class="entity-block">
+  <h3>Photos GTB</h3>
+  <div class="photo-grid">
+    {{#each bms.photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+  </div>
+</div>
 {{/if}}
 {{else}}
 <p class="muted">Évaluation de la GTB non renseignée.</p>

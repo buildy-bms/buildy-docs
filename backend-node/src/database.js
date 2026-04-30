@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 46;
+const TARGET_VERSION = 47;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1849,6 +1849,35 @@ function runMigrations() {
     log.info('Migration 46 appliquee : site_documents.bacs_audit_device_id');
   }
 
+  if (current < 47) {
+    // Cf retour Kevin v2.8 : pour chaque zone/systeme/compteur/GTB, pouvoir
+    // ouvrir un editeur de notes riches (Tiptap HTML) ameliorables via
+    // Claude, et y rattacher des photos optimisees. On ajoute :
+    //   - notes_html sur zones, bacs_audit_systems, bacs_audit_meters,
+    //     bacs_audit_bms (les colonnes 'notes' TEXT existantes restent
+    //     pour compat / fallback), et bacs_audit_system_devices.
+    //   - bacs_audit_zone_id et bacs_audit_meter_id sur site_documents
+    //     pour rattacher photos a zones et compteurs.
+    db.exec(`
+      ALTER TABLE zones ADD COLUMN notes_html TEXT;
+      ALTER TABLE bacs_audit_systems ADD COLUMN notes_html TEXT;
+      ALTER TABLE bacs_audit_meters ADD COLUMN notes_html TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN notes_html TEXT;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN notes_html TEXT;
+
+      ALTER TABLE site_documents ADD COLUMN bacs_audit_zone_id INTEGER
+        REFERENCES zones(zone_id) ON DELETE SET NULL;
+      ALTER TABLE site_documents ADD COLUMN bacs_audit_meter_id INTEGER
+        REFERENCES bacs_audit_meters(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_site_documents_zone
+        ON site_documents(bacs_audit_zone_id);
+      CREATE INDEX IF NOT EXISTS idx_site_documents_meter
+        ON site_documents(bacs_audit_meter_id);
+    `);
+    db.pragma('user_version = 47');
+    log.info('Migration 47 appliquee : notes_html + zone/meter FK sur site_documents');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2840,7 +2869,7 @@ const zones = {
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['name', 'nature', 'position', 'surface_m2', 'notes', 'deleted_at'];
+    const allowed = ['name', 'nature', 'position', 'surface_m2', 'notes', 'notes_html', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;

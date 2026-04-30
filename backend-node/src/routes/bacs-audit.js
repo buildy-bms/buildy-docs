@@ -61,6 +61,7 @@ async function routes(fastify) {
       communication: z.enum(COMMUNICATION_VALUES).nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
       notes: z.string().nullable().optional(),
+      notes_html: z.string().nullable().optional(),
       meets_r175_3_p3: z.boolean().nullable().optional(),
       meets_r175_3_p4: z.boolean().nullable().optional(),
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
@@ -91,6 +92,7 @@ async function routes(fastify) {
     if ('notes_p3' in body) { sets.push('notes_p3 = ?'); args.push(body.notes_p3); }
     if ('notes_p4' in body) { sets.push('notes_p4 = ?'); args.push(body.notes_p4); }
     if ('notes_p4_autonomous' in body) { sets.push('notes_p4_autonomous = ?'); args.push(body.notes_p4_autonomous); }
+    if ('notes_html' in body) { sets.push('notes_html = ?'); args.push(body.notes_html); }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
@@ -156,6 +158,7 @@ async function routes(fastify) {
       equipment_id: z.number().int().nullable().optional(),
       recommendation: z.enum(RECOMMENDATIONS).nullable().optional(),
       notes: z.string().nullable().optional(),
+      notes_html: z.string().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
       bms_integration_out_of_service: z.boolean().nullable().optional(),
@@ -232,6 +235,7 @@ async function routes(fastify) {
       notes_training: z.string().nullable().optional(),
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
       out_of_service: boolish,
+      notes_html: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -546,6 +550,65 @@ async function routes(fastify) {
       zoneLabel: m.zone_name || 'Général bâtiment',
     }));
 
+    // ── Photos ────────────────────────────────────────────────────────
+    // On charge tous les site_documents categorie 'photo' du site et on
+    // les rattache a chaque entite scope (zone, systeme, compteur, device,
+    // GTB) sous forme de data URL JPEG. Les photos ont deja ete optimisees
+    // a l'upload (sharp 1600px max, JPEG q=82), inutile de retraiter ici.
+    if (site) {
+      const photoRows = db.db.prepare(`
+        SELECT id, filename, mime_type,
+               bacs_audit_zone_id, bacs_audit_system_id, bacs_audit_meter_id,
+               bacs_audit_device_id, bacs_audit_bms_document_id
+        FROM site_documents
+        WHERE site_id = ? AND category = 'photo'
+        ORDER BY uploaded_at ASC
+      `).all(site.site_id);
+      const docsRoot = path.resolve(config.attachmentsDir, '..', 'site-documents', site.site_uuid);
+      const toDataUrl = (filename, mime) => {
+        try {
+          const p = path.join(docsRoot, filename);
+          const b64 = fs.readFileSync(p).toString('base64');
+          return `data:${mime || 'image/jpeg'};base64,${b64}`;
+        } catch { return null; }
+      };
+      const zonePhotos = new Map();
+      const systemPhotos = new Map();
+      const meterPhotos = new Map();
+      const devicePhotos = new Map();
+      const bmsPhotos = [];
+      for (const ph of photoRows) {
+        const url = toDataUrl(ph.filename, ph.mime_type);
+        if (!url) continue;
+        const item = { id: ph.id, dataUrl: url };
+        if (ph.bacs_audit_zone_id) {
+          if (!zonePhotos.has(ph.bacs_audit_zone_id)) zonePhotos.set(ph.bacs_audit_zone_id, []);
+          zonePhotos.get(ph.bacs_audit_zone_id).push(item);
+        }
+        if (ph.bacs_audit_system_id) {
+          if (!systemPhotos.has(ph.bacs_audit_system_id)) systemPhotos.set(ph.bacs_audit_system_id, []);
+          systemPhotos.get(ph.bacs_audit_system_id).push(item);
+        }
+        if (ph.bacs_audit_meter_id) {
+          if (!meterPhotos.has(ph.bacs_audit_meter_id)) meterPhotos.set(ph.bacs_audit_meter_id, []);
+          meterPhotos.get(ph.bacs_audit_meter_id).push(item);
+        }
+        if (ph.bacs_audit_device_id) {
+          if (!devicePhotos.has(ph.bacs_audit_device_id)) devicePhotos.set(ph.bacs_audit_device_id, []);
+          devicePhotos.get(ph.bacs_audit_device_id).push(item);
+        }
+        if (ph.bacs_audit_bms_document_id === documentId) {
+          bmsPhotos.push(item);
+        }
+      }
+      // On rattache les photos directement aux entites pour simplifier le template
+      for (const z of zones) z.photos = zonePhotos.get(z.zone_id) || [];
+      for (const m of enrichedMeters) m.photos = meterPhotos.get(m.id) || [];
+      for (const d of devices) d.photos = devicePhotos.get(d.id) || [];
+      for (const sys of enrichedSystems) sys.photos = systemPhotos.get(sys.id) || [];
+      if (bms) bms.photos = bmsPhotos;
+    }
+
     // Listes GTB integration : devices + meters integres
     const bmsManagedDevices = devices.filter(d => d.managed_by_bms);
     const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
@@ -762,6 +825,7 @@ async function routes(fastify) {
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
+      notes_html: z.string().nullable().optional(),
       meets_r175_3_p4: z.boolean().nullable().optional(),
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),

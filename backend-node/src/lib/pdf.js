@@ -9,6 +9,13 @@ const log = require('./logger').system;
 // Helpers Handlebars (utilises dans les templates .hbs)
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
+Handlebars.registerHelper('or', function(...args) {
+  // Handlebars passe l'options en dernier argument, on l'exclut
+  return args.slice(0, -1).some(v => !!v);
+});
+Handlebars.registerHelper('and', function(...args) {
+  return args.slice(0, -1).every(v => !!v);
+});
 
 // boolLabel : 1 -> 'Oui', 0 -> 'Non', null/undefined -> '—'
 Handlebars.registerHelper('boolLabel', (v) => {

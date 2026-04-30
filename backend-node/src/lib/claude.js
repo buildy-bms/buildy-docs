@@ -188,6 +188,7 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
   else if (kind === 'functionality')         lines.push(`Type : fonctionnalite Buildy`);
   else if (kind === 'equipment_description') lines.push(`Type : modele d'equipement — description fonctionnelle`);
   else if (kind === 'equipment_bacs_justification') lines.push(`Type : modele d'equipement — justification BACS contextualisee`);
+  else if (kind === 'bacs_audit_notes')      lines.push(`Type : note d'audit BACS — observation terrain sur un element saisi`);
 
   if (title)         lines.push(`Titre : ${title}`);
   if (parent_path)   lines.push(`Section parente : ${parent_path}`);
@@ -220,6 +221,8 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
       lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier) : son role dans le batiment, ce que la solution Buildy apporte en supervision en aval. 2 a 3 paragraphes courts. Pas de zones/locaux.`);
     } else if (kind === 'equipment_bacs_justification') {
       lines.push(`Redige une justification courte (1 a 2 paragraphes) qui explique pourquoi cet equipement est concerne par le decret BACS, en citant les articles applicables. Style juridique-technique sobre.`);
+    } else if (kind === 'bacs_audit_notes') {
+      lines.push(`Reformule ces notes d'audit terrain en un paragraphe ou une courte liste, francais professionnel, technique, precis. Conserve toutes les informations factuelles (marque, reference, etat, defaut constate, position GTB...), ameliore la clarte et le vocabulaire GTB. Ne pas inventer d'information manquante. Format HTML compatible Tiptap.`);
     } else {
       lines.push(`Redige le contenu HTML demande dans le style Buildy.`);
     }

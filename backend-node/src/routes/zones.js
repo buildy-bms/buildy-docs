@@ -26,6 +26,7 @@ const updateZoneSchema = z.object({
   position: z.number().int().optional(),
   surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
+  notes_html: z.string().nullable().optional(),
 });
 
 async function routes(fastify) {

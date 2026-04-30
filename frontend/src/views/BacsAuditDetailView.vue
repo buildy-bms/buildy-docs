@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowLeftIcon, BuildingOffice2Icon, MapPinIcon, ExclamationTriangleIcon,
   CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, PlusIcon, TrashIcon,
-  WrenchScrewdriverIcon, BoltIcon, FireIcon,
+  WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -22,6 +22,8 @@ import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
 import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import NotesEditorModal from '@/components/NotesEditorModal.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -289,6 +291,68 @@ async function removeZone(z) {
   } catch {
     error('Suppression impossible')
   }
+}
+
+// ── Modale notes (rich text + Claude) — partagee zones / systems / meters / bms / devices ──
+const notesModal = ref({
+  open: false,
+  title: '',
+  contextLabel: '',
+  html: '',
+  // entityType: 'zone' | 'system' | 'meter' | 'bms' | 'device'
+  // entityRef: ref reactive a la ligne en cours d'edition (pour Object.assign)
+  entityType: null,
+  entityRef: null,
+  // Contexte transmis a Claude
+  assistContext: null,
+})
+
+function openNotesModal({ title, contextLabel, entityType, entityRef, currentHtml }) {
+  notesModal.value = {
+    open: true,
+    title,
+    contextLabel,
+    html: currentHtml || '',
+    entityType,
+    entityRef,
+    assistContext: {
+      kind: 'bacs_audit_notes',
+      title: contextLabel || title,
+      parent_path: contextLabel || null,
+    },
+  }
+}
+
+async function saveNotesModal(html) {
+  const m = notesModal.value
+  if (!m.entityRef || !m.entityType) return
+  const payload = { notes_html: html || null }
+  try {
+    if (m.entityType === 'zone') {
+      const { data } = await updateZone(m.entityRef.zone_id, payload)
+      Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'system') {
+      const { data } = await updateBacsSystem(m.entityRef.id, payload)
+      Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'meter') {
+      const { data } = await updateBacsMeter(m.entityRef.id, payload)
+      Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'bms') {
+      const { data } = await updateBacsBms(docId, payload)
+      bms.value = data
+    } else if (m.entityType === 'device') {
+      const { data } = await updateBacsDevice(m.entityRef.id, payload)
+      Object.assign(m.entityRef, data)
+    }
+    success('Notes enregistrees')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Sauvegarde notes impossible')
+  }
+}
+
+function hasNotes(htmlOrText) {
+  if (!htmlOrText) return false
+  return !!String(htmlOrText).replace(/<[^>]*>/g, '').trim()
 }
 
 // ── Applicabilité R175-2 ──
@@ -600,7 +664,8 @@ onMounted(refresh)
               <th class="text-center px-5 py-2">Nom</th>
               <th class="text-center py-2 w-48">Nature</th>
               <th class="text-center py-2 w-24">Surface (m²)</th>
-              <th class="text-center px-5 py-2">Notes</th>
+              <th class="text-center py-2 w-32">Notes</th>
+              <th class="text-center py-2 w-24">Photos</th>
               <th class="text-center px-5 py-2 w-12"></th>
             </tr>
           </thead>
@@ -624,10 +689,27 @@ onMounted(refresh)
                        @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
                        class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
               </td>
-              <td class="px-5 py-2">
-                <input type="text" :value="z.notes" placeholder="—"
-                       @blur="e => e.target.value !== (z.notes || '') && patchZone(z, { notes: e.target.value || null })"
-                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+              <td class="py-2 text-center">
+                <button
+                  type="button"
+                  @click="openNotesModal({ title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
+                  :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
+                    hasNotes(z.notes_html || z.notes)
+                      ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                  title="Editer les notes (avec assistance Claude)"
+                >
+                  <PencilSquareIcon class="w-4 h-4" />
+                  {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
+                </button>
+              </td>
+              <td class="py-2 text-center">
+                <BacsPhotoButton
+                  v-if="document?.site_uuid"
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ zone_id: z.zone_id }"
+                  :label="z.name"
+                />
               </td>
               <td class="px-5 py-2 text-right">
                 <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
@@ -652,7 +734,7 @@ onMounted(refresh)
                 <input v-model.number="newZone.surface_m2" type="number" min="0" step="1" placeholder="m²"
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </td>
-              <td colspan="2" class="px-5 py-2">
+              <td colspan="3" class="px-5 py-2">
                 <button @click="addZone" :disabled="!newZone.name.trim()"
                         class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
                   + Ajouter
@@ -685,7 +767,7 @@ onMounted(refresh)
             </div>
             <div class="space-y-3">
               <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
-                <!-- En-tête catégorie : présent? + notes (pas de communication ici, c'est au niveau device) -->
+                <!-- En-tête catégorie : présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
                   <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45">
                     {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
@@ -696,9 +778,24 @@ onMounted(refresh)
                            class="rounded border-gray-300" />
                     <span class="text-gray-700">Présent</span>
                   </label>
-                  <input type="text" :value="s.notes" placeholder="Notes catégorie" :disabled="!s.present"
-                         @blur="e => e.target.value !== (s.notes || '') && patchSystem(s, { notes: e.target.value || null })"
-                         class="flex-1 text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30" />
+                  <button
+                    type="button"
+                    :disabled="!s.present"
+                    @click="openNotesModal({ title: 'Notes systeme', contextLabel: (SYSTEM_LABEL[s.system_category] || s.system_category) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
+                    :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition disabled:opacity-30 disabled:cursor-not-allowed',
+                      hasNotes(s.notes_html || s.notes)
+                        ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                  >
+                    <PencilSquareIcon class="w-4 h-4" />
+                    {{ hasNotes(s.notes_html || s.notes) ? 'Notes' : '+ Notes' }}
+                  </button>
+                  <BacsPhotoButton
+                    v-if="document?.site_uuid && s.present"
+                    :site-uuid="document.site_uuid"
+                    :attach-to="{ system_id: s.id }"
+                    :label="(SYSTEM_LABEL[s.system_category] || s.system_category) + ' - ' + g.zone_name"
+                  />
                 </div>
                 <!-- Sous-table devices + cases R175-3 §3/§4 (visible uniquement si système présent) -->
                 <SystemDevicesTable
@@ -737,7 +834,8 @@ onMounted(refresh)
               <th class="text-center py-2 w-20">Présent</th>
               <th class="text-center py-2 w-24">Communicant</th>
               <th class="text-center py-2 w-32">Protocole</th>
-              <th class="text-center px-5 py-2">Notes</th>
+              <th class="text-center py-2 w-28">Notes</th>
+              <th class="text-center py-2 w-24">Photos</th>
               <th class="text-center py-2 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>
               <th class="text-center px-5 py-2 w-12"></th>
             </tr>
@@ -778,10 +876,27 @@ onMounted(refresh)
                   <option value="other">Autre</option>
                 </select>
               </td>
-              <td class="px-5 py-2">
-                <input type="text" :value="m.notes" placeholder="—"
-                       @blur="e => e.target.value !== (m.notes || '') && patchMeter(m, { notes: e.target.value || null })"
-                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+              <td class="py-2 text-center">
+                <button
+                  type="button"
+                  @click="openNotesModal({ title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (METER_USAGES.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
+                  :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
+                    hasNotes(m.notes_html || m.notes)
+                      ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                  title="Editer les notes"
+                >
+                  <PencilSquareIcon class="w-4 h-4" />
+                  {{ hasNotes(m.notes_html || m.notes) ? 'Notes' : '+ Notes' }}
+                </button>
+              </td>
+              <td class="py-2 text-center">
+                <BacsPhotoButton
+                  v-if="document?.site_uuid"
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ meter_id: m.id }"
+                  :label="(m.zone_name || 'Général') + ' / ' + (METER_USAGES.find(u => u.value === m.usage)?.label || m.usage)"
+                />
               </td>
               <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.out_of_service"
@@ -815,7 +930,7 @@ onMounted(refresh)
               <td class="py-2">
                 <input type="checkbox" v-model="newMeter.required" class="rounded border-gray-300" />
               </td>
-              <td colspan="6" class="px-5 py-2">
+              <td colspan="7" class="px-5 py-2">
                 <button @click="addMeter"
                         class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700">
                   + Ajouter un compteur
@@ -897,6 +1012,27 @@ onMounted(refresh)
           <span class="text-xs text-gray-500">R175-3 + R175-4 + R175-5</span>
           <R175Tooltip article="R175-4" />
           <R175Tooltip article="R175-5" />
+          <div class="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              @click="openNotesModal({ title: 'Notes GTB', contextLabel: 'Solution GTB / GTC : ' + (bms.existing_solution || 'a renseigner'), entityType: 'bms', entityRef: bms, currentHtml: bms.notes_html || '' })"
+              :class="['inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition',
+                hasNotes(bms.notes_html)
+                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+              title="Editer les notes GTB"
+            >
+              <PencilSquareIcon class="w-4 h-4" />
+              {{ hasNotes(bms.notes_html) ? 'Notes' : '+ Notes' }}
+            </button>
+            <BacsPhotoButton
+              v-if="document?.site_uuid && bms.document_id"
+              :site-uuid="document.site_uuid"
+              :attach-to="{ bms_document_id: bms.document_id }"
+              label="GTB"
+              size="md"
+            />
+          </div>
         </header>
         <div class="px-5 py-4 space-y-4">
           <div class="grid grid-cols-2 gap-4">
@@ -1198,5 +1334,16 @@ onMounted(refresh)
         </table>
       </section>
     </div>
+
+    <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->
+    <NotesEditorModal
+      :open="notesModal.open"
+      :title="notesModal.title"
+      :context-label="notesModal.contextLabel"
+      v-model="notesModal.html"
+      :assist-context="notesModal.assistContext"
+      @close="notesModal.open = false"
+      @save="saveNotesModal"
+    />
   </div>
 </template>
