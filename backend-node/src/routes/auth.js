@@ -20,7 +20,7 @@ async function routes(fastify) {
 
     try {
       const params = oidc.generateOidcParams();
-      reply.setCookie('af_oidc_state', JSON.stringify({
+      reply.setCookie('docs_oidc_state', JSON.stringify({
         state: params.state,
         nonce: params.nonce,
         codeVerifier: params.codeVerifier,
@@ -46,11 +46,11 @@ async function routes(fastify) {
 
     let oidcState;
     try {
-      oidcState = JSON.parse(request.cookies.af_oidc_state || '{}');
+      oidcState = JSON.parse(request.cookies.docs_oidc_state || '{}');
     } catch {
       return reply.code(400).send({ detail: 'Etat OIDC invalide' });
     }
-    reply.clearCookie('af_oidc_state', { path: '/' });
+    reply.clearCookie('docs_oidc_state', { path: '/' });
 
     if (!oidcState.state || oidcState.state !== state) {
       return reply.code(400).send({ detail: 'Etat OIDC invalide (state mismatch)' });
@@ -130,7 +130,7 @@ async function routes(fastify) {
   fastify.post('/auth/logout', async (request, reply) => {
     let userId = null;
     try {
-      const decoded = fastify.jwt.verify(request.cookies.af_token);
+      const decoded = fastify.jwt.verify(request.cookies.docs_token);
       if (decoded.jti) db.sessions.revokeByJti(decoded.jti);
       userId = decoded.id || null;
     } catch { /* token invalide deja */ }
@@ -141,7 +141,7 @@ async function routes(fastify) {
         payload: { ip: request.ip, user_agent: request.headers['user-agent'] || null },
       });
     }
-    reply.clearCookie('af_token', { path: '/' });
+    reply.clearCookie('docs_token', { path: '/' });
     return { ok: true };
   });
 }

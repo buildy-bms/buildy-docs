@@ -20,7 +20,7 @@ async function commitExportSilently(afId, message, tag, user) {
   try {
     await gitLib.commitAf(afId, message, {
       tag,
-      author: user ? { name: user.display_name || 'Buildy AF', email: user.email || 'noreply@buildy.fr' } : undefined,
+      author: user ? { name: user.display_name || 'Buildy Docs', email: user.email || 'noreply@buildy.fr' } : undefined,
     });
   } catch (err) {
     log.warn(`Git commit skipped after export AF #${afId} : ${err.message}`);
@@ -328,7 +328,7 @@ async function routes(fastify) {
 
     const ExcelJS = require('exceljs');
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'Buildy AF';
+    wb.creator = 'Buildy Docs';
     wb.created = new Date();
     const ws = wb.addWorksheet('Liste de points', {
       views: [{ state: 'frozen', ySplit: 1 }],

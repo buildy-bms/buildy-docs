@@ -100,7 +100,7 @@ async function commitAf(afId, message, { tag, author } = {}) {
   const sha = await git.commit({
     fs, dir, message,
     author: {
-      name: author?.name || 'Buildy AF',
+      name: author?.name || 'Buildy Docs',
       email: author?.email || 'noreply@buildy.fr',
       timestamp: Math.floor(Date.now() / 1000),
       timezoneOffset: -new Date().getTimezoneOffset(),

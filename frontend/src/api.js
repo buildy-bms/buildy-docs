@@ -185,4 +185,28 @@ export const listAuditActions = () => api.get('/audit-log/actions')
 export const claudeLibraryAssist = (payload) =>
   api.post('/claude/library-assist', payload)
 
+// ── Sites (synchro bidirectionnelle Fleet Manager) ──
+export const listSites = (params) => api.get('/sites', { params })
+export const getSite = (uuid) => api.get(`/sites/${uuid}`)
+export const createSite = (data) => api.post('/sites', data)
+export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
+export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
+
+// ── Zones (locales Buildy Docs, attachees a un site) ──
+export const listZones = (siteId) => api.get('/zones', { params: { site_id: siteId } })
+export const getZone = (id) => api.get(`/zones/${id}`)
+export const createZone = (data) => api.post('/zones', data)
+export const updateZone = (id, data) => api.patch(`/zones/${id}`, data)
+export const deleteZone = (id) => api.delete(`/zones/${id}`)
+
+// ── Equipements (et compteurs) ──
+export const listEquipments = ({ zoneId, siteId } = {}) =>
+  api.get('/equipments', { params: { zone_id: zoneId, site_id: siteId } })
+export const getEquipment = (id) => api.get(`/equipments/${id}`)
+export const createEquipment = (data) => api.post('/equipments', data)
+export const updateEquipment = (id, data) => api.patch(`/equipments/${id}`, data)
+export const deleteEquipment = (id) => api.delete(`/equipments/${id}`)
+export const getBacsPowerCumul = (siteId) =>
+  api.get('/equipments/bacs-power-cumul', { params: { site_id: siteId } })
+
 export default api

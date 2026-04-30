@@ -11,13 +11,13 @@ const config = Object.freeze({
   isProduction: process.env.NODE_ENV === 'production',
 
   // Database
-  databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../data/buildy_af.db'),
+  databasePath: process.env.DATABASE_PATH || path.resolve(__dirname, '../../data/buildy_docs.db'),
   attachmentsDir: process.env.ATTACHMENTS_DIR || path.resolve(__dirname, '../../data/attachments'),
   exportsDir: process.env.EXPORTS_DIR || path.resolve(__dirname, '../../data/exports'),
   gitReposDir: process.env.GIT_REPOS_DIR || path.resolve(__dirname, '../../data/repos'),
 
   // Auth
-  jwtSecret: process.env.JWT_SECRET || 'buildy-af-secret-change-me',
+  jwtSecret: process.env.JWT_SECRET || 'buildy-docs-secret-change-me',
   accessTokenMaxAge: parseInt(process.env.ACCESS_TOKEN_MAX_AGE || '28800', 10), // 8 h (sliding)
   refreshTokenMaxAge: parseInt(process.env.REFRESH_TOKEN_MAX_AGE || '604800', 10), // 7 days
   // Mode dev : injecte un user fictif sans passer par PocketID. Inactif en prod.
@@ -34,7 +34,7 @@ const config = Object.freeze({
   oidcClientSecret: process.env.OIDC_CLIENT_SECRET || '',
   oidcRedirectUri: process.env.OIDC_REDIRECT_URI || '',
 
-  // Public URL (utilise pour les redirects + emails). Ex: https://buildy-af.buildy.wan
+  // Public URL (utilise pour les redirects + emails). Ex: https://buildy-docs.buildy.wan
   publicUrl: process.env.PUBLIC_URL || 'http://localhost:5173',
 
   // Claude (Anthropic) — assistant redaction
@@ -45,6 +45,10 @@ const config = Object.freeze({
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3100')
     .split(',').map(s => s.trim()).filter(Boolean),
 
+  // Synchro Sites avec Fleet Manager (token de service partage entre les 2 apps)
+  buildySitesSyncToken: process.env.BUILDY_SITES_SYNC_TOKEN || '',
+  fmSyncUrl: process.env.FM_SYNC_URL || '',
+
   // HTTPS (optionnel — certificats auto-signes pour acces NetBird)
   httpsEnabled: process.env.HTTPS_ENABLED === 'true',
   httpsCertPath: process.env.HTTPS_CERT_PATH || path.resolve(__dirname, '../../certs/server.crt'),
@@ -53,12 +57,12 @@ const config = Object.freeze({
 
 // Validations securite
 if (config.isProduction) {
-  if (config.jwtSecret === 'buildy-af-secret-change-me') {
+  if (config.jwtSecret === 'buildy-docs-secret-change-me') {
     console.error('[SECURITY] JWT_SECRET par defaut en production — refus de demarrer.');
     process.exit(1);
   }
   if (!config.oidcEnabled) {
-    console.error('[SECURITY] OIDC desactive en production — buildy-af exige PocketID.');
+    console.error('[SECURITY] OIDC desactive en production — buildy-docs exige PocketID.');
     process.exit(1);
   }
   if (config.devBypassAuth) {

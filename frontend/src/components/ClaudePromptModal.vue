@@ -44,7 +44,7 @@ const copied = ref(false)
 
 const promptDescription = computed(() => {
   const t = props.template
-  return `Tu es un ingénieur GTB rédacteur d'analyses fonctionnelles (AF) pour Buildy. Tu vas rédiger la **description fonctionnelle** d'un équipement pour la bibliothèque Buildy AF, dans le respect ABSOLU des règles ci-dessous.
+  return `Tu es un ingénieur GTB rédacteur d'analyses fonctionnelles (AF) pour Buildy. Tu vas rédiger la **description fonctionnelle** d'un équipement pour la bibliothèque AF de Buildy Docs, dans le respect ABSOLU des règles ci-dessous.
 
 ═══════════════════════════════════════════════════════════════════════
 POSITIONNEMENT BUILDY (à respecter dans toute la description)

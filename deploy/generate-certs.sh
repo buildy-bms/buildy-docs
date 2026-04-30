@@ -1,11 +1,11 @@
 #!/bin/bash
-# Genere des certificats HTTPS auto-signes pour buildy-af.
+# Genere des certificats HTTPS auto-signes pour buildy-docs.
 # Idempotent : ne regenere pas si les fichiers existent deja.
 set -e
 
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 CERT_DIR="$DIR/certs"
-CN="${1:-buildy-af.buildy.wan}"
+CN="${1:-buildy-docs.buildy.wan}"
 
 mkdir -p "$CERT_DIR"
 

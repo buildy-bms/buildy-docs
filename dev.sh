@@ -1,5 +1,5 @@
 #!/bin/bash
-# Buildy AF — Dev mode (backend via PM2 + frontend Vite)
+# Buildy Docs — Dev mode (backend via PM2 + frontend Vite)
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -10,7 +10,7 @@ cleanup() {
     echo "Arret du frontend..."
     kill $PID_FRONT 2>/dev/null
     wait $PID_FRONT 2>/dev/null
-    echo "Frontend arrete. Backend PM2 reste en place (pm2 stop buildy-af / pm2 logs buildy-af)."
+    echo "Frontend arrete. Backend PM2 reste en place (pm2 stop buildy-docs / pm2 logs buildy-docs)."
 }
 trap cleanup EXIT
 
@@ -32,8 +32,8 @@ fi
 
 # 1. Backend via PM2 (port 3100, watch actif)
 echo "[1/2] Backend Fastify via PM2 sur :3100"
-if pm2 describe buildy-af > /dev/null 2>&1; then
-    pm2 restart buildy-af --update-env
+if pm2 describe buildy-docs > /dev/null 2>&1; then
+    pm2 restart buildy-docs --update-env
 else
     pm2 start ecosystem.config.cjs
 fi
@@ -46,13 +46,13 @@ PID_FRONT=$!
 
 echo ""
 echo "============================================"
-echo "  Buildy AF — Dev Mode"
+echo "  Buildy Docs — Dev Mode"
 echo "============================================"
 echo "  UI:        http://localhost:5173"
 echo "  API:       http://localhost:3100/api"
 echo "  Mode:      DEV_BYPASS_AUTH=1 (user fictif)"
-echo "  Logs:      pm2 logs buildy-af"
-echo "  Stop:      pm2 stop buildy-af  (puis Ctrl+C ici)"
+echo "  Logs:      pm2 logs buildy-docs"
+echo "  Stop:      pm2 stop buildy-docs  (puis Ctrl+C ici)"
 echo "============================================"
 echo ""
 

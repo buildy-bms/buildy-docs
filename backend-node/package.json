@@ -1,7 +1,7 @@
 {
-  "name": "buildy-af-backend",
+  "name": "buildy-docs-backend",
   "version": "0.1.0",
-  "description": "Buildy AF — App de redaction d'analyses fonctionnelles GTB",
+  "description": "Buildy Docs — App de redaction documentaire (analyses fonctionnelles GTB, audits BACS, brochures commerciales)",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

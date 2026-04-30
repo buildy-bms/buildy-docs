@@ -32,8 +32,8 @@ function loginOidc() {
     <div class="bg-white shadow-xl p-10 w-full max-w-md">
       <div class="flex flex-col items-center mb-8">
         <img src="/logo-buildy.svg" alt="Buildy" class="h-12 mb-4" />
-        <h1 class="text-xl font-semibold text-gray-800">Buildy AF</h1>
-        <p class="text-sm text-gray-500 mt-1">Analyses fonctionnelles GTB</p>
+        <h1 class="text-xl font-semibold text-gray-800">Buildy Docs</h1>
+        <p class="text-sm text-gray-500 mt-1">Documentation technique &amp; commerciale</p>
       </div>
 
       <p v-if="error" class="text-red-600 text-sm mb-4 text-center">{{ error }}</p>

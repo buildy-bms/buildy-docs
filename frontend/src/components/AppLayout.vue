@@ -15,6 +15,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   UserCircleIcon,
   ClockIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/vue/24/outline'
 import CommandPalette from './CommandPalette.vue'
 
@@ -33,6 +34,7 @@ onMounted(async () => {
 const paletteRef = ref(null)
 const nav = [
   { name: 'Mes AFs', to: '/', icon: DocumentTextIcon },
+  { name: 'Mes Sites', to: '/sites', icon: BuildingOffice2Icon },
   { section: 'Bibliothèque' },
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
   { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
@@ -61,7 +63,7 @@ async function logout() {
     <div class="lg:hidden flex items-center justify-between bg-indigo-600 px-4 py-3">
       <div class="flex items-center gap-2">
         <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-6" />
-        <span class="text-white font-semibold text-sm">Buildy AF</span>
+        <span class="text-white font-semibold text-sm">Buildy Docs</span>
       </div>
       <button @click="sidebarOpen = !sidebarOpen" class="text-white/70 hover:text-white">
         <Bars3Icon v-if="!sidebarOpen" class="w-6 h-6" />
@@ -80,7 +82,7 @@ async function logout() {
       >
         <div class="hidden lg:flex flex-col items-center justify-center py-4 px-4 border-b border-white/10 shrink-0 text-center">
           <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-8 mx-auto" />
-          <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.18em] text-center block">Analyses Fonctionnelles</span>
+          <span class="mt-1.5 text-[10px] font-medium text-white/40 uppercase tracking-[0.18em] text-center block">Documentation</span>
         </div>
 
         <div class="px-2.5 mt-3">
@@ -131,7 +133,7 @@ async function logout() {
             <ArrowRightStartOnRectangleIcon class="w-4 h-4" />
             Deconnexion
           </button>
-          <p class="text-[10px] text-white/40">Buildy AF v{{ appVersion || '0.1.0' }}</p>
+          <p class="text-[10px] text-white/40">Buildy Docs v{{ appVersion || '0.1.0' }}</p>
         </div>
       </aside>
 

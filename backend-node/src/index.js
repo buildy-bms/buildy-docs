@@ -7,7 +7,7 @@ const db = require('./database');
 const log = require('./lib/logger').system;
 
 async function main() {
-  log.info('Starting Buildy AF...');
+  log.info('Starting Buildy Docs...');
   log.info(`Node.js ${process.version}, PID ${process.pid}`);
 
   db.init();
@@ -88,6 +88,9 @@ async function main() {
   await fastify.register(require('./routes/bacs'), { prefix: '/api' });
   await fastify.register(require('./routes/users'), { prefix: '/api' });
   await fastify.register(require('./routes/audit'), { prefix: '/api' });
+  await fastify.register(require('./routes/sites'), { prefix: '/api' });
+  await fastify.register(require('./routes/zones'), { prefix: '/api' });
+  await fastify.register(require('./routes/equipments'), { prefix: '/api' });
 
   // Sert les captures uploadees sous /attachments/<af-id>/<uuid>.png
   // (auth verifiee par le hook global qui couvre /attachments/*).
@@ -148,6 +151,9 @@ async function main() {
     try { db.sessions.deleteExpired(); } catch { /* ignore */ }
   }, 10 * 60_000);
 
+  // Worker de synchro sites avec Fleet Manager (no-op si non configure)
+  require('./lib/sites-sync').startSyncWorker();
+
   // Checkpoint Git auto toutes les 10 min pour les AFs ayant eu de l'activite
   // depuis le dernier commit (compare audit_log.created_at au dernier commit Git).
   const gitLib = require('./lib/git');
@@ -174,7 +180,7 @@ async function main() {
   try {
     await fastify.listen({ port: config.port, host: config.host });
     const proto = config.httpsEnabled ? 'https' : 'http';
-    log.info(`Buildy AF listening on ${proto}://${config.host}:${config.port}`);
+    log.info(`Buildy Docs listening on ${proto}://${config.host}:${config.port}`);
   } catch (err) {
     log.error(`Server listen error: ${err.message}`);
     process.exit(1);

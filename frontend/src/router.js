@@ -33,6 +33,12 @@ const routes = [
     props: true,
   },
   {
+    path: '/sites',
+    name: 'sites',
+    meta: { title: 'Mes Sites' },
+    component: () => import('@/views/SitesListView.vue'),
+  },
+  {
     path: '/library',
     redirect: '/library/sections',
   },
@@ -103,7 +109,7 @@ router.afterEach((to) => {
     isAuthenticated = false
     currentUser.value = null
   }
-  document.title = to.meta.title ? `${to.meta.title} — Buildy AF` : 'Buildy AF'
+  document.title = to.meta.title ? `${to.meta.title} — Buildy Docs` : 'Buildy Docs'
 })
 
 export function resetAuth() {

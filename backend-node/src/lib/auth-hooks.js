@@ -29,7 +29,7 @@ function issueAccessToken(fastify, reply, user) {
     { expiresIn: config.accessTokenMaxAge }
   );
   db.sessions.create(user.id, jti, expiresAt);
-  reply.setCookie('af_token', token, cookieOpts(config.accessTokenMaxAge));
+  reply.setCookie('docs_token', token, cookieOpts(config.accessTokenMaxAge));
   return { jti };
 }
 
@@ -47,7 +47,8 @@ function registerAuthHook(fastify) {
       url === '/api/auth/oidc/login' ||
       url === '/api/auth/oidc/callback' ||
       url === '/api/auth/oidc/config' ||
-      url === '/api/auth/logout'
+      url === '/api/auth/logout' ||
+      url === '/api/sites/sync' // auth Bearer (BUILDY_SITES_SYNC_TOKEN) verifiee dans la route
     ) return;
 
     // Protege /api/* ET /attachments/* (les captures sont sensibles meme avec
@@ -66,7 +67,7 @@ function registerAuthHook(fastify) {
     // Auth normale par cookie JWT
     let decoded;
     try {
-      const token = request.cookies.af_token;
+      const token = request.cookies.docs_token;
       if (!token) throw new Error('No token');
       decoded = fastify.jwt.verify(token);
     } catch {
@@ -92,7 +93,7 @@ function registerAuthHook(fastify) {
         { id: decoded.id, email: decoded.email, jti: decoded.jti },
         { expiresIn: config.accessTokenMaxAge }
       );
-      reply.setCookie('af_token', newToken, cookieOpts(config.accessTokenMaxAge));
+      reply.setCookie('docs_token', newToken, cookieOpts(config.accessTokenMaxAge));
       if (decoded.jti) {
         const newExpiresAt = new Date(Date.now() + config.accessTokenMaxAge * 1000).toISOString();
         db.sessions.extendByJti?.(decoded.jti, newExpiresAt);

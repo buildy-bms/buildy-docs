@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'buildy-af',
+      name: 'buildy-docs',
       script: 'backend-node/src/index.js',
       cwd: __dirname,
       // Dev : watch actif sur le backend pour reload automatique.
@@ -14,7 +14,7 @@ module.exports = {
       },
       env_production: {
         NODE_ENV: 'production',
-        // 3443 = port HTTPS de buildy-af sur le VPS Jelastic (FM occupe deja 443).
+        // 3443 = port HTTPS de buildy-docs sur le VPS Jelastic (FM occupe deja 443).
         // PM2 merge env_production par-dessus env, donc il faut redefinir PORT
         // sinon il garde 3100 (dev).
         PORT: 3443,

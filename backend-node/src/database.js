@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 33;
+const TARGET_VERSION = 34;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1102,6 +1102,107 @@ function runMigrations() {
     }
   }
 
+  if (current < 34) {
+    // Multi-domaines Buildy Docs (additive) : nouvelles tables sites / zones /
+    // equipments + colonnes kind/site_id/bacs_* sur afs. La table afs est
+    // conservee telle quelle pour l'instant (rename -> documents prevu en m35).
+    // Les statuts AF restent 'redaction'/'validee'/... pour ne rien casser ;
+    // l'alignement anglais sera fait en meme temps que le rename.
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        -- Sites (synchro bidirectionnelle avec Fleet Manager via site_uuid)
+        CREATE TABLE IF NOT EXISTS sites (
+          site_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          site_uuid TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          customer_name TEXT,
+          address TEXT,
+          notes TEXT,
+          created_by INTEGER REFERENCES users(id),
+          updated_by INTEGER REFERENCES users(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TEXT,
+          synced_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_sites_uuid ON sites(site_uuid);
+        CREATE INDEX IF NOT EXISTS idx_sites_active ON sites(deleted_at, name);
+
+        -- Queue de retry pour la synchro FM (cf. lib/sites-sync.js)
+        CREATE TABLE IF NOT EXISTS sites_sync_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          site_uuid TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT,
+          last_attempt_at TEXT,
+          next_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_sites_sync_queue_next ON sites_sync_queue(next_attempt_at);
+
+        -- Zones fonctionnelles (locales Buildy Docs, partagees par tous les
+        -- documents du site)
+        CREATE TABLE IF NOT EXISTS zones (
+          zone_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          site_id INTEGER NOT NULL REFERENCES sites(site_id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          nature TEXT,
+          position INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_zones_site ON zones(site_id, position);
+
+        -- Equipements ET compteurs (distingue via type)
+        CREATE TABLE IF NOT EXISTS equipments (
+          equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          power_kw REAL,
+          communication_protocol TEXT,
+          installation_date TEXT,
+          status TEXT NOT NULL DEFAULT 'operational'
+            CHECK (status IN ('designed','commissioned','tested','operational','decommissioned')),
+          bacs_classification TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_equipments_zone ON equipments(zone_id);
+        CREATE INDEX IF NOT EXISTS idx_equipments_type ON equipments(type);
+
+        -- Buildy Docs multi-domaines : kind + site_id + champs specifiques BACS
+        ALTER TABLE afs ADD COLUMN kind TEXT NOT NULL DEFAULT 'af'
+          CHECK (kind IN ('af','bacs_audit','brochure'));
+        ALTER TABLE afs ADD COLUMN site_id INTEGER REFERENCES sites(site_id) ON DELETE SET NULL;
+        ALTER TABLE afs ADD COLUMN title TEXT;
+        ALTER TABLE afs ADD COLUMN bacs_total_power_kw REAL;
+        ALTER TABLE afs ADD COLUMN bacs_total_power_source TEXT NOT NULL DEFAULT 'auto'
+          CHECK (bacs_total_power_source IN ('auto','manual_override'));
+        ALTER TABLE afs ADD COLUMN bacs_building_permit_date TEXT;
+        ALTER TABLE afs ADD COLUMN bacs_applicable_deadline TEXT;
+        ALTER TABLE afs ADD COLUMN bacs_applicability_status TEXT
+          CHECK (bacs_applicability_status IS NULL OR bacs_applicability_status IN
+            ('subject_immediate','subject_2025','subject_2027','not_subject'));
+        ALTER TABLE afs ADD COLUMN delivered_pdf_sha256 TEXT;
+        ALTER TABLE afs ADD COLUMN delivered_git_tag TEXT;
+        CREATE INDEX IF NOT EXISTS idx_afs_kind_site ON afs(kind, site_id);
+      `);
+      db.pragma('user_version = 34');
+      db.exec('COMMIT');
+      log.info('Migration 34 appliquee : multi-domaines Buildy Docs (sites/zones/equipments + kind/site_id/bacs_*)');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -1433,15 +1534,25 @@ const afs = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM afs WHERE slug = ?').get(slug);
   },
-  create({ slug, clientName, projectName, siteAddress, serviceLevel, createdBy }) {
+  create({ slug, clientName, projectName, siteAddress, serviceLevel, createdBy, kind, siteId, title }) {
     const result = db.prepare(`
-      INSERT INTO afs (slug, client_name, project_name, site_address, service_level, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(slug, clientName, projectName, siteAddress || null, serviceLevel || null, createdBy || null, createdBy || null);
+      INSERT INTO afs (slug, client_name, project_name, site_address, service_level, kind, site_id, title, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      slug, clientName, projectName, siteAddress || null, serviceLevel || null,
+      kind || 'af', siteId || null, title || null,
+      createdBy || null, createdBy || null,
+    );
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['client_name', 'project_name', 'site_address', 'service_level', 'status', 'delivered_at'];
+    const allowed = [
+      'client_name', 'project_name', 'site_address', 'service_level', 'status', 'delivered_at',
+      'kind', 'site_id', 'title',
+      'bacs_total_power_kw', 'bacs_total_power_source', 'bacs_building_permit_date',
+      'bacs_applicable_deadline', 'bacs_applicability_status',
+      'delivered_pdf_sha256', 'delivered_git_tag',
+    ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
@@ -2010,6 +2121,209 @@ const auditLog = {
   },
 };
 
+// ── Sites (synchro bidirectionnelle avec Fleet Manager) ─────────────
+const sites = {
+  list({ includeDeleted = false, search } = {}) {
+    let sql = 'SELECT * FROM sites WHERE 1=1';
+    const params = [];
+    if (!includeDeleted) sql += ' AND deleted_at IS NULL';
+    if (search) {
+      sql += ' AND (name LIKE ? OR customer_name LIKE ? OR address LIKE ?)';
+      const pattern = `%${search}%`;
+      params.push(pattern, pattern, pattern);
+    }
+    sql += ' ORDER BY name';
+    return db.prepare(sql).all(...params);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM sites WHERE site_id = ?').get(id);
+  },
+  getByUuid(uuid) {
+    return db.prepare('SELECT * FROM sites WHERE site_uuid = ?').get(uuid);
+  },
+  create({ siteUuid, name, customerName, address, notes, createdBy, syncedAt }) {
+    const result = db.prepare(`
+      INSERT INTO sites (site_uuid, name, customer_name, address, notes, created_by, updated_by, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      siteUuid, name, customerName || null, address || null, notes || null,
+      createdBy || null, createdBy || null, syncedAt || null,
+    );
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, fields) {
+    const allowed = ['name', 'customer_name', 'address', 'notes', 'synced_at', 'deleted_at'];
+    const sets = [], params = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
+      const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
+      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
+    }
+    if (fields.updatedBy != null) { sets.push('updated_by = ?'); params.push(fields.updatedBy); }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE sites SET ${sets.join(', ')} WHERE site_id = ?`).run(...params);
+    return this.getById(id);
+  },
+  softDelete(id) {
+    db.prepare('UPDATE sites SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE site_id = ?').run(id);
+  },
+  restore(id) {
+    db.prepare('UPDATE sites SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE site_id = ?').run(id);
+  },
+};
+
+// ── Zones (locales Buildy Docs, attachees a un site) ───────────────
+const zones = {
+  listBySite(siteId, { includeDeleted = false } = {}) {
+    let sql = 'SELECT * FROM zones WHERE site_id = ?';
+    const params = [siteId];
+    if (!includeDeleted) sql += ' AND deleted_at IS NULL';
+    sql += ' ORDER BY position, name';
+    return db.prepare(sql).all(...params);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM zones WHERE zone_id = ?').get(id);
+  },
+  create({ siteId, name, nature, position, notes }) {
+    const result = db.prepare(`
+      INSERT INTO zones (site_id, name, nature, position, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(siteId, name, nature || null, position || 0, notes || null);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, fields) {
+    const allowed = ['name', 'nature', 'position', 'notes', 'deleted_at'];
+    const sets = [], params = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
+      const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
+      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE zones SET ${sets.join(', ')} WHERE zone_id = ?`).run(...params);
+    return this.getById(id);
+  },
+  softDelete(id) {
+    db.prepare('UPDATE zones SET deleted_at = CURRENT_TIMESTAMP WHERE zone_id = ?').run(id);
+  },
+};
+
+// ── Equipements (et compteurs) ──────────────────────────────────────
+const equipments = {
+  listByZone(zoneId, { includeDeleted = false } = {}) {
+    let sql = 'SELECT * FROM equipments WHERE zone_id = ?';
+    const params = [zoneId];
+    if (!includeDeleted) sql += ' AND deleted_at IS NULL';
+    sql += ' ORDER BY name';
+    return db.prepare(sql).all(...params);
+  },
+  listBySite(siteId, { includeDeleted = false } = {}) {
+    let sql = `
+      SELECT e.* FROM equipments e
+      JOIN zones z ON z.zone_id = e.zone_id
+      WHERE z.site_id = ?
+    `;
+    const params = [siteId];
+    if (!includeDeleted) sql += ' AND e.deleted_at IS NULL AND z.deleted_at IS NULL';
+    sql += ' ORDER BY e.name';
+    return db.prepare(sql).all(...params);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM equipments WHERE equipment_id = ?').get(id);
+  },
+  create({ zoneId, name, type, powerKw, communicationProtocol, installationDate, status, bacsClassification, notes }) {
+    const result = db.prepare(`
+      INSERT INTO equipments
+        (zone_id, name, type, power_kw, communication_protocol, installation_date, status, bacs_classification, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      zoneId, name, type,
+      powerKw == null ? null : powerKw,
+      communicationProtocol || null,
+      installationDate || null,
+      status || 'operational',
+      bacsClassification ? JSON.stringify(bacsClassification) : null,
+      notes || null,
+    );
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, fields) {
+    const allowed = [
+      'zone_id', 'name', 'type', 'power_kw', 'communication_protocol',
+      'installation_date', 'status', 'bacs_classification', 'notes', 'deleted_at',
+    ];
+    const sets = [], params = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
+      const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
+      if (allowed.includes(col)) {
+        sets.push(`${col} = ?`);
+        params.push(col === 'bacs_classification' && v && typeof v === 'object' ? JSON.stringify(v) : v);
+      }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE equipments SET ${sets.join(', ')} WHERE equipment_id = ?`).run(...params);
+    return this.getById(id);
+  },
+  softDelete(id) {
+    db.prepare('UPDATE equipments SET deleted_at = CURRENT_TIMESTAMP WHERE equipment_id = ?').run(id);
+  },
+  // Cumul puissance chauffage + climatisation pour le seuil R175-2
+  sumBacsPowerForSite(siteId) {
+    const rows = db.prepare(`
+      SELECT e.power_kw, e.bacs_classification
+      FROM equipments e
+      JOIN zones z ON z.zone_id = e.zone_id
+      WHERE z.site_id = ? AND e.deleted_at IS NULL AND z.deleted_at IS NULL
+        AND e.status != 'decommissioned' AND e.power_kw IS NOT NULL
+    `).all(siteId);
+    let total = 0;
+    for (const r of rows) {
+      let cls = null;
+      try { cls = r.bacs_classification ? JSON.parse(r.bacs_classification) : null; } catch { cls = null; }
+      if (cls?.is_heating_system || cls?.is_air_cooling_system) total += r.power_kw;
+    }
+    return total;
+  },
+};
+
+// ── Queue retry pour la synchro FM ──────────────────────────────────
+const sitesSyncQueue = {
+  enqueue(siteUuid, payload) {
+    db.prepare(`
+      INSERT INTO sites_sync_queue (site_uuid, payload)
+      VALUES (?, ?)
+    `).run(siteUuid, JSON.stringify(payload));
+  },
+  dueNow(limit = 50) {
+    return db.prepare(`
+      SELECT * FROM sites_sync_queue
+      WHERE next_attempt_at <= CURRENT_TIMESTAMP
+      ORDER BY next_attempt_at
+      LIMIT ?
+    `).all(limit).map(r => ({ ...r, payload: JSON.parse(r.payload) }));
+  },
+  reschedule(id, { error, delaySeconds }) {
+    db.prepare(`
+      UPDATE sites_sync_queue
+      SET attempts = attempts + 1,
+          last_error = ?,
+          last_attempt_at = CURRENT_TIMESTAMP,
+          next_attempt_at = datetime('now', ? || ' seconds')
+      WHERE id = ?
+    `).run(error || null, '+' + Math.max(60, delaySeconds || 60), id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM sites_sync_queue WHERE id = ?').run(id);
+  },
+};
+
 module.exports = {
   init,
   users,
@@ -2031,5 +2345,9 @@ module.exports = {
   afInspections,
   sections,
   auditLog,
+  sites,
+  zones,
+  equipments,
+  sitesSyncQueue,
   get db() { return db; },
 };
