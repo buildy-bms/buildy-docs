@@ -231,6 +231,10 @@ export const reorderBacsZones = (docId, ids) =>
 export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
 export const validateBacsAuditStep = (docId, step, validated) =>
   api.post(`/bacs-audit/${docId}/validate-step`, { step, validated })
+export const updateBacsAuditSynthesis = (docId, html) =>
+  api.put(`/bacs-audit/${docId}/synthesis`, { html })
+export const generateBacsAuditSynthesis = (docId) =>
+  api.post(`/bacs-audit/${docId}/generate-synthesis`)
 
 // ── Site documents (DOE) ──
 export const listSiteDocuments = (siteUuid, params) =>

@@ -36,6 +36,7 @@ const showGallery = ref(false)
 const fileInput = ref(null)
 const uploading = ref(false)
 const isDragOver = ref(false)
+const dragDepth = ref(0) // counter pour eviter le flicker dragenter/dragleave sur enfants
 const captionModal = ref({ open: false, photos: [] }) // photos = [{ id, dataUrl, title, notes }]
 
 const filterParams = computed(() => {
@@ -109,6 +110,7 @@ async function onFileChosen(e) {
 
 async function onDrop(e) {
   isDragOver.value = false
+  dragDepth.value = 0
   const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
   if (!files.length) {
     notifyError('Glisse uniquement des fichiers image')
@@ -117,12 +119,18 @@ async function onDrop(e) {
   await uploadFiles(files)
 }
 
-function onDragOver(e) {
+function onDragEnter(e) {
+  // Counter approach : empeche le flicker quand le drag passe d'un enfant
+  // a l'autre (chaque transition genere un dragleave + dragenter alterne).
+  if (!e.dataTransfer?.types?.includes('Files')) return
+  dragDepth.value++
   isDragOver.value = true
 }
 function onDragLeave() {
-  isDragOver.value = false
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) isDragOver.value = false
 }
+function onDragOver(e) { /* no-op : juste pour autoriser le drop */ }
 
 async function removePhoto(p) {
   if (!confirm('Supprimer cette photo ?')) return
@@ -180,13 +188,13 @@ const btnCls = computed(() => {
       :title="label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos'"
       @click="showGallery = !showGallery"
       @dragover.prevent="onDragOver"
-      @dragenter.prevent="onDragOver"
+      @dragenter.prevent="onDragEnter"
       @dragleave.prevent="onDragLeave"
       @drop.prevent="onDrop"
     >
-      <CameraIcon class="w-4 h-4" />
-      <span v-if="photos.length" class="font-medium">{{ photos.length }}</span>
-      <span v-if="isDragOver" class="font-medium text-[10px]">+ deposer</span>
+      <CameraIcon :class="['transition-all', isDragOver ? 'w-5 h-5' : 'w-4 h-4']" />
+      <span v-if="photos.length && !isDragOver" class="font-medium">{{ photos.length }}</span>
+      <span v-if="isDragOver" class="font-semibold text-[11px] whitespace-nowrap">Deposer ici</span>
     </button>
 
     <input

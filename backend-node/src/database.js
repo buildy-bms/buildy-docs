@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 48;
+const TARGET_VERSION = 49;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1890,6 +1890,19 @@ function runMigrations() {
     log.info('Migration 48 appliquee : afs.audit_progress (stepper BACS)');
   }
 
+  if (current < 49) {
+    // Cf retour Kevin v2.10 : ajout d'une etape 12 'note de synthese' dans
+    // l'audit BACS, redigee par l'auditeur (avec assistance Claude). Le HTML
+    // est integre en tete du PDF d'audit. On stocke aussi la date de derniere
+    // generation Claude pour audit log / debug.
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN audit_synthesis_html TEXT;
+      ALTER TABLE afs ADD COLUMN audit_synthesis_generated_at TEXT;
+    `);
+    db.pragma('user_version = 49');
+    log.info('Migration 49 appliquee : afs.audit_synthesis_html (note synthese)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2239,6 +2252,7 @@ const afs = {
       'bacs_total_power_kw', 'bacs_total_power_source', 'bacs_building_permit_date',
       'bacs_applicable_deadline', 'bacs_applicability_status',
       'delivered_pdf_sha256', 'delivered_git_tag',
+      'audit_synthesis_html', 'audit_synthesis_generated_at',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

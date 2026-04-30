@@ -18,6 +18,7 @@ import {
   listZones, createZone, updateZone, deleteZone,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice,
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
+  updateBacsAuditSynthesis, generateBacsAuditSynthesis,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
@@ -26,6 +27,9 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import NotesEditorModal from '@/components/NotesEditorModal.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
+import StepValidateBadge from '@/components/StepValidateBadge.vue'
+import RichTextEditor from '@/components/RichTextEditor.vue'
+import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
 
@@ -179,6 +183,7 @@ async function refresh() {
     actionItems.value = a.data
     try { auditProgress.value = JSON.parse(d.data.audit_progress || '{}') }
     catch { auditProgress.value = {} }
+    synthesisHtml.value = d.data.audit_synthesis_html || ''
     if (d.data.site_id) {
       const z = await listZones(d.data.site_id)
       zones.value = z.data
@@ -357,7 +362,15 @@ const STEP_DEFINITIONS = [
     label: 'Plan & livraison',
     description: 'Plan de mise en conformite relu et annote commercialement.',
     isComplete: () => actionItems.value.every(a => a.estimated_effort || a.status !== 'open') },
+  { key: 'synthesis',
+    label: 'Synthèse',
+    description: 'Note de synthese redigee (manuellement ou via Claude).',
+    isComplete: () => !!(document.value?.audit_synthesis_html || '').replace(/<[^>]*>/g, '').trim() },
 ]
+
+function stepFor(key) {
+  return stepperSteps.value.find(s => s.key === key)
+}
 
 const stepperSteps = computed(() => STEP_DEFINITIONS.map(def => {
   const p = auditProgress.value?.[def.key] || {}
@@ -403,10 +416,49 @@ function onStepClick(key) {
     documents: 'section-documents',
     credentials: 'section-credentials',
     review: 'section-review',
+    synthesis: 'section-synthesis',
   }[key]
   if (targetId) {
     const el = window.document.getElementById(targetId)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+// ── Note de synthese (etape 12, redaction assistee Claude) ──
+const synthesisHtml = ref('')
+const synthesisGenerating = ref(false)
+let synthesisSaveTimer = null
+
+function onSynthesisInput(html) {
+  synthesisHtml.value = html
+  clearTimeout(synthesisSaveTimer)
+  synthesisSaveTimer = setTimeout(async () => {
+    try {
+      await updateBacsAuditSynthesis(docId, html || null)
+      if (document.value) document.value.audit_synthesis_html = html
+    } catch {
+      error('Sauvegarde synthese impossible')
+    }
+  }, 600)
+}
+
+async function generateSynthesis() {
+  if (synthesisGenerating.value) return
+  synthesisGenerating.value = true
+  try {
+    const { data } = await generateBacsAuditSynthesis(docId)
+    if (data?.html) {
+      synthesisHtml.value = data.html
+      if (document.value) {
+        document.value.audit_synthesis_html = data.html
+        document.value.audit_synthesis_generated_at = data.generated_at
+      }
+      success('Note de synthese generee par Claude')
+    }
+  } catch (e) {
+    error(e.response?.data?.detail || 'Echec generation Claude')
+  } finally {
+    synthesisGenerating.value = false
   }
 }
 
@@ -653,46 +705,47 @@ onMounted(refresh)
 
 <template>
   <div class="max-w-screen-2xl mx-auto pb-12">
-    <!-- Header -->
-    <div class="flex items-start justify-between mb-6">
-      <div>
-        <button @click="router.push('/')" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2">
-          <ArrowLeftIcon class="w-4 h-4" /> Retour
-        </button>
-        <h1 class="text-2xl font-semibold text-gray-800 flex items-center gap-2">
-          <FireIcon class="w-6 h-6 text-orange-500" />
-          Audit BACS — {{ document?.project_name || '…' }}
-        </h1>
-        <p class="text-sm text-gray-500 mt-1">
-          {{ document?.client_name }}
-          <span v-if="document?.bacs_applicable_deadline" class="ml-2 text-amber-700">
-            • Échéance R175 : {{ document.bacs_applicable_deadline }}
+    <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
+    <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 text-xs text-gray-500 mb-0.5">
+          <button @click="router.push('/')" class="hover:text-gray-700 inline-flex items-center gap-1">
+            <ArrowLeftIcon class="w-3.5 h-3.5" /> Audits
+          </button>
+          <span>›</span>
+          <span class="text-gray-400">Audit BACS</span>
+          <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700">
+            ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
-        </p>
-        <p v-if="document?.delivered_at" class="text-xs text-emerald-700 mt-1 font-mono">
-          ✓ Livré le {{ formatDate(document.delivered_at) }} —
-          <span :title="document.delivered_pdf_sha256">tag {{ document.delivered_git_tag }}</span>
-        </p>
+        </div>
+        <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 truncate">
+          <FireIcon class="w-5 h-5 text-orange-500 shrink-0" />
+          <span class="truncate">{{ document?.project_name || '…' }}</span>
+          <span class="text-sm font-normal text-gray-500 shrink-0">— {{ document?.client_name }}</span>
+          <span v-if="document?.bacs_applicable_deadline" class="text-xs text-amber-700 shrink-0">
+            · échéance R175 {{ document.bacs_applicable_deadline }}
+          </span>
+        </h1>
       </div>
-      <div class="flex items-center gap-2">
-        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <ArrowPathIcon class="w-4 h-4 shrink-0" /> Régénérer le plan
+      <div class="flex items-center gap-2 flex-wrap">
+        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
         </button>
-        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-4 h-4 shrink-0" /> CSV pour devis
+        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> CSV devis
         </button>
-        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-4 h-4 shrink-0" /> {{ exporting ? 'Génération…' : 'Exporter PDF' }}
+        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'PDF' }}
         </button>
-        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
-          <CheckCircleIcon class="w-4 h-4 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer l\'audit' }}
+        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
+          <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
         </button>
       </div>
     </div>
 
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-4">
       <!-- Stepper progression (9 etapes a valider manuellement) -->
       <BacsAuditStepper
         :steps="stepperSteps"
@@ -702,13 +755,15 @@ onMounted(refresh)
         @invalidate-step="invalidateStep"
       />
 
-      <!-- Synthese severities -->
-      <div class="grid grid-cols-3 gap-3">
+      <!-- Synthese severities (compactee) -->
+      <div class="grid grid-cols-3 gap-2">
         <div v-for="sev in ['blocking','major','minor']" :key="sev"
-             :class="['rounded-lg border p-4', SEVERITY_LABEL[sev].cls]">
-          <div class="text-xs font-medium uppercase tracking-wider opacity-70">{{ SEVERITY_LABEL[sev].label }}</div>
-          <div class="text-3xl font-semibold mt-1">{{ itemsBySeverity[sev].length }}</div>
-          <div class="text-[11px] opacity-70 mt-0.5">action{{ itemsBySeverity[sev].length > 1 ? 's' : '' }} ouverte{{ itemsBySeverity[sev].length > 1 ? 's' : '' }}</div>
+             :class="['rounded-lg border px-3 py-2 flex items-center gap-3', SEVERITY_LABEL[sev].cls]">
+          <div class="text-2xl font-semibold leading-none">{{ itemsBySeverity[sev].length }}</div>
+          <div class="text-xs leading-tight">
+            <div class="font-medium uppercase tracking-wider opacity-70">{{ SEVERITY_LABEL[sev].label }}</div>
+            <div class="opacity-70">action{{ itemsBySeverity[sev].length > 1 ? 's' : '' }} ouverte{{ itemsBySeverity[sev].length > 1 ? 's' : '' }}</div>
+          </div>
         </div>
       </div>
 
@@ -718,6 +773,7 @@ onMounted(refresh)
           <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
           <R175Tooltip article="R175-2" />
+          <StepValidateBadge class="ml-auto" :step="stepFor('identification')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <div class="px-5 py-4 grid grid-cols-2 gap-4">
           <div>
@@ -783,6 +839,7 @@ onMounted(refresh)
           <span class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
           <R175Tooltip article="R175-1 §6" />
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
+          <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -883,6 +940,7 @@ onMounted(refresh)
             Total chauffage + clim :
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
           </span>
+          <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <div class="divide-y divide-gray-100">
           <div v-for="g in systemsByZone" :key="g.zone_name" class="px-5 py-3">
@@ -956,6 +1014,7 @@ onMounted(refresh)
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
           <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
           <R175Tooltip article="R175-3 §1" />
+          <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -1088,6 +1147,7 @@ onMounted(refresh)
           <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
           <R175Tooltip article="R175-6" />
           <span class="text-xs text-gray-500">R175-6</span>
+          <StepValidateBadge class="ml-auto" :step="stepFor('thermal')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -1165,6 +1225,7 @@ onMounted(refresh)
               label="GTB"
               size="md"
             />
+            <StepValidateBadge :step="stepFor('bms')" @validate="validateStep" @invalidate="invalidateStep" />
           </div>
         </header>
         <div class="px-5 py-4 space-y-4">
@@ -1360,6 +1421,7 @@ onMounted(refresh)
           <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
           <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
           <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
+          <StepValidateBadge class="ml-auto" :step="stepFor('documents')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <div class="px-5 py-4">
           <SiteDocumentsManager
@@ -1379,6 +1441,7 @@ onMounted(refresh)
           <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
           <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
           <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
+          <StepValidateBadge class="ml-auto" :step="stepFor('credentials')" @validate="validateStep" @invalidate="invalidateStep" />
         </header>
         <div class="px-5 py-4">
           <SiteCredentialsManager
@@ -1400,12 +1463,15 @@ onMounted(refresh)
             <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
             <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
           </div>
-          <button
-            @click="router.push(`/bacs-audit/${docId}/action-items`)"
-            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Vue commerciale plein écran →
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              @click="router.push(`/bacs-audit/${docId}/action-items`)"
+              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Vue commerciale plein écran →
+            </button>
+            <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
+          </div>
         </header>
         <table class="w-full text-sm" style="table-layout: fixed">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -1421,7 +1487,8 @@ onMounted(refresh)
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="it in actionItems" :key="it.id"
-                :class="['transition', it.status === 'done' || it.status === 'declined' ? 'opacity-50' : '']">
+                :class="['transition', it.status === 'done' ? 'opacity-50 line-through' : (it.status === 'declined' ? 'opacity-50' : '')]"
+                :title="it.status === 'done' ? 'Action marquee comme terminee' : (it.status === 'declined' ? 'Action declinee' : '')">
               <td class="px-3 py-2 align-top">
                 <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', SEVERITY_LABEL[it.severity].cls]">
                   {{ SEVERITY_LABEL[it.severity].label }}
@@ -1465,6 +1532,42 @@ onMounted(refresh)
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <!-- 12. Note de synthèse (Claude) -->
+      <section id="section-synthesis" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
+        <header class="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
+          <SparklesIcon class="w-5 h-5 text-violet-500" />
+          <h2 class="text-base font-semibold text-gray-800">12. Note de synthèse</h2>
+          <span class="text-xs text-gray-500">Affichée en tête du PDF d'audit livré au client.</span>
+          <span v-if="document?.audit_synthesis_generated_at" class="text-[11px] text-violet-700 italic">
+            ✨ Générée par Claude le {{ new Date(document.audit_synthesis_generated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+          </span>
+          <StepValidateBadge class="ml-auto" :step="stepFor('synthesis')" @validate="validateStep" @invalidate="invalidateStep" />
+        </header>
+        <div class="px-5 py-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <button
+              @click="generateSynthesis"
+              :disabled="synthesisGenerating"
+              class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition shadow-sm"
+            >
+              <SparklesIcon class="w-4 h-4" :class="synthesisGenerating ? 'animate-pulse' : ''" />
+              {{ synthesisGenerating
+                  ? 'Génération en cours…'
+                  : (synthesisHtml ? 'Régénérer avec Claude' : 'Rédiger avec Claude') }}
+            </button>
+            <p class="text-[11px] text-gray-500 italic">
+              Claude lit l'intégralité de l'audit (zones, systèmes, compteurs, GTB, plan) et rédige une note client bienveillante et actionnable, sans inventer de données.
+            </p>
+          </div>
+          <RichTextEditor
+            :model-value="synthesisHtml"
+            @update:model-value="onSynthesisInput"
+            placeholder="Rédige la note de synthèse, ou clique sur 'Rédiger avec Claude' pour la pré-générer puis ajuste-la."
+            min-height="240px"
+          />
+        </div>
       </section>
     </div>
 

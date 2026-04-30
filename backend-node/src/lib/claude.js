@@ -258,4 +258,67 @@ async function assistLibrary({ mode, kind, title, html, parent_path, category_la
   return { html: text, usage: resp.usage };
 }
 
-module.exports = { streamSection, buildPrompts, assistLibrary };
+// ─── Synthese d'audit BACS ──────────────────────────────────────────
+// Appelee depuis /api/bacs-audit/:id/generate-synthesis. Construit un prompt
+// ultra-complet a partir du dump complet de l'audit (site, zones, systemes,
+// devices, compteurs, GTB, regulation, plan d'action) et demande a Claude
+// de rediger une note de synthese commerciale, bienveillante, qui :
+//  - Resume objectivement l'etat de conformite R175 du site
+//  - Souligne les points forts deja en place
+//  - Liste les actions correctives prioritaires (sans inventer)
+//  - Rappelle le role de Buildy en accompagnement
+//  - Invite le client a passer a l'action sans pression
+const SYSTEM_PROMPT_SYNTHESIS = [
+  `Tu es l'auditeur BACS senior de Buildy qui redige la note de synthese`,
+  `transmise au client a la fin d'un audit de conformite R175.`,
+  ``,
+  `Style imperatif :`,
+  `- Francais professionnel, technique mais accessible (le client n'est pas`,
+  `  forcement expert GTB).`,
+  `- Bienveillant, proactif, oriente solution. Jamais culpabilisant.`,
+  `- Rappelle subtilement le role de Buildy : accompagner le client de`,
+  `  l'audit jusqu'a la conformite operationnelle (pas un simple rapport,`,
+  `  un partenariat).`,
+  `- Termine par un appel a l'action concret : prendre contact pour planifier`,
+  `  les prochaines etapes.`,
+  ``,
+  `Regles strictes :`,
+  `- N'INVENTE JAMAIS de donnees absentes (puissance, marque, equipement,`,
+  `  compteur, etc.). Si une info manque, ne la mentionne pas plutot que`,
+  `  d'extrapoler.`,
+  `- Reste fidele au plan d'action genere : ne minimise pas les ecarts`,
+  `  bloquants, ne dramatise pas non plus.`,
+  `- Cite les articles R175 quand pertinent (R175-2 applicabilite, R175-3`,
+  `  metrologie + supervision, R175-4 maintenance, R175-5 formation,`,
+  `  R175-6 regulation thermique).`,
+  ``,
+  `Format : HTML simple compatible Tiptap (<p>, <ul>, <li>, <strong>,`,
+  `<em>, <h3>). 4 a 6 paragraphes courts. Evite les titres de section`,
+  `marketing : reste sobre.`,
+].join('\n');
+
+async function assistAuditSynthesis(auditDump) {
+  const userPrompt = [
+    `=== AUDIT BACS — DUMP COMPLET ===`,
+    JSON.stringify(auditDump, null, 2),
+    ``,
+    `=== INSTRUCTION ===`,
+    `Redige la note de synthese commerciale a partir des donnees ci-dessus.`,
+    `4 a 6 paragraphes courts en HTML Tiptap. Aucun titre marketing. Pas`,
+    `d'invention. Termine sur un appel a l'action concret (prise de contact`,
+    `Buildy pour planifier les actions correctives prioritaires).`,
+  ].join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 3072,
+    system: SYSTEM_PROMPT_SYNTHESIS,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const text = (resp.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text).join('').trim();
+  return { html: text, usage: resp.usage };
+}
+
+module.exports = { streamSection, buildPrompts, assistLibrary, assistAuditSynthesis };

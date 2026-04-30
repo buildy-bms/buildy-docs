@@ -7,6 +7,7 @@ const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
+const { assistAuditSynthesis } = require('../lib/claude');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const gitLib = require('../lib/git');
@@ -669,6 +670,7 @@ async function routes(fastify) {
       buildySolution,
       actionItems,
       actionStats,
+      synthesisHtml: af.audit_synthesis_html || null,
       complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
       applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
       bacsArticles,
@@ -982,11 +984,11 @@ async function routes(fastify) {
     };
   });
 
-  // ─── Stepper progression (v2.9) ────────────────────────────────────
-  // 9 etapes manuelles a valider par l'auditeur :
+  // ─── Stepper progression (v2.9 / v2.10) ────────────────────────────
+  // 10 etapes manuelles a valider par l'auditeur :
   //   identification, zones, systems, meters, thermal, bms, documents,
-  //   credentials, review.
-  const AUDIT_STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review'];
+  //   credentials, review, synthesis.
+  const AUDIT_STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review','synthesis'];
 
   fastify.post('/bacs-audit/:documentId/validate-step', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
@@ -1030,6 +1032,163 @@ async function routes(fastify) {
       total_steps: AUDIT_STEPS.length,
       completion_percent: Math.round((validatedCount / AUDIT_STEPS.length) * 100),
     };
+  });
+
+  // ─── Note de synthese (v2.10) ──────────────────────────────────────
+  // PUT manuel + POST generate (Claude). La note HTML est ensuite injectee
+  // en tete du PDF d'audit (chapitre 0 - Synthese executive).
+  fastify.put('/bacs-audit/:documentId/synthesis', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+    const schema = z.object({ html: z.string().nullable().optional() });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    db.afs.update(documentId, { audit_synthesis_html: body.html ?? null });
+    return db.afs.getById(documentId);
+  });
+
+  fastify.post('/bacs-audit/:documentId/generate-synthesis', async (request, reply) => {
+    if (!config.anthropicApiKey) {
+      return reply.code(503).send({ detail: 'Assistant Claude non configure (ANTHROPIC_API_KEY manquant)' });
+    }
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+    const site = af.site_id ? db.sites.getByIdInternal?.(af.site_id) || db.sites.getById(af.site_id) : null;
+    const zones = site ? db.zones.listBySite(site.site_id) : [];
+    const systems = db.db.prepare(`
+      SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
+      FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+      ORDER BY z.position, z.name, s.system_category
+    `).all(documentId);
+    const devices = db.db.prepare(`
+      SELECT d.*, s.system_category, z.name AS zone_name
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+    `).all(documentId);
+    const meters = db.db.prepare(`
+      SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
+      LEFT JOIN zones z ON z.zone_id = m.zone_id
+      WHERE m.document_id = ?
+    `).all(documentId);
+    const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+    const thermal = db.db.prepare(`
+      SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
+      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      WHERE t.document_id = ?
+    `).all(documentId);
+    const actionItems = db.db.prepare(`
+      SELECT a.*, z.name AS zone_name FROM bacs_audit_action_items a
+      LEFT JOIN zones z ON z.zone_id = a.zone_id
+      WHERE a.document_id = ? AND a.status NOT IN ('done','declined')
+      ORDER BY (CASE a.severity WHEN 'blocking' THEN 0 WHEN 'major' THEN 1 ELSE 2 END), a.position, a.id
+    `).all(documentId);
+
+    // Dump structure (notes incluses) pour permettre a Claude de produire
+    // une synthese fidele aux donnees saisies sans avoir a inventer.
+    const stripHtml = (s) => s ? String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : null;
+    const auditDump = {
+      audit: {
+        client_name: af.client_name,
+        project_name: af.project_name,
+        applicability_status: af.bacs_applicability_status,
+        applicable_deadline: af.bacs_applicable_deadline,
+        total_power_kw: af.bacs_total_power_kw,
+        total_power_source: af.bacs_total_power_source,
+        building_permit_date: af.bacs_building_permit_date,
+      },
+      site: site ? { name: site.name, address: site.address, city: site.city } : null,
+      zones: zones.map(z => ({
+        name: z.name, nature: z.nature, surface_m2: z.surface_m2,
+        notes: stripHtml(z.notes_html) || z.notes,
+      })),
+      systems: systems.filter(s => s.present).map(s => ({
+        category: s.system_category, zone: s.zone_name,
+        meets_r175_3_p3: !!s.meets_r175_3_p3,
+        meets_r175_3_p4: !!s.meets_r175_3_p4,
+        meets_r175_3_p4_autonomous: !!s.meets_r175_3_p4_autonomous,
+        managed_by_bms: !!s.managed_by_bms,
+        notes: stripHtml(s.notes_html) || s.notes,
+      })),
+      devices: devices.map(d => ({
+        name: d.name, brand: d.brand, model: d.model_reference,
+        category: d.system_category, zone: d.zone_name,
+        energy_source: d.energy_source, power_kw: d.power_kw,
+        communication_protocol: d.communication_protocol,
+        meets_r175_3_p4: !!d.meets_r175_3_p4,
+        managed_by_bms: !!d.managed_by_bms,
+        out_of_service: !!d.out_of_service,
+        notes: stripHtml(d.notes_html) || d.notes,
+      })),
+      meters: meters.map(m => ({
+        zone: m.zone_name || 'Compteur general', usage: m.usage,
+        type: m.meter_type, required: !!m.required,
+        present: !!m.present_actual, communicating: !!m.communicating,
+        managed_by_bms: !!m.managed_by_bms,
+        notes: stripHtml(m.notes_html) || m.notes,
+      })),
+      bms: bms ? {
+        existing_solution: bms.existing_solution,
+        brand: bms.existing_solution_brand,
+        location: bms.location, model_reference: bms.model_reference,
+        manages: {
+          heating: !!bms.manages_heating, cooling: !!bms.manages_cooling,
+          ventilation: !!bms.manages_ventilation, dhw: !!bms.manages_dhw,
+          lighting: !!bms.manages_lighting,
+        },
+        meets_r175_3_p1: !!bms.meets_r175_3_p1,
+        meets_r175_3_p2: !!bms.meets_r175_3_p2,
+        has_maintenance_procedures: !!bms.has_maintenance_procedures,
+        operator_trained: !!bms.operator_trained,
+        operator_training_date: bms.operator_training_date,
+        overall_compliance: bms.overall_compliance,
+        out_of_service: !!bms.out_of_service,
+        notes: stripHtml(bms.notes_html),
+      } : null,
+      thermal_regulation: thermal.map(t => ({
+        zone: t.zone_name, regulation_type: t.regulation_type,
+        generator_type: t.generator_type, age_years: t.age_years,
+        notes: t.notes,
+      })),
+      action_items_open: actionItems.map(a => ({
+        severity: a.severity, article: a.r175_article,
+        title: a.title, description: a.description,
+        zone: a.zone_name, estimated_effort: a.estimated_effort,
+        status: a.status,
+      })),
+      stats: {
+        zones_count: zones.length,
+        systems_present: systems.filter(s => s.present).length,
+        devices_count: devices.length,
+        meters_required: meters.filter(m => m.required).length,
+        meters_present: meters.filter(m => m.present_actual).length,
+        actions_blocking: actionItems.filter(a => a.severity === 'blocking').length,
+        actions_major: actionItems.filter(a => a.severity === 'major').length,
+        actions_minor: actionItems.filter(a => a.severity === 'minor').length,
+      },
+    };
+
+    try {
+      const { html, usage } = await assistAuditSynthesis(auditDump);
+      db.afs.update(documentId, {
+        audit_synthesis_html: html,
+        audit_synthesis_generated_at: new Date().toISOString(),
+      });
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'bacs_audit.synthesis.generate',
+        payload: { document_id: documentId, length: html.length, usage },
+      });
+      return { html, usage, generated_at: new Date().toISOString() };
+    } catch (err) {
+      log.error(`Generation synthese audit BACS echouee : ${err.message}`);
+      return reply.code(500).send({ detail: err.message || 'Echec generation synthese' });
+    }
   });
 }
 

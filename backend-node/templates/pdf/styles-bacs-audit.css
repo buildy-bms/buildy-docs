@@ -9,7 +9,13 @@
   size: A4 portrait;
   margin: 22mm 18mm 18mm 18mm;
 }
-@page :first { margin: 0; }
+@page :first {
+  margin: 0;
+  /* Fond bleu Buildy explicitement pose sur la 1ere page : evite tout bord
+     blanc residuel si Puppeteer/Chromium ne respecte pas parfaitement le
+     full-bleed via coverFullBleed. */
+  background: #1b2842;
+}
 
 html, body {
   margin: 0;
@@ -47,6 +53,11 @@ h1, h2, h3, h4, h5 {
   display: flex;
   flex-direction: column;
   page-break-after: always;
+  /* Defensive : assure que la couleur bleu Buildy s'imprime meme si le
+     printBackground / print-color-adjust est mal interprete au boot. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  box-shadow: 0 0 0 100mm #1b2842;
 }
 .cover-logo { width: 50mm; margin-bottom: 24mm; filter: brightness(0) invert(1); }
 .cover-doc-type {
@@ -297,3 +308,26 @@ table tr:nth-child(even) td { background: #fafafa; }
 .device-notes > strong { font-size: 9pt; }
 .device-notes .rich-notes { margin-top: 1mm; font-size: 9pt; }
 .device-notes .photo-grid img { width: 42mm; height: 32mm; }
+
+/* ── Note de synthese (chapitre 0, redigee par auditeur + Claude) ── */
+.synthesis-block {
+  background: linear-gradient(180deg, #f5f7ff 0%, #fafbff 100%);
+  border-left: 3pt solid #7c3aed;
+  padding: 5mm 8mm;
+  margin: 3mm 0 8mm;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #1f2937;
+  page-break-inside: avoid;
+}
+.synthesis-block p { margin: 0 0 3mm; }
+.synthesis-block p:last-child { margin-bottom: 0; }
+.synthesis-block h3 {
+  font-size: 11pt;
+  color: #4c1d95;
+  margin: 4mm 0 2mm;
+}
+.synthesis-block strong { color: #1b2842; font-weight: 600; }
+.synthesis-block em { color: #4c1d95; font-style: italic; }
+.synthesis-block ul, .synthesis-block ol { padding-left: 7mm; margin: 2mm 0; }
+.synthesis-block li { margin: 1mm 0; }
