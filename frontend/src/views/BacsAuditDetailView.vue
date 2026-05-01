@@ -2341,14 +2341,15 @@ onMounted(() => {
       <transition name="slide">
         <aside
           v-if="showActivity"
-          class="fixed right-3 top-3 bottom-3 w-80 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl flex flex-col"
+          class="fixed right-3 top-3 bottom-3 w-80 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl flex flex-col overflow-hidden"
         >
-          <button
-            @click="showActivity = false"
-            class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10 p-1"
-            title="Replier"
-          >✕</button>
-          <ActivityPanel ref="activityRef" :af-id="docId" :kind="document?.kind || 'bacs_audit'" />
+          <ActivityPanel
+            ref="activityRef"
+            :af-id="docId"
+            :kind="document?.kind || 'bacs_audit'"
+            closable
+            @close="showActivity = false"
+          />
         </aside>
       </transition>
       <div

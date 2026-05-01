@@ -602,16 +602,17 @@ watch(() => route.params.id, async (newId, oldId) => {
       <aside
         v-if="showActivity"
         :class="[
-          'shrink-0 relative',
+          'shrink-0 relative overflow-hidden',
           isCompact ? 'fixed right-3 top-3 bottom-3 w-72 z-40 shadow-2xl bg-white rounded-lg' : 'w-72',
         ]"
       >
-        <button
-          @click="showActivity = false"
-          class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10"
-          title="Replier"
-        >✕</button>
-        <ActivityPanel ref="activityRef" :af-id="af.id" />
+        <ActivityPanel
+          ref="activityRef"
+          :af-id="af.id"
+          :kind="af.kind || 'af'"
+          closable
+          @close="showActivity = false"
+        />
       </aside>
       <div
         v-if="isCompact && showActivity"

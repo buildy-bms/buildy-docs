@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { ClockIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { getAfAudit } from '@/api'
 
 const props = defineProps({
@@ -8,7 +8,11 @@ const props = defineProps({
   // 'af' | 'bacs_audit' | 'site_audit' — utilisé pour adapter les libellés
   // génériques (af.update → « a modifié l'audit » au lieu de « a modifié l'AF »).
   kind: { type: String, default: 'af' },
+  // Affiche une croix de fermeture dans le header (slide-out usage).
+  closable: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['close'])
 
 const isAudit = computed(() => props.kind === 'bacs_audit' || props.kind === 'site_audit')
 const docLabel = computed(() => isAudit.value ? 'l\'audit' : 'l\'AF')
@@ -104,9 +108,14 @@ defineExpose({ refresh })
       <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 inline-flex items-center gap-1.5">
         <ClockIcon class="w-3.5 h-3.5" /> Activité récente
       </h3>
-      <button @click="refresh" class="text-gray-400 hover:text-gray-700" title="Rafraîchir">
-        <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
-      </button>
+      <div class="inline-flex items-center gap-2">
+        <button @click="refresh" class="text-gray-400 hover:text-gray-700" title="Rafraîchir">
+          <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
+        </button>
+        <button v-if="closable" @click="emit('close')" class="text-gray-400 hover:text-gray-700" title="Fermer">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
     </div>
 
     <div v-if="loading && !entries.length" class="px-4 py-6 text-center text-xs text-gray-400">Chargement…</div>
