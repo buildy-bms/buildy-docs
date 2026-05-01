@@ -33,6 +33,7 @@ import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
@@ -105,6 +106,18 @@ const SYSTEM_LABEL = {
   lighting_indoor: 'Éclairage intérieur',
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
+}
+// Icone et couleur par categorie de systeme — alignees sur les
+// fonctionnalites Buildy de la bibliotheque (chap 2 Perimetre des
+// equipements supervises).
+const SYSTEM_ICON = {
+  heating:                 { icon: 'fa-solid fa-fire',         color: '#dc2626' },
+  cooling:                 { icon: 'fa-solid fa-snowflake',    color: '#0891b2' },
+  ventilation:             { icon: 'fa-solid fa-fan',          color: '#64748b' },
+  dhw:                     { icon: 'fa-solid fa-faucet',       color: '#0284c7' },
+  lighting_indoor:         { icon: 'fa-solid fa-lightbulb',    color: '#f59e0b' },
+  lighting_outdoor:        { icon: 'fa-solid fa-tower-cell',   color: '#f59e0b' },
+  electricity_production:  { icon: 'fa-solid fa-solar-panel',  color: '#16a34a' },
 }
 const COMM_OPTIONS = [
   { value: null, label: '—' },
@@ -943,14 +956,17 @@ onMounted(refresh)
               Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
             </p>
           </div>
-          <details :open="!!document?.bacs_generator_works_date || (r175_6_applicable && r175_6_applicable.applies)">
-            <summary class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 select-none flex items-center gap-1 mb-1">
-              <span class="text-gray-400">▸</span> Travaux récents sur le générateur de chaleur ?
-              <span class="ml-1 text-[10px] text-gray-400 font-normal">— déclencheur R175-6</span>
-            </summary>
-            <div class="pl-4 border-l-2 border-indigo-100 mt-2">
+          <div>
+            <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input type="checkbox"
+                     :checked="!!document?.bacs_generator_works_date"
+                     @change="e => { if (!e.target.checked) saveDocDebounced({ bacs_generator_works_date: null }); else saveDocDebounced({ bacs_generator_works_date: new Date().toISOString().slice(0, 10) }); }"
+                     class="rounded border-gray-300" />
+              <span>Travaux d'installation/remplacement de générateur de chaleur réalisés <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
+            </label>
+            <div v-if="document?.bacs_generator_works_date" class="pl-6 border-l-2 border-indigo-100 mt-2">
               <label class="block text-xs font-medium text-gray-700 mb-1">
-                Date des derniers travaux d'installation/remplacement de générateur de chaleur
+                Date des derniers travaux générateur de chaleur
               </label>
               <input
                 type="date"
@@ -959,26 +975,31 @@ onMounted(refresh)
                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
               <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                <strong>R175-6</strong> s'applique si le permis de construire est déposé après le <strong>21/07/2021</strong>, ou si des travaux d'installation/remplacement de générateur ont été engagés après cette date. Sinon, l'obligation de régulation thermique automatique par pièce/zone n'est pas applicable au site.
+                <strong>R175-6</strong> s'applique si le permis de construire est postérieur au <strong>21/07/2021</strong> ou si des travaux générateur ont été engagés après cette date.
               </p>
               <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
                  :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
                 {{ r175_6_applicable.message }}
               </p>
             </div>
-          </details>
-          <details class="col-span-2 border-t border-gray-100 pt-3" :open="!!document?.bacs_district_heating_substation_kw">
-            <summary class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 select-none flex items-center gap-1">
-              <span class="text-gray-400">▸</span> Bâtiment raccordé à un réseau urbain de chaleur ou de froid ?
-            </summary>
-            <div class="mt-2 pl-4 border-l-2 border-indigo-100">
+          </div>
+          <div class="col-span-2 border-t border-gray-100 pt-3">
+            <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input type="checkbox"
+                     :checked="!!document?.bacs_district_heating_substation_kw"
+                     @change="e => { if (!e.target.checked) saveDocDebounced({ bacs_district_heating_substation_kw: null }); else saveDocDebounced({ bacs_district_heating_substation_kw: 0 }); }"
+                     class="rounded border-gray-300" />
+              <span>Bâtiment raccordé à un <strong>réseau urbain de chaleur ou de froid</strong></span>
+            </label>
+            <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
+                 class="mt-2 pl-6 border-l-2 border-indigo-100">
               <label class="block text-xs font-medium text-gray-700 mb-1">
                 Puissance de la station d'échange (kW)
               </label>
               <input
                 type="number" min="0" step="0.1"
                 :value="document?.bacs_district_heating_substation_kw"
-                @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
                 placeholder="—"
                 class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
@@ -986,7 +1007,7 @@ onMounted(refresh)
                 <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
               </p>
             </div>
-          </details>
+          </div>
         </div>
         <div v-if="document?.bacs_applicability_status" class="px-5 pb-4">
           <div :class="['rounded-lg border p-3 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status].cls]">
@@ -1129,8 +1150,9 @@ onMounted(refresh)
             </div>
             <div class="space-y-3">
               <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
-                <!-- En-tête catégorie : présent? + notes + photos -->
+                <!-- En-tête catégorie : icone + présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
+                  <SystemCategoryIcon :category="s.system_category" size="md" />
                   <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45">
                     {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
                   </span>
@@ -1711,79 +1733,74 @@ onMounted(refresh)
           </button>
           <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
-        <table class="w-full text-sm" style="table-layout: auto">
-          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
-            <tr>
-              <th class="text-center px-2 py-2 w-16 whitespace-nowrap" title="Numéro d'action — utilisable comme référence par les intégrateurs GTB pour leur devis">N°</th>
-              <th class="text-left px-3 py-2 w-24 whitespace-nowrap">Sévérité</th>
-              <th class="text-left py-2 w-24 whitespace-nowrap">Article</th>
-              <th class="text-left py-2 min-w-70">Action</th>
-              <th class="text-left py-2 w-32 whitespace-nowrap">Zone</th>
-              <th class="text-left py-2 w-32 whitespace-nowrap">Statut</th>
-              <th class="text-left px-3 py-2 w-52" title="Préconisations Buildy / solutions envisageables pour cette action">Préconisations</th>
-              <th class="text-left px-3 py-2 w-56">Notes commerciales</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="(it, idx) in visibleActionItems" :key="it.id"
-                :class="['transition', it.status === 'declined' ? 'opacity-50' : '']"
-                :title="it.status === 'done' ? 'Action marquee comme terminee' : (it.status === 'declined' ? 'Action declinee' : '')">
-              <td class="px-2 py-2 align-top text-center">
-                <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 text-xs font-mono font-bold rounded bg-gray-800 text-white whitespace-nowrap">
-                  {{ actionNumber(idx) }}
-                </span>
-              </td>
-              <td class="px-3 py-2 align-top">
-                <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', SEVERITY_LABEL[it.severity].cls]">
-                  {{ SEVERITY_LABEL[it.severity].label }}
-                </span>
-              </td>
-              <td class="py-2 text-[11px] text-gray-500 font-mono align-top whitespace-nowrap">{{ it.r175_article || '—' }}</td>
-              <td class="py-2 align-top pr-2">
-                <div class="text-gray-800 line-clamp-2" :title="it.title">{{ it.title }}</div>
-                <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 line-clamp-2" :title="it.description">{{ it.description }}</div>
-              </td>
-              <td class="py-2 text-xs text-gray-600 align-top truncate" :title="it.zone_name">{{ it.zone_name || '—' }}</td>
-              <td class="py-2 align-top">
-                <select :value="it.status"
-                        @change="e => patchActionItem(it, { status: e.target.value })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
-                  <option v-for="(label, val) in STATUS_LABEL" :key="val" :value="val">{{ label }}</option>
-                </select>
-              </td>
-              <td class="px-3 py-2 align-top">
-                <button
-                  type="button"
-                  @click="openAlternativesEditor(it)"
-                  :class="['inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium rounded border transition whitespace-nowrap w-full',
-                    hasNotes(it.alternative_solutions_html)
-                      ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
-                      : (it.status === 'open'
-                        ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-                  :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'"
-                >
-                  <PencilSquareIcon class="w-3.5 h-3.5" />
-                  {{ hasNotes(it.alternative_solutions_html)
-                      ? 'Préconisations'
-                      : (it.status === 'open' ? '⚠ À renseigner' : '+ Préconisations') }}
-                </button>
-              </td>
-              <td class="px-3 py-2 align-top">
-                <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
-                       @blur="e => patchActionItem(it, { commercial_notes: e.target.value || null })"
-                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-              </td>
-            </tr>
-            <tr v-if="!visibleActionItems.length">
-              <td colspan="8" class="py-10 text-center">
-                <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
-                <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
-                <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="px-4 py-3 space-y-3">
+          <div v-if="!visibleActionItems.length" class="py-10 text-center">
+            <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
+            <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
+            <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
+          </div>
+          <div
+            v-for="(it, idx) in visibleActionItems"
+            :key="it.id"
+            :class="['border rounded-lg overflow-hidden transition',
+              it.status === 'declined' ? 'opacity-50' : '',
+              it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200')]"
+          >
+            <!-- Entete : N° + sevérité + article + zone + statut + bouton préconisations -->
+            <div class="px-4 py-2.5 flex items-center gap-3 flex-wrap bg-white">
+              <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 text-xs font-mono font-bold rounded bg-gray-800 text-white whitespace-nowrap shrink-0">
+                {{ actionNumber(idx) }}
+              </span>
+              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap shrink-0', SEVERITY_LABEL[it.severity].cls]">
+                {{ SEVERITY_LABEL[it.severity].label }}
+              </span>
+              <span class="text-[11px] text-gray-500 font-mono whitespace-nowrap shrink-0">{{ it.r175_article || '—' }}</span>
+              <span v-if="it.zone_name" class="text-[11px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded shrink-0">📍 {{ it.zone_name }}</span>
+              <div class="flex-1 min-w-50">
+                <div class="text-sm text-gray-800 font-medium">{{ it.title }}</div>
+                <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5">{{ it.description }}</div>
+              </div>
+              <select :value="it.status"
+                      @change="e => patchActionItem(it, { status: e.target.value })"
+                      class="text-xs px-2 py-1 border border-gray-200 rounded shrink-0 w-32">
+                <option v-for="(label, val) in STATUS_LABEL" :key="val" :value="val">{{ label }}</option>
+              </select>
+              <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
+                     @blur="e => patchActionItem(it, { commercial_notes: e.target.value || null })"
+                     class="text-xs px-2 py-1 border border-gray-200 rounded w-56 shrink-0" />
+              <button
+                type="button"
+                @click="openAlternativesEditor(it)"
+                :class="['inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded border transition whitespace-nowrap shrink-0',
+                  hasNotes(it.alternative_solutions_html)
+                    ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
+                    : (it.status === 'open'
+                      ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
+                      : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
+                :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'"
+              >
+                <PencilSquareIcon class="w-3.5 h-3.5" />
+                {{ hasNotes(it.alternative_solutions_html)
+                    ? 'Préconisations'
+                    : (it.status === 'open' ? '⚠ Préconiser' : '+ Préconiser') }}
+              </button>
+            </div>
+            <!-- Bandeau préconisations en pleine largeur sous l'action -->
+            <div v-if="hasNotes(it.alternative_solutions_html)"
+                 class="px-4 py-2 bg-violet-50 border-t border-violet-200 text-[12px] text-violet-900 leading-relaxed">
+              <p class="text-[10px] uppercase tracking-wider font-semibold text-violet-700 mb-1">Préconisations Buildy</p>
+              <div class="prose prose-sm max-w-none text-violet-900" v-html="it.alternative_solutions_html"></div>
+            </div>
+            <div v-else-if="it.status === 'open'"
+                 class="px-4 py-2 bg-red-50 border-t border-red-200 text-[11px] text-red-700 leading-relaxed flex items-center gap-2">
+              <span>⚠</span>
+              <span>Aucune préconisation Buildy renseignée pour cette action.</span>
+              <button @click="openAlternativesEditor(it)" class="ml-auto text-red-700 underline hover:text-red-900 font-medium">
+                Préconiser maintenant
+              </button>
+            </div>
+          </div>
+        </div>
       </CollapsibleSection>
 
       <!-- 12. Note de synthèse (Claude) -->

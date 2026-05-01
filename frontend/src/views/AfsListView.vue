@@ -346,7 +346,7 @@ onMounted(refresh)
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Rechercher par client, projet ou adresse…"
+          placeholder="Rechercher : client, projet, adresse, contenu audit BACS, bibliothèque…"
           autocomplete="off"
           data-1p-ignore="true"
           data-bwignore="true"
@@ -357,6 +357,12 @@ onMounted(refresh)
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
+      <span v-if="searchQuery && searchQuery.length >= 2" class="text-xs text-gray-500 whitespace-nowrap">
+        {{ filteredSorted.length }} doc{{ filteredSorted.length > 1 ? 's' : '' }}
+        <span v-if="libraryHits.length || siteOnlyHits.length" class="text-gray-400">
+          · {{ libraryHits.length }} biblio · {{ siteOnlyHits.length }} site{{ siteOnlyHits.length > 1 ? 's' : '' }}
+        </span>
+      </span>
       <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
         <button
           v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}]"

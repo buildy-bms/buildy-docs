@@ -57,7 +57,9 @@ h1, h2, h3, h4, h5 {
      printBackground / print-color-adjust est mal interprete au boot. */
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-  box-shadow: 0 0 0 100mm #1b2842;
+  /* Pas de box-shadow : la box-shadow large (100mm) debordait sur la
+     page 2 (TOC). Le fond bleu plein-bord est obtenu via @page :first
+     background + le re-render coverFullBleed dans pdf.js. */
 }
 .cover-logo { width: 50mm; margin-bottom: 24mm; filter: brightness(0) invert(1); }
 .cover-doc-type {

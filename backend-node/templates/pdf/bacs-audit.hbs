@@ -189,7 +189,7 @@
 <h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
 {{#each items}}
   {{#if present}}
-    <h3>{{categoryLabel}}{{#if total_power_kw}} <span class="muted">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
+    <h3>{{{categoryIcon system_category "18"}}}{{categoryLabel}}{{#if total_power_kw}} <span class="muted">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
     {{#if devices.length}}
       <table>
         <thead>

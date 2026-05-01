@@ -18,6 +18,12 @@ const FA_ALIAS = {
   'map-pin': 'faMapPin',
   'wrench': 'faWrench',
   'fire': 'faFire',
+  'snowflake': 'faSnowflake',
+  'fan': 'faFan',
+  'faucet': 'faFaucet',
+  'lightbulb': 'faLightbulb',
+  'tower-cell': 'faTowerCell',
+  'solar-panel': 'faSolarPanel',
   'bolt': 'faBolt',
   'gauge': 'faGauge',
   'sparkles': 'faWandMagicSparkles',
@@ -29,6 +35,17 @@ const FA_ALIAS = {
   'shield': 'faShieldHalved',
   'temperature': 'faTemperatureHalf',
 };
+// Mapping categorie BACS -> icone + couleur (aligne avec
+// frontend/components/SystemCategoryIcon.vue).
+const CATEGORY_ICON = {
+  heating:                { name: 'fire',         color: '#dc2626' },
+  cooling:                { name: 'snowflake',    color: '#0891b2' },
+  ventilation:            { name: 'fan',          color: '#64748b' },
+  dhw:                    { name: 'faucet',       color: '#0284c7' },
+  lighting_indoor:        { name: 'lightbulb',    color: '#f59e0b' },
+  lighting_outdoor:       { name: 'tower-cell',   color: '#f59e0b' },
+  electricity_production: { name: 'solar-panel',  color: '#16a34a' },
+};
 Handlebars.registerHelper('faIcon', (name, color, size) => {
   const key = FA_ALIAS[name] || name;
   const def = faIcons[key];
@@ -37,6 +54,17 @@ Handlebars.registerHelper('faIcon', (name, color, size) => {
   const px = size || '16';
   const fill = color || 'currentColor';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;"><path fill="${fill}" d="${path}"/></svg>`;
+  return new Handlebars.SafeString(svg);
+});
+// {{{categoryIcon "heating" "16"}}} -> icone + couleur dediees a la categorie BACS
+Handlebars.registerHelper('categoryIcon', (category, size) => {
+  const cfg = CATEGORY_ICON[category];
+  if (!cfg) return '';
+  const def = faIcons[FA_ALIAS[cfg.name] || cfg.name];
+  if (!def || !def.icon) return '';
+  const [w, h, , , path] = def.icon;
+  const px = size || '16';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:2mm"><path fill="${cfg.color}" d="${path}"/></svg>`;
   return new Handlebars.SafeString(svg);
 });
 Handlebars.registerHelper('or', function(...args) {
