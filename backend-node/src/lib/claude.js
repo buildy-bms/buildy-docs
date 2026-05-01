@@ -270,7 +270,9 @@ async function assistLibrary({ mode, kind, title, html, parent_path, category_la
 //  - Invite le client a passer a l'action sans pression
 const SYSTEM_PROMPT_SYNTHESIS = [
   `Tu es l'auditeur BACS senior de Buildy qui redige la note de synthese`,
-  `transmise au client a la fin d'un audit de conformite R175.`,
+  `transmise au client a la fin d'un audit de conformite au decret R175.`,
+  `Ce livrable est un audit BACS et il vaut egalement comme rapport`,
+  `d'inspection periodique R175-5-1 (a conserver 10 ans par le proprietaire).`,
   ``,
   `Style imperatif :`,
   `- Francais professionnel, technique mais accessible (le client n'est pas`,
@@ -288,9 +290,22 @@ const SYSTEM_PROMPT_SYNTHESIS = [
   `  d'extrapoler.`,
   `- Reste fidele au plan d'action genere : ne minimise pas les ecarts`,
   `  bloquants, ne dramatise pas non plus.`,
-  `- Cite les articles R175 quand pertinent (R175-2 applicabilite, R175-3`,
-  `  metrologie + supervision, R175-4 maintenance, R175-5 formation,`,
-  `  R175-6 regulation thermique).`,
+  `- Cite les articles R175 quand pertinent :`,
+  `  · R175-2 applicabilite (et puissance station d'echange si reseau urbain)`,
+  `  · R175-3 1° suivi pas horaire + conservation 5 ans`,
+  `  · R175-3 2° detection des pertes d'efficacite`,
+  `  · R175-3 3° interoperabilite (BACnet/Modbus/KNX/M-Bus/MQTT)`,
+  `  · R175-3 4° arret manuel + gestion autonome`,
+  `  · R175-4 verifications periodiques + consignes ecrites`,
+  `  · R175-5 formation de l'exploitant`,
+  `  · R175-5-1 inspection periodique (cadre du present rapport)`,
+  `  · R175-6 regulation thermique automatique par piece ou zone`,
+  `- Si l'audit indique audit_existing_af_status='absent', le mentionner`,
+  `  comme une lacune R175-5-1 1° (pas d'AF a examiner).`,
+  `- Si action_items_open contient des alternative_solutions, les mentionner`,
+  `  comme options ouvertes au proprietaire (R175-5-1 4° demande `,
+  `  explicitement les 'autres solutions envisageables') — sans privilegier`,
+  `  Buildy en exclusivite.`,
   ``,
   `Format : HTML simple compatible Tiptap (<p>, <ul>, <li>, <strong>,`,
   `<em>, <h3>). 4 a 6 paragraphes courts. Evite les titres de section`,
@@ -358,4 +373,49 @@ async function assistAuditSynthesis(auditDump) {
   return { html: normalizeSynthesisHtml(raw), usage: resp.usage };
 }
 
-module.exports = { streamSection, buildPrompts, assistLibrary, assistAuditSynthesis };
+// ─── Alternatives a une action corrective (R175-5-1 4°) ────────────
+// L'article R175-5-1 4° demande explicitement la fourniture des
+// 'recommandations [...] et autres solutions envisageables'. Pour
+// chaque action du plan de mise en conformite, l'auditeur peut
+// generer une liste d'options techniques alternatives.
+const SYSTEM_PROMPT_ALTERNATIVES = [
+  `Tu es l'auditeur BACS senior de Buildy. Pour une action corrective`,
+  `donnee, propose 2 a 4 solutions techniques alternatives realistes,`,
+  `de natures differentes (ex : different protocole, different niveau`,
+  `de profondeur, integration progressive vs remplacement complet,`,
+  `solution proprietaire vs solution ouverte, etc.).`,
+  ``,
+  `Pour chaque option, indique en une phrase :`,
+  `- la nature de la solution (1 a 4 mots)`,
+  `- ses avantages (cout, delai, simplicite, perennite, etc.)`,
+  `- ses limites ou contre-indications`,
+  ``,
+  `Reste fidele aux articles R175 (cite-les si pertinent). N'invente pas`,
+  `de marques ou references precises (reste agnostique). Sortie HTML`,
+  `Tiptap : <ul><li><strong>...</strong> : ...</li></ul>.`,
+].join('\n');
+
+async function assistActionAlternatives(actionContext) {
+  const userPrompt = [
+    `=== ACTION CORRECTIVE ===`,
+    JSON.stringify(actionContext, null, 2),
+    ``,
+    `Propose les autres solutions envisageables (R175-5-1 4°).`,
+    `Format HTML uniquement, pas de markdown, pas de fences.`,
+  ].join('\n');
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 1024,
+    system: SYSTEM_PROMPT_ALTERNATIVES,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || [])
+    .filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  // Reuse normalizeSynthesisHtml for consistent post-processing
+  return { html: normalizeSynthesisHtml(raw), usage: resp.usage };
+}
+
+module.exports = {
+  streamSection, buildPrompts, assistLibrary,
+  assistAuditSynthesis, assistActionAlternatives,
+};

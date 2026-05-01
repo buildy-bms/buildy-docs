@@ -67,7 +67,14 @@ h1, h2, h3, h4, h5 {
   text-transform: uppercase;
   letter-spacing: 0.28em;
   color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 2mm;
+}
+.cover-doc-subtype {
+  font-family: 'Manrope', sans-serif;
+  font-size: 8pt;
+  color: rgba(255, 255, 255, 0.45);
   margin-bottom: 10mm;
+  font-style: italic;
 }
 .cover-title {
   font-family: 'Poppins', sans-serif;
@@ -331,3 +338,26 @@ table tr:nth-child(even) td { background: #fafafa; }
 .synthesis-block em { color: #4c1d95; font-style: italic; }
 .synthesis-block ul, .synthesis-block ol { padding-left: 7mm; margin: 2mm 0; }
 .synthesis-block li { margin: 1mm 0; }
+
+/* ── Alternatives R175-5-1 4° dans les actions du plan ── */
+.alt-solutions {
+  margin-top: 2mm;
+  padding: 2mm 3mm;
+  background: #f5f3ff;
+  border-left: 1.5pt solid #7c3aed;
+  border-radius: 0.5mm;
+  font-size: 8.5pt;
+  color: #4c1d95;
+  page-break-inside: avoid;
+}
+.alt-solutions-label {
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  margin: 0 0 1mm 0;
+  color: #6d28d9;
+}
+.alt-solutions ul, .alt-solutions ol { padding-left: 5mm; margin: 1mm 0; }
+.alt-solutions li { margin: 0.5mm 0; line-height: 1.4; }
+.alt-solutions p { margin: 0 0 1mm; }

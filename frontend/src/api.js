@@ -235,6 +235,8 @@ export const updateBacsAuditSynthesis = (docId, html) =>
   api.put(`/bacs-audit/${docId}/synthesis`, { html })
 export const generateBacsAuditSynthesis = (docId) =>
   api.post(`/bacs-audit/${docId}/generate-synthesis`)
+export const generateActionAlternatives = (actionId) =>
+  api.post(`/bacs-audit/action-items/${actionId}/generate-alternatives`)
 export const duplicateZone = (id) => api.post(`/site-zones/${id}/duplicate`)
 export const duplicateBacsMeter = (id) => api.post(`/bacs-audit/meters/${id}/duplicate`)
 export const duplicateBacsDevice = (id) => api.post(`/bacs-audit/devices/${id}/duplicate`)

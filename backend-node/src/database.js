@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 49;
+const TARGET_VERSION = 50;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1903,6 +1903,27 @@ function runMigrations() {
     log.info('Migration 49 appliquee : afs.audit_synthesis_html (note synthese)');
   }
 
+  if (current < 50) {
+    // Cf retour Kevin v2.12 (apres relecture du decret R175 sur Notion) :
+    // - audit_existing_af_status : suit le 1° de R175-5-1 (examen de
+    //   l'analyse fonctionnelle existante a la 1ere inspection). Valeurs :
+    //   'present' (un doc AF existe et est rattache) ou 'absent' (l'auditeur
+    //   confirme qu'il n'y a pas d'AF).
+    // - bacs_district_heating_substation_kw : pour les batiments raccordes a
+    //   un reseau urbain, R175-2 stipule que la puissance a considerer est
+    //   celle de la station d'echange et non des systemes en aval.
+    // - bacs_audit_action_items.alternative_solutions_html : R175-5-1 4°
+    //   demande explicitement la fourniture des 'autres solutions
+    //   envisageables'. Champ par action pour les decrire.
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN audit_existing_af_status TEXT;
+      ALTER TABLE afs ADD COLUMN bacs_district_heating_substation_kw REAL;
+      ALTER TABLE bacs_audit_action_items ADD COLUMN alternative_solutions_html TEXT;
+    `);
+    db.pragma('user_version = 50');
+    log.info("Migration 50 appliquee : R175-5-1 (AF existante + alternatives + station d'echange)");
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2253,6 +2274,7 @@ const afs = {
       'bacs_applicable_deadline', 'bacs_applicability_status',
       'delivered_pdf_sha256', 'delivered_git_tag',
       'audit_synthesis_html', 'audit_synthesis_generated_at',
+      'audit_existing_af_status', 'bacs_district_heating_substation_kw',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

@@ -21,6 +21,7 @@ import {
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
   updateBacsAuditSynthesis, generateBacsAuditSynthesis,
   duplicateZone, duplicateBacsMeter,
+  generateActionAlternatives,
 } from '@/api'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
@@ -498,6 +499,35 @@ async function generateSynthesis() {
   }
 }
 
+// ── Alternatives R175-5-1 4° par action ──
+const alternativesGenerating = ref({}) // { [action_item_id]: boolean }
+
+async function generateAlternatives(item) {
+  if (alternativesGenerating.value[item.id]) return
+  alternativesGenerating.value[item.id] = true
+  try {
+    const { data } = await generateActionAlternatives(item.id)
+    if (data?.html) {
+      item.alternative_solutions_html = data.html
+      success('Alternatives générées par Claude')
+    }
+  } catch (e) {
+    error(e.response?.data?.detail || 'Echec generation alternatives')
+  } finally {
+    alternativesGenerating.value[item.id] = false
+  }
+}
+
+function openAlternativesEditor(item) {
+  openNotesModal({
+    title: 'Autres solutions envisageables',
+    contextLabel: item.title + ' (' + (item.r175_article || '—') + ')',
+    entityType: 'action_item_alternatives',
+    entityRef: item,
+    currentHtml: item.alternative_solutions_html || '',
+  })
+}
+
 // ── Modale notes (rich text + Claude) — partagee zones / systems / meters / bms / devices ──
 const notesModal = ref({
   open: false,
@@ -547,6 +577,9 @@ async function saveNotesModal(html) {
       bms.value = data
     } else if (m.entityType === 'device') {
       const { data } = await updateBacsDevice(m.entityRef.id, payload)
+      Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'action_item_alternatives') {
+      const { data } = await updateBacsActionItem(m.entityRef.id, { alternative_solutions_html: html || null })
       Object.assign(m.entityRef, data)
     }
     success('Notes enregistrees')
@@ -877,6 +910,22 @@ onMounted(refresh)
             />
             <p class="text-[11px] text-gray-500 mt-1">
               Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
+            </p>
+          </div>
+          <div class="col-span-2 border-t border-gray-100 pt-3">
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Puissance de la station d'échange (kW)
+              <span class="ml-1 text-[10px] text-gray-400 font-normal">— uniquement si raccordement à un réseau urbain de chaleur ou de froid</span>
+            </label>
+            <input
+              type="number" min="0" step="0.1"
+              :value="document?.bacs_district_heating_substation_kw"
+              @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+              placeholder="—"
+              class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+            <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
+              <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
             </p>
           </div>
         </div>
@@ -1329,6 +1378,36 @@ onMounted(refresh)
             </div>
           </div>
 
+          <!-- R175-5-1 1° : examen de l'analyse fonctionnelle existante -->
+          <div class="border-t border-gray-100 pt-3">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+              Analyse fonctionnelle de la GTB existante
+              <span class="ml-1 text-[10px] text-gray-400 normal-case font-normal">— R175-5-1 1°, requise à la 1ère inspection</span>
+            </h3>
+            <div v-if="document?.audit_existing_af_status !== 'absent'" class="flex items-center gap-3 flex-wrap">
+              <BacsPhotoButton
+                v-if="document?.site_uuid"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ bms_document_id: bms.document_id }"
+                label="Analyse fonctionnelle GTB"
+                size="md"
+              />
+              <p class="text-xs text-gray-500 italic flex-1">
+                Glisse ici le document d'AF de la GTB existante (PDF, Word, schéma) pour qu'il soit examiné dans le cadre de R175-5-1 1°.
+              </p>
+            </div>
+            <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              ⚠ Le propriétaire confirme l'<strong>absence d'analyse fonctionnelle documentée</strong> de la GTB existante. Cela constitue une lacune au regard de R175-5-1 1° : sa rédaction sera recommandée dans le plan de mise en conformité.
+            </p>
+            <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer mt-2 text-gray-600">
+              <input type="checkbox"
+                     :checked="document?.audit_existing_af_status === 'absent'"
+                     @change="e => saveDocDebounced({ audit_existing_af_status: e.target.checked ? 'absent' : null })"
+                     class="rounded" />
+              Le document d'analyse fonctionnelle n'existe pas
+            </label>
+          </div>
+
           <div class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
             <div class="grid grid-cols-5 gap-2 text-sm">
@@ -1551,7 +1630,8 @@ onMounted(refresh)
               <th class="text-left py-2 w-32 whitespace-nowrap">Zone</th>
               <th class="text-left py-2 w-24 whitespace-nowrap">Effort</th>
               <th class="text-left py-2 w-32 whitespace-nowrap">Statut</th>
-              <th class="text-left px-3 py-2 w-64">Notes commerciales</th>
+              <th class="text-left px-3 py-2 w-52" title="R175-5-1 4° — autres solutions envisageables">Alternatives</th>
+              <th class="text-left px-3 py-2 w-56">Notes commerciales</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -1587,13 +1667,38 @@ onMounted(refresh)
                 </select>
               </td>
               <td class="px-3 py-2 align-top">
+                <div class="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    @click="generateAlternatives(it)"
+                    :disabled="alternativesGenerating[it.id]"
+                    :class="['inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium rounded border transition disabled:opacity-50 whitespace-nowrap',
+                      hasNotes(it.alternative_solutions_html)
+                        ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                    :title="alternativesGenerating[it.id] ? 'Génération en cours…' : (hasNotes(it.alternative_solutions_html) ? 'Régénérer les alternatives' : 'Générer des alternatives via Claude')"
+                  >
+                    <SparklesIcon class="w-3.5 h-3.5" :class="alternativesGenerating[it.id] ? 'animate-pulse' : ''" />
+                    {{ alternativesGenerating[it.id]
+                        ? 'Génération…'
+                        : (hasNotes(it.alternative_solutions_html) ? 'Régénérer' : 'Préconisez d\'autres solutions') }}
+                  </button>
+                  <button
+                    v-if="hasNotes(it.alternative_solutions_html)"
+                    type="button"
+                    @click="openAlternativesEditor(it)"
+                    class="text-[10px] text-indigo-600 hover:text-indigo-800 underline whitespace-nowrap"
+                  >Voir / éditer</button>
+                </div>
+              </td>
+              <td class="px-3 py-2 align-top">
                 <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
                        @blur="e => patchActionItem(it, { commercial_notes: e.target.value || null })"
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </td>
             </tr>
             <tr v-if="!actionItems.length">
-              <td colspan="7" class="py-10 text-center">
+              <td colspan="8" class="py-10 text-center">
                 <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
                 <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
                 <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>

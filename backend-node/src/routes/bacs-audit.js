@@ -7,7 +7,7 @@ const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
-const { assistAuditSynthesis } = require('../lib/claude');
+const { assistAuditSynthesis, assistActionAlternatives } = require('../lib/claude');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const gitLib = require('../lib/git');
@@ -382,13 +382,14 @@ async function routes(fastify) {
       estimated_effort: z.enum(['low','medium','high']).nullable().optional(),
       status: z.enum(['open','quoted','in_progress','done','declined']).optional(),
       position: z.number().int().optional(),
+      alternative_solutions_html: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     // Pour items auto-generes, on n'autorise QUE l'edit des champs commerciaux
     if (row.auto_generated) {
-      const allowed = ['commercial_notes', 'estimated_effort', 'status', 'position'];
+      const allowed = ['commercial_notes', 'estimated_effort', 'status', 'position', 'alternative_solutions_html'];
       for (const k of Object.keys(body)) {
         if (!allowed.includes(k)) {
           delete body[k]; // ignore silently les champs metier
@@ -1128,6 +1129,40 @@ async function routes(fastify) {
     return db.afs.getById(documentId);
   });
 
+  // POST /bacs-audit/action-items/:id/generate-alternatives — R175-5-1 4°
+  fastify.post('/bacs-audit/action-items/:id/generate-alternatives', async (request, reply) => {
+    if (!config.anthropicApiKey) {
+      return reply.code(503).send({ detail: 'Assistant Claude non configure' });
+    }
+    const id = parseInt(request.params.id, 10);
+    const item = db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(id);
+    if (!item) return reply.code(404).send({ detail: 'Action non trouvee' });
+    const ctx = {
+      title: item.title,
+      description: item.description,
+      severity: item.severity,
+      r175_article: item.r175_article,
+      source_table: item.source_table,
+      source_subtype: item.source_subtype,
+      action_kind: item.action_kind,
+    };
+    try {
+      const { html, usage } = await assistActionAlternatives(ctx);
+      db.db.prepare('UPDATE bacs_audit_action_items SET alternative_solutions_html = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(html, id);
+      db.auditLog.add({
+        afId: item.document_id,
+        userId: request.authUser?.id,
+        action: 'bacs_audit.action_alternatives.generate',
+        payload: { action_item_id: id, length: html.length, usage },
+      });
+      return { html, usage };
+    } catch (err) {
+      log.error(`Generation alternatives echouee : ${err.message}`);
+      return reply.code(500).send({ detail: err.message });
+    }
+  });
+
   fastify.post('/bacs-audit/:documentId/generate-synthesis', async (request, reply) => {
     if (!config.anthropicApiKey) {
       return reply.code(503).send({ detail: 'Assistant Claude non configure (ANTHROPIC_API_KEY manquant)' });
@@ -1172,6 +1207,13 @@ async function routes(fastify) {
     // une synthese fidele aux donnees saisies sans avoir a inventer.
     const stripHtml = (s) => s ? String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : null;
     const auditDump = {
+      // Cadre legal de l'audit : se positionne comme rapport d'inspection
+      // periodique R175-5-1 du decret BACS (a conserver 10 ans).
+      regulatory_frame: {
+        decree: 'R175 (Decret BACS, modifie par decret 2023-259)',
+        report_type: 'Inspection periodique R175-5-1',
+        retention_years: 10,
+      },
       audit: {
         client_name: af.client_name,
         project_name: af.project_name,
@@ -1180,6 +1222,12 @@ async function routes(fastify) {
         total_power_kw: af.bacs_total_power_kw,
         total_power_source: af.bacs_total_power_source,
         building_permit_date: af.bacs_building_permit_date,
+        // R175-2 : pour batiments raccordes a un reseau urbain, la
+        // puissance a considerer est celle de la station d'echange.
+        district_heating_substation_kw: af.bacs_district_heating_substation_kw,
+        // R175-5-1 1° : examen de l'analyse fonctionnelle existante
+        // (uniquement a la 1ere inspection).
+        existing_af_status: af.audit_existing_af_status,
       },
       site: site ? { name: site.name, address: site.address, city: site.city } : null,
       zones: zones.map(z => ({
@@ -1239,6 +1287,9 @@ async function routes(fastify) {
         title: a.title, description: a.description,
         zone: a.zone_name, estimated_effort: a.estimated_effort,
         status: a.status,
+        commercial_notes: a.commercial_notes,
+        // R175-5-1 4° : autres solutions envisageables
+        alternative_solutions: stripHtml(a.alternative_solutions_html),
       })),
       stats: {
         zones_count: zones.length,
