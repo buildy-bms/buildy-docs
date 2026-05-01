@@ -120,41 +120,6 @@
 </table>
 {{/if}}
 
-<h2>Calcul du retour sur investissement (R175-2 — clause de dispense)</h2>
-<div class="roi-quote">
-  <p class="roi-quote-label">Citation du décret R175-2 (extrait)</p>
-  <blockquote>
-    « […] sauf si leur <strong>propriétaire</strong> produit une étude établissant que l'installation d'un système d'automatisation et de contrôle <strong>n'est pas réalisable avec un temps de retour sur investissement inférieur à dix ans</strong>. »
-  </blockquote>
-</div>
-<p class="muted" style="margin-top: 3mm">
-  Conformément au texte ci-dessus, le calcul du temps de retour sur investissement
-  (TRI) <strong>incombe au propriétaire du bâtiment</strong>, ou à un bureau d'études
-  techniques mandaté par lui. Il ne relève pas du périmètre du présent audit. Buildy
-  fournit les données techniques (zones, systèmes, compteurs, GTB existante, plan de
-  mise en conformité) nécessaires à la production d'une telle étude par un tiers
-  compétent.
-</p>
-{{#if document.bacs_roi_study_status}}
-<table style="margin-top: 4mm">
-  <tr>
-    <th>Statut de l'étude TRI</th>
-    <td>
-      {{#if (eq document.bacs_roi_study_status "provided_by_owner")}}Étude réalisée par le propriétaire{{/if}}
-      {{#if (eq document.bacs_roi_study_status "provided_by_third_party")}}Étude réalisée par un bureau d'études tiers{{/if}}
-      {{#if (eq document.bacs_roi_study_status "pending")}}À produire — étude non encore engagée{{/if}}
-      {{#if (eq document.bacs_roi_study_status "not_applicable")}}Non applicable (bâtiment non soumis à la dispense){{/if}}
-    </td>
-  </tr>
-</table>
-{{/if}}
-{{#if document.bacs_roi_study_html}}
-<div class="entity-block">
-  <h3>Notes / résultats du TRI fournis par le propriétaire</h3>
-  <div class="rich-notes">{{{document.bacs_roi_study_html}}}</div>
-</div>
-{{/if}}
-
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
 <h1 class="chapter">2. Zones fonctionnelles (R175-1 §6)</h1>
 {{#if zones.length}}

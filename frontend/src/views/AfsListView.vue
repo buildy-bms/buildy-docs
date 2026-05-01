@@ -11,7 +11,7 @@ import {
   XMarkIcon,
   BookmarkIcon,
 } from '@heroicons/vue/24/outline'
-import { listAfs, getAfsStats, createAf, cloneAf, deleteAf } from '@/api'
+import { listAfs, getAfsStats, createAf, cloneAf, deleteAf, seedBacsFixture } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
@@ -29,6 +29,21 @@ const stats = ref({ redaction: 0, validee: 0, commissioning: 0, commissioned: 0,
 const loading = ref(false)
 
 const showCreate = ref(false)
+const seedingFixture = ref(false)
+
+async function createBacsFixture() {
+  if (seedingFixture.value) return
+  seedingFixture.value = true
+  try {
+    const { data } = await seedBacsFixture()
+    success(`Audit BACS de test créé`)
+    router.push(data.detail_url)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Création de l\'audit fictif impossible')
+  } finally {
+    seedingFixture.value = false
+  }
+}
 const showClone = ref(false)
 const cloneSource = ref(null)
 
@@ -276,13 +291,23 @@ onMounted(refresh)
           <span class="text-emerald-700">{{ stats.livree }} livrée{{ stats.livree > 1 ? 's' : '' }}</span>
         </p>
       </div>
-      <button
-        @click="showCreate = true"
-        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-sm"
-      >
-        <DocumentPlusIcon class="w-4 h-4" />
-        Nouveau document
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          @click="createBacsFixture"
+          :disabled="seedingFixture"
+          class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
+          title="Crée un site + audit BACS de démonstration entièrement rempli pour tester l'outil"
+        >
+          ✨ {{ seedingFixture ? 'Création…' : 'Audit BACS de test' }}
+        </button>
+        <button
+          @click="showCreate = true"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-sm"
+        >
+          <DocumentPlusIcon class="w-4 h-4" />
+          Nouveau document
+        </button>
+      </div>
     </div>
 
     <!-- Toolbar : recherche + toggle vue (Lot 27) -->

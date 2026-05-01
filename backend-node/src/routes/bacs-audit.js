@@ -487,6 +487,8 @@ async function routes(fastify) {
       WHERE t.document_id = ?
       ORDER BY z.position, z.name
     `).all(documentId);
+    // On filtre done + declined : ces actions ne doivent pas apparaitre
+    // dans le PDF livre aux integrateurs GTB.
     const actionItemsRaw = db.db.prepare(`
       SELECT a.*, z.name AS zone_name FROM bacs_audit_action_items a
       LEFT JOIN zones z ON z.zone_id = a.zone_id
@@ -1238,9 +1240,6 @@ async function routes(fastify) {
         // R175-5-1 1° : examen de l'analyse fonctionnelle existante
         // (uniquement a la 1ere inspection).
         existing_af_status: af.audit_existing_af_status,
-        // R175-2 clause de dispense : etude TRI fournie par le proprietaire
-        roi_study_status: af.bacs_roi_study_status,
-        roi_study_notes: stripHtml(af.bacs_roi_study_html),
       },
       site: site ? { name: site.name, address: site.address, city: site.city } : null,
       zones: zones.map(z => ({
@@ -1333,6 +1332,194 @@ async function routes(fastify) {
       log.error(`Generation synthese audit BACS echouee : ${err.message}`);
       return reply.code(500).send({ detail: err.message || 'Echec generation synthese' });
     }
+  });
+
+  // ─── Fixture de test (v2.14) ───────────────────────────────────────
+  // Cree de bout en bout un audit BACS fictif complet pour tests :
+  // site + zones + systemes presents + devices + meters + GTB partiellement
+  // conforme + thermal regulation + plan d'action genere. Aucune donnee
+  // saisie sur des sites reels n'est touchee.
+  fastify.post('/bacs-audit/seed-fixture', async (request, reply) => {
+    const userId = request.authUser?.id;
+    const ts = Date.now();
+    const siteUuid = require('crypto').randomUUID();
+
+    // 1. Site
+    const site = db.sites.create({
+      siteUuid,
+      name: `Bâtiment Démo BACS — ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+      customerName: 'Société Démo Tertiaire SAS',
+      address: '12 rue des Tests, 75001 Paris',
+      notes: 'Site fictif généré pour tester l\'audit BACS de bout en bout. Supprimable sans impact.',
+      createdBy: userId,
+    });
+
+    // 2. Zones
+    const zonesData = [
+      { name: 'Open-space niveau 1', nature: 'open-space', surface_m2: 280 },
+      { name: 'Salles de réunion', nature: 'meeting-room', surface_m2: 60 },
+      { name: 'Couloirs & circulations', nature: 'corridor', surface_m2: 90 },
+      { name: 'Local technique sous-sol', nature: 'technical-area', surface_m2: 25 },
+      { name: 'Parking extérieur', nature: 'outdoor', surface_m2: 400 },
+    ];
+    const zones = zonesData.map((z, idx) => db.zones.create({
+      siteId: site.site_id, name: z.name, nature: z.nature,
+      position: idx, surfaceM2: z.surface_m2,
+    }));
+
+    // 3. Audit BACS
+    const slug = `audit-demo-bacs-${ts}`;
+    const af = db.afs.create({
+      slug, clientName: 'Société Démo Tertiaire SAS',
+      projectName: 'Mise en conformité BACS — Bâtiment Démo',
+      siteAddress: '12 rue des Tests, 75001 Paris',
+      kind: 'bacs_audit', siteId: site.site_id,
+      title: 'Audit BACS de démonstration', createdBy: userId,
+    });
+    seedBacsAuditStructure(af.id, site.site_id);
+
+    // 4. Identification + applicabilite R175-2
+    db.afs.update(af.id, {
+      bacs_total_power_kw: 145,
+      bacs_total_power_source: 'auto',
+      bacs_district_heating_substation_kw: null,
+      bacs_building_permit_date: '2010-06-15',
+      bacs_applicability_status: 'subject_2027',
+      bacs_applicable_deadline: '2027-01-01',
+      audit_existing_af_status: 'absent',
+    });
+
+    // 5. Marquer 4 categories comme presentes (sur la zone open-space + couloirs)
+    const openSpace = zones.find(z => z.nature === 'open-space');
+    const corridors = zones.find(z => z.nature === 'corridor');
+    const localTech = zones.find(z => z.nature === 'technical-area');
+    const parking = zones.find(z => z.nature === 'outdoor');
+
+    const presentSystems = [
+      { zone_id: openSpace.zone_id, category: 'heating' },
+      { zone_id: openSpace.zone_id, category: 'cooling' },
+      { zone_id: openSpace.zone_id, category: 'ventilation' },
+      { zone_id: openSpace.zone_id, category: 'lighting_indoor' },
+      { zone_id: corridors.zone_id, category: 'lighting_indoor' },
+      { zone_id: parking.zone_id, category: 'lighting_outdoor' },
+      { zone_id: localTech.zone_id, category: 'dhw' },
+    ];
+    for (const ps of presentSystems) {
+      db.db.prepare(`
+        UPDATE bacs_audit_systems SET present = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = ? AND zone_id = ? AND system_category = ?
+      `).run(af.id, ps.zone_id, ps.category);
+    }
+
+    // 6. Devices realistes
+    const findSystem = (zoneId, cat) => db.db.prepare(
+      'SELECT id FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND system_category = ?'
+    ).get(af.id, zoneId, cat)?.id;
+
+    const devices = [
+      { sys: findSystem(openSpace.zone_id, 'heating'),
+        name: 'Chaudière gaz', brand: 'Atlantic', model: 'Varmax 70',
+        power: 70, energy: 'gas', role: 'production', comm: 'modbus_rtu',
+        location: 'Local technique sous-sol' },
+      { sys: findSystem(openSpace.zone_id, 'cooling'),
+        name: 'Groupe extérieur DRV', brand: 'Daikin', model: 'VRV-IV 75',
+        power: 75, energy: 'electric', role: 'production', comm: 'absent',
+        location: 'Toiture' },
+      { sys: findSystem(openSpace.zone_id, 'ventilation'),
+        name: 'CTA double flux', brand: 'Aldes', model: 'DFE 800',
+        power: 6, energy: 'electric', role: 'production', comm: 'modbus_tcp',
+        location: 'Toiture' },
+      { sys: findSystem(openSpace.zone_id, 'lighting_indoor'),
+        name: 'Pavés LED bureaux', brand: 'Trilux', model: 'Sonnos M73',
+        power: 4, energy: 'electric', role: 'emission', comm: 'non_communicant',
+        location: 'Plafond open-space' },
+      { sys: findSystem(corridors.zone_id, 'lighting_indoor'),
+        name: 'Rubans LED couloirs', brand: 'Sylvania', model: 'StripLED 24V',
+        power: 1.2, energy: 'electric', role: 'emission', comm: 'non_communicant',
+        location: 'Couloirs étage' },
+      { sys: findSystem(parking.zone_id, 'lighting_outdoor'),
+        name: 'Mâts LED parking', brand: 'Schréder', model: 'Avento 2',
+        power: 2.5, energy: 'electric', role: 'emission', comm: 'absent',
+        location: 'Parking extérieur' },
+      { sys: findSystem(localTech.zone_id, 'dhw'),
+        name: 'Ballon ECS électrique', brand: 'Atlantic', model: 'Chauffeo 200L',
+        power: 2.4, energy: 'electric', role: 'production', comm: 'absent',
+        location: 'Local technique' },
+    ];
+    const insDev = db.db.prepare(`
+      INSERT INTO bacs_audit_system_devices
+        (system_id, position, name, brand, model_reference, power_kw,
+         energy_source, device_role, communication_protocol, location,
+         meets_r175_3_p4, meets_r175_3_p4_autonomous, managed_by_bms)
+      VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const d of devices) {
+      if (!d.sys) continue;
+      // Heuristique : devices communicants supposes interoperables et integres GTB
+      const interop = !['absent', 'non_communicant'].includes(d.comm);
+      insDev.run(
+        d.sys, d.name, d.brand, d.model, d.power, d.energy, d.role, d.comm, d.location,
+        interop ? 1 : 0,                                // arret manuel si communicant
+        interop ? 1 : 0,                                // autonome
+        interop ? 1 : 0,                                // managed_by_bms
+      );
+    }
+
+    // 7. Resync pour generer les compteurs requis et thermal
+    resyncBacsAuditWithSiteZones(af.id);
+
+    // 8. Marquer une partie des compteurs comme presents communicants
+    const meters = db.db.prepare('SELECT id FROM bacs_audit_meters WHERE document_id = ?').all(af.id);
+    // 1/2 des compteurs presents, 1/3 communicants
+    meters.forEach((m, idx) => {
+      const present = idx % 2 === 0;
+      const comm = present && idx % 3 === 0;
+      db.db.prepare(`
+        UPDATE bacs_audit_meters SET present_actual = ?, communicating = ?,
+        managed_by_bms = ? WHERE id = ?
+      `).run(present ? 1 : 0, comm ? 1 : 0, comm ? 1 : 0, m.id);
+    });
+
+    // 9. GTB partiellement conforme
+    db.db.prepare(`
+      INSERT INTO bacs_audit_bms (document_id, existing_solution, existing_solution_brand,
+        location, model_reference, manages_heating, manages_cooling, manages_ventilation,
+        manages_dhw, manages_lighting, meets_r175_3_p1, meets_r175_3_p2,
+        has_maintenance_procedures, operator_trained, overall_compliance)
+      VALUES (?, 'Niagara N4', 'Tridium', 'Local technique sous-sol', 'JACE 8000',
+        1, 1, 1, 0, 0, 0, 0, 1, 0, 'partial')
+      ON CONFLICT(document_id) DO UPDATE SET
+        existing_solution = excluded.existing_solution,
+        existing_solution_brand = excluded.existing_solution_brand,
+        location = excluded.location, model_reference = excluded.model_reference,
+        manages_heating = excluded.manages_heating, manages_cooling = excluded.manages_cooling,
+        manages_ventilation = excluded.manages_ventilation, manages_dhw = excluded.manages_dhw,
+        manages_lighting = excluded.manages_lighting,
+        meets_r175_3_p1 = excluded.meets_r175_3_p1, meets_r175_3_p2 = excluded.meets_r175_3_p2,
+        has_maintenance_procedures = excluded.has_maintenance_procedures,
+        operator_trained = excluded.operator_trained, overall_compliance = excluded.overall_compliance,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(af.id);
+
+    // 10. Thermal regulation : per_room sur open-space, none sur les autres
+    db.db.prepare(`
+      UPDATE bacs_audit_thermal_regulation SET regulation_type = 'per_room',
+        generator_type = 'gas', generator_age_years = 12 WHERE document_id = ? AND zone_id = ?
+    `).run(af.id, openSpace.zone_id);
+
+    // 11. Final regen plan
+    regenerateActionItems(af.id);
+
+    db.auditLog.add({
+      afId: af.id, userId, action: 'bacs_audit.fixture.create',
+      payload: { site_uuid: site.site_uuid, zones: zones.length, devices: devices.length },
+    });
+
+    return reply.code(201).send({
+      af_id: af.id, slug: af.slug,
+      site_id: site.site_id, site_uuid: site.site_uuid,
+      detail_url: `/bacs-audit/${af.id}`,
+    });
   });
 }
 

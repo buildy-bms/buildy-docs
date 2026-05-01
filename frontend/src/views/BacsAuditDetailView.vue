@@ -171,6 +171,17 @@ function actionNumber(idx) {
   return 'BACS-' + String(idx + 1).padStart(3, '0')
 }
 
+// Filtre les actions resolues automatiquement (status='done') ou
+// declinees : elles n'ont rien a faire dans le plan a livrer aux
+// integrateurs GTB. On les conserve en DB pour traçabilite (visible dans
+// l'historique et la vue plein ecran).
+const visibleActionItems = computed(() =>
+  actionItems.value.filter(it => it.status !== 'done' && it.status !== 'declined')
+)
+const resolvedCount = computed(() =>
+  actionItems.value.filter(it => it.status === 'done' || it.status === 'declined').length
+)
+
 function relativeTime(s) {
   if (!s) return ''
   const d = new Date(s)
@@ -505,28 +516,12 @@ async function generateSynthesis() {
   }
 }
 
-// ── Alternatives R175-5-1 4° par action ──
-const alternativesGenerating = ref({}) // { [action_item_id]: boolean }
-
-async function generateAlternatives(item) {
-  if (alternativesGenerating.value[item.id]) return
-  alternativesGenerating.value[item.id] = true
-  try {
-    const { data } = await generateActionAlternatives(item.id)
-    if (data?.html) {
-      item.alternative_solutions_html = data.html
-      success('Alternatives générées par Claude')
-    }
-  } catch (e) {
-    error(e.response?.data?.detail || 'Echec generation alternatives')
-  } finally {
-    alternativesGenerating.value[item.id] = false
-  }
-}
-
+// ── Preconisations / autres solutions envisageables (R175-5-1 4°) ──
+// Ouvre la modale Tiptap avec un bouton 'Reformuler avec Claude' (kind
+// bacs_audit_notes deja configure pour reformulate uniquement).
 function openAlternativesEditor(item) {
   openNotesModal({
-    title: 'Autres solutions envisageables',
+    title: 'Préconisations / autres solutions envisageables',
     contextLabel: item.title + ' (' + (item.r175_article || '—') + ')',
     entityType: 'action_item_alternatives',
     entityRef: item,
@@ -950,58 +945,6 @@ onMounted(refresh)
             sur investissement de la mise en conformité dépasse 10 ans. Ce calcul ne relève pas du périmètre de l'audit
             (cf. Annexe D, point 4).
           </p>
-        </div>
-      </CollapsibleSection>
-
-      <!-- 1bis. Calcul du retour sur investissement (R175-2 — clause de dispense) -->
-      <CollapsibleSection storage-key="roi" section-id="section-roi">
-        <template #header>
-          <BuildingOffice2Icon class="w-5 h-5 text-amber-600" />
-          <h2 class="text-base font-semibold text-gray-800">Calcul du retour sur investissement</h2>
-          <span class="text-xs text-gray-500">R175-2 — clause de dispense</span>
-          <R175Tooltip article="R175-2" />
-        </template>
-        <div class="px-5 py-4 space-y-4">
-          <div class="bg-amber-50 border-l-4 border-amber-400 px-4 py-3 rounded-r">
-            <p class="text-xs font-semibold text-amber-900 uppercase tracking-wider mb-1.5">Citation du décret R175-2</p>
-            <blockquote class="text-sm text-amber-900 italic leading-relaxed">
-              « […] sauf si leur <strong>propriétaire</strong> produit une étude établissant que l'installation d'un système d'automatisation et de contrôle <strong>n'est pas réalisable avec un temps de retour sur investissement inférieur à dix ans</strong>. »
-            </blockquote>
-            <p class="text-[11px] text-amber-800 mt-2 leading-relaxed">
-              Le calcul du temps de retour sur investissement (TRI) <strong>incombe au propriétaire du bâtiment</strong> (ou à son bureau d'études techniques mandaté). Buildy n'effectue pas ce calcul dans le cadre de l'audit : les hypothèses (prix de l'énergie, baseline de consommation, taux d'économie attendu, durée d'amortissement, aides publiques déduites) relèvent des projections financières du propriétaire et de son contexte commercial. Le présent audit fournit les données techniques nécessaires (zones, systèmes, compteurs, GTB existante, plan de mise en conformité) pour qu'une telle étude puisse être conduite par un tiers compétent.
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Statut de l'étude TRI</label>
-            <select
-              :value="document?.bacs_roi_study_status || ''"
-              @change="e => saveDocDebounced({ bacs_roi_study_status: e.target.value || null })"
-              class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-full max-w-md"
-            >
-              <option value="">Non renseigné</option>
-              <option value="pending">À produire — étude non encore engagée</option>
-              <option value="provided_by_owner">Étude réalisée par le propriétaire</option>
-              <option value="provided_by_third_party">Étude réalisée par un bureau d'études tiers</option>
-              <option value="not_applicable">Non applicable (bâtiment non soumis à la dispense)</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              Notes / résultats du TRI fournis par le propriétaire
-              <span class="text-[10px] text-gray-400 font-normal">(optionnel)</span>
-            </label>
-            <RichTextEditor
-              :model-value="document?.bacs_roi_study_html || ''"
-              @update:model-value="html => saveDocDebounced({ bacs_roi_study_html: html || null })"
-              placeholder="Si le propriétaire ou son BET fournit les conclusions de l'étude TRI, les retranscrire ici (durée, hypothèses, scénarios, conclusion sur la dispense)…"
-              min-height="160px"
-            />
-            <p class="text-[11px] text-gray-500 mt-1.5 italic">
-              Cette zone permet de tracer dans l'audit l'existence et les conclusions de l'étude TRI sans la calculer. Les pièces justificatives (rapport BET, scénarios chiffrés, factures de référence) peuvent être déposées dans la section Documents du site (catégorie « Rapport d'essais » ou « Autre »).
-            </p>
-          </div>
         </div>
       </CollapsibleSection>
 
@@ -1670,7 +1613,7 @@ onMounted(refresh)
         <template #header>
           <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
           <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
-          <span class="text-xs text-gray-500">{{ actionItems.length }} action{{ actionItems.length > 1 ? 's' : '' }}</span>
+          <span class="text-xs text-gray-500">{{ visibleActionItems.length }} action{{ visibleActionItems.length > 1 ? 's' : '' }}<span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }} masquée{{ resolvedCount > 1 ? 's' : '' }}</span></span>
           <button
             @click.stop="router.push(`/bacs-audit/${docId}/action-items`)"
             class="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
@@ -1687,15 +1630,14 @@ onMounted(refresh)
               <th class="text-left py-2 w-24 whitespace-nowrap">Article</th>
               <th class="text-left py-2 min-w-70">Action</th>
               <th class="text-left py-2 w-32 whitespace-nowrap">Zone</th>
-              <th class="text-left py-2 w-24 whitespace-nowrap">Effort</th>
               <th class="text-left py-2 w-32 whitespace-nowrap">Statut</th>
-              <th class="text-left px-3 py-2 w-52" title="R175-5-1 4° — autres solutions envisageables">Alternatives</th>
+              <th class="text-left px-3 py-2 w-52" title="R175-5-1 4° — préconisations / autres solutions envisageables">Préconisations</th>
               <th class="text-left px-3 py-2 w-56">Notes commerciales</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="(it, idx) in actionItems" :key="it.id"
-                :class="['transition', it.status === 'done' ? 'opacity-50 line-through' : (it.status === 'declined' ? 'opacity-50' : '')]"
+            <tr v-for="(it, idx) in visibleActionItems" :key="it.id"
+                :class="['transition', it.status === 'declined' ? 'opacity-50' : '']"
                 :title="it.status === 'done' ? 'Action marquee comme terminee' : (it.status === 'declined' ? 'Action declinee' : '')">
               <td class="px-2 py-2 align-top text-center">
                 <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 text-xs font-mono font-bold rounded bg-gray-800 text-white whitespace-nowrap">
@@ -1714,16 +1656,6 @@ onMounted(refresh)
               </td>
               <td class="py-2 text-xs text-gray-600 align-top truncate" :title="it.zone_name">{{ it.zone_name || '—' }}</td>
               <td class="py-2 align-top">
-                <select :value="it.estimated_effort"
-                        @change="e => patchActionItem(it, { estimated_effort: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
-                  <option :value="null">—</option>
-                  <option value="low">Faible</option>
-                  <option value="medium">Moyen</option>
-                  <option value="high">Élevé</option>
-                </select>
-              </td>
-              <td class="py-2 align-top">
                 <select :value="it.status"
                         @change="e => patchActionItem(it, { status: e.target.value })"
                         class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
@@ -1731,31 +1663,22 @@ onMounted(refresh)
                 </select>
               </td>
               <td class="px-3 py-2 align-top">
-                <div class="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    @click="generateAlternatives(it)"
-                    :disabled="alternativesGenerating[it.id]"
-                    :class="['inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium rounded border transition disabled:opacity-50 whitespace-nowrap',
-                      hasNotes(it.alternative_solutions_html)
-                        ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
-                        : (it.status === 'open'
-                          ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
-                          : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-                    :title="alternativesGenerating[it.id] ? 'Génération en cours…' : (hasNotes(it.alternative_solutions_html) ? 'Régénérer les alternatives' : 'Aucune préconisation alternative — cliquer pour générer via Claude (R175-5-1 4°)')"
-                  >
-                    <SparklesIcon class="w-3.5 h-3.5" :class="alternativesGenerating[it.id] ? 'animate-pulse' : ''" />
-                    {{ alternativesGenerating[it.id]
-                        ? 'Génération…'
-                        : (hasNotes(it.alternative_solutions_html) ? 'Régénérer' : (it.status === 'open' ? '⚠ Manquant — préconiser' : 'Préconisez d\'autres solutions')) }}
-                  </button>
-                  <button
-                    v-if="hasNotes(it.alternative_solutions_html)"
-                    type="button"
-                    @click="openAlternativesEditor(it)"
-                    class="text-[10px] text-indigo-600 hover:text-indigo-800 underline whitespace-nowrap"
-                  >Voir / éditer</button>
-                </div>
+                <button
+                  type="button"
+                  @click="openAlternativesEditor(it)"
+                  :class="['inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium rounded border transition whitespace-nowrap w-full',
+                    hasNotes(it.alternative_solutions_html)
+                      ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
+                      : (it.status === 'open'
+                        ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
+                  :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger (R175-5-1 4°)'"
+                >
+                  <PencilSquareIcon class="w-3.5 h-3.5" />
+                  {{ hasNotes(it.alternative_solutions_html)
+                      ? 'Préconisations'
+                      : (it.status === 'open' ? '⚠ À renseigner' : '+ Préconisations') }}
+                </button>
               </td>
               <td class="px-3 py-2 align-top">
                 <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
@@ -1763,8 +1686,8 @@ onMounted(refresh)
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </td>
             </tr>
-            <tr v-if="!actionItems.length">
-              <td colspan="9" class="py-10 text-center">
+            <tr v-if="!visibleActionItems.length">
+              <td colspan="8" class="py-10 text-center">
                 <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
                 <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
                 <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
