@@ -34,6 +34,8 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
+import PhotoDropzone from '@/components/PhotoDropzone.vue'
+import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
@@ -1049,7 +1051,11 @@ onMounted(refresh)
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="z in zones" :key="z.zone_id" class="group">
+            <PhotoDropTr v-for="z in zones" :key="z.zone_id" row-class="group"
+                         :site-uuid="document?.site_uuid || ''"
+                         :attach-to="{ zone_id: z.zone_id }"
+                         :enabled="!!document?.site_uuid"
+                         @changed="refreshAuditData">
               <td class="px-5 py-2">
                 <input type="text" :value="z.name"
                        @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
@@ -1098,7 +1104,7 @@ onMounted(refresh)
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </td>
-            </tr>
+            </PhotoDropTr>
             <!-- Ligne d'ajout -->
             <tr class="bg-indigo-50/30">
               <td class="px-5 py-2">
@@ -1149,7 +1155,14 @@ onMounted(refresh)
               <span v-if="g.zone_nature" class="text-[11px] text-gray-500">{{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
             </div>
             <div class="space-y-3">
-              <div v-for="s in g.items" :key="s.id" class="border border-gray-100 rounded-lg overflow-hidden">
+              <PhotoDropzone
+                v-for="s in g.items" :key="s.id"
+                :site-uuid="document?.site_uuid || ''"
+                :attach-to="{ system_id: s.id }"
+                :enabled="!!document?.site_uuid && s.present"
+                @changed="refreshAuditData"
+              >
+              <div class="border border-gray-100 rounded-lg overflow-hidden">
                 <!-- En-tête catégorie : icone + présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
                   <SystemCategoryIcon :category="s.system_category" size="md" />
@@ -1199,6 +1212,7 @@ onMounted(refresh)
                   })"
                 />
               </div>
+              </PhotoDropzone>
             </div>
           </div>
           <div v-if="!systemsByZone.length" class="px-5 py-6 text-center text-sm text-gray-500">
@@ -1233,7 +1247,12 @@ onMounted(refresh)
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="m in meters" :key="m.id" class="group" :class="m.out_of_service ? 'opacity-50' : ''">
+            <PhotoDropTr v-for="m in meters" :key="m.id"
+                         :row-class="['group', m.out_of_service ? 'opacity-50' : ''].join(' ')"
+                         :site-uuid="document?.site_uuid || ''"
+                         :attach-to="{ meter_id: m.id }"
+                         :enabled="!!document?.site_uuid"
+                         @changed="refreshAuditData">
               <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
               <td class="py-2 text-gray-700 text-center">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
               <td class="py-2 text-gray-700 text-center">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
@@ -1303,7 +1322,7 @@ onMounted(refresh)
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </td>
-            </tr>
+            </PhotoDropTr>
             <!-- Ligne d'ajout -->
             <tr class="bg-indigo-50/30">
               <td class="px-5 py-2">

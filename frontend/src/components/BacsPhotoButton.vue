@@ -108,6 +108,11 @@ async function onFileChosen(e) {
   await uploadFiles(files)
 }
 
+// Expose pour que la ligne parent puisse forwarder un drop sans
+// devoir recreer le composant. Permet de transformer une ligne complete
+// (zone, systeme, compteur, device, GTB) en zone de drop.
+defineExpose({ uploadFiles, refresh })
+
 async function onDrop(e) {
   isDragOver.value = false
   dragDepth.value = 0
