@@ -764,18 +764,19 @@ async function routes(fastify) {
         styles: 'styles-bacs-audit',
         data,
         outputPath,
+        populateToc: true,
         pageFormat: 'A4',
         skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
         pdfOptions: {
           displayHeaderFooter: true,
-          margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' },
-          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; justify-content:space-between;">
+          margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
+          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between;">
             <span>${af.client_name} — ${af.project_name}</span>
             <span>Audit BACS ${version}</span>
           </div>`,
-          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 18mm; width:100%; display:flex; align-items:center; gap:6mm;">
+          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:6mm;">
             <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
             <span style="flex:1;">Audit BACS Buildy · décret R175 · confidentiel</span>
             <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>

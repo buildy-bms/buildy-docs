@@ -9,6 +9,36 @@ const log = require('./logger').system;
 // Helpers Handlebars (utilises dans les templates .hbs)
 Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
+
+// FontAwesome icons inline en SVG, parametrables (couleur + taille).
+// Utilisation : {{{faIcon "building" "#4f46e5" "16"}}}
+const faIcons = require('@fortawesome/free-solid-svg-icons');
+const FA_ALIAS = {
+  'building': 'faBuilding',
+  'map-pin': 'faMapPin',
+  'wrench': 'faWrench',
+  'fire': 'faFire',
+  'bolt': 'faBolt',
+  'gauge': 'faGauge',
+  'sparkles': 'faWandMagicSparkles',
+  'check-circle': 'faCircleCheck',
+  'triangle-exclamation': 'faTriangleExclamation',
+  'clipboard-list': 'faClipboardList',
+  'list-check': 'faListCheck',
+  'plug': 'faPlug',
+  'shield': 'faShieldHalved',
+  'temperature': 'faTemperatureHalf',
+};
+Handlebars.registerHelper('faIcon', (name, color, size) => {
+  const key = FA_ALIAS[name] || name;
+  const def = faIcons[key];
+  if (!def || !def.icon) return '';
+  const [w, h, , , path] = def.icon;
+  const px = size || '16';
+  const fill = color || 'currentColor';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;"><path fill="${fill}" d="${path}"/></svg>`;
+  return new Handlebars.SafeString(svg);
+});
 Handlebars.registerHelper('or', function(...args) {
   // Handlebars passe l'options en dernier argument, on l'exclut
   return args.slice(0, -1).some(v => !!v);

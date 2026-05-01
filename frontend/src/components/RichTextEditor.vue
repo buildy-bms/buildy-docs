@@ -17,6 +17,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage'
 import LinkInputModal from './LinkInputModal.vue'
 
 const props = defineProps({
@@ -33,6 +34,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 const { success, error: notifyError } = useNotification()
+const { usage: claudeUsage, refresh: refreshClaudeUsage } = useClaudeUsage()
 const assisting = ref(false)
 
 const isEmpty = ref(true)
@@ -58,6 +60,7 @@ async function callClaude() {
       emit('update:modelValue', data.html)
       recomputeEmpty()
       success(empty ? 'Brouillon généré' : 'Texte reformulé')
+      refreshClaudeUsage()
     }
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de la requête Claude')
@@ -153,11 +156,14 @@ function onSaveLink(url) {
 
       <button v-if="assistContext" type="button" @click="callClaude" :disabled="assisting"
               class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-md transition"
-              :title="isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude'">
+              :title="formatUsageTooltip(claudeUsage)">
         <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
         {{ assisting
             ? (isEmpty ? 'Génération…' : 'Reformulation…')
             : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
+        <span v-if="claudeUsage" class="ml-1 text-[10px] text-violet-500 font-mono">
+          ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
+        </span>
       </button>
     </div>
     <EditorContent :editor="editor" />

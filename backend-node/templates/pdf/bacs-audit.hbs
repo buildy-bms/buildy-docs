@@ -48,14 +48,49 @@
   </div>
 </section>
 
+{{!-- ═══════════ Table des matieres ═══════════ --}}
+<section class="toc">
+  <h1 class="toc-title">Sommaire</h1>
+  <ol class="toc-list">
+    {{#if synthesisHtml}}
+    <li data-toc-link="synthesis"><span class="toc-label">Note de synthèse</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{/if}}
+    <li data-toc-link="conformity"><span class="toc-label">Synthèse de conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="identification"><span class="toc-label">1. Identification du site</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="zones"><span class="toc-label">2. Zones fonctionnelles (R175-1 §6)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="systems"><span class="toc-label">3. Systèmes techniques par zone (R175-1 §4)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="meters"><span class="toc-label">4. Compteurs et mesurage (R175-3 §1)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="thermal"><span class="toc-label">5. Régulation thermique automatique (R175-6)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="bms"><span class="toc-label">6. Solution GTB / GTC (R175-3, R175-4, R175-5)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="plan"><span class="toc-label">7. Plan de mise en conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+  </ol>
+</section>
+
+<div class="sections">
+
 {{#if synthesisHtml}}
 {{!-- ═══════════ Synthèse executive ═══════════ --}}
-<h1 class="chapter">Note de synthèse</h1>
+<h1 class="chapter" data-toc-anchor="synthesis">{{{faIcon "sparkles" "#7c3aed" "22"}}} Note de synthèse</h1>
 <div class="synthesis-block">{{{synthesisHtml}}}</div>
 {{/if}}
 
+{{!-- ═══════════ Synthèse de conformité (anciennement chapitre 7, remontée au début) ═══════════ --}}
+<h1 class="chapter" data-toc-anchor="conformity">{{{faIcon "shield" "#10b981" "22"}}} Synthèse de conformité</h1>
+{{#if bms.overall_compliance}}
+<p>État global de la conformité au décret BACS : <span class="status status-{{bms.overall_compliance}}">{{complianceLabel}}</span></p>
+{{/if}}
+<table style="max-width: 100mm">
+  <thead><tr><th>Sévérité</th><th>Actions ouvertes</th></tr></thead>
+  <tbody>
+    <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td><strong>{{actionStats.blocking}}</strong></td></tr>
+    <tr><td><span class="sev sev-major">Majeures</span></td><td><strong>{{actionStats.major}}</strong></td></tr>
+    <tr><td><span class="sev sev-minor">Mineures</span></td><td><strong>{{actionStats.minor}}</strong></td></tr>
+  </tbody>
+</table>
+<p class="muted">Détail des actions et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
+
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
-<h1 class="chapter">1. Identification du site</h1>
+<h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#4f46e5" "22"}}} 1. Identification du site</h1>
 <table>
   <tr><th>Site</th><td>{{site.name}}</td></tr>
   <tr><th>Client</th><td>{{document.client_name}}</td></tr>
@@ -120,7 +155,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
-<h1 class="chapter">2. Zones fonctionnelles (R175-1 §6)</h1>
+<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles (R175-1 §6)</h1>
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
@@ -149,7 +184,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
-<h1 class="chapter">3. Systèmes techniques par zone (R175-1 §4)</h1>
+<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone (R175-1 §4)</h1>
 {{#each systemsByZone}}
 <h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
 {{#each items}}
@@ -215,7 +250,7 @@
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
-<h1 class="chapter">4. Compteurs et mesurage (R175-3 §1)</h1>
+<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage (R175-3 §1)</h1>
 {{#if meters.length}}
 <table>
   <thead>
@@ -258,7 +293,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
-<h1 class="chapter">5. Régulation thermique automatique (R175-6)</h1>
+<h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#dc2626" "22"}}} 5. Régulation thermique automatique (R175-6)</h1>
 
 {{#if r175_6_applicable.applies}}
 <p class="muted" style="background:#fffbeb;border-left:3pt solid #f59e0b;padding:2mm 4mm;margin-bottom:4mm">
@@ -292,7 +327,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 6 — GTB ═══════════ --}}
-<h1 class="chapter">6. Solution GTB / GTC (R175-3, R175-4, R175-5)</h1>
+<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#7c3aed" "22"}}} 6. Solution GTB / GTC (R175-3, R175-4, R175-5)</h1>
 {{#if bms}}
 {{#if bms.out_of_service}}
 <p style="background:#fee2e2;border:1px solid #fca5a5;padding:3mm;border-radius:1mm;color:#991b1b;">
@@ -383,101 +418,78 @@
 <p class="muted">Évaluation de la GTB non renseignée.</p>
 {{/if}}
 
-{{!-- ═══════════ Chapitre 7 — Synthèse ═══════════ --}}
-<h1 class="chapter">7. Synthèse de conformité</h1>
-{{#if bms.overall_compliance}}
-<p>État global : <span class="status status-{{bms.overall_compliance}}">{{complianceLabel}}</span></p>
-{{/if}}
-<table>
-  <thead><tr><th>Sévérité</th><th>Nombre</th></tr></thead>
-  <tbody>
-    <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td>{{actionStats.blocking}}</td></tr>
-    <tr><td><span class="sev sev-major">Majeures</span></td><td>{{actionStats.major}}</td></tr>
-    <tr><td><span class="sev sev-minor">Mineures</span></td><td>{{actionStats.minor}}</td></tr>
-  </tbody>
-</table>
-
-{{!-- ═══════════ Chapitre 8 — Plan de mise en conformité ═══════════ --}}
-<h1 class="chapter">8. Plan de mise en conformité</h1>
+{{!-- ═══════════ Chapitre 7 — Plan de mise en conformité ═══════════ --}}
+<h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "22"}}} 7. Plan de mise en conformité</h1>
 
 {{#if actionItems.blocking.length}}
 <h2>Actions bloquantes</h2>
 <p class="muted">Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.</p>
-<table>
-  <thead><tr><th>N°</th><th>Article</th><th>Action</th><th>Zone</th><th>Description</th></tr></thead>
-  <tbody>
-    {{#each actionItems.blocking}}
-      <tr>
-        <td><span class="action-num">{{display_number}}</span></td>
-        <td><span class="muted">{{r175_article}}</span></td>
-        <td>
-          <strong>{{title}}</strong>
-          {{#if alternative_solutions_html}}
-            <div class="alt-solutions">
-              <p class="alt-solutions-label">Préconisations Buildy :</p>
-              {{{alternative_solutions_html}}}
-            </div>
-          {{else}}
-            <div class="alt-solutions-missing">
-              ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
-            </div>
-          {{/if}}
-        </td>
-        <td>{{zone_name}}</td>
-        <td>{{description}}</td>
-      </tr>
-    {{/each}}
-  </tbody>
-</table>
+{{#each actionItems.blocking}}
+<div class="action-card">
+  <div class="action-card-head">
+    <span class="action-num">{{display_number}}</span>
+    <span class="sev sev-blocking">Bloquante</span>
+    <span class="muted action-card-article">{{r175_article}}</span>
+    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+  </div>
+  <div class="action-card-title"><strong>{{title}}</strong></div>
+  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+  {{#if alternative_solutions_html}}
+    <div class="alt-solutions">
+      <p class="alt-solutions-label">Préconisations Buildy :</p>
+      {{{alternative_solutions_html}}}
+    </div>
+  {{else}}
+    <div class="alt-solutions-missing">
+      ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
+    </div>
+  {{/if}}
+</div>
+{{/each}}
 {{/if}}
 
 {{#if actionItems.major.length}}
 <h2>Actions majeures</h2>
 <p class="muted">Impact direct sur les exigences fonctionnelles R175-3.</p>
-<table>
-  <thead><tr><th>N°</th><th>Article</th><th>Action</th><th>Zone</th><th>Description</th></tr></thead>
-  <tbody>
-    {{#each actionItems.major}}
-      <tr>
-        <td><span class="action-num">{{display_number}}</span></td>
-        <td><span class="muted">{{r175_article}}</span></td>
-        <td>
-          <strong>{{title}}</strong>
-          {{#if alternative_solutions_html}}
-            <div class="alt-solutions">
-              <p class="alt-solutions-label">Préconisations Buildy :</p>
-              {{{alternative_solutions_html}}}
-            </div>
-          {{else}}
-            <div class="alt-solutions-missing">
-              ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
-            </div>
-          {{/if}}
-        </td>
-        <td>{{zone_name}}</td>
-        <td>{{description}}</td>
-      </tr>
-    {{/each}}
-  </tbody>
-</table>
+{{#each actionItems.major}}
+<div class="action-card">
+  <div class="action-card-head">
+    <span class="action-num">{{display_number}}</span>
+    <span class="sev sev-major">Majeure</span>
+    <span class="muted action-card-article">{{r175_article}}</span>
+    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+  </div>
+  <div class="action-card-title"><strong>{{title}}</strong></div>
+  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+  {{#if alternative_solutions_html}}
+    <div class="alt-solutions">
+      <p class="alt-solutions-label">Préconisations Buildy :</p>
+      {{{alternative_solutions_html}}}
+    </div>
+  {{else}}
+    <div class="alt-solutions-missing">
+      ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
+    </div>
+  {{/if}}
+</div>
+{{/each}}
 {{/if}}
 
 {{#if actionItems.minor.length}}
 <h2>Optimisations</h2>
 <p class="muted">Bonnes pratiques, hors strict décret.</p>
-<table>
-  <thead><tr><th>N°</th><th>Article</th><th>Action</th><th>Zone</th></tr></thead>
-  <tbody>
-    {{#each actionItems.minor}}
-      <tr>
-        <td><span class="action-num">{{display_number}}</span></td>
-        <td><span class="muted">{{r175_article}}</span></td>
-        <td>{{title}}</td>
-        <td>{{zone_name}}</td>
-      </tr>
-    {{/each}}
-  </tbody>
-</table>
+{{#each actionItems.minor}}
+<div class="action-card action-card-minor">
+  <div class="action-card-head">
+    <span class="action-num">{{display_number}}</span>
+    <span class="sev sev-minor">Mineure</span>
+    <span class="muted action-card-article">{{r175_article}}</span>
+    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+  </div>
+  <div class="action-card-title"><strong>{{title}}</strong></div>
+  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+</div>
+{{/each}}
 {{/if}}
 
 {{#unless actionItems.blocking.length}}
@@ -492,6 +504,7 @@
   Pour la mise en conformité, l'équipe commerciale Buildy se tient à votre
   disposition pour établir un devis chiffré.
 </p>
+</div>{{!-- /.sections --}}
 
 {{!-- ═══════════ Annexe A — Texte du décret ═══════════ --}}
 <section class="annex">

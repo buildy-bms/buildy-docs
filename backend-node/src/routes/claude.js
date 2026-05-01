@@ -12,6 +12,39 @@ async function routes(fastify) {
     model: config.claudeModel,
   }));
 
+  // GET /api/claude/usage — agrege depuis audit_log les tokens consommes
+  // par les actions Claude (30 derniers jours). Couts estimes Sonnet 4.6 :
+  // 3$/MTok input + 15$/MTok output, conversion USD/EUR ~0.92.
+  fastify.get('/claude/usage', async () => {
+    const rows = db.db.prepare(`
+      SELECT payload FROM audit_log
+      WHERE (action LIKE 'claude.%' OR action LIKE 'bacs_audit.synthesis%'
+             OR action LIKE 'bacs_audit.action_alternatives%')
+        AND created_at >= date('now', '-30 days')
+    `).all();
+    let inputTokens = 0, outputTokens = 0, requests = 0;
+    for (const r of rows) {
+      try {
+        const p = JSON.parse(r.payload || '{}');
+        const u = p.usage || {};
+        inputTokens += (u.input_tokens || 0) + (u.cache_read_input_tokens || 0);
+        outputTokens += u.output_tokens || 0;
+        if (u.input_tokens || u.output_tokens) requests++;
+      } catch { /* ignore parse */ }
+    }
+    const costUsd = (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+    const costEur = costUsd * 0.92;
+    const avgCostEur = requests > 0 ? costEur / requests : 0;
+    return {
+      window_days: 30,
+      requests,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_eur: Math.round(costEur * 100) / 100,
+      avg_cost_eur: Math.round(avgCostEur * 1000) / 1000,
+    };
+  });
+
   // POST /api/claude/library-assist
   // body: {
   //   mode: 'generate' | 'reformulate',

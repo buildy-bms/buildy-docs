@@ -36,11 +36,13 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNotification } from '@/composables/useNotification'
+import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage'
 
 const router = useRouter()
 const route = useRoute()
 const { success, error } = useNotification()
 const { confirm } = useConfirm()
+const { usage: claudeUsage, refresh: refreshClaudeUsage } = useClaudeUsage()
 
 const docId = parseInt(route.params.id, 10)
 
@@ -529,6 +531,7 @@ async function generateSynthesis() {
         document.value.audit_synthesis_generated_at = data.generated_at
       }
       success('Note de synthese generee par Claude')
+      refreshClaudeUsage()
     }
   } catch (e) {
     error(e.response?.data?.detail || 'Echec generation Claude')
@@ -795,7 +798,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="max-w-screen-2xl mx-auto pb-12">
+  <div class="w-full max-w-450 mx-auto px-4 pb-12">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
@@ -819,7 +822,13 @@ onMounted(refresh)
         </div>
         <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 truncate">
           <FireIcon class="w-5 h-5 text-orange-500 shrink-0" />
-          <span class="truncate">{{ document?.project_name || '…' }}</span>
+          <input
+            type="text"
+            :value="document?.project_name || ''"
+            @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || 'Audit BACS' })"
+            placeholder="Titre de l'audit BACS"
+            class="flex-1 min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          />
           <span class="text-sm font-normal text-gray-500 shrink-0">— {{ document?.client_name }}</span>
           <span v-if="document?.bacs_applicable_deadline" class="text-xs text-amber-700 shrink-0">
             · échéance R175 {{ document.bacs_applicable_deadline }}
@@ -934,41 +943,50 @@ onMounted(refresh)
               Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
             </p>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              Date des derniers travaux d'installation/remplacement de générateur de chaleur
+          <details :open="!!document?.bacs_generator_works_date || (r175_6_applicable && r175_6_applicable.applies)">
+            <summary class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 select-none flex items-center gap-1 mb-1">
+              <span class="text-gray-400">▸</span> Travaux récents sur le générateur de chaleur ?
               <span class="ml-1 text-[10px] text-gray-400 font-normal">— déclencheur R175-6</span>
-            </label>
-            <input
-              type="date"
-              :value="document?.bacs_generator_works_date || ''"
-              @input="e => saveDocDebounced({ bacs_generator_works_date: e.target.value || null })"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-            <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-              <strong>R175-6</strong> s'applique si le permis de construire est déposé après le <strong>21/07/2021</strong>, ou si des travaux d'installation/remplacement de générateur ont été engagés après cette date. Sinon, l'obligation de régulation thermique automatique par pièce/zone n'est pas applicable au site.
-            </p>
-            <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
-               :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
-              {{ r175_6_applicable.message }}
-            </p>
-          </div>
-          <div class="col-span-2 border-t border-gray-100 pt-3">
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              Puissance de la station d'échange (kW)
-              <span class="ml-1 text-[10px] text-gray-400 font-normal">— uniquement si raccordement à un réseau urbain de chaleur ou de froid</span>
-            </label>
-            <input
-              type="number" min="0" step="0.1"
-              :value="document?.bacs_district_heating_substation_kw"
-              @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-              placeholder="—"
-              class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-            <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-              <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
-            </p>
-          </div>
+            </summary>
+            <div class="pl-4 border-l-2 border-indigo-100 mt-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">
+                Date des derniers travaux d'installation/remplacement de générateur de chaleur
+              </label>
+              <input
+                type="date"
+                :value="document?.bacs_generator_works_date || ''"
+                @input="e => saveDocDebounced({ bacs_generator_works_date: e.target.value || null })"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                <strong>R175-6</strong> s'applique si le permis de construire est déposé après le <strong>21/07/2021</strong>, ou si des travaux d'installation/remplacement de générateur ont été engagés après cette date. Sinon, l'obligation de régulation thermique automatique par pièce/zone n'est pas applicable au site.
+              </p>
+              <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
+                 :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
+                {{ r175_6_applicable.message }}
+              </p>
+            </div>
+          </details>
+          <details class="col-span-2 border-t border-gray-100 pt-3" :open="!!document?.bacs_district_heating_substation_kw">
+            <summary class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800 select-none flex items-center gap-1">
+              <span class="text-gray-400">▸</span> Bâtiment raccordé à un réseau urbain de chaleur ou de froid ?
+            </summary>
+            <div class="mt-2 pl-4 border-l-2 border-indigo-100">
+              <label class="block text-xs font-medium text-gray-700 mb-1">
+                Puissance de la station d'échange (kW)
+              </label>
+              <input
+                type="number" min="0" step="0.1"
+                :value="document?.bacs_district_heating_substation_kw"
+                @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                placeholder="—"
+                class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              />
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
+              </p>
+            </div>
+          </details>
         </div>
         <div v-if="document?.bacs_applicability_status" class="px-5 pb-4">
           <div :class="['rounded-lg border p-3 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status].cls]">
@@ -1693,7 +1711,7 @@ onMounted(refresh)
           </button>
           <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
-        <table class="w-full text-sm" style="table-layout: fixed">
+        <table class="w-full text-sm" style="table-layout: auto">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
               <th class="text-center px-2 py-2 w-16 whitespace-nowrap" title="Numéro d'action — utilisable comme référence par les intégrateurs GTB pour leur devis">N°</th>
@@ -1784,12 +1802,16 @@ onMounted(refresh)
             <button
               @click="generateSynthesis"
               :disabled="synthesisGenerating"
+              :title="formatUsageTooltip(claudeUsage)"
               class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition shadow-sm"
             >
               <SparklesIcon class="w-4 h-4" :class="synthesisGenerating ? 'animate-pulse' : ''" />
               {{ synthesisGenerating
                   ? 'Génération en cours…'
                   : (synthesisHtml ? 'Régénérer avec Claude' : 'Rédiger avec Claude') }}
+              <span v-if="claudeUsage" class="ml-1 text-[11px] text-violet-200 font-mono">
+                ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
+              </span>
             </button>
             <p class="text-[11px] text-gray-500 italic">
               Claude lit l'intégralité de l'audit (zones, systèmes, compteurs, GTB, plan) et rédige une note client bienveillante et actionnable, sans inventer de données.

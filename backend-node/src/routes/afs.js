@@ -84,6 +84,55 @@ async function routes(fastify) {
     }));
   });
 
+  // GET /api/afs/search?q=... — recherche etendue cross-tables.
+  // Retourne af_ids (afs qui matchent quelque part : titre, contenu BACS,
+  // notes, action items, ...) + site_hits (sites sans af attache qui
+  // matchent) + library_hits (fonctionnalites/sections types biblio).
+  fastify.get('/afs/search', async (request) => {
+    const q = (request.query?.q || '').trim();
+    if (q.length < 2) return { af_ids: [], library_hits: [], site_hits: [] };
+    const like = `%${q}%`;
+    const afIds = new Set();
+    const collect = (rows) => rows.forEach(r => r.af_id && afIds.add(r.af_id));
+    collect(db.db.prepare(`SELECT id AS af_id FROM afs
+      WHERE deleted_at IS NULL AND (client_name LIKE ? OR project_name LIKE ?
+        OR site_address LIKE ? OR title LIKE ? OR audit_synthesis_html LIKE ?)`)
+      .all(like, like, like, like, like));
+    collect(db.db.prepare(`SELECT a.id AS af_id FROM afs a
+      JOIN sites s ON s.site_id = a.site_id
+      WHERE a.deleted_at IS NULL AND s.deleted_at IS NULL
+        AND (s.name LIKE ? OR s.customer_name LIKE ? OR s.address LIKE ?)`)
+      .all(like, like, like));
+    collect(db.db.prepare(`SELECT DISTINCT document_id AS af_id
+      FROM bacs_audit_action_items WHERE title LIKE ? OR description LIKE ?
+        OR commercial_notes LIKE ? OR alternative_solutions_html LIKE ?`)
+      .all(like, like, like, like));
+    collect(db.db.prepare(`SELECT DISTINCT document_id AS af_id
+      FROM bacs_audit_systems WHERE notes LIKE ? OR notes_html LIKE ?`)
+      .all(like, like));
+    collect(db.db.prepare(`SELECT DISTINCT s.document_id AS af_id
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      WHERE d.name LIKE ? OR d.brand LIKE ? OR d.model_reference LIKE ?
+        OR d.notes LIKE ? OR d.notes_html LIKE ?`)
+      .all(like, like, like, like, like));
+    collect(db.db.prepare(`SELECT DISTINCT document_id AS af_id
+      FROM bacs_audit_meters WHERE notes LIKE ? OR notes_html LIKE ?`)
+      .all(like, like));
+    collect(db.db.prepare(`SELECT DISTINCT document_id AS af_id
+      FROM bacs_audit_bms WHERE existing_solution LIKE ? OR existing_solution_brand LIKE ?
+        OR location LIKE ? OR model_reference LIKE ? OR notes_html LIKE ?
+        OR notes_data_provision LIKE ?`)
+      .all(like, like, like, like, like, like));
+    const siteHits = db.db.prepare(`SELECT site_id, site_uuid, name, customer_name, address
+      FROM sites WHERE deleted_at IS NULL AND (name LIKE ? OR customer_name LIKE ? OR address LIKE ?)
+      LIMIT 10`).all(like, like, like);
+    const libraryHits = db.db.prepare(`SELECT id, slug, number, title, kind, is_functionality
+      FROM section_templates WHERE title LIKE ? OR body_html LIKE ? OR bacs_articles LIKE ?
+      ORDER BY is_functionality DESC, number LIMIT 20`).all(like, like, like);
+    return { af_ids: [...afIds], site_hits: siteHits, library_hits: libraryHits };
+  });
+
   // GET /api/afs/stats — counts par status
   fastify.get('/afs/stats', async () => {
     const counts = db.afs.countByStatus();

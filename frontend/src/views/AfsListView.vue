@@ -11,7 +11,7 @@ import {
   XMarkIcon,
   BookmarkIcon,
 } from '@heroicons/vue/24/outline'
-import { listAfs, getAfsStats, createAf, cloneAf, deleteAf, seedBacsFixture } from '@/api'
+import { listAfs, getAfsStats, createAf, cloneAf, deleteAf, seedBacsFixture, searchAfs } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
@@ -81,6 +81,33 @@ function normalize(s) {
 
 const STATUS_ORDER = { redaction: 0, validee: 1, commissioning: 2, commissioned: 3, livree: 4 }
 
+// Recherche etendue (cross-tables) : quand l'utilisateur tape un terme,
+// on appelle /api/afs/search qui renvoie les af_ids matches dans les
+// titres, sites, contenu BACS (notes, action items, devices, GTB...) +
+// les hits library + sites independants. La recherche locale (client/
+// project/address) reste un fallback rapide.
+const extendedSearchAfIds = ref(null) // null = pas de recherche en cours
+const libraryHits = ref([])
+const siteOnlyHits = ref([])
+let searchTimer = null
+watch(searchQuery, (q) => {
+  clearTimeout(searchTimer)
+  if (!q || q.length < 2) {
+    extendedSearchAfIds.value = null
+    libraryHits.value = []
+    siteOnlyHits.value = []
+    return
+  }
+  searchTimer = setTimeout(async () => {
+    try {
+      const { data } = await searchAfs(q)
+      extendedSearchAfIds.value = new Set(data.af_ids || [])
+      libraryHits.value = data.library_hits || []
+      siteOnlyHits.value = data.site_hits || []
+    } catch { /* silencieux */ }
+  }, 250)
+})
+
 const filteredSorted = computed(() => {
   const q = normalize(searchQuery.value)
   let list = afs.value
@@ -88,11 +115,13 @@ const filteredSorted = computed(() => {
     list = list.filter(a => (a.kind || 'af') === kindFilter.value)
   }
   if (q.length >= 2) {
-    list = list.filter(a =>
+    // Union : matches locaux (instantanes) + matches backend etendus.
+    const localMatch = (a) =>
       normalize(a.client_name).includes(q) ||
       normalize(a.project_name).includes(q) ||
       normalize(a.site_address).includes(q)
-    )
+    const ids = extendedSearchAfIds.value
+    list = list.filter(a => localMatch(a) || (ids && ids.has(a.id)))
   }
   list = [...list].sort((a, b) => {
     let av, bv
@@ -489,6 +518,40 @@ onMounted(refresh)
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Hits transverses (bibliothèque + sites) -->
+    <div v-if="searchQuery && (libraryHits.length || siteOnlyHits.length)" class="mt-6 grid grid-cols-2 gap-4">
+      <div v-if="libraryHits.length" class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2 text-sm font-semibold text-gray-800">
+          📚 Bibliothèque
+          <span class="text-xs font-normal text-gray-500">{{ libraryHits.length }} résultat{{ libraryHits.length > 1 ? 's' : '' }}</span>
+        </header>
+        <ul class="divide-y divide-gray-100">
+          <li v-for="h in libraryHits" :key="h.id" class="px-4 py-2 text-sm hover:bg-indigo-50/40 cursor-pointer"
+              @click="router.push(h.is_functionality ? '/library/functionalities' : '/library/sections')">
+            <div class="flex items-center gap-2">
+              <span v-if="h.number" class="text-[10px] font-mono text-gray-400">{{ h.number }}</span>
+              <span :class="h.is_functionality ? 'inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase rounded bg-violet-100 text-violet-700' : 'inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase rounded bg-gray-100 text-gray-700'">
+                {{ h.is_functionality ? 'Fonctionnalité' : h.kind }}
+              </span>
+              <span class="text-gray-800">{{ h.title }}</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div v-if="siteOnlyHits.length" class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <header class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2 text-sm font-semibold text-gray-800">
+          📍 Sites
+          <span class="text-xs font-normal text-gray-500">{{ siteOnlyHits.length }} résultat{{ siteOnlyHits.length > 1 ? 's' : '' }}</span>
+        </header>
+        <ul class="divide-y divide-gray-100">
+          <li v-for="s in siteOnlyHits" :key="s.site_id" class="px-4 py-2 text-sm">
+            <div class="font-medium text-gray-800">{{ s.name }}</div>
+            <div class="text-[11px] text-gray-500">{{ s.customer_name }}{{ s.address ? ' · ' + s.address : '' }}</div>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- Modal nouveau document -->
