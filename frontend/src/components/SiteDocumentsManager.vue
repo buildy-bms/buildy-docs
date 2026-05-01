@@ -182,6 +182,54 @@ function openPreview(d) {
 
 function onDocsChanged() { refresh() }
 
+const selectedIds = ref(new Set())
+const allSelected = computed(() =>
+  documents.value.length > 0 && documents.value.every(d => selectedIds.value.has(d.id))
+)
+function toggleAll() {
+  if (allSelected.value) selectedIds.value = new Set()
+  else selectedIds.value = new Set(documents.value.map(d => d.id))
+}
+function toggleOne(id) {
+  const s = new Set(selectedIds.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  selectedIds.value = s
+}
+async function downloadSelection() {
+  const docs = documents.value.filter(d => selectedIds.value.has(d.id))
+  if (!docs.length) return
+  for (let i = 0; i < docs.length; i++) {
+    const d = docs[i]
+    const a = window.document.createElement('a')
+    a.href = getSiteDocumentDownloadUrl(d.id)
+    a.download = d.original_name || d.title || `document-${d.id}`
+    a.target = '_blank'
+    window.document.body.appendChild(a)
+    a.click()
+    window.document.body.removeChild(a)
+    if (i < docs.length - 1) await new Promise(r => setTimeout(r, 300))
+  }
+  success(`Téléchargement de ${docs.length} fichier${docs.length > 1 ? 's' : ''} lancé`)
+}
+async function deleteSelection() {
+  const docs = documents.value.filter(d => selectedIds.value.has(d.id))
+  if (!docs.length) return
+  const ok = await confirm({
+    title: `Supprimer ${docs.length} document${docs.length > 1 ? 's' : ''} ?`,
+    message: 'Cette action est irréversible.',
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    for (const d of docs) await deleteSiteDocument(d.id)
+    selectedIds.value = new Set()
+    refresh()
+    success(`${docs.length} document${docs.length > 1 ? 's' : ''} supprimé${docs.length > 1 ? 's' : ''}`)
+  } catch {
+    error('Suppression partielle — recharge la page')
+  }
+}
+
 watch(() => props.siteUuid, refresh)
 onMounted(() => {
   refresh()
@@ -222,9 +270,33 @@ onBeforeUnmount(() => {
       Aucun document encore importé pour ce site.
     </div>
 
-    <table v-else class="w-full text-sm mt-4">
+    <!-- Bulk actions bar -->
+    <div v-if="!loading && documents.length && selectedIds.size" class="mt-4 flex items-center justify-between gap-3 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+      <span class="text-xs text-indigo-800 font-medium">
+        {{ selectedIds.size }} document{{ selectedIds.size > 1 ? 's' : '' }} sélectionné{{ selectedIds.size > 1 ? 's' : '' }}
+      </span>
+      <div class="flex items-center gap-2">
+        <button @click="downloadSelection"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm">
+          <ArrowDownTrayIcon class="w-3.5 h-3.5" /> Télécharger
+        </button>
+        <button @click="deleteSelection"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-lg">
+          <TrashIcon class="w-3.5 h-3.5" /> Supprimer
+        </button>
+        <button @click="selectedIds = new Set()"
+                class="text-xs text-indigo-700 hover:underline">
+          Annuler
+        </button>
+      </div>
+    </div>
+
+    <table v-if="!loading && documents.length" class="w-full text-sm mt-4">
       <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
+          <th class="text-center py-2 w-10">
+            <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded" />
+          </th>
           <th class="text-center px-3 py-2 w-16">Aperçu</th>
           <th class="text-center px-3 py-2">Titre</th>
           <th class="text-center py-2 w-44">Catégorie</th>
@@ -234,7 +306,11 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        <tr v-for="d in documents" :key="d.id" class="group hover:bg-gray-50/60">
+        <tr v-for="d in documents" :key="d.id"
+            :class="['group hover:bg-gray-50/60', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
+          <td class="text-center py-2">
+            <input type="checkbox" :checked="selectedIds.has(d.id)" @change="toggleOne(d.id)" class="rounded" />
+          </td>
           <td class="px-3 py-2 text-center">
             <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block">
               <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title"

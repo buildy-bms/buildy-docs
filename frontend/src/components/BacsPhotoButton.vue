@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { CameraIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, TrashIcon, XMarkIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments,
   uploadSiteDocument,
@@ -38,6 +38,7 @@ const uploading = ref(false)
 const isDragOver = ref(false)
 const dragDepth = ref(0) // counter pour eviter le flicker dragenter/dragleave sur enfants
 const captionModal = ref({ open: false, photos: [] }) // photos = [{ id, dataUrl, title, notes }]
+const previewPhoto = ref(null)
 
 const filterParams = computed(() => {
   const p = {}
@@ -244,10 +245,10 @@ const btnCls = computed(() => {
       </div>
       <div v-else class="grid grid-cols-3 gap-1.5">
         <div v-for="p in photos" :key="p.id" class="relative group">
-          <a :href="thumbUrl(p)" target="_blank" class="block">
+          <button type="button" @click="previewPhoto = p" class="block w-full">
             <img :src="thumbUrl(p)" :alt="p.title || p.original_name"
-                 class="w-full h-16 object-cover rounded border border-gray-200" />
-          </a>
+                 class="w-full h-16 object-cover rounded border border-gray-200 hover:border-indigo-400 transition cursor-zoom-in" />
+          </button>
           <button
             @click="removePhoto(p)"
             class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center"
@@ -323,6 +324,29 @@ const btnCls = computed(() => {
             Enregistrer
           </button>
         </footer>
+      </div>
+    </div>
+
+    <!-- Lightbox preview -->
+    <div v-if="previewPhoto"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+         @click.self="previewPhoto = null">
+      <div class="relative max-w-6xl max-h-[90vh] w-full flex flex-col">
+        <header class="flex items-center justify-between text-white mb-3">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base font-semibold truncate">{{ previewPhoto.title || previewPhoto.original_name }}</h3>
+            <p v-if="label" class="text-xs opacity-70 truncate">{{ label }}</p>
+          </div>
+          <a :href="getSiteDocumentDownloadUrl(previewPhoto.id)" :download="previewPhoto.original_name || previewPhoto.title"
+             class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10 inline-flex items-center gap-1">
+            <ArrowDownTrayIcon class="w-4 h-4" /> Télécharger
+          </a>
+          <button @click="previewPhoto = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded">
+            <XMarkIcon class="w-5 h-5" />
+          </button>
+        </header>
+        <img :src="getSiteDocumentDownloadUrl(previewPhoto.id)" :alt="previewPhoto.title"
+             class="max-h-[80vh] mx-auto object-contain rounded shadow-2xl" />
       </div>
     </div>
   </div>
