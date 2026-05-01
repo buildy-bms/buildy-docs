@@ -181,8 +181,8 @@ function onSaveLink(url) {
 </script>
 
 <template>
-  <div class="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
-    <div v-if="editor" class="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50">
+  <div class="border border-gray-200 rounded-lg bg-white shadow-sm">
+    <div v-if="editor" class="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50 rounded-t-lg">
       <button type="button" @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Gras"><BoldIcon class="w-3.5 h-3.5" /></button>
@@ -224,7 +224,7 @@ function onSaveLink(url) {
         </button>
         <!-- Popover options corpus -->
         <div v-if="showLibraryMenu"
-             class="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-3 text-[12px] text-gray-700">
+             class="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 text-[12px] text-gray-700">
           <label class="flex items-start gap-2 cursor-pointer">
             <input type="checkbox" v-model="libraryContext.enabled"
                    @change="persistLibraryContext"
