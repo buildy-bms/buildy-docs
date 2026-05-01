@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { CameraIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments,
@@ -62,7 +62,14 @@ async function refresh() {
   }
 }
 
-onMounted(refresh)
+function onDocsChanged() { refresh() }
+onMounted(() => {
+  refresh()
+  window.addEventListener('site-documents:changed', onDocsChanged)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('site-documents:changed', onDocsChanged)
+})
 watch(() => filterParams.value, refresh, { deep: true })
 
 function pickFile() {
@@ -91,6 +98,7 @@ async function uploadFiles(files) {
       })
     }
     success(files.length > 1 ? `${files.length} photos televersees` : 'Photo televersee')
+    window.dispatchEvent(new CustomEvent('site-documents:changed'))
     await refresh()
     emit('changed')
     // On ouvre la modal pour ajouter titre + notes par photo

@@ -259,7 +259,11 @@
       {{/if}}
     {{/each}}
   {{else}}
-    <h3 class="muted">{{categoryLabel}} — non présent</h3>
+    {{#if not_concerned}}
+      <h3 class="muted">{{negativeLabel}}</h3>
+    {{else}}
+      <h3 class="muted">{{categoryLabel}} — non présent</h3>
+    {{/if}}
   {{/if}}
 {{/each}}
 {{/each}}

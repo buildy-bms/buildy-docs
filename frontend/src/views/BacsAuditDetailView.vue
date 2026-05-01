@@ -175,6 +175,17 @@ const SYSTEM_LABEL = {
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
 }
+// Libellés négatifs pour la case "Pas de XXX" (à la place de "Non concerné").
+// Utilisés à l'affichage UI et passés au PDF pour cohérence.
+const SYSTEM_NEGATIVE_LABEL = {
+  heating: 'Pas de chauffage',
+  cooling: 'Pas de refroidissement',
+  ventilation: 'Pas de ventilation',
+  dhw: 'Pas d\'ECS',
+  lighting_indoor: 'Pas d\'éclairage intérieur',
+  lighting_outdoor: 'Pas d\'éclairage extérieur',
+  electricity_production: 'Pas de production photovoltaïque',
+}
 // Icone et couleur par categorie de systeme — alignees sur les
 // fonctionnalites Buildy de la bibliotheque (chap 2 Perimetre des
 // equipements supervises).
@@ -1296,7 +1307,7 @@ onMounted(refresh)
                     <input type="checkbox" :checked="!!s.not_concerned"
                            @change="e => patchSystem(s, { not_concerned: e.target.checked, present: e.target.checked ? false : !!s.present })"
                            class="rounded border-gray-300" />
-                    <span class="text-gray-500 italic">Non concerné</span>
+                    <span class="text-gray-500 italic">{{ SYSTEM_NEGATIVE_LABEL[s.system_category] || 'Non concerné' }}</span>
                   </label>
                   <button
                     type="button"
@@ -1859,6 +1870,10 @@ onMounted(refresh)
             v-if="document?.site_uuid"
             :site-uuid="document.site_uuid"
             :systems="systems"
+            :zones="zones"
+            :meters="meters"
+            :devices="devices"
+            :bms="bms"
           />
           <p v-else class="text-sm text-gray-500 italic text-center py-4">
             L'audit n'est rattaché à aucun site.

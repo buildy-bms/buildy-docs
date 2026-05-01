@@ -42,6 +42,7 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
         })
       }
       success(files.length > 1 ? `${files.length} photos téléversées` : 'Photo téléversée')
+      window.dispatchEvent(new CustomEvent('site-documents:changed'))
       if (onUploaded) onUploaded()
     } catch (err) {
       notifyError(err.response?.data?.detail || 'Échec upload photo')

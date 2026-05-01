@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
   DocumentIcon, TrashIcon, ArrowDownTrayIcon, PaperClipIcon,
-  PlusIcon,
+  PlusIcon, EyeIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments, uploadSiteDocument, updateSiteDocument, deleteSiteDocument,
@@ -19,6 +19,10 @@ import { useConfirm } from '@/composables/useConfirm'
 const props = defineProps({
   siteUuid: { type: String, required: true },
   systems: { type: Array, default: () => [] }, // pour rattachement optionnel
+  zones: { type: Array, default: () => [] },
+  meters: { type: Array, default: () => [] },
+  devices: { type: Array, default: () => [] },
+  bms: { type: Object, default: () => ({}) },
 })
 
 const { success, error } = useNotification()
@@ -137,8 +141,55 @@ function categoryLabel(v) {
   return CATEGORIES.find(c => c.value === v)?.label || v
 }
 
+const SYSTEM_LABEL_FR = {
+  heating: 'Chauffage', cooling: 'Refroidissement', ventilation: 'Ventilation',
+  dhw: 'ECS', lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur', electricity_production: 'Production photovoltaïque',
+}
+
+function attachmentLabel(d) {
+  if (d.bacs_audit_zone_id) {
+    const z = props.zones.find(x => x.zone_id === d.bacs_audit_zone_id)
+    return { kind: 'Zone', label: z?.name || `Zone #${d.bacs_audit_zone_id}` }
+  }
+  if (d.bacs_audit_device_id) {
+    const dev = props.devices.find(x => x.id === d.bacs_audit_device_id)
+    return { kind: 'Système', label: dev?.name || dev?.brand || `Équipement #${d.bacs_audit_device_id}` }
+  }
+  if (d.bacs_audit_system_id) {
+    const s = props.systems.find(x => x.id === d.bacs_audit_system_id)
+    const cat = s ? (SYSTEM_LABEL_FR[s.system_category] || s.system_category) : `Système #${d.bacs_audit_system_id}`
+    return { kind: 'Catégorie', label: s ? `${cat} / ${s.zone_name}` : cat }
+  }
+  if (d.bacs_audit_meter_id) {
+    const m = props.meters.find(x => x.id === d.bacs_audit_meter_id)
+    return { kind: 'Compteur', label: m ? `${m.usage} ${m.zone_name ? '/ ' + m.zone_name : ''}`.trim() : `Compteur #${d.bacs_audit_meter_id}` }
+  }
+  if (d.bacs_audit_bms_document_id) {
+    return { kind: 'GTB', label: props.bms?.existing_solution || 'GTB' }
+  }
+  return { kind: 'Site', label: '— non rattaché' }
+}
+
+const previewDoc = ref(null)
+function isImage(d) {
+  return (d.mime_type || '').startsWith('image/') || d.category === 'photo'
+}
+function openPreview(d) {
+  if (isImage(d)) previewDoc.value = d
+  else window.open(getSiteDocumentDownloadUrl(d.id), '_blank')
+}
+
+function onDocsChanged() { refresh() }
+
 watch(() => props.siteUuid, refresh)
-onMounted(refresh)
+onMounted(() => {
+  refresh()
+  window.addEventListener('site-documents:changed', onDocsChanged)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('site-documents:changed', onDocsChanged)
+})
 </script>
 
 <template>
@@ -174,43 +225,52 @@ onMounted(refresh)
     <table v-else class="w-full text-sm mt-4">
       <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
+          <th class="text-center px-3 py-2 w-16">Aperçu</th>
           <th class="text-center px-3 py-2">Titre</th>
           <th class="text-center py-2 w-44">Catégorie</th>
-          <th class="text-center py-2 w-48">Rattaché à</th>
+          <th class="text-center py-2 w-56">Rattaché à</th>
           <th class="text-center py-2 w-24">Taille</th>
-          <th class="text-center px-3 py-2 w-24">Actions</th>
+          <th class="text-center px-3 py-2 w-28">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        <tr v-for="d in documents" :key="d.id" class="group">
+        <tr v-for="d in documents" :key="d.id" class="group hover:bg-gray-50/60">
+          <td class="px-3 py-2 text-center">
+            <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block">
+              <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title"
+                   class="w-12 h-12 object-cover rounded border border-gray-200 hover:border-indigo-400 transition" />
+            </button>
+            <DocumentIcon v-else class="w-6 h-6 text-gray-400 mx-auto" />
+          </td>
           <td class="px-3 py-2 text-gray-700">
-            <div class="flex items-center gap-2">
-              <DocumentIcon class="w-4 h-4 text-gray-400 shrink-0" />
-              <input type="text" :value="d.title"
-                     @blur="e => e.target.value !== d.title && patchDoc(d, { title: e.target.value })"
-                     class="flex-1 px-2 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-            </div>
-            <p class="text-[11px] text-gray-400 ml-6">{{ d.original_name }}</p>
+            <input type="text" :value="d.title"
+                   @blur="e => e.target.value !== d.title && patchDoc(d, { title: e.target.value })"
+                   class="w-full px-2 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            <p class="text-[11px] text-gray-400">{{ d.original_name }}</p>
           </td>
           <td class="py-2 text-center">
             <select :value="d.category"
                     @change="e => patchDoc(d, { category: e.target.value })"
                     class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
               <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
+              <option value="photo">Photo</option>
             </select>
           </td>
           <td class="py-2 text-center">
-            <select :value="d.bacs_audit_system_id"
-                    @change="e => patchDoc(d, { bacs_audit_system_id: e.target.value ? parseInt(e.target.value) : null })"
-                    class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
-              <option :value="null">— site (non rattaché)</option>
-              <option v-for="s in systems" :key="s.id" :value="s.id">
-                {{ s.system_category }} / {{ s.zone_name }}
-              </option>
-            </select>
+            <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border',
+              attachmentLabel(d).kind === 'Site'
+                ? 'border-gray-200 text-gray-500 bg-gray-50 italic'
+                : 'border-indigo-200 text-indigo-700 bg-indigo-50']">
+              <span class="font-semibold">{{ attachmentLabel(d).kind }}</span>
+              <span class="truncate max-w-40">{{ attachmentLabel(d).label }}</span>
+            </span>
           </td>
           <td class="py-2 text-center text-xs text-gray-500">{{ fmtSize(d.size_bytes) }}</td>
-          <td class="px-3 py-2 text-center">
+          <td class="px-3 py-2 text-center whitespace-nowrap">
+            <button v-if="isImage(d)" @click="openPreview(d)"
+                    class="text-gray-400 hover:text-indigo-600 mx-1" title="Aperçu">
+              <EyeIcon class="w-4 h-4" />
+            </button>
             <a :href="getSiteDocumentDownloadUrl(d.id)" target="_blank"
                class="inline-block text-gray-400 hover:text-indigo-600 mx-1" title="Télécharger">
               <ArrowDownTrayIcon class="w-4 h-4" />
@@ -222,6 +282,32 @@ onMounted(refresh)
         </tr>
       </tbody>
     </table>
+
+    <!-- Modal lightbox preview -->
+    <div v-if="previewDoc"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+         @click.self="previewDoc = null">
+      <div class="relative max-w-6xl max-h-[90vh] w-full flex flex-col">
+        <header class="flex items-center justify-between text-white mb-3">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-base font-semibold truncate">{{ previewDoc.title }}</h3>
+            <p class="text-xs opacity-70 truncate">
+              {{ attachmentLabel(previewDoc).kind }} : {{ attachmentLabel(previewDoc).label }}
+              · {{ fmtSize(previewDoc.size_bytes) }}
+            </p>
+          </div>
+          <a :href="getSiteDocumentDownloadUrl(previewDoc.id)" target="_blank"
+             class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10">
+            <ArrowDownTrayIcon class="w-4 h-4 inline-block mr-1" /> Télécharger
+          </a>
+          <button @click="previewDoc = null" class="ml-2 p-2 text-white hover:bg-white/10 rounded">
+            <XMarkIcon class="w-5 h-5" />
+          </button>
+        </header>
+        <img :src="getSiteDocumentDownloadUrl(previewDoc.id)" :alt="previewDoc.title"
+             class="max-h-[80vh] mx-auto object-contain rounded shadow-2xl" />
+      </div>
+    </div>
 
     <!-- Modal de saisie meta après drop -->
     <div v-if="showModal" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"

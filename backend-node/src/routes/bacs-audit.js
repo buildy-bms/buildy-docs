@@ -507,6 +507,10 @@ async function routes(fastify) {
     const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
       dhw:'Eau chaude sanitaire', lighting_indoor:'Éclairage intérieur',
       lighting_outdoor:'Éclairage extérieur', electricity_production:'Production photovoltaïque' };
+    const SYSTEM_NEGATIVE_LABEL = { heating:'Pas de chauffage', cooling:'Pas de refroidissement',
+      ventilation:'Pas de ventilation', dhw:'Pas d\'ECS',
+      lighting_indoor:'Pas d\'éclairage intérieur', lighting_outdoor:'Pas d\'éclairage extérieur',
+      electricity_production:'Pas de production photovoltaïque' };
     const COMM_LABEL = { modbus_tcp:'Modbus TCP', modbus_rtu:'Modbus RTU', bacnet_ip:'BACnet IP',
       bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT', lorawan:'LoRaWAN',
       autre:'Autre', non_communicant:'Non communicant', absent:'Absent' };
@@ -558,6 +562,7 @@ async function routes(fastify) {
       return {
         ...s,
         categoryLabel: SYSTEM_LABEL[s.system_category] || s.system_category,
+        negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
         commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
         devices: devs,
         device_count: devs.length,
