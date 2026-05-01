@@ -1046,22 +1046,20 @@ onMounted(() => {
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
         </div>
-        <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 truncate">
+        <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
           <FireIcon class="w-5 h-5 text-orange-500 shrink-0" />
           <input
             type="text"
             :value="document?.project_name || ''"
             @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || 'Audit BACS' })"
             placeholder="Titre de l'audit BACS"
-            class="flex-1 min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            class="min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
-          <span class="text-sm font-normal text-gray-500 shrink-0">— {{ document?.client_name }}</span>
-          <span v-if="document?.bacs_applicable_deadline" class="text-xs text-amber-700 shrink-0">
-            · échéance R175 {{ document.bacs_applicable_deadline }}
-          </span>
+          <span class="text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
         </h1>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2 flex-wrap shrink-0">
         <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden bg-white">
           <button @click="setAllSectionsCollapsed(true)"
                   class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 whitespace-nowrap"
@@ -2033,7 +2031,7 @@ onMounted(() => {
             ></textarea>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
