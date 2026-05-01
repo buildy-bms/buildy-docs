@@ -1120,7 +1120,7 @@ onMounted(() => {
         <template #summary>
           <span>
             Puissance chauffage + clim {{ document?.bacs_total_power_kw ?? '—' }} kW
-            · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}<span v-if="document?.bacs_applicable_deadline"> (échéance {{ document.bacs_applicable_deadline }})</span>
+            · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}
           </span>
         </template>
         <div class="px-5 py-4 grid grid-cols-2 gap-4">
@@ -1235,9 +1235,6 @@ onMounted(() => {
             <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
             <div class="flex-1">
               <div class="font-medium text-sm">{{ APPLICABILITY_LABEL[document.bacs_applicability_status].label }}</div>
-              <div v-if="document.bacs_applicable_deadline" class="text-xs mt-0.5">
-                Date butoir applicable : <strong>{{ formatDate(document.bacs_applicable_deadline) }}</strong>
-              </div>
             </div>
           </div>
           <p v-if="document?.bacs_applicability_status !== 'not_subject'" class="mt-2 text-[11px] text-gray-500 leading-relaxed">
