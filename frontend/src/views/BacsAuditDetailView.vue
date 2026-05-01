@@ -43,6 +43,7 @@ import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
+import BmsComponentsTable from '@/components/BmsComponentsTable.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
@@ -1841,6 +1842,11 @@ onMounted(() => {
                      class="rounded" />
               Le document d'analyse fonctionnelle n'existe pas
             </label>
+          </div>
+
+          <!-- Composants matériels GTB (passerelles, automates, contrôleurs) -->
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
+            <BmsComponentsTable :document-id="docId" />
           </div>
 
           <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">

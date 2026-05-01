@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 57;
+const TARGET_VERSION = 58;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2094,6 +2094,37 @@ function runMigrations() {
     `);
     db.pragma('user_version = 57');
     log.info('Migration 57 appliquee : thermal_regulation.category (heating/cooling) + UNIQUE recompose');
+  }
+
+  if (current < 58) {
+    // Card 6 (GTB) : composants matériels (passerelles, automates,
+    // contrôleurs, modules IO, routeurs, etc.) qui constituent
+    // l'architecture matérielle de la GTB. Permet à l'auditeur de
+    // relever chaque équipement réseau/automatisme avec ses protocoles
+    // exposés et sa localisation.
+    db.exec(`
+      CREATE TABLE bacs_audit_bms_components (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        component_type TEXT
+          CHECK (component_type IS NULL OR component_type IN
+            ('gateway','plc','controller','io_module','router','switch','server','other')),
+        brand TEXT,
+        model TEXT,
+        location TEXT,
+        ip_address TEXT,
+        protocols TEXT,
+        firmware_version TEXT,
+        notes TEXT,
+        notes_html TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_bacs_bms_components_doc ON bacs_audit_bms_components(document_id, position);
+    `);
+    db.pragma('user_version = 58');
+    log.info('Migration 58 appliquee : bacs_audit_bms_components');
   }
 
   if (current > TARGET_VERSION) {

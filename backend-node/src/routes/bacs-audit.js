@@ -293,6 +293,103 @@ async function routes(fastify) {
     return db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
   });
 
+  // ─── BMS components (passerelles, automates, contrôleurs, IO…) ─────
+  const BMS_COMPONENT_TYPES = ['gateway','plc','controller','io_module','router','switch','server','other'];
+
+  fastify.get('/bacs-audit/:documentId/bms-components', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.db.prepare(`
+      SELECT * FROM bacs_audit_bms_components
+      WHERE document_id = ? ORDER BY position, id
+    `).all(id);
+  });
+
+  fastify.post('/bacs-audit/:documentId/bms-components', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(documentId, reply)) return;
+    const schema = z.object({
+      component_type: z.enum(BMS_COMPONENT_TYPES).nullable().optional(),
+      brand: z.string().nullable().optional(),
+      model: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      ip_address: z.string().nullable().optional(),
+      protocols: z.string().nullable().optional(),
+      firmware_version: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body || {}); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM bacs_audit_bms_components WHERE document_id = ?').get(documentId).m;
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_bms_components
+        (document_id, position, component_type, brand, model, location,
+         ip_address, protocols, firmware_version, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      documentId, maxPos + 1,
+      body.component_type || null, body.brand || null, body.model || null,
+      body.location || null, body.ip_address || null, body.protocols || null,
+      body.firmware_version || null, body.notes || null,
+    );
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(r.lastInsertRowid));
+  });
+
+  fastify.patch('/bacs-audit/bms-components/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Composant non trouve' });
+    const schema = z.object({
+      component_type: z.enum(BMS_COMPONENT_TYPES).nullable().optional(),
+      brand: z.string().nullable().optional(),
+      model: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      ip_address: z.string().nullable().optional(),
+      protocols: z.string().nullable().optional(),
+      firmware_version: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      notes_html: z.string().nullable().optional(),
+      position: z.number().int().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const sets = [], args = [];
+    for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
+    if (sets.length) {
+      sets.push('updated_at = CURRENT_TIMESTAMP');
+      args.push(id);
+      db.db.prepare(`UPDATE bacs_audit_bms_components SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    }
+    return db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
+  });
+
+  fastify.post('/bacs-audit/bms-components/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const c = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
+    if (!c) return reply.code(404).send({ detail: 'Composant non trouve' });
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_bms_components
+        (document_id, position, component_type, brand, model, location,
+         ip_address, protocols, firmware_version, notes, notes_html)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      c.document_id, (c.position || 0) + 1,
+      c.component_type, c.brand, c.model, c.location,
+      c.ip_address, c.protocols, c.firmware_version, c.notes, c.notes_html,
+    );
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(r.lastInsertRowid));
+  });
+
+  fastify.delete('/bacs-audit/bms-components/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Composant non trouve' });
+    db.db.prepare('DELETE FROM bacs_audit_bms_components WHERE id = ?').run(id);
+    return reply.code(204).send();
+  });
+
   // ─── Thermal regulation (R175-6) ───────────────────────────────────
   fastify.get('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);

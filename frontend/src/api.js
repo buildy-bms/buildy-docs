@@ -205,6 +205,11 @@ export const updateBacsMeter = (id, data) => api.patch(`/bacs-audit/meters/${id}
 export const deleteBacsMeter = (id) => api.delete(`/bacs-audit/meters/${id}`)
 export const getBacsBms = (docId) => api.get(`/bacs-audit/${docId}/bms`)
 export const updateBacsBms = (docId, data) => api.put(`/bacs-audit/${docId}/bms`, data)
+export const getBacsBmsComponents = (docId) => api.get(`/bacs-audit/${docId}/bms-components`)
+export const createBacsBmsComponent = (docId, data) => api.post(`/bacs-audit/${docId}/bms-components`, data)
+export const updateBacsBmsComponent = (id, data) => api.patch(`/bacs-audit/bms-components/${id}`, data)
+export const duplicateBacsBmsComponent = (id) => api.post(`/bacs-audit/bms-components/${id}/duplicate`)
+export const deleteBacsBmsComponent = (id) => api.delete(`/bacs-audit/bms-components/${id}`)
 export const getBacsThermal = (docId) => api.get(`/bacs-audit/${docId}/thermal-regulation`)
 export const updateBacsThermal = (id, data) => api.patch(`/bacs-audit/thermal-regulation/${id}`, data)
 export const getBacsActionItems = (docId, params) =>
