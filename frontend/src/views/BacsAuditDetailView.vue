@@ -6,6 +6,7 @@ import {
   CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, PlusIcon, TrashIcon,
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
+  ChevronDoubleUpIcon, ChevronDoubleDownIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -373,6 +374,11 @@ const devicesBySystem = computed(() => {
 
 // Compteurs présents uniquement (pour la liste GTB des compteurs intégrés)
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
+
+// Tout replier / déplier (broadcast vers chaque CollapsibleSection)
+function setAllSectionsCollapsed(collapsed) {
+  window.dispatchEvent(new CustomEvent('bacs-collapse:set-all', { detail: !collapsed }))
+}
 
 // Devices enrichis avec system_category + zone_name (pour la liste GTB)
 const devicesWithMeta = computed(() => {
@@ -937,6 +943,19 @@ onMounted(refresh)
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
+        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+          <button @click="setAllSectionsCollapsed(true)"
+                  class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+                  title="Replier toutes les sections">
+            <ChevronDoubleUpIcon class="w-3.5 h-3.5 shrink-0" /> Tout replier
+          </button>
+          <span class="w-px bg-gray-200"></span>
+          <button @click="setAllSectionsCollapsed(false)"
+                  class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+                  title="Déplier toutes les sections">
+            <ChevronDoubleDownIcon class="w-3.5 h-3.5 shrink-0" /> Tout déplier
+          </button>
+        </div>
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
         </button>
@@ -980,6 +999,12 @@ onMounted(refresh)
           <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
           <R175Tooltip article="R175-2" />
           <StepValidateBadge class="ml-auto" :step="stepFor('identification')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span>
+            Puissance chauffage + clim {{ document?.bacs_total_power_kw ?? '—' }} kW
+            · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}<span v-if="document?.bacs_applicable_deadline"> (échéance {{ document.bacs_applicable_deadline }})</span>
+          </span>
         </template>
         <div class="px-5 py-4 grid grid-cols-2 gap-4">
           <div>
@@ -1116,6 +1141,14 @@ onMounted(refresh)
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
           <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
+        <template #summary>
+          <span v-if="zones.length">
+            {{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }}
+            · surface totale {{ zones.reduce((s,z) => s + (z.surface_m2 || 0), 0) || '—' }} m²
+            · {{ zones.slice(0,4).map(z => z.name).join(' · ') }}{{ zones.length > 4 ? ' …' : '' }}
+          </span>
+          <span v-else class="italic">Aucune zone définie</span>
+        </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -1207,6 +1240,14 @@ onMounted(refresh)
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
           </span>
           <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span v-if="systems.length">
+            {{ systems.filter(s => s.present).length }} système{{ systems.filter(s => s.present).length > 1 ? 's' : '' }} actif{{ systems.filter(s => s.present).length > 1 ? 's' : '' }}
+            · total chauffage + clim {{ powerSummary.heating_cooling_total_kw || 0 }} kW
+            <span v-if="hiddenNotConcernedCount"> · {{ hiddenNotConcernedCount }} non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }}</span>
+          </span>
+          <span v-else class="italic">Pas encore de systèmes saisis</span>
         </template>
         <div class="px-3 py-3 bg-gray-50">
           <div v-if="hiddenNotConcernedCount" class="flex items-center justify-end mb-2 gap-2">
@@ -1314,6 +1355,15 @@ onMounted(refresh)
           <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
           <R175Tooltip article="R175-3 §1" />
           <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span v-if="meters.length">
+            {{ meters.length }} compteur{{ meters.length > 1 ? 's' : '' }}
+            · {{ meters.filter(m => m.present_actual).length }} présent{{ meters.filter(m => m.present_actual).length > 1 ? 's' : '' }}
+            · {{ meters.filter(m => m.communicating).length }} communicant{{ meters.filter(m => m.communicating).length > 1 ? 's' : '' }}
+            · {{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length }} requis manquant{{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length > 1 ? 's' : '' }}
+          </span>
+          <span v-else class="italic">Aucun compteur listé</span>
         </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
@@ -1436,6 +1486,16 @@ onMounted(refresh)
           <span class="text-xs text-gray-500">R175-6</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('thermal')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
+        <template #summary>
+          <span v-if="thermal.length">
+            {{ thermal.length }} zone{{ thermal.length > 1 ? 's' : '' }} thermique{{ thermal.length > 1 ? 's' : '' }}
+            · {{ thermal.filter(t => t.has_automatic_regulation).length }} régulation{{ thermal.filter(t => t.has_automatic_regulation).length > 1 ? 's' : '' }} auto
+            <span v-if="thermal.filter(t => t.generator_exempt_wood).length">
+              · {{ thermal.filter(t => t.generator_exempt_wood).length }} exempté{{ thermal.filter(t => t.generator_exempt_wood).length > 1 ? 's' : '' }} bois
+            </span>
+          </span>
+          <span v-else class="italic">Aucune régulation thermique relevée</span>
+        </template>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
@@ -1521,6 +1581,15 @@ onMounted(refresh)
             />
             <StepValidateBadge :step="stepFor('bms')" @validate="validateStep" @invalidate="invalidateStep" />
           </div>
+        </template>
+        <template #summary>
+          <span v-if="bms.existing_solution">
+            {{ bms.existing_solution }}<span v-if="bms.existing_solution_brand"> · {{ bms.existing_solution_brand }}</span>
+            · suivi 5 ans {{ bms.meets_r175_3_p1 ? '✓' : '✗' }}
+            · détection dérives {{ bms.meets_r175_3_p2 ? '✓' : '✗' }}
+            · maintenance {{ bms.has_maintenance_procedures ? '✓' : '✗' }}
+          </span>
+          <span v-else class="italic">GTB non renseignée</span>
         </template>
         <div class="px-5 py-4 space-y-4">
           <div class="grid grid-cols-2 gap-4">
@@ -1771,6 +1840,13 @@ onMounted(refresh)
           <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('documents')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
+        <template #summary>
+          <span v-if="siteDocCounts.doe || siteDocCounts.photo">
+            {{ siteDocCounts.doe }} document{{ siteDocCounts.doe > 1 ? 's' : '' }} DOE
+            · {{ siteDocCounts.photo }} photo{{ siteDocCounts.photo > 1 ? 's' : '' }}
+          </span>
+          <span v-else class="italic">Aucun document</span>
+        </template>
         <div class="px-5 py-4">
           <SiteDocumentsManager
             v-if="document?.site_uuid"
@@ -1790,6 +1866,10 @@ onMounted(refresh)
           <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
           <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
           <StepValidateBadge class="ml-auto" :step="stepFor('credentials')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span v-if="siteCredCount">{{ siteCredCount }} credential{{ siteCredCount > 1 ? 's' : '' }} chiffré{{ siteCredCount > 1 ? 's' : '' }}</span>
+          <span v-else class="italic">Aucun credential</span>
         </template>
         <div class="px-5 py-4">
           <SiteCredentialsManager
@@ -1816,6 +1896,17 @@ onMounted(refresh)
             Vue commerciale →
           </button>
           <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span v-if="visibleActionItems.length">
+            <span v-if="itemsBySeverity.blocking.length" class="text-red-700 font-semibold">{{ itemsBySeverity.blocking.length }} bloquante{{ itemsBySeverity.blocking.length > 1 ? 's' : '' }}</span>
+            <span v-if="itemsBySeverity.blocking.length && (itemsBySeverity.major.length || itemsBySeverity.minor.length)"> · </span>
+            <span v-if="itemsBySeverity.major.length" class="text-orange-700">{{ itemsBySeverity.major.length }} majeure{{ itemsBySeverity.major.length > 1 ? 's' : '' }}</span>
+            <span v-if="itemsBySeverity.major.length && itemsBySeverity.minor.length"> · </span>
+            <span v-if="itemsBySeverity.minor.length" class="text-amber-700">{{ itemsBySeverity.minor.length }} mineure{{ itemsBySeverity.minor.length > 1 ? 's' : '' }}</span>
+            <span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }}</span>
+          </span>
+          <span v-else class="italic text-emerald-700">✓ Aucune action corrective</span>
         </template>
         <div class="px-4 py-3 space-y-3">
           <div v-if="!visibleActionItems.length" class="py-10 text-center">
@@ -1897,6 +1988,12 @@ onMounted(refresh)
             ✨ Générée le {{ new Date(document.audit_synthesis_generated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
           </span>
           <StepValidateBadge class="ml-auto" :step="stepFor('synthesis')" @validate="validateStep" @invalidate="invalidateStep" />
+        </template>
+        <template #summary>
+          <span v-if="synthesisHtml">
+            ✨ Note rédigée<span v-if="document?.audit_synthesis_generated_at"> · générée le {{ new Date(document.audit_synthesis_generated_at).toLocaleDateString('fr-FR') }}</span>
+          </span>
+          <span v-else class="italic">Pas encore de note de synthèse</span>
         </template>
         <div class="px-5 py-4 space-y-3">
           <div class="flex items-center gap-2">
