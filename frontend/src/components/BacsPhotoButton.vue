@@ -39,6 +39,14 @@ const isDragOver = ref(false)
 const dragDepth = ref(0) // counter pour eviter le flicker dragenter/dragleave sur enfants
 const captionModal = ref({ open: false, photos: [] }) // photos = [{ id, dataUrl, title, notes }]
 const previewPhoto = ref(null)
+const rootEl = ref(null)
+
+function onDocClick(e) {
+  if (!showGallery.value) return
+  if (rootEl.value && !rootEl.value.contains(e.target)) {
+    showGallery.value = false
+  }
+}
 
 const filterParams = computed(() => {
   const p = {}
@@ -67,9 +75,11 @@ function onDocsChanged() { refresh() }
 onMounted(() => {
   refresh()
   window.addEventListener('site-documents:changed', onDocsChanged)
+  document.addEventListener('mousedown', onDocClick)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('site-documents:changed', onDocsChanged)
+  document.removeEventListener('mousedown', onDocClick)
 })
 watch(() => filterParams.value, refresh, { deep: true })
 
@@ -195,7 +205,7 @@ const btnCls = computed(() => {
 </script>
 
 <template>
-  <div class="relative inline-block">
+  <div class="relative inline-block" ref="rootEl">
     <button
       type="button"
       :class="btnCls"
