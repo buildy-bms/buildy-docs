@@ -4,13 +4,14 @@ import { ref, onMounted, computed } from 'vue'
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
 
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs } from '@/api'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate } from '@/api'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
 import EquipmentPointsEditor from '@/components/EquipmentPointsEditor.vue'
+import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -38,6 +39,52 @@ async function onDeleted() {
 const affectedAfs = ref([])
 const templates = ref([])
 const selected = ref(null)
+const showBulk = ref(false)
+
+// Items pour BulkRegenerateModal : 2 entrees par equipement (description + justification BACS)
+const bulkItems = computed(() => {
+  const out = []
+  for (const t of templates.value) {
+    if ((t.description_html || '').trim()) {
+      out.push({
+        id: `desc-${t.id}`,
+        title: `${t.name} — description`,
+        kind: 'equipment_description',
+        _equipId: t.id,
+        _field: 'description_html',
+        payload: {
+          category_label: t.category || null,
+          category: t.category || null,
+          bacs_articles: t.bacs_articles || null,
+          current_template_id: t.id,
+        },
+      })
+    }
+    if ((t.bacs_justification || '').trim()) {
+      out.push({
+        id: `justif-${t.id}`,
+        title: `${t.name} — justification BACS`,
+        kind: 'equipment_bacs_justification',
+        _equipId: t.id,
+        _field: 'bacs_justification',
+        payload: {
+          category_label: t.category || null,
+          category: t.category || null,
+          bacs_articles: t.bacs_articles || null,
+          current_template_id: t.id,
+        },
+      })
+    }
+  }
+  return out
+})
+function bulkGetHtml(it) {
+  const t = templates.value.find(x => x.id === it._equipId)
+  return t?.[it._field] || ''
+}
+async function bulkSaveHtml(it, html) {
+  await updateEquipmentTemplate(it._equipId, { [it._field]: html })
+}
 
 const viewMode = ref(localStorage.getItem('library-view-mode') || 'table')
 const searchQuery = ref('')
@@ -170,11 +217,17 @@ onMounted(async () => {
         <p v-else class="text-sm text-gray-500">
           {{ templates.length }} modèle{{ templates.length > 1 ? 's' : '' }} d'équipement partagé{{ templates.length > 1 ? 's' : '' }}.
         </p>
-        <button @click="openCreate"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
-          <PlusIcon class="w-4 h-4" />
-          Nouveau modèle
-        </button>
+        <div class="flex items-center gap-2">
+          <button @click="showBulk = true" :disabled="!bulkItems.length"
+                  class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+            <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+          </button>
+          <button @click="openCreate"
+                  class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
+            <PlusIcon class="w-4 h-4" />
+            Nouveau modèle
+          </button>
+        </div>
       </div>
 
       <div v-if="templates.length" class="flex items-center justify-between gap-3 mb-4">
@@ -445,6 +498,16 @@ onMounted(async () => {
       @close="showEditor = false"
       @saved="onSaved"
       @deleted="onDeleted"
+    />
+
+    <BulkRegenerateModal
+      v-if="showBulk"
+      title="Régénérer les systèmes techniques avec Claude"
+      :items="bulkItems"
+      :get-html="bulkGetHtml"
+      :on-save-html="bulkSaveHtml"
+      @close="showBulk = false; refresh()"
+      @done="refresh()"
     />
   </div>
 </template>

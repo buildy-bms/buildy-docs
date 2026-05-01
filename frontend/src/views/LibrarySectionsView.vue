@@ -2,13 +2,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PlusIcon, MagnifyingGlassIcon, XMarkIcon, ChevronDoubleDownIcon, ChevronDoubleUpIcon,
+  PlusIcon, MagnifyingGlassIcon, XMarkIcon, ChevronDoubleDownIcon, ChevronDoubleUpIcon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
 import {
-  listSectionTemplates, reorderSectionTemplates,
+  listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
 } from '@/api'
 import LibrarySectionNode from '@/components/LibrarySectionNode.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
+import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import { useNotification } from '@/composables/useNotification'
 
 const { error: notifyError } = useNotification()
@@ -20,6 +21,29 @@ const showCreate = ref(false)
 const collapsed = ref(new Set())
 const rootRef = ref(null)
 const sortables = []           // Sortable instances per <ul>
+const showBulk = ref(false)
+
+// Items pour BulkRegenerateModal : sections narratives uniquement avec body_html
+const bulkItems = computed(() => flat.value
+  .filter(t => t.kind === 'standard' && (t.body_html || '').trim())
+  .map(t => ({
+    id: t.id,
+    title: t.title,
+    kind: 'narrative_section',
+    payload: {
+      bacs_articles: t.bacs_articles || null,
+      current_template_id: t.id,
+      parent_template_id: t.parent_template_id || null,
+    },
+  }))
+)
+function bulkGetHtml(it) {
+  const t = flat.value.find(x => x.id === it.id)
+  return t?.body_html || ''
+}
+async function bulkSaveHtml(it, html) {
+  await updateSectionTemplate(it.id, { body_html: html })
+}
 
 // Filtre l'arbre :
 // - feuilles equipment : leur source d'autorite est la page Equipements
@@ -191,6 +215,10 @@ onBeforeUnmount(teardownSortables)
         <button @click="collapseAll" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg whitespace-nowrap transition">
           <ChevronDoubleUpIcon class="w-3.5 h-3.5" /> Tout replier
         </button>
+        <button @click="showBulk = true" :disabled="!bulkItems.length"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+          <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+        </button>
         <button @click="openCreate"
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" /> Nouvelle section type
@@ -240,6 +268,16 @@ onBeforeUnmount(teardownSortables)
       mode="standard"
       @close="showCreate = false"
       @saved="onSaved"
+    />
+
+    <BulkRegenerateModal
+      v-if="showBulk"
+      title="Régénérer les sections types avec Claude"
+      :items="bulkItems"
+      :get-html="bulkGetHtml"
+      :on-save-html="bulkSaveHtml"
+      @close="showBulk = false; refresh()"
+      @done="refresh()"
     />
   </div>
 </template>

@@ -2,13 +2,14 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon,
+  MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
 import {
-  listSectionTemplates, reorderSectionTemplates,
+  listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
 } from '@/api'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
+import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import { useNotification } from '@/composables/useNotification'
 
 const { error: notifyError } = useNotification()
@@ -27,6 +28,30 @@ const allTemplates = ref([])
 const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
+const showBulk = ref(false)
+
+// Items mappes au format attendu par BulkRegenerateModal
+const bulkItems = computed(() => items.value
+  .filter(t => (t.body_html || '').trim())
+  .map(t => ({
+    id: t.id,
+    title: t.title,
+    kind: 'functionality',
+    payload: {
+      bacs_articles: t.bacs_articles || null,
+      avail_e: t.avail_e, avail_s: t.avail_s, avail_p: t.avail_p,
+      current_template_id: t.id,
+      parent_template_id: t.parent_template_id || null,
+    },
+  }))
+)
+function bulkGetHtml(it) {
+  const t = items.value.find(x => x.id === it.id)
+  return t?.body_html || ''
+}
+async function bulkSaveHtml(it, html) {
+  await updateSectionTemplate(it.id, { body_html: html })
+}
 function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
 async function onSaved() {
@@ -171,10 +196,16 @@ onBeforeUnmount(teardownSortables)
           {{ items.length }} fonctionnalité{{ items.length > 1 ? 's' : '' }} Buildy, regroupées par section parente.
         </p>
       </div>
-      <button @click="openCreate"
-              class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
-        <PlusIcon class="w-4 h-4" /> Nouvelle fonctionnalité
-      </button>
+      <div class="flex items-center gap-2">
+        <button @click="showBulk = true" :disabled="!bulkItems.length"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+          <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
+        </button>
+        <button @click="openCreate"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
+          <PlusIcon class="w-4 h-4" /> Nouvelle fonctionnalité
+        </button>
+      </div>
     </div>
 
     <div class="relative max-w-md mb-4">
@@ -273,6 +304,16 @@ onBeforeUnmount(teardownSortables)
       mode="functionality"
       @close="showCreate = false"
       @saved="onSaved"
+    />
+
+    <BulkRegenerateModal
+      v-if="showBulk"
+      title="Régénérer les fonctionnalités avec Claude"
+      :items="bulkItems"
+      :get-html="bulkGetHtml"
+      :on-save-html="bulkSaveHtml"
+      @close="showBulk = false; refresh()"
+      @done="refresh()"
     />
   </div>
 </template>
