@@ -231,22 +231,26 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
 
   if (has_corpus) {
     lines.push('');
-    lines.push(`=== CORPUS BIBLIOTHEQUE — REGLES D'USAGE ===`);
-    lines.push(`Le corpus existant de la bibliotheque t'est fourni dans le system prompt (titres + contenus deja rediges).`);
+    lines.push(`=== CORPUS BIBLIOTHEQUE — METHODE OBLIGATOIRE ===`);
+    lines.push(`Le corpus existant t'est fourni dans le system prompt (titres + contenus rediges).`);
     lines.push(``);
-    lines.push(`OBJECTIF : aligner vocabulaire, niveau de detail et tonalite avec ce qui existe deja.`);
+    lines.push(`ETAPE 1 — ANALYSE PREALABLE (silencieuse, ne l'ecris pas) :`);
+    lines.push(`Avant de rediger une seule ligne, parcours le corpus et identifie :`);
+    lines.push(`  a) Les entrees dont le titre OU le contenu recoupent ton sujet.`);
+    lines.push(`  b) Pour chacune, liste mentalement les informations qu'elle couvre deja.`);
+    lines.push(`  c) Determine ce qui RESTE a dire ici, qui n'est nulle part ailleurs.`);
     lines.push(``);
-    lines.push(`INTERDICTIONS STRICTES :`);
-    lines.push(`- Ne PAS recopier ni paraphraser le contenu d'une autre entree.`);
-    lines.push(`- Ne PAS dupliquer une information deja decrite ailleurs (ex : ne pas reexpliquer "supervision multi-sites" si une fonctionnalite porte deja ce titre).`);
-    lines.push(`- Ne PAS empieter sur le perimetre d'une autre entree : si un sujet est deja couvert par une fonctionnalite ou un systeme technique existant, ne le re-detaille pas ici.`);
+    lines.push(`ETAPE 2 — REDACTION (regles strictes) :`);
+    lines.push(`- N'ecris QUE ce qui est specifique a cette entree et absent du corpus.`);
+    lines.push(`- INTERDIT de re-enumerer, re-expliquer, re-resumer ce qui est deja decrit ailleurs (meme reformule).`);
+    lines.push(`  Exemple concret : si "Objet du document" liste deja les 3 fonctions de l'AF (reference fonctionnelle / contractuelle / reglementaire), "Preambule" NE LES RELISTE PAS — meme dans une formulation differente.`);
+    lines.push(`- Si tu dois evoquer un sujet couvert ailleurs, fais-le UNIQUEMENT par renvoi explicite : "voir la section « Titre exact »".`);
+    lines.push(`- Verifie l'orthographe du titre dans le corpus avant de citer.`);
     lines.push(``);
-    lines.push(`OBLIGATIONS :`);
-    lines.push(`- Quand tu effleures un sujet couvert ailleurs, RENVOIE explicitement vers l'entree concernee en citant son titre exact entre guillemets francais (« ... »). Exemples :`);
-    lines.push(`    • "Voir la fonctionnalite « Supervision multi-sites » pour le detail."`);
-    lines.push(`    • "Cette logique s'appuie sur le systeme « Centrale de traitement d'air »."`);
-    lines.push(`- Verifie l'orthographe exacte du titre dans le corpus avant de le citer.`);
-    lines.push(`- Reste focalise sur ce qui est specifique a l'entree en cours de redaction.`);
+    lines.push(`ETAPE 3 — TEST DE NON-REDONDANCE (avant de rendre ta reponse) :`);
+    lines.push(`Relis ton brouillon. Pour chaque phrase, demande-toi : "Cette information est-elle deja dans une autre entree du corpus ?" Si OUI → supprime-la ou remplace-la par un renvoi.`);
+    lines.push(``);
+    lines.push(`Si apres analyse il ne reste presque rien a dire de specifique, RENVOIE un texte court (1-2 phrases) plutot que d'inventer du contenu redondant.`);
   }
 
   return lines.join('\n');
