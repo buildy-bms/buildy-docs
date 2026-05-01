@@ -62,7 +62,7 @@ async function submit() {
       </div>
       <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
         <input type="checkbox" v-model="form.required" class="rounded" />
-        <span>Compteur requis par le décret BACS (R175-3 §1)</span>
+        <span>Compteur requis par le décret BACS (R175-3 1°)</span>
       </label>
       <div class="flex items-center justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"

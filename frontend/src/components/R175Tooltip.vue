@@ -7,7 +7,7 @@ import { InformationCircleIcon } from '@heroicons/vue/24/outline'
  * Affiche le texte complet de l'article au hover, avec un peu de contexte
  * pour aider l'auditeur à comprendre l'enjeu de la section.
  *
- * Usage : <R175Tooltip article="R175-1 §6" />
+ * Usage : <R175Tooltip article="R175-1 1°" />
  *         <R175Tooltip article="R175-3" />
  *         <R175Tooltip><p>Texte custom HTML</p></R175Tooltip>
  *
@@ -32,18 +32,20 @@ function hideDelayed() {
 }
 
 // Extraits abrégés des articles R175 (seuls les points clés pour la saisie)
+// Notation canonique : "1°", "2°"... — JAMAIS "§". Le lookup normalise les
+// deux formes (compatibilité avec d'éventuels appels historiques).
 const ARTICLE_SUMMARIES = {
   'R175-1': {
     title: 'R175-1 — Définitions',
     body: `Définit les systèmes techniques du bâtiment (chauffage, climatisation, ventilation, ECS, éclairage intégré, automatisation et contrôle, production électrique sur site), la <strong>zone fonctionnelle</strong> (espace dans lequel les usages sont homogènes) et l'<strong>interopérabilité</strong> (capacité d'un produit à communiquer et interagir avec d'autres dans le respect des exigences de sécurité).`,
   },
-  'R175-1 §4': {
-    title: 'R175-1 §4 — Systèmes techniques de bâtiment',
-    body: `Tout équipement technique de chauffage, refroidissement, ventilation, production d'eau chaude sanitaire, éclairage intégré, automatisation et contrôle des bâtiments, production d'électricité sur site, ou combinant plusieurs de ces systèmes.<br/><br/>L'audit identifie pour chaque zone les systèmes attendus, leur présence effective et leurs équipements (marque, modèle, énergie, puissance, communication).`,
+  'R175-1 4°': {
+    title: 'R175-1 4° — Éclairage intégré et production électrique',
+    body: `Sous-point R175-1 4° : éclairage intégré au bâtiment et production d'électricité sur site (PV, cogénération, micro-éolien). Au-delà, la définition globale de "système technique de bâtiment" (article R175-1) couvre tout équipement de chauffage, refroidissement, ventilation, ECS, éclairage intégré, automatisation et production électrique sur site.<br/><br/>L'audit identifie pour chaque zone les systèmes attendus, leur présence effective et leurs équipements (marque, modèle, énergie, puissance, communication).`,
   },
-  'R175-1 §6': {
-    title: 'R175-1 §6 — Zone fonctionnelle',
-    body: `Toute zone dans laquelle les usages sont homogènes (open-space tertiaire, salle de réunion, atelier, local technique, parking…). Le découpage zonal est la base du suivi R175-3 §1 : <strong>chaque zone doit être suivie indépendamment</strong>.`,
+  'R175-1 6°': {
+    title: 'R175-1 6° — Zone fonctionnelle',
+    body: `Toute zone dans laquelle les usages sont homogènes (open-space tertiaire, salle de réunion, atelier, local technique, parking…). Le découpage zonal est la base du suivi R175-3 1° : <strong>chaque zone doit être suivie indépendamment</strong>.`,
   },
   'R175-2': {
     title: 'R175-2 — Champ d\'application',
@@ -51,18 +53,18 @@ const ARTICLE_SUMMARIES = {
   },
   'R175-3': {
     title: 'R175-3 — 4 exigences fonctionnelles',
-    body: `<strong>P1.</strong> Suivi continu, à pas horaire, conservation 5 ans (capacité de la GTB)<br/><strong>P2.</strong> Détection des pertes d'efficacité (capacité de la GTB)<br/><strong>P3.</strong> Interopérabilité (par système : protocole standard ouvert)<br/><strong>P4.</strong> Arrêt manuel + reprise autonome (par équipement)`,
+    body: `<strong>1°.</strong> Suivi continu, à pas horaire, conservation 5 ans (capacité de la GTB)<br/><strong>2°.</strong> Détection des pertes d'efficacité (capacité de la GTB)<br/><strong>3°.</strong> Interopérabilité (par système : protocole standard ouvert)<br/><strong>4°.</strong> Arrêt manuel + gestion autonome (par équipement)`,
   },
-  'R175-3 §1': {
-    title: 'R175-3 §1 — Suivi continu et conservation',
+  'R175-3 1°': {
+    title: 'R175-3 1° — Suivi continu et conservation',
     body: `La consommation énergétique des systèmes techniques doit être suivie en continu, à pas horaire, et les données conservées à l'échelle mensuelle pendant 5 ans minimum. Un compteur de chaque énergie (gaz, électricité, fioul, réseau de chaleur…) est requis au niveau du bâtiment, et un sous-comptage par zone fonctionnelle pour les usages chauffage / refroidissement / ECS / éclairage.`,
   },
-  'R175-3 §3': {
-    title: 'R175-3 §3 — Interopérabilité',
+  'R175-3 3°': {
+    title: 'R175-3 3° — Interopérabilité',
     body: `Les systèmes techniques doivent pouvoir communiquer entre eux dans le respect des exigences de sécurité. Buildy considère un équipement <strong>communicant</strong> s'il expose au moins un protocole standard ouvert : <strong>BACnet/IP, BACnet MS/TP, Modbus TCP, Modbus RTU, KNX, M-Bus, MQTT, LoRaWAN</strong>.`,
   },
-  'R175-3 §4': {
-    title: 'R175-3 §4 — Arrêt manuel + fonctionnement autonome',
+  'R175-3 4°': {
+    title: 'R175-3 4° — Arrêt manuel et gestion autonome',
     body: `Chaque équipement doit pouvoir être <strong>arrêté manuellement</strong> par l'utilisateur, et la GTB doit ensuite <strong>reprendre la main de manière autonome</strong> sans intervention humaine. Buildy évalue ces 2 critères individuellement par équipement.`,
   },
   'R175-4': {
@@ -79,9 +81,16 @@ const ARTICLE_SUMMARIES = {
   },
 }
 
+// Normalise une référence d'article : "R175-1 §4" -> "R175-1 4°"
+function normalizeArticleKey(s) {
+  if (!s) return s
+  return s.replace(/§\s*(\d+)/g, (_, n) => `${n}°`)
+}
+
 const data = computed(() => {
   if (!props.article) return null
-  return ARTICLE_SUMMARIES[props.article] || {
+  const key = normalizeArticleKey(props.article)
+  return ARTICLE_SUMMARIES[key] || {
     title: props.title || props.article,
     body: `Aucun résumé disponible pour ${props.article}. Consulte le texte intégral en annexe A du PDF d'audit.`,
   }

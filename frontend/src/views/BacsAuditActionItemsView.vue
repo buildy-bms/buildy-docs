@@ -356,7 +356,7 @@ onMounted(refresh)
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Article R175 (optionnel)</label>
-          <input v-model="newItem.r175_article" type="text" placeholder="ex : R175-3 §3"
+          <input v-model="newItem.r175_article" type="text" placeholder="ex : R175-3 3°"
                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
         </div>
         <div>

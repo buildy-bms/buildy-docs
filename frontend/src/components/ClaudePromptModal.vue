@@ -55,7 +55,7 @@ Buildy est une **solution logicielle de supervision et d'hypervision** des bâti
 Buildy n'est PAS un intégrateur GTB classique (type Schneider EcoStruxure / Siemens Desigo). Buildy ne refait JAMAIS la régulation des équipements. Chaque système (CTA, chaudière, DRV, éclairage…) **reste autonome et indépendant** avec sa propre régulation native (fournie par le fabricant) ou sa régulation paramétrée par l'intégrateur du système concerné (chaufferiste, frigoriste, intégrateur process, électricien…).
 
 Buildy intervient EN AVAL, en interconnectant les équipements existants entre eux pour assurer :
-- l'interopérabilité (R175-1 §7)
+- l'interopérabilité (R175-3 3°)
 - le pilotage à distance (lecture états/mesures + transmission commandes/consignes)
 - la conformité au décret BACS (suivi continu, alarmes, arrêt manuel, gestion autonome)
 - les logiques applicatives transverses (programmations horaires, scénarios par usage, mise en cohérence multi-systèmes)
@@ -93,7 +93,7 @@ Structure type :
 \`\`\`
 <p>[1 phrase] Description courte de ce qu'est l'équipement et de sa fonction.</p>
 
-<p>[1-2 phrases] Cadrage BACS si applicable : à quel(s) titre(s) l'équipement est concerné par le décret BACS (référence aux articles R175-X §Y).</p>
+<p>[1-2 phrases] Cadrage BACS si applicable : à quel(s) titre(s) l'équipement est concerné par le décret BACS (référence aux articles R175-X N°).</p>
 
 <p><strong>La régulation de l'équipement est assurée par l'équipement lui-même</strong>, [préciser la source : fabricant et/ou intégrateur du système concerné, avec exemple de métier]. Cette régulation pilote [fonctions techniques bas niveau].</p>
 
@@ -109,9 +109,9 @@ EXEMPLE DE RÉFÉRENCE — Centrale de traitement d'air (CTA)
 
 <p>Selon sa configuration, une CTA peut être concernée par une ou plusieurs définitions du décret BACS :</p>
 <ul>
-<li>Système de ventilation (R175-1 §3) — dans tous les cas</li>
-<li>Système de chauffage (R175-1 §1) — si la CTA intègre une batterie de chauffe</li>
-<li>Système de climatisation (R175-1 §2) — si la CTA intègre une batterie de froid</li>
+<li>Système de ventilation (R175-1 3°) — dans tous les cas</li>
+<li>Système de chauffage (R175-1 1°) — si la CTA intègre une batterie de chauffe</li>
+<li>Système de climatisation (R175-1 2°) — si la CTA intègre une batterie de froid</li>
 </ul>
 
 <p><strong>La régulation de la CTA est assurée par l'équipement lui-même</strong>, via la régulation embarquée fournie par le fabricant ou via une régulation portée par l'intégrateur du lot CVC (frigoriste, intégrateur ventilation) lors de la mise en service. Cette régulation gère en autonomie la logique de fonctionnement bas niveau : séquences chaud/froid, modulation, sécurités.</p>
@@ -153,18 +153,19 @@ LES 4 EXIGENCES DU DÉCRET BACS (R175-3)
 Le système d'automatisation et de contrôle des bâtiments doit :
 1. **Suivre, enregistrer et analyser en continu** les données de production et de consommation énergétique, par zone fonctionnelle, à un pas de temps horaire (conservées 5 ans).
 2. **Situer l'efficacité énergétique** par rapport à des valeurs de référence ; détecter les pertes d'efficacité ; informer l'exploitant des possibilités d'amélioration.
-3. Être **interopérable** avec les différents systèmes techniques du bâtiment (R175-1 §7).
+3. Être **interopérable** avec les différents systèmes techniques du bâtiment (R175-3 3°).
 4. Permettre un **arrêt manuel** et une **gestion autonome** d'un ou plusieurs systèmes techniques.
 
 ═══════════════════════════════════════════════════════════════════════
 DÉFINITIONS BACS UTILES (R175-1)
 ═══════════════════════════════════════════════════════════════════════
 
-- §1 Système de chauffage : combinaison des composantes pour assurer l'augmentation contrôlée de la température de l'air intérieur.
-- §2 Système de climatisation : combinaison pour assurer un traitement de l'air permettant le contrôle/abaissement de la température.
-- §3 Système de ventilation : combinaison pour assurer le renouvellement de l'air intérieur.
-- §4 Système technique de bâtiment : tout équipement de chauffage, refroidissement, ventilation, ECS, éclairage intégré, automatisation, production d'électricité sur site.
-- §7 Interopérable : capacité d'un produit/système à communiquer et interagir avec d'autres dans le respect de la sécurité.
+- R175-1 1° Système de chauffage : combinaison des composantes pour assurer l'augmentation contrôlée de la température de l'air intérieur.
+- R175-1 2° Système de climatisation : combinaison pour assurer un traitement de l'air permettant le contrôle/abaissement de la température.
+- R175-1 3° Système de ventilation : combinaison pour assurer le renouvellement de l'air intérieur.
+- R175-1 4° Éclairage intégré et production d'électricité sur site.
+- Système technique de bâtiment (définition globale R175-1) : tout équipement de chauffage, refroidissement, ventilation, ECS, éclairage intégré, automatisation, production d'électricité sur site.
+- Interopérabilité (R175-3 3°) : capacité d'un produit/système à communiquer et interagir avec d'autres dans le respect de la sécurité.
 
 ═══════════════════════════════════════════════════════════════════════
 FORMAT DE SORTIE ATTENDU
@@ -172,9 +173,9 @@ FORMAT DE SORTIE ATTENDU
 
 Renvoie UNIQUEMENT du HTML simple structuré en **3 paragraphes courts** :
 
-1. **§1 — Définition légale** : citer l'article R175-1 §X qui s'applique à cet équipement et expliquer en quoi l'équipement entre dans cette définition. Utiliser \`<strong>\` sur les termes-clés du décret.
-2. **§2 — Obligations** : ce que le décret impose (interopérabilité, arrêt manuel, gestion autonome, suivi continu) en lien avec cet équipement spécifique.
-3. **§3 — Réponse Buildy** : comment la solution Buildy permet de répondre à ces obligations en supervisant/transmettant les données pertinentes pour cet équipement (sans refaire la régulation).
+1. **Définition légale** : citer l'article R175-1 N° qui s'applique à cet équipement et expliquer en quoi l'équipement entre dans cette définition. Utiliser \`<strong>\` sur les termes-clés du décret.
+2. **Obligations** : ce que le décret impose (interopérabilité R175-3 3°, arrêt manuel R175-3 4°, gestion autonome, suivi continu R175-3 1°) en lien avec cet équipement spécifique.
+3. **Réponse Buildy** : comment la solution Buildy permet de répondre à ces obligations en supervisant/transmettant les données pertinentes pour cet équipement (sans refaire la régulation).
 
 Pas de classes CSS, pas de \`<div>\`, pas de \`<h1/h2/h3>\`. Juste \`<p>\` et \`<strong>\`.
 
@@ -183,7 +184,7 @@ EXEMPLE DE RÉFÉRENCE — Centrale de traitement d'air (CTA)
 ═══════════════════════════════════════════════════════════════════════
 
 \`\`\`html
-<p>L'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p>
+<p>L'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (1°) et de climatisation (2°).</p>
 
 <p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu'ils puissent être <strong>arrêtés manuellement</strong> et qu'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p>
 
@@ -224,7 +225,7 @@ RÈGLES DE RÉDACTION
 3. **Pas de mention nominale du client/projet** — substituts génériques ("le bâtiment", "le site", "l'exploitant").
 4. **Pas d'invention** : s'appuyer sur la connaissance métier GTB. Si une info précise manque, formuler de manière neutre.
 5. **Vocabulaire Buildy précis** : supervision, hypervision, point, instance, équipement, anomalie, dérive, niveau de service (Essentials / Smart / Premium), Hyperveez (web), Gojee (mobile).
-6. **Références BACS contextualisées** si la section en mentionne (R175-1 §X, R175-3 §Y, R175-5-1) : citer l'article, expliquer en quoi il s'applique à cette section, sans réécrire la définition légale.
+6. **Références BACS contextualisées** si la section en mentionne (R175-1 N°, R175-3 N°, R175-5-1) : citer l'article avec la notation correcte (1°, 2°, 3°, 4° — JAMAIS §), expliquer en quoi il s'applique à cette section, sans réécrire la définition légale.
 7. **Pas de titre H1/H2/H3** : les titres sont gérés par l'app (la section a déjà son titre).
 8. HTML simple compatible Tiptap : \`<p>\`, \`<ul>/<li>\`, \`<strong>\`, \`<em>\`. Pas de classes CSS, pas de \`<div>\`.
 

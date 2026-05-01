@@ -154,7 +154,7 @@ const ZONE_NATURES = [
 ]
 const newZone = ref({ name: '', nature: null, surface_m2: null })
 
-// Compteurs (R175-3 §1)
+// Compteurs (R175-3 1°)
 const METER_USAGES = [
   { value: 'heating', label: 'Chauffage' },
   { value: 'cooling', label: 'Climatisation' },
@@ -711,7 +711,7 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
     return {
       key: def.key,
       label: def.label,
-      description: isBacs.value ? def.description : (def.descriptionSite || def.description.replace(/R175-?[0-9]?\s*(§\s*[0-9])?/g, '').replace(/\s+/g, ' ').trim()),
+      description: isBacs.value ? def.description : (def.descriptionSite || def.description.replace(/R175-?[0-9]?\s*(§\s*[0-9]|[0-9]°)?/g, '').replace(/\s+/g, ' ').trim()),
       complete: def.isComplete(),
       validated: !!p.validated,
       validated_at: p.validated_at || null,
@@ -1322,13 +1322,13 @@ onMounted(() => {
         </div>
       </CollapsibleSection>
 
-      <!-- 2. Zones fonctionnelles (R175-1 §6) — editable in-situ -->
+      <!-- 2. Zones fonctionnelles (R175-1 6°) — editable in-situ -->
       <CollapsibleSection storage-key="zones" section-id="section-zones">
         <template #header>
           <MapPinIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
-          <span v-if="isBacs" class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
-          <R175Tooltip v-if="isBacs" article="R175-1 §6" />
+          <span v-if="isBacs" class="text-xs text-gray-500">R175-1 6° — usages homogènes</span>
+          <R175Tooltip v-if="isBacs" article="R175-1 6°" />
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
           <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
@@ -1418,15 +1418,15 @@ onMounted(() => {
         </table>
       </CollapsibleSection>
 
-      <!-- Systemes par zone (R175-1 §4) -->
+      <!-- Systemes par zone (R175-1 4°) -->
       <CollapsibleSection storage-key="systems" section-id="section-systems">
         <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
           <span v-if="isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
-            R175-1 §4<R175Tooltip article="R175-1 §4" />
+            R175-1 4°<R175Tooltip article="R175-1 4°" />
             <span class="mx-1">/</span>
-            R175-3 §3, §4<R175Tooltip article="R175-3" />
+            R175-3 3°, 4°<R175Tooltip article="R175-3" />
           </span>
           <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
             Total chauffage + clim :
@@ -1525,7 +1525,7 @@ onMounted(() => {
                     :label="(SYSTEM_LABEL[s.system_category] || s.system_category) + ' - ' + g.zone_name"
                   />
                 </div>
-                <!-- Sous-table devices + cases R175-3 §3/§4 (visible uniquement si système présent) -->
+                <!-- Sous-table devices + cases R175-3 3°/4° (visible uniquement si système présent) -->
                 <SystemDevicesTable
                   v-if="s.present && !collapsedSystems.has(s.id)"
                   :system="s"
@@ -1555,13 +1555,13 @@ onMounted(() => {
         </div>
       </CollapsibleSection>
 
-      <!-- 4. Compteurs et mesurage (R175-3 §1) -->
+      <!-- 4. Compteurs et mesurage (R175-3 1°) -->
       <CollapsibleSection storage-key="meters" section-id="section-meters">
         <template #header>
           <BoltIcon class="w-5 h-5 text-emerald-600" />
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
-          <span v-if="isBacs" class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
-          <R175Tooltip v-if="isBacs" article="R175-3 §1" />
+          <span v-if="isBacs" class="text-xs text-gray-500">R175-3 1° — suivi continu, pas horaire, conservation 5 ans</span>
+          <R175Tooltip v-if="isBacs" article="R175-3 1°" />
           <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
         <template #summary>
@@ -1682,7 +1682,7 @@ onMounted(() => {
           <tfoot v-if="!meters.length">
             <tr>
               <td colspan="9" class="px-5 py-6 text-center text-xs text-gray-500">
-                Aucun compteur listé. Renseigne les compteurs requis (R175-3 §1) à mesure de la visite.
+                Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
               </td>
             </tr>
           </tfoot>

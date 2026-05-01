@@ -16,9 +16,9 @@ import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
  * Affichée sous chaque ligne (catégorie × zone) de la section 3.
  *
  * Affiche aussi les 3 cases au niveau du système :
- *  - Communicant (R175-3 §3)
- *  - Arrêt manuel possible (R175-3 §4)
- *  - Fonctionnement autonome (R175-3 §4)
+ *  - Communicant (R175-3 3°)
+ *  - Arrêt manuel possible (R175-3 4°)
+ *  - Fonctionnement autonome (R175-3 4°)
  */
 const props = defineProps({
   system: { type: Object, required: true },
@@ -245,8 +245,8 @@ async function removeDevice(d) {
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-28" title="Communication câblée vers la GTB (paire torsadée, bus, fibre, etc.)">Communication câblée</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-44">Communication</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 4° — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 4° — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-40">Notes</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-12" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
           <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-12" title="Photos rattachées à cet équipement">📷</th>

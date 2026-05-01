@@ -11,7 +11,7 @@
  *     S: bool|'option'|'paid'|'optional',  // disponibilite Smart
  *     P: bool|'option'|'paid'|'optional',  // disponibilite Premium
  *     note?: 'precision optionnelle',
- *     bacs_link?: 'R175-3 §1' (si applicable)
+ *     bacs_link?: 'R175-3 1°' (si applicable)
  *   }
  *
  * Helpers :
@@ -62,12 +62,12 @@ const SERVICE_LEVELS = {
   pilotage_equipements_cloud: {
     label: 'Pilotage des equipements du batiment depuis le cloud',
     E: true, S: true, P: true,
-    bacs_link: 'R175-3 §4',
+    bacs_link: 'R175-3 4°',
   },
   programmations_horaires: {
     label: 'Gestion centralisee des programmations horaires',
     E: true, S: true, P: true,
-    bacs_link: 'R175-3 §4',
+    bacs_link: 'R175-3 4°',
   },
   sauvegarde_donnees: {
     label: 'Sauvegarde et securisation des donnees historisees',
@@ -86,25 +86,25 @@ const SERVICE_LEVELS = {
   retention_horaires: {
     label: 'Retention historique des donnees horaires',
     E: '1 mois', S: '6 mois', P: '12 mois',
-    bacs_link: 'R175-3 §1',
+    bacs_link: 'R175-3 1°',
   },
   retention_journalieres: {
     label: 'Retention historique des donnees journalieres',
     E: '12 mois', S: '2 ans', P: '3 ans',
-    bacs_link: 'R175-3 §1',
+    bacs_link: 'R175-3 1°',
   },
   retention_mensuelles: {
     label: 'Retention historique des donnees mensuelles',
     E: '12 mois', S: '5 ans', P: '10 ans',
-    bacs_link: 'R175-3 §1 (5 ans requis)',
-    note: 'Seul le niveau Premium [P] satisfait l\'exigence reglementaire R175-3 §1 (5 ans). Smart la couvre exactement, Essentials non.',
+    bacs_link: 'R175-3 1° (5 ans requis)',
+    note: 'Seul le niveau Premium [P] satisfait l\'exigence reglementaire R175-3 1° (5 ans). Smart la couvre exactement, Essentials non.',
   },
 
   // ── Notifications & dashboards ──
   notifications_push: {
     label: 'Notifications push smartphone (anomalies)',
     E: false, S: true, P: true,
-    bacs_link: 'R175-3 §2',
+    bacs_link: 'R175-3 2°',
   },
   carte_multisites: {
     label: 'Carte d\'hypervision multi-sites',
@@ -117,7 +117,7 @@ const SERVICE_LEVELS = {
   dashboards_consommations: {
     label: 'Tableaux de bord consommations energetiques mensuels et annuels',
     E: false, S: true, P: true,
-    bacs_link: 'R175-3 §1',
+    bacs_link: 'R175-3 1°',
   },
   dashboard_cvc: {
     label: 'Tableau de bord chauffage / climatisation / ventilation avec codes erreurs',
@@ -143,7 +143,7 @@ const SERVICE_LEVELS = {
   surveillance_communication: {
     label: 'Surveillance automatique 24h/24 365j/an de la communication',
     E: true, S: true, P: true,
-    bacs_link: 'R175-3 §2',
+    bacs_link: 'R175-3 2°',
   },
   mises_a_jour_apps: {
     label: 'Mises a jour regulieres et automatiques des applications',

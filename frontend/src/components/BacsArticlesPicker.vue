@@ -3,7 +3,7 @@
  * Multi-select pour les articles du décret BACS (R175-1 à R175-6).
  *
  * v-model = string sérialisée au format historique :
- *   "R175-1 §1, §2 ; R175-3 §4 ; R175-5-1"
+ *   "R175-1 1°, 2° ; R175-3 4° ; R175-5-1"
  *
  * UI = trigger compact (pills des articles sélectionnés) qui ouvre une
  * popover contenant la liste cochable + les inputs paragraphes inline.
@@ -138,7 +138,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
                  @input="updateParagraphs(a.code, $event.target.value)"
                  @click.stop
                  type="text" autocomplete="off" data-1p-ignore="true"
-                 placeholder="§1, §2"
+                 placeholder="1°, 2°"
                  class="w-32 px-2 py-1 bg-white border border-purple-200 rounded-md text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition" />
         </label>
       </div>

@@ -8,7 +8,7 @@
  *   OU fallback auto basé sur le résumé de(s) article(s) référencé(s)
  *
  * Props :
- *   reference  : "R175-1 §1, §2 ; R175-3"
+ *   reference  : "R175-1 1°, 2° ; R175-3"
  *   justification : texte libre (optionnel, prioritaire sur le fallback)
  *   context : 'section' | 'equipment'
  *   editable : boolean — affiche un mini-input pour rédiger/éditer la justification
@@ -100,7 +100,7 @@ watch(() => props.justification, () => { editing.value = false })
         <div v-if="editing" class="mt-3 space-y-2">
           <textarea v-model="draft" rows="3" autocomplete="off" data-1p-ignore="true"
                     :placeholder="context === 'equipment'
-                      ? 'Ex : Cet équipement combine ventilation (§3) et chauffage (§1) — le décret impose pour ces systèmes l\'automatisation, la supervision continue et la capacité de pilotage.'
+                      ? 'Ex : Cet équipement combine ventilation (R175-1 3°) et chauffage (R175-1 1°) — le décret impose pour ces systèmes l\'automatisation, la supervision continue et la capacité de pilotage.'
                       : 'Ex : Cette section répond à l\'exigence du décret BACS en encadrant la liste des points exposés et leurs natures techniques.'"
                     class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition"></textarea>
           <div class="flex items-center gap-2">

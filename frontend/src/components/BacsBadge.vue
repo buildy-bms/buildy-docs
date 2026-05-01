@@ -5,7 +5,8 @@ import { getBacsArticles } from '@/api'
 import BaseModal from './BaseModal.vue'
 
 const props = defineProps({
-  // Référence brute : "R175-1" ou "R175-1 §1, §2" ou "R175-1 §1, §2 ; R175-3 §3"
+  // Référence brute : "R175-1" ou "R175-1 1°, 2°" ou "R175-1 1°, 2° ; R175-3 3°"
+  // (Format historique avec § encore parsé pour compatibilité.)
   reference: { type: String, required: true },
   // 'section' (défaut) → "Exigé par le décret BACS"
   // 'equipment'        → "Système concerné par le décret BACS"
@@ -23,7 +24,7 @@ const showModal = ref(false)
 const bacsData = ref(null)
 
 // Parse la référence en liste { code, paragraphs[] }.
-// Ajoute systématiquement R175-3 §1, §3, §4 (obligations BACS communes) en
+// Ajoute systématiquement R175-3 1°, 3°, 4° (obligations BACS communes) en
 // complément des références propres à l'équipement, parce que le bandeau
 // "Pourquoi le décret s'applique ici" cite ces obligations (interopérabilité,
 // arrêt manuel, gestion autonome, suivi continu) — les extraits justificatifs
@@ -35,7 +36,11 @@ const articleRefs = computed(() => {
   let lastCode = null
   for (const p of parts) {
     const codeMatch = p.match(/R175-\d+(-\d+)?/)
-    const paraMatches = [...p.matchAll(/§\s*(\d+)/g)].map(m => m[1])
+    // Accepte les deux notations : "1°" (canonique) et "§1" (historique).
+    const paraMatches = [
+      ...[...p.matchAll(/(\d+)°/g)].map(m => m[1]),
+      ...[...p.matchAll(/§\s*(\d+)/g)].map(m => m[1]),
+    ]
     const code = codeMatch ? codeMatch[0] : lastCode
     if (!code) continue
     lastCode = code
@@ -44,8 +49,8 @@ const articleRefs = computed(() => {
   }
 
   // Auto-ajout des exigences BACS communes (R175-3) pour les équipements
-  // référençant le décret. R175-3 §1 = suivi continu / §3 = interopérabilité /
-  // §4 = arrêt manuel + gestion autonome.
+  // référençant le décret. R175-3 1° = suivi continu / 3° = interopérabilité /
+  // 4° = arrêt manuel + gestion autonome.
   if (map.size > 0 && !map.has('R175-3')) {
     map.set('R175-3', new Set(['1', '3', '4']))
   } else if (map.has('R175-3')) {
@@ -153,7 +158,7 @@ onMounted(() => {
             Article {{ item.code }} — {{ item.article.title }}
           </p>
           <p v-if="item.paragraphs.length" class="text-[11px] text-purple-700 mt-1">
-            Paragraphes mis en évidence : {{ item.paragraphs.map(p => '§' + p).join(', ') }}
+            Sous-points mis en évidence : {{ item.paragraphs.map(p => p + '°').join(', ') }}
           </p>
         </header>
         <div class="bacs-prose px-5 py-4 text-[13px] text-gray-800" v-html="item.article.full_html"></div>
