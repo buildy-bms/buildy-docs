@@ -57,6 +57,14 @@ const routes = [
     props: true,
   },
   {
+    // Variante site_audit — meme composant
+    path: '/site-audit/:id/audit-trail',
+    name: 'site-audit-trail',
+    meta: { title: 'Historique audit GTB' },
+    component: () => import('@/views/BacsAuditTrailView.vue'),
+    props: true,
+  },
+  {
     path: '/afs/:id/versions',
     name: 'af-versions',
     meta: { title: 'Versions de l\'AF' },

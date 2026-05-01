@@ -63,7 +63,7 @@ onMounted(refresh)
 <template>
   <div class="max-w-screen-xl mx-auto pb-12">
     <div class="flex items-center gap-3 mb-4">
-      <button @click="router.push(`/bacs-audit/${docId}`)" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
+      <button @click="router.push((document?.kind === 'site_audit' ? '/site-audit/' : '/bacs-audit/') + docId)" class="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
         <ArrowLeftIcon class="w-4 h-4" /> Retour à l'audit
       </button>
     </div>

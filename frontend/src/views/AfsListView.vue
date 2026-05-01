@@ -10,6 +10,7 @@ import {
   MagnifyingGlassIcon,
   XMarkIcon,
   BookmarkIcon,
+  ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { listAfs, getAfsStats, createAf, cloneAf, deleteAf, seedBacsFixture, searchAfs } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -494,6 +495,11 @@ onMounted(refresh)
                 <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
                     <BookmarkIcon class="w-4 h-4" />
+                  </button>
+                  <button v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'"
+                          @click.stop="router.push(`${row.af.kind === 'site_audit' ? '/site-audit' : '/bacs-audit'}/${row.af.id}/audit-trail`)"
+                          class="text-gray-400 hover:text-indigo-600 p-1" title="Historique">
+                    <ClockIcon class="w-4 h-4" />
                   </button>
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />

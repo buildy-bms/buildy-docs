@@ -1076,7 +1076,7 @@ onMounted(() => {
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
             <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
           </span>
-          <button @click="router.push(`/bacs-audit/${docId}/audit-trail`)"
+          <button @click="router.push((isBacs ? '/bacs-audit/' : '/site-audit/') + docId + '/audit-trail')"
                   class="text-indigo-600 hover:text-indigo-800 underline">
             Historique
           </button>
