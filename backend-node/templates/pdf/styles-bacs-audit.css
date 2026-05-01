@@ -360,31 +360,31 @@ table tr:nth-child(even) td { background: #fafafa; }
 
 /* ── Alternatives R175-5-1 4° dans les actions du plan ── */
 .alt-solutions {
-  margin-top: 1.5mm;
-  padding: 1.5mm 2.5mm;
+  margin-top: 2mm;
+  padding: 2.5mm 3.5mm;
   background: #f5f3ff;
   border-left: 1.5pt solid #7c3aed;
   border-radius: 0.5mm;
-  font-size: 7.2pt;
+  font-size: 6.8pt;
   color: #4c1d95;
   page-break-inside: avoid;
-  line-height: 1.4;
+  line-height: 1.55;
 }
 .alt-solutions-label {
-  font-size: 6.5pt;
+  font-size: 6pt;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   font-weight: 600;
-  margin: 0 0 0.8mm 0;
+  margin: 0 0 1.5mm 0;
   color: #6d28d9;
 }
 .alt-solutions h1, .alt-solutions h2, .alt-solutions h3, .alt-solutions h4 {
-  font-size: 7.5pt; margin: 0.8mm 0 0.4mm; padding: 0; border: none;
+  font-size: 7pt; margin: 1.5mm 0 0.6mm; padding: 0; border: none;
   page-break-before: auto; color: #4c1d95; font-weight: 600;
 }
-.alt-solutions ul, .alt-solutions ol { padding-left: 4mm; margin: 0.5mm 0; font-size: 7.2pt; }
-.alt-solutions li { margin: 0.3mm 0; line-height: 1.35; }
-.alt-solutions p { margin: 0 0 0.8mm; font-size: 7.2pt; }
+.alt-solutions ul, .alt-solutions ol { padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; font-size: 6.8pt; }
+.alt-solutions li { margin: 0.5mm 0; line-height: 1.55; }
+.alt-solutions p { margin: 0 0 1mm; font-size: 6.8pt; line-height: 1.55; }
 .alt-solutions strong { font-weight: 600; }
 
 /* ── Numero d'action (BACS-001) pour reference devis integrateur ── */
@@ -403,17 +403,17 @@ table tr:nth-child(even) td { background: #fafafa; }
 
 /* ── Alternatives manquantes (R175-5-1 4°) ── */
 .alt-solutions-missing {
-  margin-top: 1.5mm;
-  padding: 1.5mm 2.5mm;
+  margin-top: 2mm;
+  padding: 2mm 3.5mm;
   background: #fef2f2;
   border-left: 1.5pt solid #dc2626;
   border-radius: 0.5mm;
-  font-size: 7.2pt;
+  font-size: 6.8pt;
   color: #991b1b;
   page-break-inside: avoid;
-  line-height: 1.35;
+  line-height: 1.5;
 }
-.alt-solutions-missing strong { color: #7f1d1d; }
+.alt-solutions-missing strong { color: #7f1d1d; font-weight: 600; }
 
 /* ── Citation reglementaire R175-2 (clause de dispense TRI) ── */
 .roi-quote {
@@ -441,50 +441,54 @@ table tr:nth-child(even) td { background: #fafafa; }
 }
 .roi-quote blockquote strong { color: #451a03; font-style: normal; }
 
-/* ── Cards d'action du plan de mise en conformite ── */
+/* ── Cards d'action du plan de mise en conformite ──
+   Cible : tailles compactes mais aérées (plus d'espace entre cards
+   et autour des libellés que dans la version v2.27). */
 .action-card {
   page-break-inside: avoid;
-  margin: 1mm 0 2mm;
-  padding: 1.8mm 2.5mm;
+  margin: 0 0 4mm;
+  padding: 3mm 4mm 3.5mm;
   background: #fff;
   border: 0.4pt solid #e5e7eb;
   border-left: 2.5pt solid #1b2842;
-  border-radius: 0.6mm;
-  font-size: 7.5pt;
+  border-radius: 1mm;
+  font-size: 7pt;
+  line-height: 1.5;
 }
 .action-card.action-card-minor { border-left-color: #fcd34d; }
 .action-card-head {
   display: flex;
   align-items: center;
-  gap: 1.4mm;
+  gap: 2mm;
   flex-wrap: wrap;
-  margin-bottom: 0.8mm;
-  font-size: 6.8pt;
+  margin-bottom: 2mm;
+  font-size: 6.5pt;
 }
 .action-card-article {
   font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
-  font-size: 6.5pt;
+  font-size: 6.2pt;
   color: #6b7280;
 }
 .action-card-zone {
-  font-size: 6.5pt;
+  font-size: 6.2pt;
   color: #4b5563;
   background: #f3f4f6;
-  padding: 0.3mm 1.2mm;
-  border-radius: 0.5mm;
+  padding: 0.4mm 1.5mm;
+  border-radius: 0.6mm;
 }
 .action-card-title {
-  font-size: 8pt;
+  font-size: 7.5pt;
   color: #111827;
-  margin: 0.3mm 0;
-  line-height: 1.3;
+  margin: 0.5mm 0 1mm;
+  line-height: 1.4;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 .action-card-desc {
-  font-size: 7.2pt;
+  font-size: 6.8pt;
   color: #4b5563;
-  margin: 0.3mm 0 1mm;
-  line-height: 1.35;
+  margin: 0 0 1.5mm;
+  line-height: 1.55;
 }
 /* Reset des éléments rich-text qui peuvent venir du RichTextEditor :
    on force des tailles compactes pour éviter qu'un h2/h3 utilisateur
@@ -493,27 +497,27 @@ table tr:nth-child(even) td { background: #fafafa; }
 .action-card h2,
 .action-card h3,
 .action-card h4 {
-  font-size: 8pt;
-  margin: 1mm 0 0.5mm;
+  font-size: 7.2pt;
+  margin: 1.5mm 0 0.6mm;
   padding: 0;
   border: none;
   page-break-before: auto;
   color: #1b2842;
 }
-.action-card p { font-size: 7.5pt; margin: 0 0 1mm; line-height: 1.4; }
-.action-card ul, .action-card ol { font-size: 7.5pt; padding-left: 4mm; margin: 0.5mm 0; }
-.action-card li { margin: 0.3mm 0; line-height: 1.35; }
-.action-card .sev { font-size: 6.5pt; padding: 0.3mm 1.2mm; }
-.action-card .action-num { font-size: 7pt; padding: 0.3mm 1.2mm; }
+.action-card p { font-size: 7pt; margin: 0 0 1.2mm; line-height: 1.5; }
+.action-card ul, .action-card ol { font-size: 7pt; padding-left: 4.5mm; margin: 0.8mm 0 1.2mm; }
+.action-card li { margin: 0.5mm 0; line-height: 1.5; }
+.action-card .sev { font-size: 6.2pt; padding: 0.4mm 1.4mm; }
+.action-card .action-num { font-size: 6.5pt; padding: 0.4mm 1.4mm; }
 /* Les blocs preconisations dans une action-card prennent toute la
    largeur (parent en bordure flush), pas confines a une cellule. */
 .action-card .alt-solutions,
 .action-card .alt-solutions-missing {
-  margin: 2mm -4mm -3mm;
-  border-radius: 0 0 0.6mm 0.6mm;
+  margin: 2.5mm -4mm -3.5mm;
+  border-radius: 0 0 0.8mm 0.8mm;
   border-left: none;
   border-top: 0.4pt solid #e5e7eb;
-  padding: 3mm 4mm;
+  padding: 3mm 4mm 3.5mm;
 }
 .action-card .alt-solutions {
   background: #f5f3ff;
