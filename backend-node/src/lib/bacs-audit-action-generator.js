@@ -247,6 +247,25 @@ function computeTargetActions(documentId) {
         description: 'L\'article R175-4 exige la présence de consignes écrites encadrant la maintenance du BACS. Aucune procédure documentée n\'a été identifiée.',
       });
     }
+    // R175-3 dernier alinea : mise a disposition des donnees
+    if (bms.data_provision_to_manager === 0) {
+      addTarget({
+        source_table: 'bms', source_id: 7,
+        category: 'documentation', severity: 'major',
+        r175_article: 'R175-3',
+        title: 'Documenter la mise à disposition des données au gestionnaire du bâtiment',
+        description: 'L\'article R175-3 (dernier alinéa) impose au propriétaire de mettre les données archivées à disposition du gestionnaire du bâtiment à sa demande. Aucune procédure documentée n\'a été identifiée.',
+      });
+    }
+    if (bms.data_provision_to_operators === 0) {
+      addTarget({
+        source_table: 'bms', source_id: 8,
+        category: 'documentation', severity: 'major',
+        r175_article: 'R175-3',
+        title: 'Documenter la transmission des données aux exploitants des systèmes techniques',
+        description: 'L\'article R175-3 (dernier alinéa) impose au propriétaire de transmettre à chaque exploitant les données concernant le système technique qu\'il opère. Aucune procédure documentée n\'a été identifiée.',
+      });
+    }
     // R175-5 : formation. Skip si la solution en place est Buildy (support natif).
     if (bms.operator_trained === 0 && !isBuildySolution(bms)) {
       addTarget({
@@ -259,23 +278,35 @@ function computeTargetActions(documentId) {
     }
   }
 
-  // Thermal regulation (R175-6)
-  const thermal = db.db.prepare(`
-    SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
-    LEFT JOIN zones z ON z.zone_id = t.zone_id
-    WHERE t.document_id = ?
-  `).all(documentId);
-  for (const t of thermal) {
-    // Exemption R175-6 : appareil independant de chauffage au bois
-    if (!t.has_automatic_regulation && t.generator_type !== 'wood_appliance') {
-      addTarget({
-        source_table: 'thermal_regulation', source_id: t.id,
-        category: 'thermal_regulation', severity: 'major',
-        r175_article: 'R175-6',
-        title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`,
-        description: 'L\'article R175-6 exige une régulation thermique automatique par pièce ou par zone. La zone n\'en dispose pas actuellement.',
-        zone_id: t.zone_id,
-      });
+  // Thermal regulation (R175-6) — applicable seulement si declencheur :
+  // PC > 21/07/2021 OU travaux generateur > 21/07/2021.
+  const af = db.db.prepare('SELECT bacs_building_permit_date, bacs_generator_works_date FROM afs WHERE id = ?').get(documentId);
+  const TRIGGER = '2021-07-21';
+  const r175_6_applicable =
+    (af?.bacs_building_permit_date && af.bacs_building_permit_date > TRIGGER) ||
+    (af?.bacs_generator_works_date && af.bacs_generator_works_date > TRIGGER);
+
+  if (r175_6_applicable) {
+    const thermal = db.db.prepare(`
+      SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
+      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      WHERE t.document_id = ?
+    `).all(documentId);
+    for (const t of thermal) {
+      // Exemption R175-6 II : appareil independant de chauffage au bois
+      // (soit via le flag explicite, soit via generator_type='wood_appliance').
+      const exempt = t.generator_exempt_wood || t.generator_type === 'wood_appliance';
+      if (exempt) continue;
+      if (!t.has_automatic_regulation) {
+        addTarget({
+          source_table: 'thermal_regulation', source_id: t.id,
+          category: 'thermal_regulation', severity: 'major',
+          r175_article: 'R175-6',
+          title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`,
+          description: 'L\'article R175-6 exige une régulation thermique automatique par pièce ou par zone chauffée. La zone n\'en dispose pas actuellement.',
+          zone_id: t.zone_id,
+        });
+      }
     }
   }
 

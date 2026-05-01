@@ -271,8 +271,8 @@ async function assistLibrary({ mode, kind, title, html, parent_path, category_la
 const SYSTEM_PROMPT_SYNTHESIS = [
   `Tu es l'auditeur BACS senior de Buildy qui redige la note de synthese`,
   `transmise au client a la fin d'un audit de conformite au decret R175.`,
-  `Ce livrable est un audit BACS et il vaut egalement comme rapport`,
-  `d'inspection periodique R175-5-1 (a conserver 10 ans par le proprietaire).`,
+  `Cet audit est un constat de conformite, distinct de l'inspection`,
+  `periodique R175-5-1 (mission separee).`,
   ``,
   `Style imperatif :`,
   `- Francais professionnel, technique mais accessible (le client n'est pas`,
@@ -296,21 +296,18 @@ const SYSTEM_PROMPT_SYNTHESIS = [
   `  · R175-3 2° detection des pertes d'efficacite`,
   `  · R175-3 3° interoperabilite (BACnet/Modbus/KNX/M-Bus/MQTT)`,
   `  · R175-3 4° arret manuel + gestion autonome`,
+  `  · R175-3 dernier alinea : mise a disposition des donnees au gestionnaire et aux exploitants`,
   `  · R175-4 verifications periodiques + consignes ecrites`,
   `  · R175-5 formation de l'exploitant`,
-  `  · R175-5-1 inspection periodique (cadre du present rapport)`,
   `  · R175-6 regulation thermique automatique par piece ou zone`,
-  `- Si l'audit indique audit_existing_af_status='absent', le mentionner`,
-  `  comme une lacune R175-5-1 1° (pas d'AF a examiner).`,
-  `- Si action_items_open contient des alternative_solutions, les mentionner`,
-  `  comme options ouvertes au proprietaire (R175-5-1 4° demande `,
-  `  explicitement les 'autres solutions envisageables') — sans privilegier`,
-  `  Buildy en exclusivite.`,
-  `- Le TRI et la clause de dispense R175-2 ne sont PAS du ressort de`,
-  `  Buildy ni du present audit : ne jamais calculer, estimer ou meme`,
-  `  evoquer un temps de retour sur investissement. Le TRI sera etabli en`,
-  `  aval, par le proprietaire ou son BET, sur la base des devis des`,
+  `- Le TRI et les clauses de dispense (R175-2 et R175-6) ne sont PAS du`,
+  `  ressort de Buildy ni du present audit : ne jamais calculer, estimer ou`,
+  `  meme evoquer un temps de retour sur investissement. Le TRI sera etabli`,
+  `  en aval, par le proprietaire ou son BET, sur la base des devis des`,
   `  integrateurs GTB qui suivront la livraison de cet audit.`,
+  `- Si action_items_open contient des alternative_solutions, les presenter`,
+  `  comme les preconisations Buildy par action (sans laisser entendre que`,
+  `  Buildy est l'unique fournisseur possible).`,
   ``,
   `Format : HTML simple compatible Tiptap (<p>, <ul>, <li>, <strong>,`,
   `<em>, <h3>). 4 a 6 paragraphes courts. Evite les titres de section`,
@@ -378,11 +375,10 @@ async function assistAuditSynthesis(auditDump) {
   return { html: normalizeSynthesisHtml(raw), usage: resp.usage };
 }
 
-// ─── Alternatives a une action corrective (R175-5-1 4°) ────────────
-// L'article R175-5-1 4° demande explicitement la fourniture des
-// 'recommandations [...] et autres solutions envisageables'. Pour
-// chaque action du plan de mise en conformite, l'auditeur peut
-// generer une liste d'options techniques alternatives.
+// ─── Alternatives a une action corrective (preconisations Buildy) ──
+// Pour chaque action du plan de mise en conformite, l'auditeur peut
+// generer une liste d'options techniques alternatives a presenter au
+// proprietaire (qui choisira ensuite avec son integrateur GTB).
 const SYSTEM_PROMPT_ALTERNATIVES = [
   `Tu es l'auditeur BACS senior de Buildy. Pour une action corrective`,
   `donnee, propose 2 a 4 solutions techniques alternatives realistes,`,

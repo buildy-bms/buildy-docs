@@ -289,9 +289,35 @@ const PLAN_AF = [
 • Pas de SLA défini`,
   },
 
-  // Chapitre 10 (Application Hyperveez) — supprimé (Lot 22). Le numéro 10 est libéré ;
-  // les chapitres suivants conservent leurs numéros (trou volontaire) pour ne pas casser
-  // les références internes des AFs déjà rédigées.
+  // ═══════════ Chapitre 10 — Maintenance et exploitation ═══════════
+  // Cf. R175-4 du décret BACS : verifications periodiques + consignes ecrites.
+  // Ce chapitre regroupe les fonctionnalites Buildy de maintenance / suivi
+  // de l'exploitation. (Le chapitre 10 etait libere depuis le Lot 22 —
+  // ancien chapitre Hyperveez.)
+  {
+    number: '10', title: 'Maintenance et exploitation', kind: 'standard',
+    body_placeholder: `Points à couvrir :
+• Maintenance logicielle du BACS Buildy (mises à jour, correctifs, monitoring proactif)
+• Suivi des interventions via GMAO et historisation des consignes appliquées
+• Référence à l'obligation R175-4 (vérifications périodiques encadrées par des consignes écrites)
+• Périmètre logiciel uniquement — les interventions matérielles sur site sont sur devis`,
+    children: [
+      { number: '10.1', title: 'Contrat de maintenance', kind: 'standard',
+        bacs_articles: 'R175-4',
+        features: ['maintenance_software'],
+        avail_e: 'paid_option',
+        avail_s: 'included',
+        avail_p: 'included',
+        body_placeholder: `À rédiger — Points à couvrir :
+• Maintenance logicielle du BACS Buildy : mises à jour applicatives, correctifs de sécurité, monitoring proactif des passerelles et de la supervision cloud
+• Suivi des incidents logiciels via support intégré (Crisp) et email (support@buildy.fr)
+• Historisation 5 ans des consignes appliquées et des interventions, conformément à R175-3 §1
+• Aucun déplacement sur site n'est inclus dans le contrat de maintenance
+• Les interventions matérielles sur site (panne d'équipement, remplacement capteur, recâblage, mise en service complémentaire) sont facturées en sus, sur devis
+• Disponibilité : option payante en Essentials, incluse en Smart et Premium`,
+      },
+    ],
+  },
 
   // ═══════════ Chapitre 11 — Gojee ═══════════
   {

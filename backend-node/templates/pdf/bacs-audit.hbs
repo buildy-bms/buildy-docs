@@ -11,7 +11,6 @@
 <section class="cover">
   <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
   <p class="cover-doc-type">Audit BACS — Décret R175</p>
-  <p class="cover-doc-subtype">Vaut comme rapport d'inspection périodique R175-5-1 — à conserver 10 ans par le propriétaire</p>
   <h1 class="cover-title">{{document.project_name}}</h1>
   <p class="cover-client">{{document.client_name}}</p>
   {{#if site.name}}<p class="cover-project">Site : {{site.name}}</p>{{/if}}
@@ -44,7 +43,7 @@
     </div>
     <div class="cover-meta-row">
       <span class="cover-meta-label">Type de document</span>
-      <span class="cover-meta-value">Audit BACS &middot; inspection R175-5-1</span>
+      <span class="cover-meta-value">Audit de conformité au décret BACS</span>
     </div>
   </div>
 </section>
@@ -80,12 +79,12 @@
   <tr><th>Applicabilité BACS (R175-2)</th><td>{{applicabilityLabel}}</td></tr>
   {{/if}}
   <tr>
-    <th>Analyse fonctionnelle de la GTB existante (R175-5-1 1°)</th>
+    <th>Analyse fonctionnelle de la GTB existante</th>
     <td>
       {{#if (eq document.audit_existing_af_status "absent")}}
-        <span style="color:#9a3412">Absente — sa rédaction est recommandée dans le plan de mise en conformité.</span>
+        <span style="color:#9a3412">Aucun document d'AF n'est disponible pour la GTB existante.</span>
       {{else}}
-        Document examiné dans le cadre de la présente inspection.
+        Document fourni par le propriétaire ou son exploitant.
       {{/if}}
     </td>
   </tr>
@@ -260,9 +259,20 @@
 
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
 <h1 class="chapter">5. Régulation thermique automatique (R175-6)</h1>
+
+{{#if r175_6_applicable.applies}}
+<p class="muted" style="background:#fffbeb;border-left:3pt solid #f59e0b;padding:2mm 4mm;margin-bottom:4mm">
+  <strong>R175-6 applicable</strong> — {{r175_6_applicable.reason}}.
+</p>
+{{else}}
+<p class="muted" style="background:#ecfdf5;border-left:3pt solid #10b981;padding:2mm 4mm;margin-bottom:4mm">
+  <strong>R175-6 non applicable</strong> — {{r175_6_applicable.reason}}.
+</p>
+{{/if}}
+
 {{#if thermal.length}}
 <table>
-  <thead><tr><th>Zone</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Notes</th></tr></thead>
+  <thead><tr><th>Zone</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Exempté bois</th><th>Notes</th></tr></thead>
   <tbody>
     {{#each thermal}}
       <tr>
@@ -271,6 +281,7 @@
         <td>{{regulationLabel}}</td>
         <td>{{generatorLabel}}</td>
         <td>{{#if generator_age_years}}{{generator_age_years}} ans{{/if}}</td>
+        <td>{{#if generator_exempt_wood}}Oui (R175-6 II){{else}}Non{{/if}}</td>
         <td>{{notes}}</td>
       </tr>
     {{/each}}
@@ -311,6 +322,15 @@
   <tr><td>P2. Détection des pertes d'efficacité</td><td>{{boolLabel bms.meets_r175_3_p2}}</td></tr>
 </table>
 <p class="muted"><em>Note : R175-3 §3 (interopérabilité) et §4 (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (cf chapitre 3).</em></p>
+
+<h3>R175-3 dernier alinéa — Mise à disposition des données</h3>
+<table>
+  <tr><td>Procédure de mise à disposition au gestionnaire du bâtiment</td><td>{{boolLabel bms.data_provision_to_manager}}</td></tr>
+  <tr><td>Procédure de transmission aux exploitants des systèmes techniques</td><td>{{boolLabel bms.data_provision_to_operators}}</td></tr>
+</table>
+{{#if bms.notes_data_provision}}
+<p class="muted"><em>Mécanisme :</em> {{bms.notes_data_provision}}</p>
+{{/if}}
 
 <h3>R175-4 — Vérifications périodiques</h3>
 <p>Consignes écrites de maintenance présentes : <strong>{{boolLabel bms.has_maintenance_procedures}}</strong></p>
@@ -394,12 +414,12 @@
           <strong>{{title}}</strong>
           {{#if alternative_solutions_html}}
             <div class="alt-solutions">
-              <p class="alt-solutions-label">Autres solutions envisageables (R175-5-1 4°) :</p>
+              <p class="alt-solutions-label">Préconisations Buildy :</p>
               {{{alternative_solutions_html}}}
             </div>
           {{else}}
             <div class="alt-solutions-missing">
-              ⚠ <strong>Aucune préconisation alternative renseignée</strong> — l'article R175-5-1 4° demande la fourniture des autres solutions envisageables.
+              ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
             </div>
           {{/if}}
         </td>
@@ -425,12 +445,12 @@
           <strong>{{title}}</strong>
           {{#if alternative_solutions_html}}
             <div class="alt-solutions">
-              <p class="alt-solutions-label">Autres solutions envisageables (R175-5-1 4°) :</p>
+              <p class="alt-solutions-label">Préconisations Buildy :</p>
               {{{alternative_solutions_html}}}
             </div>
           {{else}}
             <div class="alt-solutions-missing">
-              ⚠ <strong>Aucune préconisation alternative renseignée</strong> — l'article R175-5-1 4° demande la fourniture des autres solutions envisageables.
+              ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
             </div>
           {{/if}}
         </td>

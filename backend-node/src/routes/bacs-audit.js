@@ -259,6 +259,10 @@ async function routes(fastify) {
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
       out_of_service: boolish,
       notes_html: z.string().nullable().optional(),
+      // R175-3 dernier alinea
+      data_provision_to_manager: boolish,
+      data_provision_to_operators: boolish,
+      notes_data_provision: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -305,6 +309,7 @@ async function routes(fastify) {
       regulation_type: z.enum(REGULATION_TYPES).nullable().optional(),
       generator_type: z.enum(GENERATOR_TYPES).nullable().optional(),
       generator_age_years: z.number().int().nullable().optional(),
+      generator_exempt_wood: z.boolean().nullable().optional(),
       notes: z.string().nullable().optional(),
     });
     let body;
@@ -692,6 +697,16 @@ async function routes(fastify) {
       day: '2-digit', month: 'long', year: 'numeric',
     });
 
+    // R175-6 applicabilite : declencheur (PC > 21/07/2021 OU travaux generateur)
+    const R175_6_TRIGGER = '2021-07-21';
+    const pcAfter = af.bacs_building_permit_date && af.bacs_building_permit_date > R175_6_TRIGGER;
+    const worksAfter = af.bacs_generator_works_date && af.bacs_generator_works_date > R175_6_TRIGGER;
+    const r175_6_applicable = pcAfter || worksAfter
+      ? { applies: true, reason: pcAfter && worksAfter
+            ? 'permis de construire postérieur au 21/07/2021 et travaux générateur récents'
+            : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021') }
+      : { applies: false, reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)' };
+
     // Detail du calcul auto chauffage + clim (pour transparence dans le PDF)
     const heatingCoolingBreakdown = devices
       .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
@@ -719,6 +734,7 @@ async function routes(fastify) {
       synthesisHtml: af.audit_synthesis_html || null,
       heatingCoolingBreakdown,
       heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
+      r175_6_applicable,
       complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
       applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
       bacsArticles,
@@ -1378,12 +1394,15 @@ async function routes(fastify) {
     });
     seedBacsAuditStructure(af.id, site.site_id);
 
-    // 4. Identification + applicabilite R175-2
+    // 4. Identification + applicabilite R175-2 + R175-6
     db.afs.update(af.id, {
       bacs_total_power_kw: 145,
       bacs_total_power_source: 'auto',
       bacs_district_heating_substation_kw: null,
       bacs_building_permit_date: '2010-06-15',
+      // Travaux generateur recents → declenche R175-6 sur les zones non
+      // exemptees, permet de tester le flux applicabilite + actions.
+      bacs_generator_works_date: '2023-09-15',
       bacs_applicability_status: 'subject_2027',
       bacs_applicable_deadline: '2027-01-01',
       audit_existing_af_status: 'absent',
@@ -1485,9 +1504,11 @@ async function routes(fastify) {
       INSERT INTO bacs_audit_bms (document_id, existing_solution, existing_solution_brand,
         location, model_reference, manages_heating, manages_cooling, manages_ventilation,
         manages_dhw, manages_lighting, meets_r175_3_p1, meets_r175_3_p2,
-        has_maintenance_procedures, operator_trained, overall_compliance)
+        has_maintenance_procedures, operator_trained, overall_compliance,
+        data_provision_to_manager, data_provision_to_operators, notes_data_provision)
       VALUES (?, 'Niagara N4', 'Tridium', 'Local technique sous-sol', 'JACE 8000',
-        1, 1, 1, 0, 0, 0, 0, 1, 0, 'partial')
+        1, 1, 1, 0, 0, 0, 0, 1, 0, 'partial',
+        0, 0, 'Aucun mécanisme formel de mise à disposition des données identifié au moment de la visite.')
       ON CONFLICT(document_id) DO UPDATE SET
         existing_solution = excluded.existing_solution,
         existing_solution_brand = excluded.existing_solution_brand,
@@ -1498,6 +1519,9 @@ async function routes(fastify) {
         meets_r175_3_p1 = excluded.meets_r175_3_p1, meets_r175_3_p2 = excluded.meets_r175_3_p2,
         has_maintenance_procedures = excluded.has_maintenance_procedures,
         operator_trained = excluded.operator_trained, overall_compliance = excluded.overall_compliance,
+        data_provision_to_manager = excluded.data_provision_to_manager,
+        data_provision_to_operators = excluded.data_provision_to_operators,
+        notes_data_provision = excluded.notes_data_provision,
         updated_at = CURRENT_TIMESTAMP
     `).run(af.id);
 

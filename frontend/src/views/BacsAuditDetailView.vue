@@ -171,6 +171,27 @@ function actionNumber(idx) {
   return 'BACS-' + String(idx + 1).padStart(3, '0')
 }
 
+// R175-6 applicabilite : PC > 21/07/2021 OU travaux generateur > 21/07/2021
+const R175_6_TRIGGER_DATE = '2021-07-21'
+const r175_6_applicable = computed(() => {
+  if (!document.value) return null
+  const pc = document.value.bacs_building_permit_date
+  const works = document.value.bacs_generator_works_date
+  const pcAfter = pc && pc > R175_6_TRIGGER_DATE
+  const worksAfter = works && works > R175_6_TRIGGER_DATE
+  if (pcAfter && worksAfter) {
+    return { applies: true, message: '✓ R175-6 applicable — PC postérieur au 21/07/2021 et travaux générateur récents.' }
+  }
+  if (pcAfter) {
+    return { applies: true, message: '✓ R175-6 applicable — permis de construire postérieur au 21/07/2021.' }
+  }
+  if (worksAfter) {
+    return { applies: true, message: '✓ R175-6 applicable — travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021.' }
+  }
+  if (!pc && !works) return null
+  return { applies: false, message: 'R175-6 non applicable — aucun déclencheur (PC ou travaux générateur après 21/07/2021).' }
+})
+
 // Filtre les actions resolues automatiquement (status='done') ou
 // declinees : elles n'ont rien a faire dans le plan a livrer aux
 // integrateurs GTB. On les conserve en DB pour traçabilite (visible dans
@@ -516,12 +537,12 @@ async function generateSynthesis() {
   }
 }
 
-// ── Preconisations / autres solutions envisageables (R175-5-1 4°) ──
+// ── Preconisations Buildy par action ──
 // Ouvre la modale Tiptap avec un bouton 'Reformuler avec Claude' (kind
 // bacs_audit_notes deja configure pour reformulate uniquement).
 function openAlternativesEditor(item) {
   openNotesModal({
-    title: 'Préconisations / autres solutions envisageables',
+    title: 'Préconisations Buildy',
     contextLabel: item.title + ' (' + (item.r175_article || '—') + ')',
     entityType: 'action_item_alternatives',
     entityRef: item,
@@ -913,6 +934,25 @@ onMounted(refresh)
               Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
             </p>
           </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Date des derniers travaux d'installation/remplacement de générateur de chaleur
+              <span class="ml-1 text-[10px] text-gray-400 font-normal">— déclencheur R175-6</span>
+            </label>
+            <input
+              type="date"
+              :value="document?.bacs_generator_works_date || ''"
+              @input="e => saveDocDebounced({ bacs_generator_works_date: e.target.value || null })"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+            <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
+              <strong>R175-6</strong> s'applique si le permis de construire est déposé après le <strong>21/07/2021</strong>, ou si des travaux d'installation/remplacement de générateur ont été engagés après cette date. Sinon, l'obligation de régulation thermique automatique par pièce/zone n'est pas applicable au site.
+            </p>
+            <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
+               :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
+              {{ r175_6_applicable.message }}
+            </p>
+          </div>
           <div class="col-span-2 border-t border-gray-100 pt-3">
             <label class="block text-xs font-medium text-gray-700 mb-1">
               Puissance de la station d'échange (kW)
@@ -1280,6 +1320,7 @@ onMounted(refresh)
               <th class="text-center py-2 w-40">Type de régulation</th>
               <th class="text-center py-2 w-44">Type générateur</th>
               <th class="text-center py-2 w-24">Âge (ans)</th>
+              <th class="text-center py-2 w-24" title="Appareil indépendant de chauffage au bois — exempté R175-6 (II)">Exempté bois</th>
               <th class="text-center px-5 py-2">Notes</th>
             </tr>
           </thead>
@@ -1309,6 +1350,12 @@ onMounted(refresh)
                 <input type="number" :value="t.generator_age_years" min="0"
                        @blur="e => patchThermal(t, { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
                        class="w-16 text-xs px-2 py-1 border border-gray-200 rounded text-center" />
+              </td>
+              <td class="py-2 text-center">
+                <input type="checkbox" :checked="!!t.generator_exempt_wood"
+                       @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
+                       class="rounded border-gray-300"
+                       title="Si coché : générateur = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)" />
               </td>
               <td class="px-5 py-2">
                 <input type="text" :value="t.notes" placeholder="—"
@@ -1379,11 +1426,10 @@ onMounted(refresh)
             </div>
           </div>
 
-          <!-- R175-5-1 1° : examen de l'analyse fonctionnelle existante -->
+          <!-- Analyse fonctionnelle de la GTB existante (constat d'auditeur) -->
           <div class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
               Analyse fonctionnelle de la GTB existante
-              <span class="ml-1 text-[10px] text-gray-400 normal-case font-normal">— R175-5-1 1°, requise à la 1ère inspection</span>
             </h3>
             <div v-if="document?.audit_existing_af_status !== 'absent'" class="flex items-center gap-3 flex-wrap">
               <BacsPhotoButton
@@ -1394,11 +1440,11 @@ onMounted(refresh)
                 size="md"
               />
               <p class="text-xs text-gray-500 italic flex-1">
-                Glisse ici le document d'AF de la GTB existante (PDF, Word, schéma) pour qu'il soit examiné dans le cadre de R175-5-1 1°.
+                Glisse ici le document d'AF de la GTB existante (PDF, Word, schéma) si le propriétaire ou l'exploitant le fournit.
               </p>
             </div>
             <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              ⚠ Le propriétaire confirme l'<strong>absence d'analyse fonctionnelle documentée</strong> de la GTB existante. Cela constitue une lacune au regard de R175-5-1 1° : sa rédaction sera recommandée dans le plan de mise en conformité.
+              ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
             </p>
             <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer mt-2 text-gray-600">
               <input type="checkbox"
@@ -1546,6 +1592,31 @@ onMounted(refresh)
             </div>
           </div>
 
+          <!-- R175-3 dernier alinéa : mise à disposition des données -->
+          <div class="border-t border-gray-100 pt-3">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+              R175-3 — Mise à disposition des données
+              <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
+            </h3>
+            <div class="space-y-2 text-sm">
+              <label class="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" v-model="bms.data_provision_to_manager" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
+                <span>Procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> documentée</span>
+              </label>
+              <label class="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" v-model="bms.data_provision_to_operators" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
+                <span>Procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> documentée</span>
+              </label>
+            </div>
+            <textarea
+              v-model="bms.notes_data_provision"
+              @input="saveBmsDebounced"
+              placeholder="Décris le mécanisme : extraction CSV, accès portail web, API, planning d'envoi…"
+              class="mt-2 w-full text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+              rows="2"
+            ></textarea>
+          </div>
+
           <div class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
@@ -1631,7 +1702,7 @@ onMounted(refresh)
               <th class="text-left py-2 min-w-70">Action</th>
               <th class="text-left py-2 w-32 whitespace-nowrap">Zone</th>
               <th class="text-left py-2 w-32 whitespace-nowrap">Statut</th>
-              <th class="text-left px-3 py-2 w-52" title="R175-5-1 4° — préconisations / autres solutions envisageables">Préconisations</th>
+              <th class="text-left px-3 py-2 w-52" title="Préconisations Buildy / solutions envisageables pour cette action">Préconisations</th>
               <th class="text-left px-3 py-2 w-56">Notes commerciales</th>
             </tr>
           </thead>
@@ -1672,7 +1743,7 @@ onMounted(refresh)
                       : (it.status === 'open'
                         ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
                         : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-                  :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger (R175-5-1 4°)'"
+                  :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'"
                 >
                   <PencilSquareIcon class="w-3.5 h-3.5" />
                   {{ hasNotes(it.alternative_solutions_html)

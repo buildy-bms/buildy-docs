@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 51;
+const TARGET_VERSION = 52;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1937,6 +1937,24 @@ function runMigrations() {
     log.info('Migration 51 appliquee : afs.bacs_roi_study_* (clause de dispense R175-2)');
   }
 
+  if (current < 52) {
+    // Cf retour Kevin v2.15 :
+    // - R175-3 dernier alinea : mise a disposition des donnees au gestionnaire
+    //   et aux exploitants. Deux cases distinctes sur bacs_audit_bms.
+    // - R175-6 : declencheur (PC > 21/07/2021 OU travaux generateur >
+    //   21/07/2021) et exemption appareil bois. Date des travaux generateur
+    //   sur afs ; flag exemption sur thermal_regulation par zone.
+    db.exec(`
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_provision_to_manager INTEGER;
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_provision_to_operators INTEGER;
+      ALTER TABLE bacs_audit_bms ADD COLUMN notes_data_provision TEXT;
+      ALTER TABLE afs ADD COLUMN bacs_generator_works_date TEXT;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN generator_exempt_wood INTEGER DEFAULT 0;
+    `);
+    db.pragma('user_version = 52');
+    log.info('Migration 52 appliquee : R175-3 mise a disposition donnees + R175-6 declencheur');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2289,6 +2307,7 @@ const afs = {
       'audit_synthesis_html', 'audit_synthesis_generated_at',
       'audit_existing_af_status', 'bacs_district_heating_substation_kw',
       'bacs_roi_study_status', 'bacs_roi_study_html',
+      'bacs_generator_works_date',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

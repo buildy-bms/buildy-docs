@@ -164,7 +164,7 @@ function seedLibraryOnBoot() {
 const FUNCTIONALITY_NUMBERS = new Set([
   '1.5', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3',
   '5.1', '5.2', '5.3', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6',
-  '7', '8', '9', '11.1', '11.2', '11.3',
+  '7', '8', '9', '10.1', '11.1', '11.2', '11.3',
 ]);
 
 function seedSectionTemplatesOnBoot() {
@@ -208,6 +208,9 @@ function seedSectionTemplatesOnBoot() {
         isFunctionality: node.number ? FUNCTIONALITY_NUMBERS.has(node.number) : false,
         parentTemplateId: parentTemplateId || null,
         equipmentTemplateId,
+        availE: node.avail_e || null,
+        availS: node.avail_s || null,
+        availP: node.avail_p || null,
       });
       id = created.id;
       createdCount++;
