@@ -33,11 +33,11 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal :title="`Ajouter un équipement — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" @close="emit('close')">
+  <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Nom de l'équipement</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Nom du système</label>
           <input v-model="form.name" type="text" autofocus
                  placeholder="ex : Chaudière gaz principale, Groupe DRV…"
                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
@@ -98,7 +98,7 @@ async function submit() {
         </button>
         <button type="submit" :disabled="!canSubmit() || submitting"
                 class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
-          {{ submitting ? 'Création…' : 'Ajouter l\'équipement' }}
+          {{ submitting ? 'Création…' : 'Ajouter le système' }}
         </button>
       </div>
     </form>

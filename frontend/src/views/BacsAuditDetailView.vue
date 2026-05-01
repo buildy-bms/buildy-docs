@@ -1259,10 +1259,10 @@ onMounted(refresh)
           <div class="space-y-3">
           <div v-for="g in systemsByZone" :key="g.zone_name"
                class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
-            <div class="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
-              <MapPinIcon class="w-4 h-4 text-indigo-500" />
-              <span class="font-semibold text-sm text-gray-800">{{ g.zone_name }}</span>
-              <span v-if="g.zone_nature" class="text-[10px] text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
+            <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+              <MapPinIcon class="w-5 h-5 text-indigo-500" />
+              <span class="font-semibold text-lg text-gray-900">{{ g.zone_name }}</span>
+              <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
               <span class="ml-auto text-[10px] text-gray-400">
                 {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
                 / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
@@ -1274,7 +1274,7 @@ onMounted(refresh)
                 v-if="!s.not_concerned || showNotConcernedSystems"
                 :site-uuid="document?.site_uuid || ''"
                 :attach-to="{ system_id: s.id }"
-                :enabled="!!document?.site_uuid && s.present"
+                :enabled="!!document?.site_uuid"
                 @changed="refreshAuditData"
               >
               <div :class="['border rounded-lg overflow-hidden',
@@ -1591,6 +1591,12 @@ onMounted(refresh)
           </span>
           <span v-else class="italic">GTB non renseignée</span>
         </template>
+        <PhotoDropzone
+          :site-uuid="document?.site_uuid || ''"
+          :attach-to="{ bms_document_id: bms.document_id }"
+          :enabled="!!(document?.site_uuid && bms.document_id)"
+          @changed="refreshAuditData"
+        >
         <div class="px-5 py-4 space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -1830,6 +1836,7 @@ onMounted(refresh)
             </div>
           </div>
         </div>
+        </PhotoDropzone>
       </CollapsibleSection>
 
       <!-- 9. Documents du site (DOE) -->

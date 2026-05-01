@@ -211,22 +211,22 @@ async function removeDevice(d) {
 </script>
 
 <template>
-  <div class="bg-gray-50/40 border-l-2 border-indigo-200 ml-3 pl-4 py-2">
+  <div class="bg-gray-50/40 px-3 py-2">
     <!-- Header avec puissance totale + bouton + vert -->
-    <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-      <div class="flex items-center gap-3 text-xs text-gray-600">
-        <span class="font-semibold text-gray-700">{{ systemLabel }}</span>
-        <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono">
-          {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'équipements' : 'équipement' }})
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-2 min-w-0">
+      <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
+        <span class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
+        <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
+          {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'systèmes' : 'système' }})
         </span>
-        <span v-else class="text-gray-400 italic">aucun équipement saisi</span>
+        <span v-else class="text-gray-400 italic whitespace-nowrap">aucun système saisi</span>
       </div>
       <button
         type="button"
         @click="emit('add-device', system)"
-        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm whitespace-nowrap"
+        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm whitespace-nowrap shrink-0"
       >
-        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un équipement
+        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un système
       </button>
     </div>
 
