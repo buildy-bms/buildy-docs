@@ -1,9 +1,10 @@
 <script setup>
 /**
- * Multi-select protocoles avec popover stylé. Stocke un JSON array
- * dans v-model:value (string). Click outside ferme la popover.
+ * Multi-select protocoles avec popover téléportée dans le body
+ * (pour ne pas être clippée par les overflow:hidden des parents).
+ * Stocke un JSON array dans v-model:value (string).
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ChevronDownIcon, CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -17,6 +18,8 @@ const emit = defineEmits(['update:modelValue'])
 
 const open = ref(false)
 const rootEl = ref(null)
+const popoverEl = ref(null)
+const popoverPos = ref({ top: 0, left: 0, width: 256 })
 
 const selected = computed(() => {
   if (!props.modelValue) return []
@@ -42,12 +45,46 @@ function clear() {
   emit('update:modelValue', null)
 }
 
+function updatePosition() {
+  if (!rootEl.value) return
+  const r = rootEl.value.getBoundingClientRect()
+  const W = Math.max(256, r.width)
+  const H = 256 // max-h-64
+  let top = r.bottom + 4
+  let left = r.left
+  // flip vers le haut si pas la place en bas
+  if (top + H > window.innerHeight - 8 && r.top > H + 8) {
+    top = r.top - H - 4
+  }
+  // contraint dans la viewport horizontalement
+  if (left + W > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - W - 8)
+  }
+  popoverPos.value = { top, left, width: W }
+}
+
+async function openPopover() {
+  open.value = true
+  await nextTick()
+  updatePosition()
+}
+
 function onDocClick(e) {
   if (!open.value) return
-  if (rootEl.value && !rootEl.value.contains(e.target)) open.value = false
+  const inRoot = rootEl.value && rootEl.value.contains(e.target)
+  const inPop = popoverEl.value && popoverEl.value.contains(e.target)
+  if (!inRoot && !inPop) open.value = false
 }
-onMounted(() => document.addEventListener('mousedown', onDocClick))
-onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
+onMounted(() => {
+  document.addEventListener('mousedown', onDocClick)
+  window.addEventListener('scroll', updatePosition, true)
+  window.addEventListener('resize', updatePosition)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocClick)
+  window.removeEventListener('scroll', updatePosition, true)
+  window.removeEventListener('resize', updatePosition)
+})
 
 const buttonCls = computed(() => {
   const sz = props.size === 'xs' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
@@ -61,7 +98,7 @@ const buttonCls = computed(() => {
       type="button"
       :disabled="disabled"
       :class="buttonCls"
-      @click="open = !open"
+      @click="open ? (open = false) : openPopover()"
     >
       <span v-if="!selected.length" class="text-gray-400 italic flex-1 text-left">{{ placeholder }}</span>
       <span v-else class="flex flex-wrap gap-1 flex-1 text-left">
@@ -74,29 +111,35 @@ const buttonCls = computed(() => {
                        :class="{ 'rotate-180': open }" />
     </button>
 
-    <div v-if="open"
-         class="absolute z-30 mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1">
-      <div class="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
-        <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocoles</span>
-        <button v-if="selected.length" @click="clear"
-                class="text-[10px] text-gray-400 hover:text-red-600 inline-flex items-center gap-0.5">
-          <XMarkIcon class="w-3 h-3" /> Effacer
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="popoverEl"
+        :style="{ top: popoverPos.top + 'px', left: popoverPos.left + 'px', width: popoverPos.width + 'px' }"
+        class="fixed z-50 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1"
+      >
+        <div class="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 sticky top-0 bg-white">
+          <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocoles</span>
+          <button v-if="selected.length" @click="clear"
+                  class="text-[10px] text-gray-400 hover:text-red-600 inline-flex items-center gap-0.5">
+            <XMarkIcon class="w-3 h-3" /> Effacer
+          </button>
+        </div>
+        <button
+          v-for="o in options"
+          :key="o.value || 'null'"
+          type="button"
+          @click="toggle(o.value)"
+          class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-emerald-50/50 transition"
+          :class="selected.includes(o.value) ? 'text-emerald-700 font-medium' : 'text-gray-700'"
+        >
+          <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0',
+                         selected.includes(o.value) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300']">
+            <CheckIcon v-if="selected.includes(o.value)" class="w-3 h-3 text-white" />
+          </span>
+          {{ o.label }}
         </button>
       </div>
-      <button
-        v-for="o in options"
-        :key="o.value || 'null'"
-        type="button"
-        @click="toggle(o.value)"
-        class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-emerald-50/50 transition"
-        :class="selected.includes(o.value) ? 'text-emerald-700 font-medium' : 'text-gray-700'"
-      >
-        <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0',
-                       selected.includes(o.value) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300']">
-          <CheckIcon v-if="selected.includes(o.value)" class="w-3 h-3 text-white" />
-        </span>
-        {{ o.label }}
-      </button>
-    </div>
+    </Teleport>
   </div>
 </template>
