@@ -890,11 +890,11 @@ async function routes(fastify) {
           margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
           headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between;">
             <span>${af.client_name} — ${af.project_name}</span>
-            <span>${isBacs ? 'Audit BACS' : 'Audit site'} ${version}</span>
+            <span>${isBacs ? 'Audit BACS' : 'Audit GTB'} ${version}</span>
           </div>`,
           footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:6mm;">
             <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
-            <span style="flex:1;">${isBacs ? 'Audit BACS Buildy · décret R175 · confidentiel' : 'Audit site Buildy · préconisations devis · confidentiel'}</span>
+            <span style="flex:1;">${isBacs ? 'Audit BACS Buildy · décret R175 · confidentiel' : 'Audit GTB Buildy · préparation devis · confidentiel'}</span>
             <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
           </div>`,
         },

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>{{#if isBacs}}Audit BACS{{else}}Audit site{{/if}} — {{document.client_name}} — {{document.project_name}}</title>
+<title>{{#if isBacs}}Audit BACS{{else}}Audit GTB{{/if}} — {{document.client_name}} — {{document.project_name}}</title>
 <style>{{{styles}}}</style>
 </head>
 <body>
@@ -10,7 +10,7 @@
 {{!-- ═══════════ Page de garde ═══════════ --}}
 <section class="cover">
   <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
-  <p class="cover-doc-type">{{#if isBacs}}Audit BACS — Décret R175{{else}}Audit site — Préconisations Buildy{{/if}}</p>
+  <p class="cover-doc-type">{{#if isBacs}}Audit BACS — Décret R175{{else}}Audit GTB (Classique) — Préparation devis Buildy{{/if}}</p>
   <h1 class="cover-title">{{document.project_name}}</h1>
   <p class="cover-client">{{document.client_name}}</p>
   {{#if site.name}}<p class="cover-project">Site : {{site.name}}</p>{{/if}}
@@ -43,7 +43,7 @@
     </div>
     <div class="cover-meta-row">
       <span class="cover-meta-label">Type de document</span>
-      <span class="cover-meta-value">{{#if isBacs}}Audit de conformité au décret BACS{{else}}Audit de site (préparation devis Buildy){{/if}}</span>
+      <span class="cover-meta-value">{{#if isBacs}}Audit de conformité au décret BACS{{else}}Audit GTB classique (préparation devis Buildy){{/if}}</span>
     </div>
   </div>
 </section>

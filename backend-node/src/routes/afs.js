@@ -191,7 +191,7 @@ async function routes(fastify) {
 
     // Validation specifique aux kinds non-AF
     if ((body.kind === 'bacs_audit' || body.kind === 'site_audit') && !body.site_id) {
-      const label = body.kind === 'bacs_audit' ? 'audit BACS' : 'audit site';
+      const label = body.kind === 'bacs_audit' ? 'audit BACS' : 'audit GTB';
       return reply.code(400).send({ detail: `Un ${label} doit etre rattache a un site (site_id requis)` });
     }
     if (body.site_id) {

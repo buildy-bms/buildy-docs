@@ -514,7 +514,7 @@ async function switchKind(newKind) {
   if (newKind !== 'bacs_audit' && newKind !== 'site_audit') return
   try {
     await updateAf(docId, { kind: newKind })
-    success(newKind === 'bacs_audit' ? 'Audit basculé en mode BACS' : 'Audit basculé en mode site (devis Buildy)')
+    success(newKind === 'bacs_audit' ? 'Audit basculé en mode BACS' : 'Audit basculé en mode GTB (Classique)')
     await refresh()
     // Ré-aligner l'URL pour matcher le nouveau kind
     const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
@@ -1071,7 +1071,7 @@ onMounted(() => {
             <ArrowLeftIcon class="w-3.5 h-3.5" /> Audits
           </button>
           <span>›</span>
-          <span class="text-gray-400">{{ isBacs ? 'Audit BACS' : 'Audit site' }}</span>
+          <span class="text-gray-400">{{ isBacs ? 'Audit BACS' : 'Audit GTB (Classique)' }}</span>
           <span v-if="document?.updated_by_name" class="text-gray-400">
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
             <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
@@ -1090,8 +1090,8 @@ onMounted(() => {
           <input
             type="text"
             :value="document?.project_name || ''"
-            @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit site') })"
-            :placeholder="isBacs ? `Titre de l'audit BACS` : `Titre de l'audit site`"
+            @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit GTB') })"
+            :placeholder="isBacs ? `Titre de l'audit BACS` : `Titre de l'audit GTB`"
             class="min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
@@ -1103,7 +1103,7 @@ onMounted(() => {
             title="Type d'audit"
           >
             <option value="bacs_audit">Audit BACS (R175)</option>
-            <option value="site_audit">Audit site (devis Buildy)</option>
+            <option value="site_audit">Audit GTB (Classique)</option>
           </select>
         </h1>
       </div>
@@ -1286,7 +1286,7 @@ onMounted(() => {
         </div>
         <div v-if="!isBacs" class="px-5 py-4 text-sm text-gray-500">
           <p>
-            Audit site (devis Buildy) — les contraintes du décret R175 sont
+            Audit GTB (Classique) — les contraintes du décret R175 sont
             désactivées pour ce document. Les sections ci-dessous se
             concentrent sur l'inventaire technique nécessaire au chiffrage.
           </p>

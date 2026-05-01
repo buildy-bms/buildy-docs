@@ -229,7 +229,7 @@ async function refresh() {
 async function submitCreate() {
   if (!newAf.value.client_name.trim() || !newAf.value.project_name.trim()) return
   if ((newAf.value.kind === 'bacs_audit' || newAf.value.kind === 'site_audit') && !newAf.value.site_id) {
-    const label = newAf.value.kind === 'bacs_audit' ? 'audit BACS' : 'audit site'
+    const label = newAf.value.kind === 'bacs_audit' ? 'audit BACS' : 'audit GTB'
     error(`Un ${label} doit être rattaché à un site`)
     return
   }
@@ -237,7 +237,7 @@ async function submitCreate() {
   try {
     const { data } = await createAf(newAf.value)
     const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS'
-      : data.kind === 'site_audit' ? 'Audit site'
+      : data.kind === 'site_audit' ? 'Audit GTB'
       : data.kind === 'brochure' ? 'Brochure' : 'AF'
     success(`${kindLabel} créé : ${data.client_name} — ${data.project_name}${data.sections_count ? ` (${data.sections_count} sections seedées)` : ''}`)
     showCreate.value = false
@@ -369,7 +369,7 @@ onMounted(refresh)
       </span>
       <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
         <button
-          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'site_audit',l:'Audit site'}]"
+          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'site_audit',l:'Audit GTB'}]"
           :key="opt.v"
           @click="kindFilter = opt.v"
           :class="[
@@ -459,8 +459,8 @@ onMounted(refresh)
                   <span
                     v-else-if="row.af.kind === 'site_audit'"
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-emerald-100 text-emerald-700"
-                    title="Audit site — devis Buildy"
-                  >Site</span>
+                    title="Audit GTB (Classique) — préparation devis Buildy"
+                  >GTB</span>
                   <span
                     v-else-if="row.af.kind === 'brochure'"
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
@@ -580,7 +580,7 @@ onMounted(refresh)
               v-for="opt in [
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
-                { value: 'site_audit', label: 'Audit site', desc: 'Devis Buildy (hors décret)' },
+                { value: 'site_audit', label: 'Audit GTB (Classique)', desc: 'Préparation devis Buildy (hors décret)' },
                 { value: 'brochure', label: 'Brochure', desc: 'Bientôt', disabled: true },
               ]"
               :key="opt.value"
@@ -697,10 +697,16 @@ onMounted(refresh)
         <button @click="showCreate = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
         <button
           @click="submitCreate"
-          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || (newAf.kind === 'bacs_audit' && !newAf.site_id)"
+          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || ((newAf.kind === 'bacs_audit' || newAf.kind === 'site_audit') && !newAf.site_id)"
           class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
-          {{ submitting ? 'Création…' : (newAf.kind === 'bacs_audit' ? 'Créer l\'audit' : newAf.kind === 'brochure' ? 'Créer la brochure' : 'Créer l\'AF') }}
+          {{
+            submitting ? 'Création…'
+            : newAf.kind === 'bacs_audit' ? 'Créer l\'audit BACS'
+            : newAf.kind === 'site_audit' ? 'Créer l\'audit GTB'
+            : newAf.kind === 'brochure' ? 'Créer la brochure'
+            : 'Créer l\'AF'
+          }}
         </button>
       </template>
     </BaseModal>

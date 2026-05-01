@@ -38,7 +38,7 @@ const routes = [
     // affiche conditionnellement les blocs R175 selon ce kind.
     path: '/site-audit/:id',
     name: 'site-audit-detail',
-    meta: { title: 'Audit site (devis Buildy)' },
+    meta: { title: 'Audit GTB (Classique)' },
     component: () => import('@/views/BacsAuditDetailView.vue'),
     props: true,
   },
