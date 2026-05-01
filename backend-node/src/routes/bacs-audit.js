@@ -31,8 +31,11 @@ function assertBacsAuditExists(documentId, reply) {
     reply.code(404).send({ detail: 'Document non trouve' });
     return null;
   }
-  if (af.kind !== 'bacs_audit') {
-    reply.code(400).send({ detail: 'Document n\'est pas un audit BACS' });
+  // bacs_audit ET site_audit partagent toutes les routes (zones, systemes,
+  // devices, compteurs, GTB, photos…) — seuls les calculs R175 et le PDF
+  // diffèrent en aval (cf. action generator + template hbs).
+  if (af.kind !== 'bacs_audit' && af.kind !== 'site_audit') {
+    reply.code(400).send({ detail: 'Document n\'est pas un audit (BACS ou site)' });
     return null;
   }
   return af;
@@ -828,8 +831,11 @@ async function routes(fastify) {
       }));
     const heatingCoolingTotal = heatingCoolingBreakdown.reduce((s, d) => s + (Number(d.power_kw) || 0), 0);
 
+    const isBacs = af.kind === 'bacs_audit';
     const data = {
       document: af,
+      isBacs,
+      isSiteAudit: !isBacs,
       site,
       zones,
       systemsByZone,
@@ -884,11 +890,11 @@ async function routes(fastify) {
           margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
           headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between;">
             <span>${af.client_name} — ${af.project_name}</span>
-            <span>Audit BACS ${version}</span>
+            <span>${isBacs ? 'Audit BACS' : 'Audit site'} ${version}</span>
           </div>`,
           footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:6mm;">
             <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
-            <span style="flex:1;">Audit BACS Buildy · décret R175 · confidentiel</span>
+            <span style="flex:1;">${isBacs ? 'Audit BACS Buildy · décret R175 · confidentiel' : 'Audit site Buildy · préconisations devis · confidentiel'}</span>
             <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
           </div>`,
         },
@@ -1445,7 +1451,7 @@ async function routes(fastify) {
     };
 
     try {
-      const { html, usage } = await assistAuditSynthesis(auditDump);
+      const { html, usage } = await assistAuditSynthesis(auditDump, af.kind || 'bacs_audit');
       db.afs.update(documentId, {
         audit_synthesis_html: html,
         audit_synthesis_generated_at: new Date().toISOString(),

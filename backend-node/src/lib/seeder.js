@@ -504,8 +504,8 @@ function seedBacsMeterRequirementsOnBoot() {
 // Retourne { sections_count, systems_count, thermal_count } pour audit.
 function seedBacsAuditStructure(documentId, siteId) {
   const af = db.afs.getById(documentId);
-  if (!af || af.kind !== 'bacs_audit') {
-    throw new Error(`Document #${documentId} introuvable ou n'est pas un audit BACS`);
+  if (!af || (af.kind !== 'bacs_audit' && af.kind !== 'site_audit')) {
+    throw new Error(`Document #${documentId} introuvable ou n'est pas un audit (BACS ou site)`);
   }
   const site = db.sites.getById(siteId);
   if (!site) throw new Error(`Site #${siteId} introuvable`);
@@ -765,7 +765,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
  */
 function resyncBacsAuditWithSiteZones(documentId) {
   const af = db.afs.getById(documentId);
-  if (!af || af.kind !== 'bacs_audit' || !af.site_id) {
+  if (!af || (af.kind !== 'bacs_audit' && af.kind !== 'site_audit') || !af.site_id) {
     throw new Error(`Document #${documentId} introuvable, pas un audit BACS, ou sans site rattache`);
   }
   const zones = db.zones.listBySite(af.site_id);

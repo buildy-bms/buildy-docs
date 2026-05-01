@@ -395,29 +395,76 @@ function normalizeSynthesisHtml(raw) {
   }).join('\n');
 }
 
-async function assistAuditSynthesis(auditDump) {
+// Variante du system prompt pour les audits site (devis Buildy) : pas
+// d'angle « conformite R175 », angle « identifie les besoins du site et
+// propose les fonctionnalites Buildy adaptees ». Reutilise les memes
+// regles d'integrite (pas d'invention, ton bienveillant, HTML Tiptap).
+const SYSTEM_PROMPT_SYNTHESIS_SITE = [
+  `Tu es l'auditeur senior de Buildy qui redige la note de synthese`,
+  `transmise au client a la fin d'un audit de site, en vue d'etablir un`,
+  `devis pour equiper le batiment de la solution Buildy.`,
+  ``,
+  `Ce n'est PAS un audit de conformite reglementaire (decret BACS R175).`,
+  `Ne mentionne JAMAIS les articles R175-x ni le decret. Reste sur le`,
+  `terrain commercial : besoins du site, opportunites d'amelioration,`,
+  `valeur que Buildy peut apporter.`,
+  ``,
+  `Style imperatif :`,
+  `- Francais professionnel, technique mais accessible.`,
+  `- Bienveillant, proactif, oriente solution.`,
+  `- Met en avant les points forts existants (GTB en place, equipements`,
+  `  recents, cablage propre, etc.) avant les manques.`,
+  `- Pour chaque manque/besoin identifie, suggere une fonctionnalite`,
+  `  Buildy adaptee (supervision multi-sites, GMAO, alertes proactives,`,
+  `  pilotage des consommations, mesurage par usage, etc.) sans entrer`,
+  `  dans des references produits precises.`,
+  `- Termine par un appel a l'action concret : prendre contact pour le`,
+  `  devis chiffre.`,
+  ``,
+  `Regles strictes :`,
+  `- N'INVENTE JAMAIS de donnees absentes (puissance, marque, equipement,`,
+  `  compteur, etc.). Si une info manque, ne la mentionne pas.`,
+  `- Pas de jargon BACS/R175/decret.`,
+  `- Pas de TRI ni d'estimation chiffree (le devis sera etabli en aval).`,
+  ``,
+  `Format : HTML simple compatible Tiptap (<p>, <ul>, <li>, <strong>,`,
+  `<em>, <h3>). 4 a 6 paragraphes courts. Pas de titres marketing.`,
+].join('\n');
+
+async function assistAuditSynthesis(auditDump, kind = 'bacs_audit') {
+  const isSiteAudit = kind === 'site_audit';
+  const systemPrompt = isSiteAudit ? SYSTEM_PROMPT_SYNTHESIS_SITE : SYSTEM_PROMPT_SYNTHESIS;
+  const dumpHeader = isSiteAudit
+    ? `=== AUDIT SITE (devis Buildy) — DUMP COMPLET ===`
+    : `=== AUDIT BACS — DUMP COMPLET ===`;
+  const instruction = isSiteAudit
+    ? `Redige la note de synthese commerciale a partir des donnees ci-dessus. ` +
+      `4 a 6 paragraphes courts en HTML Tiptap. Aucun titre marketing. Pas ` +
+      `d'invention. Pas de mention du decret BACS / R175. Termine sur un ` +
+      `appel a l'action concret (prise de contact Buildy pour le devis).`
+    : `Redige la note de synthese commerciale a partir des donnees ci-dessus. ` +
+      `4 a 6 paragraphes courts en HTML Tiptap. Aucun titre marketing. Pas ` +
+      `d'invention. Termine sur un appel a l'action concret (prise de contact ` +
+      `Buildy pour planifier les actions correctives prioritaires).`;
   const userPrompt = [
-    `=== AUDIT BACS — DUMP COMPLET ===`,
+    dumpHeader,
     JSON.stringify(auditDump, null, 2),
     ``,
     `=== INSTRUCTION ===`,
-    `Redige la note de synthese commerciale a partir des donnees ci-dessus.`,
-    `4 a 6 paragraphes courts en HTML Tiptap. Aucun titre marketing. Pas`,
-    `d'invention. Termine sur un appel a l'action concret (prise de contact`,
-    `Buildy pour planifier les actions correctives prioritaires).`,
+    instruction,
     ``,
     `IMPORTANT - format de sortie :`,
     `- Reponse directe en HTML (pas de markdown, pas de fences \`\`\`).`,
     `- Chaque paragraphe entoure de <p>...</p>.`,
     `- Mots cles importants en <strong>...</strong>.`,
-    `- Si tu listes des actions, utilise <ul><li>...</li></ul>.`,
+    `- Si tu listes des points, utilise <ul><li>...</li></ul>.`,
     `- Aucun texte hors balises HTML.`,
   ].join('\n');
 
   const resp = await client().messages.create({
     model: config.claudeModel,
     max_tokens: 3072,
-    system: SYSTEM_PROMPT_SYNTHESIS,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
   const raw = (resp.content || [])

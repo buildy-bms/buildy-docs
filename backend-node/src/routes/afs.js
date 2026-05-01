@@ -15,7 +15,7 @@ const createAfSchema = z.object({
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   // Multi-domaines (Buildy Docs) : kind + site_id. Pour 'bacs_audit', le site
   // est obligatoire (le plan canonique pre-rempli a besoin des zones du site).
-  kind: z.enum(['af', 'bacs_audit', 'brochure']).optional().default('af'),
+  kind: z.enum(['af', 'bacs_audit', 'site_audit', 'brochure']).optional().default('af'),
   site_id: z.number().int().positive().nullable().optional(),
   title: z.string().optional(),
 });
@@ -27,6 +27,10 @@ const updateAfSchema = z.object({
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
   title: z.string().nullable().optional(),
+  // Switch entre kinds compatibles (bacs_audit <-> site_audit). Permet a
+  // l'auditeur de basculer si la nature du chantier evolue. On ne touche
+  // pas a 'af' / 'brochure' (structures incompatibles).
+  kind: z.enum(['bacs_audit', 'site_audit']).optional(),
   // Audit BACS : applicabilite R175-2
   bacs_total_power_kw: z.number().nullable().optional(),
   bacs_total_power_source: z.enum(['auto', 'manual_override']).optional(),
@@ -186,8 +190,9 @@ async function routes(fastify) {
     }
 
     // Validation specifique aux kinds non-AF
-    if (body.kind === 'bacs_audit' && !body.site_id) {
-      return reply.code(400).send({ detail: 'Un audit BACS doit etre rattache a un site (site_id requis)' });
+    if ((body.kind === 'bacs_audit' || body.kind === 'site_audit') && !body.site_id) {
+      const label = body.kind === 'bacs_audit' ? 'audit BACS' : 'audit site';
+      return reply.code(400).send({ detail: `Un ${label} doit etre rattache a un site (site_id requis)` });
     }
     if (body.site_id) {
       const site = db.sites.getById(body.site_id);
@@ -211,11 +216,13 @@ async function routes(fastify) {
       createdBy: userId,
     });
 
-    // Seed conditionnel selon le kind
+    // Seed conditionnel selon le kind. site_audit reutilise le seeder BACS
+    // car la structure (zones / systemes / compteurs) est identique — c'est
+    // uniquement l'affichage des blocs reglementaires R175 qui differe en UI.
     let sectionsCount = 0;
     if (body.kind === 'af') {
       sectionsCount = seedAfStructure(af.id);
-    } else if (body.kind === 'bacs_audit') {
+    } else if (body.kind === 'bacs_audit' || body.kind === 'site_audit') {
       const seedResult = seedBacsAuditStructure(af.id, body.site_id);
       sectionsCount = seedResult.sections_count;
     }
@@ -266,7 +273,7 @@ async function routes(fastify) {
     // Autres champs BACS / audit (forward direct vers db.afs.update qui
     // a sa propre allowlist).
     const passthrough = [
-      'title', 'bacs_district_heating_substation_kw', 'bacs_generator_works_date',
+      'title', 'kind', 'bacs_district_heating_substation_kw', 'bacs_generator_works_date',
       'bacs_roi_study_status', 'bacs_roi_study_html',
       'audit_existing_af_status', 'audit_synthesis_html', 'audit_synthesis_generated_at',
     ];

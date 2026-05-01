@@ -327,6 +327,13 @@ function computeTargetActions(documentId) {
  * Retourne { added, updated, resolved }.
  */
 function regenerateActionItems(documentId) {
+  // Skip pour les audits site (devis Buildy) : aucun plan d'actions
+  // automatique R175 n'est pertinent — la synthese Claude porte les
+  // recommandations Buildy.
+  const doc = db.afs.getById(documentId);
+  if (doc && doc.kind && doc.kind !== 'bacs_audit') {
+    return { added: 0, updated: 0, resolved: 0 };
+  }
   const target = computeTargetActions(documentId);
 
   const existing = db.db.prepare(`

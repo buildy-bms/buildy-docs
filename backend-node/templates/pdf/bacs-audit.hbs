@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<title>Audit BACS — {{document.client_name}} — {{document.project_name}}</title>
+<title>{{#if isBacs}}Audit BACS{{else}}Audit site{{/if}} — {{document.client_name}} — {{document.project_name}}</title>
 <style>{{{styles}}}</style>
 </head>
 <body>
@@ -10,13 +10,13 @@
 {{!-- ═══════════ Page de garde ═══════════ --}}
 <section class="cover">
   <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
-  <p class="cover-doc-type">Audit BACS — Décret R175</p>
+  <p class="cover-doc-type">{{#if isBacs}}Audit BACS — Décret R175{{else}}Audit site — Préconisations Buildy{{/if}}</p>
   <h1 class="cover-title">{{document.project_name}}</h1>
   <p class="cover-client">{{document.client_name}}</p>
   {{#if site.name}}<p class="cover-project">Site : {{site.name}}</p>{{/if}}
   {{#if site.address}}<p class="cover-address">{{site.address}}</p>{{/if}}
 
-  {{#if applicabilityLabel}}
+  {{#if isBacs}}{{#if applicabilityLabel}}
   <div class="cover-deadline-block">
     <p class="cover-deadline-label">Applicabilité R175-2</p>
     <p class="cover-deadline-value">{{applicabilityLabel}}</p>
@@ -26,7 +26,7 @@
     </p>
     {{/if}}
   </div>
-  {{/if}}
+  {{/if}}{{/if}}
 
   <div class="cover-meta">
     <div class="cover-meta-row">
@@ -43,7 +43,7 @@
     </div>
     <div class="cover-meta-row">
       <span class="cover-meta-label">Type de document</span>
-      <span class="cover-meta-value">Audit de conformité au décret BACS</span>
+      <span class="cover-meta-value">{{#if isBacs}}Audit de conformité au décret BACS{{else}}Audit de site (préparation devis Buildy){{/if}}</span>
     </div>
   </div>
 </section>
@@ -55,14 +55,20 @@
     {{#if synthesisHtml}}
     <li data-toc-link="synthesis"><span class="toc-label">Note de synthèse</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
     {{/if}}
+    {{#if isBacs}}
     <li data-toc-link="conformity"><span class="toc-label">Synthèse de conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{/if}}
     <li data-toc-link="identification"><span class="toc-label">1. Identification du site</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="zones"><span class="toc-label">2. Zones fonctionnelles (R175-1 §6)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="systems"><span class="toc-label">3. Systèmes techniques par zone (R175-1 §4)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="meters"><span class="toc-label">4. Compteurs et mesurage (R175-3 §1)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="zones"><span class="toc-label">2. Zones fonctionnelles{{#if isBacs}} (R175-1 §6){{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="systems"><span class="toc-label">3. Systèmes techniques par zone{{#if isBacs}} (R175-1 §4){{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="meters"><span class="toc-label">4. Compteurs et mesurage{{#if isBacs}} (R175-3 §1){{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{#if isBacs}}
     <li data-toc-link="thermal"><span class="toc-label">5. Régulation thermique automatique (R175-6)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="bms"><span class="toc-label">6. Solution GTB / GTC (R175-3, R175-4, R175-5)</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{/if}}
+    <li data-toc-link="bms"><span class="toc-label">{{#if isBacs}}{{#if synthesisHtml}}{{!---}}{{/if}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{#if isBacs}}
     <li data-toc-link="plan"><span class="toc-label">7. Plan de mise en conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    {{/if}}
   </ol>
 </section>
 
@@ -74,6 +80,7 @@
 <div class="synthesis-block">{{{synthesisHtml}}}</div>
 {{/if}}
 
+{{#if isBacs}}
 {{!-- ═══════════ Synthèse de conformité (anciennement chapitre 7, remontée au début) ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="conformity">{{{faIcon "shield" "#10b981" "22"}}} Synthèse de conformité</h1>
 {{#if bms.overall_compliance}}
@@ -88,6 +95,7 @@
   </tbody>
 </table>
 <p class="muted">Détail des actions et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
+{{/if}}
 
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#4f46e5" "22"}}} 1. Identification du site</h1>
@@ -95,6 +103,7 @@
   <tr><th>Site</th><td>{{site.name}}</td></tr>
   <tr><th>Client</th><td>{{document.client_name}}</td></tr>
   <tr><th>Adresse</th><td>{{site.address}}</td></tr>
+  {{#if isBacs}}
   {{#if document.bacs_total_power_kw}}
   <tr><th>Puissance cumulée chauffage + climatisation</th><td>{{document.bacs_total_power_kw}} kW</td></tr>
   {{/if}}
@@ -123,9 +132,10 @@
       {{/if}}
     </td>
   </tr>
+  {{/if}}
 </table>
 
-{{#if heatingCoolingBreakdown.length}}
+{{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
 <h3>Détail du calcul automatique de la puissance</h3>
 <p class="muted" style="margin-bottom:2mm">
   La puissance cumulée chauffage + climatisation est obtenue en additionnant
@@ -152,10 +162,10 @@
     </tr>
   </tbody>
 </table>
-{{/if}}
+{{/if}}{{/if}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles (R175-1 §6)</h1>
+<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 §6){{/if}}</h1>
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
@@ -184,7 +194,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone (R175-1 §4)</h1>
+<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 §4){{/if}}</h1>
 {{#each systemsByZone}}
 <h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
 {{#each items}}
@@ -269,7 +279,7 @@
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage (R175-3 §1)</h1>
+<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 §1){{/if}}</h1>
 {{#if meters.length}}
 <table>
   <thead>
@@ -311,6 +321,7 @@
 <p class="muted">Aucun compteur listé. Saisis les équipements (avec leur énergie) pour générer automatiquement les compteurs requis.</p>
 {{/if}}
 
+{{#if isBacs}}
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#dc2626" "22"}}} 5. Régulation thermique automatique (R175-6)</h1>
 
@@ -344,9 +355,10 @@
 {{else}}
 <p class="muted">Régulation thermique non documentée.</p>
 {{/if}}
+{{/if}}
 
-{{!-- ═══════════ Chapitre 6 — GTB ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#7c3aed" "22"}}} 6. Solution GTB / GTC (R175-3, R175-4, R175-5)</h1>
+{{!-- ═══════════ Chapitre 6 — GTB / Supervision ═══════════ --}}
+<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#7c3aed" "22"}}} {{#if isBacs}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
 {{#if bms}}
 {{#if bms.out_of_service}}
 <p style="background:#fee2e2;border:1px solid #fca5a5;padding:3mm;border-radius:1mm;color:#991b1b;">
@@ -370,6 +382,7 @@
   {{#unless bms.manages_heating}}{{#unless bms.manages_cooling}}{{#unless bms.manages_ventilation}}{{#unless bms.manages_dhw}}{{#unless bms.manages_lighting}}<span class="muted">Aucun usage déclaré.</span>{{/unless}}{{/unless}}{{/unless}}{{/unless}}{{/unless}}
 </p>
 
+{{#if isBacs}}
 <h3>R175-3 — Capacités de supervision</h3>
 <table>
   <tr><td>P1. Suivi continu, pas horaire, conservation 5 ans</td><td>{{boolLabel bms.meets_r175_3_p1}}</td></tr>
@@ -396,6 +409,7 @@
   par le support utilisateur intégré (assistance contextuelle, documentation
   embarquée, support continu). Cf. Annexe B point 8.
 </p>
+{{/if}}
 {{/if}}
 
 {{#if bmsManagedDevices.length}}
@@ -437,6 +451,7 @@
 <p class="muted">Évaluation de la GTB non renseignée.</p>
 {{/if}}
 
+{{#if isBacs}}
 {{!-- ═══════════ Chapitre 7 — Plan de mise en conformité ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "22"}}} 7. Plan de mise en conformité</h1>
 
@@ -523,8 +538,10 @@
   Pour la mise en conformité, l'équipe commerciale Buildy se tient à votre
   disposition pour établir un devis chiffré.
 </p>
+{{/if}}
 </div>{{!-- /.sections --}}
 
+{{#if isBacs}}
 {{!-- ═══════════ Annexe A — Texte du décret ═══════════ --}}
 <section class="annex">
   <h1>Annexe A — Décret BACS (R175-1 à R175-6)</h1>
@@ -567,6 +584,7 @@
     {{/each}}
   </ol>
 </section>
+{{/if}}
 
 </body>
 </html>

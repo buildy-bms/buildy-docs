@@ -228,14 +228,17 @@ async function refresh() {
 
 async function submitCreate() {
   if (!newAf.value.client_name.trim() || !newAf.value.project_name.trim()) return
-  if (newAf.value.kind === 'bacs_audit' && !newAf.value.site_id) {
-    error('Un audit BACS doit être rattaché à un site')
+  if ((newAf.value.kind === 'bacs_audit' || newAf.value.kind === 'site_audit') && !newAf.value.site_id) {
+    const label = newAf.value.kind === 'bacs_audit' ? 'audit BACS' : 'audit site'
+    error(`Un ${label} doit être rattaché à un site`)
     return
   }
   submitting.value = true
   try {
     const { data } = await createAf(newAf.value)
-    const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS' : data.kind === 'brochure' ? 'Brochure' : 'AF'
+    const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS'
+      : data.kind === 'site_audit' ? 'Audit site'
+      : data.kind === 'brochure' ? 'Brochure' : 'AF'
     success(`${kindLabel} créé : ${data.client_name} — ${data.project_name}${data.sections_count ? ` (${data.sections_count} sections seedées)` : ''}`)
     showCreate.value = false
     newAf.value = { kind: 'af', site_id: null, client_name: '', project_name: '', site_address: '', service_level: null }
@@ -301,6 +304,7 @@ function formatDate(s) {
 // Dispatcher vers la bonne vue selon le kind du document
 function routeForDoc(doc) {
   if (doc.kind === 'bacs_audit') return `/bacs-audit/${doc.id}`
+  if (doc.kind === 'site_audit') return `/site-audit/${doc.id}`
   return `/afs/${doc.id}`
 }
 
@@ -365,7 +369,7 @@ onMounted(refresh)
       </span>
       <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
         <button
-          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}]"
+          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'site_audit',l:'Audit site'}]"
           :key="opt.v"
           @click="kindFilter = opt.v"
           :class="[
@@ -452,6 +456,11 @@ onMounted(refresh)
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
                     title="Audit BACS — décret R175"
                   >BACS</span>
+                  <span
+                    v-else-if="row.af.kind === 'site_audit'"
+                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-emerald-100 text-emerald-700"
+                    title="Audit site — devis Buildy"
+                  >Site</span>
                   <span
                     v-else-if="row.af.kind === 'brochure'"
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
@@ -566,11 +575,12 @@ onMounted(refresh)
         <!-- Selecteur de kind -->
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type de document *</label>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <label
               v-for="opt in [
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
+                { value: 'site_audit', label: 'Audit site', desc: 'Devis Buildy (hors décret)' },
                 { value: 'brochure', label: 'Brochure', desc: 'Bientôt', disabled: true },
               ]"
               :key="opt.value"
@@ -604,7 +614,7 @@ onMounted(refresh)
           </label>
           <SitePicker
             v-model="newAf.site_id"
-            :required="newAf.kind === 'bacs_audit'"
+            :required="newAf.kind === 'bacs_audit' || newAf.kind === 'site_audit'"
             @change="onSiteChange"
           />
         </div>

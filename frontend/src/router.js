@@ -33,6 +33,16 @@ const routes = [
     props: true,
   },
   {
+    // Variante site (devis Buildy) — meme composant, kind=site_audit
+    // basculé en interne via le champ document.kind. Le composant
+    // affiche conditionnellement les blocs R175 selon ce kind.
+    path: '/site-audit/:id',
+    name: 'site-audit-detail',
+    meta: { title: 'Audit site (devis Buildy)' },
+    component: () => import('@/views/BacsAuditDetailView.vue'),
+    props: true,
+  },
+  {
     path: '/bacs-audit/:id/action-items',
     name: 'bacs-audit-action-items',
     meta: { title: 'Plan de mise en conformité' },

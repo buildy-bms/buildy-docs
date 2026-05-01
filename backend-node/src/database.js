@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 58;
+const TARGET_VERSION = 59;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1179,7 +1179,7 @@ function runMigrations() {
 
         -- Buildy Docs multi-domaines : kind + site_id + champs specifiques BACS
         ALTER TABLE afs ADD COLUMN kind TEXT NOT NULL DEFAULT 'af'
-          CHECK (kind IN ('af','bacs_audit','brochure'));
+          CHECK (kind IN ('af','bacs_audit','site_audit','brochure'));
         ALTER TABLE afs ADD COLUMN site_id INTEGER REFERENCES sites(site_id) ON DELETE SET NULL;
         ALTER TABLE afs ADD COLUMN title TEXT;
         ALTER TABLE afs ADD COLUMN bacs_total_power_kw REAL;
@@ -2125,6 +2125,29 @@ function runMigrations() {
     `);
     db.pragma('user_version = 58');
     log.info('Migration 58 appliquee : bacs_audit_bms_components');
+  }
+
+  if (current < 59) {
+    // Ajout du kind 'site_audit' (audit site sans contrainte décret R175,
+    // pour préparation devis Buildy). Modifie la contrainte CHECK sur
+    // afs.kind via writable_schema. better-sqlite3 nécessite unsafeMode
+    // pour autoriser l'écriture dans sqlite_master.
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'afs'"
+      ).run(
+        "CHECK (kind IN ('af','bacs_audit','brochure'))",
+        "CHECK (kind IN ('af','bacs_audit','site_audit','brochure'))",
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    db.pragma('user_version = 59');
+    log.info('Migration 59 appliquee : afs.kind CHECK étendu (site_audit)');
   }
 
   if (current > TARGET_VERSION) {

@@ -430,6 +430,11 @@ const devicesBySystem = computed(() => {
 // Compteurs présents uniquement (pour la liste GTB des compteurs intégrés)
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 
+// kind du document : 'bacs_audit' (audit de conformité décret R175) ou
+// 'site_audit' (audit site en vue d'un devis Buildy, sans contrainte
+// réglementaire). Toute la logique R175 est désactivée en mode site.
+const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
+
 // Régulation thermique (R175-6) : ne lister que les zones qui ont un
 // système chauffage ou refroidissement (présent OU non concerné).
 // Les zones sans système thermique (ex : un local technique sans chauffage)
@@ -451,28 +456,36 @@ const thermalFiltered = computed(() => {
   )
 })
 
-// Stepper de progression de la card GTB (R175-3 / R175-4 / R175-5).
+// Stepper de progression de la card GTB. En mode BACS : 8 etapes
+// dont 3 reglementaires (R175-3 capacites, R175-3 mise a disposition,
+// R175-4/5 maintenance + formation). En mode site_audit : 5 etapes,
+// les 3 reglementaires sont retirees.
 const bmsSteps = computed(() => {
   if (bms.value?.out_of_service) {
-    return [{ label: 'GTB déclarée hors-service', done: true,
-              hint: 'Plan d\'action ignore les exigences GTB' }]
+    return [{ label: isBacs.value ? 'GTB déclarée hors-service' : 'Supervision déclarée hors-service',
+              done: true,
+              hint: isBacs.value ? 'Plan d\'action ignore les exigences GTB' : 'Sections supervision masquées' }]
   }
-  return [
-    { label: 'Identification de la GTB',
+  const common = [
+    { label: isBacs.value ? 'Identification de la GTB' : 'Identification de la supervision',
       done: !!bms.value?.existing_solution,
       hint: 'Solution + marque + localisation' },
     { label: 'Protocoles de mise à disposition',
       done: !!(bms.value?.provided_protocols && JSON.parse(bms.value.provided_protocols || '[]').length) },
-    { label: 'Analyse fonctionnelle GTB',
+    { label: isBacs.value ? 'Analyse fonctionnelle GTB' : 'Documents existants (AF, plans…)',
       done: !!(document.value?.audit_existing_af_status === 'absent'
               || (siteDocCounts.value?.doe || 0) > 0) },
-    { label: 'Usages traités cochés',
+    { label: isBacs.value ? 'Usages traités cochés' : 'Usages supervisés cochés',
       done: !!(bms.value?.manages_heating || bms.value?.manages_cooling
               || bms.value?.manages_ventilation || bms.value?.manages_dhw
               || bms.value?.manages_lighting) },
     { label: 'Équipements / compteurs intégrés',
       done: !!(devices.value.some(d => d.managed_by_bms) || meters.value.some(m => m.managed_by_bms)),
-      hint: 'Au moins un système ou compteur lié à la GTB' },
+      hint: 'Au moins un système ou compteur lié à la supervision' },
+  ]
+  if (!isBacs.value) return common
+  return [
+    ...common,
     { label: 'Capacités R175-3 (P1 + P2)',
       done: !!(bms.value?.meets_r175_3_p1 && bms.value?.meets_r175_3_p2) },
     { label: 'Mise à disposition des données',
@@ -490,6 +503,25 @@ function generatorDevicesForZoneCategory(zoneId, category) {
     .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
     .map(s => s.id)
   return devices.value.filter(d => sysIds.includes(d.system_id))
+}
+
+// Switch entre kinds compatibles (BACS <-> site). PATCH le kind, refresh
+// les donnees, et redirige vers la route correspondante. Les saisies
+// existantes (zones, systemes, devices, compteurs, GTB, etc.) sont
+// preservees telles quelles ; seul l'affichage des blocs R175 change.
+async function switchKind(newKind) {
+  if (!document.value || newKind === document.value.kind) return
+  if (newKind !== 'bacs_audit' && newKind !== 'site_audit') return
+  try {
+    await updateAf(docId, { kind: newKind })
+    success(newKind === 'bacs_audit' ? 'Audit basculé en mode BACS' : 'Audit basculé en mode site (devis Buildy)')
+    await refresh()
+    // Ré-aligner l'URL pour matcher le nouveau kind
+    const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
+    if (route.path !== target) router.replace(target)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Bascule impossible')
+  }
 }
 
 // Tout replier / déplier (broadcast vers chaque CollapsibleSection)
@@ -661,18 +693,23 @@ function stepFor(key) {
   return stepperSteps.value.find(s => s.key === key)
 }
 
-const stepperSteps = computed(() => STEP_DEFINITIONS.map(def => {
-  const p = auditProgress.value?.[def.key] || {}
-  return {
-    key: def.key,
-    label: def.label,
-    description: def.description,
-    complete: def.isComplete(),
-    validated: !!p.validated,
-    validated_at: p.validated_at || null,
-    validated_by_name: p.validated_by_name || null,
-  }
-}))
+// Steps cachés en mode site_audit (purement R175) : régulation thermique
+// (R175-6) et plan de mise en conformité (R175 entier).
+const STEPS_BACS_ONLY = new Set(['thermal', 'review'])
+const stepperSteps = computed(() => STEP_DEFINITIONS
+  .filter(def => isBacs.value || !STEPS_BACS_ONLY.has(def.key))
+  .map(def => {
+    const p = auditProgress.value?.[def.key] || {}
+    return {
+      key: def.key,
+      label: def.label,
+      description: isBacs.value ? def.description : (def.descriptionSite || def.description.replace(/R175-?[0-9]?\s*(§\s*[0-9])?/g, '').replace(/\s+/g, ' ').trim()),
+      complete: def.isComplete(),
+      validated: !!p.validated,
+      validated_at: p.validated_at || null,
+      validated_by_name: p.validated_by_name || null,
+    }
+  }))
 
 async function validateStep(stepKey) {
   try {
@@ -1034,7 +1071,7 @@ onMounted(() => {
             <ArrowLeftIcon class="w-3.5 h-3.5" /> Audits
           </button>
           <span>›</span>
-          <span class="text-gray-400">Audit BACS</span>
+          <span class="text-gray-400">{{ isBacs ? 'Audit BACS' : 'Audit site' }}</span>
           <span v-if="document?.updated_by_name" class="text-gray-400">
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
             <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
@@ -1048,16 +1085,26 @@ onMounted(() => {
           </span>
         </div>
         <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
-          <FireIcon class="w-5 h-5 text-orange-500 shrink-0" />
+          <FireIcon v-if="isBacs" class="w-5 h-5 text-orange-500 shrink-0" />
+          <BuildingOffice2Icon v-else class="w-5 h-5 text-emerald-600 shrink-0" />
           <input
             type="text"
             :value="document?.project_name || ''"
-            @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || 'Audit BACS' })"
-            placeholder="Titre de l'audit BACS"
+            @blur="e => e.target.value !== (document?.project_name || '') && saveDocDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit site') })"
+            :placeholder="isBacs ? `Titre de l'audit BACS` : `Titre de l'audit site`"
             class="min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
           <span class="text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
+          <select
+            :value="document?.kind || 'bacs_audit'"
+            @change="e => switchKind(e.target.value)"
+            class="ml-2 text-xs px-2 py-1 border border-gray-200 rounded-lg bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition shrink-0"
+            title="Type d'audit"
+          >
+            <option value="bacs_audit">Audit BACS (R175)</option>
+            <option value="site_audit">Audit site (devis Buildy)</option>
+          </select>
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
@@ -1101,8 +1148,8 @@ onMounted(() => {
 
       <!-- Colonne principale : contenu de l'audit -->
       <div class="space-y-4 min-w-0">
-      <!-- Synthese severities (compactee) -->
-      <div class="grid grid-cols-3 gap-2">
+      <!-- Synthese severities (compactee) — hors site_audit (pas de plan d'actions) -->
+      <div v-if="isBacs" class="grid grid-cols-3 gap-2">
         <div v-for="sev in ['blocking','major','minor']" :key="sev"
              :class="['rounded-lg border px-3 py-2 flex items-center gap-3', SEVERITY_LABEL[sev].cls]">
           <div class="text-2xl font-semibold leading-none">{{ itemsBySeverity[sev].length }}</div>
@@ -1113,21 +1160,24 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 1. Identification + Applicabilité R175-2 -->
+      <!-- 1. Identification + Applicabilité R175-2 (R175-2 masqué en site_audit) -->
       <CollapsibleSection storage-key="identification" section-id="section-identification">
         <template #header>
           <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">1. Identification du site &amp; applicabilité R175-2</h2>
-          <R175Tooltip article="R175-2" />
+          <h2 class="text-base font-semibold text-gray-800">1. Identification du site<span v-if="isBacs"> &amp; applicabilité R175-2</span></h2>
+          <R175Tooltip v-if="isBacs" article="R175-2" />
           <StepValidateBadge class="ml-auto" :step="stepFor('identification')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
         <template #summary>
-          <span>
+          <span v-if="isBacs">
             Puissance chauffage + clim {{ document?.bacs_total_power_kw ?? '—' }} kW
             · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}
           </span>
+          <span v-else>
+            {{ document?.client_name || 'Client à renseigner' }}<span v-if="site?.name"> · site « {{ site.name }} »</span>
+          </span>
         </template>
-        <div class="px-5 py-4 grid grid-cols-2 gap-4">
+        <div v-if="isBacs" class="px-5 py-4 grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">
               Puissance nominale utile cumulée chauffage + climatisation (kW)
@@ -1234,7 +1284,14 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div v-if="document?.bacs_applicability_status" class="px-5 pb-4">
+        <div v-if="!isBacs" class="px-5 py-4 text-sm text-gray-500">
+          <p>
+            Audit site (devis Buildy) — les contraintes du décret R175 sont
+            désactivées pour ce document. Les sections ci-dessous se
+            concentrent sur l'inventaire technique nécessaire au chiffrage.
+          </p>
+        </div>
+        <div v-if="isBacs && document?.bacs_applicability_status" class="px-5 pb-4">
           <div :class="['rounded-lg border p-3 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status].cls]">
             <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
             <div class="flex-1">
@@ -1254,8 +1311,8 @@ onMounted(() => {
         <template #header>
           <MapPinIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
-          <span class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
-          <R175Tooltip article="R175-1 §6" />
+          <span v-if="isBacs" class="text-xs text-gray-500">R175-1 §6 — usages homogènes</span>
+          <R175Tooltip v-if="isBacs" article="R175-1 §6" />
           <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
           <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
@@ -1350,7 +1407,7 @@ onMounted(() => {
         <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
-          <span class="text-xs text-gray-500 inline-flex items-center gap-0.5">
+          <span v-if="isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
             R175-1 §4<R175Tooltip article="R175-1 §4" />
             <span class="mx-1">/</span>
             R175-3 §3, §4<R175Tooltip article="R175-3" />
@@ -1487,8 +1544,8 @@ onMounted(() => {
         <template #header>
           <BoltIcon class="w-5 h-5 text-emerald-600" />
           <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
-          <span class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
-          <R175Tooltip article="R175-3 §1" />
+          <span v-if="isBacs" class="text-xs text-gray-500">R175-3 §1 — suivi continu, pas horaire, conservation 5 ans</span>
+          <R175Tooltip v-if="isBacs" article="R175-3 §1" />
           <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
         <template #summary>
@@ -1616,8 +1673,8 @@ onMounted(() => {
         </table>
       </CollapsibleSection>
 
-      <!-- Régulation thermique (R175-6) -->
-      <CollapsibleSection storage-key="thermal" section-id="section-thermal">
+      <!-- Régulation thermique (R175-6) — masquée en mode site_audit -->
+      <CollapsibleSection v-if="isBacs" storage-key="thermal" section-id="section-thermal">
         <template #header>
           <FireIcon class="w-5 h-5 text-red-500" />
           <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
@@ -1716,8 +1773,8 @@ onMounted(() => {
       <CollapsibleSection storage-key="bms" section-id="section-bms">
         <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
-          <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
-          <span class="text-xs text-gray-500 inline-flex items-center gap-0.5">
+          <h2 class="text-base font-semibold text-gray-800">{{ isBacs ? '6. Solution GTB / GTC en place' : '5. Solution de supervision en place' }}</h2>
+          <span v-if="isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
             R175-3<R175Tooltip article="R175-3" />
             <span class="mx-0.5">+</span>
             R175-4<R175Tooltip article="R175-4" />
@@ -1997,7 +2054,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
+          <div v-if="isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
               R175-3 — Capacités de la solution de supervision
               <Tooltip text="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
@@ -2017,7 +2074,7 @@ onMounted(() => {
           </div>
 
           <!-- R175-3 dernier alinéa : mise à disposition des données -->
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
+          <div v-if="isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
               R175-3 — Mise à disposition des données
               <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
@@ -2041,7 +2098,7 @@ onMounted(() => {
             ></textarea>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
+          <div v-if="isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
@@ -2120,8 +2177,8 @@ onMounted(() => {
         </div>
       </CollapsibleSection>
 
-      <!-- Plan de mise en conformité -->
-      <CollapsibleSection storage-key="review" section-id="section-review">
+      <!-- Plan de mise en conformité — masqué en mode site_audit -->
+      <CollapsibleSection v-if="isBacs" storage-key="review" section-id="section-review">
         <template #header>
           <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
           <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
