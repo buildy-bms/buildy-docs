@@ -307,7 +307,7 @@ async function removeDevice(d) {
           </td>
           <td class="py-1 px-1">
             <ProtocolMultiPicker
-              :model-value="d.communication_protocols || (d.communication_protocol ? JSON.stringify([d.communication_protocol]) : null)"
+              :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
               :options="COMM_OPTIONS"
               size="xs"
               @update:modelValue="v => patchDevice(d, { communication_protocols: v })"

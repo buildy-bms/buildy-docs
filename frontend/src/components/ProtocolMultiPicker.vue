@@ -31,8 +31,14 @@ const selected = computed(() => {
   }
 })
 
+// Filtre les valeurs legacy qui ne sont plus dans les options (ex :
+// 'non_communicant', 'other') : la case « Communicant » porte déjà
+// l'info, on ne veut pas dupliquer côté pilule.
+const validValues = computed(() => new Set(props.options.map(o => o.value)))
 const selectedLabels = computed(() =>
-  selected.value.map(v => props.options.find(o => o.value === v)?.label || v)
+  selected.value
+    .filter(v => validValues.value.has(v))
+    .map(v => props.options.find(o => o.value === v)?.label || v)
 )
 
 function toggle(value) {

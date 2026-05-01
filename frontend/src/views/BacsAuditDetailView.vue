@@ -434,17 +434,20 @@ const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 // Les zones sans système thermique (ex : un local technique sans chauffage)
 // n'ont pas de régulation à évaluer.
 const thermalFiltered = computed(() => {
-  const cats = new Map()  // zone_id -> Set('heating'|'cooling')
+  // 1 ligne par (zone, catégorie) : on ne garde que les rows dont la
+  // catégorie correspond à un système présent dans la zone (sinon ça
+  // n'a pas de sens — pas de chauffage = pas de régulation chauffage).
+  const presentCats = new Map()  // zone_id -> Set('heating'|'cooling')
   for (const s of systems.value) {
     if (!s.present) continue
     if (s.system_category === 'heating' || s.system_category === 'cooling') {
-      if (!cats.has(s.zone_id)) cats.set(s.zone_id, new Set())
-      cats.get(s.zone_id).add(s.system_category)
+      if (!presentCats.has(s.zone_id)) presentCats.set(s.zone_id, new Set())
+      presentCats.get(s.zone_id).add(s.system_category)
     }
   }
-  return thermal.value
-    .filter(t => cats.has(t.zone_id))
-    .map(t => ({ ...t, _categories: [...(cats.get(t.zone_id) || [])] }))
+  return thermal.value.filter(t =>
+    presentCats.get(t.zone_id)?.has(t.category || 'heating')
+  )
 })
 
 // Stepper de progression de la card GTB (R175-3 / R175-4 / R175-5).
@@ -478,11 +481,12 @@ const bmsSteps = computed(() => {
   ]
 })
 
-// Devices disponibles comme générateurs pour une zone donnée (heating/cooling).
-function generatorDevicesForZone(zoneId) {
+// Devices disponibles comme générateurs pour une (zone, catégorie).
+// On filtre sur la category — un device de chauffage n'a aucun sens
+// comme générateur de la régulation clim et inversement.
+function generatorDevicesForZoneCategory(zoneId, category) {
   const sysIds = systems.value
-    .filter(s => s.zone_id === zoneId && s.present
-                  && (s.system_category === 'heating' || s.system_category === 'cooling'))
+    .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
     .map(s => s.id)
   return devices.value.filter(d => sysIds.includes(d.system_id))
 }
@@ -1547,7 +1551,7 @@ onMounted(() => {
               </td>
               <td class="py-2 px-2">
                 <ProtocolMultiPicker
-                  :model-value="m.communication_protocols || (m.communication_protocol ? JSON.stringify([m.communication_protocol]) : null)"
+                  :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
                   :disabled="!m.communicating"
                   :options="PROTOCOL_OPTIONS"
                   size="xs"
@@ -1632,7 +1636,7 @@ onMounted(() => {
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
               <th class="text-center px-5 py-2">Zone</th>
-              <th class="text-center py-2 w-24">Catégories</th>
+              <th class="text-center py-2 w-32">Usage</th>
               <th class="text-center py-2 w-32">Régulation auto ?</th>
               <th class="text-center py-2 w-40">Type de régulation</th>
               <th class="text-center py-2 w-44">Générateur lié</th>
@@ -1648,13 +1652,10 @@ onMounted(() => {
             <tr v-for="t in thermalFiltered" :key="t.id">
               <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
               <td class="py-2 text-center">
-                <span class="inline-flex items-center gap-1 justify-center">
-                  <Tooltip v-if="t._categories.includes('heating')" text="Chauffage">
-                    <SystemCategoryIcon category="heating" size="sm" />
-                  </Tooltip>
-                  <Tooltip v-if="t._categories.includes('cooling')" text="Refroidissement">
-                    <SystemCategoryIcon category="cooling" size="sm" />
-                  </Tooltip>
+                <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
+                      :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
+                  <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
+                  {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
                 </span>
               </td>
               <td class="py-2 text-center">
@@ -1674,7 +1675,7 @@ onMounted(() => {
                         @change="e => patchThermal(t, { generator_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
                   <option :value="null">— aucun</option>
-                  <option v-for="d in generatorDevicesForZone(t.zone_id)" :key="d.id" :value="d.id">
+                  <option v-for="d in generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')" :key="d.id" :value="d.id">
                     {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
                   </option>
                 </select>

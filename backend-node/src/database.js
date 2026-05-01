@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 56;
+const TARGET_VERSION = 57;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2043,6 +2043,57 @@ function runMigrations() {
     `);
     db.pragma('user_version = 56');
     log.info('Migration 56 appliquee : thermal_regulation.generator_device_id');
+  }
+
+  if (current < 57) {
+    // Card 5 (R175-6) : differenciation par categorie. Une zone peut avoir
+    // une regulation auto en chauffage mais pas en clim. Ajout d'un champ
+    // 'category' (heating/cooling) et changement de la cle UNIQUE de
+    // (document_id, zone_id) a (document_id, zone_id, category).
+    // Rebuild de la table car SQLite ne supporte pas DROP CONSTRAINT.
+    db.exec(`
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN category TEXT;
+      UPDATE bacs_audit_thermal_regulation SET category = 'heating' WHERE category IS NULL;
+
+      CREATE TABLE bacs_audit_thermal_regulation_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+        category TEXT NOT NULL CHECK (category IN ('heating','cooling')),
+        has_automatic_regulation INTEGER NOT NULL DEFAULT 0,
+        regulation_type TEXT
+          CHECK (regulation_type IS NULL OR regulation_type IN
+            ('per_room','per_zone','central_only','none')),
+        generator_type TEXT
+          CHECK (generator_type IS NULL OR generator_type IN
+            ('gas','electric','heat_pump','wood_appliance','district_heating','other')),
+        generator_age_years INTEGER,
+        generator_exempt_wood INTEGER DEFAULT 0,
+        generator_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, zone_id, category)
+      );
+
+      INSERT INTO bacs_audit_thermal_regulation_new
+        (id, document_id, zone_id, category, has_automatic_regulation,
+         regulation_type, generator_type, generator_age_years,
+         generator_exempt_wood, generator_device_id, notes,
+         created_at, updated_at)
+      SELECT
+        id, document_id, zone_id, COALESCE(category, 'heating'),
+        has_automatic_regulation, regulation_type, generator_type,
+        generator_age_years, generator_exempt_wood, generator_device_id, notes,
+        created_at, updated_at
+      FROM bacs_audit_thermal_regulation;
+
+      DROP TABLE bacs_audit_thermal_regulation;
+      ALTER TABLE bacs_audit_thermal_regulation_new RENAME TO bacs_audit_thermal_regulation;
+      CREATE INDEX idx_bacs_thermal_doc ON bacs_audit_thermal_regulation(document_id);
+    `);
+    db.pragma('user_version = 57');
+    log.info('Migration 57 appliquee : thermal_regulation.category (heating/cooling) + UNIQUE recompose');
   }
 
   if (current > TARGET_VERSION) {

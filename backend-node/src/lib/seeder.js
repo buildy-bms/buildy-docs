@@ -585,14 +585,36 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     }
   }
 
+  // Thermal regulation : 1 ligne par (zone, categorie) pour chaque
+  // categorie thermique (heating ou cooling) qui s'applique a la zone.
+  // S'applique = soit la nature de zone l'implique (matrice
+  // requirements_by_zone_nature), soit un systeme de cette categorie est
+  // marque present sur cette zone (cas ou l'auditeur a force la presence
+  // d'un chauffage sur une zone qui ne le requiert pas).
+  const presentSystems = db.db.prepare(`
+    SELECT DISTINCT zone_id, system_category FROM bacs_audit_systems
+    WHERE document_id = ? AND present = 1
+      AND system_category IN ('heating', 'cooling')
+  `).all(documentId);
+  const presentByZone = new Map();
+  for (const s of presentSystems) {
+    if (!presentByZone.has(s.zone_id)) presentByZone.set(s.zone_id, new Set());
+    presentByZone.get(s.zone_id).add(s.system_category);
+  }
   const insertThermal = db.db.prepare(`
-    INSERT OR IGNORE INTO bacs_audit_thermal_regulation (document_id, zone_id, has_automatic_regulation)
-    VALUES (?, ?, 0)
+    INSERT OR IGNORE INTO bacs_audit_thermal_regulation
+      (document_id, zone_id, category, has_automatic_regulation)
+    VALUES (?, ?, ?, 0)
   `);
   let thermalCount = 0;
   for (const z of zones) {
-    const r = insertThermal.run(documentId, z.zone_id);
-    if (r.changes) thermalCount++;
+    const fromNature = z.nature ? (reqByNature[z.nature] || []) : [];
+    const fromSystems = presentByZone.get(z.zone_id) || new Set();
+    for (const cat of ['heating', 'cooling']) {
+      if (!fromNature.includes(cat) && !fromSystems.has(cat)) continue;
+      const r = insertThermal.run(documentId, z.zone_id, cat);
+      if (r.changes) thermalCount++;
+    }
   }
 
   // Ligne 1-1 vide dans bacs_audit_bms (sera editee dans le formulaire GTB)

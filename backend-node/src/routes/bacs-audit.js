@@ -302,7 +302,8 @@ async function routes(fastify) {
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.zone_id = t.zone_id
       WHERE t.document_id = ?
-      ORDER BY z.position, z.name
+      ORDER BY z.position, z.name,
+               CASE t.category WHEN 'heating' THEN 0 ELSE 1 END
     `).all(id);
   });
 
