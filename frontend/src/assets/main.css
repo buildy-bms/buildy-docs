@@ -105,3 +105,47 @@
   .font-black { font-weight: 500 !important; }
 }
 strong, b { font-weight: 500; }
+
+/* ─── Checkboxes Buildy : rondes, vert #00cd92 quand cochees ─────────
+ * Surcharge globale du style Tailwind par defaut. S'applique a tous les
+ * <input type="checkbox"> non-disabled de l'app. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 9999px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 120ms, border-color 120ms;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: #00cd92;
+}
+input[type="checkbox"]:checked {
+  background-color: #00cd92;
+  border-color: #00cd92;
+}
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.32rem;
+  height: 0.55rem;
+  border: solid #fff;
+  border-width: 0 1.8px 1.8px 0;
+  transform: translate(-50%, -60%) rotate(45deg);
+}
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(0, 205, 146, 0.4);
+  outline-offset: 1px;
+}
+input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

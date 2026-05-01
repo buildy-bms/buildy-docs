@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 53;
+const TARGET_VERSION = 54;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1997,6 +1997,19 @@ function runMigrations() {
     `);
     db.pragma('user_version = 53');
     log.info('Migration 53 appliquee : site_documents.category accepte photo');
+  }
+
+  if (current < 54) {
+    // Cf retour Kevin v2.20 : ajout d'un flag 'non concerne' explicite par
+    // systeme. Permet a l'auditeur de masquer les categories qui ne
+    // s'appliquent pas au site (ex : pas de production photovoltaique du
+    // tout) sans les supprimer de la DB. Distinct de present (declare
+    // installe ou non).
+    db.exec(`
+      ALTER TABLE bacs_audit_systems ADD COLUMN not_concerned INTEGER DEFAULT 0;
+    `);
+    db.pragma('user_version = 54');
+    log.info('Migration 54 appliquee : bacs_audit_systems.not_concerned');
   }
 
   if (current > TARGET_VERSION) {

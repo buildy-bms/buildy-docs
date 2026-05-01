@@ -546,3 +546,25 @@ table tr:nth-child(even) td { background: #fafafa; }
   min-width: 12mm;
   text-align: right;
 }
+
+/* ── Pilules R175-3 §3/§4 par equipement ── */
+.r175-3-label {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 7pt;
+  color: #6b7280;
+  margin-right: 1.5mm;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.r175-3-pill {
+  display: inline-block;
+  padding: 0.3mm 1.5mm;
+  border-radius: 1mm;
+  font-size: 7pt;
+  font-weight: 500;
+  margin-right: 1.5mm;
+  white-space: nowrap;
+}
+.r175-3-ok { background: #d1fae5; color: #065f46; border: 0.3pt solid #6ee7b7; }
+.r175-3-ko { background: #fee2e2; color: #991b1b; border: 0.3pt solid #fca5a5; }
+.r175-3-row td { background: transparent !important; }

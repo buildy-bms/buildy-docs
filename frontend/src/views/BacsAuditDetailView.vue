@@ -34,6 +34,8 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
+import MeterTypePill from '@/components/MeterTypePill.vue'
+import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
@@ -61,10 +63,15 @@ const zones = ref([])
 const devices = ref([])
 const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
 
-// Toggle pour afficher les usages non concernes dans la card systemes.
-// Persistance localStorage par utilisateur.
-const showNonPresentSystems = ref(localStorage.getItem('bacs-show-non-present') === '1')
-watch(showNonPresentSystems, v => localStorage.setItem('bacs-show-non-present', v ? '1' : '0'))
+// Toggle pour afficher les usages marques 'non concerne' dans la card
+// systemes. Persistance localStorage. Par defaut tout est visible (les
+// non concernes sont masques uniquement si le flag est explicitement
+// pose par l'auditeur).
+const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
+watch(showNotConcernedSystems, v => localStorage.setItem('bacs-show-not-concerned', v ? '1' : '0'))
+const hiddenNotConcernedCount = computed(() =>
+  systems.value.filter(s => s.not_concerned).length
+)
 
 const ZONE_NATURES = [
   { value: 'shared-office', label: 'Bureau partagé' },
@@ -192,6 +199,29 @@ const itemsBySeverity = computed(() => {
 function actionNumber(idx) {
   return 'BACS-' + String(idx + 1).padStart(3, '0')
 }
+
+// Computed v-model pour les 2 checkboxes conditionnelles : evite les
+// problemes de reactivite avec :checked + @change.
+const districtConnected = computed({
+  get: () => document.value?.bacs_district_heating_substation_kw != null,
+  set: (v) => {
+    saveDocDebounced({
+      bacs_district_heating_substation_kw: v
+        ? (document.value?.bacs_district_heating_substation_kw ?? 0)
+        : null
+    })
+  }
+})
+const generatorWorksDone = computed({
+  get: () => document.value?.bacs_generator_works_date != null,
+  set: (v) => {
+    saveDocDebounced({
+      bacs_generator_works_date: v
+        ? (document.value?.bacs_generator_works_date ?? new Date().toISOString().slice(0, 10))
+        : null
+    })
+  }
+})
 
 // R175-6 applicabilite : PC > 21/07/2021 OU travaux generateur > 21/07/2021
 const R175_6_TRIGGER_DATE = '2021-07-21'
@@ -859,9 +889,6 @@ onMounted(refresh)
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
         </button>
-        <button @click="downloadCsv" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> CSV devis
-        </button>
         <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
           <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'PDF' }}
         </button>
@@ -965,10 +992,7 @@ onMounted(refresh)
           </div>
           <div>
             <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-              <input type="checkbox"
-                     :checked="document?.bacs_generator_works_date != null"
-                     @change="e => saveDocDebounced({ bacs_generator_works_date: e.target.checked ? (document?.bacs_generator_works_date || new Date().toISOString().slice(0, 10)) : null })"
-                     class="rounded border-gray-300" />
+              <input type="checkbox" v-model="generatorWorksDone" class="rounded border-gray-300" />
               <span>Travaux d'installation/remplacement de générateur de chaleur réalisés <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
             </label>
             <div v-if="document?.bacs_generator_works_date != null" class="pl-6 border-l-2 border-indigo-100 mt-2">
@@ -992,10 +1016,7 @@ onMounted(refresh)
           </div>
           <div class="col-span-2 border-t border-gray-100 pt-3">
             <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-              <input type="checkbox"
-                     :checked="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
-                     @change="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.checked ? (document?.bacs_district_heating_substation_kw || 0) : null })"
-                     class="rounded border-gray-300" />
+              <input type="checkbox" v-model="districtConnected" class="rounded border-gray-300" />
               <span>Bâtiment raccordé à un <strong>réseau urbain de chaleur ou de froid</strong></span>
             </label>
             <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
@@ -1153,13 +1174,13 @@ onMounted(refresh)
           <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
         <div class="px-3 py-3 bg-gray-50">
-          <div class="flex items-center justify-end mb-2 gap-2">
+          <div v-if="hiddenNotConcernedCount" class="flex items-center justify-end mb-2 gap-2">
             <label class="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-              <input type="checkbox" v-model="showNonPresentSystems" class="rounded border-gray-300" />
-              Afficher les usages non concernés
+              <input type="checkbox" v-model="showNotConcernedSystems" class="rounded border-gray-300" />
+              Afficher les {{ hiddenNotConcernedCount }} usage{{ hiddenNotConcernedCount > 1 ? 's' : '' }} marqué{{ hiddenNotConcernedCount > 1 ? 's' : '' }} « non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }} »
             </label>
           </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div class="space-y-3">
           <div v-for="g in systemsByZone" :key="g.zone_name"
                class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
             <div class="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
@@ -1168,19 +1189,21 @@ onMounted(refresh)
               <span v-if="g.zone_nature" class="text-[10px] text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
               <span class="ml-auto text-[10px] text-gray-400">
                 {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
-                / {{ g.items.length }}
+                / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
               </span>
             </div>
             <div class="space-y-2">
               <template v-for="s in g.items" :key="s.id">
               <PhotoDropzone
-                v-if="s.present || showNonPresentSystems"
+                v-if="!s.not_concerned || showNotConcernedSystems"
                 :site-uuid="document?.site_uuid || ''"
                 :attach-to="{ system_id: s.id }"
                 :enabled="!!document?.site_uuid && s.present"
                 @changed="refreshAuditData"
               >
-              <div :class="['border rounded-lg overflow-hidden', s.present ? 'border-gray-200' : 'border-dashed border-gray-200 bg-gray-50/50']">
+              <div :class="['border rounded-lg overflow-hidden',
+                            s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
+                                            : (s.present ? 'border-gray-200' : 'border-gray-200 bg-gray-50/30')]">
                 <!-- En-tête catégorie : icone + présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
                   <SystemCategoryIcon :category="s.system_category" size="md" />
@@ -1188,10 +1211,16 @@ onMounted(refresh)
                     {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
                   </span>
                   <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
-                    <input type="checkbox" :checked="!!s.present"
+                    <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
                            @change="e => patchSystem(s, { present: e.target.checked })"
                            class="rounded border-gray-300" />
                     <span class="text-gray-700">Présent</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
+                    <input type="checkbox" :checked="!!s.not_concerned"
+                           @change="e => patchSystem(s, { not_concerned: e.target.checked, present: e.target.checked ? false : !!s.present })"
+                           class="rounded border-gray-300" />
+                    <span class="text-gray-500 italic">Non concerné</span>
                   </label>
                   <button
                     type="button"
@@ -1274,8 +1303,8 @@ onMounted(refresh)
                          :enabled="!!document?.site_uuid"
                          @changed="refreshAuditData">
               <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
-              <td class="py-2 text-gray-700 text-center">{{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }}</td>
-              <td class="py-2 text-gray-700 text-center">{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</td>
+              <td class="py-2 text-center"><MeterUsagePill :usage="m.usage" /></td>
+              <td class="py-2 text-center"><MeterTypePill :type="m.meter_type" /></td>
               <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.required"
                        @change="e => patchMeter(m, { required: e.target.checked })"

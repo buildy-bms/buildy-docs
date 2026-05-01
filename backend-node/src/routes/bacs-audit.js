@@ -70,6 +70,7 @@ async function routes(fastify) {
       notes_p4: z.string().nullable().optional(),
       notes_p4_autonomous: z.string().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
+      not_concerned: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -83,6 +84,7 @@ async function routes(fastify) {
       }
     };
     if (body.present !== undefined) { sets.push('present = ?'); args.push(body.present ? 1 : 0); }
+    boolField('not_concerned');
     if ('communication' in body) { sets.push('communication = ?'); args.push(body.communication); }
     if ('equipment_id' in body) { sets.push('equipment_id = ?'); args.push(body.equipment_id); }
     if ('notes' in body) { sets.push('notes = ?'); args.push(body.notes); }

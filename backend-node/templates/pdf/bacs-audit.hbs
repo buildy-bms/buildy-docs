@@ -194,19 +194,18 @@
       <table class="device-table">
         <thead>
           <tr>
-            <th style="width:22%">Équipement</th>
-            <th style="width:18%">Marque / réf.</th>
+            <th style="width:24%">Équipement</th>
+            <th style="width:20%">Marque / réf.</th>
             <th style="width:9%">Énergie</th>
             <th style="width:8%">Puiss.</th>
-            <th style="width:10%">Nature</th>
-            <th style="width:13%">Communication</th>
+            <th style="width:11%">Nature</th>
+            <th style="width:14%">Communication</th>
             <th style="width:14%">Localisation</th>
-            <th style="width:6%">R175-3 §3/§4</th>
           </tr>
         </thead>
         <tbody>
           {{#each devices}}
-            <tr {{#if out_of_service}}style="opacity:0.5;text-decoration:line-through"{{/if}}>
+            <tr {{#if out_of_service}}style="opacity:0.5"{{/if}}>
               <td>
                 <strong>{{name}}</strong>
                 {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
@@ -217,18 +216,24 @@
               <td>{{roleLabel}}</td>
               <td>{{commLabel}}</td>
               <td>{{location}}</td>
-              <td style="white-space:nowrap;font-size:7pt">
-                {{#if meets_r175_3_p3}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
-                {{#if meets_r175_3_p4}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
-                {{#if meets_r175_3_p4_autonomous}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
+            </tr>
+            <tr class="r175-3-row" {{#if out_of_service}}style="opacity:0.5"{{/if}}>
+              <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
+                <span class="r175-3-label">R175-3 :</span>
+                <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                  {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} §3 Interopérable
+                </span>
+                <span class="r175-3-pill {{#if meets_r175_3_p4}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                  {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} §4 Arrêt manuel
+                </span>
+                <span class="r175-3-pill {{#if meets_r175_3_p4_autonomous}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                  {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} §4 Reprise autonome
+                </span>
               </td>
             </tr>
           {{/each}}
         </tbody>
       </table>
-      <p class="muted" style="font-size:7pt;margin-top:-2mm">
-        Colonnes R175-3 (3 cases) : interopérabilité §3 · arrêt manuel §4 · gestion autonome §4.
-      </p>
     {{else}}
       <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
     {{/if}}
