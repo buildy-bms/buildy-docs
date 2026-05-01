@@ -9,6 +9,7 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropTr from './PhotoDropTr.vue'
+import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 
 /**
  * Sous-table éditable des équipements (devices) d'un système BACS donné.
@@ -56,17 +57,18 @@ const ROLE_OPTIONS = [
   { value: 'autre', label: 'Autre' },
 ]
 const COMM_OPTIONS = [
-  { value: null, label: '—' },
   { value: 'modbus_tcp', label: 'Modbus TCP' },
   { value: 'modbus_rtu', label: 'Modbus RTU' },
   { value: 'bacnet_ip', label: 'BACnet IP' },
   { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
   { value: 'knx', label: 'KNX' },
   { value: 'mbus', label: 'M-Bus' },
+  { value: 'lonworks', label: 'LonWorks' },
   { value: 'mqtt', label: 'MQTT' },
+  { value: 'opcua', label: 'OPC-UA' },
+  { value: 'rest', label: 'API REST' },
   { value: 'lorawan', label: 'LoRaWAN' },
   { value: 'autre', label: 'Autre' },
-  { value: 'non_communicant', label: 'Non communicant' },
 ]
 
 const newDevice = ref({
@@ -241,7 +243,8 @@ async function removeDevice(d) {
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Énergie</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-24">Puissance&nbsp;(kW)</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-36">Communication</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-14" title="Câblé physiquement à la GTB">Câblé</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-44">Communication</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-40">Notes</th>
@@ -296,12 +299,19 @@ async function removeDevice(d) {
                    @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
                    :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
           </td>
+          <td class="py-1 px-1 text-center">
+            <input type="checkbox" :checked="!!d.wired"
+                   @change="e => patchDevice(d, { wired: e.target.checked })"
+                   class="rounded border-gray-300"
+                   title="Câblé physiquement à la GTB" />
+          </td>
           <td class="py-1 px-1">
-            <select :value="d.communication_protocol"
-                    @change="e => patchDevice(d, { communication_protocol: e.target.value || null })"
-                    :class="selectCls">
-              <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
+            <ProtocolMultiPicker
+              :model-value="d.communication_protocols || (d.communication_protocol ? JSON.stringify([d.communication_protocol]) : null)"
+              :options="COMM_OPTIONS"
+              size="xs"
+              @update:modelValue="v => patchDevice(d, { communication_protocols: v })"
+            />
           </td>
           <td class="py-1 px-1 text-center">
             <input type="checkbox" :checked="!!d.meets_r175_3_p4"

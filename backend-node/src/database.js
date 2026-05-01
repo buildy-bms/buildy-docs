@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 54;
+const TARGET_VERSION = 55;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2010,6 +2010,27 @@ function runMigrations() {
     `);
     db.pragma('user_version = 54');
     log.info('Migration 54 appliquee : bacs_audit_systems.not_concerned');
+  }
+
+  if (current < 55) {
+    // Retour Kevin v2.29 :
+    // (1) flag 'wired' (cablage physique) sur devices et meters. Un
+    // equipement communicant mais pas cable ne remonte pas dans la GTB
+    // -> doit apparaitre comme HS liaison.
+    // (2) communication_protocols TEXT JSON pour multi-protocoles
+    // (laisse l'ancien communication_protocol single intact pour compat
+    // descendante, mais l'UI utilisera l'array si rempli).
+    // (3) bacs_audit_bms.provided_protocols pour les protocoles de mise
+    // a disposition des points (BACnet, Modbus, OPC-UA, MQTT, API REST...).
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN wired INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_meters ADD COLUMN wired INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN communication_protocols TEXT;
+      ALTER TABLE bacs_audit_meters ADD COLUMN communication_protocols TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN provided_protocols TEXT;
+    `);
+    db.pragma('user_version = 55');
+    log.info('Migration 55 appliquee : wired + multi-protocoles + bms.provided_protocols');
   }
 
   if (current > TARGET_VERSION) {

@@ -40,6 +40,7 @@ import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import AddZoneModal from '@/components/AddZoneModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
+import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
@@ -177,6 +178,21 @@ const SYSTEM_LABEL = {
 }
 // Libellés négatifs pour la case "Pas de XXX" (à la place de "Non concerné").
 // Utilisés à l'affichage UI et passés au PDF pour cohérence.
+// Protocoles communicants disponibles (multi-select pour devices, meters, BMS)
+const PROTOCOL_OPTIONS = [
+  { value: 'modbus_tcp', label: 'Modbus TCP' },
+  { value: 'modbus_rtu', label: 'Modbus RTU' },
+  { value: 'bacnet_ip', label: 'BACnet IP' },
+  { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
+  { value: 'knx', label: 'KNX' },
+  { value: 'mbus', label: 'M-Bus' },
+  { value: 'lonworks', label: 'LonWorks' },
+  { value: 'mqtt', label: 'MQTT' },
+  { value: 'opcua', label: 'OPC-UA' },
+  { value: 'rest', label: 'API REST' },
+  { value: 'lorawan', label: 'LoRaWAN' },
+  { value: 'autre', label: 'Autre' },
+]
 const SYSTEM_NEGATIVE_LABEL = {
   heating: 'Pas de chauffage',
   cooling: 'Pas de refroidissement',
@@ -410,6 +426,21 @@ const devicesBySystem = computed(() => {
 
 // Compteurs présents uniquement (pour la liste GTB des compteurs intégrés)
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
+
+// Régulation thermique (R175-6) : ne lister que les zones qui ont un
+// système chauffage ou refroidissement (présent OU non concerné).
+// Les zones sans système thermique (ex : un local technique sans chauffage)
+// n'ont pas de régulation à évaluer.
+const thermalFiltered = computed(() => {
+  const zonesWithThermal = new Set()
+  for (const s of systems.value) {
+    if (!s.present) continue
+    if (s.system_category === 'heating' || s.system_category === 'cooling') {
+      zonesWithThermal.add(s.zone_id)
+    }
+  }
+  return thermal.value.filter(t => zonesWithThermal.has(t.zone_id))
+})
 
 // Tout replier / déplier (broadcast vers chaque CollapsibleSection)
 function setAllSectionsCollapsed(collapsed) {
@@ -1271,9 +1302,11 @@ onMounted(() => {
         <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
           <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
-          <span class="text-xs text-gray-500">R175-1 §4 / R175-3 §3, §4</span>
-          <R175Tooltip article="R175-1 §4" />
-          <R175Tooltip article="R175-3" />
+          <span class="text-xs text-gray-500 inline-flex items-center gap-0.5">
+            R175-1 §4<R175Tooltip article="R175-1 §4" />
+            <span class="mx-1">/</span>
+            R175-3 §3, §4<R175Tooltip article="R175-3" />
+          </span>
           <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
             Total chauffage + clim :
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
@@ -1345,10 +1378,11 @@ onMounted(() => {
                            class="rounded border-gray-300" />
                     <span class="text-gray-700">Présent</span>
                   </label>
-                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
-                    <input type="checkbox" :checked="!!s.not_concerned"
+                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap"
+                         :class="s.present ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'">
+                    <input type="checkbox" :checked="!!s.not_concerned" :disabled="!!s.present"
                            @change="e => patchSystem(s, { not_concerned: e.target.checked, present: e.target.checked ? false : !!s.present })"
-                           class="rounded border-gray-300" />
+                           class="rounded border-gray-300 disabled:opacity-30" />
                     <span class="text-gray-500 italic">{{ SYSTEM_NEGATIVE_LABEL[s.system_category] || 'Non concerné' }}</span>
                   </label>
                   <button
@@ -1427,7 +1461,8 @@ onMounted(() => {
               <th class="text-center py-2 w-20">Requis</th>
               <th class="text-center py-2 w-20">Présent</th>
               <th class="text-center py-2 w-24">Communicant</th>
-              <th class="text-center py-2 w-32">Protocole</th>
+              <th class="text-center py-2 w-20" title="Câblé physiquement à la GTB (paire torsadée, bus, etc.)">Câblé</th>
+              <th class="text-center py-2 w-44">Protocoles</th>
               <th class="text-center py-2 w-28">Notes</th>
               <th class="text-center py-2 w-24">Photos</th>
               <th class="text-center py-2 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>
@@ -1460,20 +1495,19 @@ onMounted(() => {
                        class="rounded border-gray-300 disabled:opacity-30" />
               </td>
               <td class="py-2 text-center">
-                <select :value="m.communication_protocol" :disabled="!m.communicating"
-                        @change="e => patchMeter(m, { communication_protocol: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded disabled:opacity-30 text-center">
-                  <option :value="null">—</option>
-                  <option value="modbus_tcp">Modbus TCP</option>
-                  <option value="modbus_rtu">Modbus RTU</option>
-                  <option value="bacnet_ip">BACnet IP</option>
-                  <option value="bacnet_mstp">BACnet MS/TP</option>
-                  <option value="knx">KNX</option>
-                  <option value="mbus">M-Bus</option>
-                  <option value="mqtt">MQTT</option>
-                  <option value="lorawan">LoRaWAN</option>
-                  <option value="other">Autre</option>
-                </select>
+                <input type="checkbox" :checked="!!m.wired" :disabled="!m.present_actual"
+                       @change="e => patchMeter(m, { wired: e.target.checked })"
+                       class="rounded border-gray-300 disabled:opacity-30"
+                       title="Câblé physiquement vers la GTB" />
+              </td>
+              <td class="py-2 px-2">
+                <ProtocolMultiPicker
+                  :model-value="m.communication_protocols || (m.communication_protocol ? JSON.stringify([m.communication_protocol]) : null)"
+                  :disabled="!m.communicating"
+                  :options="PROTOCOL_OPTIONS"
+                  size="xs"
+                  @update:modelValue="v => patchMeter(m, { communication_protocols: v })"
+                />
               </td>
               <td class="py-2 text-center">
                 <button
@@ -1540,11 +1574,11 @@ onMounted(() => {
           <StepValidateBadge class="ml-auto" :step="stepFor('thermal')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
         <template #summary>
-          <span v-if="thermal.length">
-            {{ thermal.length }} zone{{ thermal.length > 1 ? 's' : '' }} thermique{{ thermal.length > 1 ? 's' : '' }}
-            · {{ thermal.filter(t => t.has_automatic_regulation).length }} régulation{{ thermal.filter(t => t.has_automatic_regulation).length > 1 ? 's' : '' }} auto
-            <span v-if="thermal.filter(t => t.generator_exempt_wood).length">
-              · {{ thermal.filter(t => t.generator_exempt_wood).length }} exempté{{ thermal.filter(t => t.generator_exempt_wood).length > 1 ? 's' : '' }} bois
+          <span v-if="thermalFiltered.length">
+            {{ thermalFiltered.length }} zone{{ thermalFiltered.length > 1 ? 's' : '' }} thermique{{ thermalFiltered.length > 1 ? 's' : '' }}
+            · {{ thermalFiltered.filter(t => t.has_automatic_regulation).length }} régulation{{ thermalFiltered.filter(t => t.has_automatic_regulation).length > 1 ? 's' : '' }} auto
+            <span v-if="thermalFiltered.filter(t => t.generator_exempt_wood).length">
+              · {{ thermalFiltered.filter(t => t.generator_exempt_wood).length }} exempté{{ thermalFiltered.filter(t => t.generator_exempt_wood).length > 1 ? 's' : '' }} bois
             </span>
           </span>
           <span v-else class="italic">Aucune régulation thermique relevée</span>
@@ -1562,7 +1596,7 @@ onMounted(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="t in thermal" :key="t.id">
+            <tr v-for="t in thermalFiltered" :key="t.id">
               <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
               <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!t.has_automatic_regulation"
@@ -1609,9 +1643,13 @@ onMounted(() => {
         <template #header>
           <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
           <h2 class="text-base font-semibold text-gray-800">6. Solution GTB / GTC en place</h2>
-          <span class="text-xs text-gray-500">R175-3 + R175-4 + R175-5</span>
-          <R175Tooltip article="R175-4" />
-          <R175Tooltip article="R175-5" />
+          <span class="text-xs text-gray-500 inline-flex items-center gap-0.5">
+            R175-3<R175Tooltip article="R175-3" />
+            <span class="mx-0.5">+</span>
+            R175-4<R175Tooltip article="R175-4" />
+            <span class="mx-0.5">+</span>
+            R175-5<R175Tooltip article="R175-5" />
+          </span>
           <div class="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -1675,6 +1713,19 @@ onMounted(() => {
               <input v-model="bms.model_reference" type="text" placeholder="ex : JACE 8000"
                      @input="saveBmsDebounced"
                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">
+                Protocoles de mise à disposition des points
+                <span class="text-gray-400 font-normal">— vers la supervision Buildy ou un tiers</span>
+              </label>
+              <ProtocolMultiPicker
+                :model-value="bms.provided_protocols"
+                :options="PROTOCOL_OPTIONS"
+                size="sm"
+                placeholder="Aucun protocole renseigné"
+                @update:modelValue="v => { bms.provided_protocols = v; saveBmsDebounced() }"
+              />
             </div>
           </div>
 
@@ -1777,10 +1828,11 @@ onMounted(() => {
                              class="rounded disabled:opacity-30" />
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!d.bms_integration_out_of_service"
-                             :disabled="!d.managed_by_bms"
+                      <input type="checkbox" :checked="!!d.bms_integration_out_of_service || (d.managed_by_bms && !d.wired)"
+                             :disabled="!d.managed_by_bms || !d.wired"
+                             :title="d.managed_by_bms && !d.wired ? 'Équipement non câblé — automatiquement HS dans la GTB' : ''"
                              @change="e => patchDeviceMb(d, { bms_integration_out_of_service: e.target.checked })"
-                             class="rounded accent-red-500 disabled:opacity-30" />
+                             class="rounded accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed" />
                     </td>
                   </tr>
                 </tbody>
@@ -1817,15 +1869,17 @@ onMounted(() => {
                     </td>
                     <td class="py-1 text-center">
                       <input type="checkbox" :checked="!!m.managed_by_bms"
-                             :disabled="m.out_of_service"
+                             :disabled="m.out_of_service || !m.communicating"
+                             :title="!m.communicating ? 'Compteur non communicant — ne peut pas être intégré à la GTB' : ''"
                              @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
-                             class="rounded disabled:opacity-30" />
+                             class="rounded disabled:opacity-30 disabled:cursor-not-allowed" />
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!m.bms_integration_out_of_service"
-                             :disabled="!m.managed_by_bms"
+                      <input type="checkbox" :checked="!!m.bms_integration_out_of_service || (m.managed_by_bms && !m.wired)"
+                             :disabled="!m.managed_by_bms || !m.wired"
+                             :title="m.managed_by_bms && !m.wired ? 'Compteur non câblé — automatiquement HS dans la GTB' : ''"
                              @change="e => patchMeter(m, { bms_integration_out_of_service: e.target.checked })"
-                             class="rounded accent-red-500 disabled:opacity-30" />
+                             class="rounded accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed" />
                     </td>
                   </tr>
                 </tbody>

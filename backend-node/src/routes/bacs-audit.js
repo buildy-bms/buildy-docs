@@ -158,6 +158,8 @@ async function routes(fastify) {
       present_actual: z.boolean().optional(),
       communicating: z.boolean().optional(),
       communication_protocol: z.string().nullable().optional(),
+      communication_protocols: z.string().nullable().optional(),
+      wired: z.boolean().nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
       recommendation: z.enum(RECOMMENDATIONS).nullable().optional(),
       notes: z.string().nullable().optional(),
@@ -265,6 +267,8 @@ async function routes(fastify) {
       data_provision_to_manager: boolish,
       data_provision_to_operators: boolish,
       notes_data_provision: z.string().nullable().optional(),
+      // Protocoles de mise a disposition des points (BACnet/Modbus/OPC-UA/MQTT/REST...)
+      provided_protocols: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -897,6 +901,8 @@ async function routes(fastify) {
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
       device_role: z.enum(DEVICE_ROLES).nullable().optional(),
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
+      communication_protocols: z.string().nullable().optional(),
+      wired: z.boolean().nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       notes_html: z.string().nullable().optional(),
