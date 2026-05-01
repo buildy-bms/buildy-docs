@@ -5,13 +5,21 @@ import { getAfAudit } from '@/api'
 
 const props = defineProps({
   afId: { type: Number, required: true },
+  // 'af' | 'bacs_audit' | 'site_audit' — utilisé pour adapter les libellés
+  // génériques (af.update → « a modifié l'audit » au lieu de « a modifié l'AF »).
+  kind: { type: String, default: 'af' },
 })
+
+const isAudit = computed(() => props.kind === 'bacs_audit' || props.kind === 'site_audit')
+const docLabel = computed(() => isAudit.value ? 'l\'audit' : 'l\'AF')
 
 const entries = ref([])
 const loading = ref(false)
 
-const ACTION_LABELS = {
-  // AF
+// Libellés communs (af.* + section.* + export.* + claude.*) qui dépendent
+// du kind du document. Construit une map dynamique selon docLabel.
+const ACTION_LABELS = computed(() => ({
+  // Sections / contenu narratif AF (jamais déclenchés sur un audit)
   'section.update': { label: 'a édité', color: 'text-gray-700' },
   'section.override.add': { label: 'a ajouté un override de point', color: 'text-amber-700' },
   'section.override.remove': { label: 'a retiré un override de point', color: 'text-amber-700' },
@@ -19,13 +27,15 @@ const ACTION_LABELS = {
   'section.template.sync': { label: 'a synchronisé un template', color: 'text-emerald-700' },
   'section.template.dismiss': { label: 'a reporté une mise à jour template', color: 'text-gray-600' },
   'export.points-list': { label: 'a exporté la liste de points', color: 'text-indigo-700' },
-  'export.af': { label: 'a exporté l\'AF (PDF)', color: 'text-indigo-700' },
+  'export.af': { label: `a exporté ${docLabel.value} (PDF)`, color: 'text-indigo-700' },
+  'export.bacs-audit': { label: 'a exporté l\'audit (PDF)', color: 'text-indigo-700' },
   'export.synthesis': { label: 'a exporté la synthèse', color: 'text-indigo-700' },
   'af.checkpoint': { label: 'a marqué une version', color: 'text-emerald-700' },
   'af.restore': { label: 'a restauré une version', color: 'text-red-700' },
-  'af.delivered': { label: 'a livré l\'AF (DOE)', color: 'text-emerald-700' },
-  'af.update': { label: 'a modifié l\'AF', color: 'text-gray-700' },
-  'af.create': { label: 'a créé l\'AF', color: 'text-emerald-700' },
+  'af.delivered': { label: `a livré ${docLabel.value}${isAudit.value ? '' : ' (DOE)'}`, color: 'text-emerald-700' },
+  // af.update est aussi déclenché pour les audits (table afs partagée)
+  'af.update': { label: `a modifié ${docLabel.value}`, color: 'text-gray-700' },
+  'af.create': { label: `a créé ${docLabel.value}`, color: 'text-emerald-700' },
   'claude.draft': { label: 'a généré un brouillon Claude', color: 'text-violet-700' },
   // Audits BACS / GTB
   'bacs_audit.create': { label: 'a créé l\'audit', color: 'text-emerald-700' },
@@ -34,7 +44,7 @@ const ACTION_LABELS = {
   'bacs_audit.step.invalidate': { label: 'a annulé une validation d\'étape', color: 'text-amber-700' },
   'bacs_audit.synthesis.generate': { label: 'a généré la synthèse Claude', color: 'text-violet-700' },
   'bacs_audit.alternatives.generate': { label: 'a généré des préconisations Claude', color: 'text-violet-700' },
-  'export.bacs-audit': { label: 'a exporté l\'audit (PDF)', color: 'text-indigo-700' },
+  'bacs_audit.fixture.create': { label: 'a créé un audit de démonstration', color: 'text-emerald-700' },
   'document.delivered': { label: 'a livré l\'audit', color: 'text-emerald-700' },
   'site_document.upload': { label: 'a ajouté un document', color: 'text-blue-700' },
   'site_document.delete': { label: 'a supprimé un document', color: 'text-red-700' },
@@ -42,7 +52,7 @@ const ACTION_LABELS = {
   'credential.update': { label: 'a modifié un credential', color: 'text-gray-700' },
   'credential.delete': { label: 'a supprimé un credential', color: 'text-red-700' },
   'credential.revealed': { label: 'a révélé un credential', color: 'text-amber-700' },
-}
+}))
 
 async function refresh() {
   loading.value = true

@@ -2348,7 +2348,7 @@ onMounted(() => {
             class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10 p-1"
             title="Replier"
           >✕</button>
-          <ActivityPanel ref="activityRef" :af-id="docId" />
+          <ActivityPanel ref="activityRef" :af-id="docId" :kind="document?.kind || 'bacs_audit'" />
         </aside>
       </transition>
       <div
