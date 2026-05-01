@@ -243,7 +243,7 @@ async function removeDevice(d) {
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Énergie</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-24">Puissance&nbsp;(kW)</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-14" title="Câblé physiquement à la GTB">Câblé</th>
+          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-28" title="Communication câblée vers la GTB (paire torsadée, bus, fibre, etc.)">Communication câblée</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-44">Communication</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
           <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 §4 — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
@@ -303,7 +303,7 @@ async function removeDevice(d) {
             <input type="checkbox" :checked="!!d.wired"
                    @change="e => patchDevice(d, { wired: e.target.checked })"
                    class="rounded border-gray-300"
-                   title="Câblé physiquement à la GTB" />
+                   title="Communication câblée vers la GTB" />
           </td>
           <td class="py-1 px-1">
             <ProtocolMultiPicker

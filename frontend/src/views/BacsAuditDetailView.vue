@@ -1505,7 +1505,9 @@ onMounted(() => {
               <th class="text-center py-2 w-20">Requis</th>
               <th class="text-center py-2 w-20">Présent</th>
               <th class="text-center py-2 w-24">Communicant</th>
-              <th class="text-center py-2 w-20" title="Câblé physiquement à la GTB (paire torsadée, bus, etc.)">Câblé</th>
+              <th class="text-center py-2 w-28">
+                <Tooltip text="Communication câblée vers la GTB (paire torsadée, bus, fibre, etc.)"><span>Communication câblée</span></Tooltip>
+              </th>
               <th class="text-center py-2 w-44">Protocoles</th>
               <th class="text-center py-2 w-28">Notes</th>
               <th class="text-center py-2 w-24">Photos</th>
@@ -1544,7 +1546,7 @@ onMounted(() => {
                 <input type="checkbox" :checked="!!m.wired" :disabled="!m.present_actual"
                        @change="e => patchMeter(m, { wired: e.target.checked })"
                        class="rounded border-gray-300 disabled:opacity-30"
-                       title="Câblé physiquement vers la GTB" />
+                       title="Communication câblée vers la GTB" />
               </td>
               <td class="py-2 px-2">
                 <ProtocolMultiPicker
