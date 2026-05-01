@@ -361,3 +361,56 @@ table tr:nth-child(even) td { background: #fafafa; }
 .alt-solutions ul, .alt-solutions ol { padding-left: 5mm; margin: 1mm 0; }
 .alt-solutions li { margin: 0.5mm 0; line-height: 1.4; }
 .alt-solutions p { margin: 0 0 1mm; }
+
+/* ── Numero d'action (BACS-001) pour reference devis integrateur ── */
+.action-num {
+  display: inline-block;
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  background: #1f2937;
+  color: white;
+  padding: 0.5mm 1.5mm;
+  border-radius: 0.8mm;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── Alternatives manquantes (R175-5-1 4°) ── */
+.alt-solutions-missing {
+  margin-top: 2mm;
+  padding: 2mm 3mm;
+  background: #fef2f2;
+  border-left: 1.5pt solid #dc2626;
+  border-radius: 0.5mm;
+  font-size: 8.5pt;
+  color: #991b1b;
+  page-break-inside: avoid;
+}
+.alt-solutions-missing strong { color: #7f1d1d; }
+
+/* ── Citation reglementaire R175-2 (clause de dispense TRI) ── */
+.roi-quote {
+  margin: 4mm 0;
+  padding: 4mm 6mm;
+  background: #fffbeb;
+  border-left: 3pt solid #f59e0b;
+  border-radius: 0.5mm;
+  page-break-inside: avoid;
+}
+.roi-quote-label {
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: #92400e;
+  margin: 0 0 2mm 0;
+}
+.roi-quote blockquote {
+  margin: 0;
+  font-size: 9.5pt;
+  font-style: italic;
+  color: #78350f;
+  line-height: 1.5;
+}
+.roi-quote blockquote strong { color: #451a03; font-style: normal; }

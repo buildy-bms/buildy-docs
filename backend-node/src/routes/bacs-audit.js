@@ -644,8 +644,18 @@ async function routes(fastify) {
     }));
 
     // Plan de mise en conformite groupe par severite
+    // Numerotation BACS-001/002/... pour faciliter le devis des integrateurs.
+    // L'ordre suit l'affichage du PDF : bloquantes -> majeures -> mineures.
+    const numberedItems = [
+      ...actionItemsRaw.filter(a => a.severity === 'blocking'),
+      ...actionItemsRaw.filter(a => a.severity === 'major'),
+      ...actionItemsRaw.filter(a => a.severity === 'minor'),
+    ].map((a, idx) => ({
+      ...a,
+      display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
+    }));
     const actionItems = { blocking: [], major: [], minor: [] };
-    for (const a of actionItemsRaw) actionItems[a.severity]?.push(a);
+    for (const a of numberedItems) actionItems[a.severity]?.push(a);
     const actionStats = {
       blocking: actionItems.blocking.length,
       major: actionItems.major.length,
@@ -1228,6 +1238,9 @@ async function routes(fastify) {
         // R175-5-1 1° : examen de l'analyse fonctionnelle existante
         // (uniquement a la 1ere inspection).
         existing_af_status: af.audit_existing_af_status,
+        // R175-2 clause de dispense : etude TRI fournie par le proprietaire
+        roi_study_status: af.bacs_roi_study_status,
+        roi_study_notes: stripHtml(af.bacs_roi_study_html),
       },
       site: site ? { name: site.name, address: site.address, city: site.city } : null,
       zones: zones.map(z => ({

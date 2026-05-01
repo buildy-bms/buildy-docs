@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 50;
+const TARGET_VERSION = 51;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1924,6 +1924,19 @@ function runMigrations() {
     log.info("Migration 50 appliquee : R175-5-1 (AF existante + alternatives + station d'echange)");
   }
 
+  if (current < 51) {
+    // Cf retour Kevin v2.13 : la clause de dispense R175-2 (TRI > 10 ans) est
+    // explicitement de la responsabilite du proprietaire (ou son BET). On
+    // ajoute une trace de l'etude TRI dans l'audit, cite le texte du decret
+    // dans le PDF, mais Buildy ne calcule rien.
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN bacs_roi_study_status TEXT;
+      ALTER TABLE afs ADD COLUMN bacs_roi_study_html TEXT;
+    `);
+    db.pragma('user_version = 51');
+    log.info('Migration 51 appliquee : afs.bacs_roi_study_* (clause de dispense R175-2)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -2275,6 +2288,7 @@ const afs = {
       'delivered_pdf_sha256', 'delivered_git_tag',
       'audit_synthesis_html', 'audit_synthesis_generated_at',
       'audit_existing_af_status', 'bacs_district_heating_substation_kw',
+      'bacs_roi_study_status', 'bacs_roi_study_html',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

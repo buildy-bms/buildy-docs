@@ -165,6 +165,12 @@ const itemsBySeverity = computed(() => {
   return out
 })
 
+// Numero affiche par action du plan : "BACS-001" -> facilite la
+// reference dans les devis des integrateurs GTB.
+function actionNumber(idx) {
+  return 'BACS-' + String(idx + 1).padStart(3, '0')
+}
+
 function relativeTime(s) {
   if (!s) return ''
   const d = new Date(s)
@@ -947,6 +953,58 @@ onMounted(refresh)
         </div>
       </CollapsibleSection>
 
+      <!-- 1bis. Calcul du retour sur investissement (R175-2 — clause de dispense) -->
+      <CollapsibleSection storage-key="roi" section-id="section-roi">
+        <template #header>
+          <BuildingOffice2Icon class="w-5 h-5 text-amber-600" />
+          <h2 class="text-base font-semibold text-gray-800">Calcul du retour sur investissement</h2>
+          <span class="text-xs text-gray-500">R175-2 — clause de dispense</span>
+          <R175Tooltip article="R175-2" />
+        </template>
+        <div class="px-5 py-4 space-y-4">
+          <div class="bg-amber-50 border-l-4 border-amber-400 px-4 py-3 rounded-r">
+            <p class="text-xs font-semibold text-amber-900 uppercase tracking-wider mb-1.5">Citation du décret R175-2</p>
+            <blockquote class="text-sm text-amber-900 italic leading-relaxed">
+              « […] sauf si leur <strong>propriétaire</strong> produit une étude établissant que l'installation d'un système d'automatisation et de contrôle <strong>n'est pas réalisable avec un temps de retour sur investissement inférieur à dix ans</strong>. »
+            </blockquote>
+            <p class="text-[11px] text-amber-800 mt-2 leading-relaxed">
+              Le calcul du temps de retour sur investissement (TRI) <strong>incombe au propriétaire du bâtiment</strong> (ou à son bureau d'études techniques mandaté). Buildy n'effectue pas ce calcul dans le cadre de l'audit : les hypothèses (prix de l'énergie, baseline de consommation, taux d'économie attendu, durée d'amortissement, aides publiques déduites) relèvent des projections financières du propriétaire et de son contexte commercial. Le présent audit fournit les données techniques nécessaires (zones, systèmes, compteurs, GTB existante, plan de mise en conformité) pour qu'une telle étude puisse être conduite par un tiers compétent.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Statut de l'étude TRI</label>
+            <select
+              :value="document?.bacs_roi_study_status || ''"
+              @change="e => saveDocDebounced({ bacs_roi_study_status: e.target.value || null })"
+              class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-full max-w-md"
+            >
+              <option value="">Non renseigné</option>
+              <option value="pending">À produire — étude non encore engagée</option>
+              <option value="provided_by_owner">Étude réalisée par le propriétaire</option>
+              <option value="provided_by_third_party">Étude réalisée par un bureau d'études tiers</option>
+              <option value="not_applicable">Non applicable (bâtiment non soumis à la dispense)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Notes / résultats du TRI fournis par le propriétaire
+              <span class="text-[10px] text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <RichTextEditor
+              :model-value="document?.bacs_roi_study_html || ''"
+              @update:model-value="html => saveDocDebounced({ bacs_roi_study_html: html || null })"
+              placeholder="Si le propriétaire ou son BET fournit les conclusions de l'étude TRI, les retranscrire ici (durée, hypothèses, scénarios, conclusion sur la dispense)…"
+              min-height="160px"
+            />
+            <p class="text-[11px] text-gray-500 mt-1.5 italic">
+              Cette zone permet de tracer dans l'audit l'existence et les conclusions de l'étude TRI sans la calculer. Les pièces justificatives (rapport BET, scénarios chiffrés, factures de référence) peuvent être déposées dans la section Documents du site (catégorie « Rapport d'essais » ou « Autre »).
+            </p>
+          </div>
+        </div>
+      </CollapsibleSection>
+
       <!-- 2. Zones fonctionnelles (R175-1 §6) — editable in-situ -->
       <CollapsibleSection storage-key="zones" section-id="section-zones">
         <template #header>
@@ -1624,6 +1682,7 @@ onMounted(refresh)
         <table class="w-full text-sm" style="table-layout: fixed">
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
+              <th class="text-center px-2 py-2 w-16 whitespace-nowrap" title="Numéro d'action — utilisable comme référence par les intégrateurs GTB pour leur devis">N°</th>
               <th class="text-left px-3 py-2 w-24 whitespace-nowrap">Sévérité</th>
               <th class="text-left py-2 w-24 whitespace-nowrap">Article</th>
               <th class="text-left py-2 min-w-70">Action</th>
@@ -1635,9 +1694,14 @@ onMounted(refresh)
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="it in actionItems" :key="it.id"
+            <tr v-for="(it, idx) in actionItems" :key="it.id"
                 :class="['transition', it.status === 'done' ? 'opacity-50 line-through' : (it.status === 'declined' ? 'opacity-50' : '')]"
                 :title="it.status === 'done' ? 'Action marquee comme terminee' : (it.status === 'declined' ? 'Action declinee' : '')">
+              <td class="px-2 py-2 align-top text-center">
+                <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 text-xs font-mono font-bold rounded bg-gray-800 text-white whitespace-nowrap">
+                  {{ actionNumber(idx) }}
+                </span>
+              </td>
               <td class="px-3 py-2 align-top">
                 <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', SEVERITY_LABEL[it.severity].cls]">
                   {{ SEVERITY_LABEL[it.severity].label }}
@@ -1675,13 +1739,15 @@ onMounted(refresh)
                     :class="['inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium rounded border transition disabled:opacity-50 whitespace-nowrap',
                       hasNotes(it.alternative_solutions_html)
                         ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-                    :title="alternativesGenerating[it.id] ? 'Génération en cours…' : (hasNotes(it.alternative_solutions_html) ? 'Régénérer les alternatives' : 'Générer des alternatives via Claude')"
+                        : (it.status === 'open'
+                          ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
+                          : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
+                    :title="alternativesGenerating[it.id] ? 'Génération en cours…' : (hasNotes(it.alternative_solutions_html) ? 'Régénérer les alternatives' : 'Aucune préconisation alternative — cliquer pour générer via Claude (R175-5-1 4°)')"
                   >
                     <SparklesIcon class="w-3.5 h-3.5" :class="alternativesGenerating[it.id] ? 'animate-pulse' : ''" />
                     {{ alternativesGenerating[it.id]
                         ? 'Génération…'
-                        : (hasNotes(it.alternative_solutions_html) ? 'Régénérer' : 'Préconisez d\'autres solutions') }}
+                        : (hasNotes(it.alternative_solutions_html) ? 'Régénérer' : (it.status === 'open' ? '⚠ Manquant — préconiser' : 'Préconisez d\'autres solutions')) }}
                   </button>
                   <button
                     v-if="hasNotes(it.alternative_solutions_html)"
@@ -1698,7 +1764,7 @@ onMounted(refresh)
               </td>
             </tr>
             <tr v-if="!actionItems.length">
-              <td colspan="8" class="py-10 text-center">
+              <td colspan="9" class="py-10 text-center">
                 <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
                 <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
                 <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
