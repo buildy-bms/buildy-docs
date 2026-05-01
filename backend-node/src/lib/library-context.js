@@ -95,41 +95,68 @@ function formatEquipment(t, { detail = 'short' } = {}) {
   return lines.join('\n');
 }
 
-function pickNeighbors({ kind, currentTemplateId, parentTemplateId, category }) {
-  if (kind === 'functionality') {
-    return db.sectionTemplates.list({ kind: 'functionality' })
-      .filter(t => t.id !== currentTemplateId)
-      .filter(t => (t.parent_template_id || null) === (parentTemplateId || null));
-  }
-  if (kind === 'narrative_section') {
-    return db.sectionTemplates.list({ kind: 'standard' })
-      .filter(t => t.id !== currentTemplateId)
-      .filter(t => (t.parent_template_id || null) === (parentTemplateId || null));
-  }
-  if (kind === 'equipment_description' || kind === 'equipment_bacs_justification') {
-    if (!category) return [];
-    return db.equipmentTemplates.list({ category })
-      .filter(t => t.id !== currentTemplateId);
-  }
-  return [];
-}
-
 function buildNeighborsBlock({ kind, currentTemplateId, parentTemplateId, category }) {
-  const neighbors = pickNeighbors({ kind, currentTemplateId, parentTemplateId, category });
-  if (!neighbors.length) return '';
-  const isEquipment = kind === 'equipment_description' || kind === 'equipment_bacs_justification';
-  const isFunctionality = kind === 'functionality';
-  const header = isEquipment
-    ? `Autres modeles d'equipement de la meme categorie deja rediges :`
-    : isFunctionality
-      ? `Autres fonctionnalites de la meme branche deja redigees :`
-      : `Autres sections narratives de la meme branche deja redigees :`;
-  const lines = neighbors.map(t =>
-    isEquipment ? formatEquipment(t, { detail: 'medium' })
-      : isFunctionality ? formatFunctionality(t, { detail: 'medium' })
-        : formatNarrative(t, { detail: 'medium' })
-  );
-  return [header, ...lines].join('\n\n');
+  const blocks = [];
+
+  if (kind === 'narrative_section') {
+    // Sections narratives soeurs (meme parent) + TOUTES les fonctionnalites :
+    // un chapitre narratif doit pouvoir s'aligner avec les features Buildy.
+    const siblings = db.sectionTemplates.list({ kind: 'standard' })
+      .filter(t => t.id !== currentTemplateId)
+      .filter(t => (t.parent_template_id || null) === (parentTemplateId || null))
+      .filter(t => (t.body_html || '').trim());
+    if (siblings.length) {
+      blocks.push(
+        `Autres sections narratives de la meme branche deja redigees :\n\n` +
+        siblings.map(t => formatNarrative(t, { detail: 'medium' })).join('\n\n')
+      );
+    }
+    const fns = db.sectionTemplates.list({ kind: 'functionality' })
+      .filter(t => (t.body_html || '').trim());
+    if (fns.length) {
+      blocks.push(
+        `Fonctionnalites Buildy deja redigees (catalogue complet) :\n\n` +
+        fns.map(t => formatFunctionality(t, { detail: 'medium' })).join('\n\n')
+      );
+    }
+    return blocks.join('\n\n');
+  }
+
+  if (kind === 'functionality') {
+    // Toutes les autres fonctionnalites (pas seulement meme parent) +
+    // sections narratives soeurs s'il y en a, pour le contexte editorial.
+    const others = db.sectionTemplates.list({ kind: 'functionality' })
+      .filter(t => t.id !== currentTemplateId)
+      .filter(t => (t.body_html || '').trim());
+    if (others.length) {
+      blocks.push(
+        `Autres fonctionnalites Buildy deja redigees :\n\n` +
+        others.map(t => formatFunctionality(t, { detail: 'medium' })).join('\n\n')
+      );
+    }
+    const narrSiblings = db.sectionTemplates.list({ kind: 'standard' })
+      .filter(t => (t.parent_template_id || null) === (parentTemplateId || null))
+      .filter(t => (t.body_html || '').trim());
+    if (narrSiblings.length) {
+      blocks.push(
+        `Sections narratives de la meme branche pour contexte :\n\n` +
+        narrSiblings.map(t => formatNarrative(t, { detail: 'medium' })).join('\n\n')
+      );
+    }
+    return blocks.join('\n\n');
+  }
+
+  if (kind === 'equipment_description' || kind === 'equipment_bacs_justification') {
+    if (!category) return '';
+    const eq = db.equipmentTemplates.list({ category })
+      .filter(t => t.id !== currentTemplateId)
+      .filter(t => (t.description_html || '').trim() || (t.bacs_justification || '').trim());
+    if (!eq.length) return '';
+    return `Autres modeles d'equipement de la meme categorie deja rediges :\n\n` +
+      eq.map(t => formatEquipment(t, { detail: 'medium' })).join('\n\n');
+  }
+
+  return '';
 }
 
 function buildSummaryBlock({ currentTemplateId, kind }) {
