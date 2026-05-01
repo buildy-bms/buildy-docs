@@ -89,7 +89,7 @@ onUnmounted(hide)
       v-if="visible && text"
       role="tooltip"
       :style="{ top: position.top + 'px', left: position.left + 'px' }"
-      class="pointer-events-none fixed z-100 whitespace-nowrap px-2 py-1 text-[11px] font-medium text-white bg-gray-900 rounded-md shadow-lg"
+      class="pointer-events-none fixed z-100 px-2.5 py-1.5 text-[11px] font-medium leading-snug text-white bg-gray-900 rounded-md shadow-lg max-w-xs"
       :class="{
         '-translate-x-1/2 -translate-y-full': placement === 'top',
         '-translate-x-1/2': placement === 'bottom',

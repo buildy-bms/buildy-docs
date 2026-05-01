@@ -314,6 +314,7 @@ async function routes(fastify) {
       has_automatic_regulation: z.boolean().optional(),
       regulation_type: z.enum(REGULATION_TYPES).nullable().optional(),
       generator_type: z.enum(GENERATOR_TYPES).nullable().optional(),
+      generator_device_id: z.number().int().nullable().optional(),
       generator_age_years: z.number().int().nullable().optional(),
       generator_exempt_wood: z.boolean().nullable().optional(),
       notes: z.string().nullable().optional(),

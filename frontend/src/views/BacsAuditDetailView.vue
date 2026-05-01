@@ -41,6 +41,8 @@ import AddZoneModal from '@/components/AddZoneModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
+import Tooltip from '@/components/Tooltip.vue'
+import VerticalStepper from '@/components/VerticalStepper.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
@@ -432,15 +434,58 @@ const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 // Les zones sans système thermique (ex : un local technique sans chauffage)
 // n'ont pas de régulation à évaluer.
 const thermalFiltered = computed(() => {
-  const zonesWithThermal = new Set()
+  const cats = new Map()  // zone_id -> Set('heating'|'cooling')
   for (const s of systems.value) {
     if (!s.present) continue
     if (s.system_category === 'heating' || s.system_category === 'cooling') {
-      zonesWithThermal.add(s.zone_id)
+      if (!cats.has(s.zone_id)) cats.set(s.zone_id, new Set())
+      cats.get(s.zone_id).add(s.system_category)
     }
   }
-  return thermal.value.filter(t => zonesWithThermal.has(t.zone_id))
+  return thermal.value
+    .filter(t => cats.has(t.zone_id))
+    .map(t => ({ ...t, _categories: [...(cats.get(t.zone_id) || [])] }))
 })
+
+// Stepper de progression de la card GTB (R175-3 / R175-4 / R175-5).
+const bmsSteps = computed(() => {
+  if (bms.value?.out_of_service) {
+    return [{ label: 'GTB déclarée hors-service', done: true,
+              hint: 'Plan d\'action ignore les exigences GTB' }]
+  }
+  return [
+    { label: 'Identification de la GTB',
+      done: !!bms.value?.existing_solution,
+      hint: 'Solution + marque + localisation' },
+    { label: 'Protocoles de mise à disposition',
+      done: !!(bms.value?.provided_protocols && JSON.parse(bms.value.provided_protocols || '[]').length) },
+    { label: 'Analyse fonctionnelle GTB',
+      done: !!(document.value?.audit_existing_af_status === 'absent'
+              || (siteDocCounts.value?.doe || 0) > 0) },
+    { label: 'Usages traités cochés',
+      done: !!(bms.value?.manages_heating || bms.value?.manages_cooling
+              || bms.value?.manages_ventilation || bms.value?.manages_dhw
+              || bms.value?.manages_lighting) },
+    { label: 'Équipements / compteurs intégrés',
+      done: !!(devices.value.some(d => d.managed_by_bms) || meters.value.some(m => m.managed_by_bms)),
+      hint: 'Au moins un système ou compteur lié à la GTB' },
+    { label: 'Capacités R175-3 (P1 + P2)',
+      done: !!(bms.value?.meets_r175_3_p1 && bms.value?.meets_r175_3_p2) },
+    { label: 'Mise à disposition des données',
+      done: !!(bms.value?.data_provision_to_manager && bms.value?.data_provision_to_operators) },
+    { label: 'R175-4 maintenance + R175-5 formation',
+      done: !!(bms.value?.has_maintenance_procedures && bms.value?.operator_trained) },
+  ]
+})
+
+// Devices disponibles comme générateurs pour une zone donnée (heating/cooling).
+function generatorDevicesForZone(zoneId) {
+  const sysIds = systems.value
+    .filter(s => s.zone_id === zoneId && s.present
+                  && (s.system_category === 'heating' || s.system_category === 'cooling'))
+    .map(s => s.id)
+  return devices.value.filter(d => sysIds.includes(d.system_id))
+}
 
 // Tout replier / déplier (broadcast vers chaque CollapsibleSection)
 function setAllSectionsCollapsed(collapsed) {
@@ -1587,17 +1632,31 @@ onMounted(() => {
           <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
             <tr>
               <th class="text-center px-5 py-2">Zone</th>
+              <th class="text-center py-2 w-24">Catégories</th>
               <th class="text-center py-2 w-32">Régulation auto ?</th>
               <th class="text-center py-2 w-40">Type de régulation</th>
+              <th class="text-center py-2 w-44">Générateur lié</th>
               <th class="text-center py-2 w-44">Type générateur</th>
               <th class="text-center py-2 w-24">Âge (ans)</th>
-              <th class="text-center py-2 w-24" title="Appareil indépendant de chauffage au bois — exempté R175-6 (II)">Exempté bois</th>
+              <th class="text-center py-2 w-24">
+                <Tooltip text="Appareil indépendant de chauffage au bois — exempté R175-6 (II)"><span>Exempté bois</span></Tooltip>
+              </th>
               <th class="text-center px-5 py-2">Notes</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-for="t in thermalFiltered" :key="t.id">
               <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
+              <td class="py-2 text-center">
+                <span class="inline-flex items-center gap-1 justify-center">
+                  <Tooltip v-if="t._categories.includes('heating')" text="Chauffage">
+                    <SystemCategoryIcon category="heating" size="sm" />
+                  </Tooltip>
+                  <Tooltip v-if="t._categories.includes('cooling')" text="Refroidissement">
+                    <SystemCategoryIcon category="cooling" size="sm" />
+                  </Tooltip>
+                </span>
+              </td>
               <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!t.has_automatic_regulation"
                        @change="e => patchThermal(t, { has_automatic_regulation: e.target.checked })"
@@ -1608,6 +1667,16 @@ onMounted(() => {
                         @change="e => patchThermal(t, { regulation_type: e.target.value || null })"
                         class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
                   <option v-for="o in REGULATION_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+                </select>
+              </td>
+              <td class="py-2 px-2">
+                <select :value="t.generator_device_id"
+                        @change="e => patchThermal(t, { generator_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
+                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
+                  <option :value="null">— aucun</option>
+                  <option v-for="d in generatorDevicesForZone(t.zone_id)" :key="d.id" :value="d.id">
+                    {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+                  </option>
                 </select>
               </td>
               <td class="py-2 text-center">
@@ -1623,10 +1692,11 @@ onMounted(() => {
                        class="w-16 text-xs px-2 py-1 border border-gray-200 rounded text-center" />
               </td>
               <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!t.generator_exempt_wood"
-                       @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
-                       class="rounded border-gray-300"
-                       title="Si coché : générateur = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)" />
+                <Tooltip text="Si coché : générateur = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
+                  <input type="checkbox" :checked="!!t.generator_exempt_wood"
+                         @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
+                         class="rounded border-gray-300" />
+                </Tooltip>
               </td>
               <td class="px-5 py-2">
                 <input type="text" :value="t.notes" placeholder="—"
@@ -1688,7 +1758,12 @@ onMounted(() => {
           :enabled="!!(document?.site_uuid && bms.document_id)"
           @changed="refreshAuditData"
         >
-        <div class="px-5 py-4 space-y-4">
+        <div class="px-5 py-4 grid grid-cols-[180px_1fr] gap-6">
+          <aside class="border-r border-gray-100 pr-4 sticky top-4 self-start">
+            <h4 class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
+            <VerticalStepper :steps="bmsSteps" />
+          </aside>
+          <div class="space-y-4 min-w-0">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Solution en place</label>
@@ -1714,7 +1789,7 @@ onMounted(() => {
                      @input="saveBmsDebounced"
                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
             </div>
-            <div class="col-span-2">
+            <div v-if="!bms.out_of_service" class="col-span-2">
               <label class="block text-xs font-medium text-gray-700 mb-1">
                 Protocoles de mise à disposition des points
                 <span class="text-gray-400 font-normal">— vers la supervision Buildy ou un tiers</span>
@@ -1727,6 +1802,16 @@ onMounted(() => {
                 @update:modelValue="v => { bms.provided_protocols = v; saveBmsDebounced() }"
               />
             </div>
+          </div>
+
+          <!-- GTB Hors-Service toggle remonté ici pour pouvoir cacher
+               immédiatement tout ce qui est dépendant. -->
+          <div class="border-t border-gray-100 pt-3">
+            <label class="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" v-model="bms.out_of_service" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+              <span class="text-gray-700 font-medium">GTB Hors-Service</span>
+              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB et les sous-blocs ci-dessous sont masqués</span>
+            </label>
           </div>
 
           <!-- Analyse fonctionnelle de la GTB existante (constat d'auditeur) -->
@@ -1758,7 +1843,7 @@ onMounted(() => {
             </label>
           </div>
 
-          <div class="border-t border-gray-100 pt-3">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
             <div class="grid grid-cols-5 gap-2 text-sm">
               <label class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
@@ -1784,26 +1869,22 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="border-t border-gray-100 pt-3">
-            <label class="flex items-center gap-2 cursor-pointer text-sm mb-3">
-              <input type="checkbox" v-model="bms.out_of_service" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
-              <span class="text-gray-700 font-medium">GTB Hors-Service</span>
-              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB</span>
-            </label>
-          </div>
-
-          <div class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Équipements intégrés à la GTB
-                <span class="font-normal normal-case text-gray-500 text-[10px]">— "HS liaison" = équipement OK mais GTB ne le voit pas</span>
+                <span class="font-normal normal-case text-gray-500 text-[10px]">— « Opérationnel » = vérifié sur place par l'auditeur</span>
               </h3>
               <table v-if="devicesWithMeta.length" class="w-full text-xs">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Équipement</th>
-                    <th class="text-center py-1 font-semibold w-16" title="Intégré à la GTB">Intégré</th>
-                    <th class="text-center py-1 font-semibold w-20" title="Liaison GTB Hors-Service (paramétrage/communication cassé)">HS liaison</th>
+                    <th class="text-center py-1 font-semibold w-16">
+                      <Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip>
+                    </th>
+                    <th class="text-center py-1 font-semibold w-24">
+                      <Tooltip text="L'auditeur a vérifié sur place que la GTB voit cet équipement et que les valeurs remontent correctement."><span>Opérationnel</span></Tooltip>
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -1828,11 +1909,16 @@ onMounted(() => {
                              class="rounded disabled:opacity-30" />
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!d.bms_integration_out_of_service || (d.managed_by_bms && !d.wired)"
-                             :disabled="!d.managed_by_bms || !d.wired"
-                             :title="d.managed_by_bms && !d.wired ? 'Équipement non câblé — automatiquement HS dans la GTB' : ''"
-                             @change="e => patchDeviceMb(d, { bms_integration_out_of_service: e.target.checked })"
-                             class="rounded accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed" />
+                      <Tooltip
+                        :text="!d.managed_by_bms ? 'Coche d\'abord « Intégré » pour vérifier le bon fonctionnement.'
+                              : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.'
+                              : 'Cocher après avoir vérifié sur place que la GTB voit l\'équipement.'">
+                        <input type="checkbox"
+                               :checked="d.managed_by_bms && d.wired && !d.bms_integration_out_of_service"
+                               :disabled="!d.managed_by_bms || !d.wired"
+                               @change="e => patchDeviceMb(d, { bms_integration_out_of_service: !e.target.checked })"
+                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed accent-emerald-500" />
+                      </Tooltip>
                     </td>
                   </tr>
                 </tbody>
@@ -1848,8 +1934,12 @@ onMounted(() => {
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Compteur</th>
-                    <th class="text-center py-1 font-semibold w-16" title="Intégré à la GTB">Intégré</th>
-                    <th class="text-center py-1 font-semibold w-20" title="Liaison GTB Hors-Service (la GTB ne relève plus le compteur)">HS liaison</th>
+                    <th class="text-center py-1 font-semibold w-16">
+                      <Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip>
+                    </th>
+                    <th class="text-center py-1 font-semibold w-24">
+                      <Tooltip text="L'auditeur a vérifié sur place que la GTB relève bien le compteur et que les index remontent."><span>Opérationnel</span></Tooltip>
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -1868,18 +1958,25 @@ onMounted(() => {
                       </span>
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!m.managed_by_bms"
-                             :disabled="m.out_of_service || !m.communicating"
-                             :title="!m.communicating ? 'Compteur non communicant — ne peut pas être intégré à la GTB' : ''"
-                             @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
-                             class="rounded disabled:opacity-30 disabled:cursor-not-allowed" />
+                      <Tooltip
+                        :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
+                        <input type="checkbox" :checked="!!m.managed_by_bms"
+                               :disabled="m.out_of_service || !m.communicating"
+                               @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
+                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed" />
+                      </Tooltip>
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!m.bms_integration_out_of_service || (m.managed_by_bms && !m.wired)"
-                             :disabled="!m.managed_by_bms || !m.wired"
-                             :title="m.managed_by_bms && !m.wired ? 'Compteur non câblé — automatiquement HS dans la GTB' : ''"
-                             @change="e => patchMeter(m, { bms_integration_out_of_service: e.target.checked })"
-                             class="rounded accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed" />
+                      <Tooltip
+                        :text="!m.managed_by_bms ? 'Coche d\'abord « Intégré » pour vérifier le bon fonctionnement.'
+                              : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.'
+                              : 'Cocher après avoir vérifié sur place que la GTB relève le compteur.'">
+                        <input type="checkbox"
+                               :checked="m.managed_by_bms && m.wired && !m.bms_integration_out_of_service"
+                               :disabled="!m.managed_by_bms || !m.wired"
+                               @change="e => patchMeter(m, { bms_integration_out_of_service: !e.target.checked })"
+                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed accent-emerald-500" />
+                      </Tooltip>
                     </td>
                   </tr>
                 </tbody>
@@ -1891,12 +1988,12 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
               R175-3 — Capacités de la solution de supervision
-              <span class="font-normal normal-case text-gray-500 text-[10px]" title="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
-                ⓘ P3 et P4 sont au niveau des systèmes (section 3)
-              </span>
+              <Tooltip text="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
+                <span class="font-normal normal-case text-gray-500 text-[10px]">ⓘ P3 et P4 sont au niveau des systèmes (section 3)</span>
+              </Tooltip>
             </h3>
             <div class="space-y-2 text-sm">
               <label class="flex items-start gap-2 cursor-pointer">
@@ -1911,7 +2008,7 @@ onMounted(() => {
           </div>
 
           <!-- R175-3 dernier alinéa : mise à disposition des données -->
-          <div class="border-t border-gray-100 pt-3">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
               R175-3 — Mise à disposition des données
               <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
@@ -1935,7 +2032,7 @@ onMounted(() => {
             ></textarea>
           </div>
 
-          <div class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
@@ -1953,6 +2050,7 @@ onMounted(() => {
                 ✓ Buildy : exigence R175-5 nativement couverte par le support utilisateur intégré
               </p>
             </div>
+          </div>
           </div>
         </div>
         </PhotoDropzone>

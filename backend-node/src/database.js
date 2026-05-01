@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 55;
+const TARGET_VERSION = 56;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2031,6 +2031,18 @@ function runMigrations() {
     `);
     db.pragma('user_version = 55');
     log.info('Migration 55 appliquee : wired + multi-protocoles + bms.provided_protocols');
+  }
+
+  if (current < 56) {
+    // Card 5 (R175-6) : permet de lier un device existant (saisi dans la
+    // section 3) comme generateur thermique de la zone, plutot que de
+    // ressaisir generator_type a la main.
+    db.exec(`
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN generator_device_id INTEGER
+        REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL;
+    `);
+    db.pragma('user_version = 56');
+    log.info('Migration 56 appliquee : thermal_regulation.generator_device_id');
   }
 
   if (current > TARGET_VERSION) {
