@@ -225,6 +225,14 @@ const SYSTEM_PROMPT_LIBRARY = [
   `- HTML compatible Tiptap : <p>, <ul>, <ol>, <li>, <strong>, <em>, <h3>, <blockquote>.`,
   `- Aucune classe CSS, aucun <div>, aucun <html>/<body>, aucun markdown (pas de **gras**, pas de # titres).`,
   `- Reponds UNIQUEMENT par le HTML demande. Pas de preambule "Voici...", pas de conclusion, pas d'explication.`,
+  ``,
+  `=== RYTHME VISUEL — IMPORTANT ===`,
+  `Le contenu doit etre AERE et lisible, pas un pave dense.`,
+  `- Plusieurs <p> COURTS valent mieux qu'un long paragraphe.`,
+  `- Vise 1 a 3 phrases maximum par <p>. Si un paragraphe depasse 3 phrases, decoupe-le.`,
+  `- Une nouvelle idee = un nouveau <p>. Une enumeration de 3 elements ou plus = <ul>.`,
+  `- Met en valeur les concepts cles avec <strong> (1 a 3 occurrences par fiche, pas plus, pas en debut systematique).`,
+  `- Banni : "blocs" denses de 4+ phrases qui dilluent l'information et fatiguent l'oeil.`,
 ].join('\n');
 
 // Construit la partie USER du prompt selon le type d'entite et le mode
@@ -258,17 +266,17 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     lines.push(`=== TEXTE ACTUEL A REFORMULER ===`);
     lines.push(html.trim());
     lines.push('');
-    lines.push(`Reformule ce texte en respectant le sens et en ameliorant clarte, concision, vocabulaire GTB. Garde la structure (paragraphes / listes) si elle est pertinente.`);
+    lines.push(`Reformule ce texte en respectant le sens et en ameliorant clarte, concision, vocabulaire GTB. Garde la structure (paragraphes / listes) si elle est pertinente. RESPECTE le format aere : ne fusionne PAS les phrases en gros blocs denses.`);
   } else {
     lines.push(`=== INSTRUCTION ===`);
     if (kind === 'narrative_section') {
-      lines.push(`Redige le contenu de cette section narrative en 2 a 4 paragraphes courts. Style sobre, technique, precis. Pas de redondance avec le titre.`);
+      lines.push(`Redige le contenu de cette section narrative en 3 a 5 paragraphes COURTS (1 a 3 phrases par paragraphe). Style sobre, technique, precis. Pas de redondance avec le titre.`);
     } else if (kind === 'functionality') {
-      lines.push(`Decris cette fonctionnalite Buildy : ce qu'elle apporte fonctionnellement au client, pourquoi (lien BACS si applicable), comment elle se distingue selon le niveau de contrat. 2 a 4 paragraphes courts.`);
+      lines.push(`Decris cette fonctionnalite Buildy : ce qu'elle apporte fonctionnellement au client, pourquoi (lien BACS si applicable), comment elle se distingue selon le niveau de contrat. 3 a 5 paragraphes COURTS (1 a 3 phrases par paragraphe).`);
     } else if (kind === 'equipment_description') {
-      lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier) : son role dans le batiment, ce que la solution Buildy apporte en supervision en aval. 2 a 3 paragraphes courts. Pas de zones/locaux.`);
+      lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier) : son role, sa metrologie/regulation native, ce que Buildy apporte en supervision en aval. 3 a 4 paragraphes COURTS (1 a 3 phrases par paragraphe). Pas de zones/locaux.`);
     } else if (kind === 'equipment_bacs_justification') {
-      lines.push(`Redige une justification courte (1 a 2 paragraphes) qui explique pourquoi cet equipement est concerne par le decret BACS, en citant les articles applicables. Style juridique-technique sobre.`);
+      lines.push(`Redige une justification courte qui explique pourquoi cet equipement est concerne par le decret BACS, en citant les articles applicables avec la notation N° (jamais §). 2 a 3 paragraphes COURTS (1 a 3 phrases par paragraphe). Style juridique-technique sobre.`);
     } else if (kind === 'bacs_audit_notes') {
       lines.push(`Reformule ces notes d'audit terrain en un paragraphe ou une courte liste, francais professionnel, technique, precis. Conserve toutes les informations factuelles (marque, reference, etat, defaut constate, position GTB...), ameliore la clarte et le vocabulaire GTB. Ne pas inventer d'information manquante. Format HTML compatible Tiptap.`);
     } else {
