@@ -42,6 +42,8 @@ const config = Object.freeze({
   // Claude (Anthropic) — assistant redaction
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   claudeModel: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+  // Budget mensuel Claude en euros (0 = pas de plafond, credit restant non affiche)
+  claudeMonthlyBudgetEur: parseFloat(process.env.CLAUDE_MONTHLY_BUDGET_EUR || '0') || 0,
 
   // CORS — origines autorisees
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3100')

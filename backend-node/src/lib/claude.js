@@ -5,6 +5,7 @@ const config = require('../config');
 const db = require('../database');
 const { resolveSectionPoints } = require('./points-resolver');
 const { BACS_INTRO_HTML, BACS_ARTICLES } = require('../seeds/bacs-articles');
+const { buildLibraryContext } = require('./library-context');
 
 let _client = null;
 function client() {
@@ -180,7 +181,7 @@ const SYSTEM_PROMPT_LIBRARY = [
 ].join('\n');
 
 // Construit la partie USER du prompt selon le type d'entite et le mode
-function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p }) {
+function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p, has_corpus }) {
   const lines = [];
   // Bloc d'identification de l'entite
   lines.push(`=== ENTITE A REDIGER ===`);
@@ -228,25 +229,67 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     }
   }
 
+  if (has_corpus) {
+    lines.push('');
+    lines.push(`Le corpus existant de la bibliotheque t'est fourni dans le system prompt. Sers-t'en pour aligner vocabulaire, niveau de detail et tonalite avec les autres entrees deja redigees. Ne recopie pas leur contenu et evite les redondances avec les voisines proches.`);
+  }
+
   return lines.join('\n');
 }
 
 /**
  * Assistant unique de la bibliotheque (mode generate ou reformulate).
  * Retourne le HTML produit + usage de tokens.
+ *
+ * Si `library_context.enabled` est vrai, un second bloc system est ajoute
+ * avec le corpus existant (selon la strategie choisie). Ce bloc est aussi
+ * cache pour beneficier des hits sur appels successifs.
  */
-async function assistLibrary({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p } = {}) {
+async function assistLibrary({
+  mode, kind, title, html, parent_path, category_label, bacs_articles,
+  avail_e, avail_s, avail_p,
+  current_template_id, parent_template_id, category,
+  library_context,
+} = {}) {
   if (mode === 'reformulate' && (!html || !html.trim())) {
     throw new Error('Texte a reformuler vide');
   }
-  const userPrompt = buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category_label, bacs_articles, avail_e, avail_s, avail_p });
+
+  // Construction optionnelle du bloc corpus
+  let corpus = null;
+  if (library_context && library_context.enabled) {
+    corpus = buildLibraryContext({
+      kind,
+      currentTemplateId: current_template_id || null,
+      parentTemplateId: parent_template_id || null,
+      category: category || null,
+      strategy: library_context.strategy || 'neighbors',
+    });
+  }
+
+  const userPrompt = buildLibraryUserPrompt({
+    mode, kind, title, html, parent_path, category_label, bacs_articles,
+    avail_e, avail_s, avail_p,
+    has_corpus: !!corpus,
+  });
+
+  // Cache_control sur chaque bloc system : le 1er ne change jamais, le 2nd
+  // ne change qu'avec une edition de la bibliotheque (rare entre 2 appels).
+  const systemBlocks = [
+    { type: 'text', text: SYSTEM_PROMPT_LIBRARY, cache_control: { type: 'ephemeral' } },
+  ];
+  if (corpus) {
+    systemBlocks.push({
+      type: 'text',
+      text: `=== CORPUS BIBLIOTHEQUE EXISTANT (${corpus.strategy}) ===\n${corpus.text}`,
+      cache_control: { type: 'ephemeral' },
+    });
+  }
 
   const resp = await client().messages.create({
     model: config.claudeModel,
     max_tokens: 2048,
-    // Cache_control sur le SYSTEM (invariant entre tous les appels biblio
-    // -> economies de tokens et latence reduite sur les appels successifs).
-    system: [{ type: 'text', text: SYSTEM_PROMPT_LIBRARY, cache_control: { type: 'ephemeral' } }],
+    system: systemBlocks,
     messages: [{ role: 'user', content: userPrompt }],
   });
 
@@ -255,7 +298,15 @@ async function assistLibrary({ mode, kind, title, html, parent_path, category_la
     .map(b => b.text)
     .join('')
     .trim();
-  return { html: text, usage: resp.usage };
+  return {
+    html: text,
+    usage: resp.usage,
+    library_context: corpus ? {
+      strategy: corpus.strategy,
+      char_count: corpus.charCount,
+      approx_tokens: corpus.approxTokens,
+    } : null,
+  };
 }
 
 // ─── Synthese d'audit BACS ──────────────────────────────────────────

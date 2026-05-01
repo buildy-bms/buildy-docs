@@ -181,7 +181,9 @@ export const listAuditActions = () => api.get('/audit-log/actions')
 
 // ── Claude (assistant redaction bibliotheque) ──
 // payload : { mode, kind, title?, html?, parent_path?, category_label?,
-//             bacs_articles?, avail_e?, avail_s?, avail_p? }
+//             bacs_articles?, avail_e?, avail_s?, avail_p?,
+//             current_template_id?, parent_template_id?, category?,
+//             library_context?: { enabled, strategy } }
 export const getClaudeUsage = () => api.get('/claude/usage')
 export const searchAfs = (q) => api.get('/afs/search', { params: { q } })
 export const claudeLibraryAssist = (payload) =>

@@ -8,17 +8,20 @@
  * pour ça avec autosave). Idéal pour les champs courts comme description
  * fonctionnelle d'un template ou justification BACS.
  */
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon, LinkIcon, SparklesIcon,
+  ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
 import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useClaudeUsage, formatUsageTooltip } from '@/composables/useClaudeUsage'
 import LinkInputModal from './LinkInputModal.vue'
+
+const LIBRARY_CONTEXT_LS_KEY = 'buildy-docs.claude.libraryContext'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -36,6 +39,34 @@ const emit = defineEmits(['update:modelValue'])
 const { success, error: notifyError } = useNotification()
 const { usage: claudeUsage, refresh: refreshClaudeUsage } = useClaudeUsage()
 const assisting = ref(false)
+// Coût de la dernière requête Claude (affiché après l'appel)
+const lastRequestCostEur = ref(null)
+
+// Etat de l'enrichissement par corpus existant — persiste dans localStorage
+// pour ne pas re-cocher a chaque appel.
+const libraryContext = ref({ enabled: false, strategy: 'neighbors' })
+const showLibraryMenu = ref(false)
+function loadLibraryContext() {
+  try {
+    const raw = localStorage.getItem(LIBRARY_CONTEXT_LS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        libraryContext.value = {
+          enabled: !!parsed.enabled,
+          strategy: ['neighbors', 'summary', 'full'].includes(parsed.strategy)
+            ? parsed.strategy : 'neighbors',
+        }
+      }
+    }
+  } catch { /* ignore */ }
+}
+function persistLibraryContext() {
+  try {
+    localStorage.setItem(LIBRARY_CONTEXT_LS_KEY, JSON.stringify(libraryContext.value))
+  } catch { /* ignore */ }
+}
+onMounted(() => loadLibraryContext())
 
 const isEmpty = ref(true)
 function recomputeEmpty() {
@@ -54,12 +85,18 @@ async function callClaude() {
       mode,
       ...props.assistContext,
       html: empty ? undefined : html,
+      library_context: libraryContext.value.enabled
+        ? { enabled: true, strategy: libraryContext.value.strategy }
+        : undefined,
     })
     if (data?.html) {
       editor.value.commands.setContent(data.html, false)
       emit('update:modelValue', data.html)
       recomputeEmpty()
-      success(empty ? 'Brouillon généré' : 'Texte reformulé')
+      const cost = typeof data.cost_eur === 'number' ? data.cost_eur : null
+      lastRequestCostEur.value = cost
+      const costLabel = cost != null ? ` · ≈ ${cost.toFixed(4)} €` : ''
+      success((empty ? 'Brouillon généré' : 'Texte reformulé') + costLabel)
       refreshClaudeUsage()
     }
   } catch (e) {
@@ -114,7 +151,17 @@ watch(() => props.modelValue, (val) => {
   }
 })
 
-onBeforeUnmount(() => editor.value?.destroy())
+// Ferme le popover des options corpus si on clique en dehors.
+function onDocClick(ev) {
+  if (!showLibraryMenu.value) return
+  const root = ev.target?.closest?.('.rte-library-popover-root')
+  if (!root) showLibraryMenu.value = false
+}
+onMounted(() => document.addEventListener('mousedown', onDocClick))
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocClick)
+  editor.value?.destroy()
+})
 
 const isActive = (name, attrs) => editor.value?.isActive(name, attrs) || false
 
@@ -154,17 +201,100 @@ function onSaveLink(url) {
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               title="Lien"><LinkIcon class="w-3.5 h-3.5" /></button>
 
-      <button v-if="assistContext" type="button" @click="callClaude" :disabled="assisting"
-              class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-md transition"
-              :title="formatUsageTooltip(claudeUsage)">
-        <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
-        {{ assisting
-            ? (isEmpty ? 'Génération…' : 'Reformulation…')
-            : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
-        <span v-if="claudeUsage" class="ml-1 text-[10px] text-violet-500 font-mono">
-          ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
-        </span>
-      </button>
+      <div v-if="assistContext" class="rte-library-popover-root ml-auto relative flex items-center">
+        <button type="button" @click="callClaude" :disabled="assisting"
+                class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-l-md transition"
+                :title="formatUsageTooltip(claudeUsage)">
+          <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
+          {{ assisting
+              ? (isEmpty ? 'Génération…' : 'Reformulation…')
+              : (isEmpty ? 'Générer avec Claude' : 'Reformuler avec Claude') }}
+          <span v-if="claudeUsage" class="ml-1 text-[10px] text-violet-500 font-mono">
+            ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
+          </span>
+          <span v-if="libraryContext.enabled"
+                class="ml-1 inline-flex items-center px-1 rounded bg-violet-100 text-violet-700 text-[9px] font-semibold uppercase tracking-wide">
+            corpus
+          </span>
+        </button>
+        <button type="button" @click="showLibraryMenu = !showLibraryMenu" :disabled="assisting"
+                class="px-1 py-0.5 text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-r-md transition border-l border-violet-200"
+                title="Options de contexte bibliothèque">
+          <ChevronDownIcon class="w-3 h-3" />
+        </button>
+        <!-- Popover options corpus -->
+        <div v-if="showLibraryMenu"
+             class="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-3 text-[12px] text-gray-700">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" v-model="libraryContext.enabled"
+                   @change="persistLibraryContext"
+                   class="mt-0.5 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+            <span>
+              <span class="font-medium">Inclure le corpus existant</span>
+              <span class="block text-gray-500 text-[11px] leading-snug mt-0.5">
+                Claude lit les autres fonctionnalités/équipements déjà rédigés pour aligner vocabulaire et niveau de détail.
+              </span>
+            </span>
+          </label>
+          <div :class="['mt-3 pl-6 space-y-1.5', libraryContext.enabled ? '' : 'opacity-40 pointer-events-none']">
+            <div class="text-[11px] font-medium text-gray-600">Stratégie</div>
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="radio" value="neighbors" v-model="libraryContext.strategy"
+                     @change="persistLibraryContext"
+                     class="mt-0.5 border-gray-300 text-violet-600 focus:ring-violet-500" />
+              <span>
+                <span class="font-medium">Voisins</span>
+                <span class="block text-gray-500 text-[11px]">Entrées proches uniquement (rapide).</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="radio" value="summary" v-model="libraryContext.strategy"
+                     @change="persistLibraryContext"
+                     class="mt-0.5 border-gray-300 text-violet-600 focus:ring-violet-500" />
+              <span>
+                <span class="font-medium">Résumé complet</span>
+                <span class="block text-gray-500 text-[11px]">Toute la bibliothèque, en résumé court.</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="radio" value="full" v-model="libraryContext.strategy"
+                     @change="persistLibraryContext"
+                     class="mt-0.5 border-gray-300 text-violet-600 focus:ring-violet-500" />
+              <span>
+                <span class="font-medium">Corpus complet</span>
+                <span class="block text-gray-500 text-[11px]">Tous les contenus en entier (plus lent / plus coûteux).</span>
+              </span>
+            </label>
+          </div>
+          <!-- Coût + budget -->
+          <div v-if="claudeUsage" class="mt-3 pt-2 border-t border-gray-100 space-y-0.5 text-[11px] text-gray-600">
+            <div class="flex items-center justify-between">
+              <span>Coût moyen / requête</span>
+              <span class="font-mono">≈ {{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }} €</span>
+            </div>
+            <div v-if="lastRequestCostEur != null" class="flex items-center justify-between">
+              <span>Dernière requête</span>
+              <span class="font-mono text-violet-700">≈ {{ lastRequestCostEur.toFixed(4) }} €</span>
+            </div>
+            <div v-if="claudeUsage.month_cost_eur != null" class="flex items-center justify-between">
+              <span>Consommé ce mois</span>
+              <span class="font-mono">{{ (claudeUsage.month_cost_eur || 0).toFixed(2) }} €</span>
+            </div>
+            <div v-if="claudeUsage.monthly_budget_eur && claudeUsage.remaining_eur != null"
+                 class="flex items-center justify-between">
+              <span>Crédit restant <span class="text-gray-400">(budget local)</span></span>
+              <span class="font-mono"
+                    :class="claudeUsage.remaining_eur < (claudeUsage.monthly_budget_eur * 0.2) ? 'text-amber-700' : 'text-emerald-700'">
+                {{ claudeUsage.remaining_eur.toFixed(2) }} €
+              </span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-gray-100 flex justify-end">
+            <button type="button" @click="showLibraryMenu = false"
+                    class="text-[11px] text-gray-500 hover:text-gray-700">Fermer</button>
+          </div>
+        </div>
+      </div>
     </div>
     <EditorContent :editor="editor" />
     <LinkInputModal

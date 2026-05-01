@@ -14,6 +14,7 @@ import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
 import RichTextEditor from './RichTextEditor.vue'
+import SearchableSelect from './SearchableSelect.vue'
 import EquipmentTemplatePicker from './EquipmentTemplatePicker.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
 import {
@@ -142,6 +143,16 @@ const parentOptions = computed(() => {
   visit(0, 1)
   return opts
 })
+
+// Options pour SearchableSelect : on remappe id->value et on enleve le
+// prefixe '— ' du label (l'indentation visuelle est rendue via 'indent').
+const parentSelectOptions = computed(() =>
+  parentOptions.value.map(o => ({
+    value: o.id,
+    label: o.id === null ? o.label : o.label.replace(/^(— )+/, ''),
+    indent: o.depth || 0,
+  }))
+)
 
 const selectedEquipmentName = computed(() => {
   const id = form.value.equipment_template_id
@@ -278,10 +289,12 @@ async function destroy() {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Section parente</label>
-          <select v-model="form.parent_template_id"
-                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
-            <option v-for="o in parentOptions" :key="o.id ?? 'root'" :value="o.id">{{ o.label }}</option>
-          </select>
+          <SearchableSelect
+            v-model="form.parent_template_id"
+            :options="parentSelectOptions"
+            placeholder="— (top-level)"
+            search-placeholder="Rechercher une section parente…"
+          />
         </div>
       </div>
 
@@ -350,6 +363,8 @@ async function destroy() {
             avail_e: form.avail_e,
             avail_s: form.avail_s,
             avail_p: form.avail_p,
+            current_template_id: props.template?.id || null,
+            parent_template_id: form.parent_template_id || null,
           }"
         />
       </div>

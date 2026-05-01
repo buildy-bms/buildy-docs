@@ -30,5 +30,15 @@ export function formatUsageTooltip(u) {
   if (!u) return 'Coût Claude : chargement…'
   const avg = (u.avg_cost_eur || 0).toFixed(3)
   const total = (u.cost_eur || 0).toFixed(2)
-  return `Coût moyen ≈ ${avg} € par requête · Cumul 30 j : ${total} € sur ${u.requests || 0} requête${u.requests > 1 ? 's' : ''}`
+  const lines = [
+    `Coût moyen ≈ ${avg} € par requête`,
+    `Cumul 30 j : ${total} € sur ${u.requests || 0} requête${u.requests > 1 ? 's' : ''}`,
+  ]
+  if (u.month_cost_eur != null) {
+    lines.push(`Mois en cours : ${(u.month_cost_eur || 0).toFixed(2)} €`)
+  }
+  if (u.monthly_budget_eur && u.remaining_eur != null) {
+    lines.push(`Budget local : ${u.monthly_budget_eur.toFixed(2)} € → ${u.remaining_eur.toFixed(2)} € restants`)
+  }
+  return lines.join(' · ')
 }

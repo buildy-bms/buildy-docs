@@ -9,8 +9,8 @@
  *   close → fermer sans rien faire
  *   saved (template) → fermer et rafraîchir le parent
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
@@ -100,7 +100,23 @@ const form = ref({
 const selectedCategory = computed(() => CATEGORIES.find(c => c.value === form.value.category) || CATEGORIES[CATEGORIES.length - 1])
 const categoryOpen = ref(false)
 const categoryRef = ref(null)
-function toggleCategory() { categoryOpen.value = !categoryOpen.value }
+const categorySearch = ref('')
+const categorySearchRef = ref(null)
+function normalizeSearch(s) {
+  return (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+const filteredCategories = computed(() => {
+  const q = normalizeSearch(categorySearch.value.trim())
+  if (!q) return CATEGORIES
+  return CATEGORIES.filter(c => normalizeSearch(c.label).includes(q))
+})
+function toggleCategory() {
+  categoryOpen.value = !categoryOpen.value
+  if (categoryOpen.value) {
+    categorySearch.value = ''
+    nextTick(() => categorySearchRef.value?.focus?.())
+  }
+}
 function pickCategory(value) { form.value.category = value; categoryOpen.value = false }
 function onDocClick(e) {
   if (categoryRef.value && !categoryRef.value.contains(e.target)) categoryOpen.value = false
@@ -384,13 +400,25 @@ async function destroy() {
               <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="categoryOpen ? 'rotate-180' : ''" />
             </button>
             <div v-if="categoryOpen"
-                 class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto py-1">
-              <button v-for="c in CATEGORIES" :key="c.value" type="button" @click="pickCategory(c.value)"
-                      :class="['w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition',
-                               form.category === c.value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50']">
-                <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: c.icon, icon_color: c.color }" size="sm" />
-                <span class="truncate">{{ c.label }}</span>
-              </button>
+                 class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              <div class="relative border-b border-gray-100">
+                <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input ref="categorySearchRef" v-model="categorySearch" type="text"
+                       placeholder="Rechercher une catégorie…"
+                       autocomplete="off" data-1p-ignore="true"
+                       class="w-full pl-8 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
+              </div>
+              <div class="max-h-72 overflow-y-auto py-1">
+                <button v-for="c in filteredCategories" :key="c.value" type="button" @click="pickCategory(c.value)"
+                        :class="['w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition',
+                                 form.category === c.value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50']">
+                  <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: c.icon, icon_color: c.color }" size="sm" />
+                  <span class="truncate">{{ c.label }}</span>
+                </button>
+                <div v-if="!filteredCategories.length" class="px-3 py-3 text-xs text-gray-400 italic text-center">
+                  Aucune catégorie
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -492,6 +520,8 @@ async function destroy() {
             title: form.name || null,
             category_label: selectedCategory.label,
             bacs_articles: template?.bacs_articles || null,
+            current_template_id: props.template?.id || null,
+            category: form.category || template?.category || null,
           }"
         />
       </div>
@@ -507,6 +537,8 @@ async function destroy() {
             title: form.name || null,
             category_label: selectedCategory.label,
             bacs_articles: template?.bacs_articles || null,
+            current_template_id: props.template?.id || null,
+            category: form.category || template?.category || null,
           }"
         />
       </div>
