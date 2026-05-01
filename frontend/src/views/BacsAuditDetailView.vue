@@ -17,7 +17,7 @@ import {
   getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
-  getBacsDevices, getBacsPowerSummary, updateBacsDevice,
+  getBacsDevices, getBacsPowerSummary, updateBacsDevice, createBacsDevice,
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
   updateBacsAuditSynthesis, generateBacsAuditSynthesis,
   duplicateZone, duplicateBacsMeter,
@@ -36,6 +36,9 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
+import AddZoneModal from '@/components/AddZoneModal.vue'
+import AddMeterModal from '@/components/AddMeterModal.vue'
+import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
@@ -67,6 +70,56 @@ const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
 // systemes. Persistance localStorage. Par defaut tout est visible (les
 // non concernes sont masques uniquement si le flag est explicitement
 // pose par l'auditeur).
+const showAddZoneModal = ref(false)
+const showAddMeterModal = ref(false)
+const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
+
+// Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
+const ENERGY_OPTIONS = [
+  { value: null, label: 'Énergie' },
+  { value: 'gas', label: 'Gaz' },
+  { value: 'electric', label: 'Électrique' },
+  { value: 'wood', label: 'Bois' },
+  { value: 'heat_pump', label: 'PAC' },
+  { value: 'district_heating', label: 'Réseau de chaleur' },
+  { value: 'fuel_oil', label: 'Fioul' },
+  { value: 'solar', label: 'Solaire' },
+  { value: 'biomass', label: 'Biomasse' },
+  { value: 'autre', label: 'Autre' },
+]
+const ROLE_OPTIONS = [
+  { value: null, label: 'Nature' },
+  { value: 'production', label: 'Production' },
+  { value: 'distribution', label: 'Distribution' },
+  { value: 'emission', label: 'Émission' },
+  { value: 'regulation', label: 'Régulation' },
+  { value: 'autre', label: 'Autre' },
+]
+const COMM_OPTIONS = [
+  { value: null, label: '—' },
+  { value: 'modbus_tcp', label: 'Modbus TCP' },
+  { value: 'modbus_rtu', label: 'Modbus RTU' },
+  { value: 'bacnet_ip', label: 'BACnet IP' },
+  { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
+  { value: 'knx', label: 'KNX' },
+  { value: 'mbus', label: 'M-Bus' },
+  { value: 'mqtt', label: 'MQTT' },
+  { value: 'lorawan', label: 'LoRaWAN' },
+  { value: 'autre', label: 'Autre' },
+  { value: 'non_communicant', label: 'Non communicant' },
+  { value: 'absent', label: 'Absent' },
+]
+
+async function submitAddDevice(payload) {
+  if (!addDeviceModalSystem.value) return
+  try {
+    await createBacsDevice(addDeviceModalSystem.value.id, payload)
+    await refreshAuditData()
+    success('Équipement ajouté')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Création de l\'équipement impossible')
+  }
+}
 const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
 watch(showNotConcernedSystems, v => localStorage.setItem('bacs-show-not-concerned', v ? '1' : '0'))
 const hiddenNotConcernedCount = computed(() =>
@@ -133,19 +186,6 @@ const SYSTEM_ICON = {
   lighting_outdoor:        { icon: 'fa-solid fa-tower-cell',   color: '#f59e0b' },
   electricity_production:  { icon: 'fa-solid fa-solar-panel',  color: '#16a34a' },
 }
-const COMM_OPTIONS = [
-  { value: null, label: '—' },
-  { value: 'modbus_tcp', label: 'Modbus TCP' },
-  { value: 'modbus_rtu', label: 'Modbus RTU' },
-  { value: 'bacnet_ip', label: 'BACnet IP' },
-  { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
-  { value: 'knx', label: 'KNX' },
-  { value: 'mbus', label: 'M-Bus' },
-  { value: 'mqtt', label: 'MQTT' },
-  { value: 'autre', label: 'Autre' },
-  { value: 'non_communicant', label: 'Non communicant' },
-  { value: 'absent', label: 'Absent' },
-]
 const REGULATION_OPTIONS = [
   { value: null, label: '—' },
   { value: 'per_room', label: 'Par pièce' },
@@ -356,16 +396,16 @@ async function patchDeviceMb(d, patch) {
   }
 }
 
-async function addZone() {
-  if (!newZone.value.name.trim() || !document.value?.site_id) return
+async function addZone(payload) {
+  const data = payload || newZone.value
+  if (!data.name?.trim() || !document.value?.site_id) return
   try {
     await createZone({
       site_id: document.value.site_id,
-      name: newZone.value.name.trim(),
-      nature: newZone.value.nature,
-      surface_m2: newZone.value.surface_m2 ?? null,
+      name: data.name.trim(),
+      nature: data.nature,
+      surface_m2: data.surface_m2 ?? null,
     })
-    // Recharge zones puis resync l'audit (pre-remplit systems + thermal pour la nouvelle zone)
     const z = await listZones(document.value.site_id)
     zones.value = z.data
     await resyncBacsAudit(docId)
@@ -709,7 +749,17 @@ async function recomputePowerFromEquipments() {
 async function patchSystem(s, patch) {
   try {
     const { data } = await updateBacsSystem(s.id, patch)
-    Object.assign(s, data)
+    // Remplace l'item dans systems.value : Object.assign in-place ne
+    // declenche pas toujours la re-evaluation des computed (notamment
+    // systemsByZone). On recree l'array avec l'item maj pour forcer.
+    const idx = systems.value.findIndex(x => x.id === s.id)
+    if (idx !== -1) {
+      systems.value = [
+        ...systems.value.slice(0, idx),
+        data,
+        ...systems.value.slice(idx + 1),
+      ]
+    }
     // Recharge action items (potentiellement modifies par regen)
     const a = await getBacsActionItems(docId)
     actionItems.value = a.data
@@ -718,14 +768,15 @@ async function patchSystem(s, patch) {
   }
 }
 
-async function addMeter() {
-  if (!newMeter.value.usage || !newMeter.value.meter_type) return
+async function addMeter(payload) {
+  const src = payload || newMeter.value
+  if (!src.usage || !src.meter_type) return
   try {
     const { data } = await createBacsMeter(docId, {
-      zone_id: newMeter.value.zone_id || null,
-      usage: newMeter.value.usage,
-      meter_type: newMeter.value.meter_type,
-      required: newMeter.value.required,
+      zone_id: src.zone_id || null,
+      usage: src.usage,
+      meter_type: src.meter_type,
+      required: src.required,
     })
     meters.value.push({ ...data, zone_name: zones.value.find(z => z.zone_id === data.zone_id)?.name || null })
     const a = await getBacsActionItems(docId)
@@ -1131,27 +1182,11 @@ onMounted(refresh)
                 </button>
               </td>
             </PhotoDropTr>
-            <!-- Ligne d'ajout -->
-            <tr class="bg-indigo-50/30">
-              <td class="px-5 py-2">
-                <input v-model="newZone.name" type="text" placeholder="Nom de la zone à ajouter…"
-                       @keydown.enter="addZone"
-                       class="w-full text-sm px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
-              </td>
-              <td class="py-2">
-                <select v-model="newZone.nature" class="text-xs px-2 py-1 border border-gray-200 rounded">
-                  <option :value="null">— nature</option>
-                  <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-              </td>
-              <td class="py-2">
-                <input v-model.number="newZone.surface_m2" type="number" min="0" step="1" placeholder="m²"
-                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-              </td>
-              <td colspan="3" class="px-5 py-2">
-                <button @click="addZone" :disabled="!newZone.name.trim()"
-                        class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
-                  + Ajouter
+            <tr class="bg-emerald-50/30">
+              <td colspan="6" class="px-5 py-3 text-center">
+                <button @click="showAddZoneModal = true"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm">
+                  <PlusIcon class="w-4 h-4" /> Ajouter une zone
                 </button>
               </td>
             </tr>
@@ -1257,6 +1292,7 @@ onMounted(refresh)
                     entityRef: d,
                     currentHtml: d.notes_html || d.notes || ''
                   })"
+                  @add-device="sys => addDeviceModalSystem = { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name }"
                 />
               </div>
               </PhotoDropzone>
@@ -1372,31 +1408,11 @@ onMounted(refresh)
                 </button>
               </td>
             </PhotoDropTr>
-            <!-- Ligne d'ajout -->
-            <tr class="bg-indigo-50/30">
-              <td class="px-5 py-2">
-                <select v-model="newMeter.zone_id" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
-                  <option :value="null">Compteur général</option>
-                  <option v-for="z in zones" :key="z.zone_id" :value="z.zone_id">{{ z.name }}</option>
-                </select>
-              </td>
-              <td class="py-2">
-                <select v-model="newMeter.usage" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
-                  <option v-for="u in METER_USAGES" :key="u.value" :value="u.value">{{ u.label }}</option>
-                </select>
-              </td>
-              <td class="py-2">
-                <select v-model="newMeter.meter_type" class="text-xs px-2 py-1 border border-gray-200 rounded w-full">
-                  <option v-for="t in METER_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
-                </select>
-              </td>
-              <td class="py-2">
-                <input type="checkbox" v-model="newMeter.required" class="rounded border-gray-300" />
-              </td>
-              <td colspan="7" class="px-5 py-2">
-                <button @click="addMeter"
-                        class="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700">
-                  + Ajouter un compteur
+            <tr class="bg-emerald-50/30">
+              <td colspan="11" class="px-5 py-3 text-center">
+                <button @click="showAddMeterModal = true"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm">
+                  <PlusIcon class="w-4 h-4" /> Ajouter un compteur
                 </button>
               </td>
             </tr>
@@ -1921,6 +1937,32 @@ onMounted(refresh)
       :assist-context="notesModal.assistContext"
       @close="notesModal.open = false"
       @save="saveNotesModal"
+    />
+
+    <!-- Modales d'ajout -->
+    <AddZoneModal
+      v-if="showAddZoneModal"
+      :zone-natures="ZONE_NATURES"
+      @close="showAddZoneModal = false"
+      @submit="addZone"
+    />
+    <AddMeterModal
+      v-if="showAddMeterModal"
+      :zones="zones"
+      :usages="METER_USAGES"
+      :types="METER_TYPES"
+      @close="showAddMeterModal = false"
+      @submit="addMeter"
+    />
+    <AddDeviceModal
+      v-if="addDeviceModalSystem"
+      :system-label="SYSTEM_LABEL[addDeviceModalSystem.system_category] || addDeviceModalSystem.system_category"
+      :zone-name="addDeviceModalSystem.zone_name || ''"
+      :energy-options="ENERGY_OPTIONS"
+      :role-options="ROLE_OPTIONS"
+      :comm-options="COMM_OPTIONS"
+      @close="addDeviceModalSystem = null"
+      @submit="submitAddDevice"
     />
   </div>
 </template>

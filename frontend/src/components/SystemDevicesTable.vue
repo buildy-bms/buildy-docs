@@ -8,6 +8,7 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import PhotoDropTr from './PhotoDropTr.vue'
 
 /**
  * Sous-table éditable des équipements (devices) d'un système BACS donné.
@@ -24,7 +25,7 @@ const props = defineProps({
   systemLabel: { type: String, required: true },
   siteUuid: { type: String, default: null },
 })
-const emit = defineEmits(['changed', 'system-updated', 'open-device-notes'])
+const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device'])
 
 function hasNotes(htmlOrText) {
   if (!htmlOrText) return false
@@ -211,7 +212,7 @@ async function removeDevice(d) {
 
 <template>
   <div class="bg-gray-50/40 border-l-2 border-indigo-200 ml-3 pl-4 py-2">
-    <!-- Header avec puissance totale -->
+    <!-- Header avec puissance totale + bouton + vert -->
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
       <div class="flex items-center gap-3 text-xs text-gray-600">
         <span class="font-semibold text-gray-700">{{ systemLabel }}</span>
@@ -220,6 +221,13 @@ async function removeDevice(d) {
         </span>
         <span v-else class="text-gray-400 italic">aucun équipement saisi</span>
       </div>
+      <button
+        type="button"
+        @click="emit('add-device', system)"
+        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm whitespace-nowrap"
+      >
+        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un équipement
+      </button>
     </div>
 
     <!-- Table devices -->
@@ -243,9 +251,12 @@ async function removeDevice(d) {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="d in devices" :key="d.id"
-            class="group border-b border-gray-100 hover:bg-gray-50/60 transition"
-            :class="d.out_of_service ? 'opacity-50' : ''">
+        <PhotoDropTr v-for="d in devices" :key="d.id"
+            :row-class="['group border-b border-gray-100 hover:bg-gray-50/60 transition', d.out_of_service ? 'opacity-50' : ''].join(' ')"
+            :site-uuid="siteUuid || ''"
+            :attach-to="{ device_id: d.id }"
+            :enabled="!!siteUuid"
+            @changed="refreshPhotos">
           <td class="py-1 px-1">
             <input type="text" :value="d.name" placeholder="Nom"
                    @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
@@ -342,54 +353,7 @@ async function removeDevice(d) {
               <TrashIcon class="w-3.5 h-3.5" />
             </button>
           </td>
-        </tr>
-        <!-- Ligne d'ajout inline -->
-        <tr class="bg-indigo-50/30 border-t border-indigo-100">
-          <td class="py-1.5 px-1">
-            <input v-model="newDevice.name" type="text" placeholder="Nom *"
-                   @keydown.enter="addDevice"
-                   :class="inputAddCls" />
-          </td>
-          <td class="py-1.5 px-1">
-            <select v-model="newDevice.device_role" :class="selectAddCls">
-              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
-          </td>
-          <td class="py-1.5 px-1">
-            <input v-model="newDevice.brand" type="text" placeholder="Marque" :class="inputAddCls" />
-          </td>
-          <td class="py-1.5 px-1">
-            <input v-model="newDevice.model_reference" type="text" placeholder="Référence" :class="inputAddCls" />
-          </td>
-          <td class="py-1.5 px-1">
-            <select v-model="newDevice.energy_source" :class="selectAddCls">
-              <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
-          </td>
-          <td class="py-1.5 px-1">
-            <input v-model.number="newDevice.power_kw" type="number" min="0" step="0.1" placeholder="kW"
-                   :class="inputAddCls" class="text-center" />
-          </td>
-          <td class="py-1.5 px-1">
-            <input v-model="newDevice.location" type="text" placeholder="Localisation" :class="inputAddCls" />
-          </td>
-          <td class="py-1.5 px-1">
-            <select v-model="newDevice.communication_protocol" :class="selectAddCls">
-              <option v-for="o in COMM_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
-          </td>
-          <td class="py-1.5 px-1 text-center text-gray-300 text-[10px]">—</td>
-          <td class="py-1.5 px-1 text-center text-gray-300 text-[10px]">—</td>
-          <td class="py-1.5 px-1">
-            <input v-model="newDevice.notes" type="text" placeholder="Notes" :class="inputAddCls" />
-          </td>
-          <td colspan="3" class="py-1.5 px-1 text-center">
-            <button @click="addDevice" :disabled="!newDevice.name && !newDevice.brand && !newDevice.model_reference"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
-              <PlusIcon class="w-3 h-3" /> Ajouter
-            </button>
-          </td>
-        </tr>
+        </PhotoDropTr>
       </tbody>
     </table>
   </div>

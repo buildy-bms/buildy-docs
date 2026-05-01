@@ -26,10 +26,18 @@ const updateAfSchema = z.object({
   site_address: z.string().optional(),
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
+  title: z.string().nullable().optional(),
   // Audit BACS : applicabilite R175-2
   bacs_total_power_kw: z.number().nullable().optional(),
   bacs_total_power_source: z.enum(['auto', 'manual_override']).optional(),
   bacs_building_permit_date: z.string().nullable().optional(),
+  bacs_district_heating_substation_kw: z.number().nullable().optional(),
+  bacs_generator_works_date: z.string().nullable().optional(),
+  bacs_roi_study_status: z.string().nullable().optional(),
+  bacs_roi_study_html: z.string().nullable().optional(),
+  audit_existing_af_status: z.string().nullable().optional(),
+  audit_synthesis_html: z.string().nullable().optional(),
+  audit_synthesis_generated_at: z.string().nullable().optional(),
 });
 
 /**
@@ -255,6 +263,16 @@ async function routes(fastify) {
     if ('bacs_total_power_kw' in body) fields.bacs_total_power_kw = body.bacs_total_power_kw;
     if ('bacs_total_power_source' in body) fields.bacs_total_power_source = body.bacs_total_power_source;
     if ('bacs_building_permit_date' in body) fields.bacs_building_permit_date = body.bacs_building_permit_date;
+    // Autres champs BACS / audit (forward direct vers db.afs.update qui
+    // a sa propre allowlist).
+    const passthrough = [
+      'title', 'bacs_district_heating_substation_kw', 'bacs_generator_works_date',
+      'bacs_roi_study_status', 'bacs_roi_study_html',
+      'audit_existing_af_status', 'audit_synthesis_html', 'audit_synthesis_generated_at',
+    ];
+    for (const k of passthrough) {
+      if (k in body) fields[k] = body[k];
+    }
     const touchesApplicability = ['bacs_total_power_kw', 'bacs_building_permit_date'].some(k => k in body);
     if (touchesApplicability) {
       const powerKw = body.bacs_total_power_kw !== undefined ? body.bacs_total_power_kw : af.bacs_total_power_kw;
