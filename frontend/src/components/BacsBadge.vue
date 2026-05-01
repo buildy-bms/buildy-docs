@@ -20,6 +20,12 @@ const labelPrefix = props.context === 'equipment'
   ? 'Système concerné par le décret BACS'
   : 'Exigé par le décret BACS'
 
+// Reference affichee : convertit "§N" -> "N°" a la volee pour les valeurs
+// historiques en DB qui n'ont pas encore ete migrees. Idempotent.
+const formattedReference = computed(() =>
+  (props.reference || '').replace(/§\s*(\d+)/g, (_, n) => `${n}°`)
+)
+
 const showModal = ref(false)
 const bacsData = ref(null)
 
@@ -132,13 +138,13 @@ onMounted(() => {
     type="button"
     @click.stop="openModal"
     class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap hover:bg-purple-100 hover:border-purple-300 cursor-pointer"
-    :title="`Voir l'extrait du décret BACS — ${reference}`"
+    :title="`Voir l'extrait du décret BACS — ${formattedReference}`"
   >
     <ScaleIcon class="w-3 h-3" />
-    {{ labelPrefix }} · {{ reference }}
+    {{ labelPrefix }} · {{ formattedReference }}
   </button>
 
-  <BaseModal v-if="showModal" :title="`Décret BACS — ${reference}`" size="lg" @close="showModal = false">
+  <BaseModal v-if="showModal" :title="`Décret BACS — ${formattedReference}`" size="lg" @close="showModal = false">
     <div class="space-y-6 max-h-[70vh] overflow-y-auto pr-2 -mr-2">
       <!-- Explication métier en tête (Lot UX BACS) -->
       <div v-if="contextExplanation" class="bg-purple-50 border-l-4 border-purple-400 px-5 py-4">
@@ -165,7 +171,7 @@ onMounted(() => {
       </article>
 
       <div v-if="!articlesToShow.length" class="text-xs text-gray-400 italic px-2">
-        {{ bacsData ? `Article(s) « ${reference} » introuvable(s) dans le seed BACS.` : 'Chargement…' }}
+        {{ bacsData ? `Article(s) « ${formattedReference} » introuvable(s) dans le seed BACS.` : 'Chargement…' }}
       </div>
     </div>
     <template #footer>
