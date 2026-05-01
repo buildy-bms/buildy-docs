@@ -201,18 +201,23 @@ table th {
   word-break: keep-all;
   overflow-wrap: normal;
 }
-/* Aucune troncature dans les cellules : le texte wrappe naturellement.
-   On autorise word-break: break-word pour eviter les debordements de
-   tres longs mots (URLs, refs produit, etc.). */
+/* Aucune troncature dans les cellules : le texte wrappe naturellement
+   sur les espaces. On NE casse PAS les mots (sauf cas explicite via .wrap-anywhere). */
 table td {
   padding: 1.2mm 1.8mm;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: top;
   white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  font-size: 8pt;
+}
+/* Pour les valeurs vraiment longues sans espaces (URL, refs longues),
+   ajouter la classe .wrap-anywhere via le contenu pour forcer le break.
+   Par defaut on respecte les mots. */
+table td.wrap-anywhere {
   word-break: break-word;
   overflow-wrap: anywhere;
-  hyphens: auto;
-  font-size: 8pt;
 }
 table tr:nth-child(even) td { background: #fafafa; }
 

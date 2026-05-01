@@ -191,34 +191,44 @@
   {{#if present}}
     <h3>{{{categoryIcon system_category "18"}}}{{categoryLabel}}{{#if total_power_kw}} <span class="muted">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
     {{#if devices.length}}
-      <table>
+      <table class="device-table">
         <thead>
           <tr>
-            <th>Nom</th><th>Marque</th><th>Modèle</th><th>Énergie</th>
-            <th>Puiss. (kW)</th><th>Nature</th><th>Communication</th>
-            <th>Localisation</th><th>Comm. R175-3 §3</th><th>Arrêt manuel</th>
-            <th>Autonome</th><th>HS</th>
+            <th style="width:22%">Équipement</th>
+            <th style="width:18%">Marque / réf.</th>
+            <th style="width:9%">Énergie</th>
+            <th style="width:8%">Puiss.</th>
+            <th style="width:10%">Nature</th>
+            <th style="width:13%">Communication</th>
+            <th style="width:14%">Localisation</th>
+            <th style="width:6%">R175-3 §3/§4</th>
           </tr>
         </thead>
         <tbody>
           {{#each devices}}
-            <tr>
-              <td>{{name}}</td>
-              <td>{{brand}}</td>
-              <td>{{model_reference}}</td>
+            <tr {{#if out_of_service}}style="opacity:0.5;text-decoration:line-through"{{/if}}>
+              <td>
+                <strong>{{name}}</strong>
+                {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
+              </td>
+              <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
               <td>{{energyLabel}}</td>
-              <td>{{power_kw}}</td>
+              <td>{{power_kw}}{{#if power_kw}} kW{{/if}}</td>
               <td>{{roleLabel}}</td>
               <td>{{commLabel}}</td>
               <td>{{location}}</td>
-              <td>{{#if communication_protocol}}{{#unless (eq communication_protocol "non_communicant")}}{{#unless (eq communication_protocol "absent")}}Oui{{else}}Non{{/unless}}{{else}}Non{{/unless}}{{else}}Non{{/if}}</td>
-              <td>{{boolLabel meets_r175_3_p4}}</td>
-              <td>{{boolLabel meets_r175_3_p4_autonomous}}</td>
-              <td>{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}—{{/if}}</td>
+              <td style="white-space:nowrap;font-size:7pt">
+                {{#if meets_r175_3_p3}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
+                {{#if meets_r175_3_p4}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
+                {{#if meets_r175_3_p4_autonomous}}<span style="color:#16a34a">✓</span>{{else}}<span style="color:#dc2626">✗</span>{{/if}}
+              </td>
             </tr>
           {{/each}}
         </tbody>
       </table>
+      <p class="muted" style="font-size:7pt;margin-top:-2mm">
+        Colonnes R175-3 (3 cases) : interopérabilité §3 · arrêt manuel §4 · gestion autonome §4.
+      </p>
     {{else}}
       <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
     {{/if}}

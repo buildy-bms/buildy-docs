@@ -61,6 +61,11 @@ const zones = ref([])
 const devices = ref([])
 const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
 
+// Toggle pour afficher les usages non concernes dans la card systemes.
+// Persistance localStorage par utilisateur.
+const showNonPresentSystems = ref(localStorage.getItem('bacs-show-non-present') === '1')
+watch(showNonPresentSystems, v => localStorage.setItem('bacs-show-non-present', v ? '1' : '0'))
+
 const ZONE_NATURES = [
   { value: 'shared-office', label: 'Bureau partagé' },
   { value: 'private-office', label: 'Bureau privé' },
@@ -961,12 +966,12 @@ onMounted(refresh)
           <div>
             <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
               <input type="checkbox"
-                     :checked="!!document?.bacs_generator_works_date"
-                     @change="e => { if (!e.target.checked) saveDocDebounced({ bacs_generator_works_date: null }); else saveDocDebounced({ bacs_generator_works_date: new Date().toISOString().slice(0, 10) }); }"
+                     :checked="document?.bacs_generator_works_date != null"
+                     @change="e => saveDocDebounced({ bacs_generator_works_date: e.target.checked ? (document?.bacs_generator_works_date || new Date().toISOString().slice(0, 10)) : null })"
                      class="rounded border-gray-300" />
               <span>Travaux d'installation/remplacement de générateur de chaleur réalisés <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
             </label>
-            <div v-if="document?.bacs_generator_works_date" class="pl-6 border-l-2 border-indigo-100 mt-2">
+            <div v-if="document?.bacs_generator_works_date != null" class="pl-6 border-l-2 border-indigo-100 mt-2">
               <label class="block text-xs font-medium text-gray-700 mb-1">
                 Date des derniers travaux générateur de chaleur
               </label>
@@ -988,8 +993,8 @@ onMounted(refresh)
           <div class="col-span-2 border-t border-gray-100 pt-3">
             <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
               <input type="checkbox"
-                     :checked="!!document?.bacs_district_heating_substation_kw"
-                     @change="e => { if (!e.target.checked) saveDocDebounced({ bacs_district_heating_substation_kw: null }); else saveDocDebounced({ bacs_district_heating_substation_kw: 0 }); }"
+                     :checked="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
+                     @change="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.checked ? (document?.bacs_district_heating_substation_kw || 0) : null })"
                      class="rounded border-gray-300" />
               <span>Bâtiment raccordé à un <strong>réseau urbain de chaleur ou de froid</strong></span>
             </label>
@@ -1147,22 +1152,35 @@ onMounted(refresh)
           </span>
           <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
         </template>
-        <div class="divide-y divide-gray-100">
-          <div v-for="g in systemsByZone" :key="g.zone_name" class="px-5 py-3">
-            <div class="flex items-center gap-2 mb-3">
-              <MapPinIcon class="w-4 h-4 text-gray-400" />
-              <span class="font-medium text-sm text-gray-800">{{ g.zone_name }}</span>
-              <span v-if="g.zone_nature" class="text-[11px] text-gray-500">{{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
+        <div class="px-3 py-3 bg-gray-50">
+          <div class="flex items-center justify-end mb-2 gap-2">
+            <label class="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" v-model="showNonPresentSystems" class="rounded border-gray-300" />
+              Afficher les usages non concernés
+            </label>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+          <div v-for="g in systemsByZone" :key="g.zone_name"
+               class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
+            <div class="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+              <MapPinIcon class="w-4 h-4 text-indigo-500" />
+              <span class="font-semibold text-sm text-gray-800">{{ g.zone_name }}</span>
+              <span v-if="g.zone_nature" class="text-[10px] text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
+              <span class="ml-auto text-[10px] text-gray-400">
+                {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
+                / {{ g.items.length }}
+              </span>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-2">
+              <template v-for="s in g.items" :key="s.id">
               <PhotoDropzone
-                v-for="s in g.items" :key="s.id"
+                v-if="s.present || showNonPresentSystems"
                 :site-uuid="document?.site_uuid || ''"
                 :attach-to="{ system_id: s.id }"
                 :enabled="!!document?.site_uuid && s.present"
                 @changed="refreshAuditData"
               >
-              <div class="border border-gray-100 rounded-lg overflow-hidden">
+              <div :class="['border rounded-lg overflow-hidden', s.present ? 'border-gray-200' : 'border-dashed border-gray-200 bg-gray-50/50']">
                 <!-- En-tête catégorie : icone + présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
                   <SystemCategoryIcon :category="s.system_category" size="md" />
@@ -1213,7 +1231,9 @@ onMounted(refresh)
                 />
               </div>
               </PhotoDropzone>
+              </template>
             </div>
+          </div>
           </div>
           <div v-if="!systemsByZone.length" class="px-5 py-6 text-center text-sm text-gray-500">
             Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.

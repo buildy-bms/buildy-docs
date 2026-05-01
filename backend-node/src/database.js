@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 52;
+const TARGET_VERSION = 53;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -1953,6 +1953,50 @@ function runMigrations() {
     `);
     db.pragma('user_version = 52');
     log.info('Migration 52 appliquee : R175-3 mise a disposition donnees + R175-6 declencheur');
+  }
+
+  if (current < 53) {
+    // Bug v2.18 : la contrainte CHECK sur site_documents.category n'incluait
+    // pas 'photo' alors que le code JS l'attendait. Tous les uploads photo
+    // failaient en 500 SQLITE_CONSTRAINT_CHECK. SQLite ne supporte pas le
+    // modify CHECK direct → recreate table + copy data.
+    db.exec(`
+      CREATE TABLE site_documents_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL REFERENCES sites(site_id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL CHECK (category IN
+          ('plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
+           'datasheet','manuel_utilisateur','rapport_essais','photo','autre')),
+        filename TEXT NOT NULL,
+        original_name TEXT,
+        size_bytes INTEGER,
+        mime_type TEXT,
+        bacs_audit_system_id INTEGER REFERENCES bacs_audit_systems(id) ON DELETE SET NULL,
+        bacs_audit_bms_document_id INTEGER REFERENCES bacs_audit_bms(document_id) ON DELETE SET NULL,
+        bacs_audit_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+        bacs_audit_zone_id INTEGER REFERENCES zones(zone_id) ON DELETE SET NULL,
+        bacs_audit_meter_id INTEGER REFERENCES bacs_audit_meters(id) ON DELETE SET NULL,
+        uploaded_by INTEGER REFERENCES users(id),
+        uploaded_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO site_documents_new
+        (id, site_id, title, category, filename, original_name, size_bytes, mime_type,
+         bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
+         bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by, uploaded_at)
+      SELECT id, site_id, title, category, filename, original_name, size_bytes, mime_type,
+             bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
+             bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by, uploaded_at
+      FROM site_documents;
+      DROP TABLE site_documents;
+      ALTER TABLE site_documents_new RENAME TO site_documents;
+      CREATE INDEX IF NOT EXISTS idx_site_documents_site ON site_documents(site_id, category);
+      CREATE INDEX IF NOT EXISTS idx_site_documents_device ON site_documents(bacs_audit_device_id);
+      CREATE INDEX IF NOT EXISTS idx_site_documents_zone ON site_documents(bacs_audit_zone_id);
+      CREATE INDEX IF NOT EXISTS idx_site_documents_meter ON site_documents(bacs_audit_meter_id);
+    `);
+    db.pragma('user_version = 53');
+    log.info('Migration 53 appliquee : site_documents.category accepte photo');
   }
 
   if (current > TARGET_VERSION) {
