@@ -7,6 +7,7 @@ import {
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
+  ClockIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -43,6 +44,7 @@ import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
+import ActivityPanel from '@/components/ActivityPanel.vue'
 import BmsComponentsTable from '@/components/BmsComponentsTable.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
@@ -523,6 +525,12 @@ async function switchKind(newKind) {
     error(e.response?.data?.detail || 'Bascule impossible')
   }
 }
+
+// Panneau d'activité (slide-out a droite, comme dans l'AF detail).
+// Affiche les entrees du journal d'audit (validations, exports,
+// uploads, generations Claude, etc.) recuperees via /api/afs/:id/audit.
+const showActivity = ref(false)
+const activityRef = ref(null)
 
 // Tout replier / déplier (broadcast vers chaque CollapsibleSection)
 function setAllSectionsCollapsed(collapsed) {
@@ -1121,6 +1129,14 @@ onMounted(() => {
             <ChevronDoubleDownIcon class="w-3.5 h-3.5 shrink-0" /> Tout déplier
           </button>
         </div>
+        <button @click="showActivity = !showActivity"
+                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-lg whitespace-nowrap',
+                         showActivity
+                           ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                           : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']"
+                title="Panneau d'activité">
+          <ClockIcon class="w-3.5 h-3.5 shrink-0" /> Activité
+        </button>
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
         </button>
@@ -2320,6 +2336,28 @@ onMounted(() => {
       </div><!-- /colonne principale -->
     </div>
 
+    <!-- Panneau d'activité (slide-out à droite, identique à AfDetailView) -->
+    <Teleport to="body">
+      <transition name="slide">
+        <aside
+          v-if="showActivity"
+          class="fixed right-3 top-3 bottom-3 w-80 z-50 bg-white border border-gray-200 rounded-lg shadow-2xl flex flex-col"
+        >
+          <button
+            @click="showActivity = false"
+            class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xs z-10 p-1"
+            title="Replier"
+          >✕</button>
+          <ActivityPanel ref="activityRef" :af-id="docId" />
+        </aside>
+      </transition>
+      <div
+        v-if="showActivity"
+        class="fixed inset-0 bg-black/30 z-40"
+        @click="showActivity = false"
+      ></div>
+    </Teleport>
+
     <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->
     <NotesEditorModal
       :open="notesModal.open"
@@ -2358,3 +2396,8 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.slide-enter-active, .slide-leave-active { transition: transform 200ms ease; }
+.slide-enter-from, .slide-leave-to { transform: translateX(110%); }
+</style>

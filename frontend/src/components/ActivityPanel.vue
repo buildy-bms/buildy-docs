@@ -11,6 +11,7 @@ const entries = ref([])
 const loading = ref(false)
 
 const ACTION_LABELS = {
+  // AF
   'section.update': { label: 'a édité', color: 'text-gray-700' },
   'section.override.add': { label: 'a ajouté un override de point', color: 'text-amber-700' },
   'section.override.remove': { label: 'a retiré un override de point', color: 'text-amber-700' },
@@ -24,7 +25,23 @@ const ACTION_LABELS = {
   'af.restore': { label: 'a restauré une version', color: 'text-red-700' },
   'af.delivered': { label: 'a livré l\'AF (DOE)', color: 'text-emerald-700' },
   'af.update': { label: 'a modifié l\'AF', color: 'text-gray-700' },
+  'af.create': { label: 'a créé l\'AF', color: 'text-emerald-700' },
   'claude.draft': { label: 'a généré un brouillon Claude', color: 'text-violet-700' },
+  // Audits BACS / GTB
+  'bacs_audit.create': { label: 'a créé l\'audit', color: 'text-emerald-700' },
+  'site_audit.create': { label: 'a créé l\'audit GTB', color: 'text-emerald-700' },
+  'bacs_audit.step.validate': { label: 'a validé une étape', color: 'text-emerald-700' },
+  'bacs_audit.step.invalidate': { label: 'a annulé une validation d\'étape', color: 'text-amber-700' },
+  'bacs_audit.synthesis.generate': { label: 'a généré la synthèse Claude', color: 'text-violet-700' },
+  'bacs_audit.alternatives.generate': { label: 'a généré des préconisations Claude', color: 'text-violet-700' },
+  'export.bacs-audit': { label: 'a exporté l\'audit (PDF)', color: 'text-indigo-700' },
+  'document.delivered': { label: 'a livré l\'audit', color: 'text-emerald-700' },
+  'site_document.upload': { label: 'a ajouté un document', color: 'text-blue-700' },
+  'site_document.delete': { label: 'a supprimé un document', color: 'text-red-700' },
+  'credential.create': { label: 'a ajouté un credential', color: 'text-blue-700' },
+  'credential.update': { label: 'a modifié un credential', color: 'text-gray-700' },
+  'credential.delete': { label: 'a supprimé un credential', color: 'text-red-700' },
+  'credential.revealed': { label: 'a révélé un credential', color: 'text-amber-700' },
 }
 
 async function refresh() {
