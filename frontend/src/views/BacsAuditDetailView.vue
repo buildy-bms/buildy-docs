@@ -1088,16 +1088,19 @@ onMounted(() => {
 
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else class="space-y-4">
-      <!-- Stepper progression (9 etapes a valider manuellement) -->
+    <div v-else class="grid grid-cols-[230px_1fr] gap-5 items-start">
+      <!-- Stepper vertical sticky : visible tout au long du scroll de la page -->
       <BacsAuditStepper
         :steps="stepperSteps"
         :active-step-key="activeStepKey"
         @step-click="onStepClick"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
+        class="sticky top-4 self-start"
       />
 
+      <!-- Colonne principale : contenu de l'audit -->
+      <div class="space-y-4 min-w-0">
       <!-- Synthese severities (compactee) -->
       <div class="grid grid-cols-3 gap-2">
         <div v-for="sev in ['blocking','major','minor']" :key="sev"
@@ -2257,6 +2260,7 @@ onMounted(() => {
           />
         </div>
       </CollapsibleSection>
+      </div><!-- /colonne principale -->
     </div>
 
     <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->
