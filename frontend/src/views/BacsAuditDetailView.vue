@@ -1538,7 +1538,9 @@ onMounted(() => {
               </td>
               <td class="py-2 text-center">
                 <input type="checkbox" :checked="!!m.communicating" :disabled="!m.present_actual"
-                       @change="e => patchMeter(m, { communicating: e.target.checked })"
+                       @change="e => patchMeter(m, e.target.checked
+                         ? { communicating: true }
+                         : { communicating: false, communication_protocols: null, communication_protocol: null })"
                        class="rounded border-gray-300 disabled:opacity-30" />
               </td>
               <td class="py-2 text-center">
@@ -1553,7 +1555,7 @@ onMounted(() => {
                   :disabled="!m.communicating"
                   :options="PROTOCOL_OPTIONS"
                   size="xs"
-                  @update:modelValue="v => patchMeter(m, { communication_protocols: v })"
+                  @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
                 />
               </td>
               <td class="py-2 text-center">

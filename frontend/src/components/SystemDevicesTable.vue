@@ -310,7 +310,7 @@ async function removeDevice(d) {
               :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
               :options="COMM_OPTIONS"
               size="xs"
-              @update:modelValue="v => patchDevice(d, { communication_protocols: v })"
+              @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
             />
           </td>
           <td class="py-1 px-1 text-center">
