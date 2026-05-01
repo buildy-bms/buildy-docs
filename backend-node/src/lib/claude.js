@@ -231,7 +231,22 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
 
   if (has_corpus) {
     lines.push('');
-    lines.push(`Le corpus existant de la bibliotheque t'est fourni dans le system prompt. Sers-t'en pour aligner vocabulaire, niveau de detail et tonalite avec les autres entrees deja redigees. Ne recopie pas leur contenu et evite les redondances avec les voisines proches.`);
+    lines.push(`=== CORPUS BIBLIOTHEQUE — REGLES D'USAGE ===`);
+    lines.push(`Le corpus existant de la bibliotheque t'est fourni dans le system prompt (titres + contenus deja rediges).`);
+    lines.push(``);
+    lines.push(`OBJECTIF : aligner vocabulaire, niveau de detail et tonalite avec ce qui existe deja.`);
+    lines.push(``);
+    lines.push(`INTERDICTIONS STRICTES :`);
+    lines.push(`- Ne PAS recopier ni paraphraser le contenu d'une autre entree.`);
+    lines.push(`- Ne PAS dupliquer une information deja decrite ailleurs (ex : ne pas reexpliquer "supervision multi-sites" si une fonctionnalite porte deja ce titre).`);
+    lines.push(`- Ne PAS empieter sur le perimetre d'une autre entree : si un sujet est deja couvert par une fonctionnalite ou un systeme technique existant, ne le re-detaille pas ici.`);
+    lines.push(``);
+    lines.push(`OBLIGATIONS :`);
+    lines.push(`- Quand tu effleures un sujet couvert ailleurs, RENVOIE explicitement vers l'entree concernee en citant son titre exact entre guillemets francais (« ... »). Exemples :`);
+    lines.push(`    • "Voir la fonctionnalite « Supervision multi-sites » pour le detail."`);
+    lines.push(`    • "Cette logique s'appuie sur le systeme « Centrale de traitement d'air »."`);
+    lines.push(`- Verifie l'orthographe exacte du titre dans le corpus avant de le citer.`);
+    lines.push(`- Reste focalise sur ce qui est specifique a l'entree en cours de redaction.`);
   }
 
   return lines.join('\n');
