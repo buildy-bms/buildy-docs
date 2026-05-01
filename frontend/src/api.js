@@ -185,6 +185,12 @@ export const listAuditActions = () => api.get('/audit-log/actions')
 //             current_template_id?, parent_template_id?, category?,
 //             library_context?: { enabled, strategy } }
 export const getClaudeUsage = () => api.get('/claude/usage')
+// ── Prompts IA editables ──
+export const listAiPrompts = () => api.get('/ai-prompts')
+export const getAiPrompt = (key) => api.get(`/ai-prompts/${key}`)
+export const updateAiPrompt = (key, body, label = null) => api.patch(`/ai-prompts/${key}`, { body, label })
+export const resetAiPrompt = (key) => api.post(`/ai-prompts/${key}/reset`)
+export const restoreAiPromptVersion = (key, versionId) => api.post(`/ai-prompts/${key}/restore/${versionId}`)
 export const searchAfs = (q) => api.get('/afs/search', { params: { q } })
 export const claudeLibraryAssist = (payload) =>
   api.post('/claude/library-assist', payload)

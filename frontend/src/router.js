@@ -110,6 +110,12 @@ const routes = [
     meta: { title: 'Audit trail' },
     component: () => import('@/views/AuditTrailView.vue'),
   },
+  {
+    path: '/ai-prompts',
+    name: 'ai-prompts',
+    meta: { title: 'Prompts IA' },
+    component: () => import('@/views/AiPromptsView.vue'),
+  },
 ]
 
 const router = createRouter({

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 59;
+const TARGET_VERSION = 60;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2150,6 +2150,32 @@ function runMigrations() {
     log.info('Migration 59 appliquee : afs.kind CHECK étendu (site_audit)');
   }
 
+  if (current < 60) {
+    // Table de stockage des prompts IA editables depuis l'UI.
+    // Cle = identifiant logique (ex: 'library', 'synthesis', 'alternatives').
+    // Si une ligne existe, elle prevaut sur la valeur en dur dans le code ;
+    // sinon, le code retombe sur sa constante par defaut.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_prompts (
+        key TEXT PRIMARY KEY,
+        body TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE TABLE IF NOT EXISTS ai_prompt_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        label TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_ai_prompt_versions_key ON ai_prompt_versions(key, created_at DESC);
+    `);
+    db.pragma('user_version = 60');
+    log.info('Migration 60 appliquee : ai_prompts + ai_prompt_versions');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3275,6 +3301,62 @@ const sitesSyncQueue = {
   },
 };
 
+// ── Prompts IA editables ────────────────────────────────────────────
+const aiPrompts = {
+  get(key) {
+    return db.prepare('SELECT * FROM ai_prompts WHERE key = ?').get(key);
+  },
+  list() {
+    return db.prepare(`
+      SELECT p.*, u.display_name AS updated_by_name
+      FROM ai_prompts p
+      LEFT JOIN users u ON u.id = p.updated_by
+      ORDER BY p.key
+    `).all();
+  },
+  upsert({ key, body, updatedBy, label }) {
+    const existing = this.get(key);
+    db.transaction(() => {
+      // Snapshot version courante AVANT modification
+      if (existing && existing.body !== body) {
+        db.prepare(`
+          INSERT INTO ai_prompt_versions (key, body, created_by, label)
+          VALUES (?, ?, ?, ?)
+        `).run(key, existing.body, existing.updated_by || null, label || null);
+      }
+      // Insert ou update du prompt courant
+      db.prepare(`
+        INSERT INTO ai_prompts (key, body, updated_by, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+          body = excluded.body,
+          updated_by = excluded.updated_by,
+          updated_at = CURRENT_TIMESTAMP
+      `).run(key, body, updatedBy || null);
+    })();
+    return this.get(key);
+  },
+  listVersions(key, { limit = 20 } = {}) {
+    return db.prepare(`
+      SELECT v.*, u.display_name AS created_by_name
+      FROM ai_prompt_versions v
+      LEFT JOIN users u ON u.id = v.created_by
+      WHERE v.key = ?
+      ORDER BY v.created_at DESC
+      LIMIT ?
+    `).all(key, limit);
+  },
+  getVersion(versionId) {
+    return db.prepare('SELECT * FROM ai_prompt_versions WHERE id = ?').get(versionId);
+  },
+  delete(key) {
+    db.transaction(() => {
+      db.prepare('DELETE FROM ai_prompt_versions WHERE key = ?').run(key);
+      db.prepare('DELETE FROM ai_prompts WHERE key = ?').run(key);
+    })();
+  },
+};
+
 module.exports = {
   init,
   users,
@@ -3300,5 +3382,6 @@ module.exports = {
   zones,
   equipments,
   sitesSyncQueue,
+  aiPrompts,
   get db() { return db; },
 };

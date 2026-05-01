@@ -312,6 +312,20 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
 }
 
 /**
+ * Cle logique du prompt pour la bibliotheque editable depuis l'UI.
+ * Si une ligne ai_prompts existe avec cette cle, son body remplace
+ * SYSTEM_PROMPT_LIBRARY ; sinon on retombe sur la constante en dur.
+ */
+const PROMPT_KEY_LIBRARY = 'library';
+function getActivePromptLibrary() {
+  try {
+    const row = db.aiPrompts && db.aiPrompts.get(PROMPT_KEY_LIBRARY);
+    if (row && row.body && row.body.trim()) return row.body;
+  } catch { /* fallback silencieux */ }
+  return SYSTEM_PROMPT_LIBRARY;
+}
+
+/**
  * Assistant unique de la bibliotheque (mode generate ou reformulate).
  * Retourne le HTML produit + usage de tokens.
  *
@@ -347,10 +361,11 @@ async function assistLibrary({
     has_corpus: !!corpus,
   });
 
-  // Cache_control sur chaque bloc system : le 1er ne change jamais, le 2nd
-  // ne change qu'avec une edition de la bibliotheque (rare entre 2 appels).
+  // Cache_control sur chaque bloc system : le 1er ne change qu'a chaque
+  // edition du prompt depuis l'UI (rare), le 2nd ne change qu'avec une
+  // edition de la bibliotheque (rare entre 2 appels).
   const systemBlocks = [
-    { type: 'text', text: SYSTEM_PROMPT_LIBRARY, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: getActivePromptLibrary(), cache_control: { type: 'ephemeral' } },
   ];
   if (corpus) {
     systemBlocks.push({
@@ -591,4 +606,8 @@ async function assistActionAlternatives(actionContext) {
 module.exports = {
   streamSection, buildPrompts, assistLibrary,
   assistAuditSynthesis, assistActionAlternatives,
+  // Pour la page d'administration "Prompts IA"
+  PROMPT_KEY_LIBRARY,
+  DEFAULT_SYSTEM_PROMPT_LIBRARY: SYSTEM_PROMPT_LIBRARY,
+  getActivePromptLibrary,
 };

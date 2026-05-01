@@ -60,6 +60,7 @@ const nav = [
   { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
   { section: 'Système' },
+  { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
   { name: 'Audit trail', to: '/audit', icon: ClockIcon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)

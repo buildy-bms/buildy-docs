@@ -96,6 +96,7 @@ async function main() {
   await fastify.register(require('./routes/versions'), { prefix: '/api' });
   await fastify.register(require('./routes/search'), { prefix: '/api' });
   await fastify.register(require('./routes/claude'), { prefix: '/api' });
+  await fastify.register(require('./routes/ai-prompts'), { prefix: '/api' });
   await fastify.register(require('./routes/bacs'), { prefix: '/api' });
   await fastify.register(require('./routes/users'), { prefix: '/api' });
   await fastify.register(require('./routes/audit'), { prefix: '/api' });
