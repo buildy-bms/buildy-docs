@@ -1025,7 +1025,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="w-full max-w-450 mx-auto px-4 pb-12">
+  <div class="w-full mx-auto px-3 pb-12">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
@@ -1088,7 +1088,7 @@ onMounted(() => {
 
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else class="grid grid-cols-[230px_1fr] gap-5 items-start">
+    <div v-else class="grid grid-cols-[180px_1fr] gap-4 items-start">
       <!-- Stepper vertical sticky : visible tout au long du scroll de la page -->
       <BacsAuditStepper
         :steps="stepperSteps"
