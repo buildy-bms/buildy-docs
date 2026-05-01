@@ -6,7 +6,7 @@ import {
   CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, PlusIcon, TrashIcon,
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
-  ChevronDoubleUpIcon, ChevronDoubleDownIcon,
+  ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -231,11 +231,36 @@ const systemsByZone = computed(() => {
   const groups = new Map()
   for (const s of systems.value) {
     const k = s.zone_id
-    if (!groups.has(k)) groups.set(k, { zone_name: s.zone_name, zone_nature: s.zone_nature, items: [] })
+    if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, zone_nature: s.zone_nature, items: [] })
     groups.get(k).items.push(s)
   }
   return [...groups.values()]
 })
+
+// Replier/déplier manuellement les zones et catégories de la card 3.
+// Persistance via localStorage scopée au document.
+const collapsedZones = ref(new Set())
+const collapsedSystems = ref(new Set())
+function loadCollapseState() {
+  try {
+    const z = localStorage.getItem(`bacs-zone-collapse:${docId}`)
+    collapsedZones.value = new Set(z ? JSON.parse(z) : [])
+    const s = localStorage.getItem(`bacs-system-collapse:${docId}`)
+    collapsedSystems.value = new Set(s ? JSON.parse(s) : [])
+  } catch { /* silent */ }
+}
+function toggleZoneCollapsed(zoneId) {
+  const s = new Set(collapsedZones.value)
+  if (s.has(zoneId)) s.delete(zoneId); else s.add(zoneId)
+  collapsedZones.value = s
+  localStorage.setItem(`bacs-zone-collapse:${docId}`, JSON.stringify([...s]))
+}
+function toggleSystemCollapsed(systemId) {
+  const s = new Set(collapsedSystems.value)
+  if (s.has(systemId)) s.delete(systemId); else s.add(systemId)
+  collapsedSystems.value = s
+  localStorage.setItem(`bacs-system-collapse:${docId}`, JSON.stringify([...s]))
+}
 
 const itemsBySeverity = computed(() => {
   const out = { blocking: [], major: [], minor: [] }
@@ -912,7 +937,10 @@ async function deliver() {
   }
 }
 
-onMounted(refresh)
+onMounted(() => {
+  loadCollapseState()
+  refresh()
+})
 </script>
 
 <template>
@@ -1268,18 +1296,25 @@ onMounted(refresh)
             </label>
           </div>
           <div class="space-y-3">
-          <div v-for="g in systemsByZone" :key="g.zone_name"
+          <div v-for="g in systemsByZone" :key="g.zone_id"
                class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
-            <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+            <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
+                 :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
+              <button type="button" @click="toggleZoneCollapsed(g.zone_id)"
+                      class="p-1 -ml-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
+                      :title="collapsedZones.has(g.zone_id) ? 'Déplier la zone' : 'Replier la zone'">
+                <ChevronDownIcon v-if="collapsedZones.has(g.zone_id)" class="w-4 h-4" />
+                <ChevronUpIcon v-else class="w-4 h-4" />
+              </button>
               <MapPinIcon class="w-5 h-5 text-indigo-500" />
-              <span class="font-semibold text-lg text-gray-900">{{ g.zone_name }}</span>
+              <span class="font-semibold text-lg text-gray-900 cursor-pointer" @click="toggleZoneCollapsed(g.zone_id)">{{ g.zone_name }}</span>
               <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
               <span class="ml-auto text-[10px] text-gray-400">
                 {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
                 / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
               </span>
             </div>
-            <div class="space-y-2">
+            <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2">
               <template v-for="s in g.items" :key="s.id">
               <PhotoDropzone
                 v-if="!s.not_concerned || showNotConcernedSystems"
@@ -1293,8 +1328,15 @@ onMounted(refresh)
                                             : (s.present ? 'border-gray-200' : 'border-gray-200 bg-gray-50/30')]">
                 <!-- En-tête catégorie : icone + présent? + notes + photos -->
                 <div class="px-3 py-2 flex items-center gap-3 bg-white">
+                  <button v-if="s.present" type="button" @click="toggleSystemCollapsed(s.id)"
+                          class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
+                          :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
+                    <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
+                    <ChevronUpIcon v-else class="w-3.5 h-3.5" />
+                  </button>
                   <SystemCategoryIcon :category="s.system_category" size="md" />
-                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45">
+                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45 cursor-pointer"
+                        @click="s.present && toggleSystemCollapsed(s.id)">
                     {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
                   </span>
                   <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
@@ -1330,7 +1372,7 @@ onMounted(refresh)
                 </div>
                 <!-- Sous-table devices + cases R175-3 §3/§4 (visible uniquement si système présent) -->
                 <SystemDevicesTable
-                  v-if="s.present"
+                  v-if="s.present && !collapsedSystems.has(s.id)"
                   :system="s"
                   :devices="devicesBySystem[s.id] || []"
                   :system-label="SYSTEM_LABEL[s.system_category] || s.system_category"
@@ -1715,11 +1757,17 @@ onMounted(refresh)
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                   <tr v-for="d in devicesWithMeta" :key="d.id"
-                      :class="d.out_of_service ? 'opacity-50' : ''">
-                    <td class="px-2 py-1 text-gray-700">
-                      <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
-                      <span class="text-gray-400">
-                        — {{ SYSTEM_LABEL[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
+                      :class="[
+                        d.out_of_service ? 'opacity-50' : '',
+                        d.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : ''
+                      ]">
+                    <td class="px-2 py-1">
+                      <span class="inline-flex items-center gap-2">
+                        <SystemCategoryIcon :category="d.system_category" size="sm" />
+                        <strong>{{ d.name || d.brand || d.model_reference || 'Sans nom' }}</strong>
+                        <span :class="d.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
+                          — {{ SYSTEM_LABEL[d.system_category] || d.system_category }} / {{ d.zone_name || '?' }}
+                        </span>
                       </span>
                     </td>
                     <td class="py-1 text-center">
@@ -1754,11 +1802,17 @@ onMounted(refresh)
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                   <tr v-for="m in metersPresent" :key="m.id"
-                      :class="m.out_of_service ? 'opacity-50' : ''">
-                    <td class="px-2 py-1 text-gray-700">
-                      <strong>{{ METER_TYPES.find(t => t.value === m.meter_type)?.label || m.meter_type }}</strong>
-                      <span class="text-gray-400">
-                        — {{ m.zone_name || 'général' }} ({{ METER_USAGES.find(u => u.value === m.usage)?.label || m.usage }})
+                      :class="[
+                        m.out_of_service ? 'opacity-50' : '',
+                        m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : ''
+                      ]">
+                    <td class="px-2 py-1">
+                      <span class="inline-flex items-center gap-2">
+                        <MeterTypePill :type="m.meter_type" />
+                        <MeterUsagePill :usage="m.usage" />
+                        <span :class="m.bms_integration_out_of_service ? 'text-red-500' : 'text-gray-400'">
+                          — {{ m.zone_name || 'général' }}
+                        </span>
                       </span>
                     </td>
                     <td class="py-1 text-center">
