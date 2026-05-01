@@ -1,10 +1,11 @@
 #!/bin/bash
-# Buildy Docs / AF — Mise a jour code sur le VPS Jelastic.
-# A executer depuis le VPS, en root, dans /opt/buildy-af.
+# Buildy Docs — Mise a jour code sur le VPS Jelastic.
+# A executer depuis le VPS, en root, dans /opt/buildy-docs.
+# (Anciennement /opt/buildy-af, renomme le 2026-05-01.)
 set -e
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/buildy-af}"
-PM2_NAME="${PM2_NAME:-buildy-af}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/buildy-docs}"
+PM2_NAME="${PM2_NAME:-buildy-docs}"
 
 cd "$INSTALL_DIR"
 
