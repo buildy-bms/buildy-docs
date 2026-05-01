@@ -294,11 +294,22 @@ async function routes(fastify) {
       }
     }
 
-    const updated = db.afs.update(id, fields);
-    db.auditLog.add({
-      afId: id, userId, action: 'af.update',
-      payload: Object.fromEntries(Object.entries(body).filter(([_, v]) => v != null)),
-    });
+    let updated;
+    try {
+      updated = db.afs.update(id, fields);
+    } catch (err) {
+      // Log explicite (Pino n'imprime pas la stack des erreurs 500 par defaut)
+      log.error({ err, fields, body }, `PATCH /afs/${id} db.afs.update failed: ${err.message}`);
+      return reply.code(500).send({ detail: `Erreur sauvegarde : ${err.message}` });
+    }
+    try {
+      db.auditLog.add({
+        afId: id, userId, action: 'af.update',
+        payload: Object.fromEntries(Object.entries(body).filter(([_, v]) => v != null)),
+      });
+    } catch (err) {
+      log.error({ err }, `PATCH /afs/${id} auditLog.add failed: ${err.message}`);
+    }
     return updated;
   });
 
