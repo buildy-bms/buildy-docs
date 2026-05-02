@@ -247,31 +247,31 @@ async function removeDevice(d) {
           <!-- Ligne 1 : identification (micro-labels au-dessus) -->
           <div class="grid grid-cols-12 gap-2 items-end">
             <div class="col-span-12 md:col-span-3">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Nom</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Nom</label>
               <input type="text" :value="d.name" placeholder="ex : Chaudière gaz"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400 font-medium" />
             </div>
             <div class="col-span-6 md:col-span-2">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Marque</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Marque</label>
               <input type="text" :value="d.brand" placeholder="ex : Atlantic"
                      @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
             </div>
             <div class="col-span-6 md:col-span-2">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Référence</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Référence</label>
               <input type="text" :value="d.model_reference" placeholder="ex : Varmax 70"
                      @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
             </div>
             <div class="col-span-4 md:col-span-1">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Puissance</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Puissance</label>
               <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="kW"
                      @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
                      :class="inputCls" class="text-right placeholder:text-gray-400" />
             </div>
             <div class="col-span-4 md:col-span-2">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Énergie</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Énergie</label>
               <select :value="d.energy_source"
                       @change="e => patchDevice(d, { energy_source: e.target.value || null })"
                       :class="selectCls">
@@ -280,7 +280,7 @@ async function removeDevice(d) {
               </select>
             </div>
             <div class="col-span-4 md:col-span-2">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Nature</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Nature</label>
               <select :value="d.device_role"
                       @change="e => patchDevice(d, { device_role: e.target.value || null })"
                       :class="selectCls">
@@ -294,7 +294,7 @@ async function removeDevice(d) {
                via flex items-end (chaque groupe a son propre label) -->
           <div class="mt-3 flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-40">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Localisation</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Localisation</label>
               <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol"
                      @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
                      :class="inputCls" class="w-full placeholder:italic placeholder:text-gray-400" />
@@ -302,7 +302,7 @@ async function removeDevice(d) {
 
             <!-- R175-3 4° + cable comm GTB en pills cliquables -->
             <div>
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Liaison GTB</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Liaison GTB</label>
               <div class="flex items-center gap-1.5">
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
@@ -326,7 +326,7 @@ async function removeDevice(d) {
             </div>
 
             <div class="w-44">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Protocole</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Protocole</label>
               <ProtocolMultiPicker
                 :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
                 :options="COMM_OPTIONS"
@@ -337,7 +337,7 @@ async function removeDevice(d) {
             </div>
 
             <div>
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Annotations</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Annotations</label>
               <div class="flex items-center gap-2">
                 <button type="button" @click="emit('open-device-notes', d)"
                         :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',

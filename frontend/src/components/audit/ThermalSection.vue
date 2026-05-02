@@ -57,7 +57,7 @@ async function patchThermal(t, patch) {
       <span v-else class="italic">Aucune régulation thermique relevée</span>
     </template>
     <table class="w-full text-sm">
-      <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
+      <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
           <th class="text-center px-5 py-2">Zone</th>
           <th class="text-center py-2 w-32">Usage</th>
@@ -136,13 +136,13 @@ async function patchThermal(t, patch) {
           <td colspan="8" class="py-2 pr-5">
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Position de la sonde</label>
+                <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Position de la sonde</label>
                 <input type="text" :value="t.sensor_position" placeholder="ex : murale, plancher, gaine reprise"
                        @blur="e => patchThermal(t, { sensor_position: e.target.value || null })"
                        class="w-full px-2 py-1 border border-gray-200 rounded" />
               </div>
               <div>
-                <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Type de thermostat</label>
+                <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Type de thermostat</label>
                 <select :value="t.thermostat_type"
                         @change="e => patchThermal(t, { thermostat_type: e.target.value || null })"
                         class="w-full px-2 py-1 border border-gray-200 rounded">

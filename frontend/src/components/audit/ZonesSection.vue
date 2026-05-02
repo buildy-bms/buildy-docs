@@ -89,7 +89,7 @@ function hasNotes(html) {
       <span v-else class="italic">Aucune zone définie</span>
     </template>
     <table class="w-full text-sm">
-      <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
+      <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
           <th class="text-center px-5 py-2">Nom</th>
           <th class="text-center py-2 w-48">Nature</th>

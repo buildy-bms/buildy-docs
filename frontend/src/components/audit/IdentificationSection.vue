@@ -82,7 +82,7 @@ const r175_6_applicable = computed(() => {
         {{ document?.client_name || 'Client à renseigner' }}
       </span>
     </template>
-    <div v-if="audit.isBacs" class="px-5 py-4 grid grid-cols-2 gap-4">
+    <div v-if="audit.isBacs" class="px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">
           Puissance nominale utile cumulée chauffage + climatisation (kW)

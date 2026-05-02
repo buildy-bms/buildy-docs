@@ -131,11 +131,11 @@ function hasNotes(html) {
       @changed="emit('refresh-audit-data')">
       <div class="px-5 py-4 grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6">
         <aside class="border-r border-gray-100 pr-4 sticky top-4 self-start">
-          <h4 class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
+          <h4 class="text-[11px] font-medium font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
           <VerticalStepper :steps="bmsSteps" />
         </aside>
         <div class="space-y-4 min-w-0">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1">Solution en place</label>
               <input v-model="bms.existing_solution" type="text"
@@ -336,7 +336,7 @@ function hasNotes(html) {
                 <input type="checkbox" v-model="bms.meets_r175_3_p1" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span><strong>P1.</strong> Suivi continu par zone, pas horaire, conservation 5 ans</span>
               </label>
-              <div v-if="bms.meets_r175_3_p1" class="ml-6 grid grid-cols-2 gap-3 mt-1">
+              <div v-if="bms.meets_r175_3_p1" class="ml-6 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
                   <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
@@ -383,7 +383,7 @@ function hasNotes(html) {
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
                         placeholder="Décris le mécanisme : extraction CSV, accès portail web, API, planning d'envoi…"
                         class="mt-2 input-base text-xs py-1.5" rows="2"></textarea>
-              <div class="mt-3 grid grid-cols-2 gap-3">
+              <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
                   <input v-model="bms.data_provision_frequency" type="text"
@@ -409,7 +409,7 @@ function hasNotes(html) {
                 <input type="checkbox" v-model="bms.has_maintenance_procedures" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Consignes écrites des maintenances passées</span>
               </label>
-              <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 grid grid-cols-2 gap-3">
+              <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Périodicité</label>
                   <input v-model="bms.maintenance_periodicity" type="text"
@@ -432,7 +432,7 @@ function hasNotes(html) {
                 <input type="checkbox" v-model="bms.operator_trained" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Exploitant formé à l'utilisation de la supervision</span>
               </label>
-              <div v-if="bms.operator_trained" class="ml-6 mt-2 grid grid-cols-2 gap-3">
+              <div v-if="bms.operator_trained" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Date de formation</label>
                   <input v-model="bms.operator_training_date" type="date"
