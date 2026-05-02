@@ -156,7 +156,7 @@ async function patchThermal(t, patch) {
               <div class="flex items-end">
                 <label class="flex items-center gap-1.5 cursor-pointer text-gray-700">
                   <input type="checkbox" :checked="!!t.has_thermostatic_valves"
-                         @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked ? 1 : 0 })"
+                         @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked })"
                          class="rounded" />
                   Robinets thermostatiques
                 </label>
