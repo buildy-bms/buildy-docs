@@ -45,6 +45,12 @@ function onSetAll(e) {
   if (typeof e.detail === 'boolean') setOpen(e.detail)
 }
 
+// Accordeon scroll-driven : la section active s'ouvre, les autres se ferment
+// (le scroll-spy parent met activeStepKey a jour via IntersectionObserver).
+watch(() => props.active, (v) => {
+  setOpen(!!v)
+}, { immediate: true })
+
 onMounted(() => {
   window.addEventListener('bacs-collapse:set-all', onSetAll)
 })
