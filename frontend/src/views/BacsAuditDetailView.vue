@@ -2264,29 +2264,31 @@ onMounted(() => {
                 <span>Procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> documentée</span>
               </label>
             </div>
-            <textarea
-              v-model="bms.notes_data_provision"
-              @input="saveBmsDebounced"
-              placeholder="Décris le mécanisme : extraction CSV, accès portail web, API, planning d'envoi…"
-              class="mt-2 w-full text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
-              rows="2"
-            ></textarea>
-            <div class="mt-3 grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
-                <input v-model="bms.data_provision_frequency" type="text"
-                       placeholder="ex : temps réel, quotidien, hebdo, mensuel"
-                       @input="saveBmsDebounced"
-                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+            <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
+              <textarea
+                v-model="bms.notes_data_provision"
+                @input="saveBmsDebounced"
+                placeholder="Décris le mécanisme : extraction CSV, accès portail web, API, planning d'envoi…"
+                class="mt-2 w-full text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                rows="2"
+              ></textarea>
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
+                  <input v-model="bms.data_provision_frequency" type="text"
+                         placeholder="ex : temps réel, quotidien, hebdo, mensuel"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Format de sortie</label>
+                  <input v-model="bms.data_provision_format" type="text"
+                         placeholder="ex : CSV, PDF mensuel, dashboard web, API"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
               </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Format de sortie</label>
-                <input v-model="bms.data_provision_format" type="text"
-                       placeholder="ex : CSV, PDF mensuel, dashboard web, API"
-                       @input="saveBmsDebounced"
-                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-              </div>
-            </div>
+            </template>
           </div>
 
           <div v-if="isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
