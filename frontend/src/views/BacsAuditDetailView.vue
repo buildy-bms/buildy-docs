@@ -54,6 +54,8 @@ import MetersSection from '@/components/audit/MetersSection.vue'
 import SystemsSection from '@/components/audit/SystemsSection.vue'
 import DocumentsSection from '@/components/audit/DocumentsSection.vue'
 import CredentialsSection from '@/components/audit/CredentialsSection.vue'
+import IdentificationSection from '@/components/audit/IdentificationSection.vue'
+import ZonesSection from '@/components/audit/ZonesSection.vue'
 import { useAuditStore } from '@/stores/audit'
 
 const auditStore = useAuditStore()
@@ -321,48 +323,6 @@ function actionNumber(idx) {
 
 // Computed v-model pour les 2 checkboxes conditionnelles : evite les
 // problemes de reactivite avec :checked + @change.
-const districtConnected = computed({
-  get: () => document.value?.bacs_district_heating_substation_kw != null,
-  set: (v) => {
-    saveDocDebounced({
-      bacs_district_heating_substation_kw: v
-        ? (document.value?.bacs_district_heating_substation_kw ?? 0)
-        : null
-    })
-  }
-})
-const generatorWorksDone = computed({
-  get: () => document.value?.bacs_generator_works_date != null,
-  set: (v) => {
-    saveDocDebounced({
-      bacs_generator_works_date: v
-        ? (document.value?.bacs_generator_works_date ?? new Date().toISOString().slice(0, 10))
-        : null
-    })
-  }
-})
-
-// R175-6 applicabilite : PC > 21/07/2021 OU travaux generateur > 21/07/2021
-const R175_6_TRIGGER_DATE = '2021-07-21'
-const r175_6_applicable = computed(() => {
-  if (!document.value) return null
-  const pc = document.value.bacs_building_permit_date
-  const works = document.value.bacs_generator_works_date
-  const pcAfter = pc && pc > R175_6_TRIGGER_DATE
-  const worksAfter = works && works > R175_6_TRIGGER_DATE
-  if (pcAfter && worksAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — PC postérieur au 21/07/2021 et travaux générateur récents.' }
-  }
-  if (pcAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — permis de construire postérieur au 21/07/2021.' }
-  }
-  if (worksAfter) {
-    return { applies: true, message: '✓ R175-6 applicable — travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021.' }
-  }
-  if (!pc && !works) return null
-  return { applies: false, message: 'R175-6 non applicable — aucun déclencheur (PC ou travaux générateur après 21/07/2021).' }
-})
-
 // Filtre les actions resolues automatiquement (status='done') ou
 // declinees : elles n'ont rien a faire dans le plan a livrer aux
 // integrateurs GTB. On les conserve en DB pour traçabilite (visible dans
@@ -558,49 +518,6 @@ async function addZone(payload) {
     success('Zone ajoutée et plan d\'audit synchronisé')
   } catch (e) {
     error(e.response?.data?.detail || 'Création zone impossible')
-  }
-}
-
-async function patchZone(z, patch) {
-  try {
-    const { data } = await updateZone(z.zone_id, patch)
-    Object.assign(z, data)
-    // Si la nature a change, on resync (les categories attendues ont change)
-    if ('nature' in patch) {
-      await resyncBacsAudit(docId)
-      await refreshAuditData()
-    }
-  } catch {
-    error('Sauvegarde zone impossible')
-  }
-}
-
-async function dupZone(z) {
-  try {
-    const { data } = await duplicateZone(z.zone_id)
-    zones.value.push(data)
-    await refreshAuditData()
-    success(`Zone « ${data.name} » créée`)
-  } catch {
-    error('Duplication impossible')
-  }
-}
-
-async function removeZone(z) {
-  const ok = await confirm({
-    title: 'Supprimer cette zone ?',
-    message: `« ${z.name} »\n\nLes systèmes, équipements et lignes d'audit rattachés à cette zone seront aussi supprimés.`,
-    confirmLabel: 'Supprimer',
-    danger: true,
-  })
-  if (!ok) return
-  try {
-    await deleteZone(z.zone_id)
-    zones.value = zones.value.filter(x => x.zone_id !== z.zone_id)
-    await refreshAuditData()
-    success('Zone supprimée')
-  } catch {
-    error('Suppression impossible')
   }
 }
 
@@ -1136,247 +1053,25 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 1. Identification + Applicabilité R175-2 (R175-2 masqué en site_audit) -->
-      <CollapsibleSection storage-key="identification" section-id="section-identification">
-        <template #header>
-          <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">1. Identification du site<span v-if="isBacs"> &amp; applicabilité R175-2</span></h2>
-          <R175Tooltip v-if="isBacs" article="R175-2" />
-          <StepValidateBadge class="ml-auto" :step="stepFor('identification')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="isBacs">
-            Puissance chauffage + clim {{ document?.bacs_total_power_kw ?? '—' }} kW
-            · R175-2 {{ document?.bacs_applicable ? 'applicable' : 'non applicable' }}
-          </span>
-          <span v-else>
-            {{ document?.client_name || 'Client à renseigner' }}<span v-if="site?.name"> · site « {{ site.name }} »</span>
-          </span>
-        </template>
-        <div v-if="isBacs" class="px-5 py-4 grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">
-              Puissance nominale utile cumulée chauffage + climatisation (kW)
-            </label>
-            <div class="flex gap-2">
-              <input
-                type="number" min="0" step="0.1"
-                :value="document?.bacs_total_power_kw"
-                @input="e => saveDocDebounced({ bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
-                class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              />
-              <button
-                @click="recomputePowerFromEquipments"
-                class="px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap"
-                title="Cumul automatique des équipements chauffage + climatisation du site"
-              >
-                <ArrowPathIcon class="w-3.5 h-3.5 inline-block -mt-0.5" /> Auto-calculer
-              </button>
-            </div>
-            <p class="text-[11px] text-gray-500 mt-1">
-              Source : <span class="font-mono">{{ document?.bacs_total_power_source || 'auto' }}</span>
-              <span v-if="document?.bacs_total_power_source === 'manual_override'" class="text-amber-700"> (override manuel)</span>
-            </p>
-            <!-- Detail du calcul auto : transparence des devices comptes -->
-            <details v-if="powerSummary?.heating_cooling_breakdown?.length" class="mt-2 group">
-              <summary class="cursor-pointer text-[11px] text-indigo-600 hover:text-indigo-800 font-medium select-none">
-                Détail du calcul auto ({{ powerSummary.heating_cooling_breakdown.length }} équipement{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }} compté{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }})
-              </summary>
-              <div class="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
-                <p class="mb-1.5 italic">Somme des puissances des équipements <strong>chauffage</strong> et <strong>climatisation</strong> saisis dans la section 3 :</p>
-                <ul class="space-y-0.5 font-mono">
-                  <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id" class="flex justify-between gap-2">
-                    <span class="truncate">
-                      <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'">●</span>
-                      {{ d.name || (d.brand ? d.brand : '—') }}{{ d.model_reference ? ' / ' + d.model_reference : '' }}
-                      <span class="text-gray-400">({{ d.zone_name || '—' }})</span>
-                    </span>
-                    <span class="font-semibold whitespace-nowrap">{{ d.power_kw }} kW</span>
-                  </li>
-                </ul>
-                <p class="mt-2 pt-1.5 border-t border-gray-200 flex justify-between font-semibold">
-                  <span>Total chauffage + climatisation :</span>
-                  <span class="font-mono">{{ powerSummary.heating_cooling_total_kw }} kW</span>
-                </p>
-              </div>
-            </details>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-700 mb-1">Date du permis de construire</label>
-            <input
-              type="date"
-              :value="document?.bacs_building_permit_date || ''"
-              @input="e => saveDocDebounced({ bacs_building_permit_date: e.target.value || null })"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-            <p class="text-[11px] text-gray-500 mt-1">
-              Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
-            </p>
-          </div>
-          <div>
-            <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-              <input type="checkbox" v-model="generatorWorksDone" class="rounded border-gray-300" />
-              <span>Travaux d'installation/remplacement de générateur de chaleur réalisés <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
-            </label>
-            <div v-if="document?.bacs_generator_works_date != null" class="pl-6 border-l-2 border-indigo-100 mt-2">
-              <label class="block text-xs font-medium text-gray-700 mb-1">
-                Date des derniers travaux générateur de chaleur
-              </label>
-              <input
-                type="date"
-                :value="document?.bacs_generator_works_date || ''"
-                @input="e => saveDocDebounced({ bacs_generator_works_date: e.target.value || null })"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              />
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                <strong>R175-6</strong> s'applique si le permis de construire est postérieur au <strong>21/07/2021</strong> ou si des travaux générateur ont été engagés après cette date.
-              </p>
-              <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
-                 :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
-                {{ r175_6_applicable.message }}
-              </p>
-            </div>
-          </div>
-          <div class="col-span-2 border-t border-gray-100 pt-3">
-            <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-              <input type="checkbox" v-model="districtConnected" class="rounded border-gray-300" />
-              <span>Bâtiment raccordé à un <strong>réseau urbain de chaleur ou de froid</strong></span>
-            </label>
-            <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
-                 class="mt-2 pl-6 border-l-2 border-indigo-100">
-              <label class="block text-xs font-medium text-gray-700 mb-1">
-                Puissance de la station d'échange (kW)
-              </label>
-              <input
-                type="number" min="0" step="0.1"
-                :value="document?.bacs_district_heating_substation_kw"
-                @input="e => saveDocDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
-                placeholder="—"
-                class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              />
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div v-if="!isBacs" class="px-5 py-4 text-sm text-gray-500">
-          <p>
-            Audit GTB (Classique) — les contraintes du décret R175 sont
-            désactivées pour ce document. Les sections ci-dessous se
-            concentrent sur l'inventaire technique nécessaire au chiffrage.
-          </p>
-        </div>
-        <div v-if="isBacs && document?.bacs_applicability_status" class="px-5 pb-4">
-          <div :class="['rounded-lg border p-3 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status].cls]">
-            <ExclamationTriangleIcon class="w-5 h-5 shrink-0 mt-0.5" />
-            <div class="flex-1">
-              <div class="font-medium text-sm">{{ APPLICABILITY_LABEL[document.bacs_applicability_status].label }}</div>
-            </div>
-          </div>
-          <p v-if="document?.bacs_applicability_status !== 'not_subject'" class="mt-2 text-[11px] text-gray-500 leading-relaxed">
-            <em>À titre informatif :</em> l'article R175-2 prévoit une clause de dispense applicable lorsque le temps de retour
-            sur investissement de la mise en conformité dépasse 10 ans. Ce calcul ne relève pas du périmètre de l'audit
-            (cf. Annexe D, point 4).
-          </p>
-        </div>
-      </CollapsibleSection>
+      <!-- 1. Identification + Applicabilité R175-2 -->
+      <IdentificationSection
+        :step="stepFor('identification')"
+        :applicability-labels="APPLICABILITY_LABEL"
+        @save-doc="saveDocDebounced"
+        @recompute-power="recomputePowerFromEquipments"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
 
-      <!-- 2. Zones fonctionnelles (R175-1 6°) — editable in-situ -->
-      <CollapsibleSection storage-key="zones" section-id="section-zones">
-        <template #header>
-          <MapPinIcon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
-          <span v-if="isBacs" class="text-xs text-gray-500">R175-1 6° — usages homogènes</span>
-          <R175Tooltip v-if="isBacs" article="R175-1 6°" />
-          <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
-          <StepValidateBadge :step="stepFor('zones')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="zones.length">
-            {{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }}
-            · surface totale {{ zones.reduce((s,z) => s + (z.surface_m2 || 0), 0) || '—' }} m²
-            · {{ zones.slice(0,4).map(z => z.name).join(' · ') }}{{ zones.length > 4 ? ' …' : '' }}
-          </span>
-          <span v-else class="italic">Aucune zone définie</span>
-        </template>
-        <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
-            <tr>
-              <th class="text-center px-5 py-2">Nom</th>
-              <th class="text-center py-2 w-48">Nature</th>
-              <th class="text-center py-2 w-24">Surface (m²)</th>
-              <th class="text-center py-2 w-32">Notes</th>
-              <th class="text-center py-2 w-24">Photos</th>
-              <th class="text-center px-5 py-2 w-12"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <PhotoDropTr v-for="z in zones" :key="z.zone_id" row-class="group"
-                         :site-uuid="document?.site_uuid || ''"
-                         :attach-to="{ zone_id: z.zone_id }"
-                         :enabled="!!document?.site_uuid"
-                         @changed="refreshAuditData">
-              <td class="px-5 py-2">
-                <input type="text" :value="z.name"
-                       @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                       class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-              </td>
-              <td class="py-2">
-                <select :value="z.nature"
-                        @change="e => patchZone(z, { nature: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded">
-                  <option :value="null">—</option>
-                  <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                </select>
-              </td>
-              <td class="py-2">
-                <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
-                       @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-              </td>
-              <td class="py-2 text-center">
-                <button
-                  type="button"
-                  @click="openNotesModal({ title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
-                  :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
-                    hasNotes(z.notes_html || z.notes)
-                      ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-                  title="Editer les notes (avec assistance Claude)"
-                >
-                  <PencilSquareIcon class="w-4 h-4" />
-                  {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
-                </button>
-              </td>
-              <td class="py-2 text-center">
-                <BacsPhotoButton
-                  v-if="document?.site_uuid"
-                  :site-uuid="document.site_uuid"
-                  :attach-to="{ zone_id: z.zone_id }"
-                  :label="z.name"
-                />
-              </td>
-              <td class="px-5 py-2 text-right whitespace-nowrap">
-                <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
-                  <DocumentDuplicateIcon class="w-4 h-4" />
-                </button>
-                <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
-                  <TrashIcon class="w-4 h-4" />
-                </button>
-              </td>
-            </PhotoDropTr>
-            <tr class="bg-emerald-50/30">
-              <td colspan="6" class="px-5 py-3 text-center">
-                <button @click="showAddZoneModal = true"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm">
-                  <PlusIcon class="w-4 h-4" /> Ajouter une zone
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </CollapsibleSection>
+      <!-- 2. Zones fonctionnelles (R175-1 6°) -->
+      <ZonesSection
+        :zone-natures="ZONE_NATURES"
+        :step="stepFor('zones')"
+        @open-notes="openNotesModal"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @add-zone="payload => payload ? addZone(payload) : (showAddZoneModal = true)"
+      />
 
       <!-- 3. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
       <SystemsSection
