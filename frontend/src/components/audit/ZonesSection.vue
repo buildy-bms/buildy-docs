@@ -6,6 +6,7 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import BacsRefBadge from '@/components/BacsRefBadge.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -100,9 +101,12 @@ function hasNotes(html) {
                      :enabled="!!document?.site_uuid"
                      @changed="refreshAuditData">
           <td class="px-5 py-2">
-            <input type="text" :value="z.name"
-                   @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                   class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            <div class="flex items-center gap-2">
+              <BacsRefBadge kind="zones" :id="z.zone_id" />
+              <input type="text" :value="z.name"
+                     @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
+                     class="flex-1 text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            </div>
           </td>
           <td class="py-2">
             <select :value="z.nature"

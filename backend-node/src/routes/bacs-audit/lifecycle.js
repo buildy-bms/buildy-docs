@@ -488,16 +488,28 @@ async function routes(fastify) {
       `).run(present ? 1 : 0, comm ? 1 : 0, comm ? 1 : 0, m.id);
     });
 
-    // 9. GTB partiellement conforme
+    // 9. GTB partiellement conforme — incluant les champs detailles
+    //    (migration 61 : archivage, mise a dispo, maintenance, formation)
     db.db.prepare(`
       INSERT INTO bacs_audit_bms (document_id, existing_solution, existing_solution_brand,
         location, model_reference, manages_heating, manages_cooling, manages_ventilation,
-        manages_dhw, manages_lighting, meets_r175_3_p1, meets_r175_3_p2,
-        has_maintenance_procedures, operator_trained, overall_compliance,
-        data_provision_to_manager, data_provision_to_operators, notes_data_provision)
+        manages_dhw, manages_lighting,
+        meets_r175_3_p1, r175_3_p1_archival_format, r175_3_p1_retention_verified,
+        meets_r175_3_p2, r175_3_p2_anomaly_rules_html,
+        has_maintenance_procedures, maintenance_periodicity, maintenance_responsible,
+        operator_trained, operator_training_date, operator_training_provider, operator_training_topics,
+        data_provision_to_manager, data_provision_to_operators, notes_data_provision,
+        data_provision_frequency, data_provision_format,
+        overall_compliance)
       VALUES (?, 'Niagara N4', 'Tridium', 'Local technique sous-sol', 'JACE 8000',
-        1, 1, 1, 0, 0, 0, 0, 1, 0, 'partial',
-        0, 0, 'Aucun mécanisme formel de mise à disposition des données identifié au moment de la visite.')
+        1, 1, 1, 0, 0,
+        1, 'CSV mensuel + base SQL embarquee dans la JACE', 0,
+        0, NULL,
+        1, 'annuelle', 'Prestataire externe (Trend Control SAV)',
+        1, '2024-03-12', 'Tridium France', 'Lecture dashboards, gestion alarmes niveau 1',
+        1, 0, 'Le proprietaire recoit un rapport CSV mensuel ; aucun mecanisme cote exploitants.',
+        'mensuelle', 'CSV',
+        'partial')
       ON CONFLICT(document_id) DO UPDATE SET
         existing_solution = excluded.existing_solution,
         existing_solution_brand = excluded.existing_solution_brand,
@@ -505,22 +517,63 @@ async function routes(fastify) {
         manages_heating = excluded.manages_heating, manages_cooling = excluded.manages_cooling,
         manages_ventilation = excluded.manages_ventilation, manages_dhw = excluded.manages_dhw,
         manages_lighting = excluded.manages_lighting,
-        meets_r175_3_p1 = excluded.meets_r175_3_p1, meets_r175_3_p2 = excluded.meets_r175_3_p2,
+        meets_r175_3_p1 = excluded.meets_r175_3_p1,
+        r175_3_p1_archival_format = excluded.r175_3_p1_archival_format,
+        r175_3_p1_retention_verified = excluded.r175_3_p1_retention_verified,
+        meets_r175_3_p2 = excluded.meets_r175_3_p2,
+        r175_3_p2_anomaly_rules_html = excluded.r175_3_p2_anomaly_rules_html,
         has_maintenance_procedures = excluded.has_maintenance_procedures,
-        operator_trained = excluded.operator_trained, overall_compliance = excluded.overall_compliance,
+        maintenance_periodicity = excluded.maintenance_periodicity,
+        maintenance_responsible = excluded.maintenance_responsible,
+        operator_trained = excluded.operator_trained,
+        operator_training_date = excluded.operator_training_date,
+        operator_training_provider = excluded.operator_training_provider,
+        operator_training_topics = excluded.operator_training_topics,
         data_provision_to_manager = excluded.data_provision_to_manager,
         data_provision_to_operators = excluded.data_provision_to_operators,
         notes_data_provision = excluded.notes_data_provision,
+        data_provision_frequency = excluded.data_provision_frequency,
+        data_provision_format = excluded.data_provision_format,
+        overall_compliance = excluded.overall_compliance,
         updated_at = CURRENT_TIMESTAMP
     `).run(af.id);
 
-    // 10. Thermal regulation : per_room sur open-space, none sur les autres
+    // 10. Thermal regulation : per_room sur open-space avec detail
+    //     (migration 61 : sensor_position, thermostat_type, robinets)
     db.db.prepare(`
-      UPDATE bacs_audit_thermal_regulation SET regulation_type = 'per_room',
-        generator_type = 'gas', generator_age_years = 12 WHERE document_id = ? AND zone_id = ?
+      UPDATE bacs_audit_thermal_regulation
+      SET has_automatic_regulation = 1, regulation_type = 'per_room',
+          generator_type = 'gas', generator_age_years = 12,
+          sensor_position = 'murale', thermostat_type = 'programmable',
+          has_thermostatic_valves = 1
+      WHERE document_id = ? AND zone_id = ?
     `).run(af.id, openSpace.zone_id);
 
-    // 11. Final regen plan
+    // 11. Inspection periodique R175-5-1 (migration 61) : 1 passee dont
+    //     l'echeance est depassee → declenche une action corrective auto.
+    const today = new Date();
+    const lastDate = new Date(today); lastDate.setFullYear(today.getFullYear() - 2);
+    const dueDate = new Date(today); dueDate.setMonth(today.getMonth() - 3);
+    const retainedUntil = new Date(today); retainedUntil.setFullYear(today.getFullYear() + 8);
+    db.db.prepare(`
+      INSERT INTO bacs_audit_inspections
+        (document_id, last_inspection_date, last_inspection_inspector,
+         next_inspection_due_date, retained_until_date,
+         last_inspection_anomalies_html, last_inspection_recommendations_html, notes)
+      VALUES (?, ?, 'APAVE Sud-Ouest', ?, ?,
+        '<p>Trois alarmes recurrentes non investigeees sur la CTA double flux. '
+         || 'Compteur ECS non releve depuis 2022.</p>',
+        '<p>Reprendre la formation des exploitants (rotation effectif). '
+         || 'Replanifier l''inspection R175-5-1 dans les 6 mois.</p>',
+        'Inspection officielle realisee par tiers — rapport conserve 10 ans.')
+    `).run(
+      af.id,
+      lastDate.toISOString().slice(0, 10),
+      dueDate.toISOString().slice(0, 10),
+      retainedUntil.toISOString().slice(0, 10),
+    );
+
+    // 12. Final regen plan (prend en compte inspection depassee + nouveaux gaps)
     regenerateActionItems(af.id);
 
     db.auditLog.add({

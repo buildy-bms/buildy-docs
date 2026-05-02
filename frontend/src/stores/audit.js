@@ -51,6 +51,10 @@ export const useAuditStore = defineStore('audit', {
 
   actions: {
     async loadAudit(docId) {
+      // Reset complet entre 2 audits pour eviter le flicker (vue qui
+      // affiche brievement les donnees de l'audit precedent avant que les
+      // fetches ne completent).
+      this.$reset()
       this.docId = docId
       this.loading = true
       try {

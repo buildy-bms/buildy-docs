@@ -5,6 +5,7 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
+import BacsRefBadge from '@/components/BacsRefBadge.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal } from '@/api'
@@ -70,7 +71,12 @@ async function patchThermal(t, patch) {
       </thead>
       <tbody class="divide-y divide-gray-100">
         <tr v-for="t in thermalFiltered" :key="t.id">
-          <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
+          <td class="px-5 py-2 text-gray-700 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <BacsRefBadge kind="thermal" :id="t.id" />
+              <span>{{ t.zone_name }}</span>
+            </div>
+          </td>
           <td class="py-2 text-center">
             <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
                   :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">

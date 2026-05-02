@@ -9,6 +9,7 @@ import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
+import BacsRefBadge from '@/components/BacsRefBadge.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -110,7 +111,12 @@ function hasNotes(html) {
                      :attach-to="{ meter_id: m.id }"
                      :enabled="!!document?.site_uuid"
                      @changed="refreshAuditData">
-          <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
+          <td class="px-5 py-2 text-gray-700 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <BacsRefBadge kind="meters" :id="m.id" />
+              <span>{{ m.zone_name || 'Compteur général' }}</span>
+            </div>
+          </td>
           <td class="py-2 text-center"><MeterUsagePill :usage="m.usage" /></td>
           <td class="py-2 text-center"><MeterTypePill :type="m.meter_type" /></td>
           <td class="py-2 text-center">
