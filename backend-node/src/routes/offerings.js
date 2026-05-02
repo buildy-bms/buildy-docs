@@ -15,45 +15,87 @@ const log = require('../lib/logger').system;
 const { renderPdf, renderHtml, loadAssetDataUrl } = require('../lib/pdf');
 
 // Construit le bundle de donnees a passer au template offering-catalog.hbs.
+//
+// Hierarchie : section_templates utilise parent_template_id pour former
+// un arbre. Une fonctionnalite peut avoir plusieurs niveaux de parents
+// (ex: "Detection des derives" -> parent "Tableaux de bord energetiques"
+// -> parent "Application Hyperveez"). On affiche jusqu'a 2 niveaux de
+// regroupement dans le tableau (parent + sous-parent).
 function buildOfferingsData() {
-  // Toutes les fonctionnalites + leur parent (categorie)
-  const rows = db.db.prepare(`
-    SELECT
-      f.id, f.slug, f.title, f.body_html, f.service_level,
-      f.avail_e, f.avail_s, f.avail_p, f.position,
-      f.parent_template_id,
-      p.id AS parent_id, p.title AS parent_title, p.position AS parent_position
-    FROM section_templates f
-    LEFT JOIN section_templates p ON p.id = f.parent_template_id
-    WHERE f.is_functionality = 1
-    ORDER BY
-      COALESCE(p.position, 9999), COALESCE(p.id, 9999),
-      f.position, f.id
+  // 1. Recupere TOUS les section_templates (pas juste les features)
+  // pour pouvoir resoudre la chaine d'ancetres.
+  const allTemplates = db.db.prepare(`
+    SELECT id, title, parent_template_id, position, is_functionality
+    FROM section_templates
+    ORDER BY position, id
+  `).all();
+  const byId = new Map(allTemplates.map(t => [t.id, t]));
+
+  // Resout la chaine d'ancetres pour un node donne (du plus haut au
+  // plus proche, hors le node lui-meme).
+  function ancestorsOf(node) {
+    const chain = [];
+    let cur = node.parent_template_id ? byId.get(node.parent_template_id) : null;
+    while (cur) {
+      chain.unshift(cur);
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null;
+    }
+    return chain;
+  }
+
+  // 2. Recupere les fonctionnalites avec disponibilites
+  const features = db.db.prepare(`
+    SELECT id, slug, title, body_html, service_level,
+           avail_e, avail_s, avail_p, position, parent_template_id
+    FROM section_templates
+    WHERE is_functionality = 1
+    ORDER BY position, id
   `).all();
 
-  // Groupe par categorie (parent). Si pas de parent, on les met dans
-  // une categorie "Divers".
+  // 3. Groupe par chaîne d'ancêtres (concatenation des ids = clef unique)
+  // On affiche : 1er ancetre = "categorie principale" (en gros), 2eme
+  // ancetre = "sous-categorie" (en sub-header). Si une feature n'a qu'un
+  // seul ancetre, on n'affiche que la categorie principale.
   const groups = new Map();
-  for (const r of rows) {
-    const key = r.parent_id || 'orphan';
-    if (!groups.has(key)) {
-      groups.set(key, {
-        id: r.parent_id || null,
-        title: r.parent_title || 'Autres fonctionnalités',
-        position: r.parent_position ?? 9999,
+  for (const f of features) {
+    const ancestors = ancestorsOf(f);
+    const top = ancestors[0] || null;
+    const sub = ancestors.length >= 2 ? ancestors[ancestors.length - 1] : null;
+    const topKey = top ? `t${top.id}` : 'orphan';
+    const subKey = sub ? `s${sub.id}` : 'none';
+
+    if (!groups.has(topKey)) {
+      groups.set(topKey, {
+        id: top?.id || null,
+        title: top?.title || 'Autres fonctionnalités',
+        position: top?.position ?? 9999,
+        subgroups: new Map(),
+      });
+    }
+    const topGroup = groups.get(topKey);
+    if (!topGroup.subgroups.has(subKey)) {
+      topGroup.subgroups.set(subKey, {
+        id: sub?.id || null,
+        title: sub?.title || null, // null = pas de sous-categorie
+        position: sub?.position ?? 0,
         features: [],
       });
     }
-    groups.get(key).features.push({
-      id: r.id,
-      title: r.title,
-      summary: stripHtml(r.body_html || '').slice(0, 200) || null,
-      avail_e: r.avail_e || 'unavailable',
-      avail_s: r.avail_s || 'unavailable',
-      avail_p: r.avail_p || 'unavailable',
+    topGroup.subgroups.get(subKey).features.push({
+      id: f.id,
+      title: f.title,
+      avail_e: f.avail_e || 'unavailable',
+      avail_s: f.avail_s || 'unavailable',
+      avail_p: f.avail_p || 'unavailable',
     });
   }
+
+  // 4. Conversion en arrays tries
   const categories = [...groups.values()]
+    .map(g => ({
+      ...g,
+      subgroups: [...g.subgroups.values()].sort((a, b) => a.position - b.position),
+    }))
     .sort((a, b) => a.position - b.position);
 
   const exportDate = new Date().toLocaleDateString('fr-FR', {
@@ -61,18 +103,9 @@ function buildOfferingsData() {
   });
   const year = new Date().getFullYear();
 
-  // KPIs : nb fonctionnalites par niveau (incluses)
-  let countE = 0, countS = 0, countP = 0;
-  for (const c of categories) for (const f of c.features) {
-    if (f.avail_e === 'included') countE++;
-    if (f.avail_s === 'included') countS++;
-    if (f.avail_p === 'included') countP++;
-  }
-
   return {
     categories,
-    totalFeatures: rows.length,
-    countE, countS, countP,
+    totalFeatures: features.length,
     exportDate,
     year,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),

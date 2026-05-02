@@ -183,30 +183,31 @@ h1, h2, h3 {
   text-transform: none;
 }
 .th-e { background: #64748b; }
-.th-s {
-  /* Decoy : Smart visuellement plus saturé + bordure haute verte qui
+.th-s { background: #4f46e5; }
+.th-p {
+  /* Decoy : Premium visuellement plus saturé + bordure haute verte qui
      "pousse" la colonne en avant. */
-  background: #4f46e5;
+  background: #7c3aed;
   border-top: 2.2mm solid #00cd92;
   padding-top: 1.5mm;
 }
-.th-p { background: #7c3aed; }
 
-/* Decoy : la colonne Smart entiere a un fond legerement creme/blanc
-   casse pour ressortir vs E (gris) et P (gris). */
-.td-level-s {
+/* Decoy : la colonne Premium entiere a un fond legerement creme/blanc
+   casse pour ressortir vs E (gris) et S (indigo). */
+.td-level-p {
   background: #fffdf5 !important;
   border-left: 0.4pt solid #fef3c7;
   border-right: 0.4pt solid #fef3c7;
 }
 
-/* Lignes de catégorie : sub-header dans le tableau (au lieu de h2 separes) */
-.category-row td {
-  padding: 1.8mm 2mm 1mm;
+/* Lignes de catégorie niveau 1 (parent racine) : bandeau plein, fond
+   indigo pâle, le marker vert ▸ accroche l'œil. */
+.category-row-l1 td {
+  padding: 2mm 2mm 1.2mm;
   background: #eef2ff !important;
   color: #312e81;
   font-family: 'Poppins', sans-serif;
-  font-size: 7.5pt;
+  font-size: 7.8pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -218,6 +219,33 @@ h1, h2, h3 {
   font-size: 9pt;
   margin-right: 1.5mm;
   font-weight: 900;
+}
+
+/* Lignes de catégorie niveau 2 (sous-catégorie sous un parent) : plus
+   discret, indigo très pâle, marqueur · gris, padding gauche augmenté
+   pour suggérer la hiérarchie. */
+.category-row-l2 td {
+  padding: 1.3mm 2mm 0.8mm 6mm;
+  background: #f8faff !important;
+  color: #4338ca;
+  font-family: 'Poppins', sans-serif;
+  font-size: 6.8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 0.3pt solid #e0e7ff;
+}
+.cat-marker-l2 {
+  color: #9ca3af;
+  font-size: 9pt;
+  margin-right: 1.5mm;
+  font-weight: 900;
+}
+
+/* Indentation des features qui sont sous une sous-categorie pour
+   matcher visuellement la hierarchie. */
+.td-feature-indent {
+  padding-left: 6mm !important;
 }
 
 .comparison-table tbody tr:not(.category-row):nth-child(odd) td {

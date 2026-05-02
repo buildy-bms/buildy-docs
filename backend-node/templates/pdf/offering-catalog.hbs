@@ -49,11 +49,11 @@
           <div class="th-level-tagline">Démarrer simple</div>
         </th>
         <th class="th-level th-s">
-          <div class="th-level-badge">★ Le plus choisi</div>
           <div class="th-level-name">Smart</div>
           <div class="th-level-tagline">Pilotez et anticipez</div>
         </th>
         <th class="th-level th-p">
+          <div class="th-level-badge">★ Le plus choisi</div>
           <div class="th-level-name">Premium</div>
           <div class="th-level-tagline">L'intégrale</div>
         </th>
@@ -61,16 +61,23 @@
     </thead>
     <tbody>
       {{#each categories}}
-      <tr class="category-row">
+      <tr class="category-row category-row-l1">
         <td colspan="4"><span class="cat-marker">▸</span> {{title}}</td>
       </tr>
+      {{#each subgroups}}
+      {{#if title}}
+      <tr class="category-row category-row-l2">
+        <td colspan="4"><span class="cat-marker-l2">·</span> {{title}}</td>
+      </tr>
+      {{/if}}
       {{#each features}}
       <tr>
-        <td class="td-feature">{{title}}</td>
+        <td class="td-feature {{#if ../title}}td-feature-indent{{/if}}">{{title}}</td>
         <td class="td-level td-level-e"><span class="avail avail-{{avail_e}}">{{#if (eq avail_e "included")}}✓{{else}}{{#if (eq avail_e "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
         <td class="td-level td-level-s"><span class="avail avail-{{avail_s}}">{{#if (eq avail_s "included")}}✓{{else}}{{#if (eq avail_s "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
         <td class="td-level td-level-p"><span class="avail avail-{{avail_p}}">{{#if (eq avail_p "included")}}✓{{else}}{{#if (eq avail_p "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
       </tr>
+      {{/each}}
       {{/each}}
       {{/each}}
     </tbody>
