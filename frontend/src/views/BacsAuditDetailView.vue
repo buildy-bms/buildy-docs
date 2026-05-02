@@ -1179,7 +1179,7 @@ onMounted(() => {
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
         </button>
-        <button v-if="site?.site_uuid" @click="openBulkUpload"
+        <button v-if="document?.site_uuid" @click="openBulkUpload"
           title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
           <PhotoIcon class="w-3.5 h-3.5 shrink-0" /> Photos terrain
@@ -2452,7 +2452,7 @@ onMounted(() => {
 
     <BulkPhotoUploadModal
       :open="bulkUploadOpen"
-      :site-uuid="site?.site_uuid || ''"
+      :site-uuid="document?.site_uuid || ''"
       :zones="zones"
       :systems="systems"
       :devices="devices"

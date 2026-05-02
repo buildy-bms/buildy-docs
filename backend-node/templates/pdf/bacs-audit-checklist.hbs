@@ -2,31 +2,37 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Checklist audit BACS — {{site.name}}</title>
+  <title>Checklist audit GTB — {{site.name}}</title>
   <style>{{{styles}}}</style>
 </head>
 <body>
 
-<header class="cover">
+<header class="cover page">
   <div class="brand">
     <img src="{{logoDataUrl}}" alt="Buildy" class="logo" />
     <div class="brand-text">
       <div class="brand-name">Buildy</div>
-      <div class="brand-tagline">Checklist audit BACS — relevé terrain</div>
+      <div class="brand-tagline">Checklist audit GTB — relevé terrain</div>
     </div>
   </div>
   <h1>{{site.name}}</h1>
   <div class="meta">
     <div><strong>Adresse</strong> : {{site.address}}{{#if site.city}}, {{site.city}}{{/if}}</div>
-    <div><strong>Date</strong> : <span class="fillable">{{today}}</span></div>
-    <div><strong>Auditeur</strong> : <span class="fillable">_______________________________</span></div>
-    <div><strong>Présents</strong> : <span class="fillable">_______________________________</span></div>
+    <div><strong>Date</strong> :
+      <span class="field-text" data-field="text" data-name="cover.date" style="width:60mm; height:5mm; display:inline-block;"></span>
+    </div>
+    <div><strong>Auditeur</strong> :
+      <span class="field-text" data-field="text" data-name="cover.auditeur" style="width:90mm; height:5mm; display:inline-block;"></span>
+    </div>
+    <div><strong>Présents</strong> :
+      <span class="field-text" data-field="text" data-name="cover.presents" style="width:90mm; height:5mm; display:inline-block;"></span>
+    </div>
   </div>
   <div class="howto">
-    <h2>Comment l'utiliser</h2>
+    <h2>Mode d'emploi</h2>
     <ol>
-      <li>Imprimez cette feuille (ou consultez-la sur tablette).</li>
-      <li>Pour chaque ligne : cochez la case, prenez la photo, et dictez sur Plaud Pro la <em>réf</em> à gauche (ex. <code>3.Z01.01</code>).</li>
+      <li>Imprimez la feuille (ou remplissez-la directement à l'écran : tous les champs sont éditables).</li>
+      <li>Pour chaque ligne : cochez la case, prenez la photo, et dictez à voix haute la <em>réf</em> à gauche (ex. <code>3.Z01.01</code>).</li>
       <li>De retour au bureau, importez photos + transcript dans buildy-docs : la restitution est pré-remplie.</li>
     </ol>
   </div>
@@ -35,12 +41,12 @@
 <section class="page">
   <h2>1 — Identification du site</h2>
   <table class="kv">
-    <tr><th>Date du permis de construire</th><td class="fillable">_________________</td></tr>
-    <tr><th>Date des derniers travaux générateur</th><td class="fillable">_________________</td></tr>
-    <tr><th>Puissance installée chauffage (kW)</th><td class="fillable">_________________</td></tr>
-    <tr><th>Puissance installée refroidissement (kW)</th><td class="fillable">_________________</td></tr>
-    <tr><th>Surface chauffée (m²)</th><td class="fillable">_________________</td></tr>
-    <tr><th>Usage principal du bâtiment</th><td class="fillable">_________________</td></tr>
+    <tr><th>Date du permis de construire</th><td><span class="field-text" data-field="text" data-name="ident.permis_date" style="width:60mm; height:5mm; display:inline-block;"></span></td></tr>
+    <tr><th>Date des derniers travaux générateur</th><td><span class="field-text" data-field="text" data-name="ident.travaux_date" style="width:60mm; height:5mm; display:inline-block;"></span></td></tr>
+    <tr><th>Puissance installée chauffage (kW)</th><td><span class="field-text" data-field="text" data-name="ident.puissance_chauffage" style="width:40mm; height:5mm; display:inline-block;"></span></td></tr>
+    <tr><th>Puissance installée refroidissement (kW)</th><td><span class="field-text" data-field="text" data-name="ident.puissance_refroid" style="width:40mm; height:5mm; display:inline-block;"></span></td></tr>
+    <tr><th>Surface chauffée (m²)</th><td><span class="field-text" data-field="text" data-name="ident.surface" style="width:40mm; height:5mm; display:inline-block;"></span></td></tr>
+    <tr><th>Usage principal du bâtiment</th><td><span class="field-text" data-field="text" data-name="ident.usage" style="width:80mm; height:5mm; display:inline-block;"></span></td></tr>
   </table>
 </section>
 
@@ -48,9 +54,7 @@
 <section class="page">
   <h2><span class="ref">{{ref}}</span> Zone — {{name}}{{#if nature}} <small>({{nature}})</small>{{/if}}</h2>
   <p class="hint">Notez tout ce qui sort de l'ordinaire dans cette zone (occupants, horaires, équipements sensibles, contraintes d'accès).</p>
-  <div class="freeform">_______________________________________________________________________<br/>
-  _______________________________________________________________________<br/>
-  _______________________________________________________________________</div>
+  <span class="field-textarea" data-field="textarea" data-name="zone.{{ref}}.notes" style="display:block; width:100%; height:22mm; border-bottom:0.15mm dashed #cbd5e1;"></span>
 
   {{#if systems.length}}
   <h3>Systèmes &amp; équipements</h3>
@@ -61,8 +65,8 @@
         <th>Système / équipement</th>
         <th class="w-mark" title="Présent">✓</th>
         <th title="Communicant ?">Comm.</th>
-        <th title="R175-3 §4 — Arrêt manuel possible">Arrêt</th>
-        <th title="R175-3 §4 — Reprise autonome">Auto.</th>
+        <th title="Arrêt manuel possible">Arrêt</th>
+        <th title="Reprise autonome">Auto.</th>
         <th class="w-photo">Photos</th>
         <th>Notes</th>
       </tr>
@@ -72,32 +76,35 @@
         <tr class="system-row">
           <td class="ref">{{ref}}</td>
           <td><strong>{{label}}</strong></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="ph">______</td>
-          <td class="notes-line"></td>
+          <td class="cb"><span data-field="checkbox" data-name="sys.{{ref}}.present"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="sys.{{ref}}.comm"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="sys.{{ref}}.arret"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="sys.{{ref}}.auto"></span></td>
+          <td><span data-field="text" data-name="sys.{{ref}}.photos" style="display:inline-block; width:100%; height:5mm;"></span></td>
+          <td><span data-field="text" data-name="sys.{{ref}}.notes" style="display:inline-block; width:100%; height:5mm;"></span></td>
         </tr>
         {{#each devices}}
         <tr class="device-row">
           <td class="ref">{{ref}}</td>
-          <td>↳ <span class="device-name">__________________________</span></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="cb"></td>
-          <td class="ph">______</td>
-          <td class="notes-line"></td>
+          <td>↳ <span data-field="text" data-name="dev.{{ref}}.name" style="display:inline-block; width:60mm; height:4.5mm;"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.present"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.comm"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.arret"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.auto"></span></td>
+          <td><span data-field="text" data-name="dev.{{ref}}.photos" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
+          <td><span data-field="text" data-name="dev.{{ref}}.notes" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
         </tr>
         {{/each}}
         {{#unless devices.length}}
         <tr class="device-row placeholder">
           <td class="ref"></td>
-          <td>↳ Équipement à ajouter : __________________________</td>
-          <td class="cb"></td><td class="cb"></td><td class="cb"></td><td class="cb"></td>
-          <td class="ph">______</td>
-          <td class="notes-line"></td>
+          <td>↳ <span data-field="text" data-name="dev.{{ref}}.placeholder" style="display:inline-block; width:60mm; height:4.5mm;"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.placeholder.present"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.placeholder.comm"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.placeholder.arret"></span></td>
+          <td class="cb"><span data-field="checkbox" data-name="dev.{{ref}}.placeholder.auto"></span></td>
+          <td><span data-field="text" data-name="dev.{{ref}}.placeholder.photos" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
+          <td><span data-field="text" data-name="dev.{{ref}}.placeholder.notes" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
         </tr>
         {{/unless}}
       {{/each}}
@@ -112,8 +119,8 @@
       <tr>
         <th class="w-ref">Réf</th>
         <th>Usage / type</th>
-        <th class="w-mark" title="Présent physiquement">✓</th>
-        <th title="Communicant">Comm.</th>
+        <th class="w-mark">Présent</th>
+        <th>Comm.</th>
         <th class="w-photo">Photos</th>
         <th>Notes (marque, plaque)</th>
       </tr>
@@ -123,10 +130,10 @@
       <tr>
         <td class="ref">{{ref}}</td>
         <td>{{usage_label}} — <em>{{type_label}}</em></td>
-        <td class="cb"></td>
-        <td class="cb"></td>
-        <td class="ph">______</td>
-        <td class="notes-line"></td>
+        <td class="cb"><span data-field="checkbox" data-name="meter.{{ref}}.present"></span></td>
+        <td class="cb"><span data-field="checkbox" data-name="meter.{{ref}}.comm"></span></td>
+        <td><span data-field="text" data-name="meter.{{ref}}.photos" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
+        <td><span data-field="text" data-name="meter.{{ref}}.notes" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
       </tr>
       {{/each}}
     </tbody>
@@ -134,14 +141,21 @@
   {{/if}}
 
   {{#if thermal}}
-  <h3>Régulation thermique <small>(R175-6)</small></h3>
+  <h3>Régulation thermique</h3>
   <table class="kv">
     <tr><th class="w-ref">Réf</th><td class="ref">{{thermal.ref}}</td></tr>
-    <tr><th>Régulation auto par pièce/zone ?</th><td class="cb-line">☐ Oui ☐ Non — type : __________________</td></tr>
-    <tr><th>Position de la sonde</th><td class="fillable">murale / plancher / autre : ___________</td></tr>
-    <tr><th>Type de thermostat</th><td class="fillable">manuel / programmable / adaptatif : __________</td></tr>
-    <tr><th>Robinets thermostatiques ?</th><td class="cb-line">☐ Oui ☐ Non</td></tr>
-    <tr><th>Type / âge du générateur</th><td class="fillable">_________________________________</td></tr>
+    <tr><th>Régulation auto par pièce/zone ?</th><td>
+      <span data-field="checkbox" data-name="thermal.{{thermal.ref}}.auto.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="thermal.{{thermal.ref}}.auto.non"></span> Non —
+      type : <span data-field="text" data-name="thermal.{{thermal.ref}}.type" style="display:inline-block; width:60mm; height:4.5mm;"></span>
+    </td></tr>
+    <tr><th>Position de la sonde</th><td><span data-field="text" data-name="thermal.{{thermal.ref}}.sonde" style="display:inline-block; width:80mm; height:4.5mm;"></span></td></tr>
+    <tr><th>Type de thermostat</th><td><span data-field="text" data-name="thermal.{{thermal.ref}}.thermostat" style="display:inline-block; width:80mm; height:4.5mm;"></span></td></tr>
+    <tr><th>Robinets thermostatiques ?</th><td>
+      <span data-field="checkbox" data-name="thermal.{{thermal.ref}}.robinets.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="thermal.{{thermal.ref}}.robinets.non"></span> Non
+    </td></tr>
+    <tr><th>Type / âge du générateur</th><td><span data-field="text" data-name="thermal.{{thermal.ref}}.generateur" style="display:inline-block; width:80mm; height:4.5mm;"></span></td></tr>
   </table>
   {{/if}}
 </section>
@@ -149,13 +163,13 @@
 
 {{#if generalMeters.length}}
 <section class="page">
-  <h2>4.G — Compteurs généraux du bâtiment</h2>
+  <h2>Compteurs généraux du bâtiment</h2>
   <table class="checklist">
     <thead>
       <tr>
         <th class="w-ref">Réf</th>
         <th>Usage / type</th>
-        <th class="w-mark">✓</th>
+        <th class="w-mark">Présent</th>
         <th>Comm.</th>
         <th class="w-photo">Photos</th>
         <th>Notes</th>
@@ -166,10 +180,10 @@
       <tr>
         <td class="ref">{{ref}}</td>
         <td>{{usage_label}} — <em>{{type_label}}</em></td>
-        <td class="cb"></td>
-        <td class="cb"></td>
-        <td class="ph">______</td>
-        <td class="notes-line"></td>
+        <td class="cb"><span data-field="checkbox" data-name="meter.{{ref}}.present"></span></td>
+        <td class="cb"><span data-field="checkbox" data-name="meter.{{ref}}.comm"></span></td>
+        <td><span data-field="text" data-name="meter.{{ref}}.photos" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
+        <td><span data-field="text" data-name="meter.{{ref}}.notes" style="display:inline-block; width:100%; height:4.5mm;"></span></td>
       </tr>
       {{/each}}
     </tbody>
@@ -178,50 +192,80 @@
 {{/if}}
 
 <section class="page">
-  <h2>6 — GTB / BACS en place</h2>
+  <h2>GTB / supervision en place</h2>
   <table class="kv">
-    <tr><th>Solution / marque</th><td class="fillable">{{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}_________________________________{{/if}}</td></tr>
-    <tr><th>Localisation de l'IHM</th><td class="fillable">_________________________________</td></tr>
-    <tr><th>R175-3 §1 — Suivi continu pas horaire ? Format archivage ?</th><td class="cb-line">☐ Oui ☐ Non — format : ____________ — rétention 5 ans : ☐ vérifiée ☐ non</td></tr>
-    <tr><th>R175-3 §2 — Détection des dérives d'efficacité ?</th><td class="cb-line">☐ Oui ☐ Non — règles/seuils : ______________________________</td></tr>
-    <tr><th>R175-3 §3 — Interopérabilité (protocoles exposés)</th><td class="fillable">______________________________________</td></tr>
-    <tr><th>R175-3 §4 — Arrêt manuel + reprise autonome</th><td class="cb-line">☐ Oui ☐ Non — observations : __________________________</td></tr>
-    <tr><th>Mise à dispo des données — fréquence / format</th><td class="fillable">_________________________________</td></tr>
-    <tr><th>R175-4 — Consignes écrites de maintenance ?</th><td class="cb-line">☐ Oui ☐ Non — périodicité : ____________ — responsable : ____________</td></tr>
-    <tr><th>R175-5 — Formation exploitant ?</th><td class="cb-line">☐ Oui ☐ Non — date : __________ — domaines : __________________</td></tr>
-    <tr><th>Photos GTB (armoire, IHM, plaque)</th><td class="ph">_____ _____ _____</td></tr>
+    <tr><th>Solution / marque</th><td><span data-field="text" data-name="bms.solution" style="display:inline-block; width:90mm; height:5mm;">{{#if bms.existing_solution}}{{bms.existing_solution}}{{/if}}</span></td></tr>
+    <tr><th>Localisation de l'IHM</th><td><span data-field="text" data-name="bms.localisation" style="display:inline-block; width:90mm; height:5mm;"></span></td></tr>
+    <tr>
+      <th>Suivi continu pas horaire des données ?</th>
+      <td>
+        <span data-field="checkbox" data-name="bms.suivi.oui"></span> Oui &nbsp;
+        <span data-field="checkbox" data-name="bms.suivi.non"></span> Non —
+        format : <span data-field="text" data-name="bms.suivi.format" style="display:inline-block; width:50mm; height:4.5mm;"></span><br/>
+        Rétention 5 ans : <span data-field="checkbox" data-name="bms.retention.oui"></span> vérifiée &nbsp;
+        <span data-field="checkbox" data-name="bms.retention.non"></span> non
+      </td>
+    </tr>
+    <tr><th>Détection des dérives d'efficacité ?</th><td>
+      <span data-field="checkbox" data-name="bms.derives.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="bms.derives.non"></span> Non —
+      règles : <span data-field="text" data-name="bms.derives.regles" style="display:inline-block; width:80mm; height:4.5mm;"></span>
+    </td></tr>
+    <tr><th>Protocoles de communication exposés</th><td><span data-field="text" data-name="bms.protocoles" style="display:inline-block; width:120mm; height:5mm;"></span></td></tr>
+    <tr><th>Arrêt manuel possible + reprise autonome</th><td>
+      <span data-field="checkbox" data-name="bms.arret.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="bms.arret.non"></span> Non —
+      observations : <span data-field="text" data-name="bms.arret.notes" style="display:inline-block; width:80mm; height:4.5mm;"></span>
+    </td></tr>
+    <tr><th>Mise à dispo des données — fréquence / format</th><td><span data-field="text" data-name="bms.miseadispo" style="display:inline-block; width:120mm; height:5mm;"></span></td></tr>
+    <tr><th>Consignes écrites de maintenance ?</th><td>
+      <span data-field="checkbox" data-name="bms.maint.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="bms.maint.non"></span> Non —
+      périodicité : <span data-field="text" data-name="bms.maint.period" style="display:inline-block; width:30mm; height:4.5mm;"></span>
+      &nbsp; responsable : <span data-field="text" data-name="bms.maint.resp" style="display:inline-block; width:40mm; height:4.5mm;"></span>
+    </td></tr>
+    <tr><th>Exploitant formé à l'utilisation de la GTB ?</th><td>
+      <span data-field="checkbox" data-name="bms.formation.oui"></span> Oui &nbsp;
+      <span data-field="checkbox" data-name="bms.formation.non"></span> Non —
+      date : <span data-field="text" data-name="bms.formation.date" style="display:inline-block; width:30mm; height:4.5mm;"></span>
+      &nbsp; domaines : <span data-field="text" data-name="bms.formation.domaines" style="display:inline-block; width:60mm; height:4.5mm;"></span>
+    </td></tr>
+    <tr><th>Photos GTB (armoire, IHM, plaque)</th><td><span data-field="text" data-name="bms.photos" style="display:inline-block; width:120mm; height:5mm;"></span></td></tr>
   </table>
 </section>
 
 <section class="page">
-  <h2>7 — Inspection périodique R175-5-1</h2>
-  <p class="hint">L'audit Buildy n'est pas l'inspection R175-5-1. Tracer ici la dernière inspection officielle effectuée par un tiers (rapport conservé 10 ans).</p>
+  <h2>Inspection périodique par un tiers</h2>
+  <p class="hint">L'audit Buildy est un audit interne. Tracez ici la dernière inspection officielle réalisée par un organisme tiers (le rapport doit être conservé par le propriétaire).</p>
   <table class="kv">
-    <tr><th>Date de la dernière inspection</th><td class="fillable">_________________</td></tr>
-    <tr><th>Tiers inspecteur (nom / société)</th><td class="fillable">_________________________________</td></tr>
-    <tr><th>Anomalies identifiées</th><td class="fillable">_________________________________________________</td></tr>
-    <tr><th>Recommandations à reprendre</th><td class="fillable">_________________________________________________</td></tr>
-    <tr><th>Prochaine échéance prévue</th><td class="fillable">_________________</td></tr>
-    <tr><th>Rapport disponible ?</th><td class="cb-line">☐ Oui (à récupérer) ☐ Non</td></tr>
+    <tr><th>Date de la dernière inspection</th><td><span data-field="text" data-name="insp.date" style="display:inline-block; width:50mm; height:5mm;"></span></td></tr>
+    <tr><th>Tiers inspecteur (nom / société)</th><td><span data-field="text" data-name="insp.tiers" style="display:inline-block; width:90mm; height:5mm;"></span></td></tr>
+    <tr><th>Anomalies identifiées</th><td><span data-field="textarea" data-name="insp.anomalies" style="display:block; width:100%; height:18mm;"></span></td></tr>
+    <tr><th>Recommandations à reprendre</th><td><span data-field="textarea" data-name="insp.recommandations" style="display:block; width:100%; height:18mm;"></span></td></tr>
+    <tr><th>Prochaine échéance prévue</th><td><span data-field="text" data-name="insp.prochaine" style="display:inline-block; width:50mm; height:5mm;"></span></td></tr>
+    <tr><th>Rapport disponible ?</th><td>
+      <span data-field="checkbox" data-name="insp.dispo.oui"></span> Oui (à récupérer) &nbsp;
+      <span data-field="checkbox" data-name="insp.dispo.non"></span> Non
+    </td></tr>
   </table>
 </section>
 
 <section class="page request-page">
-  <h2>À demander à l'exploitant / au propriétaire</h2>
-  <p class="hint">Pièces à récupérer avant de quitter le site. Cocher au fur et à mesure.</p>
+  <h2>À récupérer auprès de l'exploitant / du propriétaire</h2>
+  <p class="hint">Pièces à demander avant de quitter le site. Cocher au fur et à mesure.</p>
   <table class="checklist">
     <thead>
       <tr>
         <th class="w-mark">✓</th>
-        <th class="w-code">Article</th>
+        <th class="w-code">Catégorie</th>
         <th>Pièce demandée</th>
       </tr>
     </thead>
     <tbody>
       {{#each documentsToRequest}}
       <tr>
-        <td class="cb"></td>
-        <td><code>{{code}}</code></td>
+        <td class="cb"><span data-field="checkbox" data-name="req.{{@index}}"></span></td>
+        <td><span class="tag">{{tag}}</span></td>
         <td>{{label}}</td>
       </tr>
       {{/each}}
@@ -232,26 +276,7 @@
 <section class="page footer-page">
   <h2>Bilan terrain</h2>
   <p class="hint">Notes libres pour la restitution au bureau.</p>
-  <div class="freeform tall">
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________<br/>
-    _______________________________________________________________________
-  </div>
+  <span data-field="textarea" data-name="bilan.notes" style="display:block; width:100%; height:120mm; border:0.15mm dashed #cbd5e1;"></span>
   <div class="signoff">
     <div>Signature auditeur :</div>
     <div class="sig-box"></div>

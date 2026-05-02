@@ -106,17 +106,18 @@ function buildChecklistData(documentId) {
     generalMeters,
     bms,
     inspections,
-    // Liste deterministe des "documents/preuves a demander a l'exploitant"
+    // Pieces a recuperer aupres de l'exploitant — formulation terrain,
+    // pas de jargon juridique. Categorie courte pour reperage rapide.
     documentsToRequest: [
-      { code: 'R175-4', label: 'Consignes écrites de maintenance du BACS (périodicité, points contrôlés, responsable)' },
-      { code: 'R175-5', label: 'Attestation de formation de l\'exploitant au paramétrage du BACS' },
-      { code: 'R175-5-1', label: 'Rapport de la dernière inspection périodique par un tiers (à conserver 10 ans)' },
-      { code: 'R175-3', label: 'Procédure de mise à disposition des données archivées au gestionnaire et aux exploitants' },
-      { code: 'R175-3', label: 'Export type des données horaires sur 12 mois (CSV ou capture interface GTB)' },
-      { code: 'R175-2', label: 'Date du permis de construire et date des travaux générateur (déclencheurs R175-2 et R175-6)' },
-      { code: 'R175-2', label: 'Études de TRI éventuelles (si dispense > 10 ans revendiquée)' },
-      { code: 'DOE',     label: 'DOE / plans / schémas / synoptiques GTB et systèmes' },
-      { code: 'Maint.',  label: 'Contrat de maintenance et historique d\'interventions' },
+      { tag: 'Maintenance',  label: 'Consignes écrites de maintenance de la GTB (périodicité, points vérifiés, responsable)' },
+      { tag: 'Formation',    label: 'Attestation de formation de l\'exploitant à l\'utilisation de la GTB' },
+      { tag: 'Inspection',   label: 'Rapport de la dernière inspection périodique réalisée par un tiers' },
+      { tag: 'Données',      label: 'Procédure / interface de mise à disposition des données aux exploitants des systèmes' },
+      { tag: 'Données',      label: 'Export type des relevés horaires sur 12 mois (CSV ou capture GTB)' },
+      { tag: 'Bâtiment',     label: 'Date du permis de construire et date des derniers travaux sur le générateur' },
+      { tag: 'Économie',     label: 'Études de retour sur investissement éventuelles' },
+      { tag: 'DOE',          label: 'DOE / plans / schémas / synoptiques GTB et systèmes' },
+      { tag: 'Maintenance',  label: 'Contrat de maintenance et historique d\'interventions' },
     ],
   };
 }

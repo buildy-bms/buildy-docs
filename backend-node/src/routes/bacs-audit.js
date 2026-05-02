@@ -276,6 +276,8 @@ async function routes(fastify) {
       pageFormat: 'A4',
       pageOrientation: 'portrait',
       pdfOptions: { format: 'A4' },
+      addFormFields: true,
+      pageContainerSelector: '.page',
     });
     db.auditLog.add({
       afId: documentId,

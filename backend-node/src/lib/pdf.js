@@ -220,7 +220,7 @@ function getBrowser() {
  *   - pages 2..N avec header/footer
  * Necessite displayHeaderFooter=true dans pdfOptions, sinon ignore.
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false }) {
+async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -285,6 +285,36 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
       ...pdfOptions,
     };
 
+    // Pour les checklists editables : on capture la position des elements
+    // [data-field="text|textarea|checkbox"] AVANT de fermer la page, en
+    // les rattachant a leur conteneur .page (chaque .page = 1 page PDF
+    // grace au page-break-before:always).
+    let extractedFields = null;
+    if (addFormFields) {
+      extractedFields = await page.evaluate((selector) => {
+        const containers = Array.from(document.querySelectorAll(selector));
+        const out = [];
+        for (let i = 0; i < containers.length; i++) {
+          const c = containers[i];
+          const cRect = c.getBoundingClientRect();
+          const fields = c.querySelectorAll('[data-field]');
+          for (const el of fields) {
+            const r = el.getBoundingClientRect();
+            out.push({
+              pageIndex: i,
+              kind: el.dataset.field,
+              name: el.dataset.name || `f${out.length}`,
+              x_css: r.left - cRect.left,
+              y_css: r.top - cRect.top,
+              w_css: r.width,
+              h_css: r.height,
+            });
+          }
+        }
+        return out;
+      }, pageContainerSelector);
+    }
+
     await page.pdf({ ...baseOptions, path: outputPath });
 
     // Cover plein-bord en deux passes : Chromium ne respecte pas fiablement
@@ -326,15 +356,19 @@ async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, 
     // Post-processing pdf-lib en une seule passe (charge/save) :
     //   - Masque header/footer de la page 1 si demande (preserve liens TOC).
     //   - Applique le filigrane Buildy sur les pages demandees.
+    //   - Injecte les champs AcroForm (text/textarea/checkbox) si demande.
     const needPostProcess =
       (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter && pdfOptions.margin) ||
-      watermark;
+      watermark || (addFormFields && extractedFields && extractedFields.length);
     if (needPostProcess) {
       await postProcessPdf(outputPath, {
         maskFirstPage: (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter)
           ? { margin: pdfOptions.margin, color: '#1b2842' }
           : null,
         watermark,
+        formFields: addFormFields ? extractedFields : null,
+        pageFormat,
+        pageOrientation,
       });
     }
   } finally {
@@ -359,7 +393,7 @@ async function replaceFirstPage(mainPath, coverPath) {
   fs.writeFileSync(mainPath, await mainDoc.save());
 }
 
-async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
+async function postProcessPdf(pdfPath, { maskFirstPage, watermark, formFields, pageFormat, pageOrientation }) {
   const { PDFDocument, rgb } = require('pdf-lib');
   const bytes = fs.readFileSync(pdfPath);
   const doc = await PDFDocument.load(bytes);
@@ -409,6 +443,50 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark }) {
       const y = (ph - hPt) / 2;
       p.drawImage(img, { x, y, width: wPt, height: hPt, opacity });
     }
+  }
+
+  // 3. Champs AcroForm — convertit les bbox CSS en coords PDF.
+  // Calibration : Puppeteer rend a 96dpi, donc 1px CSS = 0.75pt PDF.
+  // L'origine (0,0) en CSS est en haut-gauche, en PDF c'est en bas-gauche.
+  // On positionne chaque champ relativement a sa .page conteneur (1:1
+  // avec une page PDF) en tenant compte des @page margins (header CSS).
+  if (formFields && formFields.length) {
+    const PT_PER_PX = 0.75;
+    // Marges @page CSS de styles-bacs-audit-checklist.css (14mm 12mm 14mm 12mm)
+    const TOP_MARGIN_PT = 14 * 2.83465;
+    const LEFT_MARGIN_PT = 12 * 2.83465;
+    const form = doc.getForm();
+    for (const f of formFields) {
+      if (f.pageIndex >= pages.length) continue;
+      const page = pages[f.pageIndex];
+      const { width: pw, height: ph } = page.getSize();
+      const x_pt = LEFT_MARGIN_PT + f.x_css * PT_PER_PX;
+      const w_pt = Math.max(8, f.w_css * PT_PER_PX);
+      const h_pt = Math.max(8, f.h_css * PT_PER_PX);
+      // y CSS du haut du champ depuis le haut de la zone utile
+      const y_top_pt = TOP_MARGIN_PT + f.y_css * PT_PER_PX;
+      const y_pt = ph - y_top_pt - h_pt;
+      try {
+        if (f.kind === 'text' || f.kind === 'textarea') {
+          const tf = form.createTextField(f.name);
+          if (f.kind === 'textarea') tf.enableMultiline();
+          tf.addToPage(page, {
+            x: x_pt, y: y_pt, width: w_pt, height: h_pt,
+            borderWidth: 0,
+            backgroundColor: undefined,
+          });
+        } else if (f.kind === 'checkbox') {
+          const cb = form.createCheckBox(f.name);
+          cb.addToPage(page, {
+            x: x_pt, y: y_pt, width: w_pt, height: h_pt,
+            borderWidth: 0.5,
+          });
+        }
+      } catch {
+        // Nom en doublon ou autre — on saute, pas bloquant
+      }
+    }
+    // Police par defaut (Helvetica) : pdf-lib cree les appearances au save
   }
 
   fs.writeFileSync(pdfPath, await doc.save());

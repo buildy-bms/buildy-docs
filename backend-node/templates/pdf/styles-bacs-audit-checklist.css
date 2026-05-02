@@ -47,6 +47,37 @@ h3 { font-size: 10.5pt; margin: 4mm 0 1.5mm; color: #4f46e5; }
 .freeform { line-height: 1.9; margin-top: 2mm; }
 .freeform.tall { line-height: 2.1; }
 
+/* Champs editables : reservations visuelles. Les champs reels du PDF
+   (AcroForm text + checkbox) sont injectes par-dessus en post-traitement. */
+.field-text, [data-field="text"] {
+  background: #f8fafc;
+  border-bottom: 0.2mm solid #cbd5e1;
+  vertical-align: middle;
+}
+.field-textarea, [data-field="textarea"] {
+  background: #f8fafc;
+  border: 0.15mm dashed #cbd5e1;
+}
+[data-field="checkbox"] {
+  display: inline-block;
+  width: 4mm; height: 4mm;
+  border: 0.3mm solid #1b2842;
+  border-radius: 0.6mm;
+  vertical-align: middle;
+  background: #fff;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.4mm 1.5mm;
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 1mm;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.2mm;
+}
+
 .hint { font-size: 8.5pt; color: #64748b; font-style: italic; margin: 1mm 0 2mm; }
 
 table.kv { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
@@ -70,15 +101,7 @@ table.checklist tbody tr.placeholder { color: #94a3b8; font-style: italic; }
 
 .ref { font-family: 'Manrope', monospace; font-weight: 600; font-size: 8.5pt; color: #4f46e5; letter-spacing: 0.1mm; }
 
-td.cb {
-  text-align: center;
-}
-td.cb::before {
-  content: '☐';
-  font-size: 13pt;
-  color: #1b2842;
-  display: inline-block;
-}
+td.cb { text-align: center; vertical-align: middle; }
 
 .cb-line { font-size: 9pt; }
 
