@@ -141,8 +141,8 @@ watch(() => props.devices.length, refreshPhotos)
 onMounted(refreshPhotos)
 
 // Classes CSS partagees pour coherence visuelle (inputs + selects)
-const inputCls = 'w-full px-1.5 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition bg-white'
-const selectCls = 'w-full px-1.5 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center transition bg-white'
+const inputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition bg-white'
+const selectCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded-sm hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center transition bg-white'
 const inputAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 placeholder:italic placeholder:text-gray-400'
 const selectAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center'
 
