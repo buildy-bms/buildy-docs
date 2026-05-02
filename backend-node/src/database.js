@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 60;
+const TARGET_VERSION = 63;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2174,6 +2174,111 @@ function runMigrations() {
     `);
     db.pragma('user_version = 60');
     log.info('Migration 60 appliquee : ai_prompts + ai_prompt_versions');
+  }
+
+  if (current < 61) {
+    // ── R175 coverage gaps (Partie A du plan virtual-karp) ──
+    // 1. Nouvelle table bacs_audit_inspections : R175-5-1 (inspection
+    //    periodique par tiers, conservation 10 ans). Permet de tracer la
+    //    derniere inspection officielle, ses anomalies et la date prevue
+    //    pour la prochaine. Distincte de l'audit Buildy (qui est interne).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_inspections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        last_inspection_date TEXT,
+        last_inspection_inspector TEXT,
+        last_inspection_report_filename TEXT,
+        last_inspection_anomalies_html TEXT,
+        last_inspection_recommendations_html TEXT,
+        next_inspection_due_date TEXT,
+        retained_until_date TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_inspections_doc ON bacs_audit_inspections(document_id);
+    `);
+
+    // 2. bacs_audit_bms : champs detail R175-3 §1/§2, mise a disposition
+    //    des donnees, R175-4, R175-5.
+    db.exec(`
+      ALTER TABLE bacs_audit_bms ADD COLUMN r175_3_p1_archival_format TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN r175_3_p1_retention_verified INTEGER;
+      ALTER TABLE bacs_audit_bms ADD COLUMN r175_3_p2_anomaly_rules_html TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_provision_frequency TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_provision_format TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN maintenance_periodicity TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN maintenance_responsible TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN operator_training_topics TEXT;
+      ALTER TABLE bacs_audit_bms ADD COLUMN operator_training_provider TEXT;
+    `);
+
+    // 3. bacs_audit_thermal_regulation : detail R175-6 (sonde, thermostat,
+    //    robinets thermostatiques).
+    db.exec(`
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN sensor_position TEXT;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN thermostat_type TEXT;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN has_thermostatic_valves INTEGER DEFAULT 0;
+    `);
+
+    db.pragma('user_version = 61');
+    log.info('Migration 61 appliquee : R175-5-1 inspections + champs detail BMS/thermal (gaps couverture)');
+  }
+
+  if (current < 62) {
+    // Bulk upload terrain (B2 du plan virtual-karp) : on conserve l'horodatage
+    // EXIF de la prise de vue pour pouvoir trier les photos chronologiquement
+    // dans l'UI de restitution et suggerer un mapping section/photo.
+    db.exec(`ALTER TABLE site_documents ADD COLUMN taken_at TEXT;`);
+    db.pragma('user_version = 62');
+    log.info('Migration 62 appliquee : site_documents.taken_at (EXIF DateTimeOriginal)');
+  }
+
+  if (current < 63) {
+    // B3 du plan virtual-karp : import transcript Plaud Pro + suggestions Claude.
+    // - bacs_audit_transcripts : fichier (.txt/.docx) source + meta
+    // - bacs_audit_suggestions : suggestions Claude (1 ligne par champ
+    //   suggere). statut : pending/applied/rejected. Permet la validation
+    //   manuelle de l'auditeur (diff inline) avant ecriture en DB.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_transcripts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        original_name TEXT,
+        size_bytes INTEGER,
+        text_content TEXT,
+        uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        suggestions_generated_at TEXT,
+        suggestions_usage_input_tokens INTEGER,
+        suggestions_usage_output_tokens INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_transcripts_doc ON bacs_audit_transcripts(document_id);
+
+      CREATE TABLE IF NOT EXISTS bacs_audit_suggestions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transcript_id INTEGER NOT NULL REFERENCES bacs_audit_transcripts(id) ON DELETE CASCADE,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        target_kind TEXT NOT NULL,
+        target_id INTEGER,
+        target_ref TEXT,
+        field_name TEXT NOT NULL,
+        suggested_value TEXT,
+        confidence REAL,
+        source_quote TEXT,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'applied', 'rejected')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        decided_at TEXT,
+        decided_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_suggestions_doc ON bacs_audit_suggestions(document_id, status);
+      CREATE INDEX IF NOT EXISTS idx_bacs_suggestions_transcript ON bacs_audit_suggestions(transcript_id);
+    `);
+    db.pragma('user_version = 63');
+    log.info('Migration 63 appliquee : bacs_audit_transcripts + bacs_audit_suggestions');
   }
 
   if (current > TARGET_VERSION) {

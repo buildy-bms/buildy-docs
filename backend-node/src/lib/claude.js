@@ -603,9 +603,77 @@ async function assistActionAlternatives(actionContext) {
   return { html: normalizeSynthesisHtml(raw), usage: resp.usage };
 }
 
+// ─── Pre-remplissage d'un audit a partir d'un transcript Plaud Pro ──
+// L'auditeur dicte sur site (numero checklist + observations). De retour au
+// bureau, il importe le .txt : Claude lit le transcript + le squelette de
+// l'audit (zones + systemes + devices + meters avec leurs "ref" stables) et
+// renvoie une liste de suggestions de remplissage (champ par champ).
+//
+// Le prompt cache la portion stable (system prompt + schema), seul le
+// transcript et le squelette varient → cache hit eleve sur les retries.
+const SYSTEM_PROMPT_TRANSCRIPT = [
+  `Tu es l'assistant de restitution d'un audit BACS Buildy. L'auditeur a`,
+  `dicte ses observations en parcourant une checklist papier numerotee`,
+  `(refs au format <step>.Z<zone>.<item>, ex: 3.Z01.04). Tu recois :`,
+  `1. Le SQUELETTE de l'audit : liste des entites avec leur ref + libelle.`,
+  `2. Le TRANSCRIPT brut de la dictee.`,
+  ``,
+  `Ton role : extraire des suggestions de pre-remplissage, une ligne JSON`,
+  `par information identifiable. Format de sortie strict :`,
+  `\`\`\`json`,
+  `{ "suggestions": [`,
+  `  { "target_kind": "system|device|meter|zone|thermal|bms|inspection",`,
+  `    "target_ref": "3.Z01.01" | null,`,
+  `    "field_name": "notes | brand | model_reference | power_kw | name | communication | ...",`,
+  `    "suggested_value": "valeur en clair (string ou nombre)",`,
+  `    "confidence": 0.0 a 1.0,`,
+  `    "source_quote": "extrait litteral du transcript qui justifie" }`,
+  `]}`,
+  `\`\`\``,
+  ``,
+  `Regles :`,
+  `- Ne JAMAIS inventer une donnee qui n'est pas explicite dans le transcript.`,
+  `- Si la ref n'est pas claire, mettre target_ref a null et expliquer dans source_quote.`,
+  `- Privilegier confiance < 0.6 plutot qu'une mauvaise affectation.`,
+  `- Le target_kind doit correspondre au prefixe de la ref (3.* = system ou device, 4.* = meter, 5.* = thermal, 6.* = bms, 7.* = inspection).`,
+  `- Sortie JSON valide uniquement, pas de texte autour.`,
+].join('\n');
+
+async function assistTranscriptMapping({ skeleton, transcript }) {
+  const userPrompt = [
+    `=== SQUELETTE AUDIT ===`,
+    JSON.stringify(skeleton, null, 2),
+    ``,
+    `=== TRANSCRIPT DICTEE ===`,
+    transcript,
+    ``,
+    `Extrait les suggestions au format JSON specifie.`,
+  ].join('\n');
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 4096,
+    system: [
+      // System prompt cacheable (stable entre runs sur le meme audit)
+      { type: 'text', text: SYSTEM_PROMPT_TRANSCRIPT, cache_control: { type: 'ephemeral' } },
+    ],
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || [])
+    .filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  // Tente de parser le JSON, en retirant les fences eventuelles
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  let parsed = null;
+  try { parsed = JSON.parse(cleaned); }
+  catch { /* tolerant : on renvoie [] */ }
+  return {
+    suggestions: Array.isArray(parsed?.suggestions) ? parsed.suggestions : [],
+    usage: resp.usage || {},
+  };
+}
+
 module.exports = {
   streamSection, buildPrompts, assistLibrary,
-  assistAuditSynthesis, assistActionAlternatives,
+  assistAuditSynthesis, assistActionAlternatives, assistTranscriptMapping,
   // Pour la page d'administration "Prompts IA"
   PROMPT_KEY_LIBRARY,
   DEFAULT_SYSTEM_PROMPT_LIBRARY: SYSTEM_PROMPT_LIBRARY,

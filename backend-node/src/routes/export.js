@@ -1001,7 +1001,8 @@ async function routes(fastify) {
     // manuelle dans chaque AF.
     const sectionData = new Map();
     for (const sec of allSections) {
-      const attachments = db.attachments.listEffectiveForSection(sec.id).map((a) => {
+      const attachmentRows = db.attachments.listEffectiveForSection(sec.id);
+      const attachments = (await Promise.all(attachmentRows.map(async (a) => {
         let diskPath;
         if (a.source === 'section_template') {
           diskPath = path.join(config.attachmentsDir, '_tpl', 'section', a.filename);
@@ -1010,8 +1011,8 @@ async function routes(fastify) {
         } else {
           diskPath = path.join(config.attachmentsDir, String(afId), a.filename);
         }
-        return { ...a, dataUrl: loadFileAsDataUrl(diskPath) };
-      }).filter((a) => a.dataUrl);
+        return { ...a, dataUrl: await loadFileAsDataUrl(diskPath) };
+      }))).filter((a) => a.dataUrl);
 
       let zones = [];
       if (sec.kind === 'zones') {

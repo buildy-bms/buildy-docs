@@ -203,6 +203,7 @@ export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
 
 // ── Audit BACS — donnees structurees ──
+export const getBacsAuditRefs = (docId) => api.get(`/bacs-audit/${docId}/refs`)
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
 export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
 export const getBacsMeters = (docId) => api.get(`/bacs-audit/${docId}/meters`)
@@ -218,6 +219,10 @@ export const duplicateBacsBmsComponent = (id) => api.post(`/bacs-audit/bms-compo
 export const deleteBacsBmsComponent = (id) => api.delete(`/bacs-audit/bms-components/${id}`)
 export const getBacsThermal = (docId) => api.get(`/bacs-audit/${docId}/thermal-regulation`)
 export const updateBacsThermal = (id, data) => api.patch(`/bacs-audit/thermal-regulation/${id}`, data)
+export const getBacsInspections = (docId) => api.get(`/bacs-audit/${docId}/inspections`)
+export const createBacsInspection = (docId, data) => api.post(`/bacs-audit/${docId}/inspections`, data)
+export const updateBacsInspection = (id, data) => api.patch(`/bacs-audit/inspections/${id}`, data)
+export const deleteBacsInspection = (id) => api.delete(`/bacs-audit/inspections/${id}`)
 export const getBacsActionItems = (docId, params) =>
   api.get(`/bacs-audit/${docId}/action-items`, { params })
 export const createBacsActionItem = (docId, data) =>
@@ -230,6 +235,36 @@ export const regenerateBacsActionItems = (docId) =>
 export const getBacsActionItemsCsvUrl = (docId) =>
   `/api/bacs-audit/${docId}/action-items/export.csv`
 export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pdf`)
+export const exportBacsChecklistPdf = (docId) =>
+  api.post(`/bacs-audit/${docId}/exports/checklist`, null, { responseType: 'blob' })
+
+// ── Transcript Plaud + suggestions Claude (B3) ──
+export const listBacsTranscripts = (docId) => api.get(`/bacs-audit/${docId}/transcripts`)
+export const uploadBacsTranscript = (docId, file) => {
+  const fd = new FormData()
+  fd.append('file', file, file.name)
+  return api.post(`/bacs-audit/${docId}/transcripts`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+export const generateBacsSuggestions = (transcriptId) =>
+  api.post(`/bacs-audit/transcripts/${transcriptId}/suggestions`)
+export const listBacsSuggestions = (docId, params) =>
+  api.get(`/bacs-audit/${docId}/suggestions`, { params })
+export const applyBacsSuggestion = (id) =>
+  api.post(`/bacs-audit/suggestions/${id}/apply`)
+export const rejectBacsSuggestion = (id) =>
+  api.post(`/bacs-audit/suggestions/${id}/reject`)
+
+// Upload massif de photos terrain : parse EXIF + tri chronologique cote serveur.
+export const bulkUploadSitePhotos = (siteUuid, files, onProgress) => {
+  const fd = new FormData()
+  for (const f of files) fd.append('photos', f, f.name)
+  return api.post(`/sites/${siteUuid}/photos/bulk`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
+  })
+}
 export const deliverBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/deliver`)
 export const resyncBacsAudit = (docId) => api.post(`/bacs-audit/${docId}/resync`)
 

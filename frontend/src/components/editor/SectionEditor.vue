@@ -11,6 +11,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
 import { updateSection, getSectionTemplate } from '@/api'
+import SafeHtml from '@/components/SafeHtml.vue'
 import { useAutosave } from '@/composables/useAutosave'
 import { useClaudeDraft } from '@/composables/useClaudeDraft'
 import { useNotification } from '@/composables/useNotification'
@@ -449,7 +450,7 @@ function onSaveLink(url) {
         <div v-if="!claudePreview && !claudeStream.streaming.value" class="p-6 text-center text-xs text-gray-400 italic">
           Le brouillon de Claude apparaîtra ici en streaming.
         </div>
-        <div v-else class="prose prose-sm max-w-none p-4" v-html="claudePreview || ''"></div>
+        <SafeHtml v-else class="prose prose-sm max-w-none p-4" :html="claudePreview || ''" />
         <div v-if="claudeStream.streaming.value" class="px-4 py-2 text-[11px] text-indigo-600 border-t border-gray-200">
           <span class="inline-block w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse mr-1"></span>
           Claude rédige…

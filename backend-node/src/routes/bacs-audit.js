@@ -7,8 +7,46 @@ const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, loadAssetDataUrl } = require('../lib/pdf');
-const { assistAuditSynthesis, assistActionAlternatives } = require('../lib/claude');
+const { optimizeFileToDataUrl } = require('../lib/image-optimizer');
+const { assistAuditSynthesis, assistActionAlternatives, assistTranscriptMapping } = require('../lib/claude');
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const { buildAuditRefs } = require('../lib/bacs-audit-refs');
+const { buildChecklistData } = require('../lib/bacs-checklist-builder');
+
+// Charge tout ce qu'il faut pour calculer les refs stables d'un audit
+// (zones du site + entites BACS du document) et renvoie les Maps brutes
+// destinees a buildAuditRefs.
+function loadRefsInputs(documentId) {
+  const af = db.afs.getById(documentId);
+  if (!af) return null;
+  const site = af.site_id ? db.sites.getById(af.site_id) : null;
+  const zones = site ? db.db.prepare(
+    'SELECT * FROM zones WHERE site_id = ? AND deleted_at IS NULL'
+  ).all(site.site_id) : [];
+  const systems = db.db.prepare(
+    'SELECT * FROM bacs_audit_systems WHERE document_id = ?'
+  ).all(documentId);
+  const devices = db.db.prepare(`
+    SELECT d.* FROM bacs_audit_system_devices d
+    JOIN bacs_audit_systems s ON s.id = d.system_id
+    WHERE s.document_id = ?
+  `).all(documentId);
+  const meters = db.db.prepare(
+    'SELECT * FROM bacs_audit_meters WHERE document_id = ?'
+  ).all(documentId);
+  const thermal = db.db.prepare(
+    'SELECT * FROM bacs_audit_thermal_regulation WHERE document_id = ?'
+  ).all(documentId);
+  return { zones, systems, devices, meters, thermal };
+}
+
+function refsToFlatMaps(refs) {
+  const out = { zones: {}, systems: {}, devices: {}, meters: {}, thermal: {} };
+  for (const k of Object.keys(out)) {
+    for (const [id, info] of refs[k]) out[k][id] = info.ref;
+  }
+  return out;
+}
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const gitLib = require('../lib/git');
 const bacsArticlesData = require('../seeds/bacs-articles');
@@ -42,6 +80,226 @@ function assertBacsAuditExists(documentId, reply) {
 }
 
 async function routes(fastify) {
+  // ─── Transcripts Plaud Pro + suggestions Claude (B3) ───────────────
+  // Upload du transcript → genere des suggestions Claude → l'auditeur les
+  // valide (apply) ou les rejette. apply = ecrit la valeur dans la DB.
+  fastify.get('/bacs-audit/:documentId/transcripts', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.db.prepare(
+      'SELECT id, document_id, original_name, size_bytes, uploaded_at, suggestions_generated_at, suggestions_usage_input_tokens, suggestions_usage_output_tokens FROM bacs_audit_transcripts WHERE document_id = ? ORDER BY uploaded_at DESC'
+    ).all(id);
+  });
+
+  fastify.post('/bacs-audit/:documentId/transcripts', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(documentId, reply)) return;
+    const file = await request.file({ limits: { fileSize: 5 * 1024 * 1024 } });
+    if (!file) return reply.code(400).send({ detail: 'Aucun fichier recu' });
+    const buffer = await file.toBuffer();
+    if (file.file.truncated) return reply.code(413).send({ detail: 'Transcript > 5 MB' });
+    const text = buffer.toString('utf-8').slice(0, 200_000);
+    const transcriptDir = path.resolve(config.attachmentsDir, '..', 'transcripts', String(documentId));
+    fs.mkdirSync(transcriptDir, { recursive: true });
+    const filename = `${Date.now()}-${(file.filename || 'transcript.txt').replace(/[^\w.-]/g, '_')}`;
+    fs.writeFileSync(path.join(transcriptDir, filename), buffer);
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_transcripts
+        (document_id, filename, original_name, size_bytes, text_content, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(documentId, filename, file.filename || null, buffer.length, text, request.authUser?.id || null);
+    return reply.code(201).send(
+      db.db.prepare('SELECT id, document_id, original_name, size_bytes, uploaded_at FROM bacs_audit_transcripts WHERE id = ?').get(r.lastInsertRowid)
+    );
+  });
+
+  fastify.post('/bacs-audit/transcripts/:id/suggestions', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tr = db.db.prepare('SELECT * FROM bacs_audit_transcripts WHERE id = ?').get(id);
+    if (!tr) return reply.code(404).send({ detail: 'Transcript non trouve' });
+
+    // Construit un squelette minimal a partir des refs deja calcules
+    const inputs = loadRefsInputs(tr.document_id);
+    const refs = buildAuditRefs(inputs);
+    const skeleton = {
+      zones: inputs.zones.map(z => ({
+        ref: refs.zones.get(z.zone_id)?.ref,
+        name: z.name,
+        nature: z.nature,
+      })),
+      systems: inputs.systems.map(s => ({
+        ref: refs.systems.get(s.id)?.ref,
+        category: s.system_category,
+        zone_ref: refs.zones.get(s.zone_id)?.ref,
+      })),
+      devices: inputs.devices.map(d => ({
+        ref: refs.devices.get(d.id)?.ref,
+        name: d.name,
+        brand: d.brand,
+        model_reference: d.model_reference,
+      })),
+      meters: inputs.meters.map(m => ({
+        ref: refs.meters.get(m.id)?.ref,
+        usage: m.usage,
+        type: m.meter_type,
+      })),
+      thermal: inputs.thermal.map(t => ({
+        ref: refs.thermal.get(t.id)?.ref,
+        zone_ref: refs.zones.get(t.zone_id)?.ref,
+      })),
+    };
+
+    let result;
+    try { result = await assistTranscriptMapping({ skeleton, transcript: tr.text_content || '' }); }
+    catch (e) {
+      log.warn(`assistTranscriptMapping failed: ${e.message}`);
+      return reply.code(502).send({ detail: 'Echec generation suggestions Claude' });
+    }
+
+    // Resoud target_id depuis target_ref pour les futures applications
+    const refLookup = new Map();
+    for (const k of ['zones','systems','devices','meters','thermal']) {
+      for (const [rowId, info] of refs[k]) refLookup.set(info.ref, { kind: k.replace(/s$/, ''), id: rowId });
+    }
+    // Insert toutes les suggestions
+    const insert = db.db.prepare(`
+      INSERT INTO bacs_audit_suggestions
+        (transcript_id, document_id, target_kind, target_id, target_ref,
+         field_name, suggested_value, confidence, source_quote)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    let count = 0;
+    const tx = db.db.transaction((items) => {
+      for (const s of items) {
+        const matched = s.target_ref ? refLookup.get(s.target_ref) : null;
+        insert.run(
+          tr.id, tr.document_id,
+          matched?.kind || s.target_kind || 'unknown',
+          matched?.id || null,
+          s.target_ref || null,
+          s.field_name || '',
+          typeof s.suggested_value === 'string' ? s.suggested_value : JSON.stringify(s.suggested_value ?? null),
+          typeof s.confidence === 'number' ? s.confidence : null,
+          s.source_quote || null,
+        );
+        count++;
+      }
+    });
+    tx(result.suggestions || []);
+
+    db.db.prepare(`
+      UPDATE bacs_audit_transcripts
+      SET suggestions_generated_at = CURRENT_TIMESTAMP,
+          suggestions_usage_input_tokens = ?,
+          suggestions_usage_output_tokens = ?
+      WHERE id = ?
+    `).run(result.usage?.input_tokens || null, result.usage?.output_tokens || null, tr.id);
+
+    return reply.code(201).send({ count, usage: result.usage });
+  });
+
+  fastify.get('/bacs-audit/:documentId/suggestions', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const status = request.query.status;
+    const sql = `SELECT * FROM bacs_audit_suggestions WHERE document_id = ?` +
+                (status ? ` AND status = ?` : ``) +
+                ` ORDER BY created_at DESC`;
+    return db.db.prepare(sql).all(...(status ? [id, status] : [id]));
+  });
+
+  // PATCH : applique une suggestion → ecrit la valeur dans la table cible.
+  // Strategie minimaliste : si target_kind in (system,device,meter,thermal),
+  // on update la colonne <field_name> par son <suggested_value>. Pas de
+  // coercion de type — le frontend pre-valide (ou Claude renvoie une string
+  // qui correspond au type attendu).
+  fastify.post('/bacs-audit/suggestions/:id/apply', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const sug = db.db.prepare('SELECT * FROM bacs_audit_suggestions WHERE id = ?').get(id);
+    if (!sug) return reply.code(404).send({ detail: 'Suggestion non trouvee' });
+    if (sug.status === 'applied') return reply.send(sug);
+    const TABLE_OF_KIND = {
+      system: 'bacs_audit_systems',
+      device: 'bacs_audit_system_devices',
+      meter: 'bacs_audit_meters',
+      thermal: 'bacs_audit_thermal_regulation',
+      zone: 'zones',
+    };
+    const table = TABLE_OF_KIND[sug.target_kind];
+    if (!table || !sug.target_id || !sug.field_name) {
+      return reply.code(400).send({ detail: 'Suggestion non applicable automatiquement' });
+    }
+    const cols = db.db.prepare(`PRAGMA table_info(${table})`).all().map(r => r.name);
+    if (!cols.includes(sug.field_name)) {
+      return reply.code(400).send({ detail: `Colonne ${sug.field_name} absente de ${table}` });
+    }
+    const pkCol = table === 'zones' ? 'zone_id' : 'id';
+    db.db.prepare(`UPDATE ${table} SET ${sug.field_name} = ? WHERE ${pkCol} = ?`)
+      .run(sug.suggested_value, sug.target_id);
+    db.db.prepare(`UPDATE bacs_audit_suggestions SET status = 'applied', decided_at = CURRENT_TIMESTAMP, decided_by = ? WHERE id = ?`)
+      .run(request.authUser?.id || null, id);
+    return db.db.prepare('SELECT * FROM bacs_audit_suggestions WHERE id = ?').get(id);
+  });
+
+  fastify.post('/bacs-audit/suggestions/:id/reject', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const sug = db.db.prepare('SELECT id FROM bacs_audit_suggestions WHERE id = ?').get(id);
+    if (!sug) return reply.code(404).send({ detail: 'Suggestion non trouvee' });
+    db.db.prepare(`UPDATE bacs_audit_suggestions SET status = 'rejected', decided_at = CURRENT_TIMESTAMP, decided_by = ? WHERE id = ?`)
+      .run(request.authUser?.id || null, id);
+    return db.db.prepare('SELECT * FROM bacs_audit_suggestions WHERE id = ?').get(id);
+  });
+
+  // ─── Export checklist A4 (impression terrain) ──────────────────────
+  // Genere une feuille A4 imprimable avec numerotation stable,
+  // cases a cocher, emplacements pour photos, et liste des pieces a
+  // demander a l'exploitant. Le collaborateur l'utilise sur site avec
+  // photos telephone + dictee Plaud Pro pour la restitution au bureau.
+  fastify.post('/bacs-audit/:documentId/exports/checklist', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(documentId, reply);
+    if (!af) return;
+    const data = buildChecklistData(documentId);
+    if (!data) return reply.code(404).send({ detail: 'Audit introuvable' });
+    const outDir = path.resolve(config.attachmentsDir, '..', 'exports', String(documentId));
+    fs.mkdirSync(outDir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const outputPath = path.join(outDir, `bacs-audit-checklist-${ts}.pdf`);
+    const result = await renderPdf({
+      template: 'bacs-audit-checklist',
+      styles: 'styles-bacs-audit-checklist',
+      data: {
+        ...data,
+        logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+      },
+      outputPath,
+      pageFormat: 'A4',
+      pageOrientation: 'portrait',
+      pdfOptions: { format: 'A4' },
+    });
+    db.auditLog.add({
+      afId: documentId,
+      userId: request.authUser?.id,
+      action: 'bacs_audit.checklist.export',
+      payload: { size: result.sizeBytes },
+    });
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="checklist-${af.slug || documentId}.pdf"`)
+      .send(fs.createReadStream(outputPath));
+  });
+
+  // ─── Refs stables (numerotation cross-referencee) ──────────────────
+  // GET /bacs-audit/:documentId/refs → { zones, systems, devices, meters, thermal }
+  // Utilise par le stepper UI (badges) et l'export checklist PDF.
+  fastify.get('/bacs-audit/:documentId/refs', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const inputs = loadRefsInputs(id);
+    if (!inputs) return reply.code(404).send({ detail: 'Document non trouve' });
+    return refsToFlatMaps(buildAuditRefs(inputs));
+  });
+
   // ─── Systems (R175-1 §4 + R175-3 §3) ───────────────────────────────
   fastify.get('/bacs-audit/:documentId/systems', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
@@ -272,6 +530,16 @@ async function routes(fastify) {
       notes_data_provision: z.string().nullable().optional(),
       // Protocoles de mise a disposition des points (BACnet/Modbus/OPC-UA/MQTT/REST...)
       provided_protocols: z.string().nullable().optional(),
+      // ── Migration 61 : detail R175-3 §1/§2, mise a dispo donnees, R175-4/5 ──
+      r175_3_p1_archival_format: z.string().nullable().optional(),
+      r175_3_p1_retention_verified: boolish,
+      r175_3_p2_anomaly_rules_html: z.string().nullable().optional(),
+      data_provision_frequency: z.string().nullable().optional(),
+      data_provision_format: z.string().nullable().optional(),
+      maintenance_periodicity: z.string().nullable().optional(),
+      maintenance_responsible: z.string().nullable().optional(),
+      operator_training_topics: z.string().nullable().optional(),
+      operator_training_provider: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -393,6 +661,81 @@ async function routes(fastify) {
     return reply.code(204).send();
   });
 
+  // ─── Inspections periodiques (R175-5-1) ─────────────────────────────
+  // Trace les inspections officielles realisees par un tiers (rapport
+  // conserve 10 ans). Distinct de l'audit Buildy (qui est interne).
+  fastify.get('/bacs-audit/:documentId/inspections', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.db.prepare(`
+      SELECT * FROM bacs_audit_inspections
+      WHERE document_id = ?
+      ORDER BY COALESCE(last_inspection_date, '1970') DESC
+    `).all(id);
+  });
+
+  fastify.post('/bacs-audit/:documentId/inspections', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(documentId, reply)) return;
+    const schema = z.object({
+      last_inspection_date: z.string().nullable().optional(),
+      last_inspection_inspector: z.string().nullable().optional(),
+      last_inspection_report_filename: z.string().nullable().optional(),
+      last_inspection_anomalies_html: z.string().nullable().optional(),
+      last_inspection_recommendations_html: z.string().nullable().optional(),
+      next_inspection_due_date: z.string().nullable().optional(),
+      retained_until_date: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body || {}); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const cols = Object.keys(body);
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_inspections (document_id${cols.length ? ', ' + cols.join(', ') : ''})
+      VALUES (?${cols.length ? ', ' + cols.map(() => '?').join(', ') : ''})
+    `).run(documentId, ...cols.map(k => body[k]));
+    regenerateActionItems(documentId);
+    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_inspections WHERE id = ?').get(r.lastInsertRowid));
+  });
+
+  fastify.patch('/bacs-audit/inspections/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT document_id FROM bacs_audit_inspections WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Inspection non trouvee' });
+    const schema = z.object({
+      last_inspection_date: z.string().nullable().optional(),
+      last_inspection_inspector: z.string().nullable().optional(),
+      last_inspection_report_filename: z.string().nullable().optional(),
+      last_inspection_anomalies_html: z.string().nullable().optional(),
+      last_inspection_recommendations_html: z.string().nullable().optional(),
+      next_inspection_due_date: z.string().nullable().optional(),
+      retained_until_date: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const sets = [], args = [];
+    for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
+    if (sets.length) {
+      sets.push('updated_at = CURRENT_TIMESTAMP');
+      args.push(id);
+      db.db.prepare(`UPDATE bacs_audit_inspections SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    }
+    regenerateActionItems(row.document_id);
+    return db.db.prepare('SELECT * FROM bacs_audit_inspections WHERE id = ?').get(id);
+  });
+
+  fastify.delete('/bacs-audit/inspections/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT document_id FROM bacs_audit_inspections WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Inspection non trouvee' });
+    db.db.prepare('DELETE FROM bacs_audit_inspections WHERE id = ?').run(id);
+    regenerateActionItems(row.document_id);
+    return reply.code(204).send();
+  });
+
   // ─── Thermal regulation (R175-6) ───────────────────────────────────
   fastify.get('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
@@ -419,6 +762,10 @@ async function routes(fastify) {
       generator_age_years: z.number().int().nullable().optional(),
       generator_exempt_wood: z.boolean().nullable().optional(),
       notes: z.string().nullable().optional(),
+      // Migration 61 : detail R175-6
+      sensor_position: z.string().nullable().optional(),
+      thermostat_type: z.string().nullable().optional(),
+      has_thermostatic_valves: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -709,20 +1056,17 @@ async function routes(fastify) {
         ORDER BY uploaded_at ASC
       `).all(site.site_id);
       const docsRoot = path.resolve(config.attachmentsDir, '..', 'site-documents', site.site_uuid);
-      const toDataUrl = (filename, mime) => {
-        try {
-          const p = path.join(docsRoot, filename);
-          const b64 = fs.readFileSync(p).toString('base64');
-          return `data:${mime || 'image/jpeg'};base64,${b64}`;
-        } catch { return null; }
-      };
       const zonePhotos = new Map();
       const systemPhotos = new Map();
       const meterPhotos = new Map();
       const devicePhotos = new Map();
       const bmsPhotos = [];
-      for (const ph of photoRows) {
-        const url = toDataUrl(ph.filename, ph.mime_type);
+      const photoUrls = await Promise.all(photoRows.map((ph) =>
+        optimizeFileToDataUrl(path.join(docsRoot, ph.filename)).catch(() => null)
+      ));
+      for (let i = 0; i < photoRows.length; i++) {
+        const ph = photoRows[i];
+        const url = photoUrls[i];
         if (!url) continue;
         const item = { id: ph.id, dataUrl: url };
         if (ph.bacs_audit_zone_id) {

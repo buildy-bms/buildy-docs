@@ -10,6 +10,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropTr from './PhotoDropTr.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
+import BacsRefBadge from './BacsRefBadge.vue'
 
 /**
  * Sous-table éditable des équipements (devices) d'un système BACS donné.
@@ -217,6 +218,7 @@ async function removeDevice(d) {
     <!-- Header avec puissance totale + bouton + vert -->
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
+        <BacsRefBadge kind="systems" :id="system.id" />
         <span class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
         <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
           {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'systèmes' : 'système' }})

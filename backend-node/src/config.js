@@ -1,7 +1,20 @@
 'use strict';
 
 const path = require('path');
+const crypto = require('crypto');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
+// En dev, si JWT_SECRET n'est pas defini, on en genere un aleatoire en
+// memoire (jamais persiste). Ca evite le default partage "change-me" sans
+// imposer de creer un .env pour demarrer. En prod, le default est rejete
+// au demarrage (cf. validations en bas de fichier).
+function resolveJwtSecret() {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production') return 'buildy-docs-secret-change-me';
+  const generated = crypto.randomBytes(32).toString('hex');
+  console.warn(`[DEV] JWT_SECRET non defini — secret aleatoire en memoire genere (les sessions ne survivent pas au restart).`);
+  return generated;
+}
 
 const config = Object.freeze({
   // Server
@@ -19,7 +32,7 @@ const config = Object.freeze({
   gitReposDir: process.env.GIT_REPOS_DIR || path.resolve(__dirname, '../../data/repos'),
 
   // Auth
-  jwtSecret: process.env.JWT_SECRET || 'buildy-docs-secret-change-me',
+  jwtSecret: resolveJwtSecret(),
   accessTokenMaxAge: parseInt(process.env.ACCESS_TOKEN_MAX_AGE || '28800', 10), // 8 h (sliding)
   refreshTokenMaxAge: parseInt(process.env.REFRESH_TOKEN_MAX_AGE || '604800', 10), // 7 days
   // Mode dev : injecte un user fictif sans passer par PocketID. Inactif en prod.

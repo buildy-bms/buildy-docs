@@ -157,14 +157,13 @@ function getEmbeddedFontsCss() {
   return _embeddedFontsCss;
 }
 
-function loadFileAsDataUrl(absPath) {
-  if (!fs.existsSync(absPath)) return null;
-  const ext = path.extname(absPath).slice(1).toLowerCase();
-  const mime = ext === 'svg' ? 'image/svg+xml'
-             : ext === 'jpg' ? 'image/jpeg'
-             : `image/${ext}`;
-  const base64 = fs.readFileSync(absPath).toString('base64');
-  return `data:${mime};base64,${base64}`;
+const { optimizeFileToDataUrl } = require('./image-optimizer');
+
+// Renvoie une data URL JPEG optimisee (resize 1600px max, q=82, mozjpeg)
+// avec cache disque mtime-keyed adjacent au fichier source.
+// Conserve les SVG tels quels. Async — cause de sharp.
+async function loadFileAsDataUrl(absPath) {
+  return optimizeFileToDataUrl(absPath);
 }
 
 function loadAssetDataUrl(filename) {

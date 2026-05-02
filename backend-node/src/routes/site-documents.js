@@ -4,11 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
-const sharp = require('sharp');
 const { z } = require('zod');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
+const { createOptimizerStream, optimizeBuffer, readExifTakenAt } = require('../lib/image-optimizer');
 
 const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
   'datasheet','manuel_utilisateur','rapport_essais','photo','autre'];
@@ -16,10 +16,6 @@ const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonc
 // 25 MB max — DOE peut contenir des plans lourds
 const MAX_BYTES = 25 * 1024 * 1024;
 
-// Photos : on resize a max 1600px de cote + JPEG quality 82 → typique
-// passage de 4-8 MB iPhone a 200-400 KB. EXIF strippe (privacy).
-const PHOTO_MAX_DIM = 1600;
-const PHOTO_JPEG_QUALITY = 82;
 const IMAGE_MIMES = new Set(['image/jpeg','image/jpg','image/png','image/webp','image/heic','image/heif']);
 
 function siteDocsDir(siteUuid) {
@@ -112,11 +108,7 @@ async function routes(fastify) {
 
     try {
       if (isImage) {
-        const transformer = sharp()
-          .rotate()
-          .resize(PHOTO_MAX_DIM, PHOTO_MAX_DIM, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality: PHOTO_JPEG_QUALITY, mozjpeg: true });
-        await pipeline(file.file, transformer, fs.createWriteStream(fullPath));
+        await pipeline(file.file, createOptimizerStream(), fs.createWriteStream(fullPath));
         if (file.file.truncated) throw new Error('FILE_TOO_LARGE');
       } else {
         await new Promise((resolve, reject) => {
@@ -172,6 +164,66 @@ async function routes(fastify) {
       payload: { site_uuid: site.site_uuid, title, category, filename: file.filename } });
     log.info(`Site document uploaded: ${file.filename} → site ${site.site_uuid} (id=${r.lastInsertRowid})`);
     return reply.code(201).send(db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(r.lastInsertRowid));
+  });
+
+  // POST /sites/:uuid/photos/bulk — upload massif de photos terrain
+  // Multiples fichiers via @fastify/multipart parts(), parse l'EXIF
+  // DateTimeOriginal de chaque image AVANT optimisation, optimise via
+  // sharp (1600px / q=82) et persiste avec taken_at pour tri chrono.
+  // Renvoie la liste triee par horodatage.
+  fastify.post('/sites/:uuid/photos/bulk', async (request, reply) => {
+    const site = db.sites.getByUuid(request.params.uuid);
+    if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
+    const userId = request.authUser?.id;
+    const dir = siteDocsDir(site.site_uuid);
+    const inserted = [];
+    const errors = [];
+    const parts = request.parts({ limits: { fileSize: MAX_BYTES, files: 100 } });
+    for await (const part of parts) {
+      if (part.type !== 'file') continue;
+      const mime = (part.mimetype || '').toLowerCase();
+      if (!IMAGE_MIMES.has(mime)) {
+        errors.push({ filename: part.filename, detail: 'Pas une image' });
+        await part.toBuffer().catch(() => {});
+        continue;
+      }
+      try {
+        const original = await part.toBuffer();
+        if (part.file.truncated) throw new Error('FILE_TOO_LARGE');
+        const takenAt = readExifTakenAt(original);
+        const optimized = await optimizeBuffer(original);
+        const filename = crypto.randomUUID() + '.jpg';
+        const fullPath = path.join(dir, filename);
+        fs.writeFileSync(fullPath, optimized);
+        const sizeBytes = optimized.length;
+        const r = db.db.prepare(`
+          INSERT INTO site_documents
+            (site_id, title, category, filename, original_name, size_bytes,
+             mime_type, taken_at, uploaded_by)
+          VALUES (?, ?, 'photo', ?, ?, ?, 'image/jpeg', ?, ?)
+        `).run(
+          site.site_id,
+          part.filename || 'photo',
+          filename,
+          part.filename || filename,
+          sizeBytes,
+          takenAt,
+          userId || null,
+        );
+        inserted.push(db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(r.lastInsertRowid));
+      } catch (err) {
+        log.warn(`Bulk upload skip ${part.filename}: ${err.message}`);
+        errors.push({ filename: part.filename, detail: err.message });
+      }
+    }
+    inserted.sort((a, b) => {
+      const ta = a.taken_at || a.uploaded_at;
+      const tb = b.taken_at || b.uploaded_at;
+      return String(ta).localeCompare(String(tb));
+    });
+    db.auditLog.add({ userId, action: 'site_document.bulk_upload',
+      payload: { site_uuid: site.site_uuid, count: inserted.length, errors: errors.length } });
+    return reply.code(201).send({ photos: inserted, errors });
   });
 
   // GET /site-documents/:id/download — sert le fichier

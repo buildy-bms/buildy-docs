@@ -310,6 +310,32 @@ function computeTargetActions(documentId) {
     }
   }
 
+  // R175-5-1 — inspection periodique par tiers (rapport conserve 10 ans).
+  const inspections = db.db.prepare(
+    'SELECT * FROM bacs_audit_inspections WHERE document_id = ? ORDER BY COALESCE(last_inspection_date, \'1970\') DESC'
+  ).all(documentId);
+  const today = new Date().toISOString().slice(0, 10);
+  if (inspections.length === 0) {
+    addTarget({
+      source_table: 'inspections', source_id: 0,
+      category: 'documentation', severity: 'major',
+      r175_article: 'R175-5-1',
+      title: 'Programmer une inspection périodique du BACS par un tiers',
+      description: 'L\'article R175-5-1 impose une inspection périodique réalisée par un tiers (rapport conservé 10 ans). Aucune trace d\'inspection n\'a été déposée pour ce site.',
+    });
+  } else {
+    const latest = inspections[0];
+    if (latest.next_inspection_due_date && latest.next_inspection_due_date < today) {
+      addTarget({
+        source_table: 'inspections', source_id: latest.id,
+        category: 'documentation', severity: 'major',
+        r175_article: 'R175-5-1',
+        title: 'Inspection périodique R175-5-1 dépassée — replanifier',
+        description: `Échéance prévue ${latest.next_inspection_due_date} non respectée. Replanifier l'inspection par un tiers (rapport conservé 10 ans).`,
+      });
+    }
+  }
+
   return target;
 }
 

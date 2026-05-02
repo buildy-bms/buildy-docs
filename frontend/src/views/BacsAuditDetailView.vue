@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ArrowLeftIcon, BuildingOffice2Icon, MapPinIcon, ExclamationTriangleIcon,
-  CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, PlusIcon, TrashIcon,
+  CheckCircleIcon, ArrowPathIcon, DocumentArrowDownIcon, ClipboardDocumentListIcon, PhotoIcon, PlusIcon, TrashIcon,
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
@@ -11,12 +11,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
+  getBacsAuditRefs,
   getBacsSystems, updateBacsSystem,
   getBacsMeters, createBacsMeter, updateBacsMeter, deleteBacsMeter,
   getBacsBms, updateBacsBms,
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
-  getBacsActionItemsCsvUrl, exportBacsPdf, deliverBacsAudit,
+  getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice, createBacsDevice,
@@ -40,6 +41,9 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import AddZoneModal from '@/components/AddZoneModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
+import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
+import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
+import SafeHtml from '@/components/SafeHtml.vue'
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -72,6 +76,12 @@ const actionItems = ref([])
 const zones = ref([])
 const devices = ref([])
 const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
+// Refs stables (numerotation cross-referencee zone/systeme/device/meter/thermal)
+// Format flat : { zones: { id: '2.Z01', ... }, systems: {...}, ... }
+const auditRefs = ref({ zones: {}, systems: {}, devices: {}, meters: {}, thermal: {} })
+function refOf(kind, id) { return auditRefs.value?.[kind]?.[id] || '' }
+provide('auditRefs', auditRefs)
+provide('refOf', refOf)
 
 // Toggle pour afficher les usages marques 'non concerne' dans la card
 // systemes. Persistance localStorage. Par defaut tout est visible (les
@@ -391,11 +401,12 @@ async function refresh() {
       const z = await listZones(d.data.site_id)
       zones.value = z.data
     }
-    const [dev, ps] = await Promise.all([
-      getBacsDevices(docId), getBacsPowerSummary(docId),
+    const [dev, ps, refs] = await Promise.all([
+      getBacsDevices(docId), getBacsPowerSummary(docId), getBacsAuditRefs(docId),
     ])
     devices.value = dev.data
     powerSummary.value = ps.data
+    auditRefs.value = refs.data
     // Counts pour les etapes 'documents' et 'credentials' du stepper
     refreshSiteCounts()
   } catch (e) {
@@ -407,9 +418,10 @@ async function refresh() {
 
 async function refreshAuditData() {
   // Recharge systems / thermal / action_items apres un changement de zone
-  const [s, t, a, dev, ps, m] = await Promise.all([
+  const [s, t, a, dev, ps, m, refs] = await Promise.all([
     getBacsSystems(docId), getBacsThermal(docId), getBacsActionItems(docId),
     getBacsDevices(docId), getBacsPowerSummary(docId), getBacsMeters(docId),
+    getBacsAuditRefs(docId),
   ])
   systems.value = s.data
   thermal.value = t.data
@@ -417,6 +429,7 @@ async function refreshAuditData() {
   devices.value = dev.data
   powerSummary.value = ps.data
   meters.value = m.data
+  auditRefs.value = refs.data
 }
 
 // Devices regroupés par system_id (pour passer au composant SystemDevicesTable)
@@ -1043,6 +1056,36 @@ async function exportPdf() {
   }
 }
 
+const bulkUploadOpen = ref(false)
+function openBulkUpload() { bulkUploadOpen.value = true }
+function closeBulkUpload() { bulkUploadOpen.value = false }
+function onBulkUploaded() { refreshSiteCounts() }
+
+const transcriptOpen = ref(false)
+function openTranscript() { transcriptOpen.value = true }
+function closeTranscript() { transcriptOpen.value = false }
+function onSuggestionApplied() { refreshAuditData() }
+
+const exportingChecklist = ref(false)
+async function exportChecklist() {
+  exportingChecklist.value = true
+  try {
+    const { data } = await exportBacsChecklistPdf(docId)
+    const blob = new Blob([data], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = window.document.createElement('a')
+    a.href = url
+    a.download = `checklist-audit-${document.value?.slug || docId}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+    success('Checklist A4 prête à imprimer')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de l\'export de la checklist')
+  } finally {
+    exportingChecklist.value = false
+  }
+}
+
 const delivering = ref(false)
 async function deliver() {
   const ok = await confirm({
@@ -1084,10 +1127,6 @@ onMounted(() => {
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
             <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
           </span>
-          <button @click="router.push((isBacs ? '/bacs-audit/' : '/site-audit/') + docId + '/audit-trail')"
-                  class="text-indigo-600 hover:text-indigo-800 underline">
-            Historique
-          </button>
           <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700">
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
@@ -1139,6 +1178,21 @@ onMounted(() => {
         </button>
         <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
+        </button>
+        <button v-if="site?.site_uuid" @click="openBulkUpload"
+          title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
+          <PhotoIcon class="w-3.5 h-3.5 shrink-0" /> Photos terrain
+        </button>
+        <button @click="openTranscript"
+          title="Importer le transcript Plaud Pro et laisser Claude pré-remplir les champs"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 whitespace-nowrap">
+          <SparklesIcon class="w-3.5 h-3.5 shrink-0" /> Transcript IA
+        </button>
+        <button @click="exportChecklist" :disabled="exportingChecklist"
+          title="Feuille A4 imprimable à emporter sur site (cases à cocher, références photos, pièces à demander)"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-60 whitespace-nowrap">
+          <ClipboardDocumentListIcon class="w-3.5 h-3.5 shrink-0" /> {{ exportingChecklist ? 'Génération…' : 'Checklist A4' }}
         </button>
         <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
           <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'PDF' }}
@@ -2274,7 +2328,7 @@ onMounted(() => {
             <div v-if="hasNotes(it.alternative_solutions_html)"
                  class="px-4 py-2 bg-violet-50 border-t border-violet-200 text-[12px] text-violet-900 leading-relaxed">
               <p class="text-[10px] uppercase tracking-wider font-semibold text-violet-700 mb-1">Préconisations Buildy</p>
-              <div class="prose prose-sm max-w-none text-violet-900" v-html="it.alternative_solutions_html"></div>
+              <SafeHtml class="prose prose-sm max-w-none text-violet-900" :html="it.alternative_solutions_html" />
             </div>
             <div v-else-if="it.status === 'open'"
                  class="px-4 py-2 bg-red-50 border-t border-red-200 text-[11px] text-red-700 leading-relaxed flex items-center gap-2">
@@ -2394,6 +2448,24 @@ onMounted(() => {
       :comm-options="COMM_OPTIONS"
       @close="addDeviceModalSystem = null"
       @submit="submitAddDevice"
+    />
+
+    <BulkPhotoUploadModal
+      :open="bulkUploadOpen"
+      :site-uuid="site?.site_uuid || ''"
+      :zones="zones"
+      :systems="systems"
+      :devices="devices"
+      :meters="meters"
+      @close="closeBulkUpload"
+      @uploaded="onBulkUploaded"
+    />
+
+    <TranscriptAssistantModal
+      :open="transcriptOpen"
+      :document-id="docId"
+      @close="closeTranscript"
+      @applied="onSuggestionApplied"
     />
   </div>
 </template>

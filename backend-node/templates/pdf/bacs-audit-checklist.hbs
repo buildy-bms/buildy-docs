@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Checklist audit BACS — {{site.name}}</title>
+  <style>{{{styles}}}</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="brand">
+    <img src="{{logoDataUrl}}" alt="Buildy" class="logo" />
+    <div class="brand-text">
+      <div class="brand-name">Buildy</div>
+      <div class="brand-tagline">Checklist audit BACS — relevé terrain</div>
+    </div>
+  </div>
+  <h1>{{site.name}}</h1>
+  <div class="meta">
+    <div><strong>Adresse</strong> : {{site.address}}{{#if site.city}}, {{site.city}}{{/if}}</div>
+    <div><strong>Date</strong> : <span class="fillable">{{today}}</span></div>
+    <div><strong>Auditeur</strong> : <span class="fillable">_______________________________</span></div>
+    <div><strong>Présents</strong> : <span class="fillable">_______________________________</span></div>
+  </div>
+  <div class="howto">
+    <h2>Comment l'utiliser</h2>
+    <ol>
+      <li>Imprimez cette feuille (ou consultez-la sur tablette).</li>
+      <li>Pour chaque ligne : cochez la case, prenez la photo, et dictez sur Plaud Pro la <em>réf</em> à gauche (ex. <code>3.Z01.01</code>).</li>
+      <li>De retour au bureau, importez photos + transcript dans buildy-docs : la restitution est pré-remplie.</li>
+    </ol>
+  </div>
+</header>
+
+<section class="page">
+  <h2>1 — Identification du site</h2>
+  <table class="kv">
+    <tr><th>Date du permis de construire</th><td class="fillable">_________________</td></tr>
+    <tr><th>Date des derniers travaux générateur</th><td class="fillable">_________________</td></tr>
+    <tr><th>Puissance installée chauffage (kW)</th><td class="fillable">_________________</td></tr>
+    <tr><th>Puissance installée refroidissement (kW)</th><td class="fillable">_________________</td></tr>
+    <tr><th>Surface chauffée (m²)</th><td class="fillable">_________________</td></tr>
+    <tr><th>Usage principal du bâtiment</th><td class="fillable">_________________</td></tr>
+  </table>
+</section>
+
+{{#each zones}}
+<section class="page">
+  <h2><span class="ref">{{ref}}</span> Zone — {{name}}{{#if nature}} <small>({{nature}})</small>{{/if}}</h2>
+  <p class="hint">Notez tout ce qui sort de l'ordinaire dans cette zone (occupants, horaires, équipements sensibles, contraintes d'accès).</p>
+  <div class="freeform">_______________________________________________________________________<br/>
+  _______________________________________________________________________<br/>
+  _______________________________________________________________________</div>
+
+  {{#if systems.length}}
+  <h3>Systèmes &amp; équipements</h3>
+  <table class="checklist">
+    <thead>
+      <tr>
+        <th class="w-ref">Réf</th>
+        <th>Système / équipement</th>
+        <th class="w-mark" title="Présent">✓</th>
+        <th title="Communicant ?">Comm.</th>
+        <th title="R175-3 §4 — Arrêt manuel possible">Arrêt</th>
+        <th title="R175-3 §4 — Reprise autonome">Auto.</th>
+        <th class="w-photo">Photos</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each systems}}
+        <tr class="system-row">
+          <td class="ref">{{ref}}</td>
+          <td><strong>{{label}}</strong></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="ph">______</td>
+          <td class="notes-line"></td>
+        </tr>
+        {{#each devices}}
+        <tr class="device-row">
+          <td class="ref">{{ref}}</td>
+          <td>↳ <span class="device-name">__________________________</span></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="cb"></td>
+          <td class="ph">______</td>
+          <td class="notes-line"></td>
+        </tr>
+        {{/each}}
+        {{#unless devices.length}}
+        <tr class="device-row placeholder">
+          <td class="ref"></td>
+          <td>↳ Équipement à ajouter : __________________________</td>
+          <td class="cb"></td><td class="cb"></td><td class="cb"></td><td class="cb"></td>
+          <td class="ph">______</td>
+          <td class="notes-line"></td>
+        </tr>
+        {{/unless}}
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+
+  {{#if meters.length}}
+  <h3>Compteurs</h3>
+  <table class="checklist">
+    <thead>
+      <tr>
+        <th class="w-ref">Réf</th>
+        <th>Usage / type</th>
+        <th class="w-mark" title="Présent physiquement">✓</th>
+        <th title="Communicant">Comm.</th>
+        <th class="w-photo">Photos</th>
+        <th>Notes (marque, plaque)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each meters}}
+      <tr>
+        <td class="ref">{{ref}}</td>
+        <td>{{usage_label}} — <em>{{type_label}}</em></td>
+        <td class="cb"></td>
+        <td class="cb"></td>
+        <td class="ph">______</td>
+        <td class="notes-line"></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+
+  {{#if thermal}}
+  <h3>Régulation thermique <small>(R175-6)</small></h3>
+  <table class="kv">
+    <tr><th class="w-ref">Réf</th><td class="ref">{{thermal.ref}}</td></tr>
+    <tr><th>Régulation auto par pièce/zone ?</th><td class="cb-line">☐ Oui ☐ Non — type : __________________</td></tr>
+    <tr><th>Position de la sonde</th><td class="fillable">murale / plancher / autre : ___________</td></tr>
+    <tr><th>Type de thermostat</th><td class="fillable">manuel / programmable / adaptatif : __________</td></tr>
+    <tr><th>Robinets thermostatiques ?</th><td class="cb-line">☐ Oui ☐ Non</td></tr>
+    <tr><th>Type / âge du générateur</th><td class="fillable">_________________________________</td></tr>
+  </table>
+  {{/if}}
+</section>
+{{/each}}
+
+{{#if generalMeters.length}}
+<section class="page">
+  <h2>4.G — Compteurs généraux du bâtiment</h2>
+  <table class="checklist">
+    <thead>
+      <tr>
+        <th class="w-ref">Réf</th>
+        <th>Usage / type</th>
+        <th class="w-mark">✓</th>
+        <th>Comm.</th>
+        <th class="w-photo">Photos</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each generalMeters}}
+      <tr>
+        <td class="ref">{{ref}}</td>
+        <td>{{usage_label}} — <em>{{type_label}}</em></td>
+        <td class="cb"></td>
+        <td class="cb"></td>
+        <td class="ph">______</td>
+        <td class="notes-line"></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+
+<section class="page">
+  <h2>6 — GTB / BACS en place</h2>
+  <table class="kv">
+    <tr><th>Solution / marque</th><td class="fillable">{{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}_________________________________{{/if}}</td></tr>
+    <tr><th>Localisation de l'IHM</th><td class="fillable">_________________________________</td></tr>
+    <tr><th>R175-3 §1 — Suivi continu pas horaire ? Format archivage ?</th><td class="cb-line">☐ Oui ☐ Non — format : ____________ — rétention 5 ans : ☐ vérifiée ☐ non</td></tr>
+    <tr><th>R175-3 §2 — Détection des dérives d'efficacité ?</th><td class="cb-line">☐ Oui ☐ Non — règles/seuils : ______________________________</td></tr>
+    <tr><th>R175-3 §3 — Interopérabilité (protocoles exposés)</th><td class="fillable">______________________________________</td></tr>
+    <tr><th>R175-3 §4 — Arrêt manuel + reprise autonome</th><td class="cb-line">☐ Oui ☐ Non — observations : __________________________</td></tr>
+    <tr><th>Mise à dispo des données — fréquence / format</th><td class="fillable">_________________________________</td></tr>
+    <tr><th>R175-4 — Consignes écrites de maintenance ?</th><td class="cb-line">☐ Oui ☐ Non — périodicité : ____________ — responsable : ____________</td></tr>
+    <tr><th>R175-5 — Formation exploitant ?</th><td class="cb-line">☐ Oui ☐ Non — date : __________ — domaines : __________________</td></tr>
+    <tr><th>Photos GTB (armoire, IHM, plaque)</th><td class="ph">_____ _____ _____</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <h2>7 — Inspection périodique R175-5-1</h2>
+  <p class="hint">L'audit Buildy n'est pas l'inspection R175-5-1. Tracer ici la dernière inspection officielle effectuée par un tiers (rapport conservé 10 ans).</p>
+  <table class="kv">
+    <tr><th>Date de la dernière inspection</th><td class="fillable">_________________</td></tr>
+    <tr><th>Tiers inspecteur (nom / société)</th><td class="fillable">_________________________________</td></tr>
+    <tr><th>Anomalies identifiées</th><td class="fillable">_________________________________________________</td></tr>
+    <tr><th>Recommandations à reprendre</th><td class="fillable">_________________________________________________</td></tr>
+    <tr><th>Prochaine échéance prévue</th><td class="fillable">_________________</td></tr>
+    <tr><th>Rapport disponible ?</th><td class="cb-line">☐ Oui (à récupérer) ☐ Non</td></tr>
+  </table>
+</section>
+
+<section class="page request-page">
+  <h2>À demander à l'exploitant / au propriétaire</h2>
+  <p class="hint">Pièces à récupérer avant de quitter le site. Cocher au fur et à mesure.</p>
+  <table class="checklist">
+    <thead>
+      <tr>
+        <th class="w-mark">✓</th>
+        <th class="w-code">Article</th>
+        <th>Pièce demandée</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each documentsToRequest}}
+      <tr>
+        <td class="cb"></td>
+        <td><code>{{code}}</code></td>
+        <td>{{label}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+
+<section class="page footer-page">
+  <h2>Bilan terrain</h2>
+  <p class="hint">Notes libres pour la restitution au bureau.</p>
+  <div class="freeform tall">
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________<br/>
+    _______________________________________________________________________
+  </div>
+  <div class="signoff">
+    <div>Signature auditeur :</div>
+    <div class="sig-box"></div>
+  </div>
+</section>
+
+</body>
+</html>
