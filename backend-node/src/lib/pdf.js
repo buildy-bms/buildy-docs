@@ -555,8 +555,24 @@ async function shutdown() {
   }
 }
 
+/**
+ * Rend juste le HTML d'un template Handlebars (sans Puppeteer).
+ * Utilise pour la preview HTML in-browser : on retourne le HTML completement
+ * autonome (CSS embed + fonts data URL) que le frontend peut afficher dans
+ * une iframe sandboxee. La preview ne fait PAS la post-passe TOC (les
+ * numeros de page ne sont pas connus sans rendu PDF), mais elle suffit
+ * pour valider visuellement le contenu avant de declencher le PDF.
+ */
+function renderHtml({ template, styles, data }) {
+  const tpl = loadTemplate(template);
+  const css = loadStyles(styles);
+  const fullCss = getEmbeddedFontsCss() + '\n' + css;
+  return tpl({ ...data, styles: fullCss });
+}
+
 module.exports = {
   renderPdf,
+  renderHtml,
   loadAssetDataUrl,
   loadFileAsDataUrl,
   shutdown,

@@ -5,13 +5,14 @@ dist/
 .DS_Store
 *.log
 
-# Data persistante (DB SQLite + attachments + exports)
+# Data persistante (DB SQLite + attachments + exports + site-documents)
 data/buildy_af.db
 data/buildy_af.db-shm
 data/buildy_af.db-wal
 data/attachments/
 data/exports/
 data/repos/
+data/site-documents/
 # Securite : si la DB est resolue ailleurs (ex: backend-node/data/) on l'ignore aussi
 **/buildy_af.db
 **/buildy_af.db-shm
@@ -19,6 +20,13 @@ data/repos/
 **/data/exports/
 **/data/attachments/
 **/data/repos/
+**/data/site-documents/
+
+# Samples PDFs et logs dans docs/ (la vraie doc est en .md)
+docs/*.pdf
+docs/*.log
+docs/*.log.gz
+docs/*.log.*.gz
 
 # Certs HTTPS (auto-generes en dev)
 certs/*.crt

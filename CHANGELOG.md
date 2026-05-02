@@ -6,9 +6,19 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Le 
 
 Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md`](docs/improvements-sprint.md). 10 lots planifiés, ~10-12 jours de travail.
 
+### Lot B1 — Aperçu HTML/PDF avant export *(audit BACS livré)*
+
+- Nouveau composant frontend [`PdfPreviewModal.vue`](frontend/src/components/PdfPreviewModal.vue) : modal plein écran avec iframe sandboxée, header titre + bouton « Télécharger le PDF »
+- Nouvelle fonction [`renderHtml()`](backend-node/src/lib/pdf.js) dans `lib/pdf.js` : rend un template Handlebars en HTML autonome (CSS embed + fonts data URL) sans Puppeteer
+- Extraction de la construction des données dans [`backend-node/src/routes/bacs-audit/_export-data.js`](backend-node/src/routes/bacs-audit/_export-data.js) (réutilisée par export PDF + preview)
+- Endpoint `GET /api/bacs-audit/:documentId/preview` retourne le HTML rendu
+- Bouton « Aperçu » ajouté dans `BacsAuditDetailView` à côté de « Générer le rapport »
+
+⏳ AF preview à venir dans un commit séparé (refacto plus volumineux côté `export.js`).
+
 ### À venir
 
-- **Lot B1** — Aperçu HTML/PDF avant export
+- **Lot B1 (suite)** — Preview AF / synthesis / points-list
 - **Lot B3** — Vue commerciale exportable de l'audit BACS
 - **Lot B5** — Signature électronique (page d'approbation AcroForm)
 - **Lot A1** — Polish AfDetailView (Pinia + sous-composants + scroll-spy + step validate)

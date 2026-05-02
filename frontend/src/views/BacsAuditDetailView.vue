@@ -8,7 +8,7 @@ import {
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
-  ClockIcon,
+  ClockIcon, EyeIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -43,6 +43,7 @@ import AddZoneModal from '@/components/AddZoneModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
+import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import InspectionsSection from '@/components/audit/InspectionsSection.vue'
 import CompliancePlanSection from '@/components/audit/CompliancePlanSection.vue'
@@ -918,6 +919,13 @@ async function exportPdf() {
   }
 }
 
+// Aperçu HTML in-browser (sans Puppeteer) — permet de valider visuellement
+// le contenu avant de declencher l'export PDF qui prend ~3-5s.
+const previewOpen = ref(false)
+const previewUrl = computed(() => `/api/bacs-audit/${docId}/preview`)
+function openPreview() { previewOpen.value = true }
+function closePreview() { previewOpen.value = false }
+
 const bulkUploadOpen = ref(false)
 function openBulkUpload() { bulkUploadOpen.value = true }
 function closeBulkUpload() { bulkUploadOpen.value = false }
@@ -1062,6 +1070,11 @@ onBeforeUnmount(() => {
           title="Importer le transcript Plaud Pro et laisser Claude pré-remplir les champs"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 whitespace-nowrap">
           <SparklesIcon class="w-3.5 h-3.5 shrink-0" /> Transcript IA
+        </button>
+        <button @click="openPreview"
+          title="Aperçu HTML rapide du rapport (sans génération PDF, pour valider le contenu avant export)"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
+          <EyeIcon class="w-3.5 h-3.5 shrink-0" /> Aperçu
         </button>
         <button @click="exportPdf" :disabled="exporting"
           title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF"
@@ -1321,6 +1334,16 @@ onBeforeUnmount(() => {
       :document-id="docId"
       @close="closeTranscript"
       @applied="onSuggestionApplied"
+    />
+
+    <PdfPreviewModal
+      v-if="previewOpen"
+      :title="`Aperçu — ${audit.isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
+      :preview-url="previewUrl"
+      :downloading="exporting"
+      download-label="Télécharger le PDF"
+      @close="closePreview"
+      @download="exportPdf"
     />
   </div>
 </template>

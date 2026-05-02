@@ -15,8 +15,8 @@ Deux axes :
 
 | # | Lot | Effort | Statut |
 |---|---|---|---|
-| 0 | Documentation foundations | 0.5j | 🔄 En cours |
-| 1 | **B1** Preview HTML/PDF | 0.5j | ⏳ À venir |
+| 0 | Documentation foundations | 0.5j | ✅ Livré |
+| 1 | **B1** Preview HTML/PDF | 0.5j | 🔄 En cours (audit BACS livré, AF à suivre) |
 | 2 | **B3** Vue commerciale exportable | 0.5j | ⏳ À venir |
 | 3 | **B5** Signature électronique | 0.5j | ⏳ À venir |
 | 4 | **A1** Polish AfDetailView | 2j | ⏳ À venir |
