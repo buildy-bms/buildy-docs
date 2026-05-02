@@ -618,6 +618,79 @@ table .total-row td {
 }
 .roi-quote blockquote strong { color: #451a03; font-style: normal; }
 
+/* ── Carte de justification (Annexe C) ────────────────────────────
+   Plus aere et structure que les anciens 3 paragraphes a la suite. */
+.justif-card {
+  margin: 4mm 0;
+  padding: 3mm 4mm;
+  background: #fff;
+  border: 0.5pt solid #e5e7eb;
+  border-left: 2.5pt solid #4f46e5;
+  border-radius: 1mm;
+  page-break-inside: avoid;
+}
+.justif-card h3 {
+  margin: 0 0 2mm 0;
+  font-size: 9.5pt;
+  color: #1b2842;
+}
+.justif-card table.meta-table {
+  margin: 0;
+}
+.justif-card table.meta-table th {
+  width: 35mm;
+  padding: 1.2mm 3mm 1.2mm 0;
+}
+.justif-card table.meta-table td { padding: 1.2mm 0; font-size: 8.5pt; }
+
+/* ── Tableau equipements (ch.3 — devices par categorie) ──────────
+   Plus dense que les autres tables (beaucoup de colonnes), avec un
+   look plus technique. */
+table.device-table {
+  font-size: 7.5pt;
+  margin: 2mm 0 4mm;
+}
+table.device-table th {
+  background: #f9fafb;
+  color: #374151;
+  font-size: 6.5pt;
+  padding: 1.5mm 1.8mm;
+  border-bottom: 1px solid #e5e7eb;
+}
+table.device-table td {
+  padding: 1.8mm 1.8mm;
+  border-bottom: none;
+  font-size: 7.8pt;
+}
+table.device-table tr:nth-child(4n+1) td,
+table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
+
+/* Ligne R175-3 sous chaque equipement (interop / arret manuel / autonome) */
+.r175-3-row td {
+  background: transparent !important;
+  padding-top: 0 !important;
+}
+.r175-3-label {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 6.5pt;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2mm;
+  font-weight: 600;
+}
+.r175-3-pill {
+  display: inline-block;
+  font-size: 7pt;
+  padding: 0.4mm 2mm;
+  border-radius: 0.8mm;
+  margin-right: 1.5mm;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.r175-3-ok { background: #d1fae5; color: #065f46; border: 0.3pt solid #6ee7b7; }
+.r175-3-ko { background: #fee2e2; color: #991b1b; border: 0.3pt solid #fca5a5; }
+
 /* ── Cards d'action du plan de mise en conformite ──
    Cible : tailles compactes mais aérées (plus d'espace entre cards
    et autour des libellés que dans la version v2.27). */

@@ -647,15 +647,25 @@
 {{!-- ═══════════ Annexe C — Justification des préconisations ═══════════ --}}
 <section class="annex">
   <h1>Annexe C — Justification des préconisations</h1>
-  <p class="muted">Chaque action corrective listée au chapitre 8 a été générée à partir des données saisies pendant l'audit, en référence à un article précis du décret BACS. Cette annexe trace pour chaque item le raisonnement appliqué.</p>
+  <div class="callout callout-info">
+    <span class="callout-icon">📌</span>
+    <div class="callout-body">Chaque action corrective listée au chapitre 7 a été générée à partir des données saisies pendant l'audit, en référence à un article précis du décret BACS. Cette annexe trace pour chaque item le raisonnement appliqué.</div>
+  </div>
   {{#each justifications}}
-  <h3>{{title}}</h3>
-  <p><strong>Article visé :</strong> {{article}}</p>
-  <p><strong>Donnée audit :</strong> {{source}}</p>
-  <p><strong>Recommandation :</strong> {{description}}</p>
+  <div class="justif-card">
+    <h3>{{title}}</h3>
+    <table class="meta-table">
+      <tr><th>Article visé</th><td><strong>{{article}}</strong></td></tr>
+      <tr><th>Donnée audit</th><td>{{source}}</td></tr>
+      <tr><th>Recommandation</th><td>{{description}}</td></tr>
+    </table>
+  </div>
   {{/each}}
   {{#unless justifications.length}}
-  <p class="muted">Aucune action corrective générée — pas de justification à reporter.</p>
+  <div class="callout callout-reco">
+    <span class="callout-icon">✅</span>
+    <div class="callout-body">Aucune action corrective générée — pas de justification à reporter.</div>
+  </div>
   {{/unless}}
 </section>
 
