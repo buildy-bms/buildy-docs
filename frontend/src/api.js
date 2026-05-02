@@ -239,6 +239,8 @@ export const regenerateBacsActionItems = (docId) =>
 export const getBacsActionItemsCsvUrl = (docId) =>
   `/api/bacs-audit/${docId}/action-items/export.csv`
 export const exportBacsPdf = (docId) => api.post(`/bacs-audit/${docId}/export-pdf`)
+export const exportBacsPdfExecutive = (docId) => api.post(`/bacs-audit/${docId}/export-pdf-executive`)
+export const previewBacsExecutiveUrl = (docId) => `/api/bacs-audit/${docId}/preview-executive`
 export const exportBacsChecklistPdf = (docId) =>
   api.post(`/bacs-audit/${docId}/exports/checklist`, null, { responseType: 'blob' })
 
