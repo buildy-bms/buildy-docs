@@ -2304,6 +2304,16 @@ const users = {
   getById(id) {
     return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   },
+  // Batche les lookups (evite le N+1 sur les listings).
+  // Renvoie une Map<id, user>.
+  getByIds(ids) {
+    if (!ids || !ids.length) return new Map();
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return new Map();
+    const placeholders = unique.map(() => '?').join(', ');
+    const rows = db.prepare(`SELECT * FROM users WHERE id IN (${placeholders})`).all(...unique);
+    return new Map(rows.map(r => [r.id, r]));
+  },
   getByOidcSub(sub, issuer) {
     return db.prepare('SELECT * FROM users WHERE oidc_sub = ? AND oidc_issuer = ?').get(sub, issuer);
   },

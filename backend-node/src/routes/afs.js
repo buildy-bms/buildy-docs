@@ -84,15 +84,13 @@ async function routes(fastify) {
       const sid = parseInt(site_id, 10);
       items = items.filter(a => a.site_id === sid);
     }
-    // Enrichit avec auteur display_name
-    const userIds = [...new Set(items.flatMap(a => [a.created_by, a.updated_by]).filter(Boolean))];
-    const usersById = Object.fromEntries(
-      userIds.map(id => [id, db.users.getById(id)?.display_name || null])
-    );
+    // Enrichit avec auteur display_name (batch IN pour eviter le N+1)
+    const userIds = items.flatMap(a => [a.created_by, a.updated_by]);
+    const usersById = db.users.getByIds(userIds);
     return items.map(a => ({
       ...a,
-      created_by_name: usersById[a.created_by] || null,
-      updated_by_name: usersById[a.updated_by] || null,
+      created_by_name: usersById.get(a.created_by)?.display_name || null,
+      updated_by_name: usersById.get(a.updated_by)?.display_name || null,
     }));
   });
 
@@ -158,12 +156,13 @@ async function routes(fastify) {
     const af = db.afs.getById(parseInt(request.params.id, 10));
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
     const site = af.site_id ? db.sites.getById(af.site_id) : null;
+    const usersById = db.users.getByIds([af.created_by, af.updated_by]);
     return {
       ...af,
       site_uuid: site?.site_uuid || null,
       site_name: site?.name || null,
-      created_by_name: db.users.getById(af.created_by)?.display_name || null,
-      updated_by_name: db.users.getById(af.updated_by)?.display_name || null,
+      created_by_name: usersById.get(af.created_by)?.display_name || null,
+      updated_by_name: usersById.get(af.updated_by)?.display_name || null,
       sections_count: db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE af_id = ?').get(af.id).c,
     };
   });
