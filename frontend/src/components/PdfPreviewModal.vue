@@ -37,12 +37,9 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 bg-black/60 flex items-stretch justify-center" @click.self="emit('close')">
-      <div class="bg-white shadow-2xl flex flex-col w-full max-w-[1100px] m-4 rounded-xl overflow-hidden">
+      <div class="bg-white shadow-2xl flex flex-col w-full m-3 rounded-xl overflow-hidden">
         <header class="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-gray-800">{{ title }}</h2>
-            <span class="text-[11px] text-gray-500 italic">Aperçu indicatif (pagination simulée par le navigateur)</span>
-          </div>
+          <h2 class="text-sm font-semibold text-gray-800">{{ title }}</h2>
           <div class="flex items-center gap-2">
             <button @click="emit('download')" :disabled="downloading"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-60">

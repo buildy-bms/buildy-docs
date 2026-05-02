@@ -563,10 +563,32 @@ async function shutdown() {
  * numeros de page ne sont pas connus sans rendu PDF), mais elle suffit
  * pour valider visuellement le contenu avant de declencher le PDF.
  */
+// Override CSS injecte uniquement en mode preview HTML (pas dans le PDF
+// genere par Puppeteer). Reset les marges A4 que @page applique normalement
+// en print, simule une feuille de papier centree sur fond gris pour donner
+// l'illusion de "rapport sur le bureau" sans pagination reelle.
+const PREVIEW_CSS_OVERRIDE = `
+/* Override preview HTML — neutralise les marges @page (print-only) */
+html { background: #e5e7eb; }
+body {
+  background: #ffffff;
+  max-width: 210mm;
+  margin: 12mm auto;
+  padding: 18mm 12mm 16mm 12mm;
+  box-sizing: border-box;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+/* La page de garde garde sa pleine largeur (deja 210mm + bg bleu) */
+body > .cover:first-child {
+  margin: -18mm -12mm 8mm -12mm;
+  width: calc(100% + 24mm);
+}
+`;
+
 function renderHtml({ template, styles, data }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
-  const fullCss = getEmbeddedFontsCss() + '\n' + css;
+  const fullCss = getEmbeddedFontsCss() + '\n' + css + '\n' + PREVIEW_CSS_OVERRIDE;
   return tpl({ ...data, styles: fullCss });
 }
 
