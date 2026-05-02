@@ -48,6 +48,9 @@ import SafeHtml from '@/components/SafeHtml.vue'
 import InspectionsSection from '@/components/audit/InspectionsSection.vue'
 import CompliancePlanSection from '@/components/audit/CompliancePlanSection.vue'
 import SynthesisSection from '@/components/audit/SynthesisSection.vue'
+import { useAuditStore } from '@/stores/audit'
+
+const auditStore = useAuditStore()
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -389,32 +392,25 @@ function formatDate(s) {
 async function refresh() {
   loading.value = true
   try {
-    const [d, s, m, b, t, a] = await Promise.all([
-      getAf(docId), getBacsSystems(docId), getBacsMeters(docId),
-      getBacsBms(docId), getBacsThermal(docId), getBacsActionItems(docId),
-    ])
-    document.value = d.data
-    systems.value = s.data
-    meters.value = m.data
-    bms.value = b.data || {}
-    thermal.value = t.data
-    actionItems.value = a.data
-    try { auditProgress.value = JSON.parse(d.data.audit_progress || '{}') }
-    catch { auditProgress.value = {} }
-    synthesisHtml.value = d.data.audit_synthesis_html || ''
-    if (d.data.site_id) {
-      const z = await listZones(d.data.site_id)
-      zones.value = z.data
-    }
-    const [dev, ps, refs, ins] = await Promise.all([
-      getBacsDevices(docId), getBacsPowerSummary(docId), getBacsAuditRefs(docId),
-      getBacsInspections(docId),
-    ])
-    devices.value = dev.data
-    powerSummary.value = ps.data
-    auditRefs.value = refs.data
-    inspections.value = ins.data
-    // Counts pour les etapes 'documents' et 'credentials' du stepper
+    // Le store Pinia est la source de verite : il fait l'ensemble des
+    // appels et expose le state aux sous-composants extraits
+    // (InspectionsSection, CompliancePlanSection, SynthesisSection).
+    // On mirroite ensuite vers les refs locaux pour que le reste du
+    // template (gros bloc non encore migre) continue de fonctionner.
+    await auditStore.loadAudit(docId)
+    document.value = auditStore.document
+    systems.value = auditStore.systems
+    meters.value = auditStore.meters
+    bms.value = auditStore.bms
+    thermal.value = auditStore.thermal
+    actionItems.value = auditStore.actionItems
+    auditProgress.value = auditStore.auditProgress
+    synthesisHtml.value = auditStore.synthesisHtml
+    zones.value = auditStore.zones
+    devices.value = auditStore.devices
+    powerSummary.value = auditStore.powerSummary
+    auditRefs.value = auditStore.auditRefs
+    inspections.value = auditStore.inspections
     refreshSiteCounts()
   } catch (e) {
     error('Échec du chargement de l\'audit BACS')
@@ -1031,12 +1027,14 @@ function saveBmsDebounced() {
   }, 500)
 }
 
-// ── Inspections : delegues a InspectionsSection (composant) ──
+// ── Refresh helpers passes au sous-composants legacy ──
 async function refreshInspections() {
-  try { inspections.value = (await getBacsInspections(docId)).data } catch { /* */ }
+  await auditStore.refreshInspections()
+  inspections.value = auditStore.inspections
 }
 async function refreshActionItems() {
-  try { actionItems.value = (await getBacsActionItems(docId)).data } catch { /* */ }
+  await auditStore.refreshActionItems()
+  actionItems.value = auditStore.actionItems
 }
 
 async function patchActionItem(item, patch) {
@@ -2322,14 +2320,7 @@ onMounted(() => {
       </CollapsibleSection>
 
       <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
-      <InspectionsSection
-        v-if="isBacs"
-        :document-id="docId"
-        :inspections="inspections"
-        :today-iso="todayIso"
-        @refresh-inspections="refreshInspections"
-        @action-items-changed="refreshActionItems"
-      />
+      <InspectionsSection v-if="isBacs" />
 
       <!-- 9. Documents du site (DOE) -->
       <CollapsibleSection storage-key="documents" section-id="section-documents">
