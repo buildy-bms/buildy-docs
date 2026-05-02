@@ -519,7 +519,7 @@ async function addZone(payload) {
 
 // ── Stepper (9 etapes a valider manuellement) ──
 const { auditProgress, synthesisHtml } = storeToRefs(auditStore)
-const activeStepKey = ref('identification')
+const activeStepKey = ref(null)
 const siteDocCounts = ref({ doe: 0, photo: 0 })
 const siteCredCount = ref(0)
 
