@@ -142,14 +142,16 @@ async function routes(fastify) {
         pdfOptions: {
           displayHeaderFooter: true,
           margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
-          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between;">
-            <span>${af.client_name} — ${af.project_name}</span>
-            <span>${isBacs ? 'Audit BACS' : 'Audit GTB'} ${version}</span>
+          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between; align-items:center; letter-spacing:0.02em;">
+            <span style="text-transform:uppercase; letter-spacing:0.1em; font-size:6.5pt; color:#9ca3af;">${(af.client_name || '').replace(/'/g, '&#39;')} · ${(af.project_name || '').replace(/'/g, '&#39;')}</span>
+            <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#6b7280;">${isBacs ? 'Audit BACS' : 'Audit GTB'} · ${version}</span>
           </div>`,
-          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:6mm;">
-            <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
-            <span style="flex:1;">${isBacs ? 'Audit BACS Buildy · décret R175 · confidentiel' : 'Audit GTB Buildy · préparation devis · confidentiel'}</span>
-            <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
+          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
+            <img src="${logoSmall}" style="height:4mm; opacity:0.55;" />
+            <span style="flex:1; color:#9ca3af; font-size:7pt;">${isBacs ? 'Audit BACS · décret R175 · document confidentiel' : 'Audit GTB · préparation devis · document confidentiel'}</span>
+            <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
+              <span class="pageNumber"></span> <span style="color:#9ca3af; font-weight:400;">/</span> <span class="totalPages"></span>
+            </span>
           </div>`,
         },
       });
