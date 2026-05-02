@@ -12,6 +12,19 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsSystem } from '@/api'
 
+// Couleur d'accent par categorie de systeme : aligne avec
+// SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
+// categories quand plusieurs sont presentes dans une zone.
+const CATEGORY_BORDER = {
+  heating: 'border-l-red-400',
+  cooling: 'border-l-cyan-400',
+  ventilation: 'border-l-slate-400',
+  dhw: 'border-l-blue-400',
+  lighting_indoor: 'border-l-amber-400',
+  lighting_outdoor: 'border-l-amber-500',
+  electricity_production: 'border-l-emerald-500',
+}
+
 // Section 3 — Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°).
 const props = defineProps({
   systemsByZone: { type: Array, required: true },
@@ -89,7 +102,7 @@ function hasNotes(html) {
       </div>
       <div class="space-y-3">
         <div v-for="g in systemsByZone" :key="g.zone_id"
-             class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
+             class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
           <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
             <button type="button" @click="emit('toggle-zone-collapsed', g.zone_id)"
@@ -114,9 +127,10 @@ function hasNotes(html) {
                 :attach-to="{ system_id: s.id }"
                 :enabled="!!document?.site_uuid"
                 @changed="refreshAuditData">
-                <div :class="['border rounded-lg overflow-hidden',
-                              s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
-                                              : (s.present ? 'border-gray-200' : 'border-gray-200 bg-gray-50/30')]">
+                <div :class="['rounded-lg overflow-hidden border bg-white',
+                              s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
+                                        : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
+                                                            : 'border-gray-200 bg-gray-50/40')]">
                   <div class="px-3 py-2 flex items-center gap-3 bg-white">
                     <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
                             class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"

@@ -214,7 +214,7 @@ async function removeDevice(d) {
 </script>
 
 <template>
-  <div class="bg-gray-50/40 px-3 py-2">
+  <div class="bg-slate-50 border-t border-gray-200 px-3 py-3">
     <!-- Header avec puissance totale + bouton + vert -->
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
@@ -246,51 +246,60 @@ async function removeDevice(d) {
           @changed="refreshPhotos">
         <div :class="['group bg-white border border-gray-200 rounded-lg p-2.5 transition hover:border-gray-300',
                       d.out_of_service ? 'opacity-50 bg-gray-50' : '']">
-          <!-- Ligne 1 : identification -->
-          <div class="grid grid-cols-12 gap-2 items-center">
+          <!-- Ligne 1 : identification (micro-labels au-dessus) -->
+          <div class="grid grid-cols-12 gap-2 items-end">
             <div class="col-span-12 md:col-span-3">
-              <input type="text" :value="d.name" placeholder="Nom de l'équipement"
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Nom</label>
+              <input type="text" :value="d.name" placeholder="ex : Chaudière gaz"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400 font-medium" />
             </div>
             <div class="col-span-6 md:col-span-2">
-              <input type="text" :value="d.brand" placeholder="Marque"
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Marque</label>
+              <input type="text" :value="d.brand" placeholder="ex : Atlantic"
                      @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
             </div>
             <div class="col-span-6 md:col-span-2">
-              <input type="text" :value="d.model_reference" placeholder="Référence"
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Référence</label>
+              <input type="text" :value="d.model_reference" placeholder="ex : Varmax 70"
                      @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
             </div>
             <div class="col-span-4 md:col-span-1">
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Puissance</label>
               <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="kW"
                      @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
                      :class="inputCls" class="text-right placeholder:text-gray-400" />
             </div>
             <div class="col-span-4 md:col-span-2">
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Énergie</label>
               <select :value="d.energy_source"
                       @change="e => patchDevice(d, { energy_source: e.target.value || null })"
                       :class="selectCls">
-                <option :value="null">— Énergie</option>
+                <option :value="null">—</option>
                 <option v-for="o in ENERGY_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
             </div>
             <div class="col-span-4 md:col-span-2">
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Nature</label>
               <select :value="d.device_role"
                       @change="e => patchDevice(d, { device_role: e.target.value || null })"
                       :class="selectCls">
-                <option :value="null">— Nature</option>
+                <option :value="null">—</option>
                 <option v-for="o in ROLE_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
             </div>
           </div>
 
           <!-- Ligne 2 : localisation + GTB + actions -->
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <input type="text" :value="d.location" placeholder="Localisation"
-                   @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
-                   :class="inputCls" class="flex-1 min-w-32 placeholder:italic placeholder:text-gray-400" />
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <div class="flex-1 min-w-32">
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Localisation</label>
+              <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol"
+                     @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
+                     :class="inputCls" class="w-full placeholder:italic placeholder:text-gray-400" />
+            </div>
 
             <!-- R175-3 4° + cable comm GTB en pills cliquables -->
             <button type="button"
