@@ -45,6 +45,9 @@ import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
+import InspectionsSection from '@/components/audit/InspectionsSection.vue'
+import CompliancePlanSection from '@/components/audit/CompliancePlanSection.vue'
+import SynthesisSection from '@/components/audit/SynthesisSection.vue'
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -1028,47 +1031,12 @@ function saveBmsDebounced() {
   }, 500)
 }
 
-// ── Inspections périodiques R175-5-1 ──
-async function addInspection() {
-  try {
-    const { data } = await createBacsInspection(docId, {})
-    inspections.value.unshift(data)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Création de l\'inspection impossible')
-  }
+// ── Inspections : delegues a InspectionsSection (composant) ──
+async function refreshInspections() {
+  try { inspections.value = (await getBacsInspections(docId)).data } catch { /* */ }
 }
-const inspectionTimers = new Map()
-function patchInspectionDebounced(ins, patch) {
-  Object.assign(ins, patch)
-  clearTimeout(inspectionTimers.get(ins.id))
-  inspectionTimers.set(ins.id, setTimeout(async () => {
-    try {
-      const { data } = await updateBacsInspection(ins.id, patch)
-      Object.assign(ins, data)
-      const a = await getBacsActionItems(docId)
-      actionItems.value = a.data
-    } catch {
-      error('Sauvegarde inspection impossible')
-    }
-  }, 500))
-}
-async function removeInspection(ins) {
-  const ok = await confirm({
-    title: 'Supprimer cette inspection ?',
-    message: 'L\'historique de cette inspection périodique sera perdu.',
-    confirmLabel: 'Supprimer',
-  })
-  if (!ok) return
-  try {
-    await deleteBacsInspection(ins.id)
-    inspections.value = inspections.value.filter(i => i.id !== ins.id)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Suppression impossible')
-  }
+async function refreshActionItems() {
+  try { actionItems.value = (await getBacsActionItems(docId)).data } catch { /* */ }
 }
 
 async function patchActionItem(item, patch) {
@@ -2354,92 +2322,14 @@ onMounted(() => {
       </CollapsibleSection>
 
       <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
-      <CollapsibleSection v-if="isBacs" storage-key="inspections" section-id="section-inspections">
-        <template #header>
-          <ClockIcon class="w-5 h-5 text-amber-600" />
-          <h2 class="text-base font-semibold text-gray-800">7. Inspection périodique par un tiers</h2>
-          <span class="text-xs text-gray-500">R175-5-1 — rapport conservé 10 ans</span>
-          <R175Tooltip article="R175-5-1" />
-          <button @click.stop="addInspection"
-                  class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
-            <PlusIcon class="w-3.5 h-3.5" /> Ajouter
-          </button>
-        </template>
-        <template #summary>
-          <span v-if="inspections.length">
-            {{ inspections.length }} inspection{{ inspections.length > 1 ? 's' : '' }} tracée{{ inspections.length > 1 ? 's' : '' }}
-            <span v-if="latestInspection" class="text-gray-500">
-              · dernière : {{ latestInspection.last_inspection_date || '—' }}
-              <span v-if="latestInspection.next_inspection_due_date">
-                · prochaine : {{ latestInspection.next_inspection_due_date }}
-              </span>
-            </span>
-          </span>
-          <span v-else class="italic text-amber-700">Aucune inspection R175-5-1 tracée — action corrective générée</span>
-        </template>
-        <div class="px-5 py-4 space-y-3">
-          <p v-if="!inspections.length" class="text-xs text-gray-500 italic">
-            Trace ici les inspections officielles réalisées par un tiers (organisme indépendant). L'audit Buildy est interne et ne se substitue pas à cette obligation.
-          </p>
-          <div v-for="ins in inspections" :key="ins.id" class="border border-gray-200 rounded-lg p-3">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Date de l'inspection</label>
-                <input :value="ins.last_inspection_date || ''" type="date"
-                       @input="e => patchInspectionDebounced(ins, { last_inspection_date: e.target.value || null })"
-                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Tiers inspecteur (nom / société)</label>
-                <input :value="ins.last_inspection_inspector || ''" type="text"
-                       placeholder="ex : APAVE, SOCOTEC, Bureau Veritas…"
-                       @input="e => patchInspectionDebounced(ins, { last_inspection_inspector: e.target.value || null })"
-                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Prochaine échéance prévue</label>
-                <input :value="ins.next_inspection_due_date || ''" type="date"
-                       @input="e => patchInspectionDebounced(ins, { next_inspection_due_date: e.target.value || null })"
-                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">À conserver jusqu'au</label>
-                <input :value="ins.retained_until_date || ''" type="date"
-                       @input="e => patchInspectionDebounced(ins, { retained_until_date: e.target.value || null })"
-                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
-              </div>
-              <div class="col-span-2">
-                <label class="block text-[11px] text-gray-600 mb-1">Anomalies identifiées</label>
-                <textarea :value="ins.last_inspection_anomalies_html || ''" rows="2"
-                          @input="e => patchInspectionDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
-                          class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded"></textarea>
-              </div>
-              <div class="col-span-2">
-                <label class="block text-[11px] text-gray-600 mb-1">Recommandations à reprendre</label>
-                <textarea :value="ins.last_inspection_recommendations_html || ''" rows="2"
-                          @input="e => patchInspectionDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
-                          class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded"></textarea>
-              </div>
-              <div class="col-span-2">
-                <label class="block text-[11px] text-gray-600 mb-1">Notes</label>
-                <input :value="ins.notes || ''" type="text"
-                       @input="e => patchInspectionDebounced(ins, { notes: e.target.value || null })"
-                       class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded" />
-              </div>
-            </div>
-            <div class="mt-2 flex items-center gap-2">
-              <span v-if="ins.next_inspection_due_date && ins.next_inspection_due_date < todayIso"
-                    class="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-                ⚠ Échéance dépassée
-              </span>
-              <button @click="removeInspection(ins)"
-                      class="ml-auto text-[11px] text-red-600 hover:text-red-800">
-                Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      </CollapsibleSection>
+      <InspectionsSection
+        v-if="isBacs"
+        :document-id="docId"
+        :inspections="inspections"
+        :today-iso="todayIso"
+        @refresh-inspections="refreshInspections"
+        @action-items-changed="refreshActionItems"
+      />
 
       <!-- 9. Documents du site (DOE) -->
       <CollapsibleSection storage-key="documents" section-id="section-documents">
@@ -2497,152 +2387,35 @@ onMounted(() => {
       </CollapsibleSection>
 
       <!-- Plan de mise en conformité — masqué en mode site_audit -->
-      <CollapsibleSection v-if="isBacs" storage-key="review" section-id="section-review">
-        <template #header>
-          <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
-          <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
-          <span class="text-xs text-gray-500">{{ visibleActionItems.length }} action{{ visibleActionItems.length > 1 ? 's' : '' }}<span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }} masquée{{ resolvedCount > 1 ? 's' : '' }}</span></span>
-          <button
-            @click.stop="regenerate"
-            title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
-            class="ml-auto inline-flex items-center gap-1 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50"
-          >
-            <ArrowPathIcon class="w-3.5 h-3.5" /> Régénérer le plan
-          </button>
-          <button
-            @click.stop="router.push(`/bacs-audit/${docId}/action-items`)"
-            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Vue commerciale →
-          </button>
-          <StepValidateBadge :step="stepFor('review')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="visibleActionItems.length">
-            <span v-if="itemsBySeverity.blocking.length" class="text-red-700 font-semibold">{{ itemsBySeverity.blocking.length }} bloquante{{ itemsBySeverity.blocking.length > 1 ? 's' : '' }}</span>
-            <span v-if="itemsBySeverity.blocking.length && (itemsBySeverity.major.length || itemsBySeverity.minor.length)"> · </span>
-            <span v-if="itemsBySeverity.major.length" class="text-orange-700">{{ itemsBySeverity.major.length }} majeure{{ itemsBySeverity.major.length > 1 ? 's' : '' }}</span>
-            <span v-if="itemsBySeverity.major.length && itemsBySeverity.minor.length"> · </span>
-            <span v-if="itemsBySeverity.minor.length" class="text-amber-700">{{ itemsBySeverity.minor.length }} mineure{{ itemsBySeverity.minor.length > 1 ? 's' : '' }}</span>
-            <span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }}</span>
-          </span>
-          <span v-else class="italic text-emerald-700">✓ Aucune action corrective</span>
-        </template>
-        <div class="px-4 py-3 space-y-3">
-          <div v-if="!visibleActionItems.length" class="py-10 text-center">
-            <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
-            <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
-            <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
-          </div>
-          <div
-            v-for="(it, idx) in visibleActionItems"
-            :key="it.id"
-            :class="['border rounded-lg overflow-hidden transition',
-              it.status === 'declined' ? 'opacity-50' : '',
-              it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200')]"
-          >
-            <!-- Entete : N° + sevérité + article + zone + statut + bouton préconisations -->
-            <div class="px-4 py-2.5 flex items-center gap-3 flex-wrap bg-white">
-              <span class="inline-flex items-center justify-center min-w-10 px-2 py-1 text-xs font-mono font-bold rounded bg-gray-800 text-white whitespace-nowrap shrink-0">
-                {{ actionNumber(idx) }}
-              </span>
-              <span :class="['inline-block px-2 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap shrink-0', SEVERITY_LABEL[it.severity].cls]">
-                {{ SEVERITY_LABEL[it.severity].label }}
-              </span>
-              <span class="text-[11px] text-gray-500 font-mono whitespace-nowrap shrink-0">{{ it.r175_article || '—' }}</span>
-              <span v-if="it.zone_name" class="text-[11px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded shrink-0">📍 {{ it.zone_name }}</span>
-              <div class="flex-1 min-w-50">
-                <div class="text-sm text-gray-800 font-medium">{{ it.title }}</div>
-                <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5">{{ it.description }}</div>
-              </div>
-              <select :value="it.status"
-                      @change="e => patchActionItem(it, { status: e.target.value })"
-                      class="text-xs px-2 py-1 border border-gray-200 rounded shrink-0 w-32">
-                <option v-for="(label, val) in STATUS_LABEL" :key="val" :value="val">{{ label }}</option>
-              </select>
-              <input type="text" :value="it.commercial_notes" placeholder="ref produit, prix estimé…"
-                     @blur="e => patchActionItem(it, { commercial_notes: e.target.value || null })"
-                     class="text-xs px-2 py-1 border border-gray-200 rounded w-56 shrink-0" />
-              <button
-                type="button"
-                @click="openAlternativesEditor(it)"
-                :class="['inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded border transition whitespace-nowrap shrink-0',
-                  hasNotes(it.alternative_solutions_html)
-                    ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100'
-                    : (it.status === 'open'
-                      ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-                :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'"
-              >
-                <PencilSquareIcon class="w-3.5 h-3.5" />
-                {{ hasNotes(it.alternative_solutions_html)
-                    ? 'Préconisations'
-                    : (it.status === 'open' ? '⚠ Préconiser' : '+ Préconiser') }}
-              </button>
-            </div>
-            <!-- Bandeau préconisations en pleine largeur sous l'action -->
-            <div v-if="hasNotes(it.alternative_solutions_html)"
-                 class="px-4 py-2 bg-violet-50 border-t border-violet-200 text-[12px] text-violet-900 leading-relaxed">
-              <p class="text-[10px] uppercase tracking-wider font-semibold text-violet-700 mb-1">Préconisations Buildy</p>
-              <SafeHtml class="prose prose-sm max-w-none text-violet-900" :html="it.alternative_solutions_html" />
-            </div>
-            <div v-else-if="it.status === 'open'"
-                 class="px-4 py-2 bg-red-50 border-t border-red-200 text-[11px] text-red-700 leading-relaxed flex items-center gap-2">
-              <span>⚠</span>
-              <span>Aucune préconisation Buildy renseignée pour cette action.</span>
-              <button @click="openAlternativesEditor(it)" class="ml-auto text-red-700 underline hover:text-red-900 font-medium">
-                Préconiser maintenant
-              </button>
-            </div>
-          </div>
-        </div>
-      </CollapsibleSection>
+      <CompliancePlanSection
+        v-if="isBacs"
+        :visible-action-items="visibleActionItems"
+        :items-by-severity="itemsBySeverity"
+        :resolved-count="resolvedCount"
+        :step="stepFor('review')"
+        :severity-labels="SEVERITY_LABEL"
+        :status-labels="STATUS_LABEL"
+        @regenerate="regenerate"
+        @open-commercial="router.push(`/bacs-audit/${docId}/action-items`)"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @patch-item="({ item, patch }) => patchActionItem(item, patch)"
+        @open-alternatives="openAlternativesEditor"
+      />
 
       <!-- 12. Note de synthèse (Claude) -->
-      <CollapsibleSection storage-key="synthesis" section-id="section-synthesis">
-        <template #header>
-          <SparklesIcon class="w-5 h-5 text-violet-500" />
-          <h2 class="text-base font-semibold text-gray-800">12. Note de synthèse</h2>
-          <span class="text-xs text-gray-500">Affichée en tête du PDF d'audit livré au client.</span>
-          <span v-if="document?.audit_synthesis_generated_at" class="text-[11px] text-violet-700 italic">
-            ✨ Générée le {{ new Date(document.audit_synthesis_generated_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
-          </span>
-          <StepValidateBadge class="ml-auto" :step="stepFor('synthesis')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="synthesisHtml">
-            ✨ Note rédigée<span v-if="document?.audit_synthesis_generated_at"> · générée le {{ new Date(document.audit_synthesis_generated_at).toLocaleDateString('fr-FR') }}</span>
-          </span>
-          <span v-else class="italic">Pas encore de note de synthèse</span>
-        </template>
-        <div class="px-5 py-4 space-y-3">
-          <div class="flex items-center gap-2">
-            <button
-              @click="generateSynthesis"
-              :disabled="synthesisGenerating"
-              :title="formatUsageTooltip(claudeUsage)"
-              class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition shadow-sm"
-            >
-              <SparklesIcon class="w-4 h-4" :class="synthesisGenerating ? 'animate-pulse' : ''" />
-              {{ synthesisGenerating
-                  ? 'Génération en cours…'
-                  : (synthesisHtml ? 'Régénérer avec Claude' : 'Rédiger avec Claude') }}
-              <span v-if="claudeUsage" class="ml-1 text-[11px] text-violet-200 font-mono">
-                ≈{{ (claudeUsage.avg_cost_eur || 0).toFixed(3) }}€
-              </span>
-            </button>
-            <p class="text-[11px] text-gray-500 italic">
-              Claude lit l'intégralité de l'audit (zones, systèmes, compteurs, GTB, plan) et rédige une note client bienveillante et actionnable, sans inventer de données.
-            </p>
-          </div>
-          <RichTextEditor
-            :model-value="synthesisHtml"
-            @update:model-value="onSynthesisInput"
-            placeholder="Rédige la note de synthèse, ou clique sur 'Rédiger avec Claude' pour la pré-générer puis ajuste-la."
-            min-height="240px"
-          />
-        </div>
-      </CollapsibleSection>
+      <SynthesisSection
+        :synthesis-html="synthesisHtml"
+        :synthesis-generating="synthesisGenerating"
+        :generated-at="document?.audit_synthesis_generated_at"
+        :claude-usage="claudeUsage"
+        :step="stepFor('synthesis')"
+        :usage-tooltip="formatUsageTooltip(claudeUsage)"
+        @generate="generateSynthesis"
+        @update:synthesis-html="onSynthesisInput"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
       </div><!-- /colonne principale -->
     </div>
 
