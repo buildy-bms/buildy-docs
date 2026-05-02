@@ -10,8 +10,9 @@ const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const bacsArticlesData = require('../../seeds/bacs-articles');
-const bacsAuditMethodology = require('../../lib/bacs-audit-methodology');
-const bacsAuditDisclaimers = require('../../lib/bacs-audit-disclaimers');
+// Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
+const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
+const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 
 // pdf-charts charge chartjs-node-canvas qui pollue require.cache (entry
 // undefined apres chargement → bug Fastify getPluginName quand il itere
@@ -283,6 +284,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }));
   const heatingCoolingTotal = heatingCoolingBreakdown.reduce((s, d) => s + (Number(d.power_kw) || 0), 0);
 
+  // Boilerplate methodologie + disclaimers : lit la DB (admin-editable),
+  // fallback sur les fichiers .js statiques si la table est vide.
+  const methRows = db.pdfBoilerplate.list({ kind: 'methodology' });
+  const methodology = methRows.length
+    ? methRows.map(r => ({ title: r.title || '', body: r.body_html }))
+    : bacsAuditMethodologyStatic;
+  const discRows = db.pdfBoilerplate.list({ kind: 'disclaimer' });
+  const disclaimers = discRows.length
+    ? discRows.map(r => r.body_html)
+    : bacsAuditDisclaimersStatic;
+
   const isBacs = af.kind === 'bacs_audit';
 
   // ── Charts (lot B2) ──
@@ -364,8 +376,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
     applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,
     bacsArticles,
-    methodology: bacsAuditMethodology,
-    disclaimers: bacsAuditDisclaimers,
+    methodology,
+    disclaimers,
     justifications,
     authorName: user?.display_name || 'Buildy Docs',
     exportDate,

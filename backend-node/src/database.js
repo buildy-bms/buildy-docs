@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 64;
+const TARGET_VERSION = 65;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2337,6 +2337,50 @@ function runMigrations() {
     log.info("Migration 64 appliquee : source_table.CHECK accepte 'inspections' (R175-5-1)");
   }
 
+  if (current < 65) {
+    // Lot B4 : boilerplate des PDFs (methodologie / disclaimers / autres
+    // textes recurrents) sortis du code et editables via une page admin.
+    // Permet de modifier ces textes sans redeployer.
+    // - kind : 'methodology' (Annexe B audit BACS) | 'disclaimer' (Annexe D)
+    // - position : ordre d'affichage dans l'annexe
+    // - title : titre de la section (peut etre null pour les disclaimers
+    //   qui sont une liste numerotee sans titres)
+    // - body_html : contenu rich-text (HTML sanitize cote backend)
+    db.exec(`
+      CREATE TABLE pdf_boilerplate (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL
+          CHECK (kind IN ('methodology', 'disclaimer')),
+        position INTEGER NOT NULL DEFAULT 0,
+        title TEXT,
+        body_html TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE INDEX idx_pdf_boilerplate_kind ON pdf_boilerplate(kind, is_active, position);
+    `);
+    // Seed initial : migre les contenus actuels des fichiers .js vers la DB.
+    // Apres cette migration, les fichiers .js ne sont plus la source de
+    // verite — ils peuvent etre supprimes plus tard, ou conserves comme
+    // fallback de seed pour reset.
+    try {
+      const methodology = require('./lib/bacs-audit-methodology');
+      const disclaimers = require('./lib/bacs-audit-disclaimers');
+      const insertMeth = db.prepare(`INSERT INTO pdf_boilerplate
+        (kind, position, title, body_html) VALUES ('methodology', ?, ?, ?)`);
+      methodology.forEach((m, i) => insertMeth.run(i, m.title, m.body));
+      const insertDisc = db.prepare(`INSERT INTO pdf_boilerplate
+        (kind, position, title, body_html) VALUES ('disclaimer', ?, NULL, ?)`);
+      disclaimers.forEach((d, i) => insertDisc.run(i, d));
+    } catch (err) {
+      log.warn(`Seed initial pdf_boilerplate KO : ${err.message}`);
+    }
+    db.pragma('user_version = 65');
+    log.info('Migration 65 appliquee : pdf_boilerplate (methodologie + disclaimers en DB)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3528,8 +3572,46 @@ const aiPrompts = {
   },
 };
 
+const pdfBoilerplate = {
+  list({ kind, includeInactive = false } = {}) {
+    let sql = 'SELECT * FROM pdf_boilerplate WHERE 1=1';
+    const args = [];
+    if (kind) { sql += ' AND kind = ?'; args.push(kind); }
+    if (!includeInactive) sql += ' AND is_active = 1';
+    sql += ' ORDER BY kind, position, id';
+    return db.prepare(sql).all(...args);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM pdf_boilerplate WHERE id = ?').get(id);
+  },
+  create({ kind, position = 0, title = null, bodyHtml, updatedBy = null }) {
+    const result = db.prepare(`
+      INSERT INTO pdf_boilerplate (kind, position, title, body_html, updated_by)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(kind, position, title, bodyHtml, updatedBy);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, { position, title, bodyHtml, isActive, updatedBy = null }) {
+    const sets = [];
+    const args = [];
+    if (position != null) { sets.push('position = ?'); args.push(position); }
+    if (title !== undefined) { sets.push('title = ?'); args.push(title); }
+    if (bodyHtml != null) { sets.push('body_html = ?'); args.push(bodyHtml); }
+    if (isActive != null) { sets.push('is_active = ?'); args.push(isActive ? 1 : 0); }
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    sets.push('updated_by = ?'); args.push(updatedBy);
+    args.push(id);
+    db.prepare(`UPDATE pdf_boilerplate SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    return this.getById(id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM pdf_boilerplate WHERE id = ?').run(id);
+  },
+};
+
 module.exports = {
   init,
+  pdfBoilerplate,
   users,
   sessions,
   equipmentTemplates,

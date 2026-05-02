@@ -116,6 +116,12 @@ const routes = [
     meta: { title: 'Prompts IA' },
     component: () => import('@/views/AiPromptsView.vue'),
   },
+  {
+    path: '/admin/boilerplate',
+    name: 'boilerplate-admin',
+    meta: { title: 'Boilerplate PDF' },
+    component: () => import('@/views/BoilerplateAdminView.vue'),
+  },
 ]
 
 const router = createRouter({

@@ -49,9 +49,19 @@ Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md
 
 À venir : charts AF (matrice couverture niveau service via `barAfCoverage`).
 
-### À venir
+### Lot B4 — Boilerplate admin ✅
 
-- **Lot B4** — Boilerplate admin (méthodologie + disclaimers en DB)
+- **Migration 65** : table `pdf_boilerplate(id, kind, position, title, body_html, is_active, ...)` avec `kind ∈ 'methodology'|'disclaimer'`. Seed automatique depuis `lib/bacs-audit-methodology.js` et `lib/bacs-audit-disclaimers.js` à l'application de la migration (données existantes préservées).
+- **Module DB** `pdfBoilerplate` (list / getById / create / update / remove) dans [`backend-node/src/database.js`](backend-node/src/database.js).
+- **Routes admin** [`backend-node/src/routes/pdf-boilerplate.js`](backend-node/src/routes/pdf-boilerplate.js) : `GET/POST/PATCH/DELETE /api/pdf-boilerplate?kind=...`.
+- **`_export-data.js`** lit la DB en priorité, fallback sur les fichiers `.js` statiques si la table est vide. Le PDF utilise donc toujours la version courante éditée par l'admin.
+- **Vue admin** [`frontend/src/views/BoilerplateAdminView.vue`](frontend/src/views/BoilerplateAdminView.vue) avec :
+  - 2 sections (Méthodologie B / Disclaimers D)
+  - Édition Tiptap inline avec autosave debounced
+  - Boutons : ↑↓ (réordonner), 👁 (désactiver), 🗑 (supprimer), + (ajouter)
+- Lien dans la sidebar `Système → Boilerplate PDF`.
+
+### À venir
 - **Lot A2** — Brochure backend (DB + routes + lib + variante catalogue d'offres)
 - **Lot A3** — Brochure UI (composition par drag, 2 variantes Brochure / Catalogue)
 - **Lot A4** — Liaison cross-document AF / BACS / Brochure

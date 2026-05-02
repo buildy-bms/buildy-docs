@@ -122,6 +122,14 @@ export const previewAfUrl = (afId, includeBacsAnnex = false) =>
 export const previewPointsListUrl = (afId) =>
   `/api/afs/${afId}/exports/points-list/preview`
 
+// ── PDF boilerplate admin (lot B4) ──
+// Methodologie + disclaimers du PDF audit BACS, editables sans redeployer.
+export const listPdfBoilerplate = (kind) =>
+  api.get('/pdf-boilerplate', { params: kind ? { kind } : {} })
+export const createPdfBoilerplate = (data) => api.post('/pdf-boilerplate', data)
+export const updatePdfBoilerplate = (id, data) => api.patch(`/pdf-boilerplate/${id}`, data)
+export const deletePdfBoilerplate = (id) => api.delete(`/pdf-boilerplate/${id}`)
+
 // ── Permissions AF (Lot 28) ──
 export const listAfPermissions = (afId) => api.get(`/afs/${afId}/permissions`)
 export const grantAfPermission = (afId, user_id, role) => api.post(`/afs/${afId}/permissions`, { user_id, role })
