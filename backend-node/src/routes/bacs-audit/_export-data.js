@@ -9,10 +9,19 @@ const config = require('../../config');
 const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
-const charts = require('../../lib/pdf-charts');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 const bacsAuditMethodology = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimers = require('../../lib/bacs-audit-disclaimers');
+
+// pdf-charts charge chartjs-node-canvas qui pollue require.cache (entry
+// undefined apres chargement → bug Fastify getPluginName quand il itere
+// sur le cache pour resoudre le nom d'un plugin enregistre apres). Lazy
+// require pour ne charger qu'a la 1re generation PDF, apres le boot.
+let _charts = null;
+function getCharts() {
+  if (!_charts) _charts = require('../../lib/pdf-charts');
+  return _charts;
+}
 
 // Labels d'enums (pour eviter les codes anglais bruts dans le PDF)
 const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
@@ -281,7 +290,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Radar conformite : score 0-100 sur 7 axes R175 derive de bms.* + actions.
   // Bar usage power : kW agregee par usage (heating / cooling / ventilation /
   // dhw / lighting), pour visualiser la repartition energetique du site.
-  const sevDonutDataUrl = await charts.donutSeverity({
+  const sevDonutDataUrl = await getCharts().donutSeverity({
     blocking: actionStats.blocking,
     major: actionStats.major,
     minor: actionStats.minor,
@@ -309,7 +318,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     { label: 'R175-5\nFormation', score: scoreForAxis(a => /R175-5(?!-1)/.test(a.r175_article || '')) },
     { label: 'R175-6\nRegulation', score: scoreForAxis(a => /R175-6/.test(a.r175_article || '')) },
   ] : [];
-  const radarComplianceDataUrl = isBacs ? await charts.radarCompliance({ axes: radarAxes }) : null;
+  const radarComplianceDataUrl = isBacs ? await getCharts().radarCompliance({ axes: radarAxes }) : null;
 
   // Bar usage power : agrege devices par system_category
   const powerByUsage = new Map();
@@ -324,13 +333,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
     .map(u => ({
       label: SYSTEM_LABEL[u] || u,
       kw: Math.round(powerByUsage.get(u) * 10) / 10,
-      color: charts.COLORS[u === 'heating' ? 'heating'
+      color: getCharts().COLORS[u === 'heating' ? 'heating'
         : u === 'cooling' ? 'cooling'
         : u === 'ventilation' ? 'ventilation'
         : u === 'dhw' ? 'dhw'
         : 'lighting'],
     }));
-  const barUsagePowerDataUrl = barItems.length ? await charts.barUsagePower({ items: barItems }) : null;
+  const barUsagePowerDataUrl = barItems.length ? await getCharts().barUsagePower({ items: barItems }) : null;
 
   return {
     document: af,
