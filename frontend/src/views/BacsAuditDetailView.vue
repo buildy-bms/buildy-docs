@@ -16,6 +16,7 @@ import {
   getBacsMeters, createBacsMeter, updateBacsMeter, deleteBacsMeter,
   getBacsBms, updateBacsBms,
   getBacsThermal, updateBacsThermal,
+  getBacsInspections, createBacsInspection, updateBacsInspection, deleteBacsInspection,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
   getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
@@ -75,6 +76,7 @@ const thermal = ref([])
 const actionItems = ref([])
 const zones = ref([])
 const devices = ref([])
+const inspections = ref([])
 const powerSummary = ref({ by_category: {}, heating_cooling_total_kw: 0 })
 // Refs stables (numerotation cross-referencee zone/systeme/device/meter/thermal)
 // Format flat : { zones: { id: '2.Z01', ... }, systems: {...}, ... }
@@ -401,12 +403,14 @@ async function refresh() {
       const z = await listZones(d.data.site_id)
       zones.value = z.data
     }
-    const [dev, ps, refs] = await Promise.all([
+    const [dev, ps, refs, ins] = await Promise.all([
       getBacsDevices(docId), getBacsPowerSummary(docId), getBacsAuditRefs(docId),
+      getBacsInspections(docId),
     ])
     devices.value = dev.data
     powerSummary.value = ps.data
     auditRefs.value = refs.data
+    inspections.value = ins.data
     // Counts pour les etapes 'documents' et 'credentials' du stepper
     refreshSiteCounts()
   } catch (e) {
@@ -454,6 +458,10 @@ const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_a
 // système chauffage ou refroidissement (présent OU non concerné).
 // Les zones sans système thermique (ex : un local technique sans chauffage)
 // n'ont pas de régulation à évaluer.
+// Date du jour au format ISO (YYYY-MM-DD) pour comparer aux échéances.
+const todayIso = computed(() => new Date().toISOString().slice(0, 10))
+const latestInspection = computed(() => inspections.value[0] || null)
+
 const thermalFiltered = computed(() => {
   // 1 ligne par (zone, catégorie) : on ne garde que les rows dont la
   // catégorie correspond à un système présent dans la zone (sinon ça
@@ -692,6 +700,10 @@ const STEP_DEFINITIONS = [
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
     isComplete: () => !!bms.value?.existing_solution },
+  { key: 'inspections',
+    label: 'Inspections',
+    description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
+    isComplete: () => inspections.value.length > 0 && !!inspections.value[0].last_inspection_date },
   { key: 'documents',
     label: 'Documents',
     description: 'Plans, schemas, datasheets et manuels deposes.',
@@ -716,7 +728,7 @@ function stepFor(key) {
 
 // Steps cachés en mode site_audit (purement R175) : régulation thermique
 // (R175-6) et plan de mise en conformité (R175 entier).
-const STEPS_BACS_ONLY = new Set(['thermal', 'review'])
+const STEPS_BACS_ONLY = new Set(['thermal', 'inspections', 'review'])
 const stepperSteps = computed(() => STEP_DEFINITIONS
   .filter(def => isBacs.value || !STEPS_BACS_ONLY.has(def.key))
   .map(def => {
@@ -1014,6 +1026,49 @@ function saveBmsDebounced() {
       error('Sauvegarde GTB impossible')
     }
   }, 500)
+}
+
+// ── Inspections périodiques R175-5-1 ──
+async function addInspection() {
+  try {
+    const { data } = await createBacsInspection(docId, {})
+    inspections.value.unshift(data)
+    const a = await getBacsActionItems(docId)
+    actionItems.value = a.data
+  } catch {
+    error('Création de l\'inspection impossible')
+  }
+}
+const inspectionTimers = new Map()
+function patchInspectionDebounced(ins, patch) {
+  Object.assign(ins, patch)
+  clearTimeout(inspectionTimers.get(ins.id))
+  inspectionTimers.set(ins.id, setTimeout(async () => {
+    try {
+      const { data } = await updateBacsInspection(ins.id, patch)
+      Object.assign(ins, data)
+      const a = await getBacsActionItems(docId)
+      actionItems.value = a.data
+    } catch {
+      error('Sauvegarde inspection impossible')
+    }
+  }, 500))
+}
+async function removeInspection(ins) {
+  const ok = await confirm({
+    title: 'Supprimer cette inspection ?',
+    message: 'L\'historique de cette inspection périodique sera perdu.',
+    confirmLabel: 'Supprimer',
+  })
+  if (!ok) return
+  try {
+    await deleteBacsInspection(ins.id)
+    inspections.value = inspections.value.filter(i => i.id !== ins.id)
+    const a = await getBacsActionItems(docId)
+    actionItems.value = a.data
+  } catch {
+    error('Suppression impossible')
+  }
 }
 
 async function patchActionItem(item, patch) {
@@ -1829,6 +1884,41 @@ onMounted(() => {
                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </td>
             </tr>
+            <tr v-for="t in thermalFiltered" :key="`detail-${t.id}`"
+                v-show="t.has_automatic_regulation"
+                class="bg-gray-50/50 text-xs">
+              <td class="px-5 py-2 text-gray-400">↳ détail régulation</td>
+              <td colspan="8" class="py-2 pr-5">
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Position de la sonde</label>
+                    <input type="text" :value="t.sensor_position" placeholder="ex : murale, plancher, gaine reprise"
+                           @blur="e => patchThermal(t, { sensor_position: e.target.value || null })"
+                           class="w-full px-2 py-1 border border-gray-200 rounded" />
+                  </div>
+                  <div>
+                    <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Type de thermostat</label>
+                    <select :value="t.thermostat_type"
+                            @change="e => patchThermal(t, { thermostat_type: e.target.value || null })"
+                            class="w-full px-2 py-1 border border-gray-200 rounded">
+                      <option :value="null">—</option>
+                      <option value="manual">Manuel</option>
+                      <option value="programmable">Programmable</option>
+                      <option value="adaptive">Adaptatif (auto-apprentissage)</option>
+                      <option value="connected">Connecté (smart)</option>
+                    </select>
+                  </div>
+                  <div class="flex items-end">
+                    <label class="flex items-center gap-1.5 cursor-pointer text-gray-700">
+                      <input type="checkbox" :checked="!!t.has_thermostatic_valves"
+                             @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked ? 1 : 0 })"
+                             class="rounded" />
+                      Robinets thermostatiques
+                    </label>
+                  </div>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </CollapsibleSection>
@@ -2130,10 +2220,31 @@ onMounted(() => {
                 <input type="checkbox" v-model="bms.meets_r175_3_p1" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span><strong>P1.</strong> Suivi continu par zone, pas horaire, conservation 5 ans</span>
               </label>
+              <div v-if="bms.meets_r175_3_p1" class="ml-6 grid grid-cols-2 gap-3 mt-1">
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
+                  <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+                <div class="flex items-end">
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
+                    <input type="checkbox" v-model="bms.r175_3_p1_retention_verified" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
+                    Rétention 5 ans vérifiée sur place
+                  </label>
+                </div>
+              </div>
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="bms.meets_r175_3_p2" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span><strong>P2.</strong> Détection des pertes d'efficacité</span>
               </label>
+              <div v-if="bms.meets_r175_3_p2" class="ml-6">
+                <label class="block text-[11px] text-gray-600 mb-1">Règles / seuils / alertes actives</label>
+                <textarea v-model="bms.r175_3_p2_anomaly_rules_html" @input="saveBmsDebounced"
+                          placeholder="ex : alerte si ΔT > 5 °C, surconso > 20% j-1, COP < 2.5…"
+                          rows="2"
+                          class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
+              </div>
             </div>
           </div>
 
@@ -2160,6 +2271,22 @@ onMounted(() => {
               class="mt-2 w-full text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
               rows="2"
             ></textarea>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Fréquence de mise à dispo</label>
+                <input v-model="bms.data_provision_frequency" type="text"
+                       placeholder="ex : temps réel, quotidien, hebdo, mensuel"
+                       @input="saveBmsDebounced"
+                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Format de sortie</label>
+                <input v-model="bms.data_provision_format" type="text"
+                       placeholder="ex : CSV, PDF mensuel, dashboard web, API"
+                       @input="saveBmsDebounced"
+                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+              </div>
+            </div>
           </div>
 
           <div v-if="isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
@@ -2169,6 +2296,22 @@ onMounted(() => {
                 <input type="checkbox" v-model="bms.has_maintenance_procedures" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Consignes écrites des maintenances passées</span>
               </label>
+              <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Périodicité</label>
+                  <input v-model="bms.maintenance_periodicity" type="text"
+                         placeholder="ex : trimestrielle, semestrielle, annuelle"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Responsable</label>
+                  <input v-model="bms.maintenance_responsible" type="text"
+                         placeholder="ex : prestataire X, équipe interne, fournisseur GTB"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+              </div>
             </div>
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-5 — Formation exploitant</h3>
@@ -2176,6 +2319,28 @@ onMounted(() => {
                 <input type="checkbox" v-model="bms.operator_trained" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Exploitant formé à l'utilisation de la supervision</span>
               </label>
+              <div v-if="bms.operator_trained" class="ml-6 mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Date de formation</label>
+                  <input v-model="bms.operator_training_date" type="date"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+                <div>
+                  <label class="block text-[11px] text-gray-600 mb-1">Organisme / formateur</label>
+                  <input v-model="bms.operator_training_provider" type="text"
+                         placeholder="ex : intégrateur GTB, fournisseur"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-[11px] text-gray-600 mb-1">Domaines couverts</label>
+                  <input v-model="bms.operator_training_topics" type="text"
+                         placeholder="ex : paramétrage des consignes, lecture des alarmes, escalade niveau 2"
+                         @input="saveBmsDebounced"
+                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+                </div>
+              </div>
               <p v-if="(bms.existing_solution || '').toLowerCase().includes('buildy')" class="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
                 ✓ Buildy : exigence R175-5 nativement couverte par le support utilisateur intégré
               </p>
@@ -2184,6 +2349,94 @@ onMounted(() => {
           </div>
         </div>
         </PhotoDropzone>
+      </CollapsibleSection>
+
+      <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
+      <CollapsibleSection v-if="isBacs" storage-key="inspections" section-id="section-inspections">
+        <template #header>
+          <ClockIcon class="w-5 h-5 text-amber-600" />
+          <h2 class="text-base font-semibold text-gray-800">7. Inspection périodique par un tiers</h2>
+          <span class="text-xs text-gray-500">R175-5-1 — rapport conservé 10 ans</span>
+          <R175Tooltip article="R175-5-1" />
+          <button @click.stop="addInspection"
+                  class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+            <PlusIcon class="w-3.5 h-3.5" /> Ajouter
+          </button>
+        </template>
+        <template #summary>
+          <span v-if="inspections.length">
+            {{ inspections.length }} inspection{{ inspections.length > 1 ? 's' : '' }} tracée{{ inspections.length > 1 ? 's' : '' }}
+            <span v-if="latestInspection" class="text-gray-500">
+              · dernière : {{ latestInspection.last_inspection_date || '—' }}
+              <span v-if="latestInspection.next_inspection_due_date">
+                · prochaine : {{ latestInspection.next_inspection_due_date }}
+              </span>
+            </span>
+          </span>
+          <span v-else class="italic text-amber-700">Aucune inspection R175-5-1 tracée — action corrective générée</span>
+        </template>
+        <div class="px-5 py-4 space-y-3">
+          <p v-if="!inspections.length" class="text-xs text-gray-500 italic">
+            Trace ici les inspections officielles réalisées par un tiers (organisme indépendant). L'audit Buildy est interne et ne se substitue pas à cette obligation.
+          </p>
+          <div v-for="ins in inspections" :key="ins.id" class="border border-gray-200 rounded-lg p-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Date de l'inspection</label>
+                <input :value="ins.last_inspection_date || ''" type="date"
+                       @input="e => patchInspectionDebounced(ins, { last_inspection_date: e.target.value || null })"
+                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Tiers inspecteur (nom / société)</label>
+                <input :value="ins.last_inspection_inspector || ''" type="text"
+                       placeholder="ex : APAVE, SOCOTEC, Bureau Veritas…"
+                       @input="e => patchInspectionDebounced(ins, { last_inspection_inspector: e.target.value || null })"
+                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Prochaine échéance prévue</label>
+                <input :value="ins.next_inspection_due_date || ''" type="date"
+                       @input="e => patchInspectionDebounced(ins, { next_inspection_due_date: e.target.value || null })"
+                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">À conserver jusqu'au</label>
+                <input :value="ins.retained_until_date || ''" type="date"
+                       @input="e => patchInspectionDebounced(ins, { retained_until_date: e.target.value || null })"
+                       class="w-full text-sm px-2 py-1.5 border border-gray-200 rounded" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-gray-600 mb-1">Anomalies identifiées</label>
+                <textarea :value="ins.last_inspection_anomalies_html || ''" rows="2"
+                          @input="e => patchInspectionDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
+                          class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded"></textarea>
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-gray-600 mb-1">Recommandations à reprendre</label>
+                <textarea :value="ins.last_inspection_recommendations_html || ''" rows="2"
+                          @input="e => patchInspectionDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
+                          class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded"></textarea>
+              </div>
+              <div class="col-span-2">
+                <label class="block text-[11px] text-gray-600 mb-1">Notes</label>
+                <input :value="ins.notes || ''" type="text"
+                       @input="e => patchInspectionDebounced(ins, { notes: e.target.value || null })"
+                       class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded" />
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-2">
+              <span v-if="ins.next_inspection_due_date && ins.next_inspection_due_date < todayIso"
+                    class="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">
+                ⚠ Échéance dépassée
+              </span>
+              <button @click="removeInspection(ins)"
+                      class="ml-auto text-[11px] text-red-600 hover:text-red-800">
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
       </CollapsibleSection>
 
       <!-- 9. Documents du site (DOE) -->
