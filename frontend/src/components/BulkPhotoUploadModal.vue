@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { XMarkIcon, ArrowUpTrayIcon, PhotoIcon } from '@heroicons/vue/24/outline'
 import { bulkUploadSitePhotos, updateSiteDocument, getSiteDocumentDownloadUrl } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -85,17 +86,24 @@ function close() {
   photos.value = []
   progress.value = 0
 }
+
+const dialogRef = ref(null)
+useFocusTrap(dialogRef, () => props.open)
+function onEsc(e) { if (e.key === 'Escape' && props.open) close() }
+onMounted(() => document.addEventListener('keydown', onEsc))
+onUnmounted(() => document.removeEventListener('keydown', onEsc))
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+  <div v-if="open" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="close">
+    <div ref="dialogRef" role="dialog" aria-modal="true" aria-labelledby="bulk-photo-title" tabindex="-1"
+         class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden focus:outline-none">
       <header class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
         <div class="flex items-center gap-2">
           <PhotoIcon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800">Import massif de photos terrain</h2>
+          <h2 id="bulk-photo-title" class="text-base font-semibold text-gray-800">Import massif de photos terrain</h2>
         </div>
-        <button @click="close" class="text-gray-400 hover:text-gray-600"><XMarkIcon class="w-5 h-5" /></button>
+        <button @click="close" aria-label="Fermer la fenêtre" class="text-gray-400 hover:text-gray-600"><XMarkIcon class="w-5 h-5" /></button>
       </header>
 
       <div class="flex-1 overflow-y-auto p-5 space-y-4">

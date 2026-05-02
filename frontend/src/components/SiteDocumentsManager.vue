@@ -313,7 +313,8 @@ onBeforeUnmount(() => {
           </td>
           <td class="px-3 py-2 text-center">
             <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block">
-              <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title"
+              <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title || d.original_name || 'Document'"
+                   loading="lazy" decoding="async"
                    class="w-12 h-12 object-cover rounded border border-gray-200 hover:border-indigo-400 transition" />
             </button>
             <DocumentIcon v-else class="w-6 h-6 text-gray-400 mx-auto" />
@@ -380,7 +381,8 @@ onBeforeUnmount(() => {
             <XMarkIcon class="w-5 h-5" />
           </button>
         </header>
-        <img :src="getSiteDocumentDownloadUrl(previewDoc.id)" :alt="previewDoc.title"
+        <img :src="getSiteDocumentDownloadUrl(previewDoc.id)" :alt="previewDoc.title || 'Document'"
+             decoding="async"
              class="max-h-[80vh] mx-auto object-contain rounded shadow-2xl" />
       </div>
     </div>

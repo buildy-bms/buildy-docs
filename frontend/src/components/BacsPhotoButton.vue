@@ -256,7 +256,8 @@ const btnCls = computed(() => {
       <div v-else class="grid grid-cols-3 gap-1.5">
         <div v-for="p in photos" :key="p.id" class="relative group">
           <button type="button" @click="previewPhoto = p" class="block w-full">
-            <img :src="thumbUrl(p)" :alt="p.title || p.original_name"
+            <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
+                 loading="lazy" decoding="async"
                  class="w-full h-16 object-cover rounded border border-gray-200 hover:border-indigo-400 transition cursor-zoom-in" />
           </button>
           <button
@@ -304,7 +305,8 @@ const btnCls = computed(() => {
             :key="p.id"
             class="flex items-start gap-4 p-3 border border-gray-200 rounded-lg"
           >
-            <img :src="p.dataUrl" :alt="p.title"
+            <img :src="p.dataUrl" :alt="p.title || 'Photo'"
+                 loading="lazy" decoding="async"
                  class="w-32 h-24 object-cover rounded border border-gray-200 shrink-0" />
             <div class="flex-1 min-w-0">
               <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -355,7 +357,8 @@ const btnCls = computed(() => {
             <XMarkIcon class="w-5 h-5" />
           </button>
         </header>
-        <img :src="getSiteDocumentDownloadUrl(previewPhoto.id)" :alt="previewPhoto.title"
+        <img :src="getSiteDocumentDownloadUrl(previewPhoto.id)" :alt="previewPhoto.title || 'Photo'"
+             decoding="async"
              class="max-h-[80vh] mx-auto object-contain rounded shadow-2xl" />
       </div>
     </div>
