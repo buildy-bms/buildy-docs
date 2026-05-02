@@ -1338,7 +1338,7 @@ onBeforeUnmount(() => {
 
     <PdfPreviewModal
       v-if="previewOpen"
-      :title="`Aperçu — ${audit.isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
+      :title="`Aperçu — ${isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
       :preview-url="previewUrl"
       :downloading="exporting"
       download-label="Télécharger le PDF"

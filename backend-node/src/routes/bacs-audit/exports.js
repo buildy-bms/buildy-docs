@@ -122,7 +122,9 @@ async function routes(fastify) {
     const outputPath = path.join(exportsDir, String(documentId), filename);
 
     const logoSmall = loadAssetDataUrl('logo-buildy.svg');
-    const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
+    // __dirname = backend-node/src/routes/bacs-audit/, donc 3 niveaux up
+    // pour atteindre backend-node/templates/pdf/assets/
+    const WATERMARK_PATH = path.resolve(__dirname, '../../../templates/pdf/assets/watermark-buildy.png');
     const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.85, heightRatio: 0.85, opacity: 0.03 };
 
     let result;
