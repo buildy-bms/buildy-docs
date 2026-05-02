@@ -9,6 +9,7 @@ const config = require('../../config');
 const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
+const charts = require('../../lib/pdf-charts');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 const bacsAuditMethodology = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimers = require('../../lib/bacs-audit-disclaimers');
@@ -275,6 +276,62 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   const isBacs = af.kind === 'bacs_audit';
 
+  // ── Charts (lot B2) ──
+  // Donut severite : 3 segments des actions correctives.
+  // Radar conformite : score 0-100 sur 7 axes R175 derive de bms.* + actions.
+  // Bar usage power : kW agregee par usage (heating / cooling / ventilation /
+  // dhw / lighting), pour visualiser la repartition energetique du site.
+  const sevDonutDataUrl = await charts.donutSeverity({
+    blocking: actionStats.blocking,
+    major: actionStats.major,
+    minor: actionStats.minor,
+  });
+
+  // Score conformite par axe : derive du nombre d'actions critiques sur
+  // chaque axe / total d'exigences. Plus il y a d'actions sur l'axe, plus
+  // le score baisse. 100 = aucune action ouverte sur cet axe (parfait).
+  function scoreForAxis(filterFn) {
+    const axisActions = actionItemsRaw.filter(filterFn);
+    if (!axisActions.length) return 100;
+    // Penalisations : bloquante = -40, majeure = -20, mineure = -10
+    let score = 100;
+    for (const a of axisActions) {
+      score -= a.severity === 'blocking' ? 40 : (a.severity === 'major' ? 20 : 10);
+    }
+    return Math.max(0, score);
+  }
+  const radarAxes = isBacs ? [
+    { label: 'R175-3 §1\nSuivi', score: scoreForAxis(a => /R175-3 1°|R175-3 §1/.test(a.r175_article || '')) },
+    { label: 'R175-3 §2\nDerives', score: scoreForAxis(a => /R175-3 2°|R175-3 §2/.test(a.r175_article || '')) },
+    { label: 'R175-3 §3\nInterop', score: scoreForAxis(a => /R175-3 3°|R175-3 §3/.test(a.r175_article || '')) },
+    { label: 'R175-3 §4\nArret/auto', score: scoreForAxis(a => /R175-3 4°|R175-3 §4/.test(a.r175_article || '')) },
+    { label: 'R175-4\nVerifs', score: scoreForAxis(a => /R175-4/.test(a.r175_article || '')) },
+    { label: 'R175-5\nFormation', score: scoreForAxis(a => /R175-5(?!-1)/.test(a.r175_article || '')) },
+    { label: 'R175-6\nRegulation', score: scoreForAxis(a => /R175-6/.test(a.r175_article || '')) },
+  ] : [];
+  const radarComplianceDataUrl = isBacs ? await charts.radarCompliance({ axes: radarAxes }) : null;
+
+  // Bar usage power : agrege devices par system_category
+  const powerByUsage = new Map();
+  for (const d of devices) {
+    if (d.power_kw == null) continue;
+    const cat = d.system_category || 'autre';
+    powerByUsage.set(cat, (powerByUsage.get(cat) || 0) + Number(d.power_kw));
+  }
+  const USAGE_ORDER = ['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor'];
+  const barItems = USAGE_ORDER
+    .filter(u => powerByUsage.has(u))
+    .map(u => ({
+      label: SYSTEM_LABEL[u] || u,
+      kw: Math.round(powerByUsage.get(u) * 10) / 10,
+      color: charts.COLORS[u === 'heating' ? 'heating'
+        : u === 'cooling' ? 'cooling'
+        : u === 'ventilation' ? 'ventilation'
+        : u === 'dhw' ? 'dhw'
+        : 'lighting'],
+    }));
+  const barUsagePowerDataUrl = barItems.length ? await charts.barUsagePower({ items: barItems }) : null;
+
   return {
     document: af,
     isBacs,
@@ -305,6 +362,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
     exportDate,
     version,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    // Charts (lot B2)
+    sevDonutDataUrl,
+    radarComplianceDataUrl,
+    barUsagePowerDataUrl,
+    barItems, // expose pour debug / fallback texte si chart manquant
   };
 }
 

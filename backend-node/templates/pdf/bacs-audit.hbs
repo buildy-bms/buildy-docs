@@ -86,14 +86,33 @@
 {{#if bms.overall_compliance}}
 <p>État global de la conformité au décret BACS : <span class="status status-{{bms.overall_compliance}}">{{complianceLabel}}</span></p>
 {{/if}}
-<table style="max-width: 100mm">
-  <thead><tr><th>Sévérité</th><th>Actions ouvertes</th></tr></thead>
-  <tbody>
-    <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td><strong>{{actionStats.blocking}}</strong></td></tr>
-    <tr><td><span class="sev sev-major">Majeures</span></td><td><strong>{{actionStats.major}}</strong></td></tr>
-    <tr><td><span class="sev sev-minor">Mineures</span></td><td><strong>{{actionStats.minor}}</strong></td></tr>
-  </tbody>
-</table>
+
+<div class="charts-row" style="display: flex; gap: 12mm; align-items: flex-start; margin: 4mm 0;">
+  <div style="flex: 0 0 auto;">
+    <table style="margin: 0;">
+      <thead><tr><th>Sévérité</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td><strong>{{actionStats.blocking}}</strong></td></tr>
+        <tr><td><span class="sev sev-major">Majeures</span></td><td><strong>{{actionStats.major}}</strong></td></tr>
+        <tr><td><span class="sev sev-minor">Mineures</span></td><td><strong>{{actionStats.minor}}</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  {{#if sevDonutDataUrl}}
+  <div style="flex: 0 0 auto; max-width: 80mm;">
+    <img src="{{sevDonutDataUrl}}" alt="Répartition des actions par sévérité" style="width: 100%; max-width: 80mm;" />
+  </div>
+  {{/if}}
+</div>
+
+{{#if radarComplianceDataUrl}}
+<p style="margin-top: 6mm; font-weight: 600; color: #4b5563;">Score de conformité par exigence R175</p>
+<div style="text-align: center; margin: 2mm 0;">
+  <img src="{{radarComplianceDataUrl}}" alt="Radar de conformité R175" style="max-width: 130mm;" />
+</div>
+<p class="muted" style="font-size: 9pt;">Score 0-100 par axe : 100 = aucune action corrective ouverte. Pénalisations : -40 par bloquante, -20 par majeure, -10 par mineure.</p>
+{{/if}}
+
 <p class="muted">Détail des actions et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
 {{/if}}
 
@@ -163,6 +182,13 @@
   </tbody>
 </table>
 {{/if}}{{/if}}
+
+{{#if barUsagePowerDataUrl}}
+<h3>Répartition de la puissance par usage</h3>
+<div style="text-align: center; margin: 2mm 0;">
+  <img src="{{barUsagePowerDataUrl}}" alt="Puissance par usage GTB" style="max-width: 140mm;" />
+</div>
+{{/if}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 §6){{/if}}</h1>

@@ -35,18 +35,25 @@ Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md
   - StepValidateBadge dédié : non nécessaire — la colonne `fact_check_status` existante couvre déjà le besoin "marquer une section comme finie".
   - Extraction `AfMetadataPanel/AfEquipmentPanel/...` : déjà fait depuis longtemps (7 sous-composants extraits dans `frontend/src/components/editor/`).
 
+### Lot B2 — Charts dans les PDFs ✅ (1ère vague — audit BACS)
+
+- Nouvelle dépendance `chartjs-node-canvas` + `chart.js` côté backend.
+- Nouveau module [`backend-node/src/lib/pdf-charts.js`](backend-node/src/lib/pdf-charts.js) : helpers `donutSeverity`, `radarCompliance`, `barUsagePower`, `barAfCoverage`. Sortie PNG inline data URL.
+- **PDF audit BACS** :
+  - Donut sévérité (Bloquantes / Majeures / Mineures) dans la synthèse de conformité
+  - Radar 7 axes R175 (R175-3 §1/§2/§3/§4 + R175-4 + R175-5 + R175-6) avec score 0-100 par axe (pénalisations : -40 par bloquante, -20 par majeure, -10 par mineure)
+  - Bar horizontal puissance par usage GTB (chauffage / clim / vent / ECS / éclairage) dans le ch.1 Identification
+- Charts calculés dans `_export-data.js` — réutilisés par export PDF + preview HTML (`<img src="data:image/png;base64,...">` fonctionne dans les 2 cas).
+
+⚠️ Déploiement : nécessite `npm install` backend (canvas natif → cairo/pango sur le VPS).
+
+À venir : charts AF (matrice couverture niveau service via `barAfCoverage`).
+
 ### À venir
-- **Lot B2** — Charts dans les PDFs
+
 - **Lot B4** — Boilerplate admin (méthodologie + disclaimers en DB)
 - **Lot A2** — Brochure backend (DB + routes + lib + variante catalogue d'offres)
 - **Lot A3** — Brochure UI (composition par drag, 2 variantes Brochure / Catalogue)
-- **Lot A4** — Liaison cross-document AF / BACS / Brochure
-- **Lot B5** — Signature électronique (page d'approbation AcroForm)
-- **Lot A1** — Polish AfDetailView (Pinia + sous-composants + scroll-spy + step validate)
-- **Lot B2** — Charts dans les PDFs (donut sévérité + radar conformité + bar puissance)
-- **Lot B4** — Boilerplate admin-configurable (méthodologie + disclaimers en DB)
-- **Lot A2** — Brochure backend (DB + routes + lib + seed)
-- **Lot A3** — Brochure UI (composition par drag)
 - **Lot A4** — Liaison cross-document AF / BACS / Brochure
 
 ### Lot 0 — Documentation foundations *(en cours)*

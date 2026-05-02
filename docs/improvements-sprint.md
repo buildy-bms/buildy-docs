@@ -24,7 +24,7 @@ Deux axes :
 | 2 | ~~**B3** Vue commerciale exportable~~ | — | ❌ Annulé (besoin différent) |
 | 3 | ~~**B5** Signature électronique~~ | — | ❌ Annulé |
 | 4 | **A1** Polish AfDetailView | 2j | ✅ Livré (Pinia + indicateur vérification) |
-| 5 | **B2** Charts dans les PDFs | 1j | ⏳ À venir |
+| 5 | **B2** Charts dans les PDFs | 1j | ✅ Livré (BACS — donut + radar + bar) |
 | 6 | **B4** Boilerplate admin | 1j | ⏳ À venir |
 | 7 | **A2** Brochure backend | 1.5j | ⏳ À venir |
 | 8 | **A3** Brochure UI | 2-3j | ⏳ À venir |
