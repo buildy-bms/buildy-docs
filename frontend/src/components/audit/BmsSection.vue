@@ -205,7 +205,7 @@ function hasNotes(html) {
             </label>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
+          <div v-if="!bms.out_of_service && audit.docId" class="border-t border-gray-100 pt-3">
             <BmsComponentsTable :document-id="audit.docId" />
           </div>
 

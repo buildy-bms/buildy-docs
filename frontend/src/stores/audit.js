@@ -32,7 +32,11 @@ export const useAuditStore = defineStore('audit', {
     auditRefs: { zones: {}, systems: {}, devices: {}, meters: {}, thermal: {} },
     auditProgress: {},
     synthesisHtml: '',
-    loading: false,
+    // loading=true par defaut : evite que les sous-composants ne se
+    // montent avec un state non initialise (notamment BmsComponentsTable
+    // qui fetcherait avec docId=null sinon). Passe a false a la fin de
+    // loadAudit().
+    loading: true,
     saving: false,
   }),
 
