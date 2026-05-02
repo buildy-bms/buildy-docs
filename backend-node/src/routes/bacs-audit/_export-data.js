@@ -283,10 +283,6 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }));
   const heatingCoolingTotal = heatingCoolingBreakdown.reduce((s, d) => s + (Number(d.power_kw) || 0), 0);
 
-  // Top 5 actions prioritaires (utilisé par l'Executive Brief).
-  // Ordre : bloquantes -> majeures -> mineures, puis position.
-  const topActions = numberedItems.slice(0, 5);
-
   const isBacs = af.kind === 'bacs_audit';
 
   // ── Charts (lot B2) ──
@@ -361,7 +357,6 @@ async function buildBacsAuditExportData(af, opts = {}) {
     actionItems,
     actionStats,
     actionItemsRaw, // utile pour audit log et stats
-    topActions, // top 5 prioritaires (Executive Brief)
     synthesisHtml: af.audit_synthesis_html || null,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,

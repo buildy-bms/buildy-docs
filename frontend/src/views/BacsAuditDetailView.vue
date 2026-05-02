@@ -17,8 +17,7 @@ import {
   getBacsBms, updateBacsBms,
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
-  getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsPdfExecutive, previewBacsExecutiveUrl,
-  exportBacsChecklistPdf, deliverBacsAudit,
+  getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice, createBacsDevice,
@@ -922,41 +921,10 @@ async function exportPdf() {
 
 // Aperçu HTML in-browser (sans Puppeteer) — permet de valider visuellement
 // le contenu avant de declencher l'export PDF qui prend ~3-5s.
-// previewKind = 'full' (rapport long) ou 'executive' (synthese 2 pages).
 const previewOpen = ref(false)
-const previewKind = ref('full')
-const previewUrl = computed(() => previewKind.value === 'executive'
-  ? previewBacsExecutiveUrl(docId)
-  : `/api/bacs-audit/${docId}/preview`
-)
-const previewTitle = computed(() => previewKind.value === 'executive'
-  ? `Aperçu — Synthèse direction ${document.value?.client_name || ''}`
-  : `Aperçu — ${isBacs.value ? 'rapport BACS' : 'audit GTB'} ${document.value?.client_name || ''}`
-)
-function openPreview() { previewKind.value = 'full'; previewOpen.value = true }
-function openPreviewExecutive() { previewKind.value = 'executive'; previewOpen.value = true }
+const previewUrl = computed(() => `/api/bacs-audit/${docId}/preview`)
+function openPreview() { previewOpen.value = true }
 function closePreview() { previewOpen.value = false }
-
-// Export PDF Executive (synthese 2 pages decideurs)
-const exportingExecutive = ref(false)
-async function exportPdfExecutive() {
-  exportingExecutive.value = true
-  try {
-    const { data } = await exportBacsPdfExecutive(docId)
-    success(`Synthèse direction générée (${(data.file_size_bytes / 1024).toFixed(0)} Ko)`)
-    window.location.href = data.download_url
-  } catch (e) {
-    error(e.response?.data?.detail || 'Échec de l\'export Executive')
-  } finally {
-    exportingExecutive.value = false
-  }
-}
-function exportFromPreview() {
-  // Quand on clique "Télécharger le PDF" dans la modale d'aperçu, on
-  // genere le PDF correspondant a la version actuellement previewee.
-  if (previewKind.value === 'executive') exportPdfExecutive()
-  else exportPdf()
-}
 
 const bulkUploadOpen = ref(false)
 function openBulkUpload() { bulkUploadOpen.value = true }
@@ -1112,11 +1080,6 @@ onBeforeUnmount(() => {
           title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
           <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'Générer le rapport' }}
-        </button>
-        <button @click="openPreviewExecutive"
-          title="Synthèse direction (2 pages) — version courte pour décideurs : verdict, KPIs, top 5 actions"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 whitespace-nowrap">
-          <SparklesIcon class="w-3.5 h-3.5 shrink-0" /> Synthèse direction
         </button>
         <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
@@ -1375,12 +1338,12 @@ onBeforeUnmount(() => {
 
     <PdfPreviewModal
       v-if="previewOpen"
-      :title="previewTitle"
+      :title="`Aperçu — ${isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
       :preview-url="previewUrl"
-      :downloading="exporting || exportingExecutive"
+      :downloading="exporting"
       download-label="Télécharger le PDF"
       @close="closePreview"
-      @download="exportFromPreview"
+      @download="exportPdf"
     />
   </div>
 </template>
