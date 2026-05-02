@@ -8,7 +8,7 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import PhotoDropTr from './PhotoDropTr.vue'
+import PhotoDropzone from './PhotoDropzone.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import BacsRefBadge from './BacsRefBadge.vue'
 
@@ -234,139 +234,134 @@ async function removeDevice(d) {
       </button>
     </div>
 
-    <!-- Table devices -->
-    <table class="w-full text-xs border-collapse">
-      <thead v-if="devices.length" class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
-        <tr>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Nom</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Nature</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Marque</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-28">Référence</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-32">Énergie</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-24">Puissance&nbsp;(kW)</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-32">Localisation</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-28" title="Communication câblée vers la GTB (paire torsadée, bus, fibre, etc.)">Communication câblée</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-44">Communication</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 4° — L'utilisateur peut arrêter manuellement l'équipement">Arrêt manuel</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-20" title="R175-3 4° — La GTB reprend automatiquement la main de manière autonome">Autonome</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 min-w-40">Notes</th>
-          <th class="text-center py-1.5 px-2 whitespace-nowrap font-semibold border-b border-gray-200 w-12" title="Équipement Hors-Service — pas d'action corrective générée">HS</th>
-          <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-12" title="Photos rattachées à cet équipement">📷</th>
-          <th class="text-center py-1.5 px-2 font-semibold border-b border-gray-200 w-8"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <PhotoDropTr v-for="d in devices" :key="d.id"
-            :row-class="['group border-b border-gray-100 hover:bg-gray-50/60 transition', d.out_of_service ? 'opacity-50' : ''].join(' ')"
-            :site-uuid="siteUuid || ''"
-            :attach-to="{ device_id: d.id }"
-            :enabled="!!siteUuid"
-            @changed="refreshPhotos">
-          <td class="py-1 px-1">
-            <input type="text" :value="d.name" placeholder="Nom"
-                   @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1">
-            <select :value="d.device_role"
-                    @change="e => patchDevice(d, { device_role: e.target.value || null })"
-                    :class="selectCls">
-              <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
-          </td>
-          <td class="py-1 px-1">
-            <input type="text" :value="d.brand" placeholder="Marque"
-                   @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
-                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1">
-            <input type="text" :value="d.model_reference" placeholder="Référence"
-                   @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
-                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1">
-            <select :value="d.energy_source"
-                    @change="e => patchDevice(d, { energy_source: e.target.value || null })"
-                    :class="selectCls">
-              <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-            </select>
-          </td>
-          <td class="py-1 px-1">
-            <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
-                   @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                   :class="inputCls" class="text-center placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1">
+    <!-- Devices : layout en cards (1 par equipement) plutot qu'une
+         table 14 colonnes. Chaque card a 2 rangees d'inputs :
+         (1) identification (nom, marque, ref, energie, puissance, loc)
+         (2) R175 + protocoles + actions (cable, arret, autonome, etc.) -->
+    <div v-if="devices.length" class="space-y-2">
+      <PhotoDropzone v-for="d in devices" :key="d.id"
+          :site-uuid="siteUuid || ''"
+          :attach-to="{ device_id: d.id }"
+          :enabled="!!siteUuid"
+          @changed="refreshPhotos">
+        <div :class="['group bg-white border border-gray-200 rounded-lg p-2.5 transition hover:border-gray-300',
+                      d.out_of_service ? 'opacity-50 bg-gray-50' : '']">
+          <!-- Ligne 1 : identification -->
+          <div class="grid grid-cols-12 gap-2 items-center">
+            <div class="col-span-12 md:col-span-3">
+              <input type="text" :value="d.name" placeholder="Nom de l'équipement"
+                     @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-400 font-medium" />
+            </div>
+            <div class="col-span-6 md:col-span-2">
+              <input type="text" :value="d.brand" placeholder="Marque"
+                     @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
+            </div>
+            <div class="col-span-6 md:col-span-2">
+              <input type="text" :value="d.model_reference" placeholder="Référence"
+                     @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
+            </div>
+            <div class="col-span-4 md:col-span-1">
+              <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="kW"
+                     @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                     :class="inputCls" class="text-right placeholder:text-gray-400" />
+            </div>
+            <div class="col-span-4 md:col-span-2">
+              <select :value="d.energy_source"
+                      @change="e => patchDevice(d, { energy_source: e.target.value || null })"
+                      :class="selectCls">
+                <option :value="null">— Énergie</option>
+                <option v-for="o in ENERGY_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+            <div class="col-span-4 md:col-span-2">
+              <select :value="d.device_role"
+                      @change="e => patchDevice(d, { device_role: e.target.value || null })"
+                      :class="selectCls">
+                <option :value="null">— Nature</option>
+                <option v-for="o in ROLE_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Ligne 2 : localisation + GTB + actions -->
+          <div class="mt-2 flex flex-wrap items-center gap-2">
             <input type="text" :value="d.location" placeholder="Localisation"
                    @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
-                   :class="inputCls" class="placeholder:italic placeholder:text-gray-400" />
-          </td>
-          <td class="py-1 px-1 text-center">
-            <input type="checkbox" :checked="!!d.wired"
-                   @change="e => patchDevice(d, { wired: e.target.checked })"
-                   class="rounded border-gray-300"
-                   title="Communication câblée vers la GTB" />
-          </td>
-          <td class="py-1 px-1">
-            <ProtocolMultiPicker
-              :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
-              :options="COMM_OPTIONS"
-              size="xs"
-              @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
-            />
-          </td>
-          <td class="py-1 px-1 text-center">
-            <input type="checkbox" :checked="!!d.meets_r175_3_p4"
-                   @change="e => patchDevice(d, { meets_r175_3_p4: e.target.checked })"
-                   class="rounded border-gray-300" />
-          </td>
-          <td class="py-1 px-1 text-center">
-            <input type="checkbox" :checked="!!d.meets_r175_3_p4_autonomous"
-                   @change="e => patchDevice(d, { meets_r175_3_p4_autonomous: e.target.checked })"
-                   class="rounded border-gray-300" />
-          </td>
-          <td class="py-1 px-1 text-center">
-            <button
-              type="button"
-              @click="emit('open-device-notes', d)"
-              :class="['inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border transition',
-                hasNotes(d.notes_html || d.notes)
-                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                  : 'border-gray-300 text-gray-500 hover:bg-gray-50']"
-              :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter des notes'"
-            >
+                   :class="inputCls" class="flex-1 min-w-32 placeholder:italic placeholder:text-gray-400" />
+
+            <!-- R175-3 4° + cable comm GTB en pills cliquables -->
+            <button type="button"
+                    @click="patchDevice(d, { wired: !d.wired })"
+                    :class="['pill border', d.wired ? 'tone-success' : 'tone-muted']"
+                    title="Communication câblée vers la GTB">
+              <span>{{ d.wired ? '✓' : '○' }}</span> Câblé
+            </button>
+            <button type="button"
+                    @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
+                    :class="['pill border', d.meets_r175_3_p4 ? 'tone-success' : 'tone-muted']"
+                    title="R175-3 4° — Arrêt manuel possible">
+              <span>{{ d.meets_r175_3_p4 ? '✓' : '○' }}</span> Arrêt manuel
+            </button>
+            <button type="button"
+                    @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
+                    :class="['pill border', d.meets_r175_3_p4_autonomous ? 'tone-success' : 'tone-muted']"
+                    title="R175-3 4° — Reprise autonome de la GTB">
+              <span>{{ d.meets_r175_3_p4_autonomous ? '✓' : '○' }}</span> Autonome
+            </button>
+
+            <div class="w-44">
+              <ProtocolMultiPicker
+                :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
+                :options="COMM_OPTIONS"
+                size="xs"
+                @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
+              />
+            </div>
+
+            <button type="button" @click="emit('open-device-notes', d)"
+                    :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
+                      hasNotes(d.notes_html || d.notes)
+                        ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                    :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter des notes'">
               <PencilSquareIcon class="w-3.5 h-3.5" />
               {{ hasNotes(d.notes_html || d.notes) ? 'Notes' : '+ Notes' }}
             </button>
-          </td>
-          <td class="py-1 px-1 text-center">
-            <input type="checkbox" :checked="!!d.out_of_service"
-                   @change="e => patchDevice(d, { out_of_service: e.target.checked })"
-                   class="rounded border-gray-300 accent-red-500" />
-          </td>
-          <td class="py-1 px-1 text-center">
+
             <input type="file" accept="image/*" class="hidden"
                    :ref="el => { if (el) fileInputs[d.id] = el }"
                    @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
             <button @click="pickPhotoFor(d.id)"
-                    class="inline-flex items-center gap-1 text-gray-500 hover:text-indigo-600 transition"
+                    class="inline-flex items-center gap-1 text-gray-500 hover:text-indigo-600 transition px-1.5"
                     :title="`Ajouter une photo (${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''})`">
-              <CameraIcon class="w-3.5 h-3.5" />
+              <CameraIcon class="w-4 h-4" />
               <span v-if="(photosByDevice[d.id] || []).length" class="text-[10px] font-mono">
                 {{ (photosByDevice[d.id] || []).length }}
               </span>
             </button>
-          </td>
-          <td class="py-1 px-1 text-center">
-            <button @click="dupDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition mr-1" title="Dupliquer">
-              <DocumentDuplicateIcon class="w-3.5 h-3.5" />
-            </button>
-            <button @click="removeDevice(d)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition" title="Supprimer">
-              <TrashIcon class="w-3.5 h-3.5" />
-            </button>
-          </td>
-        </PhotoDropTr>
-      </tbody>
-    </table>
+
+            <label class="inline-flex items-center gap-1 text-[11px] cursor-pointer text-red-600"
+                   title="Hors-Service — ignoré dans le plan d'action">
+              <input type="checkbox" :checked="!!d.out_of_service"
+                     @change="e => patchDevice(d, { out_of_service: e.target.checked })"
+                     class="rounded border-gray-300 accent-red-500" />
+              HS
+            </label>
+
+            <div class="flex items-center gap-1 ml-auto opacity-0 group-hover:opacity-100 transition">
+              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+                <DocumentDuplicateIcon class="w-4 h-4" />
+              </button>
+              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                <TrashIcon class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </PhotoDropzone>
+    </div>
   </div>
 </template>

@@ -135,11 +135,13 @@ function hasNotes(html) {
                              class="rounded border-gray-300" />
                       <span class="text-gray-700">Présent</span>
                     </label>
-                    <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap"
-                           :class="s.present ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'">
-                      <input type="checkbox" :checked="!!s.not_concerned" :disabled="!!s.present"
-                             @change="e => patchSystem(s, { not_concerned: e.target.checked, present: e.target.checked ? false : !!s.present })"
-                             class="rounded border-gray-300 disabled:opacity-30" />
+                    <!-- Toggle "Non concerne" cache si systeme present : evite le bruit visuel.
+                         Quand le systeme est marque present, ce flag n'a pas de sens. -->
+                    <label v-if="!s.present"
+                           class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer">
+                      <input type="checkbox" :checked="!!s.not_concerned"
+                             @change="e => patchSystem(s, { not_concerned: e.target.checked })"
+                             class="rounded border-gray-300" />
                       <span class="text-gray-500 italic">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
                     </label>
                     <button
