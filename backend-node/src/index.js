@@ -42,7 +42,10 @@ async function main() {
   }
   const fastify = require('fastify')(fastifyOpts);
 
-  await fastify.register(require('@fastify/cookie'));
+  // Cookies signes : @fastify/cookie HMAC-signe les cookies si secret
+   // est fourni. On reutilise jwtSecret (deja aleatoire en dev / env en prod).
+  // setCookie({ signed: true }) signe a l'emission, parseSignedCookie() valide.
+  await fastify.register(require('@fastify/cookie'), { secret: config.jwtSecret });
   await fastify.register(require('@fastify/jwt'), { secret: config.jwtSecret });
   await fastify.register(require('@fastify/multipart'), {
     limits: { fileSize: 10 * 1024 * 1024, files: 1 }, // 10 MB / fichier
@@ -150,13 +153,15 @@ async function main() {
     log.info('No frontend/dist (dev mode — frontend served by Vite on :5173)');
   }
 
-  // Request log
+  // Request log : on strip les query params (peuvent contenir des
+  // tokens, secrets, identifiants nominatifs) et on attache request.id
+  // (auto-genere par Fastify) pour la correlation cross-logs.
   fastify.addHook('onResponse', (request, reply, done) => {
-    const url = request.url.split('?')[0];
-    if (url !== '/api/health') {
+    const path = request.url.split('?')[0];
+    if (path !== '/api/health') {
       const ms = Math.round(reply.elapsedTime);
       const level = reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warn' : 'info';
-      log[level](`${request.method} ${request.url} ${reply.statusCode} (${ms}ms) ip=${request.ip}`);
+      log[level](`${request.method} ${path} ${reply.statusCode} (${ms}ms) ip=${request.ip} rid=${request.id}`);
     }
     done();
   });

@@ -20,11 +20,13 @@ async function routes(fastify) {
 
     try {
       const params = oidc.generateOidcParams();
+      // Cookie signe (HMAC via @fastify/cookie secret). Permet de detecter
+      // toute manipulation par un client malveillant.
       reply.setCookie('docs_oidc_state', JSON.stringify({
         state: params.state,
         nonce: params.nonce,
         codeVerifier: params.codeVerifier,
-      }), cookieOpts(300));
+      }), { ...cookieOpts(300), signed: true });
 
       const authUrl = await oidc.getAuthorizationUrl(config, params);
       return reply.redirect(authUrl);
@@ -46,7 +48,10 @@ async function routes(fastify) {
 
     let oidcState;
     try {
-      oidcState = JSON.parse(request.cookies.docs_oidc_state || '{}');
+      // Verifie la signature HMAC du cookie avant de l'utiliser.
+      const unsigned = request.unsignCookie(request.cookies.docs_oidc_state || '');
+      if (!unsigned.valid) throw new Error('signature invalide');
+      oidcState = JSON.parse(unsigned.value || '{}');
     } catch {
       return reply.code(400).send({ detail: 'Etat OIDC invalide' });
     }
