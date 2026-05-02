@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
 import { InformationCircleIcon } from '@heroicons/vue/24/outline'
 
 /**
@@ -20,16 +20,41 @@ const props = defineProps({
 })
 
 const open = ref(false)
+const wrapperEl = ref(null)
+const popupEl = ref(null)
+const popupPos = ref({ top: 0, left: 0 })
+const POPUP_WIDTH = 384 // w-96
 let timer = null
 
-function show() {
+function updatePosition() {
+  if (!wrapperEl.value) return
+  const r = wrapperEl.value.getBoundingClientRect()
+  let left = r.left
+  let top = r.bottom + 4
+  // contraint dans la viewport horizontalement (8px de marge)
+  if (left + POPUP_WIDTH > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - POPUP_WIDTH - 8)
+  }
+  // flip vers le haut si pas la place en bas
+  const popupH = popupEl.value?.offsetHeight ?? 200
+  if (top + popupH > window.innerHeight - 8 && r.top > popupH + 8) {
+    top = r.top - popupH - 4
+  }
+  popupPos.value = { top, left }
+}
+
+async function show() {
   clearTimeout(timer)
   open.value = true
+  await nextTick()
+  updatePosition()
 }
 function hideDelayed() {
   clearTimeout(timer)
   timer = setTimeout(() => { open.value = false }, 150)
 }
+
+onBeforeUnmount(() => clearTimeout(timer))
 
 // Extraits abrégés des articles R175 (seuls les points clés pour la saisie)
 // Notation canonique : "1°", "2°"... — JAMAIS "§". Le lookup normalise les
@@ -98,25 +123,29 @@ const data = computed(() => {
 </script>
 
 <template>
-  <span class="relative inline-flex items-center" @mouseenter="show" @mouseleave="hideDelayed">
+  <span ref="wrapperEl" class="inline-flex items-center" @mouseenter="show" @mouseleave="hideDelayed">
     <button type="button" class="text-gray-400 hover:text-indigo-600 transition" tabindex="-1">
       <InformationCircleIcon class="w-4 h-4" />
     </button>
-    <transition
-      enter-active-class="transition ease-out duration-100"
-      enter-from-class="opacity-0 translate-y-1"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-75"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="open"
-           class="absolute z-50 left-0 top-6 w-96 bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-sm"
-           @mouseenter="show" @mouseleave="hideDelayed">
-        <div class="font-semibold text-gray-800 mb-1.5">{{ data?.title || article }}</div>
-        <div class="text-gray-600 text-xs leading-relaxed" v-html="data?.body" />
-        <slot />
-      </div>
-    </transition>
+    <Teleport to="body">
+      <transition
+        enter-active-class="transition ease-out duration-100"
+        enter-from-class="opacity-0 translate-y-1"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition ease-in duration-75"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="open"
+             ref="popupEl"
+             :style="{ top: popupPos.top + 'px', left: popupPos.left + 'px', width: POPUP_WIDTH + 'px' }"
+             class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-sm"
+             @mouseenter="show" @mouseleave="hideDelayed">
+          <div class="font-semibold text-gray-800 mb-1.5">{{ data?.title || article }}</div>
+          <div class="text-gray-600 text-xs leading-relaxed" v-html="data?.body" />
+          <slot />
+        </div>
+      </transition>
+    </Teleport>
   </span>
 </template>
