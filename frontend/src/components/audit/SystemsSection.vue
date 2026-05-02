@@ -2,8 +2,8 @@
 import { storeToRefs } from 'pinia'
 import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
@@ -23,6 +23,7 @@ const props = defineProps({
   systemNegativeLabels: { type: Object, required: true },
   zoneNatures: { type: Array, required: true },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
 })
 const showNotConcernedSystems = defineModel('showNotConcernedSystems', { type: Boolean, default: false })
 const emit = defineEmits([
@@ -51,20 +52,25 @@ function hasNotes(html) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="systems" section-id="section-systems">
+  <CollapsibleSection storage-key="systems" section-id="section-systems" :active="active">
     <template #header>
-      <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
-      <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
-      <span v-if="audit.isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
-        R175-1 4°<R175Tooltip article="R175-1 4°" />
-        <span class="mx-1">/</span>
-        R175-3 3°, 4°<R175Tooltip article="R175-3" />
-      </span>
-      <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
-        Total chauffage + clim :
-        <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
-      </span>
-      <StepValidateBadge :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="3" title="Systèmes techniques par zone"
+                     :subtitle="audit.isBacs ? 'R175-1 4° + R175-3 3°, 4°' : 'Inventaire des systèmes'"
+                     :icon="WrenchScrewdriverIcon" icon-color="text-indigo-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template v-if="audit.isBacs" #subtitle-extra>
+          <R175Tooltip article="R175-1 4°" />
+          <R175Tooltip article="R175-3" />
+        </template>
+        <template #actions>
+          <span class="text-xs text-gray-600 whitespace-nowrap">
+            Chauffage + clim :
+            <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
+          </span>
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="systemsByZone.length">

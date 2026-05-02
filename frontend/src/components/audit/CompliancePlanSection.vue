@@ -1,8 +1,8 @@
 <script setup>
 import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 
 // Section "Plan de mise en conformité" (R175 — actions correctives auto
 // + manuelles + annotations commerciales). Affiche les items visibles
@@ -13,12 +13,13 @@ const props = defineProps({
   itemsBySeverity: { type: Object, required: true },
   resolvedCount: { type: Number, default: 0 },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
   severityLabels: {
     type: Object,
     default: () => ({
-      blocking: { label: 'Bloquante', cls: 'bg-red-100 text-red-700 border-red-300' },
-      major: { label: 'Majeure', cls: 'bg-orange-100 text-orange-700 border-orange-300' },
-      minor: { label: 'Mineure', cls: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+      blocking: { label: 'Bloquante', cls: 'sev-blocking' },
+      major: { label: 'Majeure', cls: 'sev-major' },
+      minor: { label: 'Mineure', cls: 'sev-minor' },
     }),
   },
   statusLabels: {
@@ -48,25 +49,26 @@ function hasNotes(html) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="review" section-id="section-review">
+  <CollapsibleSection storage-key="review" section-id="section-review" :active="active">
     <template #header>
-      <ExclamationTriangleIcon class="w-5 h-5 text-orange-500" />
-      <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
-      <span class="text-xs text-gray-500">
-        {{ visibleActionItems.length }} action{{ visibleActionItems.length > 1 ? 's' : '' }}<span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }} masquée{{ resolvedCount > 1 ? 's' : '' }}</span>
-      </span>
-      <button
-        @click.stop="emit('regenerate')"
-        title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
-        class="ml-auto inline-flex items-center gap-1 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">
-        <ArrowPathIcon class="w-3.5 h-3.5" /> Régénérer le plan
-      </button>
-      <button
-        @click.stop="emit('open-commercial')"
-        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-        Vue commerciale →
-      </button>
-      <StepValidateBadge :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="11" title="Plan de mise en conformité"
+                     :subtitle="`${visibleActionItems.length} action${visibleActionItems.length > 1 ? 's' : ''}${resolvedCount ? ' · ' + resolvedCount + ' résolue' + (resolvedCount > 1 ? 's' : '') + ' masquée' + (resolvedCount > 1 ? 's' : '') : ''}`"
+                     :icon="ExclamationTriangleIcon" icon-color="text-orange-500"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template #actions>
+          <button @click.stop="emit('regenerate')"
+                  title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
+                  class="inline-flex items-center gap-1 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">
+            <ArrowPathIcon class="w-3.5 h-3.5" /> Régénérer
+          </button>
+          <button @click.stop="emit('open-commercial')"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+            Vue commerciale →
+          </button>
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="visibleActionItems.length">

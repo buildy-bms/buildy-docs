@@ -157,6 +157,31 @@ strong, b { font-weight: 500; }
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium
            rounded-full;
   }
+
+  /**
+   * Couleurs sémantiques unifiées (lot 1 — refonte UI audit).
+   * Réservées aux états et aux notifications. Plutôt que recopier
+   * `bg-red-50 text-red-700 border-red-200` 50× dans le code, on
+   * passe par une seule classe (sev-*, tone-*).
+   *
+   * Sévérité R175 (3 niveaux, ordonnés par gravité décroissante) :
+   *   - .sev-blocking : bloquant pour la conformité
+   *   - .sev-major    : action majeure à programmer
+   *   - .sev-minor    : action mineure / amélioration
+   *
+   * Tonalités neutres (info, succès, recommandations Buildy) :
+   *   - .tone-info    : indigo Buildy (info, focus)
+   *   - .tone-success : vert (validé, conforme)
+   *   - .tone-recco   : violet (préconisations alternatives)
+   *   - .tone-muted   : gris (désactivé, neutre)
+   */
+  .sev-blocking { @apply bg-red-50 text-red-700 border border-red-200; }
+  .sev-major    { @apply bg-orange-50 text-orange-700 border border-orange-200; }
+  .sev-minor    { @apply bg-amber-50 text-amber-700 border border-amber-200; }
+  .tone-info    { @apply bg-indigo-50 text-indigo-700 border border-indigo-200; }
+  .tone-success { @apply bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .tone-recco   { @apply bg-violet-50 text-violet-700 border border-violet-200; }
+  .tone-muted   { @apply bg-gray-50 text-gray-600 border border-gray-200; }
 }
 
 /* ─── Checkboxes Buildy : rondes, vert #00cd92 quand cochees ─────────

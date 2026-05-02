@@ -1,8 +1,8 @@
 <script setup>
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 
 // Section 12 — Note de synthèse (rédigée à la main ou pré-remplie via
 // Claude). Affichée en tête du PDF d'audit livré au client.
@@ -13,6 +13,7 @@ const props = defineProps({
   claudeUsage: { type: Object, default: null },
   step: { type: Object, default: null },
   usageTooltip: { type: String, default: '' },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'generate', 'update:synthesis-html',
@@ -21,15 +22,20 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <CollapsibleSection storage-key="synthesis" section-id="section-synthesis">
+  <CollapsibleSection storage-key="synthesis" section-id="section-synthesis" :active="active">
     <template #header>
-      <SparklesIcon class="w-5 h-5 text-violet-500" />
-      <h2 class="text-base font-semibold text-gray-800">12. Note de synthèse</h2>
-      <span class="text-xs text-gray-500">Affichée en tête du PDF d'audit livré au client.</span>
-      <span v-if="generatedAt" class="text-[11px] text-violet-700 italic">
-        ✨ Générée le {{ new Date(generatedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
-      </span>
-      <StepValidateBadge class="ml-auto" :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="12" title="Note de synthèse"
+                     subtitle="Affichée en tête du PDF d'audit livré au client."
+                     :icon="SparklesIcon" icon-color="text-violet-500"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template v-if="generatedAt" #subtitle-extra>
+          <span class="text-[11px] text-violet-700 italic">
+            ✨ Générée le {{ new Date(generatedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) }}
+          </span>
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="synthesisHtml">

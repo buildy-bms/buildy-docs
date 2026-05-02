@@ -3,12 +3,14 @@ import { storeToRefs } from 'pinia'
 import { ClockIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
 // Section "Inspection périodique par un tiers" (R175-5-1) — utilise
 // directement le store Pinia useAuditStore, plus de props nécessaires.
+defineProps({ active: { type: Boolean, default: false } })
 const audit = useAuditStore()
 const { inspections, latestInspection, todayIso } = storeToRefs(audit)
 const { error } = useNotification()
@@ -42,15 +44,18 @@ async function removeInspection(ins) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="inspections" section-id="section-inspections">
+  <CollapsibleSection storage-key="inspections" section-id="section-inspections" :active="active">
     <template #header>
-      <ClockIcon class="w-5 h-5 text-amber-600" />
-      <h2 class="text-base font-semibold text-gray-800">7. Inspection périodique par un tiers</h2>
-      <span class="text-xs text-gray-500">R175-5-1 — rapport conservé 10 ans</span>
-      <R175Tooltip article="R175-5-1" />
-      <button @click.stop="addInspection" class="ml-auto btn-primary text-xs px-2.5 py-1">
-        <PlusIcon class="w-3.5 h-3.5" /> Ajouter
-      </button>
+      <SectionHeader number="7" title="Inspection périodique par un tiers"
+                     subtitle="R175-5-1 — rapport conservé 10 ans"
+                     :icon="ClockIcon" icon-color="text-amber-600">
+        <template #subtitle-extra><R175Tooltip article="R175-5-1" /></template>
+        <template #actions>
+          <button @click.stop="addInspection" class="btn-primary text-xs px-2.5 py-1">
+            <PlusIcon class="w-3.5 h-3.5" /> Ajouter
+          </button>
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="inspections.length">

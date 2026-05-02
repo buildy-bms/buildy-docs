@@ -1,8 +1,8 @@
 <script setup>
 import { FireIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsRefBadge from '@/components/BacsRefBadge.vue'
@@ -19,6 +19,7 @@ const props = defineProps({
   generatorOptions: { type: Array, required: true },
   generatorDevicesForZoneCategory: { type: Function, required: true },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits(['validate-step', 'invalidate-step'])
 
@@ -35,13 +36,16 @@ async function patchThermal(t, patch) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="thermal" section-id="section-thermal">
+  <CollapsibleSection storage-key="thermal" section-id="section-thermal" :active="active">
     <template #header>
-      <FireIcon class="w-5 h-5 text-red-500" />
-      <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
-      <R175Tooltip article="R175-6" />
-      <span class="text-xs text-gray-500">R175-6</span>
-      <StepValidateBadge class="ml-auto" :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="5" title="Régulation thermique automatique"
+                     subtitle="R175-6"
+                     :icon="FireIcon" icon-color="text-red-500"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template #subtitle-extra><R175Tooltip article="R175-6" /></template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="thermalFiltered.length">

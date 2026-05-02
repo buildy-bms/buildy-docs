@@ -19,6 +19,8 @@ const props = defineProps({
   defaultOpen: { type: Boolean, default: true },
   // Permet de passer un id de scroll-to-section sur le wrapper
   sectionId: { type: String, default: null },
+  // Mise en evidence visuelle de la section active (calee sur le stepper).
+  active: { type: Boolean, default: false },
 })
 
 const STORAGE_PREFIX = 'bacs-collapse:'
@@ -52,7 +54,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section :id="sectionId" class="bg-white border border-gray-200 rounded-lg shadow-sm scroll-mt-24">
+  <section :id="sectionId"
+           :class="['bg-white border rounded-lg shadow-sm scroll-mt-24 transition-shadow',
+                    active ? 'border-l-4 border-l-indigo-500 border-y-gray-200 border-r-gray-200 shadow-md ring-1 ring-indigo-100/50'
+                           : 'border-gray-200']">
     <header
       class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50/60 transition select-none"
       :class="{ 'border-b-0 rounded-lg': !open }"

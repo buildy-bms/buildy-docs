@@ -259,9 +259,9 @@ const GENERATOR_OPTIONS = [
   { value: 'other', label: 'Autre' },
 ]
 const SEVERITY_LABEL = {
-  blocking: { label: 'Bloquante', cls: 'bg-red-100 text-red-700 border-red-300' },
-  major: { label: 'Majeure', cls: 'bg-orange-100 text-orange-700 border-orange-300' },
-  minor: { label: 'Mineure', cls: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  blocking: { label: 'Bloquante', cls: 'sev-blocking' },
+  major: { label: 'Majeure', cls: 'sev-major' },
+  minor: { label: 'Mineure', cls: 'sev-minor' },
 }
 const STATUS_LABEL = {
   open: 'Ouverte',
@@ -630,25 +630,62 @@ async function invalidateStep(stepKey) {
   }
 }
 
+// Mapping bidirectionnel step ↔ id DOM, utilise par onStepClick (click
+// stepper -> scroll) et par le scroll-spy (scroll page -> highlight stepper).
+const STEP_TO_SECTION_ID = {
+  identification: 'section-identification',
+  zones: 'section-zones',
+  systems: 'section-systems',
+  meters: 'section-meters',
+  thermal: 'section-thermal',
+  bms: 'section-bms',
+  inspections: 'section-inspections',
+  documents: 'section-documents',
+  credentials: 'section-credentials',
+  review: 'section-review',
+  synthesis: 'section-synthesis',
+}
+const SECTION_ID_TO_STEP = Object.fromEntries(
+  Object.entries(STEP_TO_SECTION_ID).map(([k, v]) => [v, k])
+)
+
 function onStepClick(key) {
-  activeStepKey.value = activeStepKey.value === key ? null : key
-  // Scroll vers la section correspondante
-  const targetId = {
-    identification: 'section-identification',
-    zones: 'section-zones',
-    systems: 'section-systems',
-    meters: 'section-meters',
-    thermal: 'section-thermal',
-    bms: 'section-bms',
-    documents: 'section-documents',
-    credentials: 'section-credentials',
-    review: 'section-review',
-    synthesis: 'section-synthesis',
-  }[key]
+  activeStepKey.value = key
+  const targetId = STEP_TO_SECTION_ID[key]
   if (targetId) {
     const el = window.document.getElementById(targetId)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+}
+
+// Scroll-spy : observe les sections qui entrent/sortent du viewport et
+// promote la plus haute visible comme step actif. Ainsi le stepper et la
+// bordure indigo gauche restent synchronisés avec la position de scroll.
+let _spyObserver = null
+function setupScrollSpy() {
+  if (_spyObserver) _spyObserver.disconnect()
+  const sections = Object.values(STEP_TO_SECTION_ID)
+    .map(id => window.document.getElementById(id))
+    .filter(Boolean)
+  if (!sections.length) return
+  const visible = new Set()
+  _spyObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) visible.add(e.target.id)
+      else visible.delete(e.target.id)
+    }
+    // Choisis la section visible la plus haute dans la page.
+    const topId = [...visible]
+      .map(id => ({ id, top: window.document.getElementById(id)?.getBoundingClientRect().top ?? Infinity }))
+      .sort((a, b) => a.top - b.top)[0]?.id
+    if (topId) activeStepKey.value = SECTION_ID_TO_STEP[topId] || activeStepKey.value
+  }, {
+    // Marge haute négative pour que la section "active" se déclenche
+    // dès qu'elle dépasse le 1/3 supérieur du viewport.
+    rootMargin: '-30% 0px -60% 0px',
+    threshold: [0, 0.1, 0.5],
+  })
+  sections.forEach(s => _spyObserver.observe(s))
 }
 
 // ── Note de synthese (etape 12, redaction assistee Claude) ──
@@ -770,10 +807,10 @@ function hasNotes(htmlOrText) {
 
 // ── Applicabilité R175-2 ──
 const APPLICABILITY_LABEL = {
-  subject_immediate: { label: 'Soumis (immédiat)', cls: 'bg-red-100 text-red-700 border-red-300' },
-  subject_2025: { label: 'Soumis — échéance 1er janvier 2025', cls: 'bg-orange-100 text-orange-700 border-orange-300' },
-  subject_2027: { label: 'Soumis — échéance 1er janvier 2027', cls: 'bg-amber-100 text-amber-700 border-amber-300' },
-  not_subject: { label: 'Non assujetti (puissance < 70 kW)', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  subject_immediate: { label: 'Soumis (immédiat)', cls: 'sev-blocking' },
+  subject_2025: { label: 'Soumis — échéance 1er janvier 2025', cls: 'sev-major' },
+  subject_2027: { label: 'Soumis — échéance 1er janvier 2027', cls: 'sev-minor' },
+  not_subject: { label: 'Non assujetti (puissance < 70 kW)', cls: 'tone-success' },
 }
 
 let docSaveTimer = null
@@ -939,6 +976,21 @@ onMounted(() => {
   loadCollapseState()
   refresh()
 })
+
+import { onBeforeUnmount, nextTick } from 'vue'
+
+// Active le scroll-spy une fois que les sections sont rendues dans
+// le DOM (apres loadAudit qui passe loading=false).
+watch(loading, async (isLoading) => {
+  if (!isLoading) {
+    await nextTick()
+    setupScrollSpy()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (_spyObserver) { _spyObserver.disconnect(); _spyObserver = null }
+})
 </script>
 
 <template>
@@ -1028,7 +1080,7 @@ onMounted(() => {
 
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else class="grid grid-cols-[180px_1fr] gap-4 items-start">
+    <div v-else class="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4 items-start">
       <!-- Stepper vertical sticky : visible tout au long du scroll de la page -->
       <BacsAuditStepper
         :steps="stepperSteps"
@@ -1040,9 +1092,9 @@ onMounted(() => {
       />
 
       <!-- Colonne principale : contenu de l'audit -->
-      <div class="space-y-4 min-w-0">
+      <div class="space-y-6 min-w-0">
       <!-- Synthese severities (compactee) — hors site_audit (pas de plan d'actions) -->
-      <div v-if="isBacs" class="grid grid-cols-3 gap-2">
+      <div v-if="isBacs" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div v-for="sev in ['blocking','major','minor']" :key="sev"
              :class="['rounded-lg border px-3 py-2 flex items-center gap-3', SEVERITY_LABEL[sev].cls]">
           <div class="text-2xl font-semibold leading-none">{{ itemsBySeverity[sev].length }}</div>
@@ -1055,6 +1107,7 @@ onMounted(() => {
 
       <!-- 1. Identification + Applicabilité R175-2 -->
       <IdentificationSection
+        :active="activeStepKey === 'identification'"
         :step="stepFor('identification')"
         :applicability-labels="APPLICABILITY_LABEL"
         @save-doc="saveDocDebounced"
@@ -1065,6 +1118,7 @@ onMounted(() => {
 
       <!-- 2. Zones fonctionnelles (R175-1 6°) -->
       <ZonesSection
+        :active="activeStepKey === 'zones'"
         :zone-natures="ZONE_NATURES"
         :step="stepFor('zones')"
         @open-notes="openNotesModal"
@@ -1075,6 +1129,7 @@ onMounted(() => {
 
       <!-- 3. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
       <SystemsSection
+        :active="activeStepKey === 'systems'"
         :systems-by-zone="systemsByZone"
         :devices-by-system="devicesBySystem"
         :hidden-not-concerned-count="hiddenNotConcernedCount"
@@ -1095,6 +1150,7 @@ onMounted(() => {
 
       <!-- 4. Compteurs et mesurage (R175-3 1°) -->
       <MetersSection
+        :active="activeStepKey === 'meters'"
         :meter-usages="METER_USAGES"
         :protocol-options="PROTOCOL_OPTIONS"
         :step="stepFor('meters')"
@@ -1107,6 +1163,7 @@ onMounted(() => {
       <!-- 5. Régulation thermique automatique (R175-6) -->
       <ThermalSection
         v-if="isBacs"
+        :active="activeStepKey === 'thermal'"
         :thermal-filtered="thermalFiltered"
         :regulation-options="REGULATION_OPTIONS"
         :generator-options="GENERATOR_OPTIONS"
@@ -1118,6 +1175,7 @@ onMounted(() => {
 
       <!-- 6. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
       <BmsSection
+        :active="activeStepKey === 'bms'"
         :bms-steps="bmsSteps"
         :devices-with-meta="devicesWithMeta"
         :meters-present="metersPresent"
@@ -1132,10 +1190,11 @@ onMounted(() => {
       />
 
       <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
-      <InspectionsSection v-if="isBacs" />
+      <InspectionsSection v-if="isBacs" :active="activeStepKey === 'inspections'" />
 
       <!-- 9. Documents du site (DOE) -->
       <DocumentsSection
+        :active="activeStepKey === 'documents'"
         :site-doc-counts="siteDocCounts"
         :step="stepFor('documents')"
         @validate-step="validateStep"
@@ -1144,6 +1203,7 @@ onMounted(() => {
 
       <!-- 10. Credentials du site (accès) -->
       <CredentialsSection
+        :active="activeStepKey === 'credentials'"
         :site-cred-count="siteCredCount"
         :step="stepFor('credentials')"
         @validate-step="validateStep"
@@ -1153,6 +1213,7 @@ onMounted(() => {
       <!-- Plan de mise en conformité — masqué en mode site_audit -->
       <CompliancePlanSection
         v-if="isBacs"
+        :active="activeStepKey === 'review'"
         :visible-action-items="visibleActionItems"
         :items-by-severity="itemsBySeverity"
         :resolved-count="resolvedCount"
@@ -1169,6 +1230,7 @@ onMounted(() => {
 
       <!-- 12. Note de synthèse (Claude) -->
       <SynthesisSection
+        :active="activeStepKey === 'synthesis'"
         :synthesis-html="synthesisHtml"
         :synthesis-generating="synthesisGenerating"
         :generated-at="document?.audit_synthesis_generated_at"

@@ -2,14 +2,15 @@
 import { storeToRefs } from 'pinia'
 import { DocumentArrowDownIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import SiteDocumentsManager from '@/components/SiteDocumentsManager.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import { useAuditStore } from '@/stores/audit'
 
 // Section 9 — Documents du site (DOE).
 const props = defineProps({
   siteDocCounts: { type: Object, required: true },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits(['validate-step', 'invalidate-step'])
 
@@ -18,12 +19,14 @@ const { document, systems, zones, meters, devices, bms } = storeToRefs(audit)
 </script>
 
 <template>
-  <CollapsibleSection storage-key="documents" section-id="section-documents">
+  <CollapsibleSection storage-key="documents" section-id="section-documents" :active="active">
     <template #header>
-      <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
-      <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
-      <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
-      <StepValidateBadge class="ml-auto" :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="9" title="Documents du site"
+                     subtitle="DOE — plans, schémas, AF, datasheets, manuels…"
+                     :icon="DocumentArrowDownIcon" icon-color="text-blue-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)" />
     </template>
     <template #summary>
       <span v-if="siteDocCounts.doe || siteDocCounts.photo">

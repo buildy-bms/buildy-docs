@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia'
 import { WrenchScrewdriverIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
@@ -28,6 +28,7 @@ const props = defineProps({
   systemLabels: { type: Object, required: true },
   protocolOptions: { type: Array, required: true },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step',
@@ -80,36 +81,39 @@ function hasNotes(html) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="bms" section-id="section-bms">
+  <CollapsibleSection storage-key="bms" section-id="section-bms" :active="active">
     <template #header>
-      <WrenchScrewdriverIcon class="w-5 h-5 text-purple-600" />
-      <h2 class="text-base font-semibold text-gray-800">{{ audit.isBacs ? '6. Solution GTB / GTC en place' : '5. Solution de supervision en place' }}</h2>
-      <span v-if="audit.isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
-        R175-3<R175Tooltip article="R175-3" />
-        <span class="mx-0.5">+</span>
-        R175-4<R175Tooltip article="R175-4" />
-        <span class="mx-0.5">+</span>
-        R175-5<R175Tooltip article="R175-5" />
-      </span>
-      <div class="ml-auto flex items-center gap-2">
-        <button
-          type="button"
-          @click="emit('open-notes', { title: 'Notes GTB', contextLabel: 'Solution GTB / GTC : ' + (bms.existing_solution || 'a renseigner'), entityType: 'bms', entityRef: bms, currentHtml: bms.notes_html || '' })"
-          :class="['inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition',
-            hasNotes(bms.notes_html)
-              ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-              : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-          title="Editer les notes GTB">
-          <PencilSquareIcon class="w-4 h-4" />
-          {{ hasNotes(bms.notes_html) ? 'Notes' : '+ Notes' }}
-        </button>
-        <BacsPhotoButton
-          v-if="document?.site_uuid && bms.document_id"
-          :site-uuid="document.site_uuid"
-          :attach-to="{ bms_document_id: bms.document_id }"
-          label="GTB" size="md" />
-        <StepValidateBadge :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
-      </div>
+      <SectionHeader :number="audit.isBacs ? '6' : '5'"
+                     :title="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
+                     :subtitle="audit.isBacs ? 'R175-3 + R175-4 + R175-5' : 'Inventaire du superviseur en place'"
+                     :icon="WrenchScrewdriverIcon" icon-color="text-purple-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template v-if="audit.isBacs" #subtitle-extra>
+          <R175Tooltip article="R175-3" />
+          <R175Tooltip article="R175-4" />
+          <R175Tooltip article="R175-5" />
+        </template>
+        <template #actions>
+          <button
+            type="button"
+            @click="emit('open-notes', { title: 'Notes GTB', contextLabel: 'Solution GTB / GTC : ' + (bms.existing_solution || 'a renseigner'), entityType: 'bms', entityRef: bms, currentHtml: bms.notes_html || '' })"
+            :class="['inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition',
+              hasNotes(bms.notes_html)
+                ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+            title="Editer les notes GTB">
+            <PencilSquareIcon class="w-4 h-4" />
+            {{ hasNotes(bms.notes_html) ? 'Notes' : '+ Notes' }}
+          </button>
+          <BacsPhotoButton
+            v-if="document?.site_uuid && bms.document_id"
+            :site-uuid="document.site_uuid"
+            :attach-to="{ bms_document_id: bms.document_id }"
+            label="GTB" size="md" />
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="bms.existing_solution">
@@ -125,7 +129,7 @@ function hasNotes(html) {
       :attach-to="{ bms_document_id: bms.document_id }"
       :enabled="!!(document?.site_uuid && bms.document_id)"
       @changed="emit('refresh-audit-data')">
-      <div class="px-5 py-4 grid grid-cols-[180px_1fr] gap-6">
+      <div class="px-5 py-4 grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6">
         <aside class="border-r border-gray-100 pr-4 sticky top-4 self-start">
           <h4 class="text-[10px] uppercase tracking-wider font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
           <VerticalStepper :steps="bmsSteps" />
@@ -211,7 +215,7 @@ function hasNotes(html) {
 
           <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
-            <div class="grid grid-cols-5 gap-2 text-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
               <label v-for="(usage, key) in { manages_heating: 'Chauffage', manages_cooling: 'Refroidissement', manages_ventilation: 'Ventilation', manages_dhw: 'ECS', manages_lighting: 'Éclairage' }"
                      :key="key"
                      class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
@@ -221,13 +225,13 @@ function hasNotes(html) {
             </div>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 grid grid-cols-2 gap-4">
+          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-6">
             <div>
               <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                 Équipements intégrés à la GTB
                 <span class="font-normal normal-case text-gray-500 text-[10px]">— « Opérationnel » = vérifié sur place par l'auditeur</span>
               </h3>
-              <table v-if="devicesWithMeta.length" class="w-full text-xs">
+              <table v-if="devicesWithMeta.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Équipement</th>
@@ -273,7 +277,7 @@ function hasNotes(html) {
                 Compteurs intégrés à la GTB
                 <span class="font-normal normal-case text-gray-500 text-[10px]">— uniquement les compteurs présents</span>
               </h3>
-              <table v-if="metersPresent.length" class="w-full text-xs">
+              <table v-if="metersPresent.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Compteur</th>

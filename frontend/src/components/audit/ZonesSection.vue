@@ -2,9 +2,9 @@
 import { storeToRefs } from 'pinia'
 import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import BacsRefBadge from '@/components/BacsRefBadge.vue'
 import { useAuditStore } from '@/stores/audit'
@@ -16,6 +16,7 @@ import { updateZone, deleteZone, listZones, resyncBacsAudit } from '@/api'
 const props = defineProps({
   zoneNatures: { type: Array, required: true },
   step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step', 'add-zone',
@@ -66,14 +67,19 @@ function hasNotes(html) {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="zones" section-id="section-zones">
+  <CollapsibleSection storage-key="zones" section-id="section-zones" :active="active">
     <template #header>
-      <MapPinIcon class="w-5 h-5 text-indigo-600" />
-      <h2 class="text-base font-semibold text-gray-800">2. Zones fonctionnelles</h2>
-      <span v-if="audit.isBacs" class="text-xs text-gray-500">R175-1 6° — usages homogènes</span>
-      <R175Tooltip v-if="audit.isBacs" article="R175-1 6°" />
-      <span class="ml-auto text-[11px] text-gray-500">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }} sur ce site</span>
-      <StepValidateBadge :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="2" title="Zones fonctionnelles"
+                     :subtitle="audit.isBacs ? 'R175-1 6° — usages homogènes' : 'Découpage du site'"
+                     :icon="MapPinIcon" icon-color="text-indigo-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template v-if="audit.isBacs" #subtitle-extra><R175Tooltip article="R175-1 6°" /></template>
+        <template #actions>
+          <span class="text-[11px] text-gray-500 whitespace-nowrap">{{ zones.length }} zone{{ zones.length > 1 ? 's' : '' }}</span>
+        </template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="zones.length">

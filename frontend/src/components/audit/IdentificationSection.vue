@@ -3,14 +3,15 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { BuildingOffice2Icon, ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
-import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
+import SectionHeader from '@/components/audit/SectionHeader.vue'
 import { useAuditStore } from '@/stores/audit'
 
 // Section 1 — Identification du site & applicabilité R175-2.
 const props = defineProps({
   step: { type: Object, default: null },
   applicabilityLabels: { type: Object, required: true },
+  active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'save-doc', 'recompute-power', 'validate-step', 'invalidate-step',
@@ -61,12 +62,16 @@ const r175_6_applicable = computed(() => {
 </script>
 
 <template>
-  <CollapsibleSection storage-key="identification" section-id="section-identification">
+  <CollapsibleSection storage-key="identification" section-id="section-identification" :active="active">
     <template #header>
-      <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
-      <h2 class="text-base font-semibold text-gray-800">1. Identification du site<span v-if="audit.isBacs"> &amp; applicabilité R175-2</span></h2>
-      <R175Tooltip v-if="audit.isBacs" article="R175-2" />
-      <StepValidateBadge class="ml-auto" :step="step" @validate="emit('validate-step', $event)" @invalidate="emit('invalidate-step', $event)" />
+      <SectionHeader number="1"
+                     :title="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
+                     :icon="BuildingOffice2Icon" icon-color="text-indigo-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
+        <template v-if="audit.isBacs" #subtitle-extra><R175Tooltip article="R175-2" /></template>
+      </SectionHeader>
     </template>
     <template #summary>
       <span v-if="audit.isBacs">
