@@ -24,9 +24,18 @@ Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md
 
 **Hors périmètre B1** : preview synthesis (Lot 32) — rendu très spécifique, peu utilisé hors export PDF final, gardé en édition future si besoin.
 
-### À venir
+### Lot A1 — Polish AfDetailView ✅
 
-- **Lot A1** — Polish AfDetailView (Pinia + sous-composants + scroll-spy + step validate)
+- **Pinia store [`useAfStore`](frontend/src/stores/af.js)** — centralise `af`, `sections`, `selectedSection`, `selectedId`, `loading`, `requiredLevelKey` + getters dérivés (`liveSectionNumbering`, `orderedSections`, `breadcrumbTrail`, `sectionsCountByKind`, `verificationProgress`) + actions (`loadAf`, `selectSection`, `patchSection`, `createNewSection`, `removeSection`, `applySectionUpdate`). Pattern aligné sur `useAuditStore`.
+- **`AfDetailView.vue` migré** — toutes les refs locales d'état déplacées dans le store, fonctions internes simplifiées en wrappers d'actions store. Rétrocompatible (sous-composants reçoivent les mêmes props/events).
+- **Indicateur de progression de vérification** dans le header de la sidebar arbre — compteur "✓ N/M" (sections `fact_check_status='verified'` sur sections incluses dans l'export) + barre de progression émeraude. Utilise le mécanisme existant (bouton "Vérifiée" déjà présent dans `SectionEditor`).
+- **Hors périmètre A1** :
+  - Scroll-spy : non pertinent (1 section affichée à la fois, pas de longueur de page).
+  - Layout 2 colonnes : déjà en place via `isCompact` + drawer < 1280px.
+  - StepValidateBadge dédié : non nécessaire — la colonne `fact_check_status` existante couvre déjà le besoin "marquer une section comme finie".
+  - Extraction `AfMetadataPanel/AfEquipmentPanel/...` : déjà fait depuis longtemps (7 sous-composants extraits dans `frontend/src/components/editor/`).
+
+### À venir
 - **Lot B2** — Charts dans les PDFs
 - **Lot B4** — Boilerplate admin (méthodologie + disclaimers en DB)
 - **Lot A2** — Brochure backend (DB + routes + lib + variante catalogue d'offres)

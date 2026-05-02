@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { getAf, listSections, getSection, createSection, deleteSection, updateSection, listEquipmentTemplates, moveAttachment } from '@/api'
+import { getSection, listEquipmentTemplates, moveAttachment } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAfStore } from '@/stores/af'
 import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
 import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
@@ -43,36 +45,14 @@ import EquipmentTemplatePicker from '@/components/EquipmentTemplatePicker.vue'
 
 const route = useRoute()
 const router = useRouter()
-const af = ref(null)
-const sections = ref([])
-const selectedSection = ref(null)
 
-// Numerotation auto des sections (1, 1.1, 1.2, 2…) calculee depuis l'arbre
-// (parent_id + position). Remplace le `section.number` figé en DB pour
-// l'affichage UI ; les anciennes AFs continuent d'avoir leur number stocké
-// (utilisé par les PDFs et deep-links via le fallback).
-const liveSectionNumbering = computed(() => {
-  const map = new Map()
-  const byParent = new Map()
-  for (const s of sections.value) {
-    const k = s.parent_id || 'root'
-    if (!byParent.has(k)) byParent.set(k, [])
-    byParent.get(k).push(s)
-  }
-  for (const arr of byParent.values()) {
-    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-  }
-  function walk(parentKey, prefix) {
-    const arr = byParent.get(parentKey) || []
-    arr.forEach((s, i) => {
-      const num = prefix ? `${prefix}.${i + 1}` : String(i + 1)
-      map.set(s.id, num)
-      walk(s.id, num)
-    })
-  }
-  walk('root', '')
-  return map
-})
+// Etat principal centralise dans le store Pinia (Lot A1).
+const afStore = useAfStore()
+const {
+  af, sections, selectedSection, selectedId, loading, requiredLevelKey,
+  liveSectionNumbering, orderedSections, breadcrumbTrail, sectionsCountByKind,
+  verificationProgress,
+} = storeToRefs(afStore)
 provide('liveSectionNumbering', liveSectionNumbering)
 
 // Mode presentation (lecture seule) — toggle via query param ?readonly=1.
@@ -86,53 +66,11 @@ function togglePresentation() {
     query: presentationMode.value ? {} : { ...route.query, readonly: '1' },
   })
 }
-const selectedId = ref(null)
-const loading = ref(true)
 const showActivity = ref(false)
 const activityRef = ref(null)
 const sectionEditorRef = ref(null)
-const requiredLevelKey = ref(0) // bumpé pour forcer un recalcul du niveau requis
 const { success: notifySuccess, error: notifyError } = useNotification()
 const { confirm } = useConfirm()
-
-// Fil d'Ariane : chaîne d'ancêtres de la section sélectionnée. Permet à
-// l'utilisateur de remonter rapidement le contexte quand il édite une
-// section profonde (ch. 10.2.4) sans dépendre uniquement de l'arbre.
-const breadcrumbTrail = computed(() => {
-  if (!selectedSection.value) return []
-  const byId = new Map(sections.value.map(s => [s.id, s]))
-  const trail = []
-  let cur = selectedSection.value
-  while (cur) {
-    trail.unshift(cur)
-    cur = cur.parent_id ? byId.get(cur.parent_id) : null
-  }
-  // On retire la section courante (déjà affichée comme titre dans l'éditeur)
-  return trail.slice(0, -1)
-})
-
-// Liste plate triee selon l'ordre d'affichage dans l'arbre (parent + position)
-// Utilisee pour la navigation clavier flèches haut/bas entre sections.
-const orderedSections = computed(() => {
-  const byParent = new Map()
-  for (const s of sections.value) {
-    const k = s.parent_id || 'root'
-    if (!byParent.has(k)) byParent.set(k, [])
-    byParent.get(k).push(s)
-  }
-  for (const arr of byParent.values()) {
-    arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-  }
-  const out = []
-  function walk(parentKey) {
-    for (const s of byParent.get(parentKey) || []) {
-      out.push(s)
-      walk(s.id)
-    }
-  }
-  walk('root')
-  return out
-})
 
 function isEditableTarget(el) {
   if (!el) return false
@@ -195,7 +133,7 @@ async function openAddSection(parentNode) {
 async function submitAddSection() {
   if (!addForm.value.title.trim()) return
   try {
-    const { data } = await createSection(af.value.id, {
+    const data = await afStore.createNewSection({
       parent_id: addParent.value?.id || null,
       title: addForm.value.title.trim(),
       kind: addForm.value.kind,
@@ -203,8 +141,7 @@ async function submitAddSection() {
     })
     notifySuccess(`Section "${data.title}" ajoutée`)
     showAddModal.value = false
-    await refreshSections()
-    selectSection(data.id)
+    afStore.selectSection(data.id)
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
   }
@@ -223,13 +160,8 @@ async function handleDeleteSection(node) {
   })
   if (!ok) return
   try {
-    await deleteSection(node.id)
+    await afStore.removeSection(node.id)
     notifySuccess('Section supprimée')
-    if (selectedId.value === node.id) {
-      selectedId.value = null
-      selectedSection.value = null
-    }
-    await refreshSections()
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec suppression')
   }
@@ -245,7 +177,7 @@ async function handleAttachmentDrop({ attachmentId, sectionId }) {
     // AttachmentsGrid se rafraichira via watch de sectionId.
     if (selectedSection.value) {
       const { data } = await getSection(selectedSection.value.id)
-      selectedSection.value = data
+      afStore.applySectionUpdate(data)
     }
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec du déplacement')
@@ -254,16 +186,9 @@ async function handleAttachmentDrop({ attachmentId, sectionId }) {
 
 async function handleToggleInclude(node) {
   const newVal = node.included_in_export === 0 ? 1 : 0
-  // Update optimiste de la liste plate pour feedback immediat
-  const idx = sections.value.findIndex(s => s.id === node.id)
-  if (idx >= 0) sections.value[idx] = { ...sections.value[idx], included_in_export: newVal }
   try {
-    await updateSection(node.id, { included_in_export: !!newVal })
-    if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, included_in_export: newVal }
-    requiredLevelKey.value++ // recalcul du niveau requis
+    await afStore.patchSection(node.id, { included_in_export: !!newVal })
   } catch (e) {
-    // rollback
-    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], included_in_export: node.included_in_export }
     notifyError(e.response?.data?.detail || 'Échec mise à jour')
   }
 }
@@ -279,70 +204,31 @@ function onGotoSection(payload) {
 
 async function handleToggleOptOut(node) {
   const newVal = node.opted_out_by_moa === 1 ? 0 : 1
-  const idx = sections.value.findIndex(s => s.id === node.id)
-  if (idx >= 0) sections.value[idx] = { ...sections.value[idx], opted_out_by_moa: newVal }
   try {
-    await updateSection(node.id, { opted_out_by_moa: !!newVal })
-    if (selectedSection.value?.id === node.id) selectedSection.value = { ...selectedSection.value, opted_out_by_moa: newVal }
-    requiredLevelKey.value++ // recalcul du niveau requis
+    await afStore.patchSection(node.id, { opted_out_by_moa: !!newVal })
   } catch (e) {
-    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], opted_out_by_moa: node.opted_out_by_moa }
     notifyError(e.response?.data?.detail || 'Échec mise à jour')
   }
 }
 
-const sectionsCountByKind = computed(() => {
-  const c = { standard: 0, equipment: 0, hyperveez_page: 0, synthesis: 0 }
-  for (const s of sections.value) c[s.kind] = (c[s.kind] || 0) + 1
-  return c
-})
-
-async function refreshAf() {
-  af.value = (await getAf(route.params.id)).data
-}
-
-async function refreshSections() {
-  sections.value = (await listSections(route.params.id)).data
-  // Si rien de sélectionné encore, prendre la 1ère section root
-  if (!selectedId.value && sections.value.length) {
-    selectSection(sections.value[0].id)
-  }
-}
-
 async function selectSection(id) {
-  selectedId.value = id
-  const { data } = await getSection(id)
-  selectedSection.value = data
+  await afStore.selectSection(id)
   // En mode compact, fermer automatiquement le drawer apres selection
   if (isCompact.value) treeDrawerOpen.value = false
 }
 
 function onSectionUpdated(updated) {
-  // Mettre à jour la liste plate (titre, body_html, service_level, etc.)
-  const idx = sections.value.findIndex(s => s.id === updated.id)
-  if (idx !== -1) {
-    sections.value[idx] = { ...sections.value[idx], ...updated }
-  }
-  // Garder selectedSection en sync
-  if (selectedSection.value?.id === updated.id) {
-    selectedSection.value = { ...selectedSection.value, ...updated }
-  }
-  // Refresh panneau activite + recalcul niveau requis si service_level a pu changer
+  afStore.applySectionUpdate(updated)
+  // Refresh panneau activite (autosave a possiblement insere une activite)
   activityRef.value?.refresh?.()
-  requiredLevelKey.value++
 }
 
 function onAfUpdated(updated) {
-  af.value = { ...af.value, ...updated }
+  afStore.patchSelectedAfUpdate(updated)
 }
 
 onMounted(async () => {
-  loading.value = true
-  try {
-    await Promise.all([refreshAf(), refreshSections()])
-  } finally {
-    loading.value = false
-  }
+  await afStore.loadAf(route.params.id)
   window.addEventListener('keydown', onKeydown)
 })
 
@@ -399,14 +285,7 @@ watch(() => route.params.id, async (newId, oldId) => {
       }
     }
   }
-  selectedId.value = null
-  selectedSection.value = null
-  loading.value = true
-  try {
-    await Promise.all([refreshAf(), refreshSections()])
-  } finally {
-    loading.value = false
-  }
+  await afStore.loadAf(newId)
 })
 </script>
 
@@ -430,7 +309,7 @@ watch(() => route.params.id, async (newId, oldId) => {
     <div class="px-5 lg:px-6 pt-4 pb-5 space-y-2">
       <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @toggle-presentation="togglePresentation" @goto-section="selectSection" />
       <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" @goto-section="onGotoSection" />
-      <TemplatePropagationBanner :af-id="af.id" @updated="refreshSections" />
+      <TemplatePropagationBanner :af-id="af.id" @updated="afStore.refreshSections" />
     </div>
 
     <!-- Bouton mobile pour ouvrir l'arbre (visible uniquement en mode compact) -->
@@ -463,15 +342,31 @@ watch(() => route.params.id, async (newId, oldId) => {
         ]"
       >
         <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Sections ({{ sections.length }})
-          </h3>
+          <div class="flex items-baseline justify-between gap-2">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Sections ({{ sections.length }})
+            </h3>
+            <span v-if="verificationProgress.total > 0"
+                  :class="['text-[11px] font-medium tabular-nums',
+                    verificationProgress.ratio === 1 ? 'text-emerald-600'
+                    : verificationProgress.ratio >= 0.5 ? 'text-emerald-700'
+                    : 'text-gray-500']"
+                  :title="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
+              ✓ {{ verificationProgress.verified }} / {{ verificationProgress.total }}
+            </span>
+          </div>
           <p class="text-[11px] text-gray-400 mt-0.5">
             {{ sectionsCountByKind.standard }} texte ·
             {{ sectionsCountByKind.equipment }} équip. ·
             {{ sectionsCountByKind.hyperveez_page }} Hyperveez ·
             {{ sectionsCountByKind.synthesis }} synth.
           </p>
+          <!-- Barre de progression : ratio des sections verifiees -->
+          <div v-if="verificationProgress.total > 0"
+               class="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-emerald-500 transition-all duration-300"
+                 :style="{ width: (verificationProgress.ratio * 100) + '%' }" />
+          </div>
         </div>
         <div class="p-2">
           <SectionTree

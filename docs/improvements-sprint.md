@@ -23,7 +23,7 @@ Deux axes :
 | 1 | **B1** Preview HTML/PDF | 0.5j | ✅ Livré (BACS + AF + points-list ; synthesis hors périmètre) |
 | 2 | ~~**B3** Vue commerciale exportable~~ | — | ❌ Annulé (besoin différent) |
 | 3 | ~~**B5** Signature électronique~~ | — | ❌ Annulé |
-| 4 | **A1** Polish AfDetailView | 2j | ⏳ À venir |
+| 4 | **A1** Polish AfDetailView | 2j | ✅ Livré (Pinia + indicateur vérification) |
 | 5 | **B2** Charts dans les PDFs | 1j | ⏳ À venir |
 | 6 | **B4** Boilerplate admin | 1j | ⏳ À venir |
 | 7 | **A2** Brochure backend | 1.5j | ⏳ À venir |
