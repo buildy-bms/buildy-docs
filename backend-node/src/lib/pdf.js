@@ -467,19 +467,22 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark, formFields, p
       const y_top_pt = TOP_MARGIN_PT + f.y_css * PT_PER_PX;
       const y_pt = ph - y_top_pt - h_pt;
       try {
+        const { rgb: rgbFn } = require('pdf-lib');
+        const borderColor = rgbFn(0.7, 0.74, 0.78); // gris #b3bcc6
         if (f.kind === 'text' || f.kind === 'textarea') {
           const tf = form.createTextField(f.name);
           if (f.kind === 'textarea') tf.enableMultiline();
           tf.addToPage(page, {
             x: x_pt, y: y_pt, width: w_pt, height: h_pt,
-            borderWidth: 0,
-            backgroundColor: undefined,
+            borderWidth: 0.4,
+            borderColor,
           });
         } else if (f.kind === 'checkbox') {
           const cb = form.createCheckBox(f.name);
           cb.addToPage(page, {
             x: x_pt, y: y_pt, width: w_pt, height: h_pt,
-            borderWidth: 0.5,
+            borderWidth: 0.6,
+            borderColor: rgbFn(0.1, 0.16, 0.26), // bleu sombre
           });
         }
       } catch {

@@ -1176,8 +1176,10 @@ onMounted(() => {
                 title="Panneau d'activité">
           <ClockIcon class="w-3.5 h-3.5 shrink-0" /> Activité
         </button>
-        <button @click="regenerate" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer
+        <button @click="regenerate"
+          title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer le plan
         </button>
         <button v-if="document?.site_uuid" @click="openBulkUpload"
           title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
@@ -1194,8 +1196,10 @@ onMounted(() => {
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-60 whitespace-nowrap">
           <ClipboardDocumentListIcon class="w-3.5 h-3.5 shrink-0" /> {{ exportingChecklist ? 'Génération…' : 'Checklist A4' }}
         </button>
-        <button @click="exportPdf" :disabled="exporting" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'PDF' }}
+        <button @click="exportPdf" :disabled="exporting"
+          title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'Générer le rapport' }}
         </button>
         <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
