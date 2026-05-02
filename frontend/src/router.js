@@ -123,6 +123,12 @@ const routes = [
     component: () => import('@/views/BoilerplateAdminView.vue'),
   },
   {
+    path: '/admin/offerings-config',
+    name: 'offerings-config',
+    meta: { title: 'Configuration Offres PDF' },
+    component: () => import('@/views/OfferingsConfigView.vue'),
+  },
+  {
     path: '/brochures/:id',
     name: 'brochure-detail',
     meta: { title: 'Brochure' },

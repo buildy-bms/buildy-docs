@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 66;
+const TARGET_VERSION = 67;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2476,6 +2476,85 @@ function runMigrations() {
     log.info('Migration 66 appliquee : brochure_items + brochure_library_items + afs.layout_template');
   }
 
+  if (current < 67) {
+    // PDF "Offres Buildy" entierement editable depuis l'admin :
+    // - offering_levels : 3 niveaux (E/S/P) avec nom, tagline, mise en
+    //   valeur (decoy) configurables. Slug fixe (matche les colonnes
+    //   avail_e/s/p de section_templates).
+    // - pdf_boilerplate : on ajoute les kinds 'offerings_cover_promise',
+    //   'offerings_cover_subtitle', 'offerings_cta_title',
+    //   'offerings_cta_sub', 'offerings_cta_contact' pour les textes
+    //   editables en cover et footer du PDF offres. Necessite de
+    //   recreer le CHECK de la table pdf_boilerplate (SQLite ne permet
+    //   pas le ALTER de CHECK).
+    db.exec(`
+      CREATE TABLE offering_levels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL UNIQUE
+          CHECK (slug IN ('E', 'S', 'P')),
+        name TEXT NOT NULL,
+        tagline TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        is_highlighted INTEGER NOT NULL DEFAULT 0,
+        highlight_label TEXT,
+        color_hex TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+    // Seed : valeurs courantes hardcodees du template
+    const seedLevel = db.prepare(`INSERT INTO offering_levels
+      (slug, name, tagline, position, is_highlighted, highlight_label, color_hex)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    seedLevel.run('E', 'Essentiel', 'Démarrer simple', 0, 0, null, '#64748b');
+    seedLevel.run('S', 'Smart', 'Pilotez et anticipez', 1, 0, null, '#4f46e5');
+    seedLevel.run('P', 'Premium', 'L\'intégrale', 2, 1, '★ Le plus choisi', '#7c3aed');
+
+    // Recreate pdf_boilerplate avec CHECK etendu
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('BEGIN TRANSACTION');
+    db.exec(`
+      CREATE TABLE pdf_boilerplate_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL
+          CHECK (kind IN ('methodology', 'disclaimer',
+                          'offerings_cover_promise',
+                          'offerings_cover_subtitle',
+                          'offerings_cta_title',
+                          'offerings_cta_sub',
+                          'offerings_cta_contact')),
+        position INTEGER NOT NULL DEFAULT 0,
+        title TEXT,
+        body_html TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO pdf_boilerplate_new
+        SELECT id, kind, position, title, body_html, is_active,
+               created_at, updated_at, updated_by
+        FROM pdf_boilerplate;
+      DROP TABLE pdf_boilerplate;
+      ALTER TABLE pdf_boilerplate_new RENAME TO pdf_boilerplate;
+      CREATE INDEX idx_pdf_boilerplate_kind ON pdf_boilerplate(kind, is_active, position);
+    `);
+    // Seed des textes cover/CTA des offres avec les valeurs courantes
+    const seedBoiler = db.prepare(`INSERT INTO pdf_boilerplate
+      (kind, position, title, body_html) VALUES (?, 0, NULL, ?)`);
+    seedBoiler.run('offerings_cover_promise',
+      `<p>Réduisez vos consommations. Anticipez les dérives.<br/>Conformez-vous au décret BACS — sans changer toute votre GTB.</p>`);
+    seedBoiler.run('offerings_cover_subtitle',
+      `<p>Plateforme de supervision et hypervision GTB agnostique multi-sites. Trois niveaux de service. Un seul projet : votre efficacité énergétique.</p>`);
+    seedBoiler.run('offerings_cta_title', `<p>Prêt à démarrer ?</p>`);
+    seedBoiler.run('offerings_cta_sub', `<p>Notre équipe revient vers vous sous 48 h ouvrées.</p>`);
+    seedBoiler.run('offerings_cta_contact', `<p>contact@buildy.fr · 01 23 45 67 89</p>`);
+    db.exec('COMMIT');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.pragma('user_version = 67');
+    log.info('Migration 67 appliquee : offering_levels + pdf_boilerplate.kind etendu');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3729,6 +3808,29 @@ const brochureLibrary = {
   },
 };
 
+// ── Offering levels (E/S/P avec nom + tagline + decoy editables) ──
+const offeringLevels = {
+  list() {
+    return db.prepare('SELECT * FROM offering_levels ORDER BY position, id').all();
+  },
+  getBySlug(slug) {
+    return db.prepare('SELECT * FROM offering_levels WHERE slug = ?').get(slug);
+  },
+  update(slug, { name, tagline, isHighlighted, highlightLabel, colorHex, updatedBy = null }) {
+    const sets = [];
+    const args = [];
+    if (name != null) { sets.push('name = ?'); args.push(name); }
+    if (tagline !== undefined) { sets.push('tagline = ?'); args.push(tagline); }
+    if (isHighlighted != null) { sets.push('is_highlighted = ?'); args.push(isHighlighted ? 1 : 0); }
+    if (highlightLabel !== undefined) { sets.push('highlight_label = ?'); args.push(highlightLabel); }
+    if (colorHex !== undefined) { sets.push('color_hex = ?'); args.push(colorHex); }
+    sets.push('updated_at = CURRENT_TIMESTAMP', 'updated_by = ?');
+    args.push(updatedBy, slug);
+    db.prepare(`UPDATE offering_levels SET ${sets.join(', ')} WHERE slug = ?`).run(...args);
+    return this.getBySlug(slug);
+  },
+};
+
 const pdfBoilerplate = {
   list({ kind, includeInactive = false } = {}) {
     let sql = 'SELECT * FROM pdf_boilerplate WHERE 1=1';
@@ -3769,6 +3871,7 @@ const pdfBoilerplate = {
 module.exports = {
   init,
   pdfBoilerplate,
+  offeringLevels,
   brochureItems,
   brochureLibrary,
   users,

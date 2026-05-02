@@ -125,6 +125,8 @@ export const previewPointsListUrl = (afId) =>
 // ── Catalogue offres Buildy (PDF tableau comparatif) ──
 export const previewOfferingsUrl = () => `/api/offerings/preview`
 export const exportOfferingsPdfUrl = () => `/api/offerings/export-pdf`
+export const listOfferingLevels = () => api.get('/offering-levels')
+export const updateOfferingLevel = (slug, data) => api.patch(`/offering-levels/${slug}`, data)
 
 // ── Brochures (lot A2/A3) ──
 export const listBrochureLibrary = (kind) =>

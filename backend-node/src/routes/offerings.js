@@ -5,7 +5,13 @@
 // disponibilite avail_e / avail_s / avail_p par niveau de service.
 //
 // Hierarchie : chaque fonctionnalite a un parent_template_id qui pointe
-// vers une section type parente (sert de categorie dans le tableau).
+// vers une section type parente. La chaine d'ancetres est resolue
+// jusqu'a la racine (profondeur infinie) et affichee avec indentation
+// cumulative dans le tableau.
+//
+// Niveaux d'offre (E/S/P) : nom + tagline + decoy editables via la table
+// offering_levels (page admin /admin/offerings-config).
+// Textes cover et CTA : pdf_boilerplate kinds 'offerings_*'.
 
 const path = require('path');
 const fs = require('fs');
@@ -14,13 +20,13 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, renderHtml, loadAssetDataUrl } = require('../lib/pdf');
 
-// Construit le bundle de donnees a passer au template offering-catalog.hbs.
-//
-// Hierarchie : section_templates utilise parent_template_id pour former
-// un arbre. Une fonctionnalite peut avoir plusieurs niveaux de parents
-// (ex: "Detection des derives" -> parent "Tableaux de bord energetiques"
-// -> parent "Application Hyperveez"). On affiche jusqu'a 2 niveaux de
-// regroupement dans le tableau (parent + sous-parent).
+// Lit un boilerplate par kind (texte editable depuis pdf_boilerplate).
+// Retourne le body_html du 1er actif, ou la valeur par defaut si absent.
+function getBoilerplate(kind, defaultHtml = '') {
+  const row = db.pdfBoilerplate.list({ kind })[0];
+  return row?.body_html || defaultHtml;
+}
+
 function buildOfferingsData() {
   // 1. Recupere TOUS les section_templates (pas juste les features)
   // pour pouvoir resoudre la chaine d'ancetres.
@@ -52,51 +58,55 @@ function buildOfferingsData() {
     ORDER BY position, id
   `).all();
 
-  // 3. Groupe par chaîne d'ancêtres (concatenation des ids = clef unique)
-  // On affiche : 1er ancetre = "categorie principale" (en gros), 2eme
-  // ancetre = "sous-categorie" (en sub-header). Si une feature n'a qu'un
-  // seul ancetre, on n'affiche que la categorie principale.
-  const groups = new Map();
-  for (const f of features) {
-    const ancestors = ancestorsOf(f);
-    const top = ancestors[0] || null;
-    const sub = ancestors.length >= 2 ? ancestors[ancestors.length - 1] : null;
-    const topKey = top ? `t${top.id}` : 'orphan';
-    const subKey = sub ? `s${sub.id}` : 'none';
+  // 3. Construit une liste plate "rows" qui interleave les rangees de
+  // categorie (a chaque changement d'ancetre dans la chaine) et les
+  // rangees de feature. La profondeur d'ancetres est arbitraire : on
+  // affiche autant de niveaux que la base contient.
+  const rows = [];
+  const lastChain = []; // chaine d'ancetres de la rangee precedente
 
-    if (!groups.has(topKey)) {
-      groups.set(topKey, {
-        id: top?.id || null,
-        title: top?.title || 'Autres fonctionnalités',
-        position: top?.position ?? 9999,
-        subgroups: new Map(),
+  for (const f of features) {
+    const chain = ancestorsOf(f);
+    // Trouve l'index ou la chaine actuelle commence a differer de la
+    // chaine precedente. Tout ce qui est "pareil" jusqu'a cet index
+    // n'a pas besoin de re-emettre une rangee de categorie.
+    let firstChange = 0;
+    while (
+      firstChange < chain.length &&
+      firstChange < lastChain.length &&
+      chain[firstChange].id === lastChain[firstChange].id
+    ) firstChange++;
+    // Emets une rangee categorie pour chaque ancetre a partir du 1er
+    // changement.
+    for (let depth = firstChange; depth < chain.length; depth++) {
+      rows.push({
+        kind: 'category',
+        depth,
+        title: chain[depth].title,
       });
     }
-    const topGroup = groups.get(topKey);
-    if (!topGroup.subgroups.has(subKey)) {
-      topGroup.subgroups.set(subKey, {
-        id: sub?.id || null,
-        title: sub?.title || null, // null = pas de sous-categorie
-        position: sub?.position ?? 0,
-        features: [],
-      });
-    }
-    topGroup.subgroups.get(subKey).features.push({
-      id: f.id,
+    rows.push({
+      kind: 'feature',
+      depth: chain.length,
       title: f.title,
       avail_e: f.avail_e || 'unavailable',
       avail_s: f.avail_s || 'unavailable',
       avail_p: f.avail_p || 'unavailable',
     });
+    // Met a jour la chaine pour la prochaine iteration
+    lastChain.length = 0;
+    lastChain.push(...chain);
   }
 
-  // 4. Conversion en arrays tries
-  const categories = [...groups.values()]
-    .map(g => ({
-      ...g,
-      subgroups: [...g.subgroups.values()].sort((a, b) => a.position - b.position),
-    }))
-    .sort((a, b) => a.position - b.position);
+  // 4. Niveaux d'offre depuis la DB
+  const levels = db.offeringLevels.list();
+
+  // 5. Boilerplate cover et CTA
+  const coverPromise = stripWrapperParagraph(getBoilerplate('offerings_cover_promise'));
+  const coverSubtitle = stripWrapperParagraph(getBoilerplate('offerings_cover_subtitle'));
+  const ctaTitle = stripWrapperParagraph(getBoilerplate('offerings_cta_title'));
+  const ctaSub = stripWrapperParagraph(getBoilerplate('offerings_cta_sub'));
+  const ctaContact = stripWrapperParagraph(getBoilerplate('offerings_cta_contact'));
 
   const exportDate = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric',
@@ -104,19 +114,56 @@ function buildOfferingsData() {
   const year = new Date().getFullYear();
 
   return {
-    categories,
+    rows,
+    levels,
+    colspan: levels.length + 1, // pour les rows de categorie (td colspan)
     totalFeatures: features.length,
+    coverPromise,
+    coverSubtitle,
+    ctaTitle,
+    ctaSub,
+    ctaContact,
     exportDate,
     year,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
   };
 }
 
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+// Retire le <p> wrapper que Tiptap ajoute autour des contenus simples
+// pour pouvoir injecter directement dans un h1/p personnalise du
+// template sans avoir un <p> dans un <h1>.
+function stripWrapperParagraph(html) {
+  if (!html) return '';
+  const trimmed = html.trim();
+  const m = /^<p>([\s\S]*)<\/p>$/.exec(trimmed);
+  return m ? m[1] : html;
 }
 
 async function routes(fastify) {
+  // ─── Niveaux d'offre (E/S/P) admin ────────────────────────────────
+  fastify.get('/offering-levels', async () => {
+    return db.offeringLevels.list();
+  });
+  fastify.patch('/offering-levels/:slug', async (request, reply) => {
+    const slug = request.params.slug;
+    const existing = db.offeringLevels.getBySlug(slug);
+    if (!existing) return reply.code(404).send({ detail: 'Niveau non trouvé' });
+    const body = request.body || {};
+    const updated = db.offeringLevels.update(slug, {
+      name: body.name,
+      tagline: body.tagline,
+      isHighlighted: body.is_highlighted,
+      highlightLabel: body.highlight_label,
+      colorHex: body.color_hex,
+      updatedBy: request.authUser?.id || null,
+    });
+    db.auditLog.add({
+      userId: request.authUser?.id, action: 'offering_level.update',
+      payload: { slug, fields: Object.keys(body) },
+    });
+    return updated;
+  });
+
   // ─── Preview HTML (in-browser, sans Puppeteer) ─────────────────────
   fastify.get('/offerings/preview', async (request, reply) => {
     const data = buildOfferingsData();
@@ -129,7 +176,6 @@ async function routes(fastify) {
   });
 
   // ─── Export PDF du catalogue d'offres ──────────────────────────────
-  // Pas rattache a un AF → dossier de sortie dedie data/exports/_offerings/
   fastify.post('/offerings/export-pdf', async (request, reply) => {
     const data = buildOfferingsData();
     const userId = request.authUser?.id;
@@ -162,8 +208,6 @@ async function routes(fastify) {
     });
     log.info(`Offerings PDF exported: ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
 
-    // On stream directement le fichier (pas d'enregistrement dans `exports`
-    // qui est lie a un af_id, et offerings n'a pas d'AF parent).
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `attachment; filename="${filename}"`)

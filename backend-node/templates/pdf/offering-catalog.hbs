@@ -12,18 +12,12 @@
   <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
   <p class="cover-doc-type">Catalogue commercial</p>
   <h1 class="cover-title">Offres Buildy<br/>{{year}}</h1>
-  <p class="cover-promise">
-    Réduisez vos consommations. Anticipez les dérives.<br/>
-    Conformez-vous au décret BACS — sans changer toute votre GTB.
-  </p>
-  <p class="cover-subtitle">
-    Plateforme de supervision et hypervision GTB agnostique multi-sites.
-    Trois niveaux de service. Un seul projet : votre efficacité énergétique.
-  </p>
+  <div class="cover-promise">{{{coverPromise}}}</div>
+  <p class="cover-subtitle">{{{coverSubtitle}}}</p>
   <p class="cover-meta">Édition du {{exportDate}}</p>
 </section>
 
-{{!-- ═══════════ Tableau comparatif (1-2 pages max apres cover) ═══════════ --}}
+{{!-- ═══════════ Tableau comparatif ═══════════ --}}
 <section class="comparison">
   <header class="comparison-head">
     <h1 class="page-title">Tableau des offres Buildy</h1>
@@ -37,56 +31,56 @@
   <table class="comparison-table">
     <colgroup>
       <col class="col-feature" />
-      <col class="col-level" />
-      <col class="col-level" />
-      <col class="col-level" />
+      {{#each levels}}<col class="col-level" />{{/each}}
     </colgroup>
     <thead>
       <tr>
         <th class="th-feature">Fonctionnalité</th>
-        <th class="th-level th-e">
-          <div class="th-level-name">Essentiel</div>
-          <div class="th-level-tagline">Démarrer simple</div>
+        {{#each levels}}
+        <th class="th-level th-{{slug}} {{#if is_highlighted}}th-highlighted{{/if}}"
+            {{#if color_hex}}style="background:{{color_hex}};"{{/if}}>
+          {{#if is_highlighted}}{{#if highlight_label}}
+          <div class="th-level-badge">{{highlight_label}}</div>
+          {{/if}}{{/if}}
+          <div class="th-level-name">{{name}}</div>
+          {{#if tagline}}<div class="th-level-tagline">{{tagline}}</div>{{/if}}
         </th>
-        <th class="th-level th-s">
-          <div class="th-level-name">Smart</div>
-          <div class="th-level-tagline">Pilotez et anticipez</div>
-        </th>
-        <th class="th-level th-p">
-          <div class="th-level-badge">★ Le plus choisi</div>
-          <div class="th-level-name">Premium</div>
-          <div class="th-level-tagline">L'intégrale</div>
-        </th>
+        {{/each}}
       </tr>
     </thead>
     <tbody>
-      {{#each categories}}
-      <tr class="category-row category-row-l1">
-        <td colspan="4"><span class="cat-marker">▸</span> {{title}}</td>
+      {{#each rows}}
+      {{#if (eq kind "category")}}
+      <tr class="category-row category-row-d{{depth}}">
+        <td colspan="{{../colspan}}">
+          <span class="cat-marker cat-marker-d{{depth}}">{{#if (eq depth 0)}}▸{{else}}·{{/if}}</span>
+          {{title}}
+        </td>
       </tr>
-      {{#each subgroups}}
-      {{#if title}}
-      <tr class="category-row category-row-l2">
-        <td colspan="4"><span class="cat-marker-l2">·</span> {{title}}</td>
+      {{else}}
+      <tr>
+        <td class="td-feature td-feature-d{{depth}}">{{title}}</td>
+        {{#each ../levels}}
+        {{#if (eq slug "E")}}
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_e}}">{{#if (eq ../avail_e "included")}}✓{{else}}{{#if (eq ../avail_e "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+        {{/if}}
+        {{#if (eq slug "S")}}
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_s}}">{{#if (eq ../avail_s "included")}}✓{{else}}{{#if (eq ../avail_s "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+        {{/if}}
+        {{#if (eq slug "P")}}
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_p}}">{{#if (eq ../avail_p "included")}}✓{{else}}{{#if (eq ../avail_p "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+        {{/if}}
+        {{/each}}
       </tr>
       {{/if}}
-      {{#each features}}
-      <tr>
-        <td class="td-feature {{#if ../title}}td-feature-indent{{/if}}">{{title}}</td>
-        <td class="td-level td-level-e"><span class="avail avail-{{avail_e}}">{{#if (eq avail_e "included")}}✓{{else}}{{#if (eq avail_e "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
-        <td class="td-level td-level-s"><span class="avail avail-{{avail_s}}">{{#if (eq avail_s "included")}}✓{{else}}{{#if (eq avail_s "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
-        <td class="td-level td-level-p"><span class="avail avail-{{avail_p}}">{{#if (eq avail_p "included")}}✓{{else}}{{#if (eq avail_p "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
-      </tr>
-      {{/each}}
-      {{/each}}
       {{/each}}
     </tbody>
   </table>
 
   <div class="cta-block">
-    <p class="cta-line">Prêt à démarrer ?</p>
-    <p class="cta-sub">Notre équipe revient vers vous sous 48 h ouvrées.</p>
-    <p class="cta-contact">contact@buildy.fr · 01 23 45 67 89</p>
+    <p class="cta-line">{{{ctaTitle}}}</p>
+    <p class="cta-sub">{{{ctaSub}}}</p>
+    <p class="cta-contact">{{{ctaContact}}}</p>
   </div>
   <p class="comparison-footer">
     Buildy · catalogue édité le {{exportDate}}

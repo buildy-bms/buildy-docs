@@ -182,71 +182,76 @@ h1, h2, h3 {
   letter-spacing: 0;
   text-transform: none;
 }
-.th-e { background: #64748b; }
-.th-s { background: #4f46e5; }
-.th-p {
-  /* Decoy : Premium visuellement plus saturé + bordure haute verte qui
-     "pousse" la colonne en avant. */
-  background: #7c3aed;
-  border-top: 2.2mm solid #00cd92;
-  padding-top: 1.5mm;
-}
+/* Couleurs par defaut si color_hex est null en DB */
+.th-E { background: #64748b; }
+.th-S { background: #4f46e5; }
+.th-P { background: #7c3aed; }
 
-/* Decoy : la colonne Premium entiere a un fond legerement creme/blanc
-   casse pour ressortir vs E (gris) et S (indigo). */
-.td-level-p {
+/* Decoy : niveau "is_highlighted = 1" (peu importe lequel — E/S/P).
+   Bordure haute verte 2.2mm qui pousse la colonne en avant + colonne
+   entiere fond creme. */
+.th-highlighted {
+  border-top: 2.2mm solid #00cd92;
+  padding-top: 1.5mm !important;
+}
+.td-level-highlighted {
   background: #fffdf5 !important;
   border-left: 0.4pt solid #fef3c7;
   border-right: 0.4pt solid #fef3c7;
 }
 
-/* Lignes de catégorie niveau 1 (parent racine) : bandeau plein, fond
-   indigo pâle, le marker vert ▸ accroche l'œil. */
-.category-row-l1 td {
-  padding: 2mm 2mm 1.2mm;
+/* Lignes de catégorie : profondeur infinie via classes .category-row-d{N}.
+   Plus on descend, plus c'est discret + indenté (4mm par niveau). */
+.category-row td {
   background: #eef2ff !important;
   color: #312e81;
   font-family: 'Poppins', sans-serif;
-  font-size: 7.8pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-bottom: 0.5pt solid #c7d2fe;
   border-top: 0.5pt solid #c7d2fe;
 }
-.cat-marker {
-  color: #00cd92;
-  font-size: 9pt;
-  margin-right: 1.5mm;
-  font-weight: 900;
+.category-row-d0 td {
+  padding: 2mm 2mm 1.2mm;
+  font-size: 7.8pt;
 }
-
-/* Lignes de catégorie niveau 2 (sous-catégorie sous un parent) : plus
-   discret, indigo très pâle, marqueur · gris, padding gauche augmenté
-   pour suggérer la hiérarchie. */
-.category-row-l2 td {
+.category-row-d1 td {
   padding: 1.3mm 2mm 0.8mm 6mm;
-  background: #f8faff !important;
+  background: #f5f7ff !important;
   color: #4338ca;
-  font-family: 'Poppins', sans-serif;
   font-size: 6.8pt;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 0.3pt solid #e0e7ff;
 }
-.cat-marker-l2 {
-  color: #9ca3af;
-  font-size: 9pt;
+.category-row-d2 td {
+  padding: 1.1mm 2mm 0.6mm 10mm;
+  background: #fafbff !important;
+  color: #6366f1;
+  font-size: 6.4pt;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.category-row-d3 td {
+  padding: 1mm 2mm 0.5mm 14mm;
+  background: #fafbff !important;
+  color: #818cf8;
+  font-size: 6.2pt;
+}
+.cat-marker {
   margin-right: 1.5mm;
   font-weight: 900;
 }
+.cat-marker-d0 { color: #00cd92; font-size: 9pt; }
+.cat-marker-d1 { color: #9ca3af; font-size: 9pt; }
+.cat-marker-d2 { color: #d1d5db; font-size: 9pt; }
+.cat-marker-d3 { color: #d1d5db; font-size: 9pt; }
 
-/* Indentation des features qui sont sous une sous-categorie pour
-   matcher visuellement la hierarchie. */
-.td-feature-indent {
-  padding-left: 6mm !important;
-}
+/* Indentation cumulative des features selon leur profondeur */
+.td-feature-d1 { padding-left: 6mm !important; }
+.td-feature-d2 { padding-left: 10mm !important; }
+.td-feature-d3 { padding-left: 14mm !important; }
+.td-feature-d4 { padding-left: 18mm !important; }
 
 .comparison-table tbody tr:not(.category-row):nth-child(odd) td {
   background: #fafbfc;

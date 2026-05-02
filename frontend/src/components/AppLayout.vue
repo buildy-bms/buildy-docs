@@ -63,6 +63,7 @@ const nav = [
   { section: 'Système' },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
   { name: 'Boilerplate PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },
+  { name: 'Offres PDF', to: '/admin/offerings-config', icon: DocumentDuplicateIcon },
   { name: 'Audit trail', to: '/audit', icon: ClockIcon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
