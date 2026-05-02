@@ -1,0 +1,329 @@
+/* ──────────────────────────────────────────────────────────────────
+   Catalogue Offres Buildy — A4 portrait
+   Page de garde immersive bleu marine, 3 niveaux en cards, tableau
+   comparatif fonctionnalites x niveaux groupé par catégorie.
+   ────────────────────────────────────────────────────────────────── */
+
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm 14mm 12mm;
+}
+@page :first {
+  margin: 0;
+  background: #1b2842;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 9pt;
+  color: #1f2937;
+  line-height: 1.5;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+h1, h2, h3 {
+  font-family: 'Poppins', -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── Page de garde ───────────────────────────────────────────────── */
+.cover {
+  width: 210mm;
+  height: 297mm;
+  padding: 30mm 24mm;
+  box-sizing: border-box;
+  background: #1b2842;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  page-break-after: always;
+}
+.cover-logo {
+  width: 50mm;
+  margin-bottom: 24mm;
+  filter: brightness(0) invert(1);
+}
+.cover-doc-type {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 4mm;
+}
+.cover-title {
+  font-size: 48pt;
+  font-weight: 700;
+  line-height: 1;
+  margin: 0 0 14mm;
+  letter-spacing: -0.02em;
+}
+.cover-subtitle {
+  font-size: 12pt;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 130mm;
+  margin: 0 0 20mm;
+}
+.cover-stats {
+  display: flex;
+  gap: 16mm;
+  margin: auto 0;
+}
+.cover-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+.cover-stat-num {
+  font-family: 'Poppins', sans-serif;
+  font-size: 56pt;
+  font-weight: 700;
+  color: #00cd92;
+  line-height: 1;
+}
+.cover-stat-label {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.6);
+}
+.cover-meta {
+  font-size: 9pt;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 12mm;
+}
+
+/* ── Page 2 — Présentation des 3 niveaux ────────────────────────── */
+.page-title {
+  font-size: 22pt;
+  font-weight: 700;
+  color: #1b2842;
+  margin: 0 0 8mm;
+  position: relative;
+  padding-bottom: 3mm;
+}
+.page-title::after {
+  content: '';
+  display: block;
+  width: 24mm;
+  height: 1.4mm;
+  background: #00cd92;
+  border-radius: 0.7mm;
+  margin-top: 3mm;
+}
+
+.levels-page { page-break-after: always; }
+.levels-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4mm;
+  margin: 6mm 0;
+}
+.level-card {
+  padding: 6mm 5mm;
+  border-radius: 2mm;
+  background: white;
+  border: 0.6pt solid #e5e7eb;
+  page-break-inside: avoid;
+}
+.level-card-head {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin-bottom: 3mm;
+}
+.level-badge {
+  width: 11mm;
+  height: 11mm;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: white;
+}
+.level-card h2 {
+  margin: 0;
+  font-size: 16pt;
+  color: #1b2842;
+}
+.level-tagline {
+  font-size: 9pt;
+  color: #6b7280;
+  font-style: italic;
+  margin: 0 0 4mm;
+}
+.level-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 8.5pt;
+}
+.level-features li {
+  padding: 1.2mm 0;
+  border-bottom: 0.3pt solid #f3f4f6;
+  color: #374151;
+}
+.level-features li:last-child { border-bottom: none; }
+.level-features li:first-child {
+  font-size: 9.5pt;
+  color: #1b2842;
+  font-weight: 500;
+}
+.level-features strong {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  color: #00cd92;
+  font-size: 11pt;
+}
+.level-e .level-badge { background: #6b7280; }
+.level-e            { border-top: 3pt solid #6b7280; }
+.level-s .level-badge { background: #4f46e5; }
+.level-s            { border-top: 3pt solid #4f46e5; }
+.level-p .level-badge { background: #7c3aed; }
+.level-p            { border-top: 3pt solid #7c3aed; }
+
+/* ── Légende ───────────────────────────────────────────────────── */
+.legend {
+  margin-top: 8mm;
+  padding: 4mm 5mm;
+  background: #f9fafb;
+  border-radius: 1.5mm;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6mm;
+  align-items: center;
+  font-size: 8.5pt;
+}
+.legend-title {
+  text-transform: uppercase;
+  font-size: 7.5pt;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  font-weight: 700;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2mm;
+  color: #374151;
+}
+
+/* ── Tableau comparatif ────────────────────────────────────────── */
+.comparison .page-title {
+  page-break-before: always;
+  margin-top: 0;
+}
+.category-title {
+  font-size: 11pt;
+  color: #1b2842;
+  margin: 6mm 0 2mm;
+  padding: 1.5mm 3mm;
+  background: #eef2ff;
+  border-left: 2pt solid #4f46e5;
+  border-radius: 0 1mm 1mm 0;
+  page-break-after: avoid;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 4mm;
+  font-size: 8.5pt;
+  page-break-inside: auto;
+}
+.col-feature { width: auto; }
+.col-level   { width: 22mm; }
+
+.comparison-table thead { display: table-header-group; }
+.comparison-table tr { page-break-inside: avoid; }
+
+.th-feature {
+  text-align: left;
+  padding: 2.5mm 3mm;
+  background: #1b2842;
+  color: white;
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.th-level {
+  text-align: center;
+  padding: 2.5mm 1mm;
+  font-size: 8pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: white;
+}
+.th-e { background: #6b7280; }
+.th-s { background: #4f46e5; }
+.th-p { background: #7c3aed; }
+
+.comparison-table tbody tr:nth-child(even) td { background: #fafbfc; }
+
+.td-feature {
+  padding: 2.5mm 3mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+  vertical-align: top;
+}
+.td-feature-name {
+  font-weight: 600;
+  color: #1b2842;
+  margin-bottom: 0.5mm;
+  font-size: 9pt;
+}
+.td-feature-summary {
+  font-size: 7.5pt;
+  color: #6b7280;
+  line-height: 1.45;
+}
+.td-level {
+  text-align: center;
+  padding: 2.5mm 1mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.avail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8mm;
+  height: 8mm;
+  border-radius: 50%;
+  font-size: 11pt;
+  font-weight: 700;
+  line-height: 1;
+}
+.avail-included    { background: #d1fae5; color: #065f46; }
+.avail-option      { background: #fef3c7; color: #92400e; font-size: 9pt; }
+.avail-unavailable { background: #f3f4f6; color: #9ca3af; }
+
+/* ── Footer final ───────────────────────────────────────────────── */
+.end-footer {
+  margin-top: 12mm;
+  padding: 5mm 6mm;
+  background: #f9fafb;
+  border-radius: 1.5mm;
+  text-align: center;
+  page-break-inside: avoid;
+}
+.end-footer p {
+  margin: 0 0 2mm;
+  font-size: 9pt;
+  color: #1f2937;
+  line-height: 1.5;
+}
+.end-footer p.muted {
+  font-size: 7.5pt;
+  color: #9ca3af;
+}
+.end-footer strong { color: #1b2842; }

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Offres Buildy {{year}}</title>
+  <style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ Page de garde ═══════════ --}}
+<section class="cover">
+  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+  <p class="cover-doc-type">Catalogue commercial</p>
+  <h1 class="cover-title">Offres Buildy<br/>{{year}}</h1>
+  <p class="cover-subtitle">
+    Plateforme de supervision et hypervision GTB agnostique multi-sites.
+    Trois niveaux de service au choix.
+  </p>
+  <div class="cover-stats">
+    <div class="cover-stat">
+      <span class="cover-stat-num">{{totalFeatures}}</span>
+      <span class="cover-stat-label">Fonctionnalités</span>
+    </div>
+    <div class="cover-stat">
+      <span class="cover-stat-num">3</span>
+      <span class="cover-stat-label">Niveaux de service</span>
+    </div>
+  </div>
+  <p class="cover-meta">Édition du {{exportDate}}</p>
+</section>
+
+{{!-- ═══════════ Page 2 — Présentation des 3 niveaux ═══════════ --}}
+<section class="levels-page">
+  <h1 class="page-title">Trois niveaux pour vous accompagner</h1>
+
+  <div class="levels-grid">
+    <article class="level-card level-e">
+      <header class="level-card-head">
+        <span class="level-badge">E</span>
+        <h2>Essentiel</h2>
+      </header>
+      <p class="level-tagline">Le socle indispensable.</p>
+      <ul class="level-features">
+        <li><strong>{{countE}}</strong> fonctionnalité{{#if (gt countE 1)}}s{{/if}} incluse{{#if (gt countE 1)}}s{{/if}}</li>
+        <li>Monitoring continu</li>
+        <li>Alarmes & notifications</li>
+        <li>Tableaux de bord énergétiques</li>
+      </ul>
+    </article>
+
+    <article class="level-card level-s">
+      <header class="level-card-head">
+        <span class="level-badge">S</span>
+        <h2>Smart</h2>
+      </header>
+      <p class="level-tagline">Pilotez et anticipez.</p>
+      <ul class="level-features">
+        <li><strong>{{countS}}</strong> fonctionnalité{{#if (gt countS 1)}}s{{/if}} incluse{{#if (gt countS 1)}}s{{/if}}</li>
+        <li>Tout l'Essentiel +</li>
+        <li>Commande à distance</li>
+        <li>Programmation horaire</li>
+        <li>Détection des dérives énergétiques</li>
+      </ul>
+    </article>
+
+    <article class="level-card level-p">
+      <header class="level-card-head">
+        <span class="level-badge">P</span>
+        <h2>Premium</h2>
+      </header>
+      <p class="level-tagline">L'expérience complète.</p>
+      <ul class="level-features">
+        <li><strong>{{countP}}</strong> fonctionnalité{{#if (gt countP 1)}}s{{/if}} incluse{{#if (gt countP 1)}}s{{/if}}</li>
+        <li>Tout le Smart +</li>
+        <li>IA prédictive</li>
+        <li>Rapports automatiques</li>
+        <li>Accompagnement R175</li>
+      </ul>
+    </article>
+  </div>
+
+  <div class="legend">
+    <span class="legend-title">Légende du tableau ci-après</span>
+    <span class="legend-item"><span class="avail avail-included">✓</span> Inclus dans le niveau</span>
+    <span class="legend-item"><span class="avail avail-option">⓪</span> Option payante</span>
+    <span class="legend-item"><span class="avail avail-unavailable">—</span> Non disponible</span>
+  </div>
+</section>
+
+{{!-- ═══════════ Tableau comparatif ═══════════ --}}
+<section class="comparison">
+  <h1 class="page-title">Comparatif détaillé des fonctionnalités</h1>
+
+  {{#each categories}}
+  <h2 class="category-title">{{title}}</h2>
+  <table class="comparison-table">
+    <colgroup>
+      <col class="col-feature" />
+      <col class="col-level" />
+      <col class="col-level" />
+      <col class="col-level" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="th-feature">Fonctionnalité</th>
+        <th class="th-level th-e">Essentiel</th>
+        <th class="th-level th-s">Smart</th>
+        <th class="th-level th-p">Premium</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each features}}
+      <tr>
+        <td class="td-feature">
+          <div class="td-feature-name">{{title}}</div>
+          {{#if summary}}<div class="td-feature-summary">{{summary}}</div>{{/if}}
+        </td>
+        <td class="td-level"><span class="avail avail-{{avail_e}}">{{#if (eq avail_e "included")}}✓{{else}}{{#if (eq avail_e "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+        <td class="td-level"><span class="avail avail-{{avail_s}}">{{#if (eq avail_s "included")}}✓{{else}}{{#if (eq avail_s "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+        <td class="td-level"><span class="avail avail-{{avail_p}}">{{#if (eq avail_p "included")}}✓{{else}}{{#if (eq avail_p "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/each}}
+</section>
+
+<footer class="end-footer">
+  <p><strong>Pour aller plus loin :</strong> contactez l'équipe Buildy pour échanger sur votre projet et obtenir un devis sur-mesure.</p>
+  <p class="muted">Buildy · plateforme GTB agnostique multi-sites · catalogue édité le {{exportDate}}</p>
+</footer>
+
+</body>
+</html>

@@ -3,10 +3,13 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
   MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
+  EyeIcon, DocumentArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
+  previewOfferingsUrl, exportOfferingsPdfUrl,
 } from '@/api'
+import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
@@ -29,6 +32,33 @@ const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
 const showBulk = ref(false)
+const offeringsPreviewOpen = ref(false)
+const generatingOfferings = ref(false)
+async function downloadOfferingsPdf() {
+  generatingOfferings.value = true
+  try {
+    // Import paresseux pour ne pas charger axios deux fois
+    const { default: api } = await import('@/api')
+    const response = await api.post('/offerings/export-pdf', {}, { responseType: 'blob' })
+    // Recupere le nom de fichier suggere par le serveur (Content-Disposition)
+    const dispo = response.headers['content-disposition'] || ''
+    const match = /filename="([^"]+)"/.exec(dispo)
+    const filename = match ? match[1] : `offres-buildy-${new Date().getFullYear()}.pdf`
+    // Trigger telechargement
+    const url = URL.createObjectURL(response.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    notifyError('Échec de la génération du PDF des offres')
+  } finally {
+    generatingOfferings.value = false
+  }
+}
 
 // Items mappes au format attendu par BulkRegenerateModal
 const bulkItems = computed(() => items.value
@@ -197,6 +227,16 @@ onBeforeUnmount(teardownSortables)
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <button @click="offeringsPreviewOpen = true"
+                title="Aperçu du tableau des offres Buildy (matrice fonctionnalités × niveaux E/S/P)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg whitespace-nowrap transition">
+          <EyeIcon class="w-4 h-4" /> Aperçu offres
+        </button>
+        <button @click="downloadOfferingsPdf"
+                title="Télécharger le PDF du catalogue Buildy 2026 (régénéré depuis la base)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition">
+          <DocumentArrowDownIcon class="w-4 h-4" /> Tableau des offres
+        </button>
         <button @click="showBulk = true" :disabled="!bulkItems.length"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
@@ -314,6 +354,16 @@ onBeforeUnmount(teardownSortables)
       :on-save-html="bulkSaveHtml"
       @close="showBulk = false; refresh()"
       @done="refresh()"
+    />
+
+    <PdfPreviewModal
+      v-if="offeringsPreviewOpen"
+      title="Aperçu — Tableau des offres Buildy"
+      :preview-url="previewOfferingsUrl()"
+      :downloading="generatingOfferings"
+      download-label="Télécharger le PDF"
+      @close="offeringsPreviewOpen = false"
+      @download="downloadOfferingsPdf"
     />
   </div>
 </template>

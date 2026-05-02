@@ -122,6 +122,10 @@ export const previewAfUrl = (afId, includeBacsAnnex = false) =>
 export const previewPointsListUrl = (afId) =>
   `/api/afs/${afId}/exports/points-list/preview`
 
+// ── Catalogue offres Buildy (PDF tableau comparatif) ──
+export const previewOfferingsUrl = () => `/api/offerings/preview`
+export const exportOfferingsPdfUrl = () => `/api/offerings/export-pdf`
+
 // ── Brochures (lot A2/A3) ──
 export const listBrochureLibrary = (kind) =>
   api.get('/brochures/library', { params: kind ? { kind } : {} })
