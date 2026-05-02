@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 63;
+const TARGET_VERSION = 64;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2279,6 +2279,60 @@ function runMigrations() {
     `);
     db.pragma('user_version = 63');
     log.info('Migration 63 appliquee : bacs_audit_transcripts + bacs_audit_suggestions');
+  }
+
+  if (current < 64) {
+    // Etend bacs_audit_action_items.source_table pour accepter
+    // 'inspections' (R175-5-1). Sans cela, le generateur d'actions
+    // correctives plante en SQLITE_CONSTRAINT_CHECK quand il essaie
+    // d'ajouter "Programmer une inspection" ou "Echeance depassee".
+    db.exec('PRAGMA foreign_keys = OFF');
+    db.exec('BEGIN TRANSACTION');
+    db.exec(`
+      CREATE TABLE bacs_audit_action_items_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        category TEXT NOT NULL
+          CHECK (category IN ('system','meter','bms_upgrade','thermal_regulation',
+                              'documentation','training','interoperability')),
+        severity TEXT NOT NULL
+          CHECK (severity IN ('blocking','major','minor')),
+        r175_article TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        zone_id INTEGER REFERENCES zones(zone_id) ON DELETE SET NULL,
+        equipment_id INTEGER REFERENCES equipments(equipment_id) ON DELETE SET NULL,
+        source_table TEXT
+          CHECK (source_table IS NULL OR source_table IN
+            ('systems','meters','bms','thermal_regulation','devices','inspections')),
+        source_id INTEGER,
+        source_subtype TEXT,
+        auto_generated INTEGER NOT NULL DEFAULT 1,
+        commercial_notes TEXT,
+        estimated_effort TEXT
+          CHECK (estimated_effort IS NULL OR estimated_effort IN ('low','medium','high')),
+        status TEXT NOT NULL DEFAULT 'open'
+          CHECK (status IN ('open','quoted','in_progress','done','declined')),
+        position INTEGER NOT NULL DEFAULT 0,
+        alternative_solutions_html TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO bacs_audit_action_items_new
+        SELECT id, document_id, category, severity, r175_article, title, description,
+               zone_id, equipment_id, source_table, source_id, source_subtype,
+               auto_generated, commercial_notes, estimated_effort, status, position,
+               alternative_solutions_html, created_at, updated_at
+        FROM bacs_audit_action_items;
+      DROP TABLE bacs_audit_action_items;
+      ALTER TABLE bacs_audit_action_items_new RENAME TO bacs_audit_action_items;
+      CREATE INDEX idx_bacs_actions_doc ON bacs_audit_action_items(document_id, severity, position);
+      CREATE INDEX idx_bacs_actions_source ON bacs_audit_action_items(document_id, source_table, source_id, source_subtype);
+    `);
+    db.exec('COMMIT');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.pragma('user_version = 64');
+    log.info("Migration 64 appliquee : source_table.CHECK accepte 'inspections' (R175-5-1)");
   }
 
   if (current > TARGET_VERSION) {
