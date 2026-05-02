@@ -10,7 +10,11 @@ import { useConfirm } from '@/composables/useConfirm'
 
 // Section "Inspection périodique par un tiers" (R175-5-1) — utilise
 // directement le store Pinia useAuditStore, plus de props nécessaires.
-defineProps({ active: { type: Boolean, default: false } })
+defineProps({
+  step: { type: Object, default: null },
+  active: { type: Boolean, default: false },
+})
+const emit = defineEmits(['validate-step', 'invalidate-step'])
 const audit = useAuditStore()
 const { inspections, latestInspection, todayIso } = storeToRefs(audit)
 const { error } = useNotification()
@@ -48,7 +52,10 @@ async function removeInspection(ins) {
     <template #header>
       <SectionHeader number="7" title="Inspection périodique par un tiers"
                      subtitle="R175-5-1 — rapport conservé 10 ans"
-                     :icon="ClockIcon" icon-color="text-amber-600">
+                     :icon="ClockIcon" icon-color="text-amber-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)">
         <template #subtitle-extra><R175Tooltip article="R175-5-1" /></template>
         <template #actions>
           <button @click.stop="addInspection" class="btn-primary text-xs px-2.5 py-1">

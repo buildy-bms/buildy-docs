@@ -1186,7 +1186,11 @@ onBeforeUnmount(() => {
       />
 
       <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
-      <InspectionsSection v-if="isBacs" :active="activeStepKey === 'inspections'" />
+      <InspectionsSection v-if="isBacs"
+                          :active="activeStepKey === 'inspections'"
+                          :step="stepFor('inspections')"
+                          @validate-step="validateStep"
+                          @invalidate-step="invalidateStep" />
 
       <!-- 9. Documents du site (DOE) -->
       <DocumentsSection
