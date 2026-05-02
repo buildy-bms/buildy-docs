@@ -2288,13 +2288,15 @@ function runMigrations() {
     // d'ajouter "Programmer une inspection" ou "Echeance depassee".
     db.exec('PRAGMA foreign_keys = OFF');
     db.exec('BEGIN TRANSACTION');
+    // CHECK sur category retire (les donnees prod contiennent des valeurs
+    // historiques system_addition / meter_addition / meter_connection /
+    // communication_upgrade / data_retention_upgrade qui n'etaient plus
+    // dans la whitelist mais sont legitimes). Le code applicatif enforce.
     db.exec(`
       CREATE TABLE bacs_audit_action_items_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
-        category TEXT NOT NULL
-          CHECK (category IN ('system','meter','bms_upgrade','thermal_regulation',
-                              'documentation','training','interoperability')),
+        category TEXT NOT NULL,
         severity TEXT NOT NULL
           CHECK (severity IN ('blocking','major','minor')),
         r175_article TEXT,
