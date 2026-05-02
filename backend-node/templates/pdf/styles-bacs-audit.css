@@ -155,11 +155,25 @@ h1.chapter {
   font-size: 16pt;
   font-weight: 700;
   color: #1b2842;
-  margin: 0 0 5mm 0;
-  padding-bottom: 2.5mm;
-  border-bottom: 2px solid #1b2842;
+  margin: 0 0 6mm 0;
+  padding: 0 0 2mm 0;
   page-break-before: always;
   letter-spacing: -0.01em;
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+}
+/* Trait court vert Buildy en dessous, plus elegant qu'une ligne pleine. */
+h1.chapter::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 18mm;
+  height: 1.2mm;
+  background: #00cd92;
+  border-radius: 0.6mm;
 }
 h2 {
   font-family: 'Poppins', sans-serif;
@@ -220,6 +234,119 @@ table td.wrap-anywhere {
   overflow-wrap: anywhere;
 }
 table tr:nth-child(even) td { background: #fafafa; }
+
+/* ── Lignes "label : valeur" inline avec puces ✓/✗ ─────────────────
+   Remplace les anciennes tables 2 colonnes Oui/Non pour gagner en
+   clarté. Une .kv-row par item — label gras à gauche, badge à droite. */
+.kv-list { margin: 2mm 0 4mm; padding: 0; list-style: none; }
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 1.8mm 3mm;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 8.5pt;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-row:nth-child(odd) { background: #fafbfc; }
+.kv-label { flex: 1; color: #1f2937; }
+.kv-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+  padding: 0.6mm 2.2mm;
+  border-radius: 1mm;
+  font-size: 8pt;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kv-yes { background: #d1fae5; color: #065f46; }
+.kv-no  { background: #fee2e2; color: #991b1b; }
+.kv-na  { background: #e5e7eb; color: #6b7280; }
+.kv-ico { font-weight: 700; font-size: 9pt; line-height: 1; }
+
+/* ── Liste compacte type "table sans bordures" ─────────────────────
+   Remplace les <ul><li> à puces noires des listes d'équipements ou
+   compteurs intégrés. Une ligne propre par entité, alternance grise. */
+.compact-list { margin: 2mm 0 4mm; }
+.compact-list .row {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 1.5mm 3mm;
+  font-size: 8.5pt;
+  border-bottom: 1px solid #f3f4f6;
+}
+.compact-list .row:last-child { border-bottom: none; }
+.compact-list .row:nth-child(even) { background: #fafbfc; }
+.compact-list .row strong { color: #1b2842; min-width: 38mm; flex-shrink: 0; }
+.compact-list .row .meta { color: #6b7280; flex: 1; }
+.compact-list .row .pwr {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8pt;
+  color: #1f2937;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Encadrés standardisés (callouts) ──────────────────────────────
+   Remplace les paragraphes "<p class='muted'><em>Note...</em></p>"
+   qui se confondaient avec le texte courant. 4 styles : info (gris),
+   warn (orange), reco (vert/violet Buildy), r175 (bleu indigo). */
+.callout {
+  display: flex;
+  gap: 3mm;
+  padding: 3mm 4mm;
+  margin: 3mm 0;
+  border-radius: 1mm;
+  font-size: 8.2pt;
+  line-height: 1.5;
+  page-break-inside: avoid;
+}
+.callout-icon {
+  flex-shrink: 0;
+  font-size: 11pt;
+  line-height: 1;
+  margin-top: 0.5mm;
+}
+.callout-body { flex: 1; }
+.callout-body strong { font-weight: 600; }
+.callout-body p { margin: 0 0 1.5mm; font-size: 8.2pt; }
+.callout-body p:last-child { margin-bottom: 0; }
+.callout-info {
+  background: #f3f4f6;
+  border-left: 2pt solid #6b7280;
+  color: #374151;
+}
+.callout-warn {
+  background: #fff7ed;
+  border-left: 2pt solid #ea580c;
+  color: #7c2d12;
+}
+.callout-reco {
+  background: #ecfdf5;
+  border-left: 2pt solid #00cd92;
+  color: #065f46;
+}
+.callout-r175 {
+  background: #eef2ff;
+  border-left: 2pt solid #4338ca;
+  color: #312e81;
+}
+
+/* ── Pills d'usage GTB (Chauffage / Refroidissement / ...) ─────────
+   Plus presents visuellement que les anciens spans pales. */
+.usage-tags { display: flex; flex-wrap: wrap; gap: 1.5mm; margin: 1.5mm 0 4mm; }
+.usage-tag {
+  display: inline-block;
+  padding: 1.2mm 3mm;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 1.2mm;
+  font-size: 8pt;
+  font-weight: 500;
+}
 
 /* ── Sévérités plan d'action ─────────────────────────────────────── */
 .sev {
