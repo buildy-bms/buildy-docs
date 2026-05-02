@@ -52,6 +52,8 @@ import BmsSection from '@/components/audit/BmsSection.vue'
 import ThermalSection from '@/components/audit/ThermalSection.vue'
 import MetersSection from '@/components/audit/MetersSection.vue'
 import SystemsSection from '@/components/audit/SystemsSection.vue'
+import DocumentsSection from '@/components/audit/DocumentsSection.vue'
+import CredentialsSection from '@/components/audit/CredentialsSection.vue'
 import { useAuditStore } from '@/stores/audit'
 
 const auditStore = useAuditStore()
@@ -1438,59 +1440,20 @@ onMounted(() => {
       <InspectionsSection v-if="isBacs" />
 
       <!-- 9. Documents du site (DOE) -->
-      <CollapsibleSection storage-key="documents" section-id="section-documents">
-        <template #header>
-          <DocumentArrowDownIcon class="w-5 h-5 text-blue-600" />
-          <h2 class="text-base font-semibold text-gray-800">9. Documents du site</h2>
-          <span class="text-xs text-gray-500">DOE — plans, schémas, AF, datasheets, manuels…</span>
-          <StepValidateBadge class="ml-auto" :step="stepFor('documents')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="siteDocCounts.doe || siteDocCounts.photo">
-            {{ siteDocCounts.doe }} document{{ siteDocCounts.doe > 1 ? 's' : '' }} DOE
-            · {{ siteDocCounts.photo }} photo{{ siteDocCounts.photo > 1 ? 's' : '' }}
-          </span>
-          <span v-else class="italic">Aucun document</span>
-        </template>
-        <div class="px-5 py-4">
-          <SiteDocumentsManager
-            v-if="document?.site_uuid"
-            :site-uuid="document.site_uuid"
-            :systems="systems"
-            :zones="zones"
-            :meters="meters"
-            :devices="devices"
-            :bms="bms"
-          />
-          <p v-else class="text-sm text-gray-500 italic text-center py-4">
-            L'audit n'est rattaché à aucun site.
-          </p>
-        </div>
-      </CollapsibleSection>
+      <DocumentsSection
+        :site-doc-counts="siteDocCounts"
+        :step="stepFor('documents')"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
 
       <!-- 10. Credentials du site (accès) -->
-      <CollapsibleSection storage-key="credentials" section-id="section-credentials">
-        <template #header>
-          <WrenchScrewdriverIcon class="w-5 h-5 text-amber-600" />
-          <h2 class="text-base font-semibold text-gray-800">10. Credentials d'accès</h2>
-          <span class="text-xs text-gray-500">Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)</span>
-          <StepValidateBadge class="ml-auto" :step="stepFor('credentials')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="siteCredCount">{{ siteCredCount }} credential{{ siteCredCount > 1 ? 's' : '' }} chiffré{{ siteCredCount > 1 ? 's' : '' }}</span>
-          <span v-else class="italic">Aucun credential</span>
-        </template>
-        <div class="px-5 py-4">
-          <SiteCredentialsManager
-            v-if="document?.site_uuid"
-            :site-uuid="document.site_uuid"
-            :systems="systems"
-          />
-          <p v-else class="text-sm text-gray-500 italic text-center py-4">
-            L'audit n'est rattaché à aucun site.
-          </p>
-        </div>
-      </CollapsibleSection>
+      <CredentialsSection
+        :site-cred-count="siteCredCount"
+        :step="stepFor('credentials')"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
 
       <!-- Plan de mise en conformité — masqué en mode site_audit -->
       <CompliancePlanSection
