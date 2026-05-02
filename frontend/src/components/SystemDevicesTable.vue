@@ -306,21 +306,21 @@ async function removeDevice(d) {
               <div class="flex items-center gap-1.5">
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
-                        :class="['pill border', d.wired ? 'tone-success' : 'tone-muted']"
+                        :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
                         title="Communication câblée vers la GTB">
-                  <span>{{ d.wired ? '✓' : '○' }}</span> Câblé
+                  <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
-                        :class="['pill border', d.meets_r175_3_p4 ? 'tone-success' : 'tone-muted']"
+                        :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
                         title="R175-3 4° — Arrêt manuel possible">
-                  <span>{{ d.meets_r175_3_p4 ? '✓' : '○' }}</span> Arrêt manuel
+                  <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
-                        :class="['pill border', d.meets_r175_3_p4_autonomous ? 'tone-success' : 'tone-muted']"
+                        :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
                         title="R175-3 4° — Reprise autonome de la GTB">
-                  <span>{{ d.meets_r175_3_p4_autonomous ? '✓' : '○' }}</span> Autonome
+                  <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
                 </button>
               </div>
             </div>

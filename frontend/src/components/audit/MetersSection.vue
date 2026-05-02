@@ -104,47 +104,48 @@ function hasNotes(html) {
       </thead>
       <tbody class="divide-y divide-gray-100">
         <PhotoDropTr v-for="m in meters" :key="m.id"
-                     :row-class="['group', m.out_of_service ? 'opacity-50' : ''].join(' ')"
+                     :row-class="['group',
+                       m.out_of_service ? 'opacity-50' : '',
+                       m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40 border-l-2 border-l-red-300' : ''
+                     ].join(' ')"
                      :site-uuid="document?.site_uuid || ''"
                      :attach-to="{ meter_id: m.id }"
                      :enabled="!!document?.site_uuid"
                      @changed="refreshAuditData">
-          <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
+          <td class="px-5 py-2 text-gray-700 text-center">
+            <span v-if="m.required && !m.present_actual && !m.out_of_service"
+                  class="text-red-600 mr-1" title="Compteur requis non présent">⚠</span>
+            {{ m.zone_name || 'Compteur général' }}
+          </td>
           <td class="py-2.5 text-center"><MeterUsagePill :usage="m.usage" /></td>
           <td class="py-2.5 text-center"><MeterTypePill :type="m.meter_type" /></td>
           <td class="py-2.5 px-2">
             <div class="flex flex-wrap items-center gap-1.5">
               <button type="button"
                       @click="patchMeter(m, { required: !m.required })"
-                      :class="['pill border', m.required ? 'tone-info' : 'tone-muted']"
+                      :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']"
                       :title="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
-                <span>{{ m.required ? '✓' : '○' }}</span> Requis
+                <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span> Requis
               </button>
               <button type="button"
                       @click="patchMeter(m, { present_actual: !m.present_actual })"
-                      :class="['pill border', m.present_actual ? 'tone-success' : 'tone-muted']"
+                      :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']"
                       :title="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
-                <span>{{ m.present_actual ? '✓' : '○' }}</span> Présent
+                <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span> Présent
               </button>
-              <button type="button" :disabled="!m.present_actual"
+              <button v-if="m.present_actual" type="button"
                       @click="patchMeter(m, m.communicating
                         ? { communicating: false, communication_protocols: null, communication_protocol: null }
                         : { communicating: true })"
-                      :class="['pill border', m.communicating ? 'tone-success' : 'tone-muted',
-                               !m.present_actual ? 'opacity-40 cursor-not-allowed' : '']">
-                <span>{{ m.communicating ? '✓' : '○' }}</span> Comm.
+                      :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']">
+                <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span> Comm.
               </button>
-              <button type="button" :disabled="!m.present_actual"
+              <button v-if="m.present_actual" type="button"
                       @click="patchMeter(m, { wired: !m.wired })"
-                      :class="['pill border', m.wired ? 'tone-success' : 'tone-muted',
-                               !m.present_actual ? 'opacity-40 cursor-not-allowed' : '']"
+                      :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']"
                       title="Communication câblée vers la GTB">
-                <span>{{ m.wired ? '✓' : '○' }}</span> Câblé
+                <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
               </button>
-              <span v-if="m.required && !m.present_actual && !m.out_of_service"
-                    class="pill sev-major" title="Compteur requis non présent">
-                ⚠ manquant
-              </span>
             </div>
           </td>
           <td class="py-2.5 px-2">
