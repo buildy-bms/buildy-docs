@@ -1,7 +1,10 @@
 'use strict';
 
+// Code conserve mais non expose dans l'UI (la checklist PDF papier a
+// ete abandonnee — workflow = photos + transcript Plaud + restitution
+// desktop). Les references stables (3.Z01.04) ont ete retirees.
+
 const db = require('../database');
-const { buildAuditRefs } = require('./bacs-audit-refs');
 
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
@@ -53,21 +56,18 @@ function buildChecklistData(documentId) {
     'SELECT * FROM bacs_audit_inspections WHERE document_id = ? ORDER BY COALESCE(last_inspection_date, \'1970\') DESC'
   ).all(documentId);
 
-  const refs = buildAuditRefs({ zones: zones.map(z => ({ ...z, zone_id: z.zone_id })), systems, devices, meters, thermal });
-
-  // Joint les zones aux systemes, devices, meters, thermal (avec refs)
-  const zonesById = new Map(zones.map(z => [z.zone_id, z]));
+  // Joint les zones aux systemes, devices, meters, thermal
   const systemsByZone = new Map();
   for (const s of systems) {
     if (!systemsByZone.has(s.zone_id)) systemsByZone.set(s.zone_id, []);
     systemsByZone.get(s.zone_id).push({
       ...s,
-      ref: refs.systems.get(s.id)?.ref || '',
+      ref: '',
       label: SYSTEM_LABEL[s.system_category] || s.system_category,
       devices: devices
         .filter(d => d.system_id === s.id)
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.id - b.id)
-        .map(d => ({ ...d, ref: refs.devices.get(d.id)?.ref || '' })),
+        .map(d => ({ ...d, ref: '' })),
     });
   }
   const metersByZone = new Map();
@@ -76,19 +76,19 @@ function buildChecklistData(documentId) {
     if (!metersByZone.has(k)) metersByZone.set(k, []);
     metersByZone.get(k).push({
       ...m,
-      ref: refs.meters.get(m.id)?.ref || '',
+      ref: '',
       usage_label: METER_USAGE_LABEL[m.usage] || m.usage,
       type_label: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
     });
   }
   const thermalByZone = new Map();
   for (const t of thermal) {
-    thermalByZone.set(t.zone_id, { ...t, ref: refs.thermal.get(t.id)?.ref || '' });
+    thermalByZone.set(t.zone_id, { ...t, ref: '' });
   }
 
   // Compose la liste a imprimer : 1 bloc par zone + 1 bloc "general" (compteurs site)
   const zoneBlocks = zones.map(z => ({
-    ref: refs.zones.get(z.zone_id)?.ref || '',
+    ref: '',
     name: z.name,
     nature: z.nature || '',
     notes: z.notes || '',

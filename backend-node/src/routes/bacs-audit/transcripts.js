@@ -10,7 +10,37 @@ const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
 const { assistTranscriptMapping } = require('../../lib/claude');
-const { assertBacsAuditExists, loadRefsInputs, buildAuditRefs } = require('./_shared');
+const { assertBacsAuditExists } = require('./_shared');
+
+// Charge les entites de l'audit pour construire le squelette envoye a
+// Claude (id + nom + categorie). Le mapping passe par les noms / ids
+// directement, plus de ref stable cross-referencee.
+function loadAuditEntities(documentId) {
+  const af = db.afs.getById(documentId);
+  if (!af) return null;
+  const site = af.site_id ? db.sites.getById(af.site_id) : null;
+  const zones = site ? db.db.prepare(
+    'SELECT zone_id, name, nature FROM zones WHERE site_id = ? AND deleted_at IS NULL'
+  ).all(site.site_id) : [];
+  const systems = db.db.prepare(`
+    SELECT s.id, s.system_category, s.zone_id, z.name AS zone_name
+    FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
+    WHERE s.document_id = ?`).all(documentId);
+  const devices = db.db.prepare(`
+    SELECT d.id, d.name, d.brand, d.model_reference, d.system_id
+    FROM bacs_audit_system_devices d
+    JOIN bacs_audit_systems s ON s.id = d.system_id
+    WHERE s.document_id = ?`).all(documentId);
+  const meters = db.db.prepare(`
+    SELECT m.id, m.usage, m.meter_type, m.zone_id, z.name AS zone_name
+    FROM bacs_audit_meters m LEFT JOIN zones z ON z.zone_id = m.zone_id
+    WHERE m.document_id = ?`).all(documentId);
+  const thermal = db.db.prepare(`
+    SELECT t.id, t.zone_id, z.name AS zone_name
+    FROM bacs_audit_thermal_regulation t LEFT JOIN zones z ON z.zone_id = t.zone_id
+    WHERE t.document_id = ?`).all(documentId);
+  return { zones, systems, devices, meters, thermal };
+}
 
 async function routes(fastify) {
   fastify.get('/bacs-audit/:documentId/transcripts', async (request, reply) => {
@@ -48,15 +78,8 @@ async function routes(fastify) {
     const tr = db.db.prepare('SELECT * FROM bacs_audit_transcripts WHERE id = ?').get(id);
     if (!tr) return reply.code(404).send({ detail: 'Transcript non trouve' });
 
-    const inputs = loadRefsInputs(tr.document_id);
-    const refs = buildAuditRefs(inputs);
-    const skeleton = {
-      zones: inputs.zones.map(z => ({ ref: refs.zones.get(z.zone_id)?.ref, name: z.name, nature: z.nature })),
-      systems: inputs.systems.map(s => ({ ref: refs.systems.get(s.id)?.ref, category: s.system_category, zone_ref: refs.zones.get(s.zone_id)?.ref })),
-      devices: inputs.devices.map(d => ({ ref: refs.devices.get(d.id)?.ref, name: d.name, brand: d.brand, model_reference: d.model_reference })),
-      meters: inputs.meters.map(m => ({ ref: refs.meters.get(m.id)?.ref, usage: m.usage, type: m.meter_type })),
-      thermal: inputs.thermal.map(t => ({ ref: refs.thermal.get(t.id)?.ref, zone_ref: refs.zones.get(t.zone_id)?.ref })),
-    };
+    const skeleton = loadAuditEntities(tr.document_id);
+    if (!skeleton) return reply.code(404).send({ detail: 'Document non trouve' });
 
     let result;
     try { result = await assistTranscriptMapping({ skeleton, transcript: tr.text_content || '' }); }
@@ -65,25 +88,31 @@ async function routes(fastify) {
       return reply.code(502).send({ detail: 'Echec generation suggestions Claude' });
     }
 
-    const refLookup = new Map();
-    for (const k of ['zones','systems','devices','meters','thermal']) {
-      for (const [rowId, info] of refs[k]) refLookup.set(info.ref, { kind: k.replace(/s$/, ''), id: rowId });
-    }
+    // Claude renvoie target_kind + target_id directement (id existant
+    // dans le skeleton). On valide que l'id est connu pour eviter de
+    // stocker des suggestions orphelines.
+    const validIds = {
+      zone: new Set(skeleton.zones.map(z => z.zone_id)),
+      system: new Set(skeleton.systems.map(s => s.id)),
+      device: new Set(skeleton.devices.map(d => d.id)),
+      meter: new Set(skeleton.meters.map(m => m.id)),
+      thermal: new Set(skeleton.thermal.map(t => t.id)),
+    };
     const insert = db.db.prepare(`
       INSERT INTO bacs_audit_suggestions
-        (transcript_id, document_id, target_kind, target_id, target_ref,
+        (transcript_id, document_id, target_kind, target_id,
          field_name, suggested_value, confidence, source_quote)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     let count = 0;
     const tx = db.db.transaction((items) => {
       for (const s of items) {
-        const matched = s.target_ref ? refLookup.get(s.target_ref) : null;
+        const kind = s.target_kind || 'unknown';
+        const id = (validIds[kind] && validIds[kind].has(s.target_id)) ? s.target_id : null;
         insert.run(
           tr.id, tr.document_id,
-          matched?.kind || s.target_kind || 'unknown',
-          matched?.id || null,
-          s.target_ref || null,
+          kind,
+          id,
           s.field_name || '',
           typeof s.suggested_value === 'string' ? s.suggested_value : JSON.stringify(s.suggested_value ?? null),
           typeof s.confidence === 'number' ? s.confidence : null,

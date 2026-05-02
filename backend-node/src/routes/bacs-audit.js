@@ -13,7 +13,7 @@ const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
-  assertBacsAuditExists, loadRefsInputs, refsToFlatMaps, buildAuditRefs,
+  assertBacsAuditExists,
 } = require('./bacs-audit/_shared');
 
 async function routes(fastify) {
@@ -22,16 +22,6 @@ async function routes(fastify) {
   await fastify.register(require('./bacs-audit/inspections'));
   await fastify.register(require('./bacs-audit/exports'));
   await fastify.register(require('./bacs-audit/lifecycle'));
-
-  // ─── Refs stables (numerotation cross-referencee) ──────────────────
-  // GET /bacs-audit/:documentId/refs → { zones, systems, devices, meters, thermal }
-  fastify.get('/bacs-audit/:documentId/refs', async (request, reply) => {
-    const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
-    const inputs = loadRefsInputs(id);
-    if (!inputs) return reply.code(404).send({ detail: 'Document non trouve' });
-    return refsToFlatMaps(buildAuditRefs(inputs));
-  });
 
   // ─── Systems (R175-1 §4 + R175-3 §3) ───────────────────────────────
   fastify.get('/bacs-audit/:documentId/systems', async (request, reply) => {

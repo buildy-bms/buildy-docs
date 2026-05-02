@@ -1,7 +1,6 @@
 'use strict';
 
 const db = require('../../database');
-const { buildAuditRefs } = require('../../lib/bacs-audit-refs');
 
 const SYSTEM_CATEGORIES = ['heating','cooling','ventilation','dhw',
   'lighting_indoor','lighting_outdoor','electricity_production'];
@@ -26,34 +25,8 @@ function assertBacsAuditExists(documentId, reply) {
   return af;
 }
 
-function loadRefsInputs(documentId) {
-  const af = db.afs.getById(documentId);
-  if (!af) return null;
-  const site = af.site_id ? db.sites.getById(af.site_id) : null;
-  const zones = site ? db.db.prepare(
-    'SELECT * FROM zones WHERE site_id = ? AND deleted_at IS NULL'
-  ).all(site.site_id) : [];
-  const systems = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE document_id = ?').all(documentId);
-  const devices = db.db.prepare(`
-    SELECT d.* FROM bacs_audit_system_devices d
-    JOIN bacs_audit_systems s ON s.id = d.system_id
-    WHERE s.document_id = ?
-  `).all(documentId);
-  const meters = db.db.prepare('SELECT * FROM bacs_audit_meters WHERE document_id = ?').all(documentId);
-  const thermal = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE document_id = ?').all(documentId);
-  return { zones, systems, devices, meters, thermal };
-}
-
-function refsToFlatMaps(refs) {
-  const out = { zones: {}, systems: {}, devices: {}, meters: {}, thermal: {} };
-  for (const k of Object.keys(out)) {
-    for (const [id, info] of refs[k]) out[k][id] = info.ref;
-  }
-  return out;
-}
-
 module.exports = {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
-  assertBacsAuditExists, loadRefsInputs, refsToFlatMaps, buildAuditRefs,
+  assertBacsAuditExists,
 };

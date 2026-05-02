@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, provide } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -12,7 +12,6 @@ import {
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
-  getBacsAuditRefs,
   getBacsSystems, updateBacsSystem,
   getBacsMeters, createBacsMeter, updateBacsMeter, deleteBacsMeter,
   getBacsBms, updateBacsBms,
@@ -86,15 +85,12 @@ const docId = parseInt(route.params.id, 10)
 // store via les refs, les sous-composants LISENT depuis le store.
 const {
   document, systems, meters, bms, thermal, actionItems,
-  zones, devices, inspections, powerSummary, auditRefs,
+  zones, devices, inspections, powerSummary,
   loading,
 } = storeToRefs(auditStore)
 // site garde sa nature locale (pas charge par le store, valeur calculee
 // depuis le document.site_id si besoin).
 const site = ref(null)
-function refOf(kind, id) { return auditRefs.value?.[kind]?.[id] || '' }
-provide('auditRefs', auditRefs)
-provide('refOf', refOf)
 
 // Toggle pour afficher les usages marques 'non concerne' dans la card
 // systemes. Persistance localStorage. Par defaut tout est visible (les

@@ -203,7 +203,6 @@ export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
 
 // ── Audit BACS — donnees structurees ──
-export const getBacsAuditRefs = (docId) => api.get(`/bacs-audit/${docId}/refs`)
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
 export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
 export const getBacsMeters = (docId) => api.get(`/bacs-audit/${docId}/meters`)

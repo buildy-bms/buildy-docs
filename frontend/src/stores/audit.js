@@ -10,7 +10,7 @@ import { defineStore } from 'pinia'
 import {
   getAf, getBacsSystems, getBacsMeters, getBacsBms, getBacsThermal,
   getBacsActionItems, getBacsDevices, getBacsPowerSummary,
-  getBacsAuditRefs, getBacsInspections, listZones,
+  getBacsInspections, listZones,
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
 } from '@/api'
@@ -29,7 +29,6 @@ export const useAuditStore = defineStore('audit', {
     actionItems: [],
     inspections: [],
     powerSummary: { by_category: {}, heating_cooling_total_kw: 0 },
-    auditRefs: { zones: {}, systems: {}, devices: {}, meters: {}, thermal: {} },
     auditProgress: {},
     synthesisHtml: '',
     // loading=true par defaut : evite que les sous-composants ne se
@@ -46,7 +45,6 @@ export const useAuditStore = defineStore('audit', {
     siteUuid: (s) => s.document?.site_uuid || null,
     todayIso: () => new Date().toISOString().slice(0, 10),
     latestInspection: (s) => s.inspections[0] || null,
-    refOf: (s) => (kind, id) => s.auditRefs?.[kind]?.[id] || '',
   },
 
   actions: {
@@ -79,15 +77,13 @@ export const useAuditStore = defineStore('audit', {
           const z = await listZones(d.data.site_id)
           this.zones = z.data
         }
-        const [dev, ps, refs, ins] = await Promise.all([
+        const [dev, ps, ins] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
-          getBacsAuditRefs(docId),
           getBacsInspections(docId),
         ])
         this.devices = dev.data
         this.powerSummary = ps.data
-        this.auditRefs = refs.data
         this.inspections = ins.data
       } finally {
         this.loading = false
@@ -105,11 +101,10 @@ export const useAuditStore = defineStore('audit', {
     },
 
     async refreshAuditCore() {
-      const [s, t, a, dev, ps, m, refs] = await Promise.all([
+      const [s, t, a, dev, ps, m] = await Promise.all([
         getBacsSystems(this.docId), getBacsThermal(this.docId),
         getBacsActionItems(this.docId), getBacsDevices(this.docId),
         getBacsPowerSummary(this.docId), getBacsMeters(this.docId),
-        getBacsAuditRefs(this.docId),
       ])
       this.systems = s.data
       this.thermal = t.data
@@ -117,7 +112,6 @@ export const useAuditStore = defineStore('audit', {
       this.devices = dev.data
       this.powerSummary = ps.data
       this.meters = m.data
-      this.auditRefs = refs.data
     },
 
     async addInspection() {
