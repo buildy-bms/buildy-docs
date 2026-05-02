@@ -174,27 +174,69 @@ function loadAssetDataUrl(filename) {
   return `data:${mime};base64,${base64}`;
 }
 
-// ── Pool de browser Puppeteer (1 instance partagée) ──
-let _browserPromise = null;
+// ── Pool de browser Puppeteer (1 instance partagee, recyclee periodiquement) ──
+// Recycle apres N renders pour eviter les fuites memoire long-terme.
+// Healthcheck (version()) avant chaque utilisation : si l'instance est
+// morte, on la relance immediatement. Timeout global RENDER_TIMEOUT_MS
+// applique par renderPdf (Promise.race) pour eviter les freezes.
+const RENDER_RECYCLE_AFTER = parseInt(process.env.PUPPETEER_RECYCLE_AFTER || '50', 10);
+const RENDER_TIMEOUT_MS = parseInt(process.env.PUPPETEER_RENDER_TIMEOUT_MS || '120000', 10);
 
-function getBrowser() {
-  if (!_browserPromise) {
-    _browserPromise = puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    }).then((b) => {
-      log.info('Puppeteer browser started');
-      b.on('disconnected', () => {
-        log.warn('Puppeteer browser disconnected — will relaunch on next export');
+let _browserPromise = null;
+let _browserUseCount = 0;
+
+async function _launchBrowser() {
+  const b = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+  log.info(`Puppeteer browser started (pid=${b.process()?.pid || '?'})`);
+  b.on('disconnected', () => {
+    log.warn('Puppeteer browser disconnected — will relaunch on next export');
+    _browserPromise = null;
+    _browserUseCount = 0;
+  });
+  return b;
+}
+
+async function getBrowser() {
+  if (_browserPromise) {
+    try {
+      const b = await _browserPromise;
+      // Healthcheck : si version() echoue, l'instance est morte.
+      await b.version();
+      // Recyclage planifie apres N renders.
+      if (_browserUseCount >= RENDER_RECYCLE_AFTER) {
+        log.info(`Puppeteer recycle apres ${_browserUseCount} renders`);
         _browserPromise = null;
-      });
-      return b;
-    }).catch((err) => {
+        _browserUseCount = 0;
+        try { await b.close(); } catch { /* ignore */ }
+      } else {
+        _browserUseCount++;
+        return b;
+      }
+    } catch (err) {
+      log.warn(`Puppeteer healthcheck KO (${err.message}) — relance`);
       _browserPromise = null;
-      throw err;
-    });
+      _browserUseCount = 0;
+    }
   }
+  _browserPromise = _launchBrowser().catch((err) => {
+    _browserPromise = null;
+    throw err;
+  });
+  _browserUseCount = 1;
   return _browserPromise;
+}
+
+function _withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout (${ms}ms)`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -220,7 +262,15 @@ function getBrowser() {
  *   - pages 2..N avec header/footer
  * Necessite displayHeaderFooter=true dans pdfOptions, sinon ignore.
  */
-async function renderPdf({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page' }) {
+async function renderPdf(opts) {
+  // Timeout global : si la pipeline complete depasse RENDER_TIMEOUT_MS,
+  // on rejette pour eviter qu'une requete bloque l'instance Puppeteer
+  // indefiniment. Puppeteer n'est pas killee — c'est l'appelant qui
+  // decide (en pratique le handler Fastify renvoie 502).
+  return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
+}
+
+async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
