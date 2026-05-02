@@ -122,6 +122,20 @@ export const previewAfUrl = (afId, includeBacsAnnex = false) =>
 export const previewPointsListUrl = (afId) =>
   `/api/afs/${afId}/exports/points-list/preview`
 
+// ── Brochures (lot A2/A3) ──
+export const listBrochureLibrary = (kind) =>
+  api.get('/brochures/library', { params: kind ? { kind } : {} })
+export const listBrochureItems = (brochureId) =>
+  api.get(`/brochures/${brochureId}/items`)
+export const createBrochureItem = (brochureId, data) =>
+  api.post(`/brochures/${brochureId}/items`, data)
+export const updateBrochureItem = (itemId, data) =>
+  api.patch(`/brochures/items/${itemId}`, data)
+export const deleteBrochureItem = (itemId) =>
+  api.delete(`/brochures/items/${itemId}`)
+export const updateBrochureLayout = (brochureId, layout) =>
+  api.patch(`/brochures/${brochureId}/layout`, { layout_template: layout })
+
 // ── PDF boilerplate admin (lot B4) ──
 // Methodologie + disclaimers du PDF audit BACS, editables sans redeployer.
 export const listPdfBoilerplate = (kind) =>

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 65;
+const TARGET_VERSION = 66;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2381,6 +2381,101 @@ function runMigrations() {
     log.info('Migration 65 appliquee : pdf_boilerplate (methodologie + disclaimers en DB)');
   }
 
+  if (current < 66) {
+    // Lot A2 : Brochure commerciale + Catalogue d'offres.
+    // Structure unifiee : meme outil de composition pour les 2 variantes,
+    // distinguees par afs.layout_template ('commercial-brochure' par
+    // defaut, 'offering-catalog' pour la brochure annuelle type
+    // "Offres Buildy 2026").
+    //
+    // brochure_items : liste plate d'items composant la brochure. Chaque
+    // item peut etre :
+    //   - 'feature' : item de bibliotheque rédigée (presentation Buildy,
+    //                 niveau service E/S/P, etc.)
+    //   - 'equipment_template' : reference a une fiche equipment_templates
+    //   - 'hyperveez_page' : reference a HYPERVEEZ_PAGES (slug)
+    //   - 'cgv' : extrait des CGV
+    //   - 'custom' : item ad-hoc redige uniquement pour cette brochure
+    //
+    // override_title et override_html permettent de personnaliser un item
+    // pour ce client specifique sans modifier la bibliotheque (ex: "Voici
+    // notre offre pour le projet Auchan Mainvilliers").
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN layout_template TEXT DEFAULT NULL;
+
+      CREATE TABLE brochure_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        brochure_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        item_kind TEXT NOT NULL
+          CHECK (item_kind IN ('feature', 'equipment_template',
+                               'hyperveez_page', 'cgv', 'custom')),
+        source_id INTEGER,         -- pointeur (equipment_templates.id, etc.)
+        source_slug TEXT,          -- pour hyperveez_page (slug texte)
+        title TEXT,                -- titre par defaut (peut etre override)
+        body_html TEXT,            -- contenu par defaut
+        override_title TEXT,       -- override specifique a cette brochure
+        override_html TEXT,        -- idem pour le body
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_brochure_items_brochure ON brochure_items(brochure_id, position);
+
+      -- brochure_library_items : catalogue partage de tous les items
+      -- reutilisables (presentations Buildy, niveaux d'offre, etc.)
+      -- maintenu une fois centrale, utilise dans toutes les brochures.
+      CREATE TABLE brochure_library_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL UNIQUE,
+        item_kind TEXT NOT NULL
+          CHECK (item_kind IN ('feature', 'offering_level', 'cgv', 'company')),
+        service_level TEXT
+          CHECK (service_level IS NULL OR service_level IN ('E', 'S', 'P', 'ESP')),
+        title TEXT NOT NULL,
+        summary TEXT,
+        body_html TEXT NOT NULL,
+        tags TEXT,                 -- CSV libre pour filtrage UI
+        position INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_brochure_library_kind ON brochure_library_items(item_kind, is_active, position);
+    `);
+    // Seed minimal de la bibliotheque : 4 items de demarrage.
+    // L'admin pourra etoffer via une page dediee plus tard.
+    const seedLib = db.prepare(`INSERT INTO brochure_library_items
+      (slug, item_kind, service_level, title, summary, body_html, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    seedLib.run('qui-est-buildy', 'company', null,
+      'Qui est Buildy ?',
+      'Présentation de la société, de la mission, et de l\'équipe.',
+      '<h2>Qui est Buildy ?</h2><p>Buildy est l\'éditeur d\'une plateforme de supervision et hypervision GTB agnostique multi-sites. Nous intégrons les systèmes existants sans imposer un fournisseur unique.</p><p><em>À enrichir depuis l\'admin Boilerplate.</em></p>',
+      0);
+    seedLib.run('niveau-essentiel', 'offering_level', 'E',
+      'Niveau Essentiel',
+      'Le socle : monitoring + alarmes de base + tableaux de bord.',
+      '<h2>Niveau Essentiel</h2><p>Le socle de la supervision Buildy : monitoring continu, alarmes, tableaux de bord énergétiques, dashboards consolidés multi-sites.</p>',
+      1);
+    seedLib.run('niveau-smart', 'offering_level', 'S',
+      'Niveau Smart',
+      'Essentiel + commande à distance + planifications + détection de dérives.',
+      '<h2>Niveau Smart</h2><p>L\'Essentiel enrichi des fonctions de pilotage : commandes à distance, programmation horaire, scénarios, détection automatique des dérives énergétiques (R175-3 §2).</p>',
+      2);
+    seedLib.run('niveau-premium', 'offering_level', 'P',
+      'Niveau Premium',
+      'Smart + IA prédictive + rapports automatiques + accompagnement.',
+      '<h2>Niveau Premium</h2><p>Tous les avantages Smart + IA prédictive (anticipation des défaillances), rapports énergétiques automatiques, support dédié et accompagnement à la mise en conformité R175.</p>',
+      3);
+    seedLib.run('cgv-2026', 'cgv', null,
+      'Conditions générales de vente — 2026',
+      'Conditions contractuelles applicables à toute prestation Buildy.',
+      '<h2>Conditions générales de vente</h2><p><em>Texte des CGV à insérer ici — voir docs/cgv-buildy-2026.pdf.</em></p>',
+      99);
+    db.pragma('user_version = 66');
+    log.info('Migration 66 appliquee : brochure_items + brochure_library_items + afs.layout_template');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3572,6 +3667,68 @@ const aiPrompts = {
   },
 };
 
+// ── Brochure (lot A2) ───────────────────────────────────────────────
+// Items composant une brochure (commerciale ou catalogue d'offres).
+const brochureItems = {
+  listByBrochure(brochureId) {
+    return db.prepare(`
+      SELECT * FROM brochure_items
+      WHERE brochure_id = ?
+      ORDER BY position, id
+    `).all(brochureId);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM brochure_items WHERE id = ?').get(id);
+  },
+  create({ brochureId, position = 0, itemKind, sourceId = null, sourceSlug = null,
+           title = null, bodyHtml = null, overrideTitle = null, overrideHtml = null }) {
+    const result = db.prepare(`
+      INSERT INTO brochure_items (brochure_id, position, item_kind, source_id,
+                                  source_slug, title, body_html,
+                                  override_title, override_html)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(brochureId, position, itemKind, sourceId, sourceSlug,
+           title, bodyHtml, overrideTitle, overrideHtml);
+    return this.getById(result.lastInsertRowid);
+  },
+  update(id, patch) {
+    const sets = [];
+    const args = [];
+    const fieldMap = {
+      position: 'position', overrideTitle: 'override_title',
+      overrideHtml: 'override_html', title: 'title', bodyHtml: 'body_html',
+    };
+    for (const [k, col] of Object.entries(fieldMap)) {
+      if (patch[k] !== undefined) { sets.push(`${col} = ?`); args.push(patch[k]); }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    args.push(id);
+    db.prepare(`UPDATE brochure_items SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    return this.getById(id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM brochure_items WHERE id = ?').run(id);
+  },
+};
+
+const brochureLibrary = {
+  list({ kind, includeInactive = false } = {}) {
+    let sql = 'SELECT * FROM brochure_library_items WHERE 1=1';
+    const args = [];
+    if (kind) { sql += ' AND item_kind = ?'; args.push(kind); }
+    if (!includeInactive) sql += ' AND is_active = 1';
+    sql += ' ORDER BY item_kind, position, id';
+    return db.prepare(sql).all(...args);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM brochure_library_items WHERE id = ?').get(id);
+  },
+  getBySlug(slug) {
+    return db.prepare('SELECT * FROM brochure_library_items WHERE slug = ?').get(slug);
+  },
+};
+
 const pdfBoilerplate = {
   list({ kind, includeInactive = false } = {}) {
     let sql = 'SELECT * FROM pdf_boilerplate WHERE 1=1';
@@ -3612,6 +3769,8 @@ const pdfBoilerplate = {
 module.exports = {
   init,
   pdfBoilerplate,
+  brochureItems,
+  brochureLibrary,
   users,
   sessions,
   equipmentTemplates,

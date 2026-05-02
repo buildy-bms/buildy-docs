@@ -122,6 +122,12 @@ const routes = [
     meta: { title: 'Boilerplate PDF' },
     component: () => import('@/views/BoilerplateAdminView.vue'),
   },
+  {
+    path: '/brochures/:id',
+    name: 'brochure-detail',
+    meta: { title: 'Brochure' },
+    component: () => import('@/views/BrochureDetailView.vue'),
+  },
 ]
 
 const router = createRouter({

@@ -306,6 +306,7 @@ function formatDate(s) {
 function routeForDoc(doc) {
   if (doc.kind === 'bacs_audit') return `/bacs-audit/${doc.id}`
   if (doc.kind === 'site_audit') return `/site-audit/${doc.id}`
+  if (doc.kind === 'brochure') return `/brochures/${doc.id}`
   return `/afs/${doc.id}`
 }
 
@@ -587,7 +588,7 @@ onMounted(refresh)
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
                 { value: 'site_audit', label: 'Audit GTB (Classique)', desc: 'Préparation devis Buildy (hors décret)' },
-                { value: 'brochure', label: 'Brochure', desc: 'Bientôt', disabled: true },
+                { value: 'brochure', label: 'Brochure', desc: 'Document commercial composé' },
               ]"
               :key="opt.value"
               :class="[

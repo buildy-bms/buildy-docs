@@ -26,9 +26,9 @@ Deux axes :
 | 4 | **A1** Polish AfDetailView | 2j | ✅ Livré (Pinia + indicateur vérification) |
 | 5 | **B2** Charts dans les PDFs | 1j | ✅ Livré (BACS — donut + radar + bar) |
 | 6 | **B4** Boilerplate admin | 1j | ✅ Livré |
-| 7 | **A2** Brochure backend | 1.5j | ⏳ À venir |
-| 8 | **A3** Brochure UI | 2-3j | ⏳ À venir |
-| 9 | **A4** Liaison cross-document | 1j | ⏳ À venir |
+| 7 | **A2** Brochure backend | 1.5j | ✅ Livré |
+| 8 | **A3** Brochure UI | 2-3j | ✅ Livré (sans drag-drop ni export PDF) |
+| 9 | **A4** Liaison cross-document | 1j | ✅ Livré (panneau RelatedSiteDocsPanel) |
 
 ---
 

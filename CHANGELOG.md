@@ -61,6 +61,42 @@ Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md
   - Boutons : ↑↓ (réordonner), 👁 (désactiver), 🗑 (supprimer), + (ajouter)
 - Lien dans la sidebar `Système → Boilerplate PDF`.
 
+### Lots A2 + A3 + A4 — Brochure unifiée ✅
+
+**Approche** : un même outil de composition pour 2 variantes (Brochure commerciale par client, Catalogue d'offres annuel type *Offres Buildy 2026*), distinguées par `afs.layout_template`.
+
+**Backend (A2)** :
+- Migration 66 : table `brochure_items` (liste plate par brochure) + `brochure_library_items` (catalogue partagé) + `afs.layout_template`
+- Seed minimal de la bibliothèque (Qui est Buildy / Niveaux E/S/P / CGV 2026)
+- Modules DB `brochureItems`, `brochureLibrary`
+- Routes [`backend-node/src/routes/brochures.js`](backend-node/src/routes/brochures.js) :
+  - `GET /api/brochures/library?kind=...`
+  - `GET /api/brochures/:id/items`
+  - `POST /api/brochures/:id/items` (pioche dans la bibliothèque ou crée custom)
+  - `PATCH /api/brochures/items/:id` (override titre / contenu / position)
+  - `DELETE /api/brochures/items/:id`
+  - `PATCH /api/brochures/:id/layout` (variante commercial / catalogue)
+
+**Frontend (A3)** :
+- Vue [`frontend/src/views/BrochureDetailView.vue`](frontend/src/views/BrochureDetailView.vue) : layout 2 colonnes (catalogue gauche / composition centrale)
+- Filtres catalogue : Tout / Présentations / Niveaux / Buildy / CGV
+- Items déjà ajoutés visuellement marqués (✓ vert) dans le catalogue
+- Composition : cards numérotées avec boutons ↑↓ (réordonner), édition dépliable Tiptap pour override titre + contenu
+- Bouton « Section libre » pour items custom rédigés à la main
+- Sélecteur de variante dans le header (commerciale / catalogue)
+- Activation du bouton « Brochure » dans `AfsListView` (anciennement « Bientôt »)
+- Route `/brochures/:id`
+
+**Liaison cross-document (A4)** :
+- Composant [`RelatedSiteDocsPanel.vue`](frontend/src/components/RelatedSiteDocsPanel.vue) : liste les autres documents du même site (AF + audits BACS/GTB + autres brochures), groupés par kind avec icônes et badges colorés
+- Intégré dans `BrochureDetailView` (catalogue gauche, en bas)
+- Réutilisable dans `BacsAuditDetailView` et `AfDetailView` ultérieurement
+
+**Hors périmètre** (à itérer plus tard) :
+- Drag-drop sortablejs (les boutons ↑↓ suffisent pour MVP)
+- Export PDF brochure (templates HBS dédiés `brochure-commercial.hbs` et `brochure-catalog.hbs`) — base posée mais routes pas implémentées
+- Reuse direct de sections AF dans une brochure (panneau "Reprendre depuis l'AF" dans le catalogue)
+
 ### À venir
 - **Lot A2** — Brochure backend (DB + routes + lib + variante catalogue d'offres)
 - **Lot A3** — Brochure UI (composition par drag, 2 variantes Brochure / Catalogue)
