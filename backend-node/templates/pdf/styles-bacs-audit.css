@@ -618,6 +618,127 @@ table .total-row td {
 }
 .roi-quote blockquote strong { color: #451a03; font-style: normal; }
 
+/* ── Bandeau "État de conformité" (Synthèse de conformité) ─────────
+   Plus visible que <p>État global de la conformité : pill</p>. */
+.conformity-banner {
+  display: flex;
+  align-items: center;
+  gap: 5mm;
+  padding: 5mm 6mm;
+  margin: 3mm 0 5mm;
+  border-radius: 1.5mm;
+  page-break-inside: avoid;
+}
+.conformity-icon {
+  flex-shrink: 0;
+  width: 12mm;
+  height: 12mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18pt;
+  font-weight: 700;
+  border-radius: 50%;
+  color: white;
+  line-height: 1;
+}
+.conformity-body { display: flex; flex-direction: column; gap: 1mm; }
+.conformity-label {
+  text-transform: uppercase;
+  font-size: 7pt;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  font-weight: 600;
+}
+.conformity-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.conformity-compliant     { background: #d1fae5; }
+.conformity-compliant     .conformity-icon  { background: #059669; }
+.conformity-compliant     .conformity-value { color: #065f46; }
+.conformity-partial       { background: #fef3c7; }
+.conformity-partial       .conformity-icon  { background: #d97706; }
+.conformity-partial       .conformity-value { color: #854d0e; }
+.conformity-non-compliant { background: #fee2e2; }
+.conformity-non-compliant .conformity-icon  { background: #dc2626; }
+.conformity-non-compliant .conformity-value { color: #991b1b; }
+
+/* ── Cartes article R175 (Annexe A) ───────────────────────────────
+   Chaque article du decret presente comme une fiche structuree :
+   code R175-X mono dans un badge, titre H3, texte du decret en lecture
+   confortable (pas en muted). */
+.article-card {
+  margin: 4mm 0;
+  padding: 0;
+  background: #fff;
+  border: 0.5pt solid #e5e7eb;
+  border-radius: 1mm;
+  page-break-inside: avoid;
+  overflow: hidden;
+}
+.article-card-head {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 2.5mm 4mm;
+  background: #f9fafb;
+  border-bottom: 0.5pt solid #e5e7eb;
+}
+.article-code {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8.5pt;
+  font-weight: 700;
+  background: #1b2842;
+  color: #fff;
+  padding: 1mm 2.5mm;
+  border-radius: 0.8mm;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.article-title {
+  margin: 0;
+  font-size: 9.5pt;
+  color: #1b2842;
+  font-weight: 600;
+}
+.article-body {
+  padding: 3mm 4mm;
+  font-size: 8.5pt;
+  color: #1f2937;
+  line-height: 1.55;
+}
+.article-body p { margin: 0 0 2mm; font-size: 8.5pt; }
+.article-body p:last-child { margin-bottom: 0; }
+.article-body strong { color: #1b2842; font-weight: 600; }
+.article-body ul, .article-body ol { padding-left: 6mm; margin: 1.5mm 0; }
+.article-body li { margin: 0.5mm 0; }
+
+/* ── Cartes methodologie (Annexe B) ───────────────────────────────
+   Pendant des article-card mais ton plus pose / methodologique. */
+.method-card {
+  margin: 3mm 0;
+  padding: 3mm 4mm;
+  background: #fafbfc;
+  border-left: 2.5pt solid #4f46e5;
+  border-radius: 0 0.8mm 0.8mm 0;
+  page-break-inside: avoid;
+}
+.method-title {
+  margin: 0 0 1.5mm 0;
+  font-size: 9.5pt;
+  color: #1b2842;
+  font-weight: 600;
+}
+.method-body {
+  margin: 0;
+  font-size: 8.5pt;
+  color: #374151;
+  line-height: 1.55;
+}
+
 /* ── Carte de justification (Annexe C) ────────────────────────────
    Plus aere et structure que les anciens 3 paragraphes a la suite. */
 .justif-card {

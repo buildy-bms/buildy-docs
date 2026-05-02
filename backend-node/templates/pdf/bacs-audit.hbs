@@ -84,7 +84,13 @@
 {{!-- ═══════════ Synthèse de conformité (anciennement chapitre 7, remontée au début) ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="conformity">{{{faIcon "shield" "#10b981" "22"}}} Synthèse de conformité</h1>
 {{#if bms.overall_compliance}}
-<p>État global de la conformité au décret BACS : <span class="status status-{{bms.overall_compliance}}">{{complianceLabel}}</span></p>
+<div class="conformity-banner conformity-{{bms.overall_compliance}}">
+  <span class="conformity-icon">{{#if (eq bms.overall_compliance "compliant")}}✓{{else}}{{#if (eq bms.overall_compliance "partial")}}!{{else}}✗{{/if}}{{/if}}</span>
+  <div class="conformity-body">
+    <span class="conformity-label">État global de la conformité au décret BACS</span>
+    <span class="conformity-value">{{complianceLabel}}</span>
+  </div>
+</div>
 {{/if}}
 
 <div class="charts-row" style="display: flex; gap: 12mm; align-items: flex-start; margin: 4mm 0;">
@@ -629,18 +635,33 @@
 {{!-- ═══════════ Annexe A — Texte du décret ═══════════ --}}
 <section class="annex">
   <h1>Annexe A — Décret BACS (R175-1 à R175-6)</h1>
+  <div class="callout callout-r175">
+    <span class="callout-icon">📖</span>
+    <div class="callout-body">Texte intégral des articles du décret R175 — Bâtiments tertiaires, automatisation et contrôle. Ce qui suit est la base réglementaire utilisée pour évaluer la conformité au chapitre 7.</div>
+  </div>
   {{#each bacsArticles}}
-  <h3>{{code}} — {{title}}</h3>
-  <div class="muted">{{{html}}}</div>
+  <article class="article-card">
+    <header class="article-card-head">
+      <span class="article-code">{{code}}</span>
+      <h3 class="article-title">{{title}}</h3>
+    </header>
+    <div class="article-body">{{{html}}}</div>
+  </article>
   {{/each}}
 </section>
 
 {{!-- ═══════════ Annexe B — Méthodologie ═══════════ --}}
 <section class="annex">
   <h1>Annexe B — Méthodologie et hypothèses retenues par Buildy</h1>
+  <div class="callout callout-info">
+    <span class="callout-icon">📌</span>
+    <div class="callout-body">Cette annexe trace les choix méthodologiques de Buildy. Toute évaluation de conformité du présent rapport repose sur ces hypothèses, librement opposables.</div>
+  </div>
   {{#each methodology}}
-  <h3>{{title}}</h3>
-  <p>{{body}}</p>
+  <article class="method-card">
+    <h3 class="method-title">{{title}}</h3>
+    <p class="method-body">{{body}}</p>
+  </article>
   {{/each}}
 </section>
 
@@ -672,6 +693,10 @@
 {{!-- ═══════════ Annexe D — Disclaimers ═══════════ --}}
 <section class="annex">
   <h1>Annexe D — Mentions légales et disclaimers</h1>
+  <div class="callout callout-warn">
+    <span class="callout-icon">⚠️</span>
+    <div class="callout-body">Lecture obligatoire avant utilisation du présent rapport en support de devis ou de procédure de mise en conformité.</div>
+  </div>
   <ol class="disclaimer-list">
     {{#each disclaimers}}
     <li>{{this}}</li>
