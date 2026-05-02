@@ -49,6 +49,9 @@ import InspectionsSection from '@/components/audit/InspectionsSection.vue'
 import CompliancePlanSection from '@/components/audit/CompliancePlanSection.vue'
 import SynthesisSection from '@/components/audit/SynthesisSection.vue'
 import BmsSection from '@/components/audit/BmsSection.vue'
+import ThermalSection from '@/components/audit/ThermalSection.vue'
+import MetersSection from '@/components/audit/MetersSection.vue'
+import SystemsSection from '@/components/audit/SystemsSection.vue'
 import { useAuditStore } from '@/stores/audit'
 
 const auditStore = useAuditStore()
@@ -581,16 +584,6 @@ async function dupZone(z) {
   }
 }
 
-async function dupMeter(m) {
-  try {
-    const { data } = await duplicateBacsMeter(m.id)
-    meters.value.push({ ...data, zone_name: zones.value.find(z => z.zone_id === data.zone_id)?.name || null })
-    success('Compteur dupliqué')
-  } catch {
-    error('Duplication impossible')
-  }
-}
-
 async function removeZone(z) {
   const ok = await confirm({
     title: 'Supprimer cette zone ?',
@@ -894,28 +887,6 @@ async function recomputePowerFromEquipments() {
   }
 }
 
-async function patchSystem(s, patch) {
-  try {
-    const { data } = await updateBacsSystem(s.id, patch)
-    // Remplace l'item dans systems.value : Object.assign in-place ne
-    // declenche pas toujours la re-evaluation des computed (notamment
-    // systemsByZone). On recree l'array avec l'item maj pour forcer.
-    const idx = systems.value.findIndex(x => x.id === s.id)
-    if (idx !== -1) {
-      systems.value = [
-        ...systems.value.slice(0, idx),
-        data,
-        ...systems.value.slice(idx + 1),
-      ]
-    }
-    // Recharge action items (potentiellement modifies par regen)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Sauvegarde impossible')
-  }
-}
-
 async function addMeter(payload) {
   const src = payload || newMeter.value
   if (!src.usage || !src.meter_type) return
@@ -933,39 +904,6 @@ async function addMeter(payload) {
     success('Compteur ajouté')
   } catch (e) {
     error(e.response?.data?.detail || 'Création compteur impossible')
-  }
-}
-
-async function patchMeter(m, patch) {
-  try {
-    const { data } = await updateBacsMeter(m.id, patch)
-    Object.assign(m, data)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Sauvegarde impossible')
-  }
-}
-
-async function removeMeter(m) {
-  try {
-    await deleteBacsMeter(m.id)
-    meters.value = meters.value.filter(x => x.id !== m.id)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Suppression impossible')
-  }
-}
-
-async function patchThermal(t, patch) {
-  try {
-    const { data } = await updateBacsThermal(t.id, patch)
-    Object.assign(t, data)
-    const a = await getBacsActionItems(docId)
-    actionItems.value = a.data
-  } catch {
-    error('Sauvegarde impossible')
   }
 }
 
@@ -1438,407 +1376,48 @@ onMounted(() => {
         </table>
       </CollapsibleSection>
 
-      <!-- Systemes par zone (R175-1 4°) -->
-      <CollapsibleSection storage-key="systems" section-id="section-systems">
-        <template #header>
-          <WrenchScrewdriverIcon class="w-5 h-5 text-indigo-600" />
-          <h2 class="text-base font-semibold text-gray-800 whitespace-nowrap">3. Systèmes techniques par zone</h2>
-          <span v-if="isBacs" class="text-xs text-gray-500 inline-flex items-center gap-0.5">
-            R175-1 4°<R175Tooltip article="R175-1 4°" />
-            <span class="mx-1">/</span>
-            R175-3 3°, 4°<R175Tooltip article="R175-3" />
-          </span>
-          <span class="ml-auto text-xs text-gray-600 whitespace-nowrap">
-            Total chauffage + clim :
-            <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
-          </span>
-          <StepValidateBadge :step="stepFor('systems')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="systems.length">
-            {{ systems.filter(s => s.present).length }} système{{ systems.filter(s => s.present).length > 1 ? 's' : '' }} actif{{ systems.filter(s => s.present).length > 1 ? 's' : '' }}
-            · total chauffage + clim {{ powerSummary.heating_cooling_total_kw || 0 }} kW
-            <span v-if="hiddenNotConcernedCount"> · {{ hiddenNotConcernedCount }} non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }}</span>
-          </span>
-          <span v-else class="italic">Pas encore de systèmes saisis</span>
-        </template>
-        <div class="px-3 py-3 bg-gray-50">
-          <div v-if="hiddenNotConcernedCount" class="flex items-center justify-end mb-2 gap-2">
-            <label class="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-              <input type="checkbox" v-model="showNotConcernedSystems" class="rounded border-gray-300" />
-              Afficher les {{ hiddenNotConcernedCount }} usage{{ hiddenNotConcernedCount > 1 ? 's' : '' }} marqué{{ hiddenNotConcernedCount > 1 ? 's' : '' }} « non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }} »
-            </label>
-          </div>
-          <div class="space-y-3">
-          <div v-for="g in systemsByZone" :key="g.zone_id"
-               class="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
-            <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
-                 :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
-              <button type="button" @click="toggleZoneCollapsed(g.zone_id)"
-                      class="p-1 -ml-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
-                      :title="collapsedZones.has(g.zone_id) ? 'Déplier la zone' : 'Replier la zone'">
-                <ChevronDownIcon v-if="collapsedZones.has(g.zone_id)" class="w-4 h-4" />
-                <ChevronUpIcon v-else class="w-4 h-4" />
-              </button>
-              <MapPinIcon class="w-5 h-5 text-indigo-500" />
-              <span class="font-semibold text-lg text-gray-900 cursor-pointer" @click="toggleZoneCollapsed(g.zone_id)">{{ g.zone_name }}</span>
-              <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ ZONE_NATURES.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
-              <span class="ml-auto text-[10px] text-gray-400">
-                {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
-                / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
-              </span>
-            </div>
-            <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2">
-              <template v-for="s in g.items" :key="s.id">
-              <PhotoDropzone
-                v-if="!s.not_concerned || showNotConcernedSystems"
-                :site-uuid="document?.site_uuid || ''"
-                :attach-to="{ system_id: s.id }"
-                :enabled="!!document?.site_uuid"
-                @changed="refreshAuditData"
-              >
-              <div :class="['border rounded-lg overflow-hidden',
-                            s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
-                                            : (s.present ? 'border-gray-200' : 'border-gray-200 bg-gray-50/30')]">
-                <!-- En-tête catégorie : icone + présent? + notes + photos -->
-                <div class="px-3 py-2 flex items-center gap-3 bg-white">
-                  <button v-if="s.present" type="button" @click="toggleSystemCollapsed(s.id)"
-                          class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
-                          :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
-                    <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
-                    <ChevronUpIcon v-else class="w-3.5 h-3.5" />
-                  </button>
-                  <SystemCategoryIcon :category="s.system_category" size="md" />
-                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45 cursor-pointer"
-                        @click="s.present && toggleSystemCollapsed(s.id)">
-                    {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
-                  </span>
-                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
-                    <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
-                           @change="e => patchSystem(s, { present: e.target.checked })"
-                           class="rounded border-gray-300" />
-                    <span class="text-gray-700">Présent</span>
-                  </label>
-                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap"
-                         :class="s.present ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'">
-                    <input type="checkbox" :checked="!!s.not_concerned" :disabled="!!s.present"
-                           @change="e => patchSystem(s, { not_concerned: e.target.checked, present: e.target.checked ? false : !!s.present })"
-                           class="rounded border-gray-300 disabled:opacity-30" />
-                    <span class="text-gray-500 italic">{{ SYSTEM_NEGATIVE_LABEL[s.system_category] || 'Non concerné' }}</span>
-                  </label>
-                  <button
-                    type="button"
-                    :disabled="!s.present"
-                    @click="openNotesModal({ title: 'Notes systeme', contextLabel: (SYSTEM_LABEL[s.system_category] || s.system_category) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
-                    :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition disabled:opacity-30 disabled:cursor-not-allowed',
-                      hasNotes(s.notes_html || s.notes)
-                        ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-                  >
-                    <PencilSquareIcon class="w-4 h-4" />
-                    {{ hasNotes(s.notes_html || s.notes) ? 'Notes' : '+ Notes' }}
-                  </button>
-                  <BacsPhotoButton
-                    v-if="document?.site_uuid && s.present"
-                    :site-uuid="document.site_uuid"
-                    :attach-to="{ system_id: s.id }"
-                    :label="(SYSTEM_LABEL[s.system_category] || s.system_category) + ' - ' + g.zone_name"
-                  />
-                </div>
-                <!-- Sous-table devices + cases R175-3 3°/4° (visible uniquement si système présent) -->
-                <SystemDevicesTable
-                  v-if="s.present && !collapsedSystems.has(s.id)"
-                  :system="s"
-                  :devices="devicesBySystem[s.id] || []"
-                  :system-label="SYSTEM_LABEL[s.system_category] || s.system_category"
-                  :site-uuid="document?.site_uuid"
-                  @changed="refreshAuditData"
-                  @system-updated="patch => patchSystem(s, patch)"
-                  @open-device-notes="d => openNotesModal({
-                    title: 'Notes equipement',
-                    contextLabel: (d.name || 'Equipement') + ' - ' + (SYSTEM_LABEL[s.system_category] || s.system_category) + ' / ' + g.zone_name,
-                    entityType: 'device',
-                    entityRef: d,
-                    currentHtml: d.notes_html || d.notes || ''
-                  })"
-                  @add-device="sys => addDeviceModalSystem = { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name }"
-                />
-              </div>
-              </PhotoDropzone>
-              </template>
-            </div>
-          </div>
-          </div>
-          <div v-if="!systemsByZone.length" class="px-5 py-6 text-center text-sm text-gray-500">
-            Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.
-          </div>
-        </div>
-      </CollapsibleSection>
+      <!-- 3. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
+      <SystemsSection
+        :systems-by-zone="systemsByZone"
+        :devices-by-system="devicesBySystem"
+        :hidden-not-concerned-count="hiddenNotConcernedCount"
+        :collapsed-zones="collapsedZones"
+        :collapsed-systems="collapsedSystems"
+        :system-labels="SYSTEM_LABEL"
+        :system-negative-labels="SYSTEM_NEGATIVE_LABEL"
+        :zone-natures="ZONE_NATURES"
+        :step="stepFor('systems')"
+        v-model:show-not-concerned-systems="showNotConcernedSystems"
+        @open-notes="openNotesModal"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @toggle-zone-collapsed="toggleZoneCollapsed"
+        @toggle-system-collapsed="toggleSystemCollapsed"
+        @add-device="sys => addDeviceModalSystem = sys"
+      />
 
       <!-- 4. Compteurs et mesurage (R175-3 1°) -->
-      <CollapsibleSection storage-key="meters" section-id="section-meters">
-        <template #header>
-          <BoltIcon class="w-5 h-5 text-emerald-600" />
-          <h2 class="text-base font-semibold text-gray-800">4. Compteurs et mesurage</h2>
-          <span v-if="isBacs" class="text-xs text-gray-500">R175-3 1° — suivi continu, pas horaire, conservation 5 ans</span>
-          <R175Tooltip v-if="isBacs" article="R175-3 1°" />
-          <StepValidateBadge class="ml-auto" :step="stepFor('meters')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="meters.length">
-            {{ meters.length }} compteur{{ meters.length > 1 ? 's' : '' }}
-            · {{ meters.filter(m => m.present_actual).length }} présent{{ meters.filter(m => m.present_actual).length > 1 ? 's' : '' }}
-            · {{ meters.filter(m => m.communicating).length }} communicant{{ meters.filter(m => m.communicating).length > 1 ? 's' : '' }}
-            · {{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length }} requis manquant{{ meters.filter(m => m.required && !m.present_actual && !m.out_of_service).length > 1 ? 's' : '' }}
-          </span>
-          <span v-else class="italic">Aucun compteur listé</span>
-        </template>
-        <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
-            <tr>
-              <th class="text-center px-5 py-2 w-44">Zone</th>
-              <th class="text-center py-2 w-32">Usage</th>
-              <th class="text-center py-2 w-40">Type</th>
-              <th class="text-center py-2 w-20">Requis</th>
-              <th class="text-center py-2 w-20">Présent</th>
-              <th class="text-center py-2 w-24">Communicant</th>
-              <th class="text-center py-2 w-28">
-                <Tooltip text="Communication câblée vers la GTB (paire torsadée, bus, fibre, etc.)"><span>Communication câblée</span></Tooltip>
-              </th>
-              <th class="text-center py-2 w-44">Protocoles</th>
-              <th class="text-center py-2 w-28">Notes</th>
-              <th class="text-center py-2 w-24">Photos</th>
-              <th class="text-center py-2 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>
-              <th class="text-center px-5 py-2 w-12"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <PhotoDropTr v-for="m in meters" :key="m.id"
-                         :row-class="['group', m.out_of_service ? 'opacity-50' : ''].join(' ')"
-                         :site-uuid="document?.site_uuid || ''"
-                         :attach-to="{ meter_id: m.id }"
-                         :enabled="!!document?.site_uuid"
-                         @changed="refreshAuditData">
-              <td class="px-5 py-2 text-gray-700 text-center">{{ m.zone_name || 'Compteur général' }}</td>
-              <td class="py-2 text-center"><MeterUsagePill :usage="m.usage" /></td>
-              <td class="py-2 text-center"><MeterTypePill :type="m.meter_type" /></td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!m.required"
-                       @change="e => patchMeter(m, { required: e.target.checked })"
-                       class="rounded border-gray-300" />
-              </td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!m.present_actual"
-                       @change="e => patchMeter(m, { present_actual: e.target.checked })"
-                       class="rounded border-gray-300" />
-              </td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!m.communicating" :disabled="!m.present_actual"
-                       @change="e => patchMeter(m, e.target.checked
-                         ? { communicating: true }
-                         : { communicating: false, communication_protocols: null, communication_protocol: null })"
-                       class="rounded border-gray-300 disabled:opacity-30" />
-              </td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!m.wired" :disabled="!m.present_actual"
-                       @change="e => patchMeter(m, { wired: e.target.checked })"
-                       class="rounded border-gray-300 disabled:opacity-30"
-                       title="Communication câblée vers la GTB" />
-              </td>
-              <td class="py-2 px-2">
-                <ProtocolMultiPicker
-                  :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
-                  :disabled="!m.communicating"
-                  :options="PROTOCOL_OPTIONS"
-                  size="xs"
-                  @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
-                />
-              </td>
-              <td class="py-2 text-center">
-                <button
-                  type="button"
-                  @click="openNotesModal({ title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (METER_USAGES.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
-                  :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
-                    hasNotes(m.notes_html || m.notes)
-                      ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-                  title="Editer les notes"
-                >
-                  <PencilSquareIcon class="w-4 h-4" />
-                  {{ hasNotes(m.notes_html || m.notes) ? 'Notes' : '+ Notes' }}
-                </button>
-              </td>
-              <td class="py-2 text-center">
-                <BacsPhotoButton
-                  v-if="document?.site_uuid"
-                  :site-uuid="document.site_uuid"
-                  :attach-to="{ meter_id: m.id }"
-                  :label="(m.zone_name || 'Général') + ' / ' + (METER_USAGES.find(u => u.value === m.usage)?.label || m.usage)"
-                />
-              </td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!m.out_of_service"
-                       @change="e => patchMeter(m, { out_of_service: e.target.checked })"
-                       class="rounded border-gray-300" />
-              </td>
-              <td class="px-5 py-2 text-right whitespace-nowrap">
-                <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
-                  <DocumentDuplicateIcon class="w-4 h-4" />
-                </button>
-                <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
-                  <TrashIcon class="w-4 h-4" />
-                </button>
-              </td>
-            </PhotoDropTr>
-            <tr class="bg-emerald-50/30">
-              <td colspan="11" class="px-5 py-3 text-center">
-                <button @click="showAddMeterModal = true"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm">
-                  <PlusIcon class="w-4 h-4" /> Ajouter un compteur
-                </button>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot v-if="!meters.length">
-            <tr>
-              <td colspan="9" class="px-5 py-6 text-center text-xs text-gray-500">
-                Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </CollapsibleSection>
+      <MetersSection
+        :meter-usages="METER_USAGES"
+        :protocol-options="PROTOCOL_OPTIONS"
+        :step="stepFor('meters')"
+        @open-notes="openNotesModal"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @add-meter="showAddMeterModal = true"
+      />
 
-      <!-- Régulation thermique (R175-6) — masquée en mode site_audit -->
-      <CollapsibleSection v-if="isBacs" storage-key="thermal" section-id="section-thermal">
-        <template #header>
-          <FireIcon class="w-5 h-5 text-red-500" />
-          <h2 class="text-base font-semibold text-gray-800">5. Régulation thermique automatique</h2>
-          <R175Tooltip article="R175-6" />
-          <span class="text-xs text-gray-500">R175-6</span>
-          <StepValidateBadge class="ml-auto" :step="stepFor('thermal')" @validate="validateStep" @invalidate="invalidateStep" />
-        </template>
-        <template #summary>
-          <span v-if="thermalFiltered.length">
-            {{ thermalFiltered.length }} zone{{ thermalFiltered.length > 1 ? 's' : '' }} thermique{{ thermalFiltered.length > 1 ? 's' : '' }}
-            · {{ thermalFiltered.filter(t => t.has_automatic_regulation).length }} régulation{{ thermalFiltered.filter(t => t.has_automatic_regulation).length > 1 ? 's' : '' }} auto
-            <span v-if="thermalFiltered.filter(t => t.generator_exempt_wood).length">
-              · {{ thermalFiltered.filter(t => t.generator_exempt_wood).length }} exempté{{ thermalFiltered.filter(t => t.generator_exempt_wood).length > 1 ? 's' : '' }} bois
-            </span>
-          </span>
-          <span v-else class="italic">Aucune régulation thermique relevée</span>
-        </template>
-        <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
-            <tr>
-              <th class="text-center px-5 py-2">Zone</th>
-              <th class="text-center py-2 w-32">Usage</th>
-              <th class="text-center py-2 w-32">Régulation auto ?</th>
-              <th class="text-center py-2 w-40">Type de régulation</th>
-              <th class="text-center py-2 w-44">Générateur lié</th>
-              <th class="text-center py-2 w-44">Type générateur</th>
-              <th class="text-center py-2 w-24">Âge (ans)</th>
-              <th class="text-center py-2 w-24">
-                <Tooltip text="Appareil indépendant de chauffage au bois — exempté R175-6 (II)"><span>Exempté bois</span></Tooltip>
-              </th>
-              <th class="text-center px-5 py-2">Notes</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="t in thermalFiltered" :key="t.id">
-              <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
-              <td class="py-2 text-center">
-                <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
-                      :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
-                  <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
-                  {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-                </span>
-              </td>
-              <td class="py-2 text-center">
-                <input type="checkbox" :checked="!!t.has_automatic_regulation"
-                       @change="e => patchThermal(t, { has_automatic_regulation: e.target.checked })"
-                       class="rounded border-gray-300" />
-              </td>
-              <td class="py-2 text-center">
-                <select :value="t.regulation_type"
-                        @change="e => patchThermal(t, { regulation_type: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
-                  <option v-for="o in REGULATION_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                </select>
-              </td>
-              <td class="py-2 px-2">
-                <select :value="t.generator_device_id"
-                        @change="e => patchThermal(t, { generator_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
-                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
-                  <option :value="null">— aucun</option>
-                  <option v-for="d in generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')" :key="d.id" :value="d.id">
-                    {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
-                  </option>
-                </select>
-              </td>
-              <td class="py-2 text-center">
-                <select :value="t.generator_type"
-                        @change="e => patchThermal(t, { generator_type: e.target.value || null })"
-                        class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
-                  <option v-for="o in GENERATOR_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                </select>
-              </td>
-              <td class="py-2 text-center">
-                <input type="number" :value="t.generator_age_years" min="0"
-                       @blur="e => patchThermal(t, { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                       class="w-16 text-xs px-2 py-1 border border-gray-200 rounded text-center" />
-              </td>
-              <td class="py-2 text-center">
-                <Tooltip text="Si coché : générateur = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
-                  <input type="checkbox" :checked="!!t.generator_exempt_wood"
-                         @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
-                         class="rounded border-gray-300" />
-                </Tooltip>
-              </td>
-              <td class="px-5 py-2">
-                <input type="text" :value="t.notes" placeholder="—"
-                       @blur="e => patchThermal(t, { notes: e.target.value || null })"
-                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-              </td>
-            </tr>
-            <tr v-for="t in thermalFiltered" :key="`detail-${t.id}`"
-                v-show="t.has_automatic_regulation"
-                class="bg-gray-50/50 text-xs">
-              <td class="px-5 py-2 text-gray-400">↳ détail régulation</td>
-              <td colspan="8" class="py-2 pr-5">
-                <div class="grid grid-cols-3 gap-3">
-                  <div>
-                    <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Position de la sonde</label>
-                    <input type="text" :value="t.sensor_position" placeholder="ex : murale, plancher, gaine reprise"
-                           @blur="e => patchThermal(t, { sensor_position: e.target.value || null })"
-                           class="w-full px-2 py-1 border border-gray-200 rounded" />
-                  </div>
-                  <div>
-                    <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-0.5">Type de thermostat</label>
-                    <select :value="t.thermostat_type"
-                            @change="e => patchThermal(t, { thermostat_type: e.target.value || null })"
-                            class="w-full px-2 py-1 border border-gray-200 rounded">
-                      <option :value="null">—</option>
-                      <option value="manual">Manuel</option>
-                      <option value="programmable">Programmable</option>
-                      <option value="adaptive">Adaptatif (auto-apprentissage)</option>
-                      <option value="connected">Connecté (smart)</option>
-                    </select>
-                  </div>
-                  <div class="flex items-end">
-                    <label class="flex items-center gap-1.5 cursor-pointer text-gray-700">
-                      <input type="checkbox" :checked="!!t.has_thermostatic_valves"
-                             @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked ? 1 : 0 })"
-                             class="rounded" />
-                      Robinets thermostatiques
-                    </label>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </CollapsibleSection>
+      <!-- 5. Régulation thermique automatique (R175-6) -->
+      <ThermalSection
+        v-if="isBacs"
+        :thermal-filtered="thermalFiltered"
+        :regulation-options="REGULATION_OPTIONS"
+        :generator-options="GENERATOR_OPTIONS"
+        :generator-devices-for-zone-category="generatorDevicesForZoneCategory"
+        :step="stepFor('thermal')"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+      />
 
       <!-- 6. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
       <BmsSection
