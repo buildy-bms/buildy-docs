@@ -95,7 +95,7 @@ function hasNotes(html) {
           <th class="text-center py-2.5 w-32">Usage</th>
           <th class="text-center py-2.5 w-40">Type</th>
           <th class="text-left py-2.5 w-72">État compteur</th>
-          <th class="text-center py-2.5 w-44">Protocoles</th>
+          <th class="text-center py-2.5 w-44">Protocole(s)</th>
           <th class="text-center py-2.5 w-24">Notes</th>
           <th class="text-center py-2.5 w-24">Photos</th>
           <th class="text-center py-2.5 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>

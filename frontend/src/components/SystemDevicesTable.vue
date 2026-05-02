@@ -326,7 +326,7 @@ async function removeDevice(d) {
             </div>
 
             <div class="w-44">
-              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Protocole</label>
+              <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Protocole(s)</label>
               <ProtocolMultiPicker
                 :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
                 :options="COMM_OPTIONS"

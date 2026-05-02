@@ -125,7 +125,7 @@ const buttonCls = computed(() => {
         class="fixed z-50 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1"
       >
         <div class="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 sticky top-0 bg-white">
-          <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocoles</span>
+          <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocole(s)</span>
           <button v-if="selected.length" @click="clear"
                   class="text-[10px] text-gray-400 hover:text-red-600 inline-flex items-center gap-0.5">
             <XMarkIcon class="w-3 h-3" /> Effacer
