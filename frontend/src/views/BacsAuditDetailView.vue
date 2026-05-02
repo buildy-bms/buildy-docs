@@ -1176,11 +1176,6 @@ onMounted(() => {
                 title="Panneau d'activité">
           <ClockIcon class="w-3.5 h-3.5 shrink-0" /> Activité
         </button>
-        <button @click="regenerate"
-          title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Régénérer le plan
-        </button>
         <button v-if="document?.site_uuid" @click="openBulkUpload"
           title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
@@ -1190,11 +1185,6 @@ onMounted(() => {
           title="Importer le transcript Plaud Pro et laisser Claude pré-remplir les champs"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 whitespace-nowrap">
           <SparklesIcon class="w-3.5 h-3.5 shrink-0" /> Transcript IA
-        </button>
-        <button @click="exportChecklist" :disabled="exportingChecklist"
-          title="Feuille A4 imprimable à emporter sur site (cases à cocher, références photos, pièces à demander)"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-60 whitespace-nowrap">
-          <ClipboardDocumentListIcon class="w-3.5 h-3.5 shrink-0" /> {{ exportingChecklist ? 'Génération…' : 'Checklist A4' }}
         </button>
         <button @click="exportPdf" :disabled="exporting"
           title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF"
@@ -2258,8 +2248,15 @@ onMounted(() => {
           <h2 class="text-base font-semibold text-gray-800">11. Plan de mise en conformité</h2>
           <span class="text-xs text-gray-500">{{ visibleActionItems.length }} action{{ visibleActionItems.length > 1 ? 's' : '' }}<span v-if="resolvedCount" class="text-emerald-600"> · {{ resolvedCount }} résolue{{ resolvedCount > 1 ? 's' : '' }} masquée{{ resolvedCount > 1 ? 's' : '' }}</span></span>
           <button
+            @click.stop="regenerate"
+            title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
+            class="ml-auto inline-flex items-center gap-1 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50"
+          >
+            <ArrowPathIcon class="w-3.5 h-3.5" /> Régénérer le plan
+          </button>
+          <button
             @click.stop="router.push(`/bacs-audit/${docId}/action-items`)"
-            class="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
           >
             Vue commerciale →
           </button>
