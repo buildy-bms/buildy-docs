@@ -297,6 +297,9 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       // 1. Mesure les positions de chaque ancre (data-toc-anchor)
       // 2. Calcule sa page basee sur la hauteur de page utile
       // 3. Met a jour les .toc-page correspondants
+      // 4. Rend la TOC cliquable : ajoute id="X" sur les ancres et wrappe
+      //    le contenu des items TOC dans <a href="#X"> (Puppeteer genere
+      //    alors des liens internes cliquables dans le PDF).
       // Note : margins @page CSS = 22mm/18mm. Hauteur utile A4 ≈ 257mm = 971px,
       // A3 ≈ 380mm = 1436px. Cover + TOC = 2 pages avant les sections.
       const pageInnerPx = pageFormat === 'A3' ? 1436 : 971;
@@ -310,18 +313,31 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
         const anchors = document.querySelectorAll('[data-toc-anchor]');
         const anchorPages = new Map();
         for (const a of anchors) {
+          const id = a.getAttribute('data-toc-anchor');
+          // Ajoute id="X" si absent — necessaire pour que <a href="#X">
+          // soit cliquable dans le PDF.
+          if (!a.id) a.id = `toc-${id}`;
           const top = a.getBoundingClientRect().top + window.scrollY;
           const offsetInSections = Math.max(0, top - sectionsTop);
           const pageNum = firstPage + Math.floor(offsetInSections / innerPx);
-          anchorPages.set(a.getAttribute('data-toc-anchor'), pageNum);
+          anchorPages.set(id, pageNum);
         }
 
-        // Met a jour les liens TOC
+        // Met a jour les liens TOC + les rend cliquables
         for (const link of document.querySelectorAll('[data-toc-link]')) {
           const id = link.getAttribute('data-toc-link');
           const pageNum = anchorPages.get(id);
           const pageEl = link.querySelector('.toc-page');
           if (pageEl && pageNum != null) pageEl.textContent = String(pageNum);
+          // Wrap les enfants dans un <a href="#toc-X"> pour rendre la
+          // ligne cliquable. Idempotent (no-op si deja wrappe).
+          if (!link.querySelector(':scope > a.toc-link-anchor')) {
+            const a = document.createElement('a');
+            a.className = 'toc-link-anchor';
+            a.href = `#toc-${id}`;
+            while (link.firstChild) a.appendChild(link.firstChild);
+            link.appendChild(a);
+          }
         }
       }, pageInnerPx, FIRST_SECTION_PAGE);
     }

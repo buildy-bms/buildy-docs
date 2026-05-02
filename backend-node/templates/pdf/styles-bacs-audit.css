@@ -934,23 +934,56 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
 }
 .toc-list li {
   counter-increment: toc;
-  display: grid;
-  grid-template-columns: 14mm 1fr auto;
-  align-items: baseline;
-  gap: 0;
-  padding: 2.8mm 3mm;
+  padding: 0;
+  margin: 0;
   border-radius: 0.8mm;
   font-size: 10.5pt;
   color: #1f2937;
 }
 .toc-list li:nth-child(odd) { background: #fafbfc; }
 .toc-list li::before {
+  /* Le numero auto est rendu via le wrapping <a> ci-dessous (cf
+     .toc-link-anchor::before) pour que la zone cliquable couvre toute
+     la ligne y compris le numero. On retire le ::before sur le li. */
+  display: none;
+}
+/* Wrap <a> ajoute par Puppeteer (populateToc) pour rendre la TOC
+   cliquable. Doit reprendre le layout grid du li parent. */
+.toc-list li > a.toc-link-anchor,
+.toc-list li {
+  display: grid;
+  grid-template-columns: 14mm 1fr auto;
+  align-items: baseline;
+  gap: 0;
+}
+.toc-list li > a.toc-link-anchor {
+  text-decoration: none;
+  color: inherit;
+  padding: 2.8mm 3mm;
+  border-radius: 0.8mm;
+}
+.toc-list li > a.toc-link-anchor::before {
   content: counter(toc, decimal-leading-zero);
   font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
   font-size: 9pt;
   font-weight: 700;
   color: #4f46e5;
   letter-spacing: 0.04em;
+}
+/* Fallback : si la TOC n'a pas (encore) ete wrappee par le post-render
+   Puppeteer (ex: dans la preview HTML qui n'execute pas populateToc),
+   on garde un numero visible via le ::before du li. */
+.toc-list li:not(:has(a.toc-link-anchor))::before {
+  display: inline-block;
+  content: counter(toc, decimal-leading-zero);
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 9pt;
+  font-weight: 700;
+  color: #4f46e5;
+  letter-spacing: 0.04em;
+}
+.toc-list li:not(:has(a.toc-link-anchor)) {
+  padding: 2.8mm 3mm;
 }
 .toc-label {
   font-family: 'Poppins', sans-serif;
