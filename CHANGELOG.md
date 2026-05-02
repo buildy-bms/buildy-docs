@@ -6,20 +6,32 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Le 
 
 Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md`](docs/improvements-sprint.md). 10 lots planifiés, ~10-12 jours de travail.
 
-### Lot B1 — Aperçu HTML/PDF avant export *(audit BACS livré)*
+### Lot B1 — Aperçu HTML/PDF avant export ✅
 
-- Nouveau composant frontend [`PdfPreviewModal.vue`](frontend/src/components/PdfPreviewModal.vue) : modal plein écran avec iframe sandboxée, header titre + bouton « Télécharger le PDF »
-- Nouvelle fonction [`renderHtml()`](backend-node/src/lib/pdf.js) dans `lib/pdf.js` : rend un template Handlebars en HTML autonome (CSS embed + fonts data URL) sans Puppeteer
+**Audit BACS** :
+- Nouveau composant frontend [`PdfPreviewModal.vue`](frontend/src/components/PdfPreviewModal.vue) — modal plein écran avec iframe sandboxée, bouton « Télécharger le PDF »
+- Nouvelle fonction [`renderHtml()`](backend-node/src/lib/pdf.js) dans `lib/pdf.js` — rend un template Handlebars en HTML autonome (CSS embed + fonts data URL) sans Puppeteer
 - Extraction de la construction des données dans [`backend-node/src/routes/bacs-audit/_export-data.js`](backend-node/src/routes/bacs-audit/_export-data.js) (réutilisée par export PDF + preview)
-- Endpoint `GET /api/bacs-audit/:documentId/preview` retourne le HTML rendu
-- Bouton « Aperçu » ajouté dans `BacsAuditDetailView` à côté de « Générer le rapport »
+- Endpoint `GET /api/bacs-audit/:documentId/preview`
+- Bouton « Aperçu » dans `BacsAuditDetailView`
 
-⏳ AF preview à venir dans un commit séparé (refacto plus volumineux côté `export.js`).
+**AF + Liste de points** :
+- Nouveau module [`backend-node/src/routes/_export-builders.js`](backend-node/src/routes/_export-builders.js) — extraction de la construction de données (AF tree + tocFlat + serviceLevel ; points-list rows + categories + totals)
+- Refactor de `routes/export.js` qui importe ces helpers (POST AF / POST points-list / GET points-list.xlsx fonctionnent comme avant)
+- Endpoint `GET /api/afs/:afId/exports/af/preview?includeBacsAnnex=0|1`
+- Endpoint `GET /api/afs/:afId/exports/points-list/preview`
+- Bouton « Aperçu » ajouté dans la modale d'export du `CycleBandeau`
+
+**Hors périmètre B1** : preview synthesis (Lot 32) — rendu très spécifique, peu utilisé hors export PDF final, gardé en édition future si besoin.
 
 ### À venir
 
-- **Lot B1 (suite)** — Preview AF / synthesis / points-list
-- **Lot B3** — Vue commerciale exportable de l'audit BACS
+- **Lot A1** — Polish AfDetailView (Pinia + sous-composants + scroll-spy + step validate)
+- **Lot B2** — Charts dans les PDFs
+- **Lot B4** — Boilerplate admin (méthodologie + disclaimers en DB)
+- **Lot A2** — Brochure backend (DB + routes + lib + variante catalogue d'offres)
+- **Lot A3** — Brochure UI (composition par drag, 2 variantes Brochure / Catalogue)
+- **Lot A4** — Liaison cross-document AF / BACS / Brochure
 - **Lot B5** — Signature électronique (page d'approbation AcroForm)
 - **Lot A1** — Polish AfDetailView (Pinia + sous-composants + scroll-spy + step validate)
 - **Lot B2** — Charts dans les PDFs (donut sévérité + radar conformité + bar puissance)

@@ -116,6 +116,11 @@ export const exportAf = (afId, data) =>
 export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
+// URLs preview HTML (rendu Handlebars sans Puppeteer, pour iframe)
+export const previewAfUrl = (afId, includeBacsAnnex = false) =>
+  `/api/afs/${afId}/exports/af/preview${includeBacsAnnex ? '?includeBacsAnnex=1' : ''}`
+export const previewPointsListUrl = (afId) =>
+  `/api/afs/${afId}/exports/points-list/preview`
 
 // ── Permissions AF (Lot 28) ──
 export const listAfPermissions = (afId) => api.get(`/afs/${afId}/permissions`)

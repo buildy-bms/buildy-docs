@@ -6,19 +6,23 @@ Sprint en cours, ~10-12 jours estimés. Suivi détaillé de chaque lot. Mis à j
 
 Deux axes :
 
-- **Axe A — Produit** : finir la Brochure commerciale (à zéro) + polisher AfDetailView (mature backend, retard UX vs BACS).
-- **Axe B — Restitution PDFs** : preview, charts, signature, vue commerciale, boilerplate admin.
+- **Axe A — Produit** : Brochure unifiée (Brochure commerciale + Catalogue d'offres annuel, mêmes outils, 2 variantes de mise en page) + polisher AfDetailView.
+- **Axe B — Restitution PDFs** : preview, charts, boilerplate admin.
 
 **Hors périmètre** (gardé pour plus tard) : Terrain & dictée Plaud, Qualité/dette technique (tests frontend, E2E, Sentry), Collaboration multi-utilisateur (verrous, commentaires inline).
+
+**Annulés en cours de sprint** :
+- ~~B3 Vue commerciale exportable PDF~~ (besoin différent côté utilisateur)
+- ~~B5 Signature électronique~~ (pas demandée)
 
 ## État des lots
 
 | # | Lot | Effort | Statut |
 |---|---|---|---|
 | 0 | Documentation foundations | 0.5j | ✅ Livré |
-| 1 | **B1** Preview HTML/PDF | 0.5j | 🔄 En cours (audit BACS livré, AF à suivre) |
-| 2 | **B3** Vue commerciale exportable | 0.5j | ⏳ À venir |
-| 3 | **B5** Signature électronique | 0.5j | ⏳ À venir |
+| 1 | **B1** Preview HTML/PDF | 0.5j | ✅ Livré (BACS + AF + points-list ; synthesis hors périmètre) |
+| 2 | ~~**B3** Vue commerciale exportable~~ | — | ❌ Annulé (besoin différent) |
+| 3 | ~~**B5** Signature électronique~~ | — | ❌ Annulé |
 | 4 | **A1** Polish AfDetailView | 2j | ⏳ À venir |
 | 5 | **B2** Charts dans les PDFs | 1j | ⏳ À venir |
 | 6 | **B4** Boilerplate admin | 1j | ⏳ À venir |
@@ -211,12 +215,15 @@ La méthodologie Buildy (Annexe B) et les disclaimers (Annexe D) sont hardcodés
 
 La brochure commerciale est listée comme « à venir » depuis le début. Doit assembler des extraits de la bibliothèque de fonctionnalités (déjà seedée pour les AF via `HYPERVEEZ_PAGES`).
 
+**Approche unifiée** : on traite ensemble la Brochure commerciale (par client) ET le Catalogue d'offres annuel (générique, type `docs/offres-buildy-2026-ia.pdf`). Même outil de composition, mêmes items dans la bibliothèque, 2 variantes de mise en page PDF.
+
 ### Périmètre
 
 - **Schema DB** :
   - `brochure_chapters(id, brochure_id, parent_id, position, title, body_html, created_at, updated_at)`
   - `brochure_items(id, brochure_id, chapter_id, item_kind, source_id, position, override_html, override_title, created_at)`
-  - `item_kind` ∈ `'feature'`, `'equipment_template'`, `'hyperveez_page'`, `'custom'`
+  - `item_kind` ∈ `'feature'`, `'offering_level'`, `'equipment_template'`, `'hyperveez_page'`, `'cgv'`, `'custom'`
+  - Nouvelle colonne `documents.layout_template` ∈ `'commercial-brochure'` | `'offering-catalog'`
   - CHECK constraint statuts brochure : `'draft' | 'published'`
 - **Routes** `backend-node/src/routes/brochures.js` :
   - `GET /api/brochures/:id` (full tree)
@@ -224,8 +231,12 @@ La brochure commerciale est listée comme « à venir » depuis le début. Doit 
   - `POST /api/brochures/:id/items` (pick from library)
   - `PATCH /api/brochures/:id/items/:itemId` (override)
   - `DELETE /api/brochures/:id/items/:itemId`
-  - `GET /api/brochures/library` (catalogue indexé par `item_kind`, filtrable)
-- **`backend-node/src/lib/brochure-library.js`** : catalogage + seed
+  - `GET /api/brochures/library` (catalogue indexé par `item_kind`, filtrable par niveau de service E/S/P)
+- **`backend-node/src/lib/brochure-library.js`** : catalogage + seed initial depuis :
+  - `HYPERVEEZ_PAGES` (pages produit déjà seedées)
+  - `equipment_templates` (fiches équipement)
+  - 3 items de type `offering_level` : Essentiel, Smart, Premium (1 par niveau, à rédiger une fois)
+  - `cgv` : extrait du PDF CGV Buildy 2026
 - Tests Vitest
 
 ---
@@ -242,10 +253,19 @@ La brochure commerciale est listée comme « à venir » depuis le début. Doit 
   - Drag-drop catalogue → composition (`sortablejs` est déjà installé)
   - Réordonnement par drag des items
   - Override par item : titre + body_html via Tiptap
+  - Sélecteur de variante en header : « Brochure commerciale » / « Catalogue d'offres » (modifie `documents.layout_template`)
 - `frontend/src/views/BrochuresListView.vue` (séparée d'`AfsListView`)
 - Liaison route : `/brochures/:id`
 - Pinia store `useBrochureStore`
 - Activation du bouton « Brochure » actuellement disabled dans `AfsListView`
+- À la création : choix de la variante (commerciale par défaut). Une variante "Catalogue" pré-rempli avec un assemblage standard (Qui est Buildy → Niveaux E/S/P → Tableau comparatif → Conditions générales) pour gagner du temps.
+
+### Templates PDF (au lot A3 ou en transition vers un mini-A3.5)
+
+- `backend-node/templates/pdf/brochure-commercial.hbs` (page de garde "Proposition pour [Client]", structure libre)
+- `backend-node/templates/pdf/brochure-catalog.hbs` (page de garde "Offres Buildy 2026", structure systématique avec tableau comparatif)
+- Partials communs : `_item-feature.hbs`, `_item-equipment.hbs`, `_item-hyperveez.hbs`, `_item-offering-level.hbs`, `_item-cgv.hbs`
+- Endpoint `POST /api/brochures/:id/exports` (lit `documents.layout_template` pour choisir le template)
 
 ---
 

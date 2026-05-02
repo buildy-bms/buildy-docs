@@ -4,13 +4,16 @@ import {
   CheckBadgeIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
   RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
+  EyeIcon,
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
+import PdfPreviewModal from './PdfPreviewModal.vue'
 import { useRouter } from 'vue-router'
 import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
+  previewAfUrl, previewPointsListUrl,
   listSections, getAfRequiredLevel,
 } from '@/api'
 import SectionPickerTree from './SectionPickerTree.vue'
@@ -263,6 +266,29 @@ async function submitExport() {
   }
 }
 
+// Apercu HTML in-browser (sans Puppeteer) — disponible pour AF + points-list.
+// Synthesis n'est pas couvert pour l'instant (rendu trop specifique, peu utilise
+// hors export PDF final).
+const previewOpen = ref(false)
+const previewKind = ref(null)
+const previewUrlComputed = computed(() => {
+  if (!previewKind.value) return ''
+  if (previewKind.value === 'af') return previewAfUrl(props.af.id, exportIncludeBacs.value)
+  if (previewKind.value === 'points-list') return previewPointsListUrl(props.af.id)
+  return ''
+})
+const previewTitle = computed(() => {
+  if (previewKind.value === 'af') return "Aperçu — Analyse fonctionnelle"
+  if (previewKind.value === 'points-list') return "Aperçu — Liste de points"
+  return 'Aperçu'
+})
+function openPreview() {
+  if (exportKind.value === 'synthesis') return // pas de preview synthesis (volumineux, peu utile)
+  previewKind.value = exportKind.value
+  previewOpen.value = true
+}
+function closePreview() { previewOpen.value = false; previewKind.value = null }
+
 const exportTitle = computed(() => {
   if (exportKind.value === 'af') return "Exporter l'analyse fonctionnelle (PDF A4)"
   if (exportKind.value === 'synthesis') return 'Exporter le tableau de synthèse (PDF A3 paysage)'
@@ -507,6 +533,16 @@ const exportDescription = computed(() => {
     <template #footer>
       <button @click="showExport = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Fermer</button>
       <button
+        v-if="exportKind !== 'synthesis'"
+        type="button"
+        @click="openPreview"
+        title="Aperçu HTML rapide du rendu (sans génération PDF)"
+        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 text-sm font-medium rounded-lg hover:bg-indigo-100"
+      >
+        <EyeIcon class="w-4 h-4" />
+        Aperçu
+      </button>
+      <button
         @click="submitExport"
         :disabled="submitting || !exportMotif.trim()"
         class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
@@ -516,6 +552,16 @@ const exportDescription = computed(() => {
       </button>
     </template>
   </BaseModal>
+
+  <PdfPreviewModal
+    v-if="previewOpen"
+    :title="previewTitle"
+    :preview-url="previewUrlComputed"
+    :downloading="submitting"
+    download-label="Générer le PDF"
+    @download="submitExport"
+    @close="closePreview"
+  />
 
   <!-- Modale transition de phase avec snapshot (validee / livree) -->
   <BaseModal v-if="showTransitionModal" :title="transitionTo === 'livree' ? 'Livraison du DOE' : 'Validation de l\'AF'" size="md" @close="showTransitionModal = false">
