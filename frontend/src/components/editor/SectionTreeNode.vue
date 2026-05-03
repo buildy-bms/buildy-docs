@@ -135,6 +135,15 @@ const titleHtml = computed(() => {
       @dragleave="onDragLeave"
       @drop="onDrop"
     >
+      <!-- Slot statut "verifie" : toujours rendu (place fixe la plus a gauche)
+           pour aligner verticalement les ✓ d'une ligne a l'autre. -->
+      <Tooltip :text="node.fact_check_status === 'verified' ? 'Section vérifiée' : 'À vérifier'">
+        <CheckCircleIcon
+          :class="['w-3.5 h-3.5 shrink-0',
+            node.fact_check_status === 'verified' ? 'text-emerald-500' : 'text-gray-300']"
+        />
+      </Tooltip>
+
       <button
         v-if="hasChildren"
         type="button"
@@ -153,8 +162,8 @@ const titleHtml = computed(() => {
         {{ displayedNumber }}
       </span>
 
-      <!-- Indicateurs de statut (gauche du titre) : niveau de service +
-           état de vérification + section vide. À gauche pour scan rapide. -->
+      <!-- Indicateurs de niveau (a cote du numero) : niveau de service +
+           pill option payante. -->
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
       <Tooltip
         v-if="hasPaidOption"
@@ -168,19 +177,6 @@ const titleHtml = computed(() => {
             : 'bg-orange-50 text-orange-700 border-orange-200']">
           €
         </span>
-      </Tooltip>
-
-      <Tooltip
-        v-if="node.fact_check_status === 'verified'"
-        text="Section vérifiée"
-      >
-        <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-      </Tooltip>
-      <Tooltip
-        v-else
-        text="À vérifier"
-      >
-        <CheckCircleIcon class="w-3.5 h-3.5 text-gray-300 shrink-0" />
       </Tooltip>
 
       <Tooltip v-if="empty && !excluded" text="Section vide — à rédiger" placement="top">
