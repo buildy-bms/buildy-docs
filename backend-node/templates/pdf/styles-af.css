@@ -611,25 +611,32 @@ table.points-mini .badge-type {
 .syn-instance .syn-qty { text-align: center; font-weight: 600; color: #1b2842; }
 
 /* ── Synthese "Tableau des offres Buildy" ──────────────────────────── */
-.annex-offerings { page-break-before: always; padding: 5mm 0; }
+.annex-offerings { page-break-before: always; padding: 3mm 0; }
+.annex-offerings h1 {
+  font-size: 14pt;
+  margin: 0 0 2mm;
+}
 .annex-intro {
-  font-size: 8pt;
+  font-size: 7.4pt;
   color: #4b5563;
   line-height: 1.4;
-  margin: 0 0 3mm;
+  margin: 0 0 2mm;
 }
 .annex-intro strong { color: #1b2842; font-weight: 600; }
 .annex-legend {
   display: flex;
-  gap: 4mm;
-  margin: 0 0 3mm;
-  font-size: 7pt;
+  flex-wrap: wrap;
+  gap: 1mm 3mm;
+  margin: 0 0 2mm;
+  font-size: 6.4pt;
   color: #6b7280;
 }
 .annex-legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 1.2mm;
+  gap: 1mm;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .annex-avail-yes {
   display: inline-flex;
@@ -658,22 +665,22 @@ table.points-mini .badge-type {
 .annex-offerings-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 7pt;
+  font-size: 6.4pt;
 }
 .annex-offerings-table thead { display: table-header-group; }
 .annex-offerings-table tr { page-break-inside: avoid; }
 .annex-col-feature { width: auto; }
-.annex-col-level { width: 22mm; }
+.annex-col-level { width: 26mm; }
 
 .annex-offerings-table thead th {
   background: #1b2842;
   color: rgba(255, 255, 255, 0.85);
   font-family: 'Manrope', sans-serif;
-  font-size: 6pt;
+  font-size: 5.8pt;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 700;
-  padding: 3mm 1mm 2mm;
+  padding: 1.5mm 1mm 2mm;
   vertical-align: bottom;
   text-align: center;
   position: relative;
@@ -691,13 +698,14 @@ table.points-mini .badge-type {
 .annex-th-P { background: #10b981; }
 .annex-th-name {
   font-family: 'Poppins', sans-serif;
-  font-size: 8pt;
+  font-size: 7.6pt;
   font-weight: 700;
   color: white;
+  line-height: 1.1;
 }
 .annex-th-tagline {
   font-family: 'Manrope', sans-serif;
-  font-size: 5.6pt;
+  font-size: 5.4pt;
   font-weight: 400;
   font-style: italic;
   opacity: 0.78;
@@ -713,24 +721,37 @@ table.points-mini .badge-type {
 }
 .annex-th-target-ph {
   display: block;
-  height: 4.5mm;
+  height: 3.5mm;
 }
-.annex-th-target-badge {
-  /* Badge "Niveau cible" : style medaille, dans le flux. */
+.annex-th-target-badge,
+.annex-th-required-badge {
+  /* Badges header colonne : style medaille / pilule, dans le flux. */
   display: inline-block;
-  margin: 0 auto 1.5mm;
+  margin: 0 auto 1mm;
   font-family: 'Manrope', sans-serif;
-  font-size: 5.2pt;
+  font-size: 4.8pt;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  padding: 0.5mm 1.8mm;
+  border-radius: 3mm;
+  white-space: nowrap;
+}
+.annex-th-target-badge {
+  /* Niveau cible AF (engagement contractuel actuel) : medaille or. */
   background: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%);
   color: #1b2842;
-  padding: 0.6mm 2.2mm;
-  border-radius: 4mm;
-  white-space: nowrap;
   box-shadow: 0 0.3mm 0.8mm rgba(180, 130, 0, 0.25);
   border: 0.4pt solid #d97706;
+}
+.annex-th-required-badge {
+  /* Offre requise par les exigences MOA : pill emeraude (signal contractuel
+     "incontournable"). Differente du badge or pour eviter toute confusion
+     quand le niveau cible et le niveau requis sont distincts. */
+  background: linear-gradient(135deg, #6ee7b7 0%, #00cd92 100%);
+  color: #052e16;
+  box-shadow: 0 0.3mm 0.8mm rgba(0, 100, 60, 0.22);
+  border: 0.4pt solid #00b884;
 }
 .annex-cell-target {
   background: #fff8e7 !important;
@@ -742,6 +763,18 @@ table.points-mini .badge-type {
   background: #6ee7b7;
   color: #064e3b;
 }
+/* Niveau requis par les exigences MOA : fond emeraude pale, distinct
+   du creme-or du niveau cible. */
+.annex-cell-required {
+  background: #f0fdf4 !important;
+}
+.annex-offerings-table tbody tr:not(.annex-cat):nth-child(odd) td.annex-cell-required {
+  background: #dcfce7 !important;
+}
+.annex-cell-required .annex-avail-yes {
+  background: #6ee7b7;
+  color: #064e3b;
+}
 
 .annex-cat td {
   background: #f8fafc !important;
@@ -750,26 +783,27 @@ table.points-mini .badge-type {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 1.1mm 1.6mm 0.7mm;
-  font-size: 6.8pt;
+  padding: 0.7mm 1.6mm 0.5mm;
+  font-size: 6.4pt;
   border-top: 0.4pt solid #e2e8f0;
   border-bottom: 0.4pt solid #e2e8f0;
 }
-.annex-cat-d1 td { padding-left: 5mm; background: #fafbfc !important; font-size: 6pt; color: #475569; }
-.annex-cat-d2 td { padding-left: 8mm; background: #ffffff !important; font-size: 5.6pt; color: #64748b; }
+.annex-cat-d1 td { padding-left: 5mm; background: #fafbfc !important; font-size: 5.8pt; color: #475569; }
+.annex-cat-d2 td { padding-left: 8mm; background: #ffffff !important; font-size: 5.4pt; color: #64748b; }
 .annex-cat-marker { color: #00cd92; font-size: 7.5pt; margin-right: 1mm; font-weight: 900; }
 
 .annex-feature {
-  padding: 0.8mm 1.6mm 0.8mm 3mm;
+  padding: 0.5mm 1.6mm 0.5mm 3mm;
   border-bottom: 0.3pt solid #f3f4f6;
   color: #1f2937;
-  font-size: 6.8pt;
+  font-size: 6.4pt;
+  line-height: 1.25;
 }
 .annex-feature-d1 { padding-left: 5mm; }
 .annex-feature-d2 { padding-left: 8mm; }
 .annex-feature-d3 { padding-left: 11mm; }
 .annex-cell {
-  padding: 0.8mm 0;
+  padding: 0.5mm 0;
   border-bottom: 0.3pt solid #f3f4f6;
   text-align: center;
   vertical-align: middle;

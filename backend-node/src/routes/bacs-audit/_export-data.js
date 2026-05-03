@@ -321,16 +321,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }
     return Math.max(0, score);
   }
-  const radarAxes = isBacs ? [
-    { label: 'R175-3 §1\nSuivi', score: scoreForAxis(a => /R175-3 1°|R175-3 §1/.test(a.r175_article || '')) },
-    { label: 'R175-3 §2\nDerives', score: scoreForAxis(a => /R175-3 2°|R175-3 §2/.test(a.r175_article || '')) },
-    { label: 'R175-3 §3\nInterop', score: scoreForAxis(a => /R175-3 3°|R175-3 §3/.test(a.r175_article || '')) },
-    { label: 'R175-3 §4\nArret/auto', score: scoreForAxis(a => /R175-3 4°|R175-3 §4/.test(a.r175_article || '')) },
-    { label: 'R175-4\nVerifs', score: scoreForAxis(a => /R175-4/.test(a.r175_article || '')) },
-    { label: 'R175-5\nFormation', score: scoreForAxis(a => /R175-5(?!-1)/.test(a.r175_article || '')) },
-    { label: 'R175-6\nRegulation', score: scoreForAxis(a => /R175-6/.test(a.r175_article || '')) },
-  ] : [];
-  const radarComplianceDataUrl = isBacs ? await getCharts().radarCompliance({ axes: radarAxes }) : null;
+  // Radar de conformite R175 retire (PO retour : pas pertinent dans le PDF,
+  // synthese executive deja portee par les compteurs + donut severite).
 
   // Bar usage power : agrege devices par system_category
   const powerByUsage = new Map();
@@ -385,7 +377,6 @@ async function buildBacsAuditExportData(af, opts = {}) {
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
     // Charts (lot B2)
     sevDonutDataUrl,
-    radarComplianceDataUrl,
     barUsagePowerDataUrl,
     barItems, // expose pour debug / fallback texte si chart manquant
   };

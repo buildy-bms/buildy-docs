@@ -11,6 +11,9 @@
     {{#if offeringsAnnex.demandedCount}}
     {{offeringsAnnex.demandedCount}} fonction{{#if (gt offeringsAnnex.demandedCount 1)}}s{{/if}} exigée{{#if (gt offeringsAnnex.demandedCount 1)}}s{{/if}} par la maîtrise d'ouvrage (à inclure dans l'avenant contractuel).
     {{/if}}
+    {{#if offeringsAnnex.requiredLevelLabel}}
+    Pour couvrir ces exigences, l'offre minimum à souscrire est <strong>{{offeringsAnnex.requiredLevelLabel}}</strong>.
+    {{/if}}
     {{#if offeringsAnnex.optedOutCount}}
     {{offeringsAnnex.optedOutCount}} fonction{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} refusée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} par la maîtrise d'ouvrage (barrée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} dans le tableau).
     {{/if}}
@@ -33,9 +36,11 @@
       <tr>
         <th class="annex-th-feature">Fonctionnalité</th>
         {{#each offeringsAnnex.levels}}
-        <th class="annex-th-level annex-th-{{slug}} {{#if is_target}}annex-th-target{{/if}}">
+        <th class="annex-th-level annex-th-{{slug}} {{#if is_target}}annex-th-target{{/if}}{{#if is_required}}annex-th-required{{/if}}">
           {{#if is_target}}
             <div class="annex-th-target-badge">Niveau ciblé</div>
+          {{else if is_required}}
+            <div class="annex-th-required-badge">Requis MOA</div>
           {{else}}
             <div class="annex-th-target-ph"></div>
           {{/if}}
@@ -64,21 +69,21 @@
         </td>
         {{#each ../offeringsAnnex.levels}}
         {{#if (eq slug "E")}}
-          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}} {{#if is_required}}annex-cell-required{{/if}}">
             {{#if (eq ../avail_e "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
             {{#if (eq ../avail_e "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_e "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}
           </td>
         {{/if}}
         {{#if (eq slug "S")}}
-          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}} {{#if is_required}}annex-cell-required{{/if}}">
             {{#if (eq ../avail_s "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
             {{#if (eq ../avail_s "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_s "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}
           </td>
         {{/if}}
         {{#if (eq slug "P")}}
-          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}} {{#if is_required}}annex-cell-required{{/if}}">
             {{#if (eq ../avail_p "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
             {{#if (eq ../avail_p "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_p "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}

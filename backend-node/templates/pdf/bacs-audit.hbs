@@ -59,9 +59,9 @@
     <li data-toc-link="conformity"><span class="toc-label">Synthèse de conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
     {{/if}}
     <li data-toc-link="identification"><span class="toc-label">Identification du site</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="zones"><span class="toc-label">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 §6</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="systems"><span class="toc-label">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 §4</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="meters"><span class="toc-label">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 §1</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="zones"><span class="toc-label">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 6°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="systems"><span class="toc-label">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 4°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li data-toc-link="meters"><span class="toc-label">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 1°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
     {{#if isBacs}}
     <li data-toc-link="thermal"><span class="toc-label">Régulation thermique automatique <span class="toc-ref">R175-6</span></span><span class="toc-dots"></span><span class="toc-page">—</span></li>
     {{/if}}
@@ -110,14 +110,6 @@
   </div>
   {{/if}}
 </div>
-
-{{#if radarComplianceDataUrl}}
-<p style="margin-top: 6mm; font-weight: 600; color: #4b5563;">Score de conformité par exigence R175</p>
-<div style="text-align: center; margin: 2mm 0;">
-  <img src="{{radarComplianceDataUrl}}" alt="Radar de conformité R175" style="max-width: 130mm;" />
-</div>
-<p class="muted" style="font-size: 9pt;">Score 0-100 par axe : 100 = aucune action corrective ouverte. Pénalisations : -40 par bloquante, -20 par majeure, -10 par mineure.</p>
-{{/if}}
 
 <p class="muted">Détail des actions et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
 {{/if}}
@@ -197,7 +189,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 §6){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
@@ -226,7 +218,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 §4){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
 {{#each systemsByZone}}
 <h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
 {{#each items}}
@@ -263,13 +255,13 @@
               <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
                 <span class="r175-3-label">R175-3 :</span>
                 <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} §3 Interopérable
+                  {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} Interopérable
                 </span>
                 <span class="r175-3-pill {{#if meets_r175_3_p4}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} §4 Arrêt manuel
+                  {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} Arrêt manuel
                 </span>
                 <span class="r175-3-pill {{#if meets_r175_3_p4_autonomous}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} §4 Reprise autonome
+                  {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} Autonome
                 </span>
               </td>
             </tr>
@@ -311,7 +303,7 @@
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 §1){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
 {{#if meters.length}}
 <table>
   <thead>
@@ -435,7 +427,7 @@
 </div>
 <div class="callout callout-info">
   <span class="callout-icon">📌</span>
-  <div class="callout-body">R175-3 §3 (interopérabilité) et §4 (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (cf chapitre 3).</div>
+  <div class="callout-body">R175-3 3° (interopérabilité) et 4° (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (cf chapitre 3).</div>
 </div>
 
 <h3>R175-3 dernier alinéa — Mise à disposition des données</h3>

@@ -401,23 +401,32 @@ function buildOfferingsAnnexForAf(af) {
   }
   for (const r of roots) emit(r, 0);
 
-  // Niveaux d'offre : marque le niveau cible de l'AF avec is_target = true.
-  // Ce flag override le decoy admin (qui n'a pas de sens dans le contexte
-  // d'une AF deja contractualisee).
+  // Niveaux d'offre :
+  //  - is_target  → niveau cible AF (engagement contractuel actuel)
+  //  - is_required → niveau minimum requis pour couvrir les fonctions
+  //                  exigees par la MOA (calcule par buildContractualSummary)
+  //  Si les deux coincident, seul is_target est marque (badge or unique).
   const allLevels = db.offeringLevels.list();
   const targetSlug = (af.service_level || '').toUpperCase();
+  const summary = buildContractualSummaryForAf(af);
+  const requiredSlug = summary.hasDemands && summary.upgradeNeeded
+    ? summary.recommendedLevel
+    : null;
   const levels = allLevels.map(l => ({
     ...l,
     is_target: l.slug === targetSlug,
+    is_required: requiredSlug ? l.slug === requiredSlug : false,
     is_highlighted: false, // override : on n'utilise pas le decoy global
   }));
   const targetLevel = levels.find(l => l.is_target);
+  const requiredLevel = levels.find(l => l.is_required);
 
   return {
     rows,
     levels,
     colspan: levels.length + 1,
     targetLevelLabel: targetLevel?.name || null,
+    requiredLevelLabel: requiredLevel?.name || null,
     optedOutCount,
     demandedCount,
   };
