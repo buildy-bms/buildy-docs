@@ -7,7 +7,6 @@
     <col class="syn-col-ref" />
     <col class="syn-col-loc" />
     <col class="syn-col-qty" />
-    <col class="syn-col-level" />
   </colgroup>
   <thead>
     <tr>
@@ -15,14 +14,13 @@
       <th class="syn-th-ref">Référence</th>
       <th class="syn-th-loc">Localisation</th>
       <th class="syn-th-qty">Qté</th>
-      <th class="syn-th-level">Niveau min.</th>
     </tr>
   </thead>
   <tbody>
     {{#each rows}}
     {{#if (eq kind "category")}}
     <tr class="syn-cat syn-cat-d{{depth}}">
-      <td colspan="5">
+      <td colspan="4">
         <span class="syn-cat-marker">▸</span>
         {{title}}
       </td>
@@ -39,9 +37,6 @@
       <td colspan="3" class="syn-system-meta">
         {{#if points_total}}{{points_total}} point{{#if (gt points_total 1)}}s{{/if}} contractuel{{#if (gt points_total 1)}}s{{/if}}{{/if}}
       </td>
-      <td class="syn-level-cell">
-        {{#if service_level}}<span class="syn-level-badge">{{service_level}}</span>{{else}}<span class="syn-na">—</span>{{/if}}
-      </td>
     </tr>
     {{/if}}
     {{#if (eq kind "instance")}}
@@ -50,7 +45,6 @@
       <td class="syn-ref">{{reference}}</td>
       <td class="syn-loc">{{location}}</td>
       <td class="syn-qty">{{qty}}</td>
-      <td></td>
     </tr>
     {{/if}}
     {{/each}}

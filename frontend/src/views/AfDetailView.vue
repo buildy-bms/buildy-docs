@@ -12,6 +12,7 @@ import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vu
 import ActivityPanel from '@/components/ActivityPanel.vue'
 import RequiredServiceLevelPanel from '@/components/RequiredServiceLevelPanel.vue'
 import { useResizable } from '@/composables/useResizable'
+import { ChevronLeftIcon, ChevronRightIcon, PresentationChartLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
   storageKey: 'af-tree-width',
@@ -32,8 +33,19 @@ if (typeof window !== 'undefined') {
   mql.addEventListener('change', updateCompact)
 }
 const treeDrawerOpen = ref(false)
-// Garde le bandeau d'icone pour montrer comment ouvrir le drawer
-const treeOpen = computed(() => !isCompact.value || treeDrawerOpen.value)
+// Toggle desktop : permet de masquer entierement l'arbre pour gagner de la
+// place (notamment en projection videoprojecteur).
+const treeCollapsed = ref(localStorage.getItem('af-tree-collapsed') === '1')
+function toggleTreeCollapsed() {
+  treeCollapsed.value = !treeCollapsed.value
+  localStorage.setItem('af-tree-collapsed', treeCollapsed.value ? '1' : '0')
+}
+// Visible si compact + drawer ouvert, ou desktop + non collapse.
+const treeOpen = computed(() =>
+  isCompact.value ? treeDrawerOpen.value : !treeCollapsed.value
+)
+// Modale "projection" plein ecran pour videoprojecteur en reunion
+const projectionOpen = ref(false)
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -42,6 +54,7 @@ import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
 import ZonesTable from '@/components/editor/ZonesTable.vue'
 import EquipmentDescriptionPanel from '@/components/editor/EquipmentDescriptionPanel.vue'
 import EquipmentTemplatePicker from '@/components/EquipmentTemplatePicker.vue'
+import SafeHtml from '@/components/SafeHtml.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,6 +94,12 @@ function isEditableTarget(el) {
 }
 
 async function onKeydown(e) {
+  // Echap ferme la projection en priorite
+  if (e.key === 'Escape' && projectionOpen.value) {
+    e.preventDefault()
+    projectionOpen.value = false
+    return
+  }
   // Cmd/Ctrl + S : flush autosave + toast (marche meme dans l'editeur)
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
     e.preventDefault()
@@ -332,61 +351,85 @@ watch(() => route.params.id, async (newId, oldId) => {
         @click="treeDrawerOpen = false"
       ></div>
 
+      <!-- Bouton pour ré-afficher l'arbre quand collapsé en desktop -->
+      <button
+        v-if="!isCompact && treeCollapsed"
+        @click="toggleTreeCollapsed"
+        class="shrink-0 self-start mt-2 px-2 py-3 bg-white border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-indigo-600 transition-colors flex flex-col items-center gap-2"
+        title="Afficher l'arborescence des sections"
+      >
+        <ChevronRightIcon class="w-4 h-4" />
+        <span class="text-[10px] font-semibold uppercase tracking-wider [writing-mode:vertical-rl]">Sections</span>
+      </button>
+
       <!-- Sidebar arbre des sections (redimensionnable, drawer en compact) -->
       <aside
         v-show="treeOpen"
         :style="{ width: treeWidth + 'px' }"
         :class="[
-          'shrink-0 bg-white rounded-lg border border-gray-200 overflow-y-auto relative',
+          'shrink-0 bg-white rounded-lg border border-gray-200 relative flex',
           isCompact ? 'fixed left-3 top-3 bottom-3 z-40 shadow-2xl' : '',
         ]"
       >
-        <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
-          <div class="flex items-baseline justify-between gap-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Sections ({{ sections.length }})
-            </h3>
-            <span v-if="verificationProgress.total > 0"
-                  :class="['text-[11px] font-medium tabular-nums',
-                    verificationProgress.ratio === 1 ? 'text-emerald-600'
-                    : verificationProgress.ratio >= 0.5 ? 'text-emerald-700'
-                    : 'text-gray-500']"
-                  :title="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
-              ✓ {{ verificationProgress.verified }} / {{ verificationProgress.total }}
-            </span>
+        <div class="flex-1 min-w-0 overflow-y-auto">
+          <div class="px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10">
+            <div class="flex items-baseline justify-between gap-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Sections ({{ sections.length }})
+              </h3>
+              <div class="flex items-center gap-2">
+                <span v-if="verificationProgress.total > 0"
+                      :class="['text-[11px] font-medium tabular-nums',
+                        verificationProgress.ratio === 1 ? 'text-emerald-600'
+                        : verificationProgress.ratio >= 0.5 ? 'text-emerald-700'
+                        : 'text-gray-500']"
+                      :title="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
+                  ✓ {{ verificationProgress.verified }} / {{ verificationProgress.total }}
+                </span>
+                <button
+                  v-if="!isCompact"
+                  @click="toggleTreeCollapsed"
+                  class="text-gray-400 hover:text-indigo-600 transition-colors"
+                  title="Masquer l'arborescence"
+                >
+                  <ChevronLeftIcon class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-0.5">
+              {{ sectionsCountByKind.standard }} texte ·
+              {{ sectionsCountByKind.equipment }} équip. ·
+              {{ sectionsCountByKind.hyperveez_page }} Hyperveez ·
+              {{ sectionsCountByKind.synthesis }} synth.
+            </p>
+            <!-- Barre de progression : ratio des sections verifiees -->
+            <div v-if="verificationProgress.total > 0"
+                 class="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-emerald-500 transition-all duration-300"
+                   :style="{ width: (verificationProgress.ratio * 100) + '%' }" />
+            </div>
           </div>
-          <p class="text-[11px] text-gray-400 mt-0.5">
-            {{ sectionsCountByKind.standard }} texte ·
-            {{ sectionsCountByKind.equipment }} équip. ·
-            {{ sectionsCountByKind.hyperveez_page }} Hyperveez ·
-            {{ sectionsCountByKind.synthesis }} synth.
-          </p>
-          <!-- Barre de progression : ratio des sections verifiees -->
-          <div v-if="verificationProgress.total > 0"
-               class="mt-1.5 h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div class="h-full bg-emerald-500 transition-all duration-300"
-                 :style="{ width: (verificationProgress.ratio * 100) + '%' }" />
+          <div class="p-2">
+            <SectionTree
+              :sections="sections"
+              :selected-id="selectedId"
+              :af-id="af?.id"
+              @select="selectSection"
+              @add-root="openAddSection(null)"
+              @add-child="openAddSection"
+              @delete="handleDeleteSection"
+              @toggle-include="handleToggleInclude"
+              @toggle-opt-out="handleToggleOptOut"
+              @attachment-drop="handleAttachmentDrop"
+            />
           </div>
         </div>
-        <div class="p-2">
-          <SectionTree
-            :sections="sections"
-            :selected-id="selectedId"
-            :af-id="af?.id"
-            @select="selectSection"
-            @add-root="openAddSection(null)"
-            @add-child="openAddSection"
-            @delete="handleDeleteSection"
-            @toggle-include="handleToggleInclude"
-            @toggle-opt-out="handleToggleOptOut"
-            @attachment-drop="handleAttachmentDrop"
-          />
-        </div>
-        <!-- Poignée de drag-resize (cachee en compact) -->
+        <!-- Poignée de drag-resize (cachee en compact). Hors du conteneur
+             scrollable pour ne pas etre cachee par la scrollbar verticale. -->
         <div
           v-if="!isCompact"
-          @mousedown="onTreeResize"
-          class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-indigo-300 transition-colors z-20"
+          @mousedown.prevent="onTreeResize"
+          class="shrink-0 w-2 cursor-col-resize bg-transparent hover:bg-indigo-300 transition-colors"
           title="Glisser pour redimensionner"
         ></div>
       </aside>
@@ -396,33 +439,43 @@ watch(() => route.params.id, async (newId, oldId) => {
            qui laissent des markers de commentaire (space-y-* peut s'y faire piéger). -->
       <div class="flex-1 min-w-0 overflow-y-auto pr-1 flex flex-col gap-5">
         <template v-if="selectedSection">
-          <!-- Fil d'Ariane des ancêtres : affiché seulement si la section a au
-               moins un parent (sinon la section racine est déjà visible dans le titre). -->
-          <nav
-            v-if="breadcrumbTrail.length"
-            aria-label="Fil d'Ariane"
-            class="flex items-center flex-wrap gap-x-1 gap-y-0.5 text-xs text-gray-500 -mb-2 px-1"
-          >
-            <button
-              type="button"
-              @click="selectSection(sections[0]?.id)"
-              class="hover:text-indigo-700 transition-colors"
+          <!-- Fil d'Ariane des ancêtres + bouton projection. -->
+          <div class="flex items-center justify-between gap-3 -mb-2 px-1">
+            <nav
+              v-if="breadcrumbTrail.length"
+              aria-label="Fil d'Ariane"
+              class="flex items-center flex-wrap gap-x-1 gap-y-0.5 text-xs text-gray-500 min-w-0"
             >
-              {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
-            </button>
-            <template v-for="(ancestor, idx) in breadcrumbTrail" :key="ancestor.id">
-              <span class="text-gray-300">/</span>
               <button
                 type="button"
-                @click="selectSection(ancestor.id)"
-                class="hover:text-indigo-700 transition-colors truncate max-w-xs"
-                :title="ancestor.title"
+                @click="selectSection(sections[0]?.id)"
+                class="hover:text-indigo-700 transition-colors whitespace-nowrap"
               >
-                <span v-if="ancestor.number" class="font-mono text-gray-400 mr-1">§{{ ancestor.number }}</span>
-                {{ ancestor.title }}
+                {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
               </button>
-            </template>
-          </nav>
+              <template v-for="(ancestor, idx) in breadcrumbTrail" :key="ancestor.id">
+                <span class="text-gray-300">/</span>
+                <button
+                  type="button"
+                  @click="selectSection(ancestor.id)"
+                  class="hover:text-indigo-700 transition-colors truncate max-w-xs"
+                  :title="ancestor.title"
+                >
+                  <span v-if="ancestor.number" class="font-mono text-gray-400 mr-1">§{{ ancestor.number }}</span>
+                  {{ ancestor.title }}
+                </button>
+              </template>
+            </nav>
+            <button
+              type="button"
+              @click="projectionOpen = true"
+              class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
+              title="Afficher cette section en plein écran (vidéoprojecteur)"
+            >
+              <PresentationChartLineIcon class="w-3.5 h-3.5 shrink-0" />
+              Projection
+            </button>
+          </div>
 
           <SectionEditor
             ref="sectionEditorRef"
@@ -555,4 +608,42 @@ watch(() => route.params.id, async (newId, oldId) => {
       </button>
     </template>
   </BaseModal>
+
+  <!-- Mode projection : section affichee plein ecran pour videoprojecteur -->
+  <Teleport to="body">
+    <div
+      v-if="projectionOpen && selectedSection"
+      class="fixed inset-0 z-50 bg-white flex flex-col"
+      @keydown.esc="projectionOpen = false"
+      tabindex="0"
+    >
+      <header class="shrink-0 flex items-center justify-between gap-4 px-8 py-4 border-b border-gray-200 bg-gray-50">
+        <div class="min-w-0 flex-1">
+          <p class="text-xs uppercase tracking-wider text-gray-500 truncate">
+            {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
+          </p>
+          <h1 class="text-2xl font-bold text-gray-900 truncate mt-0.5">
+            <span v-if="selectedSection.number" class="font-mono text-indigo-600 mr-2">§{{ selectedSection.number }}</span>
+            {{ selectedSection.title }}
+          </h1>
+        </div>
+        <button
+          @click="projectionOpen = false"
+          class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg bg-white transition-colors whitespace-nowrap"
+          title="Fermer (Échap)"
+        >
+          <XMarkIcon class="w-4 h-4 shrink-0" />
+          Fermer
+        </button>
+      </header>
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <div class="max-w-4xl mx-auto px-12 py-10">
+          <SafeHtml
+            class="prose prose-2xl max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-a:text-indigo-600"
+            :html="selectedSection.body_html || '<p class=\'text-gray-400 italic\'>Aucun contenu rédigé pour cette section.</p>'"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>

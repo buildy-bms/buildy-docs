@@ -404,8 +404,13 @@ function onSaveLink(url) {
       </div>
     </div>
 
-    <!-- Encart contextualisé "lien avec le décret BACS" (visible, éditable) -->
-    <div v-if="section.bacs_articles" class="px-5 pt-4">
+    <!-- Éditeur Tiptap -->
+    <div class="px-5">
+      <EditorContent :editor="editor" />
+    </div>
+
+    <!-- Encart contextualisé "lien avec le décret BACS" (sous l'éditeur) -->
+    <div v-if="section.bacs_articles" class="px-5 pt-4 pb-1">
       <BacsContextBox
         :reference="section.bacs_articles"
         :justification="section.bacs_justification"
@@ -414,11 +419,6 @@ function onSaveLink(url) {
         editable
         @updated="emit('updated', $event)"
       />
-    </div>
-
-    <!-- Éditeur Tiptap -->
-    <div class="px-5">
-      <EditorContent :editor="editor" />
     </div>
   </div>
 

@@ -162,15 +162,26 @@ export const useAfStore = defineStore('af', () => {
 
   // Patch local + serveur d'une section. Optimiste : si l'API echoue,
   // l'appelant gere le rollback (cas typique des toggles include/opt-out).
+  // Les colonnes booleennes SQLite sont stockees en 0/1 : on normalise les
+  // booleens recus dans le patch pour que les comparateurs `=== 1` cote tree
+  // restent coherents apres l'update optimiste (sinon UI non reactive).
+  function normalizePatch(patch) {
+    const norm = { ...patch }
+    for (const key of ['opted_out_by_moa', 'included_in_export']) {
+      if (typeof norm[key] === 'boolean') norm[key] = norm[key] ? 1 : 0
+    }
+    return norm
+  }
   async function patchSection(sectionId, patch) {
+    const localPatch = normalizePatch(patch)
     const idx = sections.value.findIndex(s => s.id === sectionId)
     const original = idx >= 0 ? sections.value[idx] : null
-    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], ...patch }
+    if (idx >= 0) sections.value[idx] = { ...sections.value[idx], ...localPatch }
+    if (selectedSection.value?.id === sectionId) {
+      selectedSection.value = { ...selectedSection.value, ...localPatch }
+    }
     try {
       await updateSection(sectionId, patch)
-      if (selectedSection.value?.id === sectionId) {
-        selectedSection.value = { ...selectedSection.value, ...patch }
-      }
       requiredLevelKey.value++
     } catch (err) {
       // Rollback

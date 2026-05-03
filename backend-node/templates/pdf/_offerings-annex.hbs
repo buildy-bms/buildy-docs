@@ -1,15 +1,15 @@
-{{!-- Annexe "Tableau des offres Buildy" insere dans un PDF AF.
-     Filtre les fonctionnalites selon les sections opt-out par MOA et
-     met en avant le niveau cible de l'AF (override le decoy admin). --}}
+{{!-- Synthèse "Tableau des offres Buildy" insere dans un PDF AF.
+     Met en avant le niveau cible de l'AF, et marque comme refusees (barrees,
+     grisees) les fonctionnalites refusees par le maitre d'ouvrage. --}}
 <section class="annex annex-offerings">
-  <h1>Annexe — Tableau des offres Buildy</h1>
+  <h1>Synthèse — Tableau des offres Buildy</h1>
   <p class="annex-intro">
     Récapitulatif des fonctionnalités disponibles selon le niveau de service Buildy souscrit.
     {{#if offeringsAnnex.targetLevelLabel}}
     Le niveau ciblé par cette analyse fonctionnelle est <strong>{{offeringsAnnex.targetLevelLabel}}</strong>.
     {{/if}}
     {{#if offeringsAnnex.optedOutCount}}
-    {{offeringsAnnex.optedOutCount}} fonctionnalité{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} retirée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} du tableau (refusée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} par le maître d'ouvrage).
+    {{offeringsAnnex.optedOutCount}} fonctionnalité{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} refusée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} par le maître d'ouvrage (barrée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} dans le tableau).
     {{/if}}
   </p>
 
@@ -17,6 +17,7 @@
     <span class="annex-legend-item"><span class="annex-avail-yes">✓</span> Inclus</span>
     <span class="annex-legend-item"><span class="annex-avail-no">—</span> Non disponible</span>
     <span class="annex-legend-item"><span class="annex-avail-opt">€&nbsp;Option</span> Option payante</span>
+    <span class="annex-legend-item"><span class="annex-refused-pill">Refusé MOA</span> Refusé par le MOA</span>
   </div>
 
   <table class="annex-offerings-table">
@@ -46,10 +47,11 @@
         </td>
       </tr>
       {{else}}
-      <tr>
+      <tr class="{{#if refused}}annex-row-refused{{/if}}">
         <td class="annex-feature annex-feature-d{{depth}}">
           {{title}}
           {{#if all_option}}<span class="annex-opt-badge">+ Option payante</span>{{/if}}
+          {{#if refused}}<span class="annex-refused-pill">Refusé MOA</span>{{/if}}
         </td>
         {{#each ../offeringsAnnex.levels}}
         {{#if (eq slug "E")}}

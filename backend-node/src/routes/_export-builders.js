@@ -341,7 +341,7 @@ function buildOfferingsAnnexForAf(af) {
   for (const r of roots) sortChildren(r);
 
   function hasFeatureDescendant(node) {
-    if (node.is_functionality && !optedOutTemplateIds.has(node.id)) return true;
+    if (node.is_functionality) return true;
     return node.children.some(hasFeatureDescendant);
   }
 
@@ -350,10 +350,8 @@ function buildOfferingsAnnexForAf(af) {
   function emit(node, visualDepth) {
     if (!hasFeatureDescendant(node)) return;
     if (node.is_functionality) {
-      if (optedOutTemplateIds.has(node.id)) {
-        optedOutCount++;
-        return; // refusee par le MOA, on ne l'affiche pas
-      }
+      const refused = optedOutTemplateIds.has(node.id);
+      if (refused) optedOutCount++;
       const ae = node.avail_e || 'unavailable';
       const as = node.avail_s || 'unavailable';
       const ap = node.avail_p || 'unavailable';
@@ -366,6 +364,7 @@ function buildOfferingsAnnexForAf(af) {
         avail_s: as,
         avail_p: ap,
         all_option: allOption,
+        refused,
       });
       for (const child of node.children) emit(child, visualDepth + 1);
     } else {

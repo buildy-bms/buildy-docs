@@ -544,10 +544,9 @@ table.points-mini .badge-type {
 .synthesis-systems thead { display: table-header-group; }
 .synthesis-systems tr { page-break-inside: avoid; }
 .syn-col-name { width: auto; }
-.syn-col-ref { width: 32mm; }
-.syn-col-loc { width: 38mm; }
-.syn-col-qty { width: 12mm; }
-.syn-col-level { width: 18mm; }
+.syn-col-ref { width: 36mm; }
+.syn-col-loc { width: 42mm; }
+.syn-col-qty { width: 14mm; }
 
 .synthesis-systems thead th {
   background: #1b2842;
@@ -560,8 +559,7 @@ table.points-mini .badge-type {
   padding: 3mm 2mm;
   text-align: left;
 }
-.synthesis-systems .syn-th-qty,
-.synthesis-systems .syn-th-level { text-align: center; }
+.synthesis-systems .syn-th-qty { text-align: center; }
 
 .syn-cat td {
   background: #eef2ff !important;
@@ -589,18 +587,6 @@ table.points-mini .badge-type {
 .syn-system .syn-name-d2 { padding-left: 10mm; }
 .syn-count { color: #6b7280; font-size: 7.2pt; font-weight: 400; margin-left: 1.5mm; }
 .syn-system-meta { color: #6b7280; font-size: 7.5pt; }
-.syn-level-cell { text-align: center; }
-.syn-level-badge {
-  display: inline-block;
-  font-family: "SFMono-Regular", Menlo, monospace;
-  font-size: 8pt;
-  font-weight: 700;
-  background: #1b2842;
-  color: white;
-  padding: 0.4mm 2mm;
-  border-radius: 0.6mm;
-}
-.syn-na { color: #d1d5db; font-weight: 600; }
 
 .syn-instance td {
   padding: 1.4mm 2mm;
@@ -786,6 +772,38 @@ table.points-mini .badge-type {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+}
+.annex-refused-pill {
+  display: inline-block;
+  margin-left: 2mm;
+  padding: 0.4mm 1.5mm;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 0.4pt solid #fca5a5;
+  border-radius: 0.6mm;
+  font-size: 6pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.annex-row-refused td.annex-feature {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+.annex-row-refused td.annex-feature .annex-refused-pill,
+.annex-row-refused td.annex-feature .annex-opt-badge {
+  text-decoration: none;
+}
+.annex-row-refused td.annex-cell {
+  color: #d1d5db;
+  opacity: 0.6;
+}
+.annex-row-refused td.annex-cell .annex-avail-yes,
+.annex-row-refused td.annex-cell .annex-avail-no,
+.annex-row-refused td.annex-cell .annex-avail-opt {
+  filter: grayscale(1);
+  opacity: 0.6;
 }
 
 /* Anciennes classes synthesis-table : conservees pour compat */
