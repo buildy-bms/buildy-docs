@@ -141,12 +141,12 @@ async function routes(fastify) {
     const { data } = buildPointsListExportData(af, { user, previewMode: true });
     const html = renderHtml({
       template: 'points-list', styles: 'styles-points', data,
-      pageFormat: 'A3', pageOrientation: 'landscape',
+      pageFormat: 'A4', pageOrientation: 'landscape',
     });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
   });
 
-  // POST /api/afs/:afId/exports/points-list — generer la liste de points PDF A3
+  // POST /api/afs/:afId/exports/points-list — generer la liste de points PDF A4 paysage (aligne sur Synthese)
   fastify.post('/afs/:afId/exports/points-list', async (request, reply) => {
     const afId = parseInt(request.params.afId, 10);
     const af = db.afs.getById(afId);
@@ -180,10 +180,10 @@ async function routes(fastify) {
         styles: 'styles-points',
         data,
         outputPath,
-        pageFormat: 'A3',
+        pageFormat: 'A4',
         pageOrientation: 'landscape',
         coverFullBleed: true,
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
       });
     } catch (err) {
       log.error(`PDF render failed: ${err.message}`);

@@ -389,35 +389,16 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     // re-rend la page 1, puis remplace la page 1 du PDF principal.
     if (coverFullBleed) {
       const coverTmpPath = outputPath.replace(/\.pdf$/i, '.cover-tmp.pdf');
-      // Dimensions explicites en mm — plus deterministe pour Chromium que
-      // les keywords "A3 landscape" / "A4 landscape" qui ne sont pas reevalues
-      // fiablement quand le @page d'origine utilise deja ce keyword (cas A3
-      // landscape de la liste de points).
-      const dims = pageFormat === 'A3' ? { w: 420, h: 297 } : { w: 297, h: 210 };
       const sizeRule = pageOrientation === 'landscape'
-        ? `${dims.w}mm ${dims.h}mm`
-        : `${dims.h}mm ${dims.w}mm`;
+        ? `${pageFormat} landscape`
+        : `${pageFormat} portrait`;
       const overrideStyleId = await page.evaluate((size) => {
         const id = '__cover_fullbleed_override__';
         const style = document.createElement('style');
         style.id = id;
         // Surcharge tous les @page (y compris @page :first et named pages)
-        // avec margin 0 et la taille demandee. Reset html/body et force la
-        // cover en 100vw/100vh pour ne plus dependre de la cascade @page.
-        style.textContent = `
-          @page { size: ${size} !important; margin: 0 !important; padding: 0 !important; }
-          html, body { margin: 0 !important; padding: 0 !important; }
-          body > .cover:first-child {
-            /* +4mm de bleed sur chaque dimension pour absorber le sub-pixel
-               rounding (420mm @ 96dpi = 1587.4px, viewport rounded a 1587px
-               -> ~0.1mm de blanc residuel). Le surplus est rogne par les
-               bords de page. */
-            width: calc(100vw + 4mm) !important;
-            height: calc(100vh + 4mm) !important;
-            margin: -2mm !important;
-            box-sizing: border-box !important;
-          }
-        `;
+        // avec margin 0 et la taille demandee.
+        style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }`;
         document.head.appendChild(style);
         return id;
       }, sizeRule);
