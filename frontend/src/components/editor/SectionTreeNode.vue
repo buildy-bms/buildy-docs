@@ -189,8 +189,9 @@ const titleHtml = computed(() => {
 
       <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
-      <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer -->
-      <span class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
+      <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
+           hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre. -->
+      <span class="hidden group-hover:flex items-center gap-0.5 shrink-0">
         <button
           v-if="canDemand"
           type="button"
