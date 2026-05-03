@@ -67,21 +67,21 @@
         {{#if (eq slug "E")}}
           <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
             {{#if (eq ../avail_e "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_e "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_e "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_e "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
           </td>
         {{/if}}
         {{#if (eq slug "S")}}
           <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
             {{#if (eq ../avail_s "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_s "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_s "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_s "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
           </td>
         {{/if}}
         {{#if (eq slug "P")}}
           <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
             {{#if (eq ../avail_p "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_p "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_p "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
             {{#if (eq ../avail_p "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
           </td>
         {{/if}}

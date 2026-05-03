@@ -83,10 +83,10 @@ function buildOfferingsData() {
       const ae = node.avail_e || 'unavailable';
       const as = node.avail_s || 'unavailable';
       const ap = node.avail_p || 'unavailable';
-      // Si toutes les dispos sont 'option' -> feature 100% optionnelle,
+      // Si toutes les dispos sont 'paid_option' -> feature 100% optionnelle,
       // on l'identifie pour afficher un badge "+ OPTION PAYANTE" a cote
-      // du titre.
-      const allOption = ae === 'option' && as === 'option' && ap === 'option';
+      // du titre. Note : la valeur en DB est 'paid_option' (pas 'option').
+      const allOption = ae === 'paid_option' && as === 'paid_option' && ap === 'paid_option';
       rows.push({
         kind: 'feature',
         depth: visualDepth,
