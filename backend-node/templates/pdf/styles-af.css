@@ -827,14 +827,19 @@ table.points-mini .badge-type {
   vertical-align: middle;
 }
 .annex-row-refused td.annex-feature {
-  color: #9ca3af;
+  background: #fef2f2;
+  color: #991b1b;
+  font-weight: 600;
   text-decoration: line-through;
+  border-left: 1.2mm solid #ef4444;
+  padding-left: 2mm !important;
 }
 .annex-row-refused td.annex-feature .annex-refused-pill,
 .annex-row-refused td.annex-feature .annex-opt-badge {
   text-decoration: none;
 }
 .annex-row-refused td.annex-cell {
+  background: #fef2f2;
   color: #d1d5db;
   opacity: 0.6;
 }

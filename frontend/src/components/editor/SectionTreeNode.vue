@@ -193,7 +193,7 @@ const titleHtml = computed(() => {
           type="button"
           @click.stop="emit('toggle-demanded', node)"
           :class="['p-0.5 rounded', demanded ? 'hover:bg-gray-200 text-emerald-700' : 'hover:bg-emerald-200 text-emerald-600']"
-          :title="demanded ? 'Annuler la validation' : 'Valider cette option payante (demandée par la maîtrise d\'ouvrage)'"
+          :title="demanded ? 'Annuler la validation' : 'Marquer comme fonction exigée par la maîtrise d\'ouvrage (à inclure dans l\'avenant contractuel)'"
         >
           <CheckBadgeIcon class="w-3 h-3" />
         </button>
@@ -233,7 +233,7 @@ const titleHtml = computed(() => {
         </button>
       </span>
       <!-- Indicateur permanent si section demandee, ecartee, ou exclue -->
-      <span v-if="demanded" class="shrink-0 text-emerald-700" title="Option payante validée par la MOA — incluse dans l'avenant contractuel">
+      <span v-if="demanded" class="shrink-0 text-emerald-700" title="Fonction exigée par la maîtrise d'ouvrage — à inclure dans l'avenant contractuel">
         <CheckBadgeIcon class="w-3 h-3" />
       </span>
       <span v-else-if="optedOut" class="shrink-0 text-amber-700" title="Écartée par la MOA — visible dans le PDF avec encart">
