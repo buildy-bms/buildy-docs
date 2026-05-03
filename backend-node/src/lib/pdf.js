@@ -280,14 +280,9 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
   const page = await browser.newPage();
   try {
     // Viewport en pixels = format de page A4 ou A3 a 96 DPI (1mm = 3.7795px)
-    // A4 = 210x297mm = 793.7x1122.5px, A3 = 297x420mm = 1122.5x1587.4px.
-    // On arrondit TOUJOURS a l'entier SUPERIEUR : la viewport doit deborder
-    // d'une fraction de pixel sur la page reelle (clippage invisible) sinon
-    // une bande blanche apparait au bord (cas A3 paysage de la liste de
-    // points : 1587 < 1587.4 -> ~0.1mm de blanc a droite). A4 fonctionnait
-    // par chance car 794 > 793.7. Arrondi sup pour les deux maintenant.
+    // A4 = 210x297mm = 794x1123px, A3 = 297x420mm = 1123x1587px
     let viewport = pageFormat === 'A3'
-      ? { width: 1124, height: 1588 }
+      ? { width: 1123, height: 1587 }
       : { width: 794, height: 1123 };
     if (pageOrientation === 'landscape') {
       viewport = { width: viewport.height, height: viewport.width };
