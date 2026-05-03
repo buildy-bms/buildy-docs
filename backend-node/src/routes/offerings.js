@@ -28,91 +28,81 @@ function getBoilerplate(kind, defaultHtml = '') {
 }
 
 function buildOfferingsData() {
-  // 1. Recupere TOUS les section_templates (pas juste les features)
-  // pour pouvoir resoudre la chaine d'ancetres.
+  // 1. Recupere TOUS les section_templates pour construire l'arbre.
+  // On garde tous les noeuds qui sont :
+  //   - des features (is_functionality = 1)
+  //   - OU des ancetres de features (categories de regroupement)
   const allTemplates = db.db.prepare(`
-    SELECT id, title, parent_template_id, position, is_functionality
+    SELECT id, title, parent_template_id, position, is_functionality,
+           avail_e, avail_s, avail_p
     FROM section_templates
     ORDER BY position, id
   `).all();
-  const byId = new Map(allTemplates.map(t => [t.id, t]));
+  const byId = new Map(allTemplates.map(t => [t.id, { ...t, children: [] }]));
 
-  // Resout la chaine d'ancetres pour un node donne (du plus haut au
-  // plus proche, hors le node lui-meme).
-  function ancestorsOf(node) {
-    const chain = [];
-    let cur = node.parent_template_id ? byId.get(node.parent_template_id) : null;
-    while (cur) {
-      chain.unshift(cur);
-      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null;
-    }
-    return chain;
+  // 2. Construit l'arbre : pour chaque node, ajoute-le aux enfants de
+  // son parent. Les noeuds racine ont parent_template_id null.
+  const roots = [];
+  for (const node of byId.values()) {
+    const parentNode = node.parent_template_id ? byId.get(node.parent_template_id) : null;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+  // Tri par position dans chaque niveau
+  function sortChildren(node) {
+    node.children.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+    for (const c of node.children) sortChildren(c);
+  }
+  roots.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+  for (const r of roots) sortChildren(r);
+
+  // 3. Determine si un node a au moins une feature dans sa descendance
+  //    (utile pour eluder les branches sans features).
+  function hasFeatureDescendant(node) {
+    if (node.is_functionality) return true;
+    return node.children.some(hasFeatureDescendant);
   }
 
-  // 2. Recupere les fonctionnalites avec disponibilites
-  const features = db.db.prepare(`
-    SELECT id, slug, title, body_html, service_level,
-           avail_e, avail_s, avail_p, position, parent_template_id
-    FROM section_templates
-    WHERE is_functionality = 1
-  `).all();
-
-  // 2.bis Tri des features par leur chaine d'ancetres : les features
-  // d'une meme branche sont consecutives. Sinon les categories se
-  // repetent (ex: f1 dans cat A, f2 dans cat B, f3 dans cat A ->
-  // 3 rangees de categorie au lieu de 2). On utilise la position de
-  // chaque ancetre dans la chaine, puis la position de la feature
-  // elle-meme.
-  function sortKey(t) {
-    const chain = ancestorsOf(t);
-    const parts = chain.map(a => `${String(a.position ?? 9999).padStart(6, '0')}-${a.id}`);
-    parts.push(`${String(t.position ?? 9999).padStart(6, '0')}-${t.id}`);
-    return parts.join('|');
-  }
-  features.sort((a, b) => {
-    const ka = sortKey(a), kb = sortKey(b);
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  });
-
-  // 3. Construit une liste plate "rows" qui interleave les rangees de
-  // categorie (a chaque changement d'ancetre dans la chaine) et les
-  // rangees de feature. La profondeur d'ancetres est arbitraire : on
-  // affiche autant de niveaux que la base contient.
+  // 4. DFS de l'arbre pour generer les rows :
+  //   - Un node non-feature qui a des descendants features est emis
+  //     comme une CATEGORY row (bandeau indigo). Sa depth_visual est
+  //     la profondeur depuis la racine non-feature.
+  //   - Un node feature est emis comme une FEATURE row avec ses
+  //     dispos E/S/P. Sa depth_visual = depth de sa categorie ancetre
+  //     la plus proche + 1 + nb d'ancetres features.
+  //   - On ne re-emit pas une categorie si elle n'a pas d'enfant.
+  //
+  // Convention indentation visuelle :
+  //   - depth 0 : categorie racine (bandeau plein indigo)
+  //   - depth 1+ : sous-categorie ou feature indentee
   const rows = [];
-  const lastChain = []; // chaine d'ancetres de la rangee precedente
+  function emit(node, visualDepth) {
+    if (!hasFeatureDescendant(node)) return; // skip branches sans features
 
-  for (const f of features) {
-    const chain = ancestorsOf(f);
-    // Trouve l'index ou la chaine actuelle commence a differer de la
-    // chaine precedente. Tout ce qui est "pareil" jusqu'a cet index
-    // n'a pas besoin de re-emettre une rangee de categorie.
-    let firstChange = 0;
-    while (
-      firstChange < chain.length &&
-      firstChange < lastChain.length &&
-      chain[firstChange].id === lastChain[firstChange].id
-    ) firstChange++;
-    // Emets une rangee categorie pour chaque ancetre a partir du 1er
-    // changement.
-    for (let depth = firstChange; depth < chain.length; depth++) {
+    if (node.is_functionality) {
+      rows.push({
+        kind: 'feature',
+        depth: visualDepth,
+        title: node.title,
+        avail_e: node.avail_e || 'unavailable',
+        avail_s: node.avail_s || 'unavailable',
+        avail_p: node.avail_p || 'unavailable',
+      });
+      // Une feature peut avoir des features enfants -> on les emit indentes
+      for (const child of node.children) emit(child, visualDepth + 1);
+    } else {
+      // Categorie de regroupement : emit la category row + recurse
       rows.push({
         kind: 'category',
-        depth,
-        title: chain[depth].title,
+        depth: visualDepth,
+        title: node.title,
       });
+      for (const child of node.children) emit(child, visualDepth + 1);
     }
-    rows.push({
-      kind: 'feature',
-      depth: chain.length,
-      title: f.title,
-      avail_e: f.avail_e || 'unavailable',
-      avail_s: f.avail_s || 'unavailable',
-      avail_p: f.avail_p || 'unavailable',
-    });
-    // Met a jour la chaine pour la prochaine iteration
-    lastChain.length = 0;
-    lastChain.push(...chain);
   }
+  for (const r of roots) emit(r, 0);
+
+  const features = allTemplates.filter(t => t.is_functionality);
 
   // 4. Niveaux d'offre depuis la DB
   const levels = db.offeringLevels.list();
