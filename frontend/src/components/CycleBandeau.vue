@@ -355,10 +355,10 @@ const exportDescription = computed(() => {
       <button
         @click="openExport('points-list')"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
-        title="Exporter la liste de points contractuelle en PDF A3"
+        title="Exporter la liste de points contractuelle en PDF A4 paysage"
       >
         <TableCellsIcon class="w-4 h-4" />
-        Points (A3)
+        Points (A4)
       </button>
       <a
         :href="`/api/afs/${af.id}/exports/points-list.xlsx`"
