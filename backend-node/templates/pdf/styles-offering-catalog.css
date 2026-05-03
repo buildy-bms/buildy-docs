@@ -6,7 +6,7 @@
 
 @page {
   size: A4 portrait;
-  margin: 14mm 12mm 14mm 12mm;
+  margin: 10mm 10mm 10mm 10mm;
 }
 @page :first {
   margin: 0;
@@ -87,18 +87,18 @@ h1, h2, h3 {
   margin-top: 14mm;
 }
 
-/* ── Tableau comparatif (compact, 1-2 pages A4 max apres cover) ──── */
+/* ── Tableau comparatif (compact, doit tenir sur 1 page A4 apres cover) ──── */
 .comparison-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 6mm;
-  margin: 0 0 4mm;
-  padding-bottom: 2mm;
+  gap: 4mm;
+  margin: 0 0 2mm;
+  padding-bottom: 1mm;
   border-bottom: 0.4pt solid #e5e7eb;
 }
 .page-title {
-  font-size: 16pt;
+  font-size: 13pt;
   font-weight: 700;
   color: #1b2842;
   margin: 0;
@@ -106,8 +106,8 @@ h1, h2, h3 {
 }
 .comparison-legend {
   display: flex;
-  gap: 4mm;
-  font-size: 7pt;
+  gap: 3mm;
+  font-size: 6.5pt;
   color: #6b7280;
 }
 .legend-item {
@@ -116,82 +116,76 @@ h1, h2, h3 {
   gap: 1mm;
 }
 
-/* Tableau ultra-compact */
+/* Tableau ultra-compact : 1 page A4 cible apres cover */
 .comparison-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0 0 3mm;
-  font-size: 7.5pt;
+  margin: 0 0 2mm;
+  font-size: 6.4pt;
 }
 .col-feature { width: auto; }
-.col-level   { width: 18mm; }
+.col-level   { width: 16mm; }
 
 .comparison-table thead { display: table-header-group; }
 .comparison-table tr { page-break-inside: avoid; }
 
 .th-feature {
   text-align: left;
-  padding: 4mm 4mm 4mm 4mm;
+  padding: 2.5mm 3mm;
   background: #1b2842;
   color: rgba(255, 255, 255, 0.85);
   font-family: 'Manrope', sans-serif;
-  font-size: 7.5pt;
+  font-size: 6.4pt;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   font-weight: 700;
   vertical-align: middle;
 }
 .th-level {
-  /* Hauteur uniforme pour les 3 colonnes (decoy ou pas) : padding-top
-     egal partout, le badge ruban est en absolute donc ne deforme pas
-     la cellule. */
   text-align: center;
-  padding: 5mm 1mm 3mm;
+  padding: 3mm 1mm 2mm;
   color: white;
   vertical-align: bottom;
   position: relative;
 }
 .th-level-badge {
-  /* Ruban "Le plus choisi" : positionne en absolute dans la zone
-     superieure de la cellule (interne, pas overflow), pour eviter
-     d'etre clippe par le bord de page lors du repeat du table-header
-     sur les pages suivantes. */
+  /* Ruban "Offre vedette" : ancre a droite de la cellule pour deborder
+     a gauche (espace libre dans la cellule precedente) plutot que de
+     deborder a droite (= bord de page → clipping). Sans max-width pour
+     accepter les libelles longs comme "★ Le plus choisi". */
   position: absolute;
-  top: 1mm;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100% - 2mm);
+  top: 0.8mm;
+  right: 0;
+  left: auto;
   font-family: 'Manrope', sans-serif;
-  font-size: 5.4pt;
+  font-size: 5pt;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   background: #00cd92;
   color: #051428;
-  padding: 0.6mm 2mm;
+  padding: 0.5mm 1.8mm;
   border-radius: 5mm;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   box-shadow: 0 0.4mm 1mm rgba(0, 0, 0, 0.15);
   border: 0.4pt solid #00b884;
   z-index: 2;
 }
 .th-level-name {
   font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
+  font-size: 8.5pt;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   line-height: 1.1;
 }
 .th-level-tagline {
   font-family: 'Manrope', sans-serif;
-  font-size: 6.8pt;
+  font-size: 5.8pt;
   font-weight: 400;
   font-style: italic;
   opacity: 0.78;
-  margin-top: 1mm;
+  margin-top: 0.5mm;
   letter-spacing: 0;
   text-transform: none;
   line-height: 1.2;
@@ -227,60 +221,61 @@ h1, h2, h3 {
   border-top: 0.5pt solid #c7d2fe;
 }
 .category-row-d0 td {
-  padding: 2mm 2mm 1.2mm;
-  font-size: 7.8pt;
+  padding: 1.2mm 2mm 0.8mm;
+  font-size: 6.8pt;
 }
 .category-row-d1 td {
-  padding: 1.3mm 2mm 0.8mm 6mm;
+  padding: 0.9mm 2mm 0.6mm 5mm;
   background: #f5f7ff !important;
   color: #4338ca;
-  font-size: 6.8pt;
+  font-size: 6pt;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 .category-row-d2 td {
-  padding: 1.1mm 2mm 0.6mm 10mm;
+  padding: 0.7mm 2mm 0.4mm 8mm;
   background: #fafbff !important;
   color: #6366f1;
-  font-size: 6.4pt;
+  font-size: 5.6pt;
   font-weight: 600;
   letter-spacing: 0.03em;
 }
 .category-row-d3 td {
-  padding: 1mm 2mm 0.5mm 14mm;
+  padding: 0.6mm 2mm 0.3mm 11mm;
   background: #fafbff !important;
   color: #818cf8;
-  font-size: 6.2pt;
+  font-size: 5.4pt;
 }
 .cat-marker {
-  margin-right: 1.5mm;
+  margin-right: 1mm;
   font-weight: 900;
 }
-.cat-marker-d0 { color: #00cd92; font-size: 9pt; }
-.cat-marker-d1 { color: #9ca3af; font-size: 9pt; }
-.cat-marker-d2 { color: #d1d5db; font-size: 9pt; }
-.cat-marker-d3 { color: #d1d5db; font-size: 9pt; }
+.cat-marker-d0 { color: #00cd92; font-size: 7.5pt; }
+.cat-marker-d1 { color: #9ca3af; font-size: 7.5pt; }
+.cat-marker-d2 { color: #d1d5db; font-size: 7.5pt; }
+.cat-marker-d3 { color: #d1d5db; font-size: 7.5pt; }
 
 /* Indentation cumulative des features selon leur profondeur */
-.td-feature-d1 { padding-left: 6mm !important; }
-.td-feature-d2 { padding-left: 10mm !important; }
-.td-feature-d3 { padding-left: 14mm !important; }
-.td-feature-d4 { padding-left: 18mm !important; }
+.td-feature-d1 { padding-left: 5mm !important; }
+.td-feature-d2 { padding-left: 8mm !important; }
+.td-feature-d3 { padding-left: 11mm !important; }
+.td-feature-d4 { padding-left: 14mm !important; }
 
 .comparison-table tbody tr:not(.category-row):nth-child(odd) td {
   background: #fafbfc;
 }
 
 .td-feature {
-  padding: 1.4mm 2mm;
+  padding: 0.6mm 2mm;
   border-bottom: 0.3pt solid #f3f4f6;
   vertical-align: middle;
   color: #1f2937;
-  font-size: 7.8pt;
+  font-size: 6.6pt;
+  line-height: 1.25;
 }
 .td-level {
   text-align: center;
-  padding: 1.4mm 0;
+  padding: 0.6mm 0;
   border-bottom: 0.3pt solid #f3f4f6;
   vertical-align: middle;
 }
@@ -289,10 +284,10 @@ h1, h2, h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 5.5mm;
-  height: 5.5mm;
+  width: 4mm;
+  height: 4mm;
   border-radius: 50%;
-  font-size: 8pt;
+  font-size: 7pt;
   font-weight: 700;
   line-height: 1;
 }
@@ -306,12 +301,12 @@ h1, h2, h3 {
    en orange chaud. Plus explicite que le picto. */
 .avail-text {
   display: inline-block;
-  padding: 0.5mm 1.8mm;
+  padding: 0.3mm 1.4mm;
   background: #fff7ed;
   color: #c2410c;
   border: 0.4pt solid #fed7aa;
-  border-radius: 0.8mm;
-  font-size: 6.8pt;
+  border-radius: 0.6mm;
+  font-size: 5.4pt;
   font-weight: 600;
   white-space: nowrap;
   letter-spacing: 0.02em;
@@ -339,32 +334,32 @@ h1, h2, h3 {
    de police (Manrope), pas d'italique. Hierarchie typographique
    simple : titre en gros, sous-titre en moyen, contact en regular. */
 .cta-block {
-  margin: 6mm 0 3mm;
-  padding: 6mm 8mm;
+  margin: 3mm 0 2mm;
+  padding: 3mm 5mm;
   background: #1b2842;
   color: white;
-  border-radius: 2mm;
+  border-radius: 1.5mm;
   text-align: center;
   page-break-inside: avoid;
 }
 .cta-line {
   font-family: 'Poppins', sans-serif;
-  font-size: 16pt;
+  font-size: 11pt;
   font-weight: 700;
-  margin: 0 0 2mm;
+  margin: 0 0 0.8mm;
   color: white;
   letter-spacing: -0.01em;
 }
 .cta-sub {
   font-family: 'Manrope', sans-serif;
-  font-size: 10pt;
+  font-size: 7.5pt;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.72);
-  margin: 0 0 4mm;
+  margin: 0 0 2mm;
 }
 .cta-contact {
   font-family: 'Manrope', sans-serif;
-  font-size: 11pt;
+  font-size: 8.5pt;
   font-weight: 600;
   color: white;
   margin: 0;
