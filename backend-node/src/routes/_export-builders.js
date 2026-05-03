@@ -81,6 +81,7 @@ async function buildAfExportData(af, opts = {}) {
     motif = 'Apercu',
     excludedSectionIds = [],
     includeBacsAnnex = false,
+    includeOfferingsAnnex = false,
     previewMode = false,
   } = opts;
   const authorName = user?.display_name || user?.email || 'Inconnu';
@@ -130,6 +131,74 @@ async function buildAfExportData(af, opts = {}) {
     sectionData.set(sec.id, { attachments, equipment, zones });
   }
 
+  // Construit dynamiquement les rows du tableau de synthese (systemes +
+  // instances) qui remplace l'ancien tableau hardcode SYNTHESIS_ROWS.
+  // Style : tableau des offres -> hierarchie via parent_id (depth visuelle),
+  // chaque section equipment incluse devient une "system row" suivie de
+  // ses "instance rows" (reference + location + qty).
+  function buildSynthesisRows() {
+    const rows = [];
+    function walk(parentId, depth) {
+      const children = allSections
+        .filter(s => s.parent_id === parentId)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      for (const sec of children) {
+        if (!sec.included_in_export || sec.opted_out_by_moa) {
+          // Skip mais explore quand meme les enfants au cas ou ils sont
+          // inclus (cas rare mais possible).
+          walk(sec.id, depth + 1);
+          continue;
+        }
+        if (sec.kind === 'equipment') {
+          const tpl = sec.equipment_template_id
+            ? db.equipmentTemplates.getById(sec.equipment_template_id) : null;
+          const points = resolveSectionPoints(sec.id);
+          const instances = db.equipmentInstances.listBySection(sec.id);
+          const totalQty = instances.reduce((s, i) => s + (i.qty || 1), 0);
+          rows.push({
+            kind: 'system',
+            depth,
+            title: sec.title,
+            template_slug: tpl?.slug || null,
+            instances_count: instances.length,
+            total_qty: totalQty,
+            points_total: points.length,
+            service_level: sec.service_level || null,
+            service_level_label: formatLevelFull(sec.service_level),
+          });
+          for (const inst of instances) {
+            rows.push({
+              kind: 'instance',
+              depth: depth + 1,
+              reference: inst.reference || '—',
+              location: inst.location || '',
+              qty: inst.qty || 1,
+            });
+          }
+          // Recurse pour les eventuels enfants d'une section equipment
+          walk(sec.id, depth + 1);
+        } else {
+          // Categorie de regroupement : on recurse, mais on n'emet une
+          // row category que si on a des descendants equipment.
+          const before = rows.length;
+          walk(sec.id, depth + 1);
+          const after = rows.length;
+          if (after > before) {
+            // Insert la row category AVANT les rows enfants ajoutees
+            rows.splice(before, 0, {
+              kind: 'category',
+              depth,
+              title: sec.title,
+            });
+          }
+        }
+      }
+    }
+    walk(null, 0);
+    return rows;
+  }
+  const synthesisRows = buildSynthesisRows();
+
   function buildTree(parentId, depth) {
     return allSections
       .filter(s => s.parent_id === parentId)
@@ -139,7 +208,7 @@ async function buildAfExportData(af, opts = {}) {
         const sl = s.service_level;
         const badgeClass = sl ? sl.replace(/[^A-Z]/g, '') : '';
         const synthesisHtml = s.kind === 'synthesis'
-          ? renderSynthesisTable({ rows: SYNTHESIS_ROWS })
+          ? renderSynthesisTable({ rows: synthesisRows })
           : null;
         const liveBacs = resolveLiveBacs(s);
         return {
@@ -202,6 +271,14 @@ async function buildAfExportData(af, opts = {}) {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
+  // Annexe "Tableau des offres Buildy" optionnelle. Filtre les
+  // fonctionnalites refusees par le MOA (sections opt_out_by_moa) et
+  // met en avant le niveau cible de l'AF (af.service_level) plutot
+  // que le decoy admin global.
+  const offeringsAnnex = includeOfferingsAnnex
+    ? buildOfferingsAnnexForAf(af)
+    : null;
+
   const data = {
     af,
     authorName,
@@ -216,9 +293,107 @@ async function buildAfExportData(af, opts = {}) {
     includeBacsAnnex,
     bacsArticles: includeBacsAnnex ? BACS_ARTICLES : null,
     bacsIntroHtml: includeBacsAnnex ? BACS_INTRO_HTML : null,
+    offeringsAnnex,
   };
 
   return { data, version, allSectionsCount: allSections.length, serviceLevel };
+}
+
+/**
+ * Construit les donnees du tableau des offres adaptees au contexte d'une AF :
+ *  - Filtre les fonctionnalites dont la section template parente correspond
+ *    a une section de l'AF marquee opt_out_by_moa = 1 (refusee par le MOA).
+ *  - Override le decoy admin (offering_levels.is_highlighted) par le niveau
+ *    de service cible de l'AF (af.service_level). Le niveau ainsi mis en
+ *    valeur est l'engagement contractuel reel.
+ */
+function buildOfferingsAnnexForAf(af) {
+  // Recupere les section_template_id des sections de l'AF refusees par le MOA
+  const optedOutTemplateIds = new Set(
+    db.db.prepare(`
+      SELECT DISTINCT section_template_id
+      FROM sections
+      WHERE af_id = ?
+        AND opted_out_by_moa = 1
+        AND section_template_id IS NOT NULL
+    `).all(af.id).map(r => r.section_template_id)
+  );
+
+  // Recupere tous les section_templates pour construire l'arbre
+  const allTemplates = db.db.prepare(`
+    SELECT id, title, parent_template_id, position, is_functionality,
+           avail_e, avail_s, avail_p
+    FROM section_templates
+    ORDER BY position, id
+  `).all();
+  const byId = new Map(allTemplates.map(t => [t.id, { ...t, children: [] }]));
+  const roots = [];
+  for (const node of byId.values()) {
+    const parentNode = node.parent_template_id ? byId.get(node.parent_template_id) : null;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+  function sortChildren(node) {
+    node.children.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+    for (const c of node.children) sortChildren(c);
+  }
+  roots.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+  for (const r of roots) sortChildren(r);
+
+  function hasFeatureDescendant(node) {
+    if (node.is_functionality && !optedOutTemplateIds.has(node.id)) return true;
+    return node.children.some(hasFeatureDescendant);
+  }
+
+  let optedOutCount = 0;
+  const rows = [];
+  function emit(node, visualDepth) {
+    if (!hasFeatureDescendant(node)) return;
+    if (node.is_functionality) {
+      if (optedOutTemplateIds.has(node.id)) {
+        optedOutCount++;
+        return; // refusee par le MOA, on ne l'affiche pas
+      }
+      const ae = node.avail_e || 'unavailable';
+      const as = node.avail_s || 'unavailable';
+      const ap = node.avail_p || 'unavailable';
+      const allOption = ae === 'paid_option' && as === 'paid_option' && ap === 'paid_option';
+      rows.push({
+        kind: 'feature',
+        depth: visualDepth,
+        title: node.title,
+        avail_e: ae,
+        avail_s: as,
+        avail_p: ap,
+        all_option: allOption,
+      });
+      for (const child of node.children) emit(child, visualDepth + 1);
+    } else {
+      rows.push({ kind: 'category', depth: visualDepth, title: node.title });
+      for (const child of node.children) emit(child, visualDepth + 1);
+    }
+  }
+  for (const r of roots) emit(r, 0);
+
+  // Niveaux d'offre : marque le niveau cible de l'AF avec is_target = true.
+  // Ce flag override le decoy admin (qui n'a pas de sens dans le contexte
+  // d'une AF deja contractualisee).
+  const allLevels = db.offeringLevels.list();
+  const targetSlug = (af.service_level || '').toUpperCase();
+  const levels = allLevels.map(l => ({
+    ...l,
+    is_target: l.slug === targetSlug,
+    is_highlighted: false, // override : on n'utilise pas le decoy global
+  }));
+  const targetLevel = levels.find(l => l.is_target);
+
+  return {
+    rows,
+    levels,
+    colspan: levels.length + 1,
+    targetLevelLabel: targetLevel?.name || null,
+    optedOutCount,
+  };
 }
 
 /**

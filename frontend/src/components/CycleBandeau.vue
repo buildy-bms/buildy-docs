@@ -38,6 +38,7 @@ const showExport = ref(false)
 const exportKind = ref('points-list') // 'points-list' | 'af'
 const exportMotif = ref('')
 const exportIncludeBacs = ref(false)
+const exportIncludeOfferings = ref(false)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
 
@@ -228,6 +229,7 @@ function openExport(kind) {
   exportKind.value = kind
   exportMotif.value = ''
   exportIncludeBacs.value = false
+  exportIncludeOfferings.value = false
   lastExportId.value = null
   lastExportInfo.value = null
   exportExcluded.value = new Set()
@@ -246,7 +248,10 @@ async function submitExport() {
              : exportKind.value === 'synthesis' ? exportSynthesis
              : exportPointsList
     const payload = { motif: exportMotif.value.trim() }
-    if (exportKind.value === 'af') payload.includeBacsAnnex = exportIncludeBacs.value
+    if (exportKind.value === 'af') {
+      payload.includeBacsAnnex = exportIncludeBacs.value
+      payload.includeOfferingsAnnex = exportIncludeOfferings.value
+    }
     if (exportExcluded.value.size > 0) payload.excluded_section_ids = [...exportExcluded.value]
     const { data } = await fn(props.af.id, payload)
     if (exportKind.value === 'af') {
@@ -273,7 +278,7 @@ const previewOpen = ref(false)
 const previewKind = ref(null)
 const previewUrlComputed = computed(() => {
   if (!previewKind.value) return ''
-  if (previewKind.value === 'af') return previewAfUrl(props.af.id, exportIncludeBacs.value)
+  if (previewKind.value === 'af') return previewAfUrl(props.af.id, exportIncludeBacs.value, exportIncludeOfferings.value)
   if (previewKind.value === 'points-list') return previewPointsListUrl(props.af.id)
   return ''
 })
@@ -503,20 +508,38 @@ const exportDescription = computed(() => {
         </div>
       </div>
 
-      <!-- Option Annexe BACS, uniquement pour AF -->
-      <div v-if="exportKind === 'af'" class="flex items-start gap-2 pt-2 border-t border-gray-100">
-        <input
-          v-model="exportIncludeBacs"
-          type="checkbox"
-          id="bacs-annex"
-          class="mt-0.5 w-4 h-4 rounded border-gray-200 text-indigo-600 focus:ring-indigo-500"
-        />
-        <label for="bacs-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
-          Inclure l'<strong>annexe Décret BACS</strong> (R175-1 à R175-6)
-          <span class="block text-[11px] text-gray-400 mt-0.5">
-            Ajoute en fin de document les articles complets pour référence.
-          </span>
-        </label>
+      <!-- Options d'annexes, uniquement pour AF -->
+      <div v-if="exportKind === 'af'" class="space-y-2 pt-2 border-t border-gray-100">
+        <div class="flex items-start gap-2">
+          <input
+            v-model="exportIncludeBacs"
+            type="checkbox"
+            id="bacs-annex"
+            class="mt-0.5 w-4 h-4 rounded border-gray-200 text-indigo-600 focus:ring-indigo-500"
+          />
+          <label for="bacs-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
+            Inclure l'<strong>annexe Décret BACS</strong> (R175-1 à R175-6)
+            <span class="block text-[11px] text-gray-400 mt-0.5">
+              Articles complets du décret en fin de document, pour référence.
+            </span>
+          </label>
+        </div>
+        <div class="flex items-start gap-2">
+          <input
+            v-model="exportIncludeOfferings"
+            type="checkbox"
+            id="offerings-annex"
+            class="mt-0.5 w-4 h-4 rounded border-gray-200 text-emerald-600 focus:ring-emerald-500"
+          />
+          <label for="offerings-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
+            Inclure le <strong>Tableau des offres Buildy</strong>
+            <span class="block text-[11px] text-gray-400 mt-0.5">
+              Récapitulatif des fonctionnalités par niveau de service. Filtré
+              automatiquement (les fonctionnalités refusées par le MOA sont
+              retirées) ; le niveau ciblé par cette AF est mis en évidence.
+            </span>
+          </label>
+        </div>
       </div>
       <div v-if="lastExportId" class="p-3 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
         <p>✓ PDF généré et téléchargé. Si le téléchargement n'a pas démarré,

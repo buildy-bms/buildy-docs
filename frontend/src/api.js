@@ -117,8 +117,12 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 // URLs preview HTML (rendu Handlebars sans Puppeteer, pour iframe)
-export const previewAfUrl = (afId, includeBacsAnnex = false) =>
-  `/api/afs/${afId}/exports/af/preview${includeBacsAnnex ? '?includeBacsAnnex=1' : ''}`
+export const previewAfUrl = (afId, includeBacsAnnex = false, includeOfferingsAnnex = false) => {
+  const qs = []
+  if (includeBacsAnnex) qs.push('includeBacsAnnex=1')
+  if (includeOfferingsAnnex) qs.push('includeOfferingsAnnex=1')
+  return `/api/afs/${afId}/exports/af/preview${qs.length ? '?' + qs.join('&') : ''}`
+}
 export const previewPointsListUrl = (afId) =>
   `/api/afs/${afId}/exports/points-list/preview`
 

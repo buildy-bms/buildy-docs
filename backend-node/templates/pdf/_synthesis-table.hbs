@@ -1,31 +1,58 @@
-{{!-- Tableau de synthese (ch.12) — auto-genere depuis l'arbre des sections --}}
-<table class="synthesis-table">
+{{!-- Tableau de synthese des systemes / instances de l'AF.
+     Mise en forme alignee sur le tableau des offres : header bleu marine,
+     categories en bandeau indigo, instances indentees sous leur systeme. --}}
+<table class="synthesis-systems">
+  <colgroup>
+    <col class="syn-col-name" />
+    <col class="syn-col-ref" />
+    <col class="syn-col-loc" />
+    <col class="syn-col-qty" />
+    <col class="syn-col-level" />
+  </colgroup>
   <thead>
     <tr>
-      <th>Catégorie d'équipement</th>
-      <th>Décret BACS</th>
-      <th class="num">Monitoring</th>
-      <th class="num">Contrôle & Commande</th>
-      <th class="num">Alarmes</th>
-      <th class="num">Reporting & Analyse</th>
-      <th>Niveau min.</th>
+      <th class="syn-th-name">Système / Instance</th>
+      <th class="syn-th-ref">Référence</th>
+      <th class="syn-th-loc">Localisation</th>
+      <th class="syn-th-qty">Qté</th>
+      <th class="syn-th-level">Niveau min.</th>
     </tr>
   </thead>
   <tbody>
     {{#each rows}}
-    <tr>
-      <td class="row-name">{{name}}</td>
-      <td class="row-bacs">{{#if bacs}}<span class="bacs-tag">⚖️ {{bacs}}</span>{{else}}—{{/if}}</td>
-      <td class="num">{{#if monitoring}}<span class="check">✓</span>{{else}}—{{/if}}</td>
-      <td class="num">{{#if commande}}<span class="check">✓</span>{{else}}—{{/if}}</td>
-      <td class="num">{{#if alarmes}}<span class="check">✓</span>{{else}}—{{/if}}</td>
-      <td class="num">{{#if reporting}}<span class="check">✓</span>{{else}}—{{/if}}</td>
-      <td><span class="row-level">{{levelLabel}}</span></td>
+    {{#if (eq kind "category")}}
+    <tr class="syn-cat syn-cat-d{{depth}}">
+      <td colspan="5">
+        <span class="syn-cat-marker">▸</span>
+        {{title}}
+      </td>
     </tr>
+    {{/if}}
+    {{#if (eq kind "system")}}
+    <tr class="syn-system">
+      <td class="syn-name syn-name-d{{depth}}">
+        <strong>{{title}}</strong>
+        {{#if instances_count}}
+        <span class="syn-count">· {{instances_count}} instance{{#if (gt instances_count 1)}}s{{/if}}</span>
+        {{/if}}
+      </td>
+      <td colspan="3" class="syn-system-meta">
+        {{#if points_total}}{{points_total}} point{{#if (gt points_total 1)}}s{{/if}} contractuel{{#if (gt points_total 1)}}s{{/if}}{{/if}}
+      </td>
+      <td class="syn-level-cell">
+        {{#if service_level}}<span class="syn-level-badge">{{service_level}}</span>{{else}}<span class="syn-na">—</span>{{/if}}
+      </td>
+    </tr>
+    {{/if}}
+    {{#if (eq kind "instance")}}
+    <tr class="syn-instance">
+      <td class="syn-name syn-name-d{{depth}}">↳</td>
+      <td class="syn-ref">{{reference}}</td>
+      <td class="syn-loc">{{location}}</td>
+      <td class="syn-qty">{{qty}}</td>
+      <td></td>
+    </tr>
+    {{/if}}
     {{/each}}
   </tbody>
 </table>
-<p class="synthesis-legend">
-  ✓ = applicable · — = non applicable · ⚖️ = couvert par le décret BACS.
-  Tableau indicatif, à ajuster selon le périmètre réel du déploiement.
-</p>

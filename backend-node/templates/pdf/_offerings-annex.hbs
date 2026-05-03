@@ -1,0 +1,82 @@
+{{!-- Annexe "Tableau des offres Buildy" insere dans un PDF AF.
+     Filtre les fonctionnalites selon les sections opt-out par MOA et
+     met en avant le niveau cible de l'AF (override le decoy admin). --}}
+<section class="annex annex-offerings">
+  <h1>Annexe — Tableau des offres Buildy</h1>
+  <p class="annex-intro">
+    Récapitulatif des fonctionnalités disponibles selon le niveau de service Buildy souscrit.
+    {{#if offeringsAnnex.targetLevelLabel}}
+    Le niveau ciblé par cette analyse fonctionnelle est <strong>{{offeringsAnnex.targetLevelLabel}}</strong>.
+    {{/if}}
+    {{#if offeringsAnnex.optedOutCount}}
+    {{offeringsAnnex.optedOutCount}} fonctionnalité{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} retirée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} du tableau (refusée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} par le maître d'ouvrage).
+    {{/if}}
+  </p>
+
+  <div class="annex-legend">
+    <span class="annex-legend-item"><span class="annex-avail-yes">✓</span> Inclus</span>
+    <span class="annex-legend-item"><span class="annex-avail-no">—</span> Non disponible</span>
+    <span class="annex-legend-item"><span class="annex-avail-opt">€&nbsp;Option</span> Option payante</span>
+  </div>
+
+  <table class="annex-offerings-table">
+    <colgroup>
+      <col class="annex-col-feature" />
+      {{#each offeringsAnnex.levels}}<col class="annex-col-level" />{{/each}}
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="annex-th-feature">Fonctionnalité</th>
+        {{#each offeringsAnnex.levels}}
+        <th class="annex-th-level annex-th-{{slug}} {{#if is_target}}annex-th-target{{/if}}">
+          {{#if is_target}}<div class="annex-th-target-badge">Niveau ciblé</div>{{/if}}
+          <div class="annex-th-name">{{name}}</div>
+          {{#if tagline}}<div class="annex-th-tagline">{{tagline}}</div>{{/if}}
+        </th>
+        {{/each}}
+      </tr>
+    </thead>
+    <tbody>
+      {{#each offeringsAnnex.rows}}
+      {{#if (eq kind "category")}}
+      <tr class="annex-cat annex-cat-d{{depth}}">
+        <td colspan="{{../offeringsAnnex.colspan}}">
+          <span class="annex-cat-marker">▸</span>
+          {{title}}
+        </td>
+      </tr>
+      {{else}}
+      <tr>
+        <td class="annex-feature annex-feature-d{{depth}}">
+          {{title}}
+          {{#if all_option}}<span class="annex-opt-badge">+ Option payante</span>{{/if}}
+        </td>
+        {{#each ../offeringsAnnex.levels}}
+        {{#if (eq slug "E")}}
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+            {{#if (eq ../avail_e "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
+            {{#if (eq ../avail_e "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_e "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}
+          </td>
+        {{/if}}
+        {{#if (eq slug "S")}}
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+            {{#if (eq ../avail_s "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
+            {{#if (eq ../avail_s "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_s "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}
+          </td>
+        {{/if}}
+        {{#if (eq slug "P")}}
+          <td class="annex-cell {{#if is_target}}annex-cell-target{{/if}}">
+            {{#if (eq ../avail_p "included")}}<span class="annex-avail-yes">✓</span>{{/if}}
+            {{#if (eq ../avail_p "paid_option")}}<span class="annex-avail-opt">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_p "unavailable")}}<span class="annex-avail-no">—</span>{{/if}}
+          </td>
+        {{/if}}
+        {{/each}}
+      </tr>
+      {{/if}}
+      {{/each}}
+    </tbody>
+  </table>
+</section>

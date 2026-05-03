@@ -63,6 +63,7 @@ const SERVICE_LEVEL_LABELS = {
 const exportSchema = z.object({
   motif: z.string().min(1, 'Motif requis'),
   includeBacsAnnex: z.boolean().optional(),
+  includeOfferingsAnnex: z.boolean().optional(),
   excluded_section_ids: z.array(z.number()).optional(),
 });
 
@@ -914,9 +915,11 @@ async function routes(fastify) {
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
     const includeBacsAnnex = request.query.includeBacsAnnex === '1';
+    const includeOfferingsAnnex = request.query.includeOfferingsAnnex === '1';
     const { data } = await buildAfExportData(af, {
       user,
       includeBacsAnnex,
+      includeOfferingsAnnex,
       previewMode: true,
     });
     const html = renderHtml({ template: 'af', styles: 'styles-af', data });
@@ -944,6 +947,7 @@ async function routes(fastify) {
       motif: body.motif,
       excludedSectionIds: body.excluded_section_ids || [],
       includeBacsAnnex: !!body.includeBacsAnnex,
+      includeOfferingsAnnex: !!body.includeOfferingsAnnex,
       previewMode: false,
     });
 
