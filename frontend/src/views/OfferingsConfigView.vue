@@ -140,14 +140,14 @@ async function downloadPdf() {
           prochain export PDF.
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 shrink-0">
         <button @click="previewOpen = true"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg">
-          <EyeIcon class="w-4 h-4" /> Aperçu
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg whitespace-nowrap">
+          <EyeIcon class="w-4 h-4 shrink-0" /> Aperçu
         </button>
         <button @click="downloadPdf" :disabled="generating"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg disabled:opacity-60">
-          <DocumentArrowDownIcon class="w-4 h-4" />
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-4 h-4 shrink-0" />
           {{ generating ? 'Génération…' : 'Télécharger PDF' }}
         </button>
       </div>
