@@ -80,13 +80,21 @@ function buildOfferingsData() {
     if (!hasFeatureDescendant(node)) return; // skip branches sans features
 
     if (node.is_functionality) {
+      const ae = node.avail_e || 'unavailable';
+      const as = node.avail_s || 'unavailable';
+      const ap = node.avail_p || 'unavailable';
+      // Si toutes les dispos sont 'option' -> feature 100% optionnelle,
+      // on l'identifie pour afficher un badge "+ OPTION PAYANTE" a cote
+      // du titre.
+      const allOption = ae === 'option' && as === 'option' && ap === 'option';
       rows.push({
         kind: 'feature',
         depth: visualDepth,
         title: node.title,
-        avail_e: node.avail_e || 'unavailable',
-        avail_s: node.avail_s || 'unavailable',
-        avail_p: node.avail_p || 'unavailable',
+        avail_e: ae,
+        avail_s: as,
+        avail_p: ap,
+        all_option: allOption,
       });
       // Une feature peut avoir des features enfants -> on les emit indentes
       for (const child of node.children) emit(child, visualDepth + 1);

@@ -23,7 +23,7 @@
     <h1 class="page-title">Tableau des offres Buildy</h1>
     <div class="comparison-legend">
       <span class="legend-item"><span class="avail avail-included">✓</span> Inclus</span>
-      <span class="legend-item"><span class="avail avail-option">⓪</span> Option</span>
+      <span class="legend-item"><span class="avail-text">€&nbsp;Option</span> Option payante</span>
       <span class="legend-item"><span class="avail avail-unavailable">—</span> Non dispo</span>
     </div>
   </header>
@@ -59,16 +59,31 @@
       </tr>
       {{else}}
       <tr>
-        <td class="td-feature td-feature-d{{depth}}">{{title}}</td>
+        <td class="td-feature td-feature-d{{depth}}">
+          {{title}}
+          {{#if all_option}}<span class="opt-badge">+ Option payante</span>{{/if}}
+        </td>
         {{#each ../levels}}
         {{#if (eq slug "E")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_e}}">{{#if (eq ../avail_e "included")}}✓{{else}}{{#if (eq ../avail_e "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
+            {{#if (eq ../avail_e "included")}}<span class="avail avail-included">✓</span>{{/if}}
+            {{#if (eq ../avail_e "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_e "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
+          </td>
         {{/if}}
         {{#if (eq slug "S")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_s}}">{{#if (eq ../avail_s "included")}}✓{{else}}{{#if (eq ../avail_s "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
+            {{#if (eq ../avail_s "included")}}<span class="avail avail-included">✓</span>{{/if}}
+            {{#if (eq ../avail_s "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_s "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
+          </td>
         {{/if}}
         {{#if (eq slug "P")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}"><span class="avail avail-{{../avail_p}}">{{#if (eq ../avail_p "included")}}✓{{else}}{{#if (eq ../avail_p "option")}}⓪{{else}}—{{/if}}{{/if}}</span></td>
+          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
+            {{#if (eq ../avail_p "included")}}<span class="avail avail-included">✓</span>{{/if}}
+            {{#if (eq ../avail_p "option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
+            {{#if (eq ../avail_p "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
+          </td>
         {{/if}}
         {{/each}}
       </tr>
