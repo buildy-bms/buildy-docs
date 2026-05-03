@@ -139,7 +139,10 @@ async function routes(fastify) {
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
     const { data } = buildPointsListExportData(af, { user, previewMode: true });
-    const html = renderHtml({ template: 'points-list', styles: 'styles-points', data });
+    const html = renderHtml({
+      template: 'points-list', styles: 'styles-points', data,
+      pageFormat: 'A3', pageOrientation: 'landscape',
+    });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
   });
 

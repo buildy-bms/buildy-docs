@@ -358,7 +358,7 @@ onBeforeUnmount(teardownSortables)
 
     <PdfPreviewModal
       v-if="offeringsPreviewOpen"
-      title="Aperçu — Tableau des offres Buildy"
+      title="Aperçu — Tableau des fonctionnalités Buildy"
       :preview-url="previewOfferingsUrl()"
       :downloading="generatingOfferings"
       download-label="Télécharger le PDF"

@@ -118,13 +118,14 @@ h1, h2, h3, h4, h5 {
 .cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
 .cover-version-tag {
   display: inline-block;
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Manrope', sans-serif;
   font-size: 9pt;
   background: #00cd92;
   color: #051428;
   padding: 1mm 3mm;
   border-radius: 1mm;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 .cover-motif {
   margin-top: 3mm;
@@ -194,11 +195,12 @@ h1, h2, h3, h4, h5 {
 .toc-row.lvl-3 { padding-left: 10mm; color: #6b7280; font-size: 9pt; }
 .toc-row.lvl-4 { padding-left: 15mm; color: #9ca3af; font-size: 8.5pt; }
 .toc-num {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Poppins', sans-serif;
   min-width: 14mm;
   font-weight: 500;
   color: #9ca3af;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 .toc-row.lvl-1 .toc-num { color: #1b2842; font-weight: 600; }
 .toc-title { flex-shrink: 0; }
@@ -212,13 +214,14 @@ h1, h2, h3, h4, h5 {
 }
 .toc-row.lvl-1 .toc-dots { border-bottom-color: transparent; }
 .toc-page {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Poppins', sans-serif;
   font-size: 9pt;
   color: #6b7280;
   font-weight: 500;
   flex-shrink: 0;
   text-align: right;
   min-width: 8mm;
+  font-variant-numeric: tabular-nums;
 }
 .toc-row.lvl-1 .toc-page { color: #1b2842; font-weight: 600; }
 
@@ -255,10 +258,11 @@ h1, h2, h3, h4, h5 {
 .section h4 { font-size: 9.5pt; font-weight: 600; color: #374151; margin-top: 2.5mm; page-break-after: avoid; }
 
 .section-num {
-  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-family: 'Poppins', sans-serif;
   margin-right: 3mm;
   color: #6b7280;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .section h1 .section-num { color: #94a3b8; }
 

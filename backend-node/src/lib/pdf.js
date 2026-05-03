@@ -580,31 +580,47 @@ async function shutdown() {
  * pour valider visuellement le contenu avant de declencher le PDF.
  */
 // Override CSS injecte uniquement en mode preview HTML (pas dans le PDF
-// genere par Puppeteer). Reset les marges A4 que @page applique normalement
-// en print, simule une feuille de papier centree sur fond gris pour donner
-// l'illusion de "rapport sur le bureau" sans pagination reelle.
-const PREVIEW_CSS_OVERRIDE = `
-/* Override preview HTML — neutralise les marges @page (print-only) */
+// genere par Puppeteer). Reset les marges @page (print-only), simule
+// une feuille de papier centree sur fond gris.
+//
+// Le format page (A4 portrait par defaut, mais aussi A3 paysage pour la
+// liste de points) doit etre passe par l'appelant pour que la cover et
+// le contenu rendent dans les bonnes dimensions.
+function buildPreviewOverride({ pageFormat = 'A4', pageOrientation = 'portrait' } = {}) {
+  // Dimensions par format (en mm). Largeur visible utilisee pour body max-width
+  // et la mise a l'echelle de la cover.
+  const dims = {
+    'A4-portrait':  { w: 210, h: 297, padX: 12, padY: 18 },
+    'A4-landscape': { w: 297, h: 210, padX: 14, padY: 14 },
+    'A3-portrait':  { w: 297, h: 420, padX: 14, padY: 18 },
+    'A3-landscape': { w: 420, h: 297, padX: 14, padY: 14 },
+  };
+  const key = `${pageFormat}-${pageOrientation}`;
+  const d = dims[key] || dims['A4-portrait'];
+  return `
+/* Override preview HTML — page ${key} */
 html { background: #e5e7eb; }
 body {
   background: #ffffff;
-  max-width: 210mm;
+  max-width: ${d.w}mm;
   margin: 12mm auto;
-  padding: 18mm 12mm 16mm 12mm;
+  padding: ${d.padY}mm ${d.padX}mm ${d.padY}mm ${d.padX}mm;
   box-sizing: border-box;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
-/* La page de garde garde sa pleine largeur (deja 210mm + bg bleu) */
+/* La page de garde s'etend bord-a-bord (couleur de fond definie dans
+   les styles du template). La marge negative compense le padding du body. */
 body > .cover:first-child {
-  margin: -18mm -12mm 8mm -12mm;
-  width: calc(100% + 24mm);
+  margin: -${d.padY}mm -${d.padX}mm 8mm -${d.padX}mm;
+  width: calc(100% + ${d.padX * 2}mm);
 }
 `;
+}
 
-function renderHtml({ template, styles, data }) {
+function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation = 'portrait' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
-  const fullCss = getEmbeddedFontsCss() + '\n' + css + '\n' + PREVIEW_CSS_OVERRIDE;
+  const fullCss = getEmbeddedFontsCss() + '\n' + css + '\n' + buildPreviewOverride({ pageFormat, pageOrientation });
   return tpl({ ...data, styles: fullCss });
 }
 

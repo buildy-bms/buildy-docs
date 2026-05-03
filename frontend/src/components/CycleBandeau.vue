@@ -532,7 +532,7 @@ const exportDescription = computed(() => {
             class="mt-0.5 w-4 h-4 rounded border-gray-200 text-emerald-600 focus:ring-emerald-500"
           />
           <label for="offerings-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
-            Inclure le <strong>Tableau des offres Buildy</strong>
+            Inclure le <strong>Tableau des fonctionnalités Buildy</strong>
             <span class="block text-[11px] text-gray-400 mt-0.5">
               Récapitulatif des fonctionnalités par niveau de service. Filtré
               automatiquement (les fonctionnalités refusées par le MOA sont

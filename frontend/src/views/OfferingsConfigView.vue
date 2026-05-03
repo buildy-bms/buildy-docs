@@ -250,7 +250,7 @@ async function downloadPdf() {
 
     <PdfPreviewModal
       v-if="previewOpen"
-      title="Aperçu — Tableau des offres Buildy"
+      title="Aperçu — Tableau des fonctionnalités Buildy"
       :preview-url="previewOfferingsUrl()"
       :downloading="generating"
       download-label="Télécharger le PDF"
