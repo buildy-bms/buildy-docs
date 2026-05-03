@@ -55,8 +55,24 @@ function buildOfferingsData() {
            avail_e, avail_s, avail_p, position, parent_template_id
     FROM section_templates
     WHERE is_functionality = 1
-    ORDER BY position, id
   `).all();
+
+  // 2.bis Tri des features par leur chaine d'ancetres : les features
+  // d'une meme branche sont consecutives. Sinon les categories se
+  // repetent (ex: f1 dans cat A, f2 dans cat B, f3 dans cat A ->
+  // 3 rangees de categorie au lieu de 2). On utilise la position de
+  // chaque ancetre dans la chaine, puis la position de la feature
+  // elle-meme.
+  function sortKey(t) {
+    const chain = ancestorsOf(t);
+    const parts = chain.map(a => `${String(a.position ?? 9999).padStart(6, '0')}-${a.id}`);
+    parts.push(`${String(t.position ?? 9999).padStart(6, '0')}-${t.id}`);
+    return parts.join('|');
+  }
+  features.sort((a, b) => {
+    const ka = sortKey(a), kb = sortKey(b);
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
 
   // 3. Construit une liste plate "rows" qui interleave les rangees de
   // categorie (a chaque changement d'ancetre dans la chaine) et les
