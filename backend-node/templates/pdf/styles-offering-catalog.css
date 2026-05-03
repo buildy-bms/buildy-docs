@@ -131,14 +131,15 @@ h1, h2, h3 {
 
 .th-feature {
   text-align: left;
-  padding: 5mm 2mm 3mm;
+  padding: 4mm 4mm 4mm 4mm;
   background: #1b2842;
-  color: white;
-  font-size: 7pt;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'Manrope', sans-serif;
+  font-size: 7.5pt;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-  vertical-align: bottom;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  vertical-align: middle;
 }
 .th-level {
   /* Hauteur uniforme pour les 3 colonnes (decoy ou pas) : padding-top
@@ -331,44 +332,47 @@ h1, h2, h3 {
   vertical-align: middle;
 }
 
-/* Call-to-action en bas du tableau : ferme le doc sur une promesse
-   chaude (vs mention administrative seche). */
+/* Call-to-action en bas du tableau : un seul ton, une seule famille
+   de police (Manrope), pas d'italique. Hierarchie typographique
+   simple : titre en gros, sous-titre en moyen, contact en regular. */
 .cta-block {
   margin: 6mm 0 3mm;
-  padding: 5mm 6mm;
+  padding: 6mm 8mm;
   background: #1b2842;
   color: white;
-  border-radius: 1.5mm;
+  border-radius: 2mm;
   text-align: center;
   page-break-inside: avoid;
 }
 .cta-line {
   font-family: 'Poppins', sans-serif;
-  font-size: 14pt;
+  font-size: 16pt;
   font-weight: 700;
-  margin: 0 0 1mm;
+  margin: 0 0 2mm;
   color: white;
   letter-spacing: -0.01em;
 }
 .cta-sub {
-  font-size: 9pt;
-  color: rgba(255, 255, 255, 0.78);
-  margin: 0 0 2mm;
-  font-style: italic;
+  font-family: 'Manrope', sans-serif;
+  font-size: 10pt;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0 0 4mm;
 }
 .cta-contact {
-  font-family: "SFMono-Regular", Menlo, monospace;
-  font-size: 8.5pt;
-  color: #00cd92;
+  font-family: 'Manrope', sans-serif;
+  font-size: 11pt;
+  font-weight: 600;
+  color: white;
   margin: 0;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
 }
 
-/* Footer final administratif tres discret */
+/* Footer final administratif tres discret, sans italique */
 .comparison-footer {
-  margin: 2mm 0 0;
-  font-size: 6.5pt;
+  margin: 3mm 0 0;
+  font-size: 7pt;
   color: #9ca3af;
   text-align: center;
-  font-style: italic;
+  font-weight: 400;
 }
