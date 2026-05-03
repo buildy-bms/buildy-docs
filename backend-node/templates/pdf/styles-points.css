@@ -1,15 +1,13 @@
 /* ──────────────────────────────────────────────────────────────────
-   Liste de points contractuelle — A4 PAYSAGE — DOE Buildy (Lot 19)
+   Liste de points contractuelle — A3 PAYSAGE — DOE Buildy (Lot 19)
    - Une seule grande table, no-wrap absolu, table-layout: fixed
    - Colonnes calibrées pour fitter exactement la largeur utile
    - thead répété sur chaque page (display: table-header-group)
-   - Format aligné sur Synthese (A4 paysage) pour beneficier du meme
-     mecanisme coverFullBleed eprouve.
    ────────────────────────────────────────────────────────────────── */
 
 @page {
-  size: A4 landscape; /* 297 mm × 210 mm — aligne sur Synthese */
-  margin: 14mm 14mm 12mm 14mm;
+  size: A3 landscape; /* 420 mm × 297 mm */
+  margin: 14mm 10mm 12mm 10mm;
 }
 
 @page :first {
@@ -29,49 +27,49 @@ html, body {
 
 h1, h2, h3 { font-family: 'Poppins', sans-serif; }
 
-/* ── Page de garde — A4 paysage 297×210 (aligne sur Synthese) ── */
+/* ── Page de garde — A3 paysage 420×297 ──────────────────────── */
 .cover {
-  width: 297mm;
-  height: 210mm;
-  padding: 18mm 22mm;
+  width: 420mm;
+  height: 297mm;
+  padding: 22mm 28mm;
   background: #1b2842;
   color: white;
   page-break-after: always;
   display: grid;
   grid-template-rows: auto auto auto 1fr;
-  gap: 8mm;
+  gap: 10mm;
   position: relative;
   box-sizing: border-box;
 }
 .cover-top { display: flex; flex-direction: column; }
 .cover-logo {
-  width: 36mm;
-  margin-bottom: 6mm;
+  width: 50mm;
+  margin-bottom: 10mm;
   filter: brightness(0) invert(1);
 }
 .cover-doc-type {
-  font-size: 8pt;
+  font-size: 9pt;
   text-transform: uppercase;
   letter-spacing: 0.25em;
   color: rgba(255, 255, 255, 0.6);
-  margin: 0 0 2.5mm;
+  margin: 0 0 4mm;
   font-weight: 500;
 }
 .cover-title {
-  font-size: 26pt;
+  font-size: 36pt;
   font-weight: 700;
-  margin: 0 0 2.5mm;
+  margin: 0 0 4mm;
   letter-spacing: -0.01em;
   line-height: 1.1;
 }
 .cover-client {
-  font-size: 14pt;
+  font-size: 18pt;
   color: rgba(255, 255, 255, 0.88);
   font-weight: 500;
-  margin: 0 0 1.5mm;
+  margin: 0 0 2mm;
 }
 .cover-address {
-  font-size: 9.5pt;
+  font-size: 11pt;
   color: rgba(255, 255, 255, 0.55);
   margin: 0;
 }
@@ -82,16 +80,16 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14mm;
+  gap: 18mm;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 5mm 0;
+  padding: 6mm 0;
   align-self: stretch;
 }
 .cover-totals-item { text-align: center; }
 .cover-totals-value {
   font-family: 'Poppins', sans-serif;
-  font-size: 26pt;
+  font-size: 32pt;
   font-weight: 700;
   color: white;
   margin: 0;
@@ -99,63 +97,63 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; }
   letter-spacing: -0.02em;
 }
 .cover-totals-label {
-  font-size: 7.5pt;
+  font-size: 8.5pt;
   color: rgba(255, 255, 255, 0.55);
-  margin: 2mm 0 0;
+  margin: 2.5mm 0 0;
   text-transform: uppercase;
   letter-spacing: 0.14em;
 }
 .cover-totals-sep {
   width: 1px;
-  height: 12mm;
+  height: 16mm;
   background: rgba(255, 255, 255, 0.12);
 }
 
 .cover-meta {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 3mm 10mm;
+  gap: 4mm 12mm;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 5mm;
+  padding-top: 8mm;
 }
 .cover-meta-row { display: flex; flex-direction: column; }
 .cover-meta-label {
-  font-size: 7pt;
+  font-size: 7.5pt;
   text-transform: uppercase;
   letter-spacing: 0.15em;
   color: rgba(255, 255, 255, 0.4);
   margin-bottom: 1.5mm;
 }
-.cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
+.cover-meta-value { font-size: 11pt; color: white; font-weight: 500; }
 .cover-version-tag {
   font-family: 'Manrope', sans-serif;
   background: #00cd92;
   color: #1b2842;
-  padding: 0.5mm 2mm;
-  border-radius: 0.8mm;
-  font-weight: 600;
-  font-size: 9pt;
+  padding: 0.8mm 2.5mm;
+  border-radius: 1mm;
+  font-weight: 700;
+  font-size: 10pt;
   letter-spacing: 0.02em;
 }
 .cover-motif {
-  margin-top: 1.5mm;
-  font-size: 8.5pt;
+  margin-top: 2mm;
+  font-size: 9pt;
   color: rgba(255, 255, 255, 0.65);
   font-style: italic;
 }
 .cover-bottom {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding-top: 5mm;
+  padding-top: 6mm;
 }
 .cover-disclaimer {
-  font-size: 7.5pt;
+  font-size: 8pt;
   color: rgba(255, 255, 255, 0.65);
   line-height: 1.55;
-  margin: 0 0 2.5mm;
+  margin: 0 0 3mm;
   text-align: justify;
 }
 .cover-legal {
-  font-size: 7pt;
+  font-size: 7.5pt;
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.5;
   margin: 0;
@@ -172,19 +170,20 @@ table.points {
   table-layout: fixed;
   font-size: 7.5pt;
 }
-/* Largeurs calibrées pour A4 paysage 269mm utile (297 - 2×14mm)
-   Total : 34 + 22 + 24 + 24 + 51 + 15 + 9 + 15 + 11 + 64 = 269 mm */
+/* Largeurs calibrées pour A3 paysage 400mm utile (420 - 2×10mm)
+   Total : 50 + 32 + 36 + 36 + 76 + 22 + 14 + 22 + 16 + 96 = 400 mm
+   Cat elargie a 50mm pour absorber "Centrale de traitement d'air (CTA)" sans truncation. */
 table.points col, /* fallback */
-table.points th.col-cat,         table.points td.col-cat         { width: 34mm; }
-table.points th.col-ref,         table.points td.col-ref         { width: 22mm; }
-table.points th.col-loc,         table.points td.col-loc         { width: 24mm; }
-table.points th.col-tech,        table.points td.col-tech        { width: 24mm; }
-table.points th.col-label,       table.points td.col-label       { width: 51mm; }
-table.points th.col-type,        table.points td.col-type        { width: 15mm; }
-table.points th.col-dir,         table.points td.col-dir         { width: 9mm; }
-table.points th.col-nature,      table.points td.col-nature      { width: 15mm; }
-table.points th.col-unit,        table.points td.col-unit        { width: 11mm; }
-table.points th.col-commentaire, table.points td.col-commentaire { width: 64mm; }
+table.points th.col-cat,         table.points td.col-cat         { width: 50mm; }
+table.points th.col-ref,         table.points td.col-ref         { width: 32mm; }
+table.points th.col-loc,         table.points td.col-loc         { width: 36mm; }
+table.points th.col-tech,        table.points td.col-tech        { width: 36mm; }
+table.points th.col-label,       table.points td.col-label       { width: 76mm; }
+table.points th.col-type,        table.points td.col-type        { width: 22mm; }
+table.points th.col-dir,         table.points td.col-dir         { width: 14mm; }
+table.points th.col-nature,      table.points td.col-nature      { width: 22mm; }
+table.points th.col-unit,        table.points td.col-unit        { width: 16mm; }
+table.points th.col-commentaire, table.points td.col-commentaire { width: 96mm; }
 
 table.points thead { display: table-header-group; } /* répétition headers sur chaque page */
 table.points tr { page-break-inside: avoid; }
