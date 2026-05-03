@@ -230,6 +230,19 @@ async function handleToggleOptOut(node) {
   }
 }
 
+async function handleToggleDemanded(node) {
+  const newVal = node.demanded_by_moa === 1 ? 0 : 1
+  try {
+    // L'exclusivite refusee/demandee est garantie cote backend, mais on
+    // anticipe l'effet local pour eviter un flash visuel.
+    const patch = { demanded_by_moa: !!newVal }
+    if (newVal && node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+    await afStore.patchSection(node.id, patch)
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec mise à jour')
+  }
+}
+
 async function selectSection(id) {
   await afStore.selectSection(id)
   // En mode compact, fermer automatiquement le drawer apres selection
@@ -420,6 +433,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               @delete="handleDeleteSection"
               @toggle-include="handleToggleInclude"
               @toggle-opt-out="handleToggleOptOut"
+              @toggle-demanded="handleToggleDemanded"
               @attachment-drop="handleAttachmentDrop"
             />
           </div>

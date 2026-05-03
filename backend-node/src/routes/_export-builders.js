@@ -35,6 +35,8 @@ const SYNTHESIS_ROWS = [
 
 const synthesisTablePath = path.resolve(__dirname, '../../templates/pdf/_synthesis-table.hbs');
 const renderSynthesisTable = Handlebars.compile(fs.readFileSync(synthesisTablePath, 'utf-8'));
+const contractualSummaryPath = path.resolve(__dirname, '../../templates/pdf/_contractual-summary.hbs');
+const renderContractualSummary = Handlebars.compile(fs.readFileSync(contractualSummaryPath, 'utf-8'));
 
 function buildLiveBacsResolver() {
   const cats = db.systemCategoriesDb.list();
@@ -198,6 +200,8 @@ async function buildAfExportData(af, opts = {}) {
     return rows;
   }
   const synthesisRows = buildSynthesisRows();
+  const contractualSummary = buildContractualSummaryForAf(af);
+  const contractualSummaryHtml = renderContractualSummary(contractualSummary);
 
   function buildTree(parentId, depth) {
     return allSections
@@ -210,6 +214,10 @@ async function buildAfExportData(af, opts = {}) {
         const synthesisHtml = s.kind === 'synthesis'
           ? renderSynthesisTable({ rows: synthesisRows })
           : null;
+        // Le chapitre 13 "Engagement contractuel" reçoit la synthese
+        // calculee (offre recommandee + options à souscrire). On la prepend
+        // au body_html existant pour que le texte canonique reste editable.
+        const isContractualChapter = s.number === '13';
         const liveBacs = resolveLiveBacs(s);
         return {
           id: s.id,
@@ -224,6 +232,7 @@ async function buildAfExportData(af, opts = {}) {
             : null,
           bacs_justification: s.bacs_justification || data.equipment?.bacs_justification || null,
           synthesis_table_html: synthesisHtml,
+          contractual_summary_html: isContractualChapter ? contractualSummaryHtml : null,
           body_html: s.body_html,
           generic_note: s.generic_note,
           opted_out_by_moa: s.opted_out_by_moa === 1,
@@ -279,6 +288,9 @@ async function buildAfExportData(af, opts = {}) {
     ? buildOfferingsAnnexForAf(af)
     : null;
 
+  // contractualSummary deja calcule plus haut (utilise dans le tree pour
+  // le chapitre 13). Reutilise-le tel quel pour le bundle data.
+
   const data = {
     af,
     authorName,
@@ -294,6 +306,7 @@ async function buildAfExportData(af, opts = {}) {
     bacsArticles: includeBacsAnnex ? BACS_ARTICLES : null,
     bacsIntroHtml: includeBacsAnnex ? BACS_INTRO_HTML : null,
     offeringsAnnex,
+    contractualSummary,
   };
 
   return { data, version, allSectionsCount: allSections.length, serviceLevel };
@@ -315,6 +328,16 @@ function buildOfferingsAnnexForAf(af) {
       FROM sections
       WHERE af_id = ?
         AND opted_out_by_moa = 1
+        AND section_template_id IS NOT NULL
+    `).all(af.id).map(r => r.section_template_id)
+  );
+  // Sections explicitement demandees par le MOA (symetrique de opted_out).
+  const demandedTemplateIds = new Set(
+    db.db.prepare(`
+      SELECT DISTINCT section_template_id
+      FROM sections
+      WHERE af_id = ?
+        AND demanded_by_moa = 1
         AND section_template_id IS NOT NULL
     `).all(af.id).map(r => r.section_template_id)
   );
@@ -346,12 +369,15 @@ function buildOfferingsAnnexForAf(af) {
   }
 
   let optedOutCount = 0;
+  let demandedCount = 0;
   const rows = [];
   function emit(node, visualDepth) {
     if (!hasFeatureDescendant(node)) return;
     if (node.is_functionality) {
       const refused = optedOutTemplateIds.has(node.id);
+      const demanded = demandedTemplateIds.has(node.id);
       if (refused) optedOutCount++;
+      if (demanded) demandedCount++;
       const ae = node.avail_e || 'unavailable';
       const as = node.avail_s || 'unavailable';
       const ap = node.avail_p || 'unavailable';
@@ -365,6 +391,7 @@ function buildOfferingsAnnexForAf(af) {
         avail_p: ap,
         all_option: allOption,
         refused,
+        demanded,
       });
       for (const child of node.children) emit(child, visualDepth + 1);
     } else {
@@ -392,6 +419,106 @@ function buildOfferingsAnnexForAf(af) {
     colspan: levels.length + 1,
     targetLevelLabel: targetLevel?.name || null,
     optedOutCount,
+    demandedCount,
+  };
+}
+
+/**
+ * Synthese "engagement contractuel" : a partir des fonctionnalites demandees
+ * par le MOA, deduit le niveau d'offre minimum a souscrire (E/S/P) et la
+ * liste des options payantes a inclure dans l'avenant.
+ *
+ * Algorithme :
+ *   1. Pour chaque fonctionnalite demandee, on regarde sa disponibilite a
+ *      chaque niveau (avail_e/s/p). On retient le niveau MINIMUM ou elle est
+ *      'included' OU 'paid_option'.
+ *   2. L'offre recommandee = max() de ces niveaux (E < S < P).
+ *   3. Au niveau recommande, les fonctionnalites demandees qui sont
+ *      'paid_option' sont listees comme "options a souscrire" dans l'avenant.
+ *      Celles 'included' sont deja couvertes.
+ */
+const LEVEL_RANK = { E: 0, S: 1, P: 2 };
+const LEVEL_NAMES = { E: 'Essentiel', S: 'Smart', P: 'Premium' };
+function buildContractualSummaryForAf(af) {
+  // Recupere toutes les sections demandees + refusees pour l'AF.
+  const demandedSections = db.db.prepare(`
+    SELECT s.id, s.title, s.section_template_id
+    FROM sections s
+    WHERE s.af_id = ?
+      AND s.demanded_by_moa = 1
+      AND s.section_template_id IS NOT NULL
+  `).all(af.id);
+
+  const targetSlug = (af.service_level || 'E').toUpperCase();
+  const targetRank = LEVEL_RANK[targetSlug] ?? 0;
+
+  if (demandedSections.length === 0) {
+    return {
+      hasDemands: false,
+      currentLevel: targetSlug,
+      currentLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
+      recommendedLevel: targetSlug,
+      recommendedLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
+      upgradeNeeded: false,
+      requiredOptions: [],
+      coveredFeatures: [],
+    };
+  }
+
+  // Lookup des template_id demandes pour chercher leurs availabilities.
+  const tplIds = demandedSections.map(s => s.section_template_id);
+  const placeholders = tplIds.map(() => '?').join(',');
+  const tpls = db.db.prepare(`
+    SELECT id, title, avail_e, avail_s, avail_p
+    FROM section_templates WHERE id IN (${placeholders})
+  `).all(...tplIds);
+  const byTplId = new Map(tpls.map(t => [t.id, t]));
+
+  // Pour chaque demande : trouve le niveau min ou la feature est dispo.
+  const features = []; // { title, avails, minLevel, unavailable }
+  let maxRank = targetRank;
+  for (const s of demandedSections) {
+    const tpl = byTplId.get(s.section_template_id);
+    if (!tpl) continue;
+    const avails = { E: tpl.avail_e, S: tpl.avail_s, P: tpl.avail_p };
+    let minLevel = null;
+    for (const lvl of ['E', 'S', 'P']) {
+      const v = avails[lvl];
+      if (v === 'included' || v === 'paid_option') { minLevel = lvl; break; }
+    }
+    if (!minLevel) {
+      features.push({ title: tpl.title, avails, minLevel: null, unavailable: true });
+      continue;
+    }
+    const rank = LEVEL_RANK[minLevel];
+    if (rank > maxRank) maxRank = rank;
+    features.push({ title: tpl.title, avails, minLevel, unavailable: false });
+  }
+
+  // Resolve le niveau recommande
+  const recommendedSlug = Object.entries(LEVEL_RANK).find(([, r]) => r === maxRank)?.[0] || 'E';
+  const upgradeNeeded = maxRank > targetRank;
+
+  // A ce niveau recommande, distingue les features 'included' des 'paid_option'
+  const requiredOptions = [];
+  const coveredFeatures = [];
+  for (const f of features) {
+    if (f.unavailable) continue;
+    const availAtRec = f.avails[recommendedSlug];
+    if (availAtRec === 'paid_option') requiredOptions.push({ title: f.title });
+    else if (availAtRec === 'included') coveredFeatures.push({ title: f.title });
+  }
+
+  return {
+    hasDemands: true,
+    currentLevel: targetSlug,
+    currentLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
+    recommendedLevel: recommendedSlug,
+    recommendedLevelName: LEVEL_NAMES[recommendedSlug] || recommendedSlug,
+    upgradeNeeded,
+    requiredOptions,
+    coveredFeatures,
+    unavailableFeatures: features.filter(f => f.unavailable).map(f => ({ title: f.title })),
   };
 }
 

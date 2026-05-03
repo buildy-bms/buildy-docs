@@ -352,6 +352,14 @@ const PLAN_AF = [
     number: '12', title: 'Tableau de synthèse', kind: 'synthesis',
     body_placeholder: 'Tableau matriciel auto-généré à l\'export depuis le contenu des chapitres précédents. Ajustable manuellement avant export final. Colonnes : Catégorie d\'équipement | Décret BACS | Monitoring | Contrôle & Commande | Alarmes | Reporting & Analyse | Niveau min.',
   },
+
+  // ═══════════ Chapitre 13 — Engagement contractuel ═══════════
+  // Contenu détaillé seedé depuis migration 69 (cf. database.js).
+  // L'export PDF y greffe automatiquement la synthèse "offre cible
+  // recommandée" calculée à partir des fonctionnalités demandées par le MOA.
+  {
+    number: '13', title: 'Engagement contractuel', kind: 'standard',
+  },
 ];
 
 module.exports = { PLAN_AF };

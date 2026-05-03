@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, nextTick, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 
@@ -19,7 +19,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'attachment-drop'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop'])
 
 // Drag-drop accueille les captures depuis l'editeur. On reagit uniquement
 // si le payload contient 'application/x-buildy-attachment' (l'id de la
@@ -46,11 +46,14 @@ const displayedNumber = computed(() =>
 
 const excluded = computed(() => props.node.included_in_export === 0)
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
-// L'option "écartée par la MOA" n'a de sens que pour des sections dont le niveau requis est S ou P.
+const demanded = computed(() => props.node.demanded_by_moa === 1)
+// Les toggles "écartée" et "demandée par MOA" n'ont de sens que pour les
+// fonctionnalités dont le niveau requis est S ou P (les paid_option).
 const canOptOut = computed(() => {
   const lvl = (props.node.service_level || '').toUpperCase()
   return lvl.includes('S') || lvl.includes('P')
 })
+const canDemand = canOptOut
 
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
@@ -157,10 +160,19 @@ const titleHtml = computed(() => {
         <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 block"></span>
       </Tooltip>
 
-      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '']" v-html="titleHtml"></span>
+      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
-      <!-- Actions au survol : ecarter MOA + inclure/exclure + ajouter enfant + supprimer -->
+      <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer -->
       <span class="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
+        <button
+          v-if="canDemand"
+          type="button"
+          @click.stop="emit('toggle-demanded', node)"
+          :class="['p-0.5 rounded', demanded ? 'hover:bg-gray-200 text-emerald-700' : 'hover:bg-emerald-200 text-emerald-600']"
+          :title="demanded ? 'Annuler la validation' : 'Valider cette option payante (demandée par la maîtrise d\'ouvrage)'"
+        >
+          <CheckBadgeIcon class="w-3 h-3" />
+        </button>
         <button
           v-if="canOptOut"
           type="button"
@@ -196,8 +208,11 @@ const titleHtml = computed(() => {
           <TrashIcon class="w-3 h-3" />
         </button>
       </span>
-      <!-- Indicateur permanent si section exclue ou ecartee -->
-      <span v-if="optedOut" class="shrink-0 text-amber-700" title="Écartée par la MOA — visible dans le PDF avec encart">
+      <!-- Indicateur permanent si section demandee, ecartee, ou exclue -->
+      <span v-if="demanded" class="shrink-0 text-emerald-700" title="Option payante validée par la MOA — incluse dans l'avenant contractuel">
+        <CheckBadgeIcon class="w-3 h-3" />
+      </span>
+      <span v-else-if="optedOut" class="shrink-0 text-amber-700" title="Écartée par la MOA — visible dans le PDF avec encart">
         <NoSymbolIcon class="w-3 h-3" />
       </span>
       <span v-else-if="excluded" class="shrink-0 text-amber-600" title="Exclue des exports">
@@ -222,6 +237,7 @@ const titleHtml = computed(() => {
         @delete="emit('delete', $event)"
         @toggle-include="emit('toggle-include', $event)"
         @toggle-opt-out="emit('toggle-opt-out', $event)"
+        @toggle-demanded="emit('toggle-demanded', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
       />
     </div>

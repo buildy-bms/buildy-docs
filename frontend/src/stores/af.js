@@ -167,7 +167,7 @@ export const useAfStore = defineStore('af', () => {
   // restent coherents apres l'update optimiste (sinon UI non reactive).
   function normalizePatch(patch) {
     const norm = { ...patch }
-    for (const key of ['opted_out_by_moa', 'included_in_export']) {
+    for (const key of ['opted_out_by_moa', 'demanded_by_moa', 'included_in_export']) {
       if (typeof norm[key] === 'boolean') norm[key] = norm[key] ? 1 : 0
     }
     return norm

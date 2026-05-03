@@ -541,6 +541,8 @@ table.points-mini .badge-type {
   font-size: 7pt;
   page-break-inside: auto;
 }
+/* Saut de page systematique avant le tableau de synthese (ch.12). */
+.synthesis-systems-wrap { page-break-before: always; }
 .synthesis-systems thead { display: table-header-group; }
 .synthesis-systems tr { page-break-inside: avoid; }
 .syn-col-name { width: auto; }
@@ -771,6 +773,30 @@ table.points-mini .badge-type {
   letter-spacing: 0.06em;
   vertical-align: middle;
 }
+.annex-demanded-pill {
+  display: inline-block;
+  margin-left: 1.5mm;
+  padding: 0.3mm 1.2mm;
+  background: #d1fae5;
+  color: #065f46;
+  border: 0.4pt solid #6ee7b7;
+  border-radius: 0.6mm;
+  font-size: 5.4pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.annex-row-demanded td.annex-feature {
+  background: #f0fdf4;
+  font-weight: 600;
+  color: #065f46;
+  border-left: 1.2mm solid #00cd92;
+  padding-left: 2mm !important;
+}
+.annex-row-demanded td.annex-cell {
+  background: #f0fdf4;
+}
 .annex-refused-pill {
   display: inline-block;
   margin-left: 1.5mm;
@@ -802,6 +828,111 @@ table.points-mini .badge-type {
 .annex-row-refused td.annex-cell .annex-avail-opt {
   filter: grayscale(1);
   opacity: 0.6;
+}
+
+/* ── Synthese "Engagement contractuel" (ch.13) ──────────────────── */
+.contractual-summary {
+  margin: 4mm 0 6mm;
+  page-break-inside: avoid;
+}
+.contractual-recommended {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+  border: 0.6pt solid #6ee7b7;
+  border-left: 1.5mm solid #00cd92;
+  border-radius: 1.5mm;
+  padding: 4mm 5mm;
+  margin-bottom: 4mm;
+}
+.contractual-recommended-label {
+  font-family: 'Manrope', sans-serif;
+  font-size: 6.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #047857;
+  font-weight: 700;
+  margin-bottom: 1mm;
+}
+.contractual-recommended-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18pt;
+  font-weight: 800;
+  color: #064e3b;
+  line-height: 1;
+  margin-bottom: 2mm;
+}
+.contractual-upgrade-note {
+  font-size: 8.5pt;
+  color: #78350f;
+  background: #fef3c7;
+  border: 0.4pt solid #fde68a;
+  border-radius: 1mm;
+  padding: 2mm 3mm;
+  line-height: 1.4;
+}
+.contractual-upgrade-note.contractual-upgrade-ok {
+  color: #064e3b;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+.contractual-block {
+  margin: 3mm 0;
+  break-inside: avoid;
+}
+.contractual-block-warn {
+  background: #fef2f2;
+  border: 0.4pt solid #fecaca;
+  border-radius: 1mm;
+  padding: 2mm 3mm;
+}
+.contractual-block-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 9pt;
+  font-weight: 700;
+  color: #1b2842;
+  margin: 0 0 1.5mm;
+}
+.contractual-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contractual-list li {
+  padding: 1mm 0;
+  font-size: 8.5pt;
+  color: #1f2937;
+  line-height: 1.4;
+  border-bottom: 0.3pt solid #f3f4f6;
+}
+.contractual-list li:last-child { border-bottom: none; }
+.contractual-pill {
+  display: inline-block;
+  padding: 0.4mm 1.5mm;
+  border-radius: 0.6mm;
+  font-size: 6.4pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2mm;
+  vertical-align: middle;
+}
+.contractual-pill-option {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 0.4pt solid #fed7aa;
+}
+.contractual-pill-included {
+  background: #d1fae5;
+  color: #065f46;
+  border: 0.4pt solid #a7f3d0;
+}
+.contractual-noinput {
+  background: #f9fafb;
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 1.5mm;
+  padding: 4mm 5mm;
+  font-size: 9pt;
+  color: #4b5563;
+  line-height: 1.5;
 }
 
 /* Anciennes classes synthesis-table : conservees pour compat */

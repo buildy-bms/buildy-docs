@@ -17,6 +17,7 @@ const updateSectionSchema = z.object({
   fact_check_status: z.enum(['unverified', 'verified', 'backend_only', 'in_progress', 'documented']).optional(),
   section_template_version: z.number().int().optional(),
   opted_out_by_moa: z.boolean().optional(),
+  demanded_by_moa: z.boolean().optional(),
 }).strict();
 
 const overrideSchema = z.object({
@@ -166,6 +167,17 @@ async function routes(fastify) {
     try { body = updateSectionSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
+    // Exclusivite logique : refusee et demandee ne peuvent pas etre actives
+    // simultanement. Si on toggle l'une, on force l'autre a 0.
+    let optedOutByMoa = body.opted_out_by_moa == null ? undefined : (body.opted_out_by_moa ? 1 : 0);
+    let demandedByMoa = body.demanded_by_moa == null ? undefined : (body.demanded_by_moa ? 1 : 0);
+    if (optedOutByMoa === 1 && demandedByMoa === undefined && section.demanded_by_moa) {
+      demandedByMoa = 0;
+    }
+    if (demandedByMoa === 1 && optedOutByMoa === undefined && section.opted_out_by_moa) {
+      optedOutByMoa = 0;
+    }
+
     const userId = request.authUser?.id;
     const updated = db.sections.update(id, {
       title: body.title,
@@ -174,7 +186,8 @@ async function routes(fastify) {
       bacsJustification: body.bacs_justification,
       bodyHtml: body.body_html,
       includedInExport: body.included_in_export == null ? undefined : (body.included_in_export ? 1 : 0),
-      optedOutByMoa: body.opted_out_by_moa == null ? undefined : (body.opted_out_by_moa ? 1 : 0),
+      optedOutByMoa,
+      demandedByMoa,
       sectionTemplateVersion: body.section_template_version,
       factCheckStatus: body.fact_check_status,
       updatedBy: userId,

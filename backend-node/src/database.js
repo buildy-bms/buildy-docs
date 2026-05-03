@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 68;
+const TARGET_VERSION = 69;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2597,6 +2597,58 @@ function runMigrations() {
     log.info('Migration 68 appliquee : re-seed methodology + disclaimers avec accents');
   }
 
+  if (current < 69) {
+    // Lot — Mode "demandee par MOA" : symetrique de opted_out_by_moa.
+    // Permet de marquer une fonctionnalite paid_option comme explicitement
+    // demandee par le maitre d'ouvrage. Sert ensuite a deduire le niveau
+    // d'offre minimum a souscrire (chapitre engagement contractuel).
+    // Exclusivite logique : une section demandee ne peut pas etre refusee
+    // (geree cote API/UI, contrainte applicative).
+    try { db.exec('ALTER TABLE sections ADD COLUMN demanded_by_moa INTEGER NOT NULL DEFAULT 0'); }
+    catch { /* deja la */ }
+
+    // Seed du nouveau chapitre 13 "Engagement contractuel et pilotage de
+    // l'offre apres livraison". Inseré apres la synthese (chapitre 12).
+    const slug = 'engagement-contractuel';
+    const exists = db.prepare('SELECT id FROM section_templates WHERE slug = ?').get(slug);
+    if (!exists) {
+      const bodyHtml = `<p>Cette analyse fonctionnelle engage le maître d'ouvrage et Buildy sur un périmètre fonctionnel précis. Les fonctionnalités cochées comme « demandées par le MOA » dans les chapitres précédents définissent le niveau d'offre minimum à souscrire (Essentiel, Smart ou Premium) ainsi que les éventuelles options associées.</p>
+
+<h3>Engagement avant livraison du chantier</h3>
+<p>L'offre cible recommandée est précisée dans la synthèse en tête de ce chapitre, calculée à partir des fonctionnalités demandées. Le contrat correspondant doit être signé en avenant au présent document, afin que la plateforme Buildy soit pleinement opérationnelle au moment de la livraison du bâtiment. Toute fonctionnalité demandée et identifiée comme option payante doit être incluse dans cet avenant.</p>
+
+<h3>Pilotage de l'offre après livraison</h3>
+<p>Une fois le bâtiment livré, l'exploitant ou le locataire reste libre de poursuivre ou non les engagements pris à la conception. Buildy adresse un devis de renouvellement environ un mois avant chaque échéance contractuelle. Le client peut accepter, modifier ou refuser ce renouvellement.</p>
+<p>En cas de non-renouvellement de l'ensemble des contrats, la passerelle bascule automatiquement sur la licence <strong>Essentiel</strong>. Les fonctionnalités correspondant aux niveaux supérieurs ou aux options sont alors désactivées, sans interruption du service supervisé localement par la passerelle.</p>
+
+<h3>Connectivité réseau</h3>
+<p>Si le client renonce à un contrat <strong>Premium</strong> ou à l'option <strong>connectivité 4G</strong>, il devient responsable de la fourniture de la connectivité Internet de la passerelle (lien filaire ou Wi-Fi mis à disposition sur le réseau de l'exploitant). Sans connectivité, seules les fonctions locales restent actives ; la supervision distante, l'hypervision multi-sites et les rapports cloud sont indisponibles.</p>
+
+<h3>Options de service</h3>
+<p>Les options telles que <strong>Sérénité</strong> (assistance, mises à jour pilotées, garantie étendue) sont indépendantes du niveau d'offre choisi. Elles peuvent être ajoutées, conservées ou résiliées séparément, lors du renouvellement annuel.</p>`;
+
+      db.prepare(`
+        INSERT INTO section_templates
+          (slug, number, title, kind, body_html, is_functionality, position)
+        VALUES (?, '13', 'Engagement contractuel', 'standard', ?, 0, ?)
+      `).run(slug, bodyHtml, 1300);
+    } else {
+      // Si le slug existe deja (re-run ou migration partielle), on rafraichit
+      // le body uniquement si le row n'a jamais ete edite (created_at == updated_at).
+      db.prepare(`
+        UPDATE section_templates
+           SET title = 'Engagement contractuel',
+               number = '13',
+               kind = 'standard',
+               position = 1300
+         WHERE slug = ?
+      `).run(slug);
+    }
+
+    db.pragma('user_version = 69');
+    log.info('Migration 69 appliquee : sections.demanded_by_moa + chapitre 13 Engagement contractuel');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3029,7 +3081,7 @@ const sections = {
     const allowed = [
       'parent_id', 'position', 'number', 'title', 'service_level', 'service_level_source',
       'bacs_articles', 'bacs_justification', 'body_html', 'kind', 'included_in_export', 'generic_note',
-      'opted_out_by_moa',
+      'opted_out_by_moa', 'demanded_by_moa',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
       'section_template_id', 'section_template_version',
       'hyperveez_page_slug',

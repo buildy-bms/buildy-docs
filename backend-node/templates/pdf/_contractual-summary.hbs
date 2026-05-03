@@ -1,0 +1,58 @@
+{{!-- Synthese "engagement contractuel" injectee en tete du chapitre 13.
+     Calculee a partir des fonctionnalites demandees par le MOA :
+     niveau d'offre minimum + options payantes a souscrire dans l'avenant. --}}
+<div class="contractual-summary">
+  {{#if hasDemands}}
+    <div class="contractual-recommended">
+      <div class="contractual-recommended-label">Offre recommandée</div>
+      <div class="contractual-recommended-name">{{recommendedLevelName}}</div>
+      {{#if upgradeNeeded}}
+      <div class="contractual-upgrade-note">
+        ⚠ Le niveau actuellement renseigné dans l'AF est <strong>{{currentLevelName}}</strong>.
+        Les fonctionnalités demandées par le MOA imposent de monter à <strong>{{recommendedLevelName}}</strong>.
+      </div>
+      {{else}}
+      <div class="contractual-upgrade-note contractual-upgrade-ok">
+        Niveau cohérent avec l'AF (<strong>{{currentLevelName}}</strong>).
+      </div>
+      {{/if}}
+    </div>
+
+    {{#if requiredOptions.length}}
+    <div class="contractual-block">
+      <h4 class="contractual-block-title">Options payantes à inclure dans l'avenant</h4>
+      <ul class="contractual-list contractual-list-options">
+        {{#each requiredOptions}}
+        <li><span class="contractual-pill contractual-pill-option">€ Option</span> {{title}}</li>
+        {{/each}}
+      </ul>
+    </div>
+    {{/if}}
+
+    {{#if coveredFeatures.length}}
+    <div class="contractual-block">
+      <h4 class="contractual-block-title">Fonctionnalités demandées déjà incluses dans l'offre {{recommendedLevelName}}</h4>
+      <ul class="contractual-list">
+        {{#each coveredFeatures}}
+        <li><span class="contractual-pill contractual-pill-included">✓ Incluse</span> {{title}}</li>
+        {{/each}}
+      </ul>
+    </div>
+    {{/if}}
+
+    {{#if unavailableFeatures.length}}
+    <div class="contractual-block contractual-block-warn">
+      <h4 class="contractual-block-title">⚠ Fonctionnalités demandées non disponibles dans le catalogue actuel</h4>
+      <ul class="contractual-list">
+        {{#each unavailableFeatures}}
+        <li>{{title}}</li>
+        {{/each}}
+      </ul>
+    </div>
+    {{/if}}
+  {{else}}
+    <div class="contractual-noinput">
+      <p>Aucune option payante n'a été explicitement demandée par le maître d'ouvrage à ce stade. L'offre <strong>{{currentLevelName}}</strong> renseignée dans l'analyse fonctionnelle reste l'engagement contractuel applicable.</p>
+    </div>
+  {{/if}}
+</div>

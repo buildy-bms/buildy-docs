@@ -8,6 +8,9 @@
     {{#if offeringsAnnex.targetLevelLabel}}
     Le niveau ciblé par cette analyse fonctionnelle est <strong>{{offeringsAnnex.targetLevelLabel}}</strong>.
     {{/if}}
+    {{#if offeringsAnnex.demandedCount}}
+    {{offeringsAnnex.demandedCount}} option{{#if (gt offeringsAnnex.demandedCount 1)}}s{{/if}} demandée{{#if (gt offeringsAnnex.demandedCount 1)}}s{{/if}} par le MOA (à inclure dans l'avenant contractuel).
+    {{/if}}
     {{#if offeringsAnnex.optedOutCount}}
     {{offeringsAnnex.optedOutCount}} fonctionnalité{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} refusée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} par le maître d'ouvrage (barrée{{#if (gt offeringsAnnex.optedOutCount 1)}}s{{/if}} dans le tableau).
     {{/if}}
@@ -17,6 +20,7 @@
     <span class="annex-legend-item"><span class="annex-avail-yes">✓</span> Inclus</span>
     <span class="annex-legend-item"><span class="annex-avail-no">—</span> Non disponible</span>
     <span class="annex-legend-item"><span class="annex-avail-opt">€&nbsp;Option</span> Option payante</span>
+    <span class="annex-legend-item"><span class="annex-demanded-pill">★ Demandée MOA</span> Validée par le MOA</span>
     <span class="annex-legend-item"><span class="annex-refused-pill">Refusé MOA</span> Refusé par le MOA</span>
   </div>
 
@@ -47,10 +51,11 @@
         </td>
       </tr>
       {{else}}
-      <tr class="{{#if refused}}annex-row-refused{{/if}}">
+      <tr class="{{#if refused}}annex-row-refused{{/if}}{{#if demanded}}annex-row-demanded{{/if}}">
         <td class="annex-feature annex-feature-d{{depth}}">
           {{title}}
           {{#if all_option}}<span class="annex-opt-badge">+ Option payante</span>{{/if}}
+          {{#if demanded}}<span class="annex-demanded-pill">★ Demandée MOA</span>{{/if}}
           {{#if refused}}<span class="annex-refused-pill">Refusé MOA</span>{{/if}}
         </td>
         {{#each ../offeringsAnnex.levels}}
