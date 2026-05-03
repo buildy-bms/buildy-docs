@@ -120,72 +120,74 @@ h1, h2, h3 {
 .comparison-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 0 0 2mm;
-  font-size: 6.4pt;
+  margin: 0 0 3mm;
+  font-size: 7pt;
+  border: 0.4pt solid #e5e7eb;
 }
 .col-feature { width: auto; }
-.col-level   { width: 16mm; }
+.col-level   { width: 22mm; }
 
 .comparison-table thead { display: table-header-group; }
 .comparison-table tr { page-break-inside: avoid; }
 
 .th-feature {
   text-align: left;
-  padding: 2.5mm 3mm;
+  padding: 4mm 3mm 3mm;
   background: #1b2842;
   color: rgba(255, 255, 255, 0.85);
   font-family: 'Manrope', sans-serif;
-  font-size: 6.4pt;
+  font-size: 6.6pt;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   font-weight: 700;
-  vertical-align: middle;
+  vertical-align: bottom;
 }
 .th-level {
   text-align: center;
-  padding: 3mm 1mm 2mm;
+  padding: 1.5mm 2mm 2.5mm;
   color: white;
   vertical-align: bottom;
-  position: relative;
 }
+/* Badge "Offre vedette" : dans le flux de la cellule (pas absolute),
+   centre, jamais clippe, jamais en overflow. Apparait au-dessus du
+   nom du niveau, comme une etiquette de bandeau. */
 .th-level-badge {
-  /* Ruban "Offre vedette" : ancre a droite de la cellule pour deborder
-     a gauche (espace libre dans la cellule precedente) plutot que de
-     deborder a droite (= bord de page → clipping). Sans max-width pour
-     accepter les libelles longs comme "★ Le plus choisi". */
-  position: absolute;
-  top: 0.8mm;
-  right: 0;
-  left: auto;
+  display: inline-block;
+  margin: 0 auto 1.5mm;
   font-family: 'Manrope', sans-serif;
-  font-size: 5pt;
+  font-size: 5.6pt;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   background: #00cd92;
   color: #051428;
-  padding: 0.5mm 1.8mm;
-  border-radius: 5mm;
+  padding: 0.7mm 2.2mm;
+  border-radius: 4mm;
   white-space: nowrap;
-  box-shadow: 0 0.4mm 1mm rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.3mm 0.8mm rgba(0, 0, 0, 0.2);
   border: 0.4pt solid #00b884;
-  z-index: 2;
+}
+/* Reserve l'espace du badge dans les colonnes non-highlighted pour
+   garder un alignement vertical parfait des noms de niveau. */
+.th-level-badge-ph {
+  display: block;
+  height: 5mm;
 }
 .th-level-name {
   font-family: 'Poppins', sans-serif;
-  font-size: 8.5pt;
+  font-size: 9pt;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   line-height: 1.1;
 }
 .th-level-tagline {
   font-family: 'Manrope', sans-serif;
-  font-size: 5.8pt;
+  font-size: 6pt;
   font-weight: 400;
   font-style: italic;
-  opacity: 0.78;
-  margin-top: 0.5mm;
+  opacity: 0.85;
+  margin-top: 0.8mm;
   letter-spacing: 0;
   text-transform: none;
   line-height: 1.2;
@@ -195,17 +197,28 @@ h1, h2, h3 {
 .th-S { background: #4f46e5; }
 .th-P { background: #7c3aed; }
 
-/* Decoy : niveau "is_highlighted = 1". Plus de border-top qui
-   deformait la hauteur de la colonne ; le ruban .th-level-badge en
-   absolute fait office d'identifiant visuel. On garde juste un
-   leger boost de saturation via une ombre interieure douce. */
+/* Niveau "vedette" (is_highlighted = 1) : traitement visuel renforce
+   pour matcher l'effet "carte mise en avant" des grilles tarifaires
+   commerciales — bordure verte epaisse de chaque cote de la colonne
+   (du header jusqu'a la derniere ligne) + fond creme tres leger sur
+   l'ensemble des cellules de la colonne. */
 .th-highlighted {
-  box-shadow: inset 0 1mm 0 rgba(0, 205, 146, 0.6);
+  border-top: 1.2mm solid #00cd92;
+  border-left: 0.6mm solid #00cd92;
+  border-right: 0.6mm solid #00cd92;
 }
 .td-level-highlighted {
-  background: #fffdf5 !important;
-  border-left: 0.4pt solid #fef3c7;
-  border-right: 0.4pt solid #fef3c7;
+  background: #fffef7 !important;
+  border-left: 0.6mm solid #00cd92;
+  border-right: 0.6mm solid #00cd92;
+}
+.comparison-table tbody tr:not(.category-row):nth-child(odd) td.td-level-highlighted {
+  background: #fffaee !important;
+}
+/* Bordure inferieure verte epaisse sur la derniere ligne de la colonne
+   vedette, pour fermer le "cadre" autour de la colonne. */
+.comparison-table tbody tr:last-child td.td-level-highlighted {
+  border-bottom: 0.6mm solid #00cd92;
 }
 
 /* Lignes de catégorie : profondeur infinie via classes .category-row-d{N}.

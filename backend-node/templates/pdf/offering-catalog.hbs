@@ -39,9 +39,15 @@
         {{#each levels}}
         <th class="th-level th-{{slug}} {{#if is_highlighted}}th-highlighted{{/if}}"
             {{#if color_hex}}style="background:{{color_hex}};"{{/if}}>
-          {{#if is_highlighted}}{{#if highlight_label}}
-          <div class="th-level-badge">{{highlight_label}}</div>
-          {{/if}}{{/if}}
+          {{#if is_highlighted}}
+            {{#if highlight_label}}
+              <div class="th-level-badge">{{highlight_label}}</div>
+            {{else}}
+              <div class="th-level-badge-ph"></div>
+            {{/if}}
+          {{else}}
+            <div class="th-level-badge-ph"></div>
+          {{/if}}
           <div class="th-level-name">{{name}}</div>
           {{#if tagline}}<div class="th-level-tagline">{{tagline}}</div>{{/if}}
         </th>
