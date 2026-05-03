@@ -162,14 +162,19 @@
   {{/if}}
 </section>
 
-{{!-- ═══════════════════ PAGE 3 — Synthèse des fonctionnalités ═══════════════════ --}}
-<section class="page">
+{{!-- ═══════════════════ PAGE 3 — Synthèse des fonctionnalités ═══════════════════
+     Reutilise le partial _offerings-annex (charte unifiee : badges Offre
+     ciblee / Offre requise par la MOA, fonctions exigees + refusees mises
+     en evidence). Iterer les section_templates plutot que les sections
+     d'AF garantit l'absence de doublons (une AF customisee/dupliquee
+     ne fait plus apparaitre 2 fois la meme fonctionnalite). --}}
+<section class="page page-offerings">
   <header class="page-header">
     <div class="page-header-left">
       <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
       <div>
         <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">3. Fonctionnalités Buildy</h1>
+        <h1 class="page-title">3. Fonctionnalités Buildy par niveau d'offre</h1>
       </div>
     </div>
     <div class="page-header-right">
@@ -177,47 +182,7 @@
     </div>
   </header>
 
-  <p class="section-intro">Liste exhaustive des fonctionnalités décrites dans l'AF. Pour chaque fonctionnalité, les colonnes <strong>Essentials / Smart / Premium</strong> indiquent la disponibilité au niveau de contrat correspondant (incluse, option payante ou non disponible). La colonne <strong>Statut dans cette AF</strong> donne le verdict effectif compte tenu du contrat visé, des écartements MOA et des sections retirées.</p>
-
-  <table class="features-table compact">
-    <thead>
-      <tr>
-        <th class="ft-num">N°</th>
-        <th class="ft-title">Fonctionnalité</th>
-        <th class="ft-avail">Essentials</th>
-        <th class="ft-avail">Smart</th>
-        <th class="ft-avail">Premium</th>
-        <th class="ft-include">Statut dans cette AF</th>
-        <th class="ft-reason">Détail</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each functionalities}}
-      <tr class="ft-row ft-status-{{statusInAf}}">
-        <td class="ft-num"><code>§{{number}}</code></td>
-        <td class="ft-title">{{title}}</td>
-        <td class="ft-avail">{{> _avail-cell value=availE}}</td>
-        <td class="ft-avail">{{> _avail-cell value=availS}}</td>
-        <td class="ft-avail">{{> _avail-cell value=availP}}</td>
-        <td class="ft-include">
-          {{#if (eq statusInAf "included")}}<span class="status-pill status-included">✓ Inclus</span>{{/if}}
-          {{#if (eq statusInAf "paid_option")}}<span class="status-pill status-paid">€ Option payante</span>{{/if}}
-          {{#if (eq statusInAf "unavailable")}}<span class="status-pill status-unavailable">✗ Non dispo</span>{{/if}}
-          {{#if (eq statusInAf "opted_out")}}<span class="status-pill status-opted-out">⊘ Écartée MOA</span>{{/if}}
-          {{#if (eq statusInAf "excluded")}}<span class="status-pill status-excluded">— Retirée</span>{{/if}}
-        </td>
-        <td class="ft-reason">{{#if reason}}<em>{{reason}}</em>{{else}}<span class="muted">—</span>{{/if}}</td>
-      </tr>
-      {{/each}}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="5">Total</td>
-        <td class="ft-include"><strong>{{functionalitiesIncluded}} inclus{{#if functionalitiesPaidOption}} · {{functionalitiesPaidOption}} option(s) payante(s){{/if}} / {{functionalities.length}}</strong></td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
+  {{> _offerings-annex}}
 </section>
 
 {{!-- ═══════════════════ PAGE 4 — Synthèse des systèmes ═══════════════════ --}}

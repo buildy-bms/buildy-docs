@@ -14,6 +14,7 @@ const gitLib = require('../lib/git');
 const {
   buildAfExportData,
   buildPointsListExportData,
+  buildOfferingsAnnexForAf,
 } = require('./_export-builders');
 
 // Filigrane Buildy (favicon) applique sur tous les exports PDF
@@ -850,6 +851,9 @@ async function routes(fastify) {
       zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
       functionalities, functionalitiesIncluded, functionalitiesPaidOption,
       systemsSummary, systemsTotals,
+      // Tableau des offres avec badges Offre cible / Offre requise (charte
+      // alignee sur l'annexe AF, consomme le partial _offerings-annex.hbs).
+      offeringsAnnex: buildOfferingsAnnexForAf(af),
     };
 
     const exportsDir = path.resolve(config.exportsDir);

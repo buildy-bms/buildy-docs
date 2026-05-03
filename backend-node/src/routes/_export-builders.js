@@ -638,6 +638,7 @@ function buildPointsListExportData(af, opts = {}) {
 module.exports = {
   buildAfExportData,
   buildPointsListExportData,
+  buildOfferingsAnnexForAf,
   // Re-exporte pour que export.js puisse les utiliser sans dupliquer
   buildLiveBacsResolver,
   SYNTHESIS_ROWS,
