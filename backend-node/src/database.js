@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 67;
+const TARGET_VERSION = 68;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2553,6 +2553,48 @@ function runMigrations() {
     db.exec('PRAGMA foreign_keys = ON');
     db.pragma('user_version = 67');
     log.info('Migration 67 appliquee : offering_levels + pdf_boilerplate.kind etendu');
+  }
+
+  if (current < 68) {
+    // Re-seed des textes methodology + disclaimer avec les versions
+    // accentuees des fichiers .js (les valeurs initiales seedees en
+    // migration 65 etaient sans accents). On respecte les editions
+    // utilisateur : on remplace UNIQUEMENT les rows non touchees
+    // (created_at = updated_at, c.a.d. jamais editees via l'admin).
+    try {
+      const methodology = require('./lib/bacs-audit-methodology');
+      const disclaimers = require('./lib/bacs-audit-disclaimers');
+      // Pour les rows methodology jamais editees, supprime puis re-insere
+      // dans le meme ordre. Conserve les editions utilisateur.
+      db.exec(`
+        DELETE FROM pdf_boilerplate
+        WHERE kind IN ('methodology', 'disclaimer')
+          AND created_at = updated_at
+      `);
+      // Re-insert les rows manquantes (apres delete) seulement si la table
+      // est vide pour ce kind (eviter de creer des duplicats si l'utilisateur
+      // a deja toutes les rows editees).
+      const countMeth = db.prepare(
+        `SELECT COUNT(*) AS c FROM pdf_boilerplate WHERE kind = 'methodology'`
+      ).get().c;
+      if (countMeth === 0) {
+        const insertMeth = db.prepare(`INSERT INTO pdf_boilerplate
+          (kind, position, title, body_html) VALUES ('methodology', ?, ?, ?)`);
+        methodology.forEach((m, i) => insertMeth.run(i, m.title, m.body));
+      }
+      const countDisc = db.prepare(
+        `SELECT COUNT(*) AS c FROM pdf_boilerplate WHERE kind = 'disclaimer'`
+      ).get().c;
+      if (countDisc === 0) {
+        const insertDisc = db.prepare(`INSERT INTO pdf_boilerplate
+          (kind, position, title, body_html) VALUES ('disclaimer', ?, NULL, ?)`);
+        disclaimers.forEach((d, i) => insertDisc.run(i, d));
+      }
+    } catch (err) {
+      log.warn(`Re-seed pdf_boilerplate accents KO : ${err.message}`);
+    }
+    db.pragma('user_version = 68');
+    log.info('Migration 68 appliquee : re-seed methodology + disclaimers avec accents');
   }
 
   if (current > TARGET_VERSION) {

@@ -12,16 +12,20 @@
  * recommandations, (7) la fiabilite des informations fournies par le
  * proprietaire.
  *
+ * Note : commentaires en ASCII-safe, valeurs en francais accentue (PDF livre).
+ *
  * Cf plan section "Disclaimers obligatoires". Toute modification doit etre
- * relue par un juriste avant deploiement.
+ * relue par un juriste avant deploiement. Apres migration 65, ces valeurs
+ * sont seedees dans pdf_boilerplate ; ce fichier sert de fallback. Editer
+ * via la page admin "Textes standards PDF".
  */
 
 module.exports = [
-  `Le present rapport constitue un audit de conformite prealable au decret n° 2023-259 du 7 avril 2023 (BACS), realise a des fins informatives et commerciales. Il ne se substitue pas a l'inspection periodique reglementaire prevue a l'article R175-5-1, qui doit etre realisee a l'initiative du proprietaire par un tiers competent.`,
-  `L'evaluation est conduite selon une approche fonctionnelle, basee sur les 4 exigences de l'article R175-3, independamment de la norme NF EN ISO 52120-1 dont l'application est volontaire en France.`,
-  `La conformite au decret BACS est distincte de l'eligibilite aux Certificats d'Economies d'Energie (CEE) : la fiche BAT-TH-116 exige un systeme certifie classe A ou B selon ISO 52120-1, ce qui n'est pas requis par le decret. Si le proprietaire souhaite beneficier des CEE, une certification supplementaire est necessaire.`,
-  `Le calcul du temps de retour sur investissement (clause de dispense de l'article R175-2, TRI > 10 ans) n'est en aucun cas realise par Buildy. Ce calcul releve exclusivement de la responsabilite du proprietaire, qui s'appuie sur les devis qu'il aura recus pour la mise en conformite et sur ses propres hypotheses de reduction des couts energetiques. Buildy mentionne l'existence de cette clause a titre informatif uniquement et n'emet aucun avis sur son applicabilite ni sur le resultat eventuel du calcul.`,
-  `Le present audit est base sur l'etat des textes en vigueur a la date d'etablissement du rapport. Toute evolution reglementaire ulterieure peut modifier les conclusions.`,
-  `Les recommandations sont formulees a titre indicatif et non contraignant. Le proprietaire reste seul juge des suites a donner et des moyens de mise en conformite retenus.`,
-  `Buildy ne saurait etre tenu responsable d'eventuels manquements resultant d'informations partielles ou erronees fournies lors de l'audit, ni d'evolutions ulterieures de l'etat du batiment.`,
+  `Le présent rapport constitue un audit de conformité préalable au décret n° 2023-259 du 7 avril 2023 (BACS), réalisé à des fins informatives et commerciales. Il ne se substitue pas à l'inspection périodique réglementaire prévue à l'article R175-5-1, qui doit être réalisée à l'initiative du propriétaire par un tiers compétent.`,
+  `L'évaluation est conduite selon une approche fonctionnelle, basée sur les 4 exigences de l'article R175-3, indépendamment de la norme NF EN ISO 52120-1 dont l'application est volontaire en France.`,
+  `La conformité au décret BACS est distincte de l'éligibilité aux Certificats d'Économies d'Énergie (CEE) : la fiche BAT-TH-116 exige un système certifié classe A ou B selon ISO 52120-1, ce qui n'est pas requis par le décret. Si le propriétaire souhaite bénéficier des CEE, une certification supplémentaire est nécessaire.`,
+  `Le calcul du temps de retour sur investissement (clause de dispense de l'article R175-2, TRI > 10 ans) n'est en aucun cas réalisé par Buildy. Ce calcul relève exclusivement de la responsabilité du propriétaire, qui s'appuie sur les devis qu'il aura reçus pour la mise en conformité et sur ses propres hypothèses de réduction des coûts énergétiques. Buildy mentionne l'existence de cette clause à titre informatif uniquement et n'émet aucun avis sur son applicabilité ni sur le résultat éventuel du calcul.`,
+  `Le présent audit est basé sur l'état des textes en vigueur à la date d'établissement du rapport. Toute évolution réglementaire ultérieure peut modifier les conclusions.`,
+  `Les recommandations sont formulées à titre indicatif et non contraignant. Le propriétaire reste seul juge des suites à donner et des moyens de mise en conformité retenus.`,
+  `Buildy ne saurait être tenu responsable d'éventuels manquements résultant d'informations partielles ou erronées fournies lors de l'audit, ni d'évolutions ultérieures de l'état du bâtiment.`,
 ];

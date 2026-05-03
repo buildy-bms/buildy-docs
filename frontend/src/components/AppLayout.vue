@@ -62,8 +62,8 @@ const nav = [
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
   { section: 'Système' },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
-  { name: 'Boilerplate PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },
-  { name: 'Offres PDF', to: '/admin/offerings-config', icon: DocumentDuplicateIcon },
+  { name: 'Textes standards PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },
+  { name: 'Tableau des offres', to: '/admin/offerings-config', icon: DocumentDuplicateIcon },
   { name: 'Audit trail', to: '/audit', icon: ClockIcon },
 ]
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
