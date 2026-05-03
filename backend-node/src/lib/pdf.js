@@ -408,13 +408,9 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
           @page { size: ${size} !important; margin: 0 !important; padding: 0 !important; }
           html, body { margin: 0 !important; padding: 0 !important; }
           body > .cover:first-child {
-            /* +4mm de bleed sur chaque dimension pour absorber le sub-pixel
-               rounding (420mm @ 96dpi = 1587.4px, viewport rounded a 1587px
-               -> ~0.1mm de blanc residuel). Le surplus est rogne par les
-               bords de page. */
-            width: calc(100vw + 4mm) !important;
-            height: calc(100vh + 4mm) !important;
-            margin: -2mm !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
             box-sizing: border-box !important;
           }
         `;
