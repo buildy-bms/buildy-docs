@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { getSection, listEquipmentTemplates, moveAttachment } from '@/api'
+import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAfStore } from '@/stores/af'
@@ -46,6 +46,38 @@ const treeOpen = computed(() =>
 )
 // Modale "projection" plein ecran pour videoprojecteur en reunion
 const projectionOpen = ref(false)
+// Captures de la section en cours d'affichage (chargees a l'ouverture)
+const projectionAttachments = ref([])
+const projectionLightboxIndex = ref(null)
+
+async function loadProjectionAttachments(sectionId) {
+  if (!sectionId) { projectionAttachments.value = []; return }
+  try {
+    const { data } = await listSectionAttachments(sectionId)
+    projectionAttachments.value = (data || []).filter(a => a.kind?.startsWith('image') || /\.(png|jpe?g|webp|gif)$/i.test(a.filename || ''))
+  } catch {
+    projectionAttachments.value = []
+  }
+}
+function projectionAttUrl(att) {
+  return att.url_path || `/attachments/${af.value?.id}/${att.filename}`
+}
+
+function projectionGoto(direction) {
+  const list = orderedSections.value
+  if (!list.length) return
+  const idx = list.findIndex(s => s.id === selectedId.value)
+  const next = direction === 'next'
+    ? list[Math.min(list.length - 1, idx + 1)]
+    : list[Math.max(0, idx - 1)]
+  if (next && next.id !== selectedId.value) selectSection(next.id)
+}
+
+// Recharge les captures quand la section change ou quand on ouvre la modale
+watch([projectionOpen, selectedId], ([open, id]) => {
+  if (open && id) loadProjectionAttachments(id)
+  else if (!open) { projectionAttachments.value = []; projectionLightboxIndex.value = null }
+})
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -55,6 +87,7 @@ import ZonesTable from '@/components/editor/ZonesTable.vue'
 import EquipmentDescriptionPanel from '@/components/editor/EquipmentDescriptionPanel.vue'
 import EquipmentTemplatePicker from '@/components/EquipmentTemplatePicker.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
+import BacsContextBox from '@/components/BacsContextBox.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,11 +127,23 @@ function isEditableTarget(el) {
 }
 
 async function onKeydown(e) {
-  // Echap ferme la projection en priorite
-  if (e.key === 'Escape' && projectionOpen.value) {
-    e.preventDefault()
-    projectionOpen.value = false
-    return
+  // Echap : ferme lightbox d'abord, puis projection
+  if (e.key === 'Escape') {
+    if (projectionLightboxIndex.value !== null) {
+      e.preventDefault()
+      projectionLightboxIndex.value = null
+      return
+    }
+    if (projectionOpen.value) {
+      e.preventDefault()
+      projectionOpen.value = false
+      return
+    }
+  }
+  // Fleches gauche/droite en mode projection : nav prev/next section
+  if (projectionOpen.value && projectionLightboxIndex.value === null) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); projectionGoto('next'); return }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); projectionGoto('prev'); return }
   }
   // Cmd/Ctrl + S : flush autosave + toast (marche meme dans l'editeur)
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -498,6 +543,21 @@ watch(() => route.params.id, async (newId, oldId) => {
             @updated="onSectionUpdated"
           />
 
+          <!-- Encart "lien avec le décret BACS" en card séparée sous l'éditeur. -->
+          <div
+            v-if="selectedSection.bacs_articles"
+            class="bg-white rounded-lg border border-gray-200 p-4"
+          >
+            <BacsContextBox
+              :reference="selectedSection.bacs_articles"
+              :justification="selectedSection.bacs_justification"
+              :context="selectedSection.kind === 'equipment' ? 'equipment' : 'section'"
+              :section-id="selectedSection.id"
+              editable
+              @updated="onSectionUpdated"
+            />
+          </div>
+
           <!-- Pour kind='zones' : tableau des zones fonctionnelles -->
           <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" :af-id="af.id" />
 
@@ -623,40 +683,130 @@ watch(() => route.params.id, async (newId, oldId) => {
     </template>
   </BaseModal>
 
-  <!-- Mode projection : section affichee plein ecran pour videoprojecteur -->
+  <!-- Mode projection : section affichee plein ecran pour videoprojecteur.
+       Affiche TOUT le contenu de la section : encart BACS, body Tiptap,
+       description equipement, points typiques, instances, captures,
+       cliquables (lightbox). Navigation precedent/suivant via boutons et
+       fleches gauche/droite. -->
   <Teleport to="body">
     <div
       v-if="projectionOpen && selectedSection"
       class="fixed inset-0 z-50 bg-white flex flex-col"
-      @keydown.esc="projectionOpen = false"
       tabindex="0"
     >
-      <header class="shrink-0 flex items-center justify-between gap-4 px-8 py-4 border-b border-gray-200 bg-gray-50">
+      <header class="shrink-0 flex items-center justify-between gap-4 px-8 py-3 border-b border-gray-200 bg-gray-50">
         <div class="min-w-0 flex-1">
-          <p class="text-xs uppercase tracking-wider text-gray-500 truncate">
+          <p class="text-[11px] uppercase tracking-wider text-gray-500 truncate">
             {{ af?.client_name }}<span v-if="af?.project_name"> — {{ af.project_name }}</span>
           </p>
-          <h1 class="text-2xl font-bold text-gray-900 truncate mt-0.5">
+          <h1 class="text-xl font-bold text-gray-900 truncate mt-0.5">
             <span v-if="selectedSection.number" class="font-mono text-indigo-600 mr-2">§{{ selectedSection.number }}</span>
             {{ selectedSection.title }}
           </h1>
         </div>
+        <div class="shrink-0 flex items-center gap-2">
+          <button
+            @click="projectionGoto('prev')"
+            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
+            title="Section précédente (←)"
+          >
+            <ChevronLeftIcon class="w-4 h-4 shrink-0" />
+            Précédent
+          </button>
+          <button
+            @click="projectionGoto('next')"
+            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
+            title="Section suivante (→)"
+          >
+            Suivant
+            <ChevronRightIcon class="w-4 h-4 shrink-0" />
+          </button>
+          <button
+            @click="projectionOpen = false"
+            class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg bg-white transition-colors whitespace-nowrap"
+            title="Fermer (Échap)"
+          >
+            <XMarkIcon class="w-4 h-4 shrink-0" />
+            Fermer
+          </button>
+        </div>
+      </header>
+      <div class="flex-1 min-h-0 overflow-y-auto bg-white">
+        <div class="max-w-5xl mx-auto px-12 py-8 space-y-6">
+          <!-- Encart BACS -->
+          <div v-if="selectedSection.bacs_articles" class="bg-violet-50 border-l-4 border-violet-400 rounded-r-lg p-4">
+            <p class="text-sm font-semibold text-violet-900 mb-1">⚖️ {{ selectedSection.kind === 'equipment' ? 'Système concerné' : 'Exigé' }} par le décret BACS · {{ selectedSection.bacs_articles }}</p>
+            <SafeHtml v-if="selectedSection.bacs_justification" class="prose prose-sm max-w-none text-violet-900" :html="selectedSection.bacs_justification" />
+          </div>
+
+          <!-- Body Tiptap -->
+          <SafeHtml
+            v-if="selectedSection.body_html"
+            class="prose prose-xl max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-a:text-indigo-600"
+            :html="selectedSection.body_html"
+          />
+          <p v-else class="text-gray-400 italic text-lg">Aucun contenu rédigé pour cette section.</p>
+
+          <!-- Equipment description (heritee de la bibliotheque) -->
+          <EquipmentDescriptionPanel
+            v-if="selectedSection.kind === 'equipment' && selectedSection.equipment_template_id"
+            :template-id="selectedSection.equipment_template_id"
+          />
+          <!-- Points typiques -->
+          <PointsTable
+            v-if="selectedSection.kind === 'equipment'"
+            :section-id="selectedSection.id"
+            :equipment-template-id="selectedSection.equipment_template_id"
+          />
+          <!-- Instances reelles -->
+          <EquipmentInstancesTable
+            v-if="selectedSection.kind === 'equipment'"
+            :section-id="selectedSection.id"
+            :af-id="af.id"
+            :template-id="selectedSection.equipment_template_id"
+          />
+          <!-- Zones (kind=zones) -->
+          <ZonesTable v-if="selectedSection.kind === 'zones'" :section-id="selectedSection.id" :af-id="af.id" />
+
+          <!-- Miniatures captures, cliquables -->
+          <div v-if="projectionAttachments.length" class="pt-4 border-t border-gray-100">
+            <p class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Captures ({{ projectionAttachments.length }})</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <button
+                v-for="(att, idx) in projectionAttachments"
+                :key="att.id"
+                type="button"
+                @click="projectionLightboxIndex = idx"
+                class="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400 transition-colors"
+                :title="att.original_name || att.filename"
+              >
+                <img
+                  :src="projectionAttUrl(att)"
+                  :alt="att.original_name || att.filename"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Lightbox plein ecran pour une miniature cliquee -->
+      <div
+        v-if="projectionLightboxIndex !== null && projectionAttachments[projectionLightboxIndex]"
+        class="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-8"
+        @click.self="projectionLightboxIndex = null"
+      >
+        <img
+          :src="projectionAttUrl(projectionAttachments[projectionLightboxIndex])"
+          class="max-w-full max-h-full object-contain"
+        />
         <button
-          @click="projectionOpen = false"
-          class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg bg-white transition-colors whitespace-nowrap"
+          @click="projectionLightboxIndex = null"
+          class="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg"
           title="Fermer (Échap)"
         >
-          <XMarkIcon class="w-4 h-4 shrink-0" />
-          Fermer
+          <XMarkIcon class="w-6 h-6" />
         </button>
-      </header>
-      <div class="flex-1 min-h-0 overflow-y-auto">
-        <div class="max-w-4xl mx-auto px-12 py-10">
-          <SafeHtml
-            class="prose prose-2xl max-w-none prose-headings:font-bold prose-p:leading-relaxed prose-a:text-indigo-600"
-            :html="selectedSection.body_html || '<p class=\'text-gray-400 italic\'>Aucun contenu rédigé pour cette section.</p>'"
-          />
-        </div>
       </div>
     </div>
   </Teleport>

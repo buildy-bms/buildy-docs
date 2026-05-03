@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 69;
+const TARGET_VERSION = 70;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2647,6 +2647,77 @@ function runMigrations() {
 
     db.pragma('user_version = 69');
     log.info('Migration 69 appliquee : sections.demanded_by_moa + chapitre 13 Engagement contractuel');
+  }
+
+  if (current < 70) {
+    // Lot — Deduplication "Engagement contractuel".
+    // La migration 69 inserait le template avec slug = 'engagement-contractuel'
+    // mais sectionTemplateSlug(plan_af_node) renvoie node.number = '13'. Le
+    // seeder boot creait donc un 2e template (slug='13'), et seedAfStructure
+    // generait 2 sections par nouvelle AF.
+    // Fix : on garde le row le plus ancien (avec notre body_html seede),
+    // on lui force le slug = '13', et on supprime tous les autres rows en
+    // doublon ainsi que les sections orphelines des AFs existantes.
+    try {
+      const dupeTpls = db.prepare(`
+        SELECT id, slug, body_html, position, current_version
+        FROM section_templates
+        WHERE title = 'Engagement contractuel'
+        ORDER BY (CASE WHEN body_html IS NOT NULL AND body_html != '' THEN 0 ELSE 1 END), id
+      `).all();
+      if (dupeTpls.length > 0) {
+        const keep = dupeTpls[0];
+        const toDelete = dupeTpls.slice(1);
+        // Renomme le slug du keep en '13' (en evitant collision avec un
+        // autre template qui aurait deja '13' mais titre different).
+        const otherWithSlug13 = db.prepare(`
+          SELECT id FROM section_templates WHERE slug = '13' AND id != ?
+        `).get(keep.id);
+        if (!otherWithSlug13) {
+          db.prepare(`UPDATE section_templates SET slug = '13', number = '13', position = 1300 WHERE id = ?`).run(keep.id);
+        }
+        // Supprime les sections orphelines des AFs (celles qui pointaient vers
+        // un template doublon) puis les templates eux-memes.
+        for (const dup of toDelete) {
+          const orphans = db.prepare(`
+            SELECT id FROM sections WHERE section_template_id = ?
+          `).all(dup.id);
+          for (const o of orphans) {
+            db.prepare(`DELETE FROM sections WHERE id = ?`).run(o.id);
+          }
+          db.prepare(`DELETE FROM section_templates WHERE id = ?`).run(dup.id);
+        }
+        if (toDelete.length > 0) {
+          log.info(`Migration 70 : ${toDelete.length} template(s) "Engagement contractuel" en doublon supprimes + sections liees nettoyees`);
+        }
+      }
+      // Cas edge : AF qui a 2 sections "Engagement contractuel" mais toutes les
+      // 2 pointent vers le meme template (cree avant la deduplication des
+      // templates) → on supprime la plus jeune.
+      const dupeSections = db.prepare(`
+        SELECT af_id, COUNT(*) AS c, MIN(id) AS keep_id, GROUP_CONCAT(id) AS ids
+        FROM sections
+        WHERE title = 'Engagement contractuel'
+        GROUP BY af_id
+        HAVING c > 1
+      `).all();
+      let deletedSections = 0;
+      for (const dup of dupeSections) {
+        const allIds = dup.ids.split(',').map(Number);
+        const toRemove = allIds.filter(id => id !== dup.keep_id);
+        for (const id of toRemove) {
+          db.prepare('DELETE FROM sections WHERE id = ?').run(id);
+          deletedSections++;
+        }
+      }
+      if (deletedSections > 0) {
+        log.info(`Migration 70 : ${deletedSections} section(s) "Engagement contractuel" en doublon supprimees`);
+      }
+    } catch (err) {
+      log.warn(`Migration 70 (dedupe Engagement contractuel) KO : ${err.message}`);
+    }
+    db.pragma('user_version = 70');
+    log.info('Migration 70 appliquee : deduplication template + sections "Engagement contractuel"');
   }
 
   if (current > TARGET_VERSION) {
