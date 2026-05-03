@@ -44,40 +44,13 @@ function toggleTreeCollapsed() {
 const treeOpen = computed(() =>
   isCompact.value ? treeDrawerOpen.value : !treeCollapsed.value
 )
-// Modale "projection" plein ecran pour videoprojecteur en reunion
+// Modale "projection" plein ecran pour videoprojecteur en reunion.
+// L'etat se trouve ici, mais le watch + les helpers qui dependent du store
+// (selectedId, orderedSections, selectSection) sont declares plus bas, apres
+// le storeToRefs(afStore).
 const projectionOpen = ref(false)
-// Captures de la section en cours d'affichage (chargees a l'ouverture)
 const projectionAttachments = ref([])
 const projectionLightboxIndex = ref(null)
-
-async function loadProjectionAttachments(sectionId) {
-  if (!sectionId) { projectionAttachments.value = []; return }
-  try {
-    const { data } = await listSectionAttachments(sectionId)
-    projectionAttachments.value = (data || []).filter(a => a.kind?.startsWith('image') || /\.(png|jpe?g|webp|gif)$/i.test(a.filename || ''))
-  } catch {
-    projectionAttachments.value = []
-  }
-}
-function projectionAttUrl(att) {
-  return att.url_path || `/attachments/${af.value?.id}/${att.filename}`
-}
-
-function projectionGoto(direction) {
-  const list = orderedSections.value
-  if (!list.length) return
-  const idx = list.findIndex(s => s.id === selectedId.value)
-  const next = direction === 'next'
-    ? list[Math.min(list.length - 1, idx + 1)]
-    : list[Math.max(0, idx - 1)]
-  if (next && next.id !== selectedId.value) selectSection(next.id)
-}
-
-// Recharge les captures quand la section change ou quand on ouvre la modale
-watch([projectionOpen, selectedId], ([open, id]) => {
-  if (open && id) loadProjectionAttachments(id)
-  else if (!open) { projectionAttachments.value = []; projectionLightboxIndex.value = null }
-})
 import SectionTree from '@/components/editor/SectionTree.vue'
 import SectionEditor from '@/components/editor/SectionEditor.vue'
 import PointsTable from '@/components/editor/PointsTable.vue'
@@ -100,6 +73,35 @@ const {
   verificationProgress,
 } = storeToRefs(afStore)
 provide('liveSectionNumbering', liveSectionNumbering)
+
+// Helpers projection (utilisent selectedId / orderedSections / af du store)
+async function loadProjectionAttachments(sectionId) {
+  if (!sectionId) { projectionAttachments.value = []; return }
+  try {
+    const { data } = await listSectionAttachments(sectionId)
+    projectionAttachments.value = (data || []).filter(a =>
+      a.kind?.startsWith('image') || /\.(png|jpe?g|webp|gif)$/i.test(a.filename || ''))
+  } catch {
+    projectionAttachments.value = []
+  }
+}
+function projectionAttUrl(att) {
+  return att.url_path || `/attachments/${af.value?.id}/${att.filename}`
+}
+function projectionGoto(direction) {
+  const list = orderedSections.value
+  if (!list.length) return
+  const idx = list.findIndex(s => s.id === selectedId.value)
+  const next = direction === 'next'
+    ? list[Math.min(list.length - 1, idx + 1)]
+    : list[Math.max(0, idx - 1)]
+  if (next && next.id !== selectedId.value) selectSection(next.id)
+}
+// Recharge les captures quand la section change ou quand on ouvre la modale
+watch([projectionOpen, selectedId], ([open, id]) => {
+  if (open && id) loadProjectionAttachments(id)
+  else if (!open) { projectionAttachments.value = []; projectionLightboxIndex.value = null }
+})
 
 // Mode presentation (lecture seule) — toggle via query param ?readonly=1.
 // Les composants enfants peuvent injecter `presentationMode` pour adapter
