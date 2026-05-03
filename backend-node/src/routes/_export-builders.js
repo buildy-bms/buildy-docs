@@ -404,14 +404,15 @@ function buildOfferingsAnnexForAf(af) {
   // Niveaux d'offre :
   //  - is_target  → niveau cible AF (engagement contractuel actuel)
   //  - is_required → niveau minimum requis pour couvrir les fonctions
-  //                  exigees par la MOA (calcule par buildContractualSummary)
-  //  Si les deux coincident, seul is_target est marque (badge or unique).
+  //                  exigees par la MOA (toujours marque des qu'il y a
+  //                  au moins une fonction exigee, meme si l'offre cible
+  //                  AF la couvre deja).
+  //  Le template gere le cas where target == required en n'affichant que
+  //  le badge or (Niveau cible) pour eviter les doublons visuels.
   const allLevels = db.offeringLevels.list();
   const targetSlug = (af.service_level || '').toUpperCase();
   const summary = buildContractualSummaryForAf(af);
-  const requiredSlug = summary.hasDemands && summary.upgradeNeeded
-    ? summary.recommendedLevel
-    : null;
+  const requiredSlug = summary.hasDemands ? summary.recommendedLevel : null;
   const levels = allLevels.map(l => ({
     ...l,
     is_target: l.slug === targetSlug,
