@@ -3042,9 +3042,18 @@ const afs = {
 // ── Sections ─────────────────────────────────────────────────────────
 const sections = {
   listByAf(afId) {
+    // Joint avail_e/s/p depuis le section_template pour permettre a l'UI
+    // de distinguer "inclus" / "option payante" / "indisponible" sans avoir
+    // a refaire un appel par section.
     return db.prepare(`
-      SELECT * FROM sections WHERE af_id = ?
-      ORDER BY parent_id NULLS FIRST, position, id
+      SELECT s.*,
+             stt.avail_e AS tpl_avail_e,
+             stt.avail_s AS tpl_avail_s,
+             stt.avail_p AS tpl_avail_p
+      FROM sections s
+      LEFT JOIN section_templates stt ON stt.id = s.section_template_id
+      WHERE s.af_id = ?
+      ORDER BY s.parent_id NULLS FIRST, s.position, s.id
     `).all(afId);
   },
   getById(id) {
@@ -3052,7 +3061,10 @@ const sections = {
       SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email,
              eqt.slug AS equipment_template_slug, eqt.name AS equipment_template_name,
              stt.slug AS section_template_slug, stt.title AS section_template_title,
-             stt.is_functionality AS section_template_is_functionality
+             stt.is_functionality AS section_template_is_functionality,
+             stt.avail_e AS tpl_avail_e,
+             stt.avail_s AS tpl_avail_s,
+             stt.avail_p AS tpl_avail_p
       FROM sections s
       LEFT JOIN users u ON u.id = s.updated_by
       LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id

@@ -47,12 +47,26 @@ const displayedNumber = computed(() =>
 const excluded = computed(() => props.node.included_in_export === 0)
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
 const demanded = computed(() => props.node.demanded_by_moa === 1)
+// Disponibilites par niveau (depuis le section_template). Permet de
+// distinguer les features "incluses" des "options payantes" (paid_option).
+const availE = computed(() => props.node.tpl_avail_e || null)
+const availS = computed(() => props.node.tpl_avail_s || null)
+const availP = computed(() => props.node.tpl_avail_p || null)
+// Une feature est une "option payante" si au moins un niveau l'expose en
+// paid_option (typiquement Connectivite 4G, Plans 2D/3D, API Connect...).
+const hasPaidOption = computed(() => [availE.value, availS.value, availP.value].includes('paid_option'))
+// "Tout en option" = paid_option aux 3 niveaux (Serenite-style add-on).
+const allPaidOption = computed(() =>
+  availE.value === 'paid_option' && availS.value === 'paid_option' && availP.value === 'paid_option'
+)
 // Les toggles "écartée" et "demandée par MOA" n'ont de sens que pour les
-// fonctionnalités dont le niveau requis est S ou P (les paid_option).
-const canOptOut = computed(() => {
-  const lvl = (props.node.service_level || '').toUpperCase()
-  return lvl.includes('S') || lvl.includes('P')
-})
+// fonctionnalités optionnelles. Eligibilite :
+//  - feature avec au moins un paid_option (Sérénité, Connectivité 4G…)
+//  - OU feature au niveau Smart / Premium / Smart+Premium uniquement
+const OPTIONAL_LEVELS = new Set(['S', 'P', 'S/P'])
+const canOptOut = computed(() =>
+  hasPaidOption.value || OPTIONAL_LEVELS.has((props.node.service_level || '').toUpperCase())
+)
 const canDemand = canOptOut
 
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
@@ -142,6 +156,19 @@ const titleHtml = computed(() => {
       <!-- Indicateurs de statut (gauche du titre) : niveau de service +
            état de vérification + section vide. À gauche pour scan rapide. -->
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
+      <Tooltip
+        v-if="hasPaidOption"
+        :text="allPaidOption
+          ? 'Option payante à tous les niveaux (add-on facturé séparément, type Sérénité, Connectivité 4G, API Connect)'
+          : 'Option payante — facturée en plus du contrat de base'"
+      >
+        <span :class="['inline-flex items-center px-1 py-0 text-[9px] font-bold rounded border whitespace-nowrap shrink-0',
+          allPaidOption
+            ? 'bg-orange-100 text-orange-800 border-orange-300'
+            : 'bg-orange-50 text-orange-700 border-orange-200']">
+          €
+        </span>
+      </Tooltip>
 
       <Tooltip
         v-if="node.fact_check_status === 'verified'"
