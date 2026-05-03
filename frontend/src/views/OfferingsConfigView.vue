@@ -161,53 +161,56 @@ async function downloadPdf() {
         <header class="px-5 py-3 border-b border-gray-200 bg-gray-50">
           <h2 class="text-sm font-semibold text-gray-800">Niveaux d'offre</h2>
           <p class="text-[11px] text-gray-500 mt-0.5">
-            Un seul niveau peut être mis en valeur (décoy). Le niveau choisi
-            apparaît avec une bordure verte épaisse, un badge personnalisable,
-            et un fond crème dans tout le tableau du PDF.
+            Un seul niveau peut être mis en avant (effet « offre vedette »). Le niveau choisi
+            apparaît avec une bordure verte, un badge et un fond crème dans le tableau du PDF.
           </p>
         </header>
         <div class="divide-y divide-gray-100">
           <div v-for="level in levels" :key="level.slug" class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-[80px_1fr_1fr_auto] gap-4 items-start">
-              <!-- Slug + badge couleur -->
-              <div class="flex items-center gap-2">
-                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold font-mono text-sm"
+            <div class="grid grid-cols-1 md:grid-cols-[180px_1fr_1fr_auto] gap-4 items-start">
+              <!-- Avatar + libelle complet -->
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-full text-white font-bold font-mono text-sm shrink-0"
                       :style="{ background: level.color_hex || '#9ca3af' }">
                   {{ level.slug }}
                 </span>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-gray-800 truncate">{{ level.name }}</div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Niveau {{ level.slug }}</div>
+                </div>
               </div>
-              <!-- Nom -->
+              <!-- Nom edite -->
               <div>
                 <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Nom affiché</label>
                 <input type="text" :value="level.name"
                        @input="e => scheduleSaveLevel(level, { name: e.target.value })"
-                       class="input-base text-sm" />
+                       class="input-base text-sm w-full" />
               </div>
               <!-- Tagline -->
               <div>
                 <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Tagline</label>
                 <input type="text" :value="level.tagline"
                        @input="e => scheduleSaveLevel(level, { tagline: e.target.value })"
-                       class="input-base text-sm" placeholder="ex : Démarrer simple" />
+                       class="input-base text-sm w-full" placeholder="ex : Démarrer simple" />
               </div>
-              <!-- Decoy -->
+              <!-- Mise en avant (decoy) -->
               <div class="flex flex-col gap-1.5">
-                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Décoy</label>
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold" title="« Décoy » en marketing : niveau sur lequel l'œil se pose en premier, présenté comme l'offre vedette du tableau.">Mise en avant</label>
                 <button @click="setHighlighted(level)"
-                        :class="['inline-flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-lg border transition',
+                        :class="['inline-flex items-center gap-1 px-3 py-2 text-xs font-medium rounded-lg border transition whitespace-nowrap',
                           level.is_highlighted
                             ? 'bg-emerald-500 text-white border-emerald-500'
                             : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50']">
-                  <StarIcon class="w-3.5 h-3.5" />
-                  {{ level.is_highlighted ? 'Mis en valeur' : 'Mettre en valeur' }}
+                  <StarIcon class="w-3.5 h-3.5 shrink-0" />
+                  {{ level.is_highlighted ? 'Offre vedette' : 'Mettre en avant' }}
                 </button>
               </div>
             </div>
-            <div v-if="level.is_highlighted" class="mt-3 ml-[96px] grid grid-cols-1 gap-2">
-              <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Texte du badge décoy</label>
+            <div v-if="level.is_highlighted" class="mt-3 ml-48 max-w-md">
+              <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1 font-semibold">Texte du badge « offre vedette »</label>
               <input type="text" :value="level.highlight_label"
                      @input="e => scheduleSaveLevel(level, { highlight_label: e.target.value })"
-                     class="input-base text-sm" placeholder="ex : ★ Le plus choisi" />
+                     class="input-base text-sm w-full" placeholder="ex : ★ Le plus choisi" />
             </div>
           </div>
         </div>
