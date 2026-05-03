@@ -281,9 +281,9 @@ h1, h2, h3, h4, h5 {
 .badge-bacs {
   display: inline-block;
   font-size: 7pt;
-  color: #6d28d9;
-  background: #f5f3ff;
-  border: 1px solid #ddd6fe;
+  color: #1b2842;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   padding: 0.6mm 2mm;
   border-radius: 1mm;
   font-weight: 600;
@@ -361,10 +361,11 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 }
 .section-opted-out-text strong { color: #451a03; font-weight: 600; }
 
-/* Encart contextualisé "lien avec le décret BACS" (Lot 17b) */
+/* Encart contextualisé "lien avec le décret BACS" — charte PDF Buildy :
+   filet navy a gauche, fond gris tres leger, label navy. Pas de violet. */
 .bacs-context {
-  background: #faf5ff;
-  border-left: 0.8mm solid #a855f7;
+  background: #f8fafc;
+  border-left: 0.8mm solid #1b2842;
   padding: 2.5mm 4mm;
   margin: 2mm 0 4mm;
   page-break-inside: avoid;
@@ -373,7 +374,7 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   font-family: 'Poppins', sans-serif;
   font-size: 8pt;
   font-weight: 700;
-  color: #6d28d9;
+  color: #1b2842;
   margin: 0 0 1.5mm;
   letter-spacing: 0.02em;
 }
@@ -406,9 +407,9 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 .protocol-pill {
   display: inline-block;
   padding: 0.5mm 2.2mm;
-  background: #eef2ff;
-  color: #4338ca;
-  border: 0.3mm solid #c7d2fe;
+  background: #f1f5f9;
+  color: #1b2842;
+  border: 0.3mm solid #cbd5e1;
   border-radius: 999px;
   font-size: 7.5pt;
   font-weight: 600;
@@ -440,7 +441,7 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   border: 0.2mm solid transparent;
 }
 .badge-nature[data-nature="Booléen"]               { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-.badge-nature[data-nature="Numérique"]             { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+.badge-nature[data-nature="Numérique"]             { background: #f1f5f9; color: #1b2842; border-color: #cbd5e1; }
 .badge-nature[data-nature="Enum"]                  { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 .badge-nature[data-nature="Chaîne de caractères"]  { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
 
@@ -564,19 +565,19 @@ table.points-mini .badge-type {
 .synthesis-systems .syn-th-qty { text-align: center; }
 
 .syn-cat td {
-  background: #eef2ff !important;
-  color: #312e81;
+  background: #f8fafc !important;
+  color: #1b2842;
   font-family: 'Poppins', sans-serif;
   font-size: 6.8pt;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 1.1mm 1.6mm 0.7mm;
-  border-bottom: 0.4pt solid #c7d2fe;
-  border-top: 0.4pt solid #c7d2fe;
+  border-bottom: 0.4pt solid #e2e8f0;
+  border-top: 0.4pt solid #e2e8f0;
 }
-.syn-cat-d1 td { padding-left: 5mm; background: #f5f7ff !important; font-size: 6pt; color: #4338ca; }
-.syn-cat-d2 td { padding-left: 8mm; background: #fafbff !important; font-size: 5.6pt; color: #6366f1; }
+.syn-cat-d1 td { padding-left: 5mm; background: #fafbfc !important; font-size: 6pt; color: #475569; }
+.syn-cat-d2 td { padding-left: 8mm; background: #ffffff !important; font-size: 5.6pt; color: #64748b; }
 .syn-cat-marker { color: #00cd92; font-size: 7.5pt; margin-right: 1mm; font-weight: 900; }
 
 .syn-system td {
@@ -683,9 +684,11 @@ table.points-mini .badge-type {
   padding-right: 3mm;
   letter-spacing: 0.1em;
 }
-.annex-th-E { background: #64748b; }
-.annex-th-S { background: #4f46e5; }
-.annex-th-P { background: #7c3aed; }
+/* Couleurs niveaux : alignees sur ServiceLevelBadge UI + offering_levels DB
+   (migration 71) — gris/amber/emerald, jamais d'indigo/violet. */
+.annex-th-E { background: #6b7280; }
+.annex-th-S { background: #f59e0b; }
+.annex-th-P { background: #10b981; }
 .annex-th-name {
   font-family: 'Poppins', sans-serif;
   font-size: 8pt;
@@ -702,46 +705,58 @@ table.points-mini .badge-type {
   letter-spacing: 0;
   text-transform: none;
 }
+/* Niveau cible AF : mise en valeur sans cadre, charte PDF Buildy
+   (cf. docs/pdf-design-system.md). Fond creme-or sur la colonne,
+   ✓ legerement satures, header un poil plus haut. */
 .annex-th-target {
-  box-shadow: inset 0 1mm 0 rgba(0, 205, 146, 0.6);
+  padding-top: 1mm;
+}
+.annex-th-target-ph {
+  display: block;
+  height: 4.5mm;
 }
 .annex-th-target-badge {
-  position: absolute;
-  top: -2.5mm;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Badge "Niveau cible" : style medaille, dans le flux. */
+  display: inline-block;
+  margin: 0 auto 1.5mm;
   font-family: 'Manrope', sans-serif;
   font-size: 5.2pt;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: #00cd92;
-  color: #051428;
-  padding: 0.6mm 2mm;
-  border-radius: 5mm;
+  letter-spacing: 0.1em;
+  background: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%);
+  color: #1b2842;
+  padding: 0.6mm 2.2mm;
+  border-radius: 4mm;
   white-space: nowrap;
-  box-shadow: 0 0.4mm 1mm rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0.3mm 0.8mm rgba(180, 130, 0, 0.25);
+  border: 0.4pt solid #d97706;
 }
 .annex-cell-target {
-  background: #fffdf5 !important;
-  border-left: 0.4pt solid #fef3c7;
-  border-right: 0.4pt solid #fef3c7;
+  background: #fff8e7 !important;
+}
+.annex-offerings-table tbody tr:not(.annex-cat):nth-child(odd) td.annex-cell-target {
+  background: #fef3d4 !important;
+}
+.annex-cell-target .annex-avail-yes {
+  background: #6ee7b7;
+  color: #064e3b;
 }
 
 .annex-cat td {
-  background: #eef2ff !important;
-  color: #312e81;
+  background: #f8fafc !important;
+  color: #1b2842;
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 1.1mm 1.6mm 0.7mm;
   font-size: 6.8pt;
-  border-top: 0.4pt solid #c7d2fe;
-  border-bottom: 0.4pt solid #c7d2fe;
+  border-top: 0.4pt solid #e2e8f0;
+  border-bottom: 0.4pt solid #e2e8f0;
 }
-.annex-cat-d1 td { padding-left: 5mm; background: #f5f7ff !important; font-size: 6pt; color: #4338ca; }
-.annex-cat-d2 td { padding-left: 8mm; background: #fafbff !important; font-size: 5.6pt; color: #6366f1; }
+.annex-cat-d1 td { padding-left: 5mm; background: #fafbfc !important; font-size: 6pt; color: #475569; }
+.annex-cat-d2 td { padding-left: 8mm; background: #ffffff !important; font-size: 5.6pt; color: #64748b; }
 .annex-cat-marker { color: #00cd92; font-size: 7.5pt; margin-right: 1mm; font-weight: 900; }
 
 .annex-feature {
@@ -966,9 +981,9 @@ table.points-mini .badge-type {
 .synthesis-table .bacs-tag {
   display: inline-block;
   font-size: 7.5pt;
-  color: #6d28d9;
-  background: #f5f3ff;
-  border: 1px solid #ddd6fe;
+  color: #1b2842;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   padding: 0.5mm 1.5mm;
   border-radius: 1mm;
   white-space: nowrap;

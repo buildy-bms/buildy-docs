@@ -280,13 +280,12 @@ Voir `feedback_pdf_fonts_embed.md` dans la mémoire utilisateur.
 | PDF | Statut |
 |---|---|
 | Tableau des offres (`offering-catalog.hbs` + `styles-offering-catalog.css`) | ✅ Référence |
-| AF — annexe Tableau des offres (`_offerings-annex.hbs` + `styles-af.css`) | 🟡 Partiel — utilise crème-or pour vedette mais bandeaux catégorie encore en indigo |
-| AF — tableau de synthèse systèmes (`_synthesis-table.hbs`) | 🟡 Partiel — bandeaux indigo `#eef2ff`, à passer en `#f8fafc` |
-| AF — chapitre Engagement contractuel (`_contractual-summary.hbs`) | ✅ OK (vert pour offre recommandée car contexte différent) |
-| Audit BACS — checklist (`bacs-audit-checklist.hbs`) | ❌ Non aligné — utilise indigo `#4f46e5` partout |
-| Audit BACS — rapport principal (`bacs-audit.hbs`) | ❌ Non aligné — bordures violet `#7c3aed` |
-| Plan d'actions BACS commercial (`bacs-audit-commercial.hbs`) | ❌ Non aligné |
-| Liste de points A3 (`points-list.hbs`) | ❌ Non aligné |
-| Brochure (`brochure.hbs`) | ❌ Non aligné |
+| AF — corps + annexe offerings + synthèse systèmes (`styles-af.css`) | ✅ Aligné — bandeaux catégorie en gris/navy, mise en valeur sans cadre crème-or sur niveau cible, badge médaille, encart BACS en filet navy |
+| AF — chapitre Engagement contractuel (`_contractual-summary.hbs`) | ✅ Aligné (vert pour offre recommandée car contexte sémantique distinct) |
+| Audit BACS — rapport principal (`styles-bacs-audit.css`) | ✅ Aligné — synthèse + alt-solutions + callouts R175 + cartes méthodologie/justification en navy/gris |
+| Audit BACS — checklist (`styles-bacs-audit-checklist.css`) | ✅ Aligné — H2/H3 + howto + tags + ref en navy/gris |
+| Plan d'actions BACS commercial (`bacs-audit-commercial.hbs`) | 🟡 Hérite de `styles-bacs-audit.css` (à vérifier visuellement) |
+| Liste de points A3 (`points-list.hbs`) | ❌ Non audité |
+| Brochure (`brochure.hbs`) | ❌ Non audité |
 
-**Prochaine étape** : passer ces 6 PDF sur la même charte. Privilégier d'abord le PDF audit BACS principal (`bacs-audit.hbs` + `styles-bacs-audit.css`) car c'est le livrable client le plus visible.
+**Prochaine étape** : audit visuel du Plan d'actions BACS commercial + alignement points-list A3 et brochure si pertinent.

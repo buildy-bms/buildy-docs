@@ -34,7 +34,11 @@
         <th class="annex-th-feature">Fonctionnalité</th>
         {{#each offeringsAnnex.levels}}
         <th class="annex-th-level annex-th-{{slug}} {{#if is_target}}annex-th-target{{/if}}">
-          {{#if is_target}}<div class="annex-th-target-badge">Niveau ciblé</div>{{/if}}
+          {{#if is_target}}
+            <div class="annex-th-target-badge">Niveau ciblé</div>
+          {{else}}
+            <div class="annex-th-target-ph"></div>
+          {{/if}}
           <div class="annex-th-name">{{name}}</div>
           {{#if tagline}}<div class="annex-th-tagline">{{tagline}}</div>{{/if}}
         </th>
