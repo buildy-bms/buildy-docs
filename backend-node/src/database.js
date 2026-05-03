@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 70;
+const TARGET_VERSION = 72;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2718,6 +2718,121 @@ function runMigrations() {
     }
     db.pragma('user_version = 70');
     log.info('Migration 70 appliquee : deduplication template + sections "Engagement contractuel"');
+  }
+
+  if (current < 71) {
+    // Aligne offering_levels.color_hex sur les couleurs du ServiceLevelBadge
+    // de l'UI (gray / amber / emerald) pour coherence visuelle entre le
+    // tableau des offres PDF, l'arbre des sections, et la page de config.
+    // Ne touche pas les rows que l'utilisateur a edite (heuristique : color
+    // encore une des valeurs seedees a l'origine en migration 67).
+    try {
+      db.prepare(`UPDATE offering_levels SET color_hex = '#6b7280' WHERE slug = 'E' AND color_hex = '#64748b'`).run();
+      db.prepare(`UPDATE offering_levels SET color_hex = '#f59e0b' WHERE slug = 'S' AND color_hex = '#4f46e5'`).run();
+      db.prepare(`UPDATE offering_levels SET color_hex = '#10b981' WHERE slug = 'P' AND color_hex = '#7c3aed'`).run();
+    } catch (err) {
+      log.warn(`Migration 71 (alignement color_hex) KO : ${err.message}`);
+    }
+    db.pragma('user_version = 71');
+    log.info('Migration 71 appliquee : color_hex offering_levels aligne sur ServiceLevelBadge');
+  }
+
+  if (current < 72) {
+    // Deduplication globale section_templates + sections.
+    // Cause : 2 strategies de generation de slug coexistent —
+    //   (a) seedSectionTemplatesOnBoot utilise node.number (PLAN_AF)
+    //   (b) creation manuelle via UI utilise slugify(title)
+    // → pour une meme entree (CTA, Engagement contractuel...), on peut avoir
+    // 2 templates et donc seedAfStructure cree 2 sections par AF.
+    //
+    // Algorithme :
+    //   1. Pour chaque title dupliquee : garder le template avec un number
+    //      defini (canonical PLAN_AF) > avec body_html non vide > id le plus
+    //      petit. Retargeter sections + enfants vers le keep, supprimer
+    //      les autres.
+    //   2. Forcer slug='13' pour Engagement contractuel (sinon le seeder
+    //      boot recreera un template slug='13' a chaque demarrage).
+    //   3. Pour chaque section avec section_template_id = keep MAIS apparait
+    //      en plusieurs exemplaires sous le meme parent : garder la plus
+    //      ancienne, supprimer les enfants orphelins/vides.
+    try {
+      const dupes = db.prepare(`
+        SELECT title, GROUP_CONCAT(id) ids
+        FROM section_templates
+        GROUP BY title
+        HAVING COUNT(*) > 1
+      `).all();
+      let tplsRemoved = 0;
+      let sectionsRetargeted = 0;
+      for (const d of dupes) {
+        const ids = d.ids.split(',').map(Number);
+        const rows = db.prepare(`
+          SELECT id, slug, number, body_html
+          FROM section_templates WHERE id IN (${ids.join(',')})
+        `).all();
+        rows.sort((a, b) => {
+          const aNum = a.number ? 0 : 1;
+          const bNum = b.number ? 0 : 1;
+          if (aNum !== bNum) return aNum - bNum;
+          const aBody = (a.body_html && a.body_html.length > 10) ? 0 : 1;
+          const bBody = (b.body_html && b.body_html.length > 10) ? 0 : 1;
+          if (aBody !== bBody) return aBody - bBody;
+          return a.id - b.id;
+        });
+        const keep = rows[0];
+        for (const dup of rows.slice(1)) {
+          const r = db.prepare(`UPDATE sections SET section_template_id = ? WHERE section_template_id = ?`)
+            .run(keep.id, dup.id);
+          sectionsRetargeted += r.changes;
+          db.prepare(`UPDATE section_templates SET parent_template_id = ? WHERE parent_template_id = ?`)
+            .run(keep.id, dup.id);
+          db.prepare(`DELETE FROM section_templates WHERE id = ?`).run(dup.id);
+          tplsRemoved++;
+        }
+      }
+      if (tplsRemoved > 0) {
+        log.info(`Migration 72 : ${tplsRemoved} template(s) en doublon supprimes, ${sectionsRetargeted} section(s) re-rattachee(s) au keep`);
+      }
+      // Force slug = '13' pour Engagement contractuel (sinon recree au boot)
+      const engagement = db.prepare(`SELECT id, slug FROM section_templates WHERE title = 'Engagement contractuel' LIMIT 1`).get();
+      if (engagement && engagement.slug !== '13') {
+        // Si un autre template a deja slug='13', on lui change le slug en
+        // 'engagement-contractuel-orphelin' pour ne pas violer l'unique.
+        const conflicting = db.prepare(`SELECT id FROM section_templates WHERE slug = '13' AND id != ?`).get(engagement.id);
+        if (conflicting) {
+          db.prepare(`UPDATE section_templates SET slug = 'orphan-' || id WHERE id = ?`).run(conflicting.id);
+        }
+        db.prepare(`UPDATE section_templates SET slug = '13', number = '13' WHERE id = ?`).run(engagement.id);
+      }
+      // Dedup sections AF : meme parent + meme template_id => doublon.
+      // Garde la plus ancienne, supprime les autres si elles n'ont pas
+      // d'enfants (sinon on risque d'orpheliner du contenu utilisateur).
+      const dupSections = db.prepare(`
+        SELECT af_id, COALESCE(parent_id, 0) parent_key, section_template_id, GROUP_CONCAT(id) ids
+        FROM sections
+        WHERE section_template_id IS NOT NULL
+        GROUP BY af_id, COALESCE(parent_id, 0), section_template_id
+        HAVING COUNT(*) > 1
+      `).all();
+      let sectionsDeleted = 0;
+      for (const d of dupSections) {
+        const ids = d.ids.split(',').map(Number).sort((a, b) => a - b);
+        const keepId = ids[0];
+        for (const id of ids.slice(1)) {
+          const childCount = db.prepare(`SELECT COUNT(*) c FROM sections WHERE parent_id = ?`).get(id).c;
+          if (childCount > 0) continue; // refuse de rendre orphelins des enfants
+          db.prepare(`DELETE FROM sections WHERE id = ?`).run(id);
+          sectionsDeleted++;
+        }
+      }
+      if (sectionsDeleted > 0) {
+        log.info(`Migration 72 : ${sectionsDeleted} section(s) en doublon supprimees dans les AFs`);
+      }
+    } catch (err) {
+      log.warn(`Migration 72 (dedup global) KO : ${err.message}`);
+    }
+    db.pragma('user_version = 72');
+    log.info('Migration 72 appliquee : deduplication globale templates + sections');
   }
 
   if (current > TARGET_VERSION) {
