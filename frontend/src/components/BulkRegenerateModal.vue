@@ -40,6 +40,16 @@ function toggleAll() {
 }
 const selectionCount = computed(() => selectedIds.value.size)
 
+// Libelle francais du kind (la valeur DB est en anglais : functionality,
+// narrative_section, equipment_template).
+function kindLabel(kind) {
+  return {
+    functionality: 'Fonctionnalité',
+    narrative_section: 'Section',
+    equipment_template: 'Équipement',
+  }[kind] || kind
+}
+
 // Options
 const useCorpus = ref(false)
 const corpusStrategy = ref('neighbors')
@@ -136,7 +146,7 @@ function cancel() {
 
       <!-- Liste des entrées -->
       <div class="border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
-        <div class="sticky top-0 bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2 text-xs">
+        <div class="sticky top-0 z-10 bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2 text-xs shadow-sm">
           <input type="checkbox"
                  :checked="selectionCount === items.length && items.length > 0"
                  :indeterminate.prop="selectionCount > 0 && selectionCount < items.length"
@@ -155,7 +165,7 @@ function cancel() {
                    :disabled="running"
                    class="rounded border-gray-300 text-violet-600" />
             <span class="flex-1 truncate">
-              <span class="text-[10px] uppercase font-semibold text-gray-400 mr-1.5">{{ it.kind.replace('equipment_', 'eq.').replace('_', ' ') }}</span>
+              <span class="text-[10px] uppercase font-semibold text-gray-400 mr-1.5">{{ kindLabel(it.kind) }}</span>
               {{ it.title }}
             </span>
             <span v-if="statusOf(it.id) === 'running'"
