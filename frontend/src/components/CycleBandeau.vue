@@ -372,10 +372,10 @@ const exportDescription = computed(() => {
     <button
       @click="openExport('synthesis')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
-      title="Exporter le tableau de synthèse en PDF A3 paysage"
+      title="Exporter le tableau de synthèse en PDF A4 paysage"
     >
       <TableCellsIcon class="w-4 h-4" />
-      Synthèse (A3)
+      Synthèse (A4)
     </button>
     <button
       @click="showInstances = true"
