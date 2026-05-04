@@ -392,7 +392,6 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       const sizeRule = pageOrientation === 'landscape'
         ? `${pageFormat} landscape`
         : `${pageFormat} portrait`;
-      log.info(`[DEBUG coverFullBleed] template=${template} format=${pageFormat} orient=${pageOrientation} sizeRule=${sizeRule} viewport=${JSON.stringify(viewport)}`);
       const overrideStyleId = await page.evaluate((size) => {
         const id = '__cover_fullbleed_override__';
         const style = document.createElement('style');
