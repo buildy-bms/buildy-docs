@@ -34,3 +34,4 @@ certs/*.key
 
 # PM2
 .pm2/
+data/buildy_af.db.backup*
