@@ -37,13 +37,13 @@ function buildLevelVerdict({ requiredLevel, contractLevel }) {
   };
   if (RANK[requiredLevel] > RANK[contractLevel]) return {
     kind: 'shortfall',
-    text: 'Le contrat actuel ne couvre pas l\'intégralité du périmètre décrit.',
+    text: 'Le niveau visé est insuffisant — certaines fonctionnalités de l\'AF ne seront pas activables au contrat actuel.',
   };
   if (RANK[requiredLevel] < RANK[contractLevel]) return {
     kind: 'over',
-    text: 'Le contrat dépasse les besoins — marge disponible pour activer d\'autres fonctionnalités.',
+    text: 'Le niveau visé dépasse les besoins — marge disponible pour activer d\'autres fonctionnalités.',
   };
-  return { kind: 'ok', text: 'Le contrat couvre exactement le périmètre décrit.' };
+  return { kind: 'ok', text: 'Le niveau visé couvre exactement les fonctionnalités décrites dans l\'AF.' };
 }
 
 const SYNTHESIS_ROWS = [

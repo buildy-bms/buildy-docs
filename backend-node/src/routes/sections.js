@@ -179,19 +179,48 @@ async function routes(fastify) {
     }
 
     const userId = request.authUser?.id;
+    const includedInExport = body.included_in_export == null ? undefined : (body.included_in_export ? 1 : 0);
     const updated = db.sections.update(id, {
       title: body.title,
       serviceLevel: body.service_level,
       bacsArticles: body.bacs_articles,
       bacsJustification: body.bacs_justification,
       bodyHtml: body.body_html,
-      includedInExport: body.included_in_export == null ? undefined : (body.included_in_export ? 1 : 0),
+      includedInExport,
       optedOutByMoa,
       demandedByMoa,
       sectionTemplateVersion: body.section_template_version,
       factCheckStatus: body.fact_check_status,
       updatedBy: userId,
     });
+
+    // Cascade aux descendants : opted_out / demanded / included_in_export se
+    // propagent au sous-arbre. Sans cela, un parent ecarte par la MOA voit
+    // ses enfants reapparaitre dans le calcul du niveau requis (filtre
+    // "ancetre present" inoperant si l'ancetre est lui-meme exclu de
+    // includedSections). Cf service-level-resolver.js + cas Gojee de base
+    // 2026-05-04.
+    const cascadeFields = {};
+    if (optedOutByMoa !== undefined) cascadeFields.optedOutByMoa = optedOutByMoa;
+    if (demandedByMoa !== undefined) cascadeFields.demandedByMoa = demandedByMoa;
+    if (includedInExport !== undefined) cascadeFields.includedInExport = includedInExport;
+    // Exclusivite : si on cascade opt-out=1, force aussi demanded=0 sur les
+    // descendants (et inversement). Aligne sur la logique du parent.
+    if (cascadeFields.optedOutByMoa === 1) cascadeFields.demandedByMoa = 0;
+    if (cascadeFields.demandedByMoa === 1) cascadeFields.optedOutByMoa = 0;
+    if (Object.keys(cascadeFields).length > 0) {
+      const descendants = db.db.prepare(`
+        WITH RECURSIVE descendants(id) AS (
+          SELECT id FROM sections WHERE parent_id = ?
+          UNION ALL
+          SELECT s.id FROM sections s JOIN descendants d ON s.parent_id = d.id
+        )
+        SELECT id FROM descendants
+      `).all(id);
+      for (const d of descendants) {
+        db.sections.update(d.id, { ...cascadeFields, updatedBy: userId });
+      }
+    }
 
     // Re-index FTS si le body ou title a change
     if ('body_html' in body || 'title' in body) {

@@ -91,13 +91,13 @@ onMounted(loadSites)
       :class="disabled ? 'opacity-60 cursor-not-allowed' : ''"
       @click="!disabled && (open = true)"
     >
-      <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0" />
+      <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
       <div class="flex-1 min-w-0">
-        <div class="text-sm font-medium text-gray-800 truncate">{{ selected.name }}</div>
-        <div class="flex items-center gap-2 text-[11px] text-gray-500 truncate">
+        <div class="text-sm font-medium text-gray-800 wrap-break-word">{{ selected.name }}</div>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500">
           <span v-if="selected.customer_name">{{ selected.customer_name }}</span>
-          <span v-if="selected.address" class="flex items-center gap-1 truncate">
-            <MapPinIcon class="w-3 h-3 shrink-0" />{{ selected.address }}
+          <span v-if="selected.address" class="inline-flex items-start gap-1 wrap-break-word">
+            <MapPinIcon class="w-3 h-3 shrink-0 mt-0.5" />{{ selected.address }}
           </span>
         </div>
       </div>
@@ -148,8 +148,8 @@ onMounted(loadSites)
         <div class="flex items-start gap-2">
           <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-gray-800 truncate">{{ s.name }}</div>
-            <div class="text-[11px] text-gray-500 truncate">
+            <div class="text-sm font-medium text-gray-800 wrap-break-word">{{ s.name }}</div>
+            <div class="text-[11px] text-gray-500 wrap-break-word">
               <span v-if="s.customer_name">{{ s.customer_name }}</span>
               <span v-if="s.customer_name && s.address"> — </span>
               <span v-if="s.address">{{ s.address }}</span>

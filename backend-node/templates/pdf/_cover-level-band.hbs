@@ -25,11 +25,14 @@
   {{#if serviceLevel.justifications.length}}
   <div class="cover-level-band-justifications">
     <p class="cover-level-band-justif-label">Niveau requis justifié par</p>
-    <ul class="cover-level-band-justif-list">
+    <div class="cover-level-band-justif-chips">
       {{#each serviceLevel.justifications}}
-      <li>{{title}}</li>
+        {{#if (lt @index 4)}}<span class="cover-level-band-justif-chip">{{title}}</span>{{/if}}
       {{/each}}
-    </ul>
+      {{#if (gt serviceLevel.justifications.length 4)}}
+      <span class="cover-level-band-justif-chip cover-level-band-justif-chip-more">+ {{minus serviceLevel.justifications.length 4}} autre{{#if (gt (minus serviceLevel.justifications.length 4) 1)}}s{{/if}}</span>
+      {{/if}}
+    </div>
   </div>
   {{/if}}
 

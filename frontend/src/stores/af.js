@@ -180,8 +180,16 @@ export const useAfStore = defineStore('af', () => {
     if (selectedSection.value?.id === sectionId) {
       selectedSection.value = { ...selectedSection.value, ...localPatch }
     }
+    // Si le patch touche un flag qui se cascade aux descendants cote
+    // backend (opted_out / demanded / included_in_export), on refresh
+    // toute la liste pour propager visuellement la cascade au tree.
+    const cascadeKeys = ['opted_out_by_moa', 'demanded_by_moa', 'included_in_export']
+    const triggersCascade = cascadeKeys.some(k => k in patch)
     try {
       await updateSection(sectionId, patch)
+      if (triggersCascade) {
+        await refreshSections()
+      }
       requiredLevelKey.value++
     } catch (err) {
       // Rollback

@@ -194,7 +194,7 @@ const titleHtml = computed(() => {
         <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 block"></span>
       </Tooltip>
 
-      <span :class="['flex-1 min-w-0 truncate text-[13px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
+      <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
            hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre. -->

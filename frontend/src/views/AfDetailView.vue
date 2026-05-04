@@ -13,6 +13,13 @@ import ActivityPanel from '@/components/ActivityPanel.vue'
 import RequiredServiceLevelPanel from '@/components/RequiredServiceLevelPanel.vue'
 import { useResizable } from '@/composables/useResizable'
 import { ChevronLeftIcon, ChevronRightIcon, PresentationChartLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import {
+  faCircleCheck, faBan, faEye, faEyeSlash, faTrashCan,
+} from '@fortawesome/pro-solid-svg-icons'
+library.add(faCircleCheck, faBan, faEye, faEyeSlash, faTrashCan)
+import Tooltip from '@/components/Tooltip.vue'
 
 const { width: treeWidth, onMouseDown: onTreeResize } = useResizable({
   storageKey: 'af-tree-width',
@@ -271,7 +278,11 @@ function onGotoSection(payload) {
 async function handleToggleOptOut(node) {
   const newVal = node.opted_out_by_moa === 1 ? 0 : 1
   try {
-    await afStore.patchSection(node.id, { opted_out_by_moa: !!newVal })
+    // Exclusivite mutuelle avec demanded_by_moa : on ne peut pas
+    // simultanement marquer une fonction "exigée" ET "écartée".
+    const patch = { opted_out_by_moa: !!newVal }
+    if (newVal && node.demanded_by_moa === 1) patch.demanded_by_moa = false
+    await afStore.patchSection(node.id, patch)
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec mise à jour')
   }
@@ -295,6 +306,25 @@ async function selectSection(id) {
   // En mode compact, fermer automatiquement le drawer apres selection
   if (isCompact.value) treeDrawerOpen.value = false
 }
+
+// Eligibilite des actions opt-out / demanded sur la section selectionnee
+// (memes regles que SectionTreeNode : feature avec au moins un paid_option,
+// OU service_level dans S/P/S/P).
+const OPTIONAL_LEVELS_SET = new Set(['S', 'P', 'S/P'])
+const selectedCanOptOut = computed(() => {
+  const s = selectedSection.value
+  if (!s) return false
+  const hasPaid = [s.tpl_avail_e, s.tpl_avail_s, s.tpl_avail_p].includes('paid_option')
+  return hasPaid || OPTIONAL_LEVELS_SET.has((s.service_level || '').toUpperCase())
+})
+const selectedFlags = computed(() => {
+  const s = selectedSection.value
+  return {
+    optedOut: s?.opted_out_by_moa === 1,
+    demanded: s?.demanded_by_moa === 1,
+    excluded: s?.included_in_export === 0,
+  }
+})
 
 function onSectionUpdated(updated) {
   afStore.applySectionUpdate(updated)
@@ -536,6 +566,68 @@ watch(() => route.params.id, async (newId, oldId) => {
               <PresentationChartLineIcon class="w-3.5 h-3.5 shrink-0" />
               Projection
             </button>
+          </div>
+
+          <!-- Barre d'actions persistante (memes actions que dans l'arbre, toujours visibles) -->
+          <div v-if="selectedSection.kind !== 'zones'" class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <Tooltip
+              v-if="selectedCanOptOut"
+              :text="selectedFlags.demanded ? 'Annuler — la fonction ne sera plus marquée comme exigée par la MOA' : 'Marquer cette fonction comme exigée par la maîtrise d\'ouvrage (à inclure dans l\'avenant contractuel)'"
+            >
+              <button
+                type="button"
+                @click="handleToggleDemanded(selectedSection)"
+                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap',
+                         selectedFlags.demanded
+                           ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                           : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50']"
+              >
+                <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ selectedFlags.demanded ? 'Exigée par la MOA' : 'Marquer exigée' }}</span>
+              </button>
+            </Tooltip>
+            <Tooltip
+              v-if="selectedCanOptOut"
+              :text="selectedFlags.optedOut ? 'Réactiver cette fonctionnalité (elle ne sera plus marquée comme écartée par la MOA)' : 'Marquer cette fonctionnalité comme écartée par la maîtrise d\'ouvrage (visible dans le PDF avec encart)'"
+            >
+              <button
+                type="button"
+                @click="handleToggleOptOut(selectedSection)"
+                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap',
+                         selectedFlags.optedOut
+                           ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                           : 'text-amber-700 border-amber-200 hover:bg-amber-50']"
+              >
+                <FontAwesomeIcon :icon="['fas', 'ban']" class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ selectedFlags.optedOut ? 'Écartée par la MOA' : 'Marquer écartée' }}</span>
+              </button>
+            </Tooltip>
+            <Tooltip
+              :text="selectedFlags.excluded ? 'Réinclure cette section dans les exports (PDF, listes)' : 'Exclure cette section de tous les exports (PDF, listes) — utile pour des sections internes ou en cours de rédaction'"
+            >
+              <button
+                type="button"
+                @click="handleToggleInclude(selectedSection)"
+                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap',
+                         selectedFlags.excluded
+                           ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                           : 'text-gray-700 border-gray-200 hover:bg-gray-50']"
+              >
+                <FontAwesomeIcon :icon="['fas', selectedFlags.excluded ? 'eye-slash' : 'eye']" class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ selectedFlags.excluded ? 'Exclue des exports' : 'Incluse dans les exports' }}</span>
+              </button>
+            </Tooltip>
+            <span class="flex-1"></span>
+            <Tooltip text="Supprimer définitivement cette section et toutes ses sous-sections — action irréversible">
+              <button
+                type="button"
+                @click="handleDeleteSection(selectedSection)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors whitespace-nowrap"
+              >
+                <FontAwesomeIcon :icon="['fas', 'trash-can']" class="w-3.5 h-3.5 shrink-0" />
+                <span>Supprimer</span>
+              </button>
+            </Tooltip>
           </div>
 
           <SectionEditor

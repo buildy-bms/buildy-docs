@@ -24,6 +24,11 @@ const updateAfSchema = z.object({
   client_name: z.string().min(1).optional(),
   project_name: z.string().min(1).optional(),
   site_address: z.string().optional(),
+  // Permet de réassocier l'AF à un autre site (ou la détacher en passant null
+  // pour les kinds qui le supportent, p.ex. 'af'). Pour 'bacs_audit' /
+  // 'site_audit', la route refuse silencieusement le null (cf db.afs.update
+  // côté contrainte). UI : SitePicker dans la fiche AF.
+  site_id: z.number().int().positive().nullable().optional(),
   service_level: z.enum(['E', 'S', 'P']).nullable().optional(),
   status: z.enum(['redaction', 'validee', 'commissioning', 'commissioned', 'livree']).optional(),
   title: z.string().nullable().optional(),
@@ -258,6 +263,7 @@ async function routes(fastify) {
       status: body.status,
       updatedBy: userId,
     };
+    if ('site_id' in body) fields.site_id = body.site_id;
 
     // Transitions de statut auto : si on bascule vers livree, on stamp delivered_at
     if (body.status === 'livree' && af.status !== 'livree') {

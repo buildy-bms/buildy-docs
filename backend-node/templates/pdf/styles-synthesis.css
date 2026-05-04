@@ -28,12 +28,12 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
 /* ── COVER PAGE 1 (style coherent avec AF + points-list) ─────── */
 .cover {
   width: 297mm; height: 210mm; /* A4 paysage */
-  padding: 16mm 24mm;
+  padding: 12mm 22mm;
   background: #1b2842; color: white;
   page-break-after: always;
   display: flex;
   flex-direction: column;
-  gap: 8mm;
+  gap: 6mm;
   position: relative;
   box-sizing: border-box;
   overflow: hidden;        /* garde-fou : jamais de débordement hors cover */
@@ -44,45 +44,45 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
 .cover-meta        { flex: 0 0 auto; margin-top: auto; }  /* pousse meta + legal en bas */
 .cover-legal       { flex: 0 0 auto; }
 .cover-top { display: flex; flex-direction: column; }
-.cover-logo { width: 32mm; margin-bottom: 6mm; filter: brightness(0) invert(1); }
+.cover-logo { width: 28mm; margin-bottom: 4mm; filter: brightness(0) invert(1); }
 /* Cover : doc-type en gros titre majuscule, nom de projet en sous-titre. */
 .cover-doc-type {
   font-family: 'Poppins', sans-serif;
-  font-size: 26pt; font-weight: 700;
+  font-size: 22pt; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.02em;
-  color: white; margin: 0 0 4mm; line-height: 1.1;
+  color: white; margin: 0 0 3mm; line-height: 1.1;
 }
 .cover-title {
   font-family: 'Poppins', sans-serif;
-  font-size: 14pt; font-weight: 400;
+  font-size: 13pt; font-weight: 400;
   color: rgba(255,255,255,0.75);
-  letter-spacing: -0.005em; margin: 0 0 2.5mm; line-height: 1.2;
+  letter-spacing: -0.005em; margin: 0 0 2mm; line-height: 1.2;
 }
 .cover-client {
-  font-size: 13pt; color: rgba(255,255,255,0.88); font-weight: 500; margin: 0 0 1.5mm;
+  font-size: 12pt; color: rgba(255,255,255,0.88); font-weight: 500; margin: 0 0 1mm;
 }
-.cover-address { font-size: 9.5pt; color: rgba(255,255,255,0.55); margin: 0; }
+.cover-address { font-size: 9pt; color: rgba(255,255,255,0.55); margin: 0; }
 
 /* Bloc Totaux centre — style aligne sur le PDF Liste de points */
 .cover-kpi-grid {
   display: flex; align-items: center; justify-content: center;
-  gap: 12mm;
+  gap: 10mm;
   background: rgba(0, 205, 146, 0.08);
   border: 1px solid rgba(0, 205, 146, 0.25);
   border-radius: 2mm;
-  padding: 7mm 14mm;
+  padding: 5mm 12mm;
   align-self: stretch;
 }
 .cover-kpi-card { text-align: center; flex: 1; }
-.cover-kpi-card + .cover-kpi-card { border-left: 1px solid rgba(255,255,255,0.12); padding-left: 12mm; }
+.cover-kpi-card + .cover-kpi-card { border-left: 1px solid rgba(255,255,255,0.12); padding-left: 10mm; }
 .cover-kpi-value {
   font-family: 'Poppins', sans-serif;
-  font-size: 32pt; color: #00cd92; margin: 0;
+  font-size: 26pt; color: #00cd92; margin: 0;
   font-weight: 700; line-height: 1; letter-spacing: -0.02em;
 }
-.cover-kpi-sub { font-size: 17pt; color: rgba(255,255,255,0.5); font-weight: 500; }
+.cover-kpi-sub { font-size: 14pt; color: rgba(255,255,255,0.5); font-weight: 500; }
 .cover-kpi-label {
-  font-size: 8.5pt; color: rgba(255,255,255,0.85); margin: 2.5mm 0 0;
+  font-size: 8pt; color: rgba(255,255,255,0.85); margin: 2mm 0 0;
   text-transform: uppercase; letter-spacing: 0.1em; font-weight: 500;
 }
 
@@ -91,38 +91,49 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   border: 0.4mm solid rgba(255,255,255,0.18);
   border-left: 1.5mm solid #00cd92;
   border-radius: 2mm;
-  padding: 6mm 9mm;
+  padding: 4mm 7mm;
 }
-.cover-level-band-row { display: flex; align-items: center; gap: 6mm; margin-bottom: 3mm; }
+.cover-level-band-row { display: flex; align-items: center; gap: 5mm; margin-bottom: 2mm; }
 .cover-level-band-item { flex: 1; }
 .cover-level-band-label {
-  font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.12em;
-  color: rgba(255,255,255,0.55); margin: 0 0 1.5mm;
+  font-size: 7pt; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.55); margin: 0 0 1mm;
 }
-.cover-level-band-value { font-size: 17pt; color: white; margin: 0; font-weight: 600; font-family: 'Poppins', sans-serif; line-height: 1.1; }
-.cover-level-band-arrow { font-size: 11pt; color: rgba(255,255,255,0.4); padding: 0 4mm; font-style: italic; }
+.cover-level-band-value { font-size: 15pt; color: white; margin: 0; font-weight: 600; font-family: 'Poppins', sans-serif; line-height: 1.1; }
+.cover-level-band-arrow { font-size: 10pt; color: rgba(255,255,255,0.4); padding: 0 3mm; font-style: italic; }
 .cover-verdict-text {
-  font-size: 10pt; color: rgba(255,255,255,0.85); margin: 3mm 0 0; line-height: 1.45;
+  font-size: 9pt; color: rgba(255,255,255,0.85); margin: 2.5mm 0 0; line-height: 1.4;
   font-style: italic;
-  border-top: 1px solid rgba(255,255,255,0.1); padding-top: 3mm;
+  border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2mm;
 }
 /* Bloc justifications dans le bandeau (rendu via _cover-level-band.hbs).
    Place entre la row required/visé et le verdict, separe par un border-top. */
 .cover-level-band-justifications {
-  margin: 3mm 0 0;
-  padding: 3mm 0 0;
+  margin: 2mm 0 0;
+  padding: 2mm 0 0;
   border-top: 1px solid rgba(255,255,255,0.1);
 }
 .cover-level-band-justif-label {
-  font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.12em;
-  color: rgba(255,255,255,0.55); margin: 0 0 1.5mm;
+  font-size: 7pt; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.55); margin: 0 0 1mm;
 }
-.cover-level-band-justif-list {
-  margin: 0; padding-left: 5mm;
-  font-size: 9.5pt; color: rgba(255,255,255,0.85);
-  line-height: 1.5; list-style: disc;
+.cover-level-band-justif-chips {
+  display: flex; flex-wrap: wrap; gap: 1.5mm 2mm; align-items: center;
 }
-.cover-level-band-justif-list li { margin: 0 0 0.5mm; }
+.cover-level-band-justif-chip {
+  display: inline-block;
+  padding: 1mm 2.5mm;
+  background: rgba(255,255,255,0.08);
+  border: 0.3mm solid rgba(255,255,255,0.15);
+  border-radius: 1mm;
+  font-size: 8.5pt; color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+}
+.cover-level-band-justif-chip-more {
+  background: transparent; border-color: transparent;
+  color: rgba(255,255,255,0.5); font-style: italic;
+  padding-left: 1mm;
+}
 .cover-level-band-shortfall { border-left-color: #f87171; }
 .cover-level-band-shortfall .cover-kpi-value { color: #f87171; }
 .cover-level-band-no-contract { border-left-color: #fbbf24; }

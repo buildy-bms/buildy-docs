@@ -9,6 +9,19 @@
 import { ref, watch, computed } from 'vue'
 import { ExclamationTriangleIcon, CheckCircleIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getAfRequiredLevel } from '@/api'
+import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
+
+/**
+ * Aligne le badge de niveau de chaque justification sur celui affiché dans
+ * l'arborescence (SectionTreeNode → minServiceLevel) : prend le niveau MINIMUM
+ * accessible (premier token de "E/S/P" → "E", "S/P" → "S", "P" → "P").
+ * Sinon le badge afficherait le brut "S/P" alors que l'arbre affiche "S",
+ * ce qui crée une incohérence visuelle. */
+function minServiceLevel(lvl) {
+  const v = (lvl || '').toUpperCase().trim()
+  if (!v) return null
+  return v.split('/')[0].trim() || null
+}
 
 const props = defineProps({
   afId: { type: Number, required: true },
@@ -21,12 +34,8 @@ const emit = defineEmits(['goto-section'])
 const data = ref(null)
 const loading = ref(false)
 
-const LEVEL_LABEL = { E: 'Essentials', S: 'Smart', P: 'Premium' }
-const LEVEL_COLOR = {
-  E: 'bg-gray-100 text-gray-800 border-gray-200',
-  S: 'bg-blue-100 text-blue-800 border-blue-300',
-  P: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-}
+// Aligne sur ServiceLevelBadge (Essentiel sans 's' final).
+const LEVEL_LABEL = { E: 'Essentiel', S: 'Smart', P: 'Premium' }
 
 async function refresh() {
   loading.value = true
@@ -58,9 +67,7 @@ defineExpose({ refresh })
   <div v-if="data && data.required" class="border border-gray-200 rounded-lg bg-white shadow-xs px-4 py-2.5">
     <div class="flex items-center gap-3 flex-wrap">
       <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0">Niveau requis</p>
-      <span :class="['inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full border', LEVEL_COLOR[data.required]]">
-        {{ LEVEL_LABEL[data.required] }}
-      </span>
+      <ServiceLevelBadge :level="data.required" variant="full" />
       <template v-if="verdict?.kind === 'shortfall'">
         <span class="inline-flex items-center gap-1 text-xs text-red-700 font-medium">
           <ExclamationTriangleIcon class="w-3.5 h-3.5" />
@@ -87,7 +94,7 @@ defineExpose({ refresh })
         title="Aller à cette section"
       >
         <span class="text-gray-700 font-medium">{{ j.title }}</span>
-        <span :class="['inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full', LEVEL_COLOR[j.level]]">{{ LEVEL_LABEL[j.level] || j.level }}</span>
+        <ServiceLevelBadge v-if="minServiceLevel(j.level)" :level="minServiceLevel(j.level)" />
       </button>
       <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic">
         +{{ data.justifications.length - 6 }} autres

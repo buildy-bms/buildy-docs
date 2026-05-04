@@ -9,6 +9,7 @@ import {
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
+import SitePicker from './SitePicker.vue'
 import PdfPreviewModal from './PdfPreviewModal.vue'
 import { useRouter } from 'vue-router'
 import api, {
@@ -37,8 +38,11 @@ const submitting = ref(false)
 const showExport = ref(false)
 const exportKind = ref('points-list') // 'points-list' | 'af'
 const exportMotif = ref('')
-const exportIncludeBacs = ref(false)
-const exportIncludeOfferings = ref(false)
+// Annexes cochees par defaut sur l'export AF — le DOE livre est presque
+// toujours attendu avec annexe BACS + tableau des offres. L'utilisateur peut
+// decocher au cas par cas.
+const exportIncludeBacs = ref(true)
+const exportIncludeOfferings = ref(true)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
 
@@ -90,15 +94,22 @@ function onInlineKeydown(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveInlineEdit() }
   else if (e.key === 'Escape') { e.preventDefault(); cancelInlineEdit() }
 }
-const editForm = ref({ client_name: '', project_name: '', site_address: '', service_level: null })
+const editForm = ref({ client_name: '', project_name: '', site_address: '', service_level: null, site_id: null })
 function openEdit() {
   editForm.value = {
     client_name: props.af.client_name,
     project_name: props.af.project_name,
     site_address: props.af.site_address || '',
     service_level: props.af.service_level || null,
+    site_id: props.af.site_id || null,
   }
   showEdit.value = true
+}
+function onEditSiteChange(site) {
+  // Quand on lie l'AF a un site, on hydrate adresse / client par defaut si vides
+  if (!site) return
+  if (site.address && !editForm.value.site_address) editForm.value.site_address = site.address
+  if (site.customer_name && !editForm.value.client_name) editForm.value.client_name = site.customer_name
 }
 async function submitEdit() {
   if (!editForm.value.client_name.trim() || !editForm.value.project_name.trim()) return
@@ -109,6 +120,7 @@ async function submitEdit() {
       project_name: editForm.value.project_name.trim(),
       site_address: editForm.value.site_address.trim() || null,
       service_level: editForm.value.service_level,
+      site_id: editForm.value.site_id,
     })
     success('AF mise à jour')
     showEdit.value = false
@@ -240,8 +252,8 @@ async function rollbackPhase() {
 function openExport(kind) {
   exportKind.value = kind
   exportMotif.value = ''
-  exportIncludeBacs.value = false
-  exportIncludeOfferings.value = false
+  exportIncludeBacs.value = true
+  exportIncludeOfferings.value = true
   lastExportId.value = null
   lastExportInfo.value = null
   exportExcluded.value = new Set()
@@ -680,6 +692,13 @@ const exportDescription = computed(() => {
       <!-- ── Identité du chantier ─────────────────────────────────── -->
       <section class="space-y-3">
         <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Identité du chantier</h3>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1.5">
+            Site associé
+            <span class="text-gray-400 font-normal">— optionnel, partage zones &amp; équipements avec les autres documents du site</span>
+          </label>
+          <SitePicker v-model="editForm.site_id" @change="onEditSiteChange" />
+        </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1.5">Client <span class="text-red-500">*</span></label>

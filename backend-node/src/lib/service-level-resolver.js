@@ -54,10 +54,30 @@ function resolveAfLevel(includedSections) {
     }
   }
 
+  // Auto-dedup par lien parent : si une section justification a un ancetre
+  // qui est aussi dans les justifications, on la retire (l'ancetre couvre
+  // deja le besoin). Ex: "Fonctionnalites Gojee de base" (S/P) + ses 4
+  // sous-fonctions (S/P) → on ne garde que le parent. Implem option A
+  // (cf discussion 2026-05-04). Necessite que les sections aient leur
+  // parent_id renseigne (toujours le cas pour les sections issues d'un
+  // PLAN_AF, et pour les sections heritage de l'ancien plan).
+  const sectionsById = new Map(includedSections.map(s => [s.id, s]));
+  const justifIds = new Set(justifications.map(j => j.section_id));
+  const filtered = justifications.filter(j => {
+    const sec = sectionsById.get(j.section_id);
+    let parentId = sec?.parent_id;
+    while (parentId) {
+      if (justifIds.has(parentId)) return false; // un ancetre couvre deja → on filtre
+      const parent = sectionsById.get(parentId);
+      parentId = parent?.parent_id;
+    }
+    return true;
+  });
+
   return {
     level: maxLevel,
     label: maxLevel ? LABELS[maxLevel] : null,
-    justifications: justifications.slice(0, 8), // top 8
+    justifications: filtered.slice(0, 8), // top 8
   };
 }
 

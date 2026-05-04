@@ -117,12 +117,23 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   font-size: 7pt; text-transform: uppercase; letter-spacing: 0.12em;
   color: rgba(255,255,255,0.55); margin: 0 0 1mm;
 }
-.cover-level-band-justif-list {
-  margin: 0; padding-left: 5mm;
-  font-size: 8.5pt; color: rgba(255,255,255,0.85);
-  line-height: 1.4; list-style: disc;
+.cover-level-band-justif-chips {
+  display: flex; flex-wrap: wrap; gap: 1.5mm 2mm; align-items: center;
 }
-.cover-level-band-justif-list li { margin: 0; }
+.cover-level-band-justif-chip {
+  display: inline-block;
+  padding: 1mm 2.5mm;
+  background: rgba(255,255,255,0.08);
+  border: 0.3mm solid rgba(255,255,255,0.15);
+  border-radius: 1mm;
+  font-size: 8pt; color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+}
+.cover-level-band-justif-chip-more {
+  background: transparent; border-color: transparent;
+  color: rgba(255,255,255,0.5); font-style: italic;
+  padding-left: 1mm;
+}
 .cover-level-band-shortfall { border-left-color: #f87171; }
 .cover-level-band-shortfall .cover-kpi-value { color: #f87171; }
 .cover-level-band-no-contract { border-left-color: #fbbf24; }
