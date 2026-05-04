@@ -48,23 +48,24 @@ h1, h2, h3, h4, h5 {
   page-break-after: always;
 }
 .cover-logo { width: 50mm; margin-bottom: 24mm; filter: brightness(0) invert(1); }
+/* Cover AF : "Analyse Fonctionnelle" en gros titre, nom de projet en sous-titre. */
 .cover-doc-type {
-  font-family: 'Manrope', sans-serif;
-  font-size: 9pt;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.28em;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 10mm;
-}
-.cover-title {
   font-family: 'Poppins', sans-serif;
   font-size: 30pt;
   font-weight: 700;
   line-height: 1.1;
-  margin: 0 0 12mm;
+  margin: 0 0 4mm;
   color: white;
   letter-spacing: -0.01em;
+}
+.cover-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18pt;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 12mm;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: -0.005em;
 }
 .cover-client { font-size: 15pt; font-weight: 500; margin-bottom: 3mm; color: rgba(255, 255, 255, 0.92); }
 .cover-project { font-size: 12pt; margin-bottom: 5mm; color: rgba(255, 255, 255, 0.7); }
