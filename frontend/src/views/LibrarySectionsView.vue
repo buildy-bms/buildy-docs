@@ -1,30 +1,75 @@
 <script setup>
+/**
+ * Bibliotheque des sections types narratives.
+ *
+ * Mise en forme alignee sur LibraryFunctionalitiesView :
+ *  - tableau plat en ordre DFS (parent suivi de ses descendants)
+ *  - drag-drop scope par data-parent-id (onMove rejette les re-parentages)
+ *  - colonne Photos avec drag-drop d'images sur les lignes
+ *  - filtre : is_functionality=0 AND kind != 'equipment' (les equipements
+ *    et fonctionnalites ont leurs pages dediees)
+ */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PlusIcon, MagnifyingGlassIcon, XMarkIcon, ChevronDoubleDownIcon, ChevronDoubleUpIcon, SparklesIcon,
+  PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilIcon, Bars3Icon, SparklesIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
+  uploadSectionTemplateAttachment,
 } from '@/api'
-import LibrarySectionNode from '@/components/LibrarySectionNode.vue'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faCamera } from '@fortawesome/pro-solid-svg-icons'
+library.add(faCamera)
+import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
+import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
+import { useRoute } from 'vue-router'
 
-const { error: notifyError } = useNotification()
-const tree = ref([])           // hierarchical
-const flat = ref([])           // for search
+const { error: notifyError, success: notifySuccess } = useNotification()
+const route = useRoute()
+
+const items = ref([])           // sections types affichees
+const allTemplates = ref([])    // tous les templates (pour parent_path / depth)
 const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
-const collapsed = ref(new Set())
-const rootRef = ref(null)
-const sortables = []           // Sortable instances per <ul>
 const showBulk = ref(false)
 
-// Items pour BulkRegenerateModal : sections narratives uniquement avec body_html
-const bulkItems = computed(() => flat.value
+// Modal Captures + drag-drop d'images sur une ligne
+const photosModalTemplate = ref(null)
+function openPhotos(t) { photosModalTemplate.value = t }
+function closePhotos() {
+  photosModalTemplate.value = null
+  refresh()
+}
+const dragOverRowId = ref(null)
+function onRowDragOver(e, t) {
+  if (!e.dataTransfer?.types?.includes('Files')) return
+  e.preventDefault()
+  dragOverRowId.value = t.id
+}
+function onRowDragLeave() { dragOverRowId.value = null }
+async function onRowDrop(e, t) {
+  dragOverRowId.value = null
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
+  if (!files.length) return
+  e.preventDefault()
+  try {
+    for (const f of files) await uploadSectionTemplateAttachment(t.id, f)
+    notifySuccess(`${files.length} capture${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} à « ${t.title} »`)
+    await refresh()
+  } catch {
+    notifyError('Échec de l\'upload')
+  }
+}
+
+// Items pour BulkRegenerateModal (sections narratives uniquement avec body_html)
+const bulkItems = computed(() => items.value
   .filter(t => t.kind === 'standard' && (t.body_html || '').trim())
   .map(t => ({
     id: t.id,
@@ -38,34 +83,24 @@ const bulkItems = computed(() => flat.value
   }))
 )
 function bulkGetHtml(it) {
-  const t = flat.value.find(x => x.id === it.id)
+  const t = items.value.find(x => x.id === it.id)
   return t?.body_html || ''
 }
 async function bulkSaveHtml(it, html) {
   await updateSectionTemplate(it.id, { body_html: html })
 }
 
-// Filtre l'arbre :
-// - feuilles equipment : leur source d'autorite est la page Equipements
-//   (chaque modele expose son placement via multi-select chips)
-// - fonctionnalites (is_functionality=true) : page Fonctionnalites dediee
-// Les masquer ici evite la redondance entre les trois pages.
-function stripNonStructural(nodes) {
-  return nodes
-    .filter(n => n.kind !== 'equipment' && !n.is_functionality)
-    .map(n => ({ ...n, children: stripNonStructural(n.children || []) }))
-}
-
 async function refresh() {
-  const { data: t } = await listSectionTemplates({ tree: true })
-  tree.value = stripNonStructural(t)
-  // Liste plate pour la recherche / count, alignee sur le meme filtre
-  const { data: list } = await listSectionTemplates({})
-  flat.value = list.filter(n => n.kind !== 'equipment' && !n.is_functionality)
+  // On recupere TOUS les templates pour pouvoir calculer le parent_path
+  // (ancetres non-structurels inclus dans la chaine), puis on filtre
+  // l'affichage aux sections structurelles.
+  const { data: all } = await listSectionTemplates({})
+  allTemplates.value = all
+  items.value = all.filter(t => t.kind !== 'equipment' && !t.is_functionality)
   await nextTick()
   setupSortables()
 }
-function openEditor(node) { editing.value = node }
+function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
 async function onSaved() {
   editing.value = null
@@ -77,144 +112,168 @@ async function onDeleted() {
   await refresh()
 }
 
-function toggle(id) {
-  if (collapsed.value.has(id)) collapsed.value.delete(id)
-  else collapsed.value.add(id)
-  collapsed.value = new Set(collapsed.value)
-  // Re-bind sortable after collapse/expand DOM change
-  nextTick(setupSortables)
-}
-function expandAll() { collapsed.value = new Set() }
-function collapseAll() {
-  const set = new Set()
-  function walk(nodes) {
-    for (const n of nodes) {
-      if (n.children?.length) { set.add(n.id); walk(n.children) }
+// parent_template_id -> { title, path } (pour groupement DFS)
+const parentInfoById = computed(() => {
+  const byId = new Map(allTemplates.value.map(t => [t.id, t]))
+  function pathOf(t) {
+    const parts = []
+    let cur = t
+    while (cur) {
+      parts.unshift(cur.title)
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
     }
+    return parts.join(' › ')
   }
-  walk(tree.value)
-  collapsed.value = set
-}
-
-// Numerotation auto (1, 1.1, 1.2, 2…) pour l'affichage uniquement.
-// Identique a la logique du seedAfStructure : top-level zones n'ont pas de
-// number et n'incrementent pas le compteur.
-const numbering = computed(() => {
   const map = new Map()
-  let topCounter = 0
-  function walk(nodes, prefix) {
-    nodes.forEach((n, i) => {
-      let num
-      if (!prefix && n.kind === 'zones') {
-        num = ''
-      } else if (!prefix) {
-        topCounter += 1
-        num = String(topCounter)
-      } else {
-        num = `${prefix}.${i + 1}`
-      }
-      if (num) map.set(n.id, num)
-      if (n.children?.length) walk(n.children, num || '')
-    })
-  }
-  walk(tree.value, '')
+  for (const t of allTemplates.value) map.set(t.id, { title: t.title, path: pathOf(t) })
   return map
 })
 
-// Recherche : filtre le tree pour ne garder que les nodes matchant + ancetres.
-const filteredTree = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  if (!q) return tree.value
-  function match(n) {
-    return (n.title || '').toLowerCase().includes(q) ||
-           (n.bacs_articles || '').toLowerCase().includes(q) ||
-           (numbering.value.get(n.id) || '').includes(q)
-  }
-  function filter(nodes) {
-    const result = []
-    for (const n of nodes) {
-      const childMatches = filter(n.children || [])
-      if (match(n) || childMatches.length) {
-        result.push({ ...n, children: childMatches })
-      }
+// depth visuel = nombre d'ancetres affiches dans la table
+const enrichedItems = computed(() => {
+  const visibleIds = new Set(items.value.map(t => t.id))
+  const byId = new Map(allTemplates.value.map(t => [t.id, t]))
+  function visualDepth(t) {
+    let d = 0
+    let cur = t.parent_template_id ? byId.get(t.parent_template_id) : null
+    while (cur) {
+      if (visibleIds.has(cur.id)) d++
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
     }
-    return result
+    return d
   }
-  return filter(tree.value)
+  return items.value.map(t => {
+    const p = t.parent_template_id ? parentInfoById.value.get(t.parent_template_id) : null
+    return {
+      ...t,
+      parent_title: p?.title || null,
+      parent_path: p?.path || null,
+      visual_depth: visualDepth(t),
+    }
+  })
 })
 
-// Drag-and-drop nested. On applique Sortable sur chaque <ul.sortable-list>
-// (root + tous les enfants). group: 'sections-tree' permet le cross-list drag.
+// Liste plate ordonnee en DFS (parent suivi de ses enfants).
+const flatItems = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const filtered = q
+    ? enrichedItems.value.filter(t =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.bacs_articles || '').toLowerCase().includes(q) ||
+        (t.parent_title || '').toLowerCase().includes(q)
+      )
+    : enrichedItems.value
+  if (q) return filtered
+
+  const byParent = new Map()
+  for (const t of filtered) {
+    const k = t.parent_template_id || 'orphans'
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(t)
+  }
+  for (const arr of byParent.values()) arr.sort((a, b) => (a.position || 0) - (b.position || 0))
+
+  const visibleIds = new Set(filtered.map(t => t.id))
+  const out = []
+  const seen = new Set()
+  function emit(parentKey) {
+    const arr = byParent.get(parentKey)
+    if (!arr) return
+    for (const t of arr) {
+      if (seen.has(t.id)) continue
+      seen.add(t.id)
+      out.push(t)
+      if (byParent.has(t.id)) emit(t.id)
+    }
+  }
+  // Racines : groupes dont la cle pointe vers un parent NON affiche
+  const rootKeys = []
+  for (const k of byParent.keys()) {
+    if (k === 'orphans' || !visibleIds.has(k)) rootKeys.push(k)
+  }
+  rootKeys.sort((a, b) => {
+    if (a === 'orphans') return 1
+    if (b === 'orphans') return -1
+    const pa = byParent.get(a)?.[0]?.parent_path || ''
+    const pb = byParent.get(b)?.[0]?.parent_path || ''
+    return pa.localeCompare(pb, 'fr')
+  })
+  for (const k of rootKeys) emit(k)
+  return out
+})
+
+// Drag-drop : single Sortable + onMove pour empecher le re-parentage
+const tbodyRef = ref(null)
+let sortableInstance = null
 function teardownSortables() {
-  while (sortables.length) {
-    try { sortables.pop().destroy() } catch (_) { /* ignore */ }
+  if (sortableInstance) {
+    try { sortableInstance.destroy() } catch { /* ignore */ }
+    sortableInstance = null
   }
 }
 function setupSortables() {
   teardownSortables()
-  if (!rootRef.value || search.value.trim()) return
-  const lists = rootRef.value.querySelectorAll('ul.sortable-list')
-  for (const ul of lists) {
-    const s = Sortable.create(ul, {
-      group: 'sections-tree',
-      handle: '.drag-handle',
-      animation: 150,
-      ghostClass: 'sortable-ghost',
-      chosenClass: 'sortable-chosen',
-      dragClass: 'sortable-drag',
-      fallbackOnBody: true,
-      invertSwap: true,
-      onEnd: async (evt) => {
-        const targetUl = evt.to
-        const parentAttr = targetUl.getAttribute('data-parent')
-        const parentId = parentAttr ? parseInt(parentAttr, 10) : null
-        const ids = Array.from(targetUl.children)
-          .map(li => parseInt(li.getAttribute('data-id'), 10))
-          .filter(Boolean)
-        try {
-          await reorderSectionTemplates({ ids, parent_template_id: parentId })
-          await refresh()
-        } catch (e) {
-          notifyError(e.response?.data?.detail || 'Échec de la réorganisation')
-          await refresh()
-        }
-      },
-    })
-    sortables.push(s)
-  }
+  if (search.value.trim()) return
+  const el = tbodyRef.value
+  if (!el) return
+  sortableInstance = Sortable.create(el, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onMove(evt) {
+      const a = evt.dragged?.getAttribute('data-parent-id') || ''
+      const b = evt.related?.getAttribute('data-parent-id') || ''
+      return a === b
+    },
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const draggedParent = evt.item.getAttribute('data-parent-id') || ''
+      const ids = Array.from(el.children)
+        .filter(li => (li.getAttribute('data-parent-id') || '') === draggedParent)
+        .map(li => parseInt(li.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      const parentId = draggedParent === '' ? null : parseInt(draggedParent, 10)
+      try {
+        await reorderSectionTemplates({ ids, parent_template_id: parentId })
+        await refresh()
+      } catch {
+        notifyError('Échec de la réorganisation')
+        await refresh()
+      }
+    },
+  })
 }
 
-watch(search, () => nextTick(setupSortables))
+watch([flatItems, search], async () => {
+  await nextTick()
+  setupSortables()
+}, { deep: false })
 
-import { useRoute } from 'vue-router'
-const route = useRoute()
 onMounted(async () => {
   await refresh()
   if (route.query.open) {
-    const target = flat.value.find(t => t.slug === route.query.open)
+    const target = items.value.find(t => t.slug === route.query.open)
     if (target) openEditor(target)
   }
+  await nextTick()
+  setupSortables()
 })
 onBeforeUnmount(teardownSortables)
 </script>
 
 <template>
   <div class="max-w-screen-2xl mx-auto">
-    <div class="mb-5 flex items-end justify-between gap-3">
+    <div class="mb-6 flex items-end justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold text-gray-800">Bibliothèque de sections types</h1>
         <p class="text-sm text-gray-500 mt-1">
-          {{ flat.length }} entrée{{ flat.length > 1 ? 's' : '' }} dans l'arbre canonique de l'AF.
-          Glisser-déposer pour réorganiser ou re-parenter — chaque AF nouvellement créée suit cette structure et la numérotation se calcule automatiquement.
+          {{ items.length }} section{{ items.length > 1 ? 's' : '' }} narrative{{ items.length > 1 ? 's' : '' }}
+          dans l'arbre canonique de l'AF. Glisser-déposer pour réorganiser au sein d'une fratrie.
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button @click="expandAll" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg whitespace-nowrap transition">
-          <ChevronDoubleDownIcon class="w-3.5 h-3.5" /> Tout déplier
-        </button>
-        <button @click="collapseAll" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg whitespace-nowrap transition">
-          <ChevronDoubleUpIcon class="w-3.5 h-3.5" /> Tout replier
-        </button>
         <button @click="showBulk = true" :disabled="!bulkItems.length"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <SparklesIcon class="w-4 h-4" /> Régénérer avec Claude
@@ -228,7 +287,7 @@ onBeforeUnmount(teardownSortables)
 
     <div class="relative max-w-md mb-4">
       <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-      <input v-model="search" type="text" placeholder="Rechercher (titre, numéro, BACS)…"
+      <input v-model="search" type="text" placeholder="Rechercher (titre, BACS)…"
              autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
              class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       <button v-if="search" @click="search = ''"
@@ -237,20 +296,74 @@ onBeforeUnmount(teardownSortables)
       </button>
     </div>
 
-    <div ref="rootRef" class="bg-white border border-gray-200 rounded-lg">
-      <ul data-parent="" class="sortable-list">
-        <LibrarySectionNode v-for="node in filteredTree"
-                            :key="node.id"
-                            :node="node"
-                            :level="0"
-                            :collapsed="collapsed"
-                            :numbering="numbering"
-                            @edit="openEditor"
-                            @toggle="toggle" />
-        <li v-if="!filteredTree.length" class="px-4 py-8 text-center text-sm text-gray-400 italic">
-          {{ search ? `Aucune section ne correspond à « ${search} ».` : 'Aucune section type.' }}
-        </li>
-      </ul>
+    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+      <table class="w-full text-sm" style="table-layout: auto">
+        <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
+          <tr>
+            <th class="text-center px-2 py-2.5 w-8"></th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
+            <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
+            <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
+            <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
+          </tr>
+        </thead>
+        <tbody ref="tbodyRef">
+          <tr v-for="t in flatItems" :key="t.id" :data-id="t.id"
+              :data-parent-id="t.parent_template_id || ''"
+              :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                       dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+              @click="openEditor(t)"
+              @dragover="onRowDragOver($event, t)"
+              @dragleave="onRowDragLeave"
+              @drop="onRowDrop($event, t)">
+            <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
+                @click.stop>
+              <Bars3Icon class="w-4 h-4 inline-block" />
+            </td>
+            <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap"
+                :style="t.visual_depth ? `padding-left: ${16 + t.visual_depth * 18}px` : ''">
+              <span v-if="t.visual_depth" class="text-gray-400 mr-1.5">↳</span>
+              {{ t.title }}
+            </td>
+            <td class="px-2 py-2 text-center align-middle" @click.stop>
+              <button
+                type="button"
+                @click="openPhotos(t)"
+                :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition',
+                         t.attachments_count > 0
+                           ? 'text-emerald-600 hover:bg-emerald-100'
+                           : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
+                :title="t.attachments_count > 0
+                  ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
+                  : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
+              >
+                <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
+                <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
+              </button>
+            </td>
+            <td class="px-4 py-2 whitespace-nowrap">
+              <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
+              <span v-else class="text-gray-300 italic text-xs">—</span>
+            </td>
+            <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
+              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" title="AFs utilisant cette section / AFs avec mise à jour en attente">
+                {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
+              </span>
+              <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
+              <span v-else class="text-gray-300 italic" title="Jamais utilisée — candidate au nettoyage">∅</span>
+            </td>
+            <td class="px-4 py-2 text-center whitespace-nowrap">
+              <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
+            </td>
+          </tr>
+          <tr v-if="!flatItems.length">
+            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              {{ search ? `Aucune section ne correspond à « ${search} ».` : 'Aucune section type.' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <SectionTemplateEditor
@@ -279,11 +392,28 @@ onBeforeUnmount(teardownSortables)
       @close="showBulk = false; refresh()"
       @done="refresh()"
     />
+
+    <BaseModal
+      v-if="photosModalTemplate"
+      :title="`Captures d'écran — ${photosModalTemplate.title}`"
+      size="lg"
+      @close="closePhotos"
+    >
+      <TemplateAttachmentsGrid
+        template-kind="section"
+        :template-id="photosModalTemplate.id"
+      />
+      <template #footer>
+        <button @click="closePhotos"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition">
+          Fermer
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <style scoped>
-ul.sortable-list { list-style: none; margin: 0; padding: 0; min-height: 4px; }
 .sortable-ghost { opacity: 0.4; background: #eef2ff; }
 .sortable-chosen { background: #eef2ff; }
 .sortable-drag { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }

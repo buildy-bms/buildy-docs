@@ -5,14 +5,23 @@ import { ref, onMounted, computed } from 'vue'
 defineProps({ embedded: { type: Boolean, default: false } })
 
 import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate } from '@/api'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment } from '@/api'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faCamera } from '@fortawesome/pro-solid-svg-icons'
+library.add(faCamera)
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
 import EquipmentPointsEditor from '@/components/EquipmentPointsEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
+import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import { useNotification } from '@/composables/useNotification'
 import { useRouter, useRoute } from 'vue-router'
+
+const { error: notifyError, success: notifySuccess } = useNotification()
 
 const router = useRouter()
 const route = useRoute()
@@ -122,6 +131,71 @@ const filteredSorted = computed(() => {
   })
   return list
 })
+
+// Liste plate hierarchique par categorie (alignee sur la presentation
+// hierarchique de la bibliotheque des fonctionnalites). Chaque categorie
+// devient une "ligne parente" synthetique suivie des equipements qui en
+// relevent (depth=1, indentation + ↳).
+//
+// En mode recherche : on garde l'ordre de tri choisi (plat), sans titres
+// de categorie, parce que les regroupements n'ont plus de sens.
+const flatEquipmentItems = computed(() => {
+  const list = filteredSorted.value
+  if (normalize(searchQuery.value).length >= 2) {
+    return list.map(t => ({ kind: 'template', t, visual_depth: 0 }))
+  }
+  // Groupage par categorie en preservant l'ordre du tri courant
+  const byCat = new Map()
+  for (const t of list) {
+    const k = t.category || 'autres'
+    if (!byCat.has(k)) byCat.set(k, [])
+    byCat.get(k).push(t)
+  }
+  // Tri des categories : ordre de CATEGORY_LABELS sinon alphabetique
+  const labelOrder = Object.keys(CATEGORY_LABELS)
+  const cats = [...byCat.keys()].sort((a, b) => {
+    const ia = labelOrder.indexOf(a), ib = labelOrder.indexOf(b)
+    if (ia !== -1 && ib !== -1) return ia - ib
+    if (ia !== -1) return -1
+    if (ib !== -1) return 1
+    return (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'fr')
+  })
+  const out = []
+  for (const cat of cats) {
+    const items = byCat.get(cat)
+    out.push({ kind: 'category', cat, label: CATEGORY_LABELS[cat] || cat, count: items.length })
+    for (const t of items) out.push({ kind: 'template', t, visual_depth: 1 })
+  }
+  return out
+})
+
+// Modal Captures + drag-drop d'images sur les lignes equipements
+const photosModalTemplate = ref(null)
+function openPhotos(t) { photosModalTemplate.value = t }
+async function closePhotos() {
+  photosModalTemplate.value = null
+  await refresh()
+}
+const dragOverRowId = ref(null)
+function onRowDragOver(e, t) {
+  if (!e.dataTransfer?.types?.includes('Files')) return
+  e.preventDefault()
+  dragOverRowId.value = t.id
+}
+function onRowDragLeave() { dragOverRowId.value = null }
+async function onRowDrop(e, t) {
+  dragOverRowId.value = null
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
+  if (!files.length) return
+  e.preventDefault()
+  try {
+    for (const f of files) await uploadEquipmentTemplateAttachment(t.id, f)
+    notifySuccess(`${files.length} capture${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} à « ${t.name} »`)
+    await refresh()
+  } catch {
+    notifyError('Échec de l\'upload')
+  }
+}
 const loading = ref(false)
 
 const TYPE_COLORS = {
@@ -252,17 +326,15 @@ onMounted(async () => {
 
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement...</div>
 
-      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+      <div v-else-if="viewMode === 'table'" class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
         <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('category')">
-                Catégorie {{ sortBy === 'category' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
+              <th class="text-center px-4 py-2.5 whitespace-nowrap w-10"></th>
+              <th class="text-left px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
+              <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap">Slug</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
@@ -277,29 +349,65 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in filteredSorted" :key="t.id"
-                class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
-                @click="openTemplate(t)">
-              <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="t" size="sm" /></td>
-              <td class="px-4 py-2 text-center text-gray-600 text-xs uppercase tracking-wider whitespace-nowrap">{{ CATEGORY_LABELS[t.category] || t.category || '—' }}</td>
-              <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">{{ t.name }}</td>
-              <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
-              <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
-              </td>
-              <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" :title="`Utilisé dans ${t.sections_using_count} section(s) AF`">
-                  <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
-                </span>
-                <span v-else class="text-[11px] text-gray-300 italic" title="Jamais utilisé — candidat au nettoyage">∅ inutilisé</span>
-              </td>
-              <td class="px-4 py-2 whitespace-nowrap">
-                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
-                <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
-              </td>
-              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
-            </tr>
-            <tr v-if="!filteredSorted.length">
+            <template v-for="(it, idx) in flatEquipmentItems" :key="it.kind === 'category' ? `cat-${it.cat}` : `tpl-${it.t.id}`">
+              <!-- Ligne parente synthetique : un en-tete de categorie. Pas
+                   d'action, juste un libelle aligne sur la cellule Titre. -->
+              <tr v-if="it.kind === 'category'"
+                  class="border-t border-gray-100 bg-gray-50/40">
+                <td class="px-4 py-1.5"></td>
+                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="7">
+                  {{ it.label }}
+                  <span class="text-gray-400 normal-case font-normal ml-2">· {{ it.count }}</span>
+                </td>
+              </tr>
+              <!-- Ligne equipement : depth=1, ↳, drag-drop d'image -->
+              <tr v-else :data-id="it.t.id"
+                  :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                           dragOverRowId === it.t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                  @click="openTemplate(it.t)"
+                  @dragover="onRowDragOver($event, it.t)"
+                  @dragleave="onRowDragLeave"
+                  @drop="onRowDrop($event, it.t)">
+                <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="it.t" size="sm" /></td>
+                <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap"
+                    :style="it.visual_depth ? `padding-left: ${16 + it.visual_depth * 18}px` : ''">
+                  <span v-if="it.visual_depth" class="text-gray-400 mr-1.5">↳</span>
+                  {{ it.t.name }}
+                </td>
+                <td class="px-2 py-2 text-center align-middle" @click.stop>
+                  <button
+                    type="button"
+                    @click="openPhotos(it.t)"
+                    :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition',
+                             it.t.attachments_count > 0
+                               ? 'text-emerald-600 hover:bg-emerald-100'
+                               : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
+                    :title="it.t.attachments_count > 0
+                      ? `${it.t.attachments_count} capture${it.t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
+                      : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
+                  >
+                    <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
+                    <span v-if="it.t.attachments_count > 0" class="text-[11px] font-semibold">{{ it.t.attachments_count }}</span>
+                  </button>
+                </td>
+                <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ it.t.slug }}</code></td>
+                <td class="px-4 py-2 text-center whitespace-nowrap">
+                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ it.t.points_count }}</span>
+                </td>
+                <td class="px-4 py-2 text-center whitespace-nowrap">
+                  <span v-if="it.t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" :title="`Utilisé dans ${it.t.sections_using_count} section(s) AF`">
+                    <BookmarkIcon class="w-3 h-3" /> {{ it.t.sections_using_count }}
+                  </span>
+                  <span v-else class="text-[11px] text-gray-300 italic" title="Jamais utilisé — candidat au nettoyage">∅ inutilisé</span>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                  <ProtocolPills v-if="it.t.preferred_protocols" :protocols="it.t.preferred_protocols" :show-label="false" :max="2" />
+                  <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
+                </td>
+                <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ it.t.current_version }}</td>
+              </tr>
+            </template>
+            <tr v-if="!flatEquipmentItems.length">
               <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
@@ -509,6 +617,26 @@ onMounted(async () => {
       @close="showBulk = false; refresh()"
       @done="refresh()"
     />
+
+    <!-- Modal Captures d'écran (heritees automatiquement par toutes les
+         sections AF qui referencent ce modele d'equipement). -->
+    <BaseModal
+      v-if="photosModalTemplate"
+      :title="`Captures d'écran — ${photosModalTemplate.name}`"
+      size="lg"
+      @close="closePhotos"
+    >
+      <TemplateAttachmentsGrid
+        template-kind="equipment"
+        :template-id="photosModalTemplate.id"
+      />
+      <template #footer>
+        <button @click="closePhotos"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition">
+          Fermer
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 

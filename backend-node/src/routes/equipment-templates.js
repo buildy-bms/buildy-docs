@@ -55,6 +55,7 @@ async function routes(fastify) {
       ...inheritBacsFromCategory(t, categoriesByKey),
       points_count: db.db.prepare('SELECT COUNT(*) AS c FROM equipment_template_points WHERE template_id = ?').get(t.id).c,
       sections_using_count: db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE equipment_template_id = ? AND af_id IN (SELECT id FROM afs WHERE deleted_at IS NULL)').get(t.id).c,
+      attachments_count: db.db.prepare('SELECT COUNT(*) AS c FROM attachments WHERE equipment_template_id = ?').get(t.id).c,
     }));
   });
 
