@@ -15,20 +15,8 @@
   <p class="cover-client">{{af.client_name}}</p>
   {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
 
-  {{#if serviceLevel.label}}
-  <div class="cover-service-level">
-    <p class="cover-service-level-label">Niveau de service requis pour cette AF</p>
-    <p class="cover-service-level-value">{{serviceLevel.label}}</p>
-    {{#if serviceLevel.justifications.length}}
-    <p class="cover-service-level-justif">Justifié par :</p>
-    <ul class="cover-service-level-justif-list">
-      {{#each serviceLevel.justifications}}
-      <li>{{title}}</li>
-      {{/each}}
-    </ul>
-    {{/if}}
-  </div>
-  {{/if}}
+  {{!-- Bandeau cover unifié (mutualisé avec Synthèse + Liste de points) --}}
+  {{> _cover-level-band}}
 
   <div class="cover-meta">
     <div class="cover-meta-row">

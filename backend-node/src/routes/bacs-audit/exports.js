@@ -9,7 +9,7 @@ const fs = require('fs');
 const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
-const { renderPdf, renderHtml, loadAssetDataUrl } = require('../../lib/pdf');
+const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl } = require('../../lib/pdf');
 const { buildChecklistData } = require('../../lib/bacs-checklist-builder');
 const { assertBacsAuditExists } = require('./_shared');
 const { buildBacsAuditExportData } = require('./_export-data');
@@ -139,21 +139,16 @@ async function routes(fastify) {
         skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
-        pdfOptions: {
-          displayHeaderFooter: true,
-          margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
-          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between; align-items:center; letter-spacing:0.02em;">
-            <span style="text-transform:uppercase; letter-spacing:0.1em; font-size:6.5pt; color:#9ca3af;">${(af.client_name || '').replace(/'/g, '&#39;')} · ${(af.project_name || '').replace(/'/g, '&#39;')}</span>
-            <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#6b7280;">${isBacs ? 'Audit BACS' : 'Audit GTB'} · ${version}</span>
-          </div>`,
-          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
-            <img src="${logoSmall}" style="height:4mm; opacity:0.55;" />
-            <span style="flex:1; color:#9ca3af; font-size:7pt;">${isBacs ? 'Audit BACS · décret R175 · document confidentiel' : 'Audit GTB · préparation devis · document confidentiel'}</span>
-            <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
-              <span class="pageNumber"></span> <span style="color:#9ca3af; font-weight:400;">/</span> <span class="totalPages"></span>
-            </span>
-          </div>`,
-        },
+        pdfOptions: buildHeaderFooter({
+          clientName: af.client_name,
+          projectName: af.project_name,
+          docType: isBacs ? 'Audit BACS' : 'Audit GTB',
+          version,
+          logoDataUrl: logoSmall,
+          footerNote: isBacs
+            ? 'Audit BACS · décret R175 · document confidentiel'
+            : 'Audit GTB · préparation devis · document confidentiel',
+        }),
       });
     } catch (err) {
       log.error(`PDF audit BACS render failed: ${err.message}`);

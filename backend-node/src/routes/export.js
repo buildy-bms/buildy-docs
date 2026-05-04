@@ -9,12 +9,13 @@ const log = require('../lib/logger').system;
 const { assertWrite } = require('../lib/af-permissions');
 // Helpers Handlebars (gt, eq) sont enregistres au require de pdf.js.
 const Handlebars = require('handlebars');
-const { renderPdf, renderHtml, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
+const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
 const gitLib = require('../lib/git');
 const {
   buildAfExportData,
   buildPointsListExportData,
   buildOfferingsAnnexForAf,
+  buildLevelVerdict,
 } = require('./_export-builders');
 
 // Filigrane Buildy (favicon) applique sur tous les exports PDF
@@ -182,8 +183,18 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         pageOrientation: 'landscape',
+        skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
+        pdfOptions: buildHeaderFooter({
+          clientName: af.client_name,
+          projectName: af.project_name,
+          docType: 'Liste de points',
+          version,
+          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+          footerNote: 'Liste de points contractuelle · document confidentiel',
+          margin: { top: '14mm', bottom: '14mm', left: '14mm', right: '14mm' },
+        }),
       });
     } catch (err) {
       log.error(`PDF render failed: ${err.message}`);
@@ -386,18 +397,7 @@ async function routes(fastify) {
 
     const contractLevel = af.service_level || null;
     const requiredLevel = required.level || null;
-    let levelVerdict;
-    if (!requiredLevel) {
-      levelVerdict = { kind: 'none', text: 'Aucun calcul possible.' };
-    } else if (!contractLevel) {
-      levelVerdict = { kind: 'no-contract', text: `Niveau de contrat requis : ${LEVEL_LABELS[requiredLevel]}. Aucun niveau contractuel fixé — à arbitrer au bon de commande.` };
-    } else if (RANK[requiredLevel] > RANK[contractLevel]) {
-      levelVerdict = { kind: 'shortfall', text: `Le contrat actuel (${LEVEL_LABELS[contractLevel]}) ne couvre pas le périmètre décrit dans cette AF, qui requiert un niveau ${LEVEL_LABELS[requiredLevel]}.` };
-    } else if (RANK[requiredLevel] < RANK[contractLevel]) {
-      levelVerdict = { kind: 'over', text: `Le contrat actuel (${LEVEL_LABELS[contractLevel]}) couvre largement le périmètre décrit (qui requiert seulement ${LEVEL_LABELS[requiredLevel]}). Marge disponible pour activer d'autres fonctionnalités.` };
-    } else {
-      levelVerdict = { kind: 'ok', text: `Le contrat ${LEVEL_LABELS[contractLevel]} couvre exactement le périmètre décrit dans cette AF.` };
-    }
+    const levelVerdict = buildLevelVerdict({ requiredLevel, contractLevel });
 
     const kpis = {
       systemsCovered: equipmentLive.filter(s => {
@@ -849,6 +849,8 @@ async function routes(fastify) {
       motif: body.motif,
       logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
       kpis, optedOutList,
+      // serviceLevel.justifications consomme par _cover-level-band.hbs
+      serviceLevel: required,
       // Nouveau modele tabulaire :
       systemCategories: SYSTEM_CATEGORIES,
       zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
@@ -873,8 +875,18 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         pageOrientation: 'landscape',
+        skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
+        pdfOptions: buildHeaderFooter({
+          clientName: af.client_name,
+          projectName: af.project_name,
+          docType: 'Synthèse',
+          version,
+          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+          footerNote: 'Synthèse Analyse Fonctionnelle · document confidentiel',
+          margin: { top: '18mm', bottom: '16mm', left: '14mm', right: '14mm' },
+        }),
       });
     } catch (err) {
       log.error(`PDF synthesis render failed: ${err.message}`);
@@ -966,7 +978,6 @@ async function routes(fastify) {
 
     let result;
     try {
-      const logoSmall = loadAssetDataUrl('logo-buildy.svg');
       result = await renderPdf({
         template: 'af',
         styles: 'styles-af',
@@ -977,19 +988,14 @@ async function routes(fastify) {
         skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
-        pdfOptions: {
-          displayHeaderFooter: true,
-          margin: { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
-          headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between;">
-            <span>${af.client_name} — ${af.project_name}</span>
-            <span>Analyse Fonctionnelle ${version}</span>
-          </div>`,
-          footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:8pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:6mm;">
-            <img src="${logoSmall}" style="height:5mm; opacity:0.6;" />
-            <span style="flex:1;">Analyse fonctionnelle Buildy · confidentiel</span>
-            <span>Page <span class="pageNumber"></span> / <span class="totalPages"></span></span>
-          </div>`,
-        },
+        pdfOptions: buildHeaderFooter({
+          clientName: af.client_name,
+          projectName: af.project_name,
+          docType: 'Analyse Fonctionnelle',
+          version,
+          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+          footerNote: 'Analyse fonctionnelle Buildy · document confidentiel',
+        }),
       });
     } catch (err) {
       log.error(`PDF AF render failed: ${err.message}`);

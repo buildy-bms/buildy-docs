@@ -20,6 +20,32 @@ const { BACS_ARTICLES, BACS_INTRO_HTML } = require('../seeds/bacs-articles');
 
 const SERVICE_LEVEL_LABELS = { E: 'Essentials', S: 'Smart', P: 'Premium' };
 
+/**
+ * Calcule le verdict "niveau requis vs niveau visé" pour une AF.
+ * Retourne { kind, text } — `kind` pilote la couleur de la barre à
+ * gauche de l'encart cover (vert ok, jaune no-contract, rouge
+ * shortfall, bleu over). `text` est un message court QUI NE REPETE PAS
+ * les niveaux required/visé (déjà affichés dans le header du bandeau).
+ * Utilisé par Synthèse, AF, Liste de points (encart cover cohérent).
+ */
+function buildLevelVerdict({ requiredLevel, contractLevel }) {
+  const RANK = { E: 0, S: 1, P: 2 };
+  if (!requiredLevel) return { kind: 'none', text: 'Aucun calcul possible.' };
+  if (!contractLevel) return {
+    kind: 'no-contract',
+    text: 'Aucun niveau contractuel fixé — à arbitrer au bon de commande.',
+  };
+  if (RANK[requiredLevel] > RANK[contractLevel]) return {
+    kind: 'shortfall',
+    text: 'Le contrat actuel ne couvre pas l\'intégralité du périmètre décrit.',
+  };
+  if (RANK[requiredLevel] < RANK[contractLevel]) return {
+    kind: 'over',
+    text: 'Le contrat dépasse les besoins — marge disponible pour activer d\'autres fonctionnalités.',
+  };
+  return { kind: 'ok', text: 'Le contrat couvre exactement le périmètre décrit.' };
+}
+
 const SYNTHESIS_ROWS = [
   { name: 'Chauffage & Climatisation', bacs: '§1 §2', monitoring: true, commande: true, alarmes: true, reporting: true, levelLabel: 'Essentials' },
   { name: 'Ventilation', bacs: '§3', monitoring: true, commande: true, alarmes: true, reporting: true, levelLabel: 'Essentials' },
@@ -291,6 +317,18 @@ async function buildAfExportData(af, opts = {}) {
   // contractualSummary deja calcule plus haut (utilise dans le tree pour
   // le chapitre 13). Reutilise-le tel quel pour le bundle data.
 
+  // KPIs niveau requis vs niveau visé — alimentent le bandeau cover unifié
+  // (mêmes couleurs et même verdict que la Synthèse).
+  const requiredLevel = serviceLevel?.level || null;
+  const contractLevel = af.service_level || null;
+  const kpis = {
+    requiredLevel,
+    requiredLevelLabel: requiredLevel ? SERVICE_LEVEL_LABELS[requiredLevel] : null,
+    contractLevel,
+    contractLevelLabel: contractLevel ? SERVICE_LEVEL_LABELS[contractLevel] : null,
+    verdict: buildLevelVerdict({ requiredLevel, contractLevel }),
+  };
+
   const data = {
     af,
     authorName,
@@ -300,6 +338,7 @@ async function buildAfExportData(af, opts = {}) {
     contractualLevelLabel: SERVICE_LEVEL_LABELS[af.service_level] || af.service_level || '—',
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
     serviceLevel,
+    kpis,
     tree,
     tocFlat,
     includeBacsAnnex,
@@ -403,16 +442,22 @@ function buildOfferingsAnnexForAf(af) {
 
   // Niveaux d'offre :
   //  - is_target  → niveau cible AF (engagement contractuel actuel)
-  //  - is_required → niveau minimum requis pour couvrir les fonctions
-  //                  exigees par la MOA (toujours marque des qu'il y a
-  //                  au moins une fonction exigee, meme si l'offre cible
-  //                  AF la couvre deja).
+  //  - is_required → niveau Buildy requis pour le perimetre AF.
+  //                  Calcule via resolveAfLevel() sur TOUTES les sections
+  //                  actives (non opt-out), pour rester aligne avec le calcul
+  //                  utilise par la cover (kpis.requiredLevelLabel) et eviter
+  //                  qu'un meme AF affiche 2 niveaux requis differents (bug
+  //                  isole 2026-05-04 : cover disait Premium, page 3 disait
+  //                  Essentiel parce qu'elle ne regardait que les sections
+  //                  demanded par la MOA via buildContractualSummaryForAf).
   //  Le template gere le cas where target == required en n'affichant que
   //  le badge or (Niveau cible) pour eviter les doublons visuels.
   const allLevels = db.offeringLevels.list();
   const targetSlug = (af.service_level || '').toUpperCase();
   const summary = buildContractualSummaryForAf(af);
-  const requiredSlug = summary.hasDemands ? summary.recommendedLevel : null;
+  const sectionsForLevel = db.sections.listByAf(af.id);
+  const requiredAfLevel = resolveAfLevel(sectionsForLevel.filter(s => !s.opted_out_by_moa));
+  const requiredSlug = requiredAfLevel?.level || null;
   const levels = allLevels.map(l => ({
     ...l,
     is_target: l.slug === targetSlug,
@@ -425,7 +470,7 @@ function buildOfferingsAnnexForAf(af) {
   return {
     rows,
     levels,
-    colspan: levels.length + 1,
+    colspan: levels.length + 2, // Fonctionnalité + Engagement MOA + N niveaux
     targetLevelLabel: targetLevel?.name || null,
     requiredLevelLabel: requiredLevel?.name || null,
     optedOutCount,
@@ -619,6 +664,19 @@ function buildPointsListExportData(af, opts = {}) {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
+  // KPIs niveau requis vs niveau visé — pour piloter la couleur de la
+  // barre à gauche de l'encart cover (cohérence avec Synthèse + AF).
+  const requiredAfLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+  const requiredLevel = requiredAfLevel?.level || null;
+  const contractLevel = af.service_level || null;
+  const kpis = {
+    requiredLevel,
+    requiredLevelLabel: requiredLevel ? SERVICE_LEVEL_LABELS[requiredLevel] : null,
+    contractLevel,
+    contractLevelLabel: contractLevel ? SERVICE_LEVEL_LABELS[contractLevel] : null,
+    verdict: buildLevelVerdict({ requiredLevel, contractLevel }),
+  };
+
   const data = {
     af,
     authorName,
@@ -627,6 +685,8 @@ function buildPointsListExportData(af, opts = {}) {
     motif,
     serviceLevelLabel: SERVICE_LEVEL_LABELS[af.service_level] || af.service_level || '—',
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    kpis,
+    serviceLevel: requiredAfLevel,    // .justifications consomme par _cover-level-band.hbs
     categories,
     rows,
     totals,
@@ -639,6 +699,7 @@ module.exports = {
   buildAfExportData,
   buildPointsListExportData,
   buildOfferingsAnnexForAf,
+  buildLevelVerdict,
   // Re-exporte pour que export.js puisse les utiliser sans dupliquer
   buildLiveBacsResolver,
   SYNTHESIS_ROWS,

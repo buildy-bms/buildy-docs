@@ -29,21 +29,8 @@
     </div>
   </div>
 
-  {{!-- Bandeau niveau de service + disclaimer (analogue cover-level-band synthese) --}}
-  <div class="cover-level-band">
-    <div class="cover-level-band-row">
-      <div class="cover-level-band-item">
-        <p class="cover-level-band-label">Niveau de service</p>
-        <p class="cover-level-band-value">{{serviceLevelLabel}}</p>
-      </div>
-    </div>
-    <p class="cover-verdict-text">
-      Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
-      Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
-      La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
-      en avant-projet ou validés par Buildy avant mise en production.
-    </p>
-  </div>
+  {{!-- Bandeau niveau requis vs visé (mutualisé avec AF + Synthèse) --}}
+  {{> _cover-level-band}}
 
   {{!-- Meta projet (3 colonnes comme synthesis) --}}
   <div class="cover-meta">

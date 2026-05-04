@@ -37,21 +37,8 @@
     </div>
   </div>
 
-  {{!-- Bandeau niveau de contrat --}}
-  <div class="cover-level-band cover-level-band-{{kpis.verdict.kind}}">
-    <div class="cover-level-band-row">
-      <div class="cover-level-band-item">
-        <p class="cover-level-band-label">Niveau Buildy requis</p>
-        <p class="cover-level-band-value">{{#if kpis.requiredLevelLabel}}{{kpis.requiredLevelLabel}}{{else}}—{{/if}}</p>
-      </div>
-      <div class="cover-level-band-arrow">vs</div>
-      <div class="cover-level-band-item">
-        <p class="cover-level-band-label">Niveau actuellement visé</p>
-        <p class="cover-level-band-value">{{#if kpis.contractLevelLabel}}{{kpis.contractLevelLabel}}{{else}}<em>à définir</em>{{/if}}</p>
-      </div>
-    </div>
-    <p class="cover-verdict-text">{{kpis.verdict.text}}</p>
-  </div>
+  {{!-- Bandeau niveau de contrat (mutualise via partial) --}}
+  {{> _cover-level-band}}
 
   {{!-- Meta projet --}}
   <div class="cover-meta">
@@ -79,18 +66,7 @@
 {{!-- ═══════════════════ PAGE 1bis — Détails projet (tabulaire) ═══════════════════ --}}
 {{#if optedOutList.length}}
 <section class="page">
-  <header class="page-header">
-    <div class="page-header-left">
-      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
-      <div>
-        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">Fonctionnalités écartées par la maîtrise d'ouvrage</h1>
-      </div>
-    </div>
-    <div class="page-header-right">
-      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-    </div>
-  </header>
+  <h1 class="page-title">Fonctionnalités écartées par la maîtrise d'ouvrage</h1>
 
   <p class="section-intro">Ces fonctionnalités, bien que décrites dans l'AF, ont été <strong>volontairement écartées</strong> par la maîtrise d'ouvrage et ne seront pas disponibles à la livraison du chantier. Pour les activer ultérieurement, un contrat adapté doit être conclu entre Buildy et l'exploitant.</p>
 
@@ -107,18 +83,7 @@
 
 {{!-- ═══════════════════ PAGE 2 — Zones fonctionnelles × catégories ═══════════════════ --}}
 <section class="page">
-  <header class="page-header">
-    <div class="page-header-left">
-      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
-      <div>
-        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">2. Zones fonctionnelles du bâtiment</h1>
-      </div>
-    </div>
-    <div class="page-header-right">
-      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-    </div>
-  </header>
+  <h1 class="page-title">2. Zones fonctionnelles du bâtiment</h1>
 
   {{#if hasZones}}
   <p class="section-intro">Nombre d'instances d'équipements prévues par zone et par catégorie. Les colonnes marquées <span class="bacs-col-marker">⚖️</span> correspondent à des systèmes <strong>visés par le décret BACS</strong> (R175-1 1° chauffage, 2° climatisation, 3° ventilation, 4° systèmes techniques de bâtiment).</p>
@@ -169,36 +134,14 @@
      d'AF garantit l'absence de doublons (une AF customisee/dupliquee
      ne fait plus apparaitre 2 fois la meme fonctionnalite). --}}
 <section class="page page-offerings">
-  <header class="page-header">
-    <div class="page-header-left">
-      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
-      <div>
-        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">3. Fonctionnalités Buildy par niveau d'offre</h1>
-      </div>
-    </div>
-    <div class="page-header-right">
-      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-    </div>
-  </header>
+  <h1 class="page-title">3. Fonctionnalités Buildy par niveau d'offre</h1>
 
   {{> _offerings-annex}}
 </section>
 
 {{!-- ═══════════════════ PAGE 4 — Synthèse des systèmes ═══════════════════ --}}
 <section class="page">
-  <header class="page-header">
-    <div class="page-header-left">
-      <img class="page-logo" src="{{logoDataUrl}}" alt="Buildy" />
-      <div>
-        <p class="page-doctype">Synthèse — {{af.client_name}} {{af.project_name}}</p>
-        <h1 class="page-title">4. Systèmes techniques supervisés</h1>
-      </div>
-    </div>
-    <div class="page-header-right">
-      <p class="page-meta"><span class="meta-label">Version</span> <span class="version-tag">{{version}}</span></p>
-    </div>
-  </header>
+  <h1 class="page-title">4. Systèmes techniques supervisés</h1>
 
   <p class="section-intro">Liste de toutes les catégories de systèmes décrites dans l'AF, leur statut au regard du décret BACS, le nombre d'instances déclarées et le total de points en lecture / écriture <strong>attendus</strong> côté Buildy.</p>
 

@@ -1,0 +1,37 @@
+{{!-- Bandeau cover unifie : Required vs Visé + Justifications + Verdict.
+     Inclus à l'identique dans af.hbs, synthesis.hbs, points-list.hbs.
+     La barre de couleur a gauche reflete le verdict (vert ok / jaune
+     no-contract / rouge shortfall / bleu over).
+
+     Attendu dans le contexte :
+       kpis.requiredLevelLabel             ex: "Premium"
+       kpis.contractLevelLabel             ex: "Smart" ou null
+       kpis.verdict                        { kind, text }   message court SANS répéter les niveaux
+       serviceLevel.justifications         [{ title, ... }]  optionnel
+--}}
+<div class="cover-level-band cover-level-band-{{kpis.verdict.kind}}">
+  <div class="cover-level-band-row">
+    <div class="cover-level-band-item">
+      <p class="cover-level-band-label">Niveau Buildy requis</p>
+      <p class="cover-level-band-value">{{#if kpis.requiredLevelLabel}}{{kpis.requiredLevelLabel}}{{else}}—{{/if}}</p>
+    </div>
+    <div class="cover-level-band-arrow">vs</div>
+    <div class="cover-level-band-item">
+      <p class="cover-level-band-label">Niveau actuellement visé</p>
+      <p class="cover-level-band-value">{{#if kpis.contractLevelLabel}}{{kpis.contractLevelLabel}}{{else}}<em>à définir</em>{{/if}}</p>
+    </div>
+  </div>
+
+  {{#if serviceLevel.justifications.length}}
+  <div class="cover-level-band-justifications">
+    <p class="cover-level-band-justif-label">Niveau requis justifié par</p>
+    <ul class="cover-level-band-justif-list">
+      {{#each serviceLevel.justifications}}
+      <li>{{title}}</li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
+
+  <p class="cover-verdict-text">{{kpis.verdict.text}}</p>
+</div>

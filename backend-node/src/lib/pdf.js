@@ -423,14 +423,20 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     //   - Masque header/footer de la page 1 si demande (preserve liens TOC).
     //   - Applique le filigrane Buildy sur les pages demandees.
     //   - Injecte les champs AcroForm (text/textarea/checkbox) si demande.
+    //
+    // ATTENTION : si coverFullBleed est actif, la page 1 a deja ete re-rendue
+    // SANS header/footer (cf bloc plus haut). Appliquer maskFirstPage par
+    // dessus dessinerait 2 rectangles bleu marine qui tronquent le contenu
+    // reel de la cover (logo en haut, legal en bas). Bug isole 2026-05-04.
+    const skipMaskBecauseFullBleed = coverFullBleed;
+    const needMask = skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter
+      && pdfOptions.margin && !skipMaskBecauseFullBleed;
     const needPostProcess =
-      (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter && pdfOptions.margin) ||
+      needMask ||
       watermark || (addFormFields && extractedFields && extractedFields.length);
     if (needPostProcess) {
       await postProcessPdf(outputPath, {
-        maskFirstPage: (skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter)
-          ? { margin: pdfOptions.margin, color: '#1b2842' }
-          : null,
+        maskFirstPage: needMask ? { margin: pdfOptions.margin, color: '#1b2842' } : null,
         watermark,
         formFields: addFormFields ? extractedFields : null,
         pageFormat,
@@ -617,6 +623,43 @@ body > .cover:first-child {
 `;
 }
 
+// Header/footer Puppeteer unifie pour tous les PDF Buildy.
+// - HEADER : "CLIENT · PROJET" a gauche (uppercase), "<Doc> · <version>" a droite (mono)
+// - FOOTER : [logo Buildy] | "<Doc> · note" | "Page X / Y"
+// Toujours utiliser cet helper, jamais de header/footer custom dans une route :
+// l'objectif est d'avoir des en-tetes/pieds de page identiques sur tous les exports.
+function buildHeaderFooter({
+  clientName,
+  projectName,
+  docType,        // ex: "Analyse Fonctionnelle", "Synthèse", "Audit BACS", "Liste de points"
+  version,        // ex: "af-v0.14"
+  logoDataUrl,    // result of loadAssetDataUrl('logo-buildy.svg')
+  footerNote,     // optionnel, defaut = "<docType> · document confidentiel"
+  margin,         // optionnel, defaut adapte au portrait A4
+}) {
+  const esc = (s) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+  const ctx = `${esc(clientName)} · ${esc(projectName)}`;
+  const docRight = `${esc(docType)} · ${esc(version)}`;
+  const note = footerNote || `${docType} · document confidentiel`;
+  return {
+    displayHeaderFooter: true,
+    margin: margin || { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },
+    headerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; justify-content:space-between; align-items:center; letter-spacing:0.02em;">
+      <span style="text-transform:uppercase; letter-spacing:0.1em; font-size:6.5pt; color:#9ca3af;">${ctx}</span>
+      <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#6b7280;">${docRight}</span>
+    </div>`,
+    footerTemplate: `<div style="font-family:'Helvetica',sans-serif; font-size:7.5pt; color:#9ca3af; padding:0 12mm; width:100%; display:flex; align-items:center; gap:4mm; border-top:0.4pt solid #e5e7eb; padding-top:2mm;">
+      <img src="${logoDataUrl}" style="height:4mm; opacity:0.55;" />
+      <span style="flex:1; color:#9ca3af; font-size:7pt;">${esc(note)}</span>
+      <span style="font-family:'SFMono-Regular',Menlo,monospace; font-size:7pt; color:#4b5563; font-weight:600;">
+        <span class="pageNumber"></span> <span style="color:#9ca3af; font-weight:400;">/</span> <span class="totalPages"></span>
+      </span>
+    </div>`,
+  };
+}
+
 function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation = 'portrait' }) {
   const tpl = loadTemplate(template);
   const css = loadStyles(styles);
@@ -627,6 +670,7 @@ function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation
 module.exports = {
   renderPdf,
   renderHtml,
+  buildHeaderFooter,
   loadAssetDataUrl,
   loadFileAsDataUrl,
   shutdown,

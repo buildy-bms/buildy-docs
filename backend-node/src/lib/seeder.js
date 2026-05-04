@@ -353,13 +353,32 @@ function backfillNewPlanSections() {
   let totalInserted = 0;
 
   for (const af of allAfs) {
-    const existingNumbers = new Set(
-      db.db.prepare('SELECT number FROM sections WHERE af_id = ?').all(af.id).map(r => r.number)
+    // Dedup par section_template_id (stable) au lieu de number (instable :
+    // a chaque renumerotation du PLAN_AF, des chapitres existants se voyaient
+    // re-inseres car leur nouveau number ne matchait plus l'ancien). Bug
+    // isole 2026-05-04 : AF #25 avait 13 sections en doublon car le plan a
+    // renomme "Maintenance et exploitation" de ch.6 a ch.10, idem ch.8/12,
+    // ch.9/13, etc. — backfill recreait tous ces chapitres a chaque boot.
+    const existingTemplateIds = new Set(
+      db.db.prepare('SELECT section_template_id FROM sections WHERE af_id = ? AND section_template_id IS NOT NULL').all(af.id).map(r => r.section_template_id)
+    );
+    // Fallback par title (pour les sections orphelines sans section_template_id).
+    const existingTitles = new Set(
+      db.db.prepare('SELECT title FROM sections WHERE af_id = ?').all(af.id).map(r => r.title)
     );
 
     for (const { number, parent_number, position, node } of planNodes) {
-      if (existingNumbers.has(number)) continue;
       if (!node.number) continue; // skip 'zones' top-level (deja gere)
+
+      // Lookup section_template d'abord (sert au dedup)
+      const slug = sectionTemplateSlug(node);
+      const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
+
+      // Dedup principal : section_template_id deja present pour cette AF
+      if (tpl && existingTemplateIds.has(tpl.id)) continue;
+      // Dedup secondaire : fallback par title (couvre les sections heritees
+      // sans link vers un template, ex: AFs creees avant Lot 33).
+      if (existingTitles.has(node.title)) continue;
 
       // Trouve le parent dans cette AF (par number)
       let parentId = null;
@@ -368,10 +387,6 @@ function backfillNewPlanSections() {
         if (!parent) continue; // parent absent → skip (cas theorique)
         parentId = parent.id;
       }
-
-      // Lookup section_template
-      const slug = sectionTemplateSlug(node);
-      const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
       const serviceLevel = node.features
         ? formatServiceLevel(node.features)
         : (node.service_level || null);
@@ -396,7 +411,9 @@ function backfillNewPlanSections() {
       if (tpl) {
         db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
           .run(tpl.id, tpl.current_version, created.id);
+        existingTemplateIds.add(tpl.id);
       }
+      existingTitles.add(node.title);
       totalInserted++;
     }
   }
