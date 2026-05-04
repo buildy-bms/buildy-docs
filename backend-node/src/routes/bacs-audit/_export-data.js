@@ -210,6 +210,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   }));
   const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
+  // Compteurs avec notes ou photos : pour le sous-bloc "Notes terrain"
+  // de la section 4 (sinon on n'affiche rien, plutot que des cards vides).
+  const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
 
   const thermal = thermalRaw.map(t => ({
     ...t,
@@ -359,6 +362,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     zones,
     systemsByZone,
     meters: enrichedMeters,
+    metersWithDetails,
     thermal,
     bms,
     bmsManagedDevices,

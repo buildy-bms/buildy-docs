@@ -156,25 +156,33 @@
 </div>
 {{/if}}
 
-<div class="charts-row" style="display: flex; gap: 12mm; align-items: flex-start; margin: 4mm 0;">
-  <div style="flex: 0 0 auto;">
-    <table style="margin: 0;">
-      <thead><tr><th>Sévérité</th><th>Actions</th></tr></thead>
-      <tbody>
-        <tr><td><span class="sev sev-blocking">Bloquantes</span></td><td><strong>{{actionStats.blocking}}</strong></td></tr>
-        <tr><td><span class="sev sev-major">Majeures</span></td><td><strong>{{actionStats.major}}</strong></td></tr>
-        <tr><td><span class="sev sev-minor">Mineures</span></td><td><strong>{{actionStats.minor}}</strong></td></tr>
-      </tbody>
-    </table>
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Actions correctives par sévérité</h3>
+    <p class="panel-subtitle">Détail complet et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
   </div>
-  {{#if sevDonutDataUrl}}
-  <div style="flex: 0 0 auto; max-width: 80mm;">
-    <img src="{{sevDonutDataUrl}}" alt="Répartition des actions par sévérité" style="width: 100%; max-width: 80mm;" />
+  <div class="panel-body">
+    <div class="severity-stats">
+      <div class="sev-stat">
+        <span class="sev sev-blocking">Bloquantes</span>
+        <span class="sev-stat-count">{{actionStats.blocking}}</span>
+      </div>
+      <div class="sev-stat">
+        <span class="sev sev-major">Majeures</span>
+        <span class="sev-stat-count">{{actionStats.major}}</span>
+      </div>
+      <div class="sev-stat">
+        <span class="sev sev-minor">Mineures</span>
+        <span class="sev-stat-count">{{actionStats.minor}}</span>
+      </div>
+      {{#if sevDonutDataUrl}}
+      <div class="sev-stat-chart">
+        <img src="{{sevDonutDataUrl}}" alt="Répartition des actions par sévérité" />
+      </div>
+      {{/if}}
+    </div>
   </div>
-  {{/if}}
 </div>
-
-<p class="muted">Détail des actions et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
 {{/if}}
 
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
@@ -231,38 +239,47 @@
 </div>
 
 {{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
-<h3>Détail du calcul automatique de la puissance</h3>
-<p class="muted" style="margin-bottom:2mm">
-  La puissance cumulée chauffage + climatisation est obtenue en additionnant
-  les puissances nominales utiles des équipements saisis dans les catégories
-  <strong>chauffage</strong> et <strong>climatisation</strong> (chapitre 3).
-</p>
-<table>
-  <thead>
-    <tr><th>Équipement</th><th>Marque / référence</th><th>Catégorie</th><th>Zone</th><th>Puissance</th></tr>
-  </thead>
-  <tbody>
-    {{#each heatingCoolingBreakdown}}
-      <tr>
-        <td>{{name}}</td>
-        <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
-        <td>{{categoryLabel}}</td>
-        <td>{{zone_name}}</td>
-        <td><strong>{{power_kw}} kW</strong></td>
-      </tr>
-    {{/each}}
-    <tr class="total-row">
-      <td colspan="4" style="text-align:right"><strong>Total chauffage + climatisation</strong></td>
-      <td><strong>{{heatingCoolingTotal}} kW</strong></td>
-    </tr>
-  </tbody>
-</table>
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Détail du calcul automatique de la puissance</h3>
+    <p class="panel-subtitle">
+      Somme des puissances nominales utiles des équipements saisis dans les catégories
+      <strong>chauffage</strong> et <strong>climatisation</strong> (chapitre 3).
+    </p>
+  </div>
+  <div class="panel-body">
+    <table>
+      <thead>
+        <tr><th>Équipement</th><th>Marque / référence</th><th>Catégorie</th><th>Zone</th><th>Puissance</th></tr>
+      </thead>
+      <tbody>
+        {{#each heatingCoolingBreakdown}}
+          <tr>
+            <td>{{name}}</td>
+            <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
+            <td>{{categoryLabel}}</td>
+            <td>{{zone_name}}</td>
+            <td><strong>{{power_kw}} kW</strong></td>
+          </tr>
+        {{/each}}
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right"><strong>Total chauffage + climatisation</strong></td>
+          <td><strong>{{heatingCoolingTotal}} kW</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 {{/if}}{{/if}}
 
 {{#if barUsagePowerDataUrl}}
-<h3>Répartition de la puissance par usage</h3>
-<div style="text-align: center; margin: 2mm 0;">
-  <img src="{{barUsagePowerDataUrl}}" alt="Puissance par usage GTB" style="max-width: 140mm;" />
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Répartition de la puissance par usage</h3>
+  </div>
+  <div class="panel-body panel-body-center">
+    <img src="{{barUsagePowerDataUrl}}" alt="Puissance par usage GTB" style="max-width: 140mm;" />
+  </div>
 </div>
 {{/if}}
 
@@ -301,75 +318,89 @@
 <h2 class="zone-heading">{{zone_name}}</h2>
 {{#each items}}
   {{#if present}}
-    <h3 class="system-heading">{{{categoryIcon system_category "18"}}}<span class="system-heading-label">{{categoryLabel}}</span>{{#if total_power_kw}} <span class="system-heading-meta">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
-    {{#if devices.length}}
-      <table class="device-table">
-        <thead>
-          <tr>
-            <th style="width:24%">Équipement</th>
-            <th style="width:20%">Marque / réf.</th>
-            <th style="width:9%">Énergie</th>
-            <th style="width:8%">Puiss.</th>
-            <th style="width:11%">Nature</th>
-            <th style="width:14%">Communication</th>
-            <th style="width:14%">Localisation</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#each devices}}
-            <tr {{#if out_of_service}}style="opacity:0.5"{{/if}}>
-              <td>
-                <strong>{{name}}</strong>
-                {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
-              </td>
-              <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
-              <td>{{energyLabel}}</td>
-              <td>{{power_kw}}{{#if power_kw}} kW{{/if}}</td>
-              <td>{{roleLabel}}</td>
-              <td>{{commLabel}}</td>
-              <td>{{location}}</td>
-            </tr>
-            <tr class="r175-3-row" {{#if out_of_service}}style="opacity:0.5"{{/if}}>
-              <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
-                <span class="r175-3-label">R175-3 :</span>
-                <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} Interopérable
-                </span>
-                <span class="r175-3-pill {{#if meets_r175_3_p4}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} Arrêt manuel
-                </span>
-                <span class="r175-3-pill {{#if meets_r175_3_p4_autonomous}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                  {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} Autonome
-                </span>
-              </td>
-            </tr>
-          {{/each}}
-        </tbody>
-      </table>
-    {{else}}
-      <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
-    {{/if}}
-    {{#if notes_html}}
-      <div class="rich-notes">{{{notes_html}}}</div>
-    {{else}}{{#if notes}}<p class="muted"><em>Notes :</em> {{notes}}</p>{{/if}}{{/if}}
-    {{#if photos.length}}
-      <div class="photo-grid">
-        {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+    <div class="system-card system-card-{{system_category}}">
+      <div class="system-card-head">
+        {{{categoryIcon system_category "16"}}}
+        <span class="system-card-label">{{categoryLabel}}</span>
+        {{#if total_power_kw}}
+          <span class="system-card-power">{{total_power_kw}} kW</span>
+        {{/if}}
+        <span class="system-card-count">{{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}}</span>
       </div>
-    {{/if}}
-    {{#each devices}}
-      {{#if (or notes_html photos.length)}}
-        <div class="device-notes">
-          <strong class="muted">{{name}}{{#if brand}} — {{brand}}{{/if}}{{#if model_reference}} {{model_reference}}{{/if}}</strong>
-          {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
+      <div class="system-card-body">
+        {{#if devices.length}}
+          <table class="device-table">
+            <thead>
+              <tr>
+                <th style="width:24%">Équipement</th>
+                <th style="width:20%">Marque / réf.</th>
+                <th style="width:9%">Énergie</th>
+                <th style="width:8%">Puiss.</th>
+                <th style="width:11%">Nature</th>
+                <th style="width:14%">Communication</th>
+                <th style="width:14%">Localisation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each devices}}
+                <tr {{#if out_of_service}}style="opacity:0.5"{{/if}}>
+                  <td>
+                    <strong>{{name}}</strong>
+                    {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
+                  </td>
+                  <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
+                  <td>{{energyLabel}}</td>
+                  <td>{{power_kw}}{{#if power_kw}} kW{{/if}}</td>
+                  <td>{{roleLabel}}</td>
+                  <td>{{commLabel}}</td>
+                  <td>{{location}}</td>
+                </tr>
+                <tr class="r175-3-row" {{#if out_of_service}}style="opacity:0.5"{{/if}}>
+                  <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
+                    <span class="r175-3-label">R175-3 :</span>
+                    <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                      {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} Interopérable
+                    </span>
+                    <span class="r175-3-pill {{#if meets_r175_3_p4}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                      {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} Arrêt manuel
+                    </span>
+                    <span class="r175-3-pill {{#if meets_r175_3_p4_autonomous}}r175-3-ok{{else}}r175-3-ko{{/if}}">
+                      {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} Autonome
+                    </span>
+                  </td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        {{else}}
+          <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
+        {{/if}}
+        {{#if (or notes_html notes photos.length)}}
+        <div class="system-card-notes">
+          {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
+          {{else}}{{#if notes}}<p class="muted">{{notes}}</p>{{/if}}{{/if}}
           {{#if photos.length}}
             <div class="photo-grid">
               {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
             </div>
           {{/if}}
         </div>
-      {{/if}}
-    {{/each}}
+        {{/if}}
+        {{#each devices}}
+          {{#if (or notes_html photos.length)}}
+            <div class="device-notes">
+              <strong class="muted">{{name}}{{#if brand}} — {{brand}}{{/if}}{{#if model_reference}} {{model_reference}}{{/if}}</strong>
+              {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
+              {{#if photos.length}}
+                <div class="photo-grid">
+                  {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+                </div>
+              {{/if}}
+            </div>
+          {{/if}}
+        {{/each}}
+      </div>
+    </div>
   {{else}}
     <div class="system-absent">
       {{{categoryIcon system_category "16"}}}
@@ -405,10 +436,17 @@
     {{/each}}
   </tbody>
 </table>
-{{#each meters}}
-  {{#if (or notes_html notes photos.length)}}
-    <div class="entity-block">
-      <h3>{{zoneLabel}} — {{usageLabel}} ({{typeLabel}})</h3>
+{{#if metersWithDetails.length}}
+<h3 class="subheading">Notes terrain & photos</h3>
+<p class="muted" style="margin: -1mm 0 2mm">Détails relevés par l'auditeur sur les compteurs du tableau ci-dessus.</p>
+{{#each metersWithDetails}}
+  <div class="detail-card">
+    <div class="detail-card-head">
+      {{{faIcon "gauge" "#10b981" "13"}}}
+      <span class="detail-card-title">{{zoneLabel}} — {{usageLabel}}</span>
+      <span class="detail-card-meta">{{typeLabel}}</span>
+    </div>
+    <div class="detail-card-body">
       {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
       {{else}}{{#if notes}}<p>{{notes}}</p>{{/if}}{{/if}}
       {{#if photos.length}}
@@ -417,8 +455,9 @@
         </div>
       {{/if}}
     </div>
-  {{/if}}
+  </div>
 {{/each}}
+{{/if}}
 {{else}}
 <p class="muted">Aucun compteur listé. Saisis les équipements (avec leur énergie) pour générer automatiquement les compteurs requis.</p>
 {{/if}}

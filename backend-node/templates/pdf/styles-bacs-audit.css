@@ -1033,31 +1033,184 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   font-style: italic;
 }
 
-/* ── Chapitre 3 — titres zone / système (allégés) ─────────────────
-   Headings plus aérés et moins gras pour ressembler à l'UI. Trait
-   subtil sous le nom de zone, label catégorie en weight 500. */
+/* ── Panneau standard (titre + sous-titre + corps en card) ────────
+   Utilise pour grouper visuellement un sous-bloc autonome (calcul de
+   puissance, graphique, sous-section narrative…). Plus clair qu'un
+   simple <h3> + <table> qui flotte. */
+.panel {
+  margin: 4mm 0 6mm;
+  background: #fff;
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 1.2mm;
+  page-break-inside: avoid;
+  overflow: hidden;
+}
+.panel-head {
+  background: #f9fafb;
+  border-bottom: 0.4pt solid #e5e7eb;
+  padding: 2.5mm 4mm 2mm;
+}
+.panel-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 9.5pt;
+  font-weight: 600;
+  color: #1b2842;
+  margin: 0;
+}
+.panel-subtitle {
+  margin: 1mm 0 0;
+  font-size: 7.8pt;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.panel-body { padding: 3mm 4mm; }
+.panel-body table { margin: 0; }
+.panel-body-center { text-align: center; padding: 3mm 4mm; }
+
+/* ── Chapitre 3 — zone heading + carte par catégorie de système ───
+   Chaque catégorie présente est une vraie card autonome :
+   header (icone + label + puissance + nb équipements) + body
+   (tableau d'équipements + notes/photos), filet vertical coloré par
+   catégorie. Lisibilité forte, pas de heading nu qui flotte. */
 h2.zone-heading {
   font-family: 'Poppins', sans-serif;
   font-size: 12pt;
   font-weight: 600;
   color: #1b2842;
-  margin: 7mm 0 2mm;
+  margin: 7mm 0 3mm;
   padding: 0 0 1.2mm;
   border-bottom: 0.6pt solid #e5e7eb;
   letter-spacing: -0.01em;
 }
-h3.system-heading {
+.system-card {
+  margin: 0 0 4mm;
+  background: #fff;
+  border: 0.4pt solid #e5e7eb;
+  border-left: 2.5pt solid #94a3b8;
+  border-radius: 1.2mm;
+  page-break-inside: avoid;
+  overflow: hidden;
+}
+.system-card-heating { border-left-color: #dc2626; }
+.system-card-cooling { border-left-color: #0891b2; }
+.system-card-ventilation { border-left-color: #64748b; }
+.system-card-dhw { border-left-color: #0284c7; }
+.system-card-lighting_indoor { border-left-color: #f59e0b; }
+.system-card-lighting_outdoor { border-left-color: #f59e0b; }
+.system-card-electricity_production { border-left-color: #16a34a; }
+.system-card-head {
   display: flex;
   align-items: center;
-  gap: 1.5mm;
+  gap: 2mm;
+  padding: 2.2mm 3.5mm;
+  background: #f9fafb;
+  border-bottom: 0.4pt solid #e5e7eb;
+}
+.system-card-label {
   font-family: 'Poppins', sans-serif;
   font-size: 9.5pt;
-  font-weight: 500;
-  color: #1f2937;
-  margin: 4mm 0 1.5mm;
+  font-weight: 600;
+  color: #1b2842;
 }
-.system-heading-label { color: #1b2842; font-weight: 600; }
-.system-heading-meta { color: #6b7280; font-weight: 400; font-size: 8.5pt; }
+.system-card-power {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8pt;
+  font-weight: 600;
+  background: #ecfdf5;
+  color: #065f46;
+  padding: 0.5mm 2mm;
+  border-radius: 0.8mm;
+  border: 0.3pt solid #6ee7b7;
+}
+.system-card-count {
+  margin-left: auto;
+  font-size: 7.5pt;
+  color: #6b7280;
+  font-weight: 500;
+}
+.system-card-body { padding: 2.5mm 3.5mm; }
+.system-card-body table { margin: 0; }
+.system-card-notes {
+  margin-top: 3mm;
+  padding-top: 2.5mm;
+  border-top: 0.4pt dashed #e5e7eb;
+}
+.system-card-notes p:last-child { margin-bottom: 0; }
+
+/* Sévérité : 3 grosses tuiles + chart aligné */
+.severity-stats {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+  flex-wrap: wrap;
+}
+.sev-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  align-items: center;
+  padding: 3mm 5mm;
+  background: #fafbfc;
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 1mm;
+  min-width: 28mm;
+}
+.sev-stat-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16pt;
+  font-weight: 700;
+  color: #1b2842;
+  line-height: 1;
+}
+.sev-stat-chart {
+  margin-left: auto;
+  max-width: 60mm;
+}
+.sev-stat-chart img { width: 100%; max-width: 60mm; }
+
+/* Sous-titre standard (section 4 notes terrain, etc.) */
+h3.subheading {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10pt;
+  font-weight: 600;
+  color: #1b2842;
+  margin: 6mm 0 1mm;
+  padding-bottom: 1mm;
+  border-bottom: 0.4pt solid #e5e7eb;
+}
+
+/* ── Detail card (notes terrain compteurs, etc.) ──────────────────
+   Plus compact qu'une system-card, mais structure header/body. */
+.detail-card {
+  margin: 0 0 3mm;
+  background: #fff;
+  border: 0.4pt solid #e5e7eb;
+  border-left: 2pt solid #10b981;
+  border-radius: 1mm;
+  page-break-inside: avoid;
+  overflow: hidden;
+}
+.detail-card-head {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  padding: 1.8mm 3mm;
+  background: #f9fafb;
+  border-bottom: 0.4pt solid #f3f4f6;
+}
+.detail-card-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: #1b2842;
+}
+.detail-card-meta {
+  margin-left: auto;
+  font-size: 7.5pt;
+  color: #6b7280;
+}
+.detail-card-body { padding: 2.5mm 3mm; }
+.detail-card-body p:last-child { margin-bottom: 0; }
 
 /* Catégorie marquée non présent / non concerné — visible avec icône */
 .system-absent {
