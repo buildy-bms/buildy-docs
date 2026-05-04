@@ -39,13 +39,18 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
 }
 .cover-top { display: flex; flex-direction: column; }
 .cover-logo { width: 36mm; margin-bottom: 6mm; filter: brightness(0) invert(1); }
+/* Cover : doc-type en gros titre majuscule, nom de projet en sous-titre. */
 .cover-doc-type {
-  font-size: 8pt; text-transform: uppercase; letter-spacing: 0.25em;
-  color: rgba(255,255,255,0.6); margin: 0 0 2.5mm; font-weight: 500;
+  font-family: 'Poppins', sans-serif;
+  font-size: 24pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.02em;
+  color: white; margin: 0 0 3mm; line-height: 1.1;
 }
 .cover-title {
-  font-size: 26pt; font-weight: 700; margin: 0 0 2.5mm;
-  letter-spacing: -0.01em; line-height: 1.1;
+  font-family: 'Poppins', sans-serif;
+  font-size: 15pt; font-weight: 400;
+  color: rgba(255,255,255,0.75);
+  letter-spacing: -0.005em; margin: 0 0 2.5mm; line-height: 1.2;
 }
 .cover-client {
   font-size: 14pt; color: rgba(255,255,255,0.88); font-weight: 500; margin: 0 0 1.5mm;
