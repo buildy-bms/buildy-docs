@@ -87,7 +87,7 @@ else
 fi
 
 # 6. Firewall (ouvre PORT pour NetBird subnet 100.64.0.0/16)
-echo "[6/6] Ouverture iptables port $PORT pour le subnet NetBird..."
+echo "[6/7] Ouverture iptables port $PORT pour le subnet NetBird..."
 if iptables -L INPUT -n | grep -q "tcp dpt:$PORT"; then
     echo "  → regle iptables deja presente."
 else
@@ -100,6 +100,19 @@ else
     fi
 fi
 
+# 7. Sauvegardes auto de la DB : crontab daily 03:00 + dossiers + premier snapshot
+echo "[7/7] Setup sauvegardes auto de la DB (cron daily + dossiers)..."
+mkdir -p $INSTALL_DIR/data/backups/{daily,predeploy,manual-legacy,pre-restore}
+CRON_LINE="0 3 * * * $INSTALL_DIR/deploy/backup-db.sh daily >> /var/log/buildy-docs-backup.log 2>&1"
+if crontab -l 2>/dev/null | grep -qF "deploy/backup-db.sh daily"; then
+    echo "  → ligne cron deja presente."
+else
+    (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
+    echo "  → ligne cron ajoutee : $CRON_LINE"
+fi
+touch /var/log/buildy-docs-backup.log
+chmod +x $INSTALL_DIR/deploy/backup-db.sh $INSTALL_DIR/deploy/restore-db.sh
+
 echo ""
 echo "=========================================="
 echo "  Installation terminee."
@@ -108,4 +121,5 @@ echo "  1. Editer $INSTALL_DIR/.env avec les valeurs PocketID OIDC"
 echo "  2. cd $INSTALL_DIR && pm2 start ecosystem.config.cjs --env production"
 echo "  3. pm2 save"
 echo "  4. Tester : https://buildy-docs.buildy.wan:$PORT/api/health"
+echo "  5. Backups DB : daily 03:00 -> data/backups/daily, pre-deploy auto, restore via deploy/restore-db.sh"
 echo "=========================================="

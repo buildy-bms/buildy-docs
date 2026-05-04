@@ -32,6 +32,14 @@ pm2 stop buildy-docs             # arret backend
 - Prod : `pm2 start ecosystem.config.cjs --env production` (NODE_ENV=production, PORT=3443, TZ=Europe/Paris, watch desactive)
 - Premier deploiement / apres `pm2 delete` : `pm2 start ecosystem.config.cjs --env production && pm2 save`
 
+## Sauvegardes DB de prod
+- **Daily auto** : crontab root `0 3 * * * /opt/buildy-docs/deploy/backup-db.sh daily`, retention 30 jours, log dans `/var/log/buildy-docs-backup.log`
+- **Pre-deploy auto** : `deploy/update-vps.sh` execute `backup-db.sh predeploy` en etape 0 avant tout `git pull`, retention 20 deploys, snapshot tagge avec le SHA git
+- **Stockage** : `/opt/buildy-docs/data/backups/{daily,predeploy,manual-legacy,pre-restore}/<kind>-<ts>[-<sha>].db.gz`
+- **Methode** : `node + better-sqlite3.backup()` — copie WAL-safe sans arret pm2
+- **Restauration** : `bash /opt/buildy-docs/deploy/restore-db.sh` (mode interactif liste les snapshots, demande confirmation, sauvegarde l'etat courant sous `pre-restore/` avant overwrite, restart pm2)
+- **Non-offsite** : protection contre regression / erreur humaine uniquement, PAS contre une perte du VPS
+
 ## Convention chemins
 - Backend Node : `backend-node/src/{lib,routes,services}/` (meme convention FM)
 - Frontend Vue : `frontend/src/{components,views,composables,stores}/`
