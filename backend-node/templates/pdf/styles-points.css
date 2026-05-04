@@ -38,6 +38,12 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   gap: 8mm;
   position: relative;
   box-sizing: border-box;
+  /* DEBUG : bordure jaune fluo de 3mm pour voir EXACTEMENT ou la cover
+     se positionne par rapport aux bords de page. Si la bordure jaune
+     n'est pas a l'extreme bord, c'est que @page :first margin: 0 n'est
+     pas respecte ET/OU coverFullBleed n'a pas tourne. */
+  outline: 3mm solid #facc15 !important;
+  outline-offset: -3mm !important;
 }
 .cover-top { display: flex; flex-direction: column; }
 .cover-logo { width: 36mm; margin-bottom: 6mm; filter: brightness(0) invert(1); }
