@@ -290,7 +290,7 @@
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
   <tbody>
     {{#each zones}}
-      <tr><td>{{name}}</td><td>{{nature}}</td><td>{{surface_m2}}</td></tr>
+      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{surface_m2}}</td></tr>
     {{/each}}
   </tbody>
 </table>
@@ -514,133 +514,202 @@
   <div class="callout-body"><strong>GTB Hors-Service.</strong> Les exigences R175-3, R175-4 et R175-5 ne sont pas évaluées car la GTB n'est pas opérationnelle au moment de l'audit.</div>
 </div>
 {{/if}}
-<table>
-  <tr><th>Solution en place</th><td>{{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}<span class="muted">Non renseigné</span>{{/if}}</td></tr>
-  {{#if bms.existing_solution_brand}}<tr><th>Marque / éditeur</th><td>{{bms.existing_solution_brand}}</td></tr>{{/if}}
-  {{#if bms.location}}<tr><th>Localisation</th><td>{{bms.location}}</td></tr>{{/if}}
-  {{#if bms.model_reference}}<tr><th>Référence modèle</th><td>{{bms.model_reference}}</td></tr>{{/if}}
-</table>
 
-<h3>Usages traités par la GTB</h3>
-<div class="usage-tags">
-  {{#if bms.manages_heating}}<span class="usage-tag">Chauffage</span>{{/if}}
-  {{#if bms.manages_cooling}}<span class="usage-tag">Refroidissement</span>{{/if}}
-  {{#if bms.manages_ventilation}}<span class="usage-tag">Ventilation</span>{{/if}}
-  {{#if bms.manages_dhw}}<span class="usage-tag">ECS</span>{{/if}}
-  {{#if bms.manages_lighting}}<span class="usage-tag">Éclairage</span>{{/if}}
-  {{#unless bms.manages_heating}}{{#unless bms.manages_cooling}}{{#unless bms.manages_ventilation}}{{#unless bms.manages_dhw}}{{#unless bms.manages_lighting}}<span class="muted">Aucun usage déclaré.</span>{{/unless}}{{/unless}}{{/unless}}{{/unless}}{{/unless}}
+{{!-- Card 1 — Identité de la solution GTB --}}
+<div class="info-cards">
+  <div class="info-card info-card-wide info-card-accent">
+    <span class="info-card-label">Solution en place</span>
+    <span class="info-card-value info-card-value-strong">
+      {{#if bms.existing_solution}}{{bms.existing_solution}}{{else}}Non renseigné{{/if}}
+    </span>
+  </div>
+  {{#if bms.existing_solution_brand}}
+  <div class="info-card">
+    <span class="info-card-label">Marque / éditeur</span>
+    <span class="info-card-value">{{bms.existing_solution_brand}}</span>
+  </div>
+  {{/if}}
+  {{#if bms.model_reference}}
+  <div class="info-card">
+    <span class="info-card-label">Référence modèle</span>
+    <span class="info-card-value">{{bms.model_reference}}</span>
+  </div>
+  {{/if}}
+  {{#if bms.location}}
+  <div class="info-card info-card-wide">
+    <span class="info-card-label">Localisation</span>
+    <span class="info-card-value">{{bms.location}}</span>
+  </div>
+  {{/if}}
+</div>
+
+{{!-- Card 2 — Usages traités par la GTB --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Usages traités par la GTB</h3>
+  </div>
+  <div class="panel-body">
+    <div class="usage-tags">
+      {{#if bms.manages_heating}}<span class="usage-tag">Chauffage</span>{{/if}}
+      {{#if bms.manages_cooling}}<span class="usage-tag">Refroidissement</span>{{/if}}
+      {{#if bms.manages_ventilation}}<span class="usage-tag">Ventilation</span>{{/if}}
+      {{#if bms.manages_dhw}}<span class="usage-tag">ECS</span>{{/if}}
+      {{#if bms.manages_lighting}}<span class="usage-tag">Éclairage</span>{{/if}}
+      {{#unless bms.manages_heating}}{{#unless bms.manages_cooling}}{{#unless bms.manages_ventilation}}{{#unless bms.manages_dhw}}{{#unless bms.manages_lighting}}<span class="muted">Aucun usage déclaré.</span>{{/unless}}{{/unless}}{{/unless}}{{/unless}}{{/unless}}
+    </div>
+  </div>
 </div>
 
 {{#if isBacs}}
-<h3>R175-3 — Capacités de supervision</h3>
-<div class="kv-list">
-  <div class="kv-row">
-    <span class="kv-label">P1. Suivi continu, pas horaire, conservation 5 ans</span>
-    <span class="kv-value {{#if bms.meets_r175_3_p1}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.meets_r175_3_p1}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.meets_r175_3_p1}}
-    </span>
+{{!-- Card 3 — R175-3 Capacités de supervision --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">R175-3 — Capacités de supervision</h3>
+    <p class="panel-subtitle">3° (interopérabilité) et 4° (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (chapitre 3).</p>
   </div>
-  <div class="kv-row">
-    <span class="kv-label">P2. Détection des pertes d'efficacité</span>
-    <span class="kv-value {{#if bms.meets_r175_3_p2}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.meets_r175_3_p2}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.meets_r175_3_p2}}
-    </span>
-  </div>
-</div>
-<div class="callout callout-info">
-  <span class="callout-icon">📌</span>
-  <div class="callout-body">R175-3 3° (interopérabilité) et 4° (arrêt manuel + autonome) sont évalués au niveau de chaque équipement (cf chapitre 3).</div>
-</div>
-
-<h3>R175-3 dernier alinéa — Mise à disposition des données</h3>
-<div class="kv-list">
-  <div class="kv-row">
-    <span class="kv-label">Procédure de mise à disposition au gestionnaire du bâtiment</span>
-    <span class="kv-value {{#if bms.data_provision_to_manager}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.data_provision_to_manager}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.data_provision_to_manager}}
-    </span>
-  </div>
-  <div class="kv-row">
-    <span class="kv-label">Procédure de transmission aux exploitants des systèmes techniques</span>
-    <span class="kv-value {{#if bms.data_provision_to_operators}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.data_provision_to_operators}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.data_provision_to_operators}}
-    </span>
-  </div>
-</div>
-{{#if bms.notes_data_provision}}
-<div class="callout callout-info">
-  <span class="callout-icon">📌</span>
-  <div class="callout-body"><strong>Mécanisme :</strong> {{bms.notes_data_provision}}</div>
-</div>
-{{/if}}
-
-<h3>R175-4 — Vérifications périodiques</h3>
-<div class="kv-list">
-  <div class="kv-row">
-    <span class="kv-label">Consignes écrites de maintenance présentes</span>
-    <span class="kv-value {{#if bms.has_maintenance_procedures}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.has_maintenance_procedures}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.has_maintenance_procedures}}
-    </span>
+  <div class="panel-body">
+    <div class="kv-list">
+      <div class="kv-row">
+        <span class="kv-label">P1. Suivi continu, pas horaire, conservation 5 ans</span>
+        <span class="kv-value {{#if bms.meets_r175_3_p1}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.meets_r175_3_p1}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.meets_r175_3_p1}}
+        </span>
+      </div>
+      <div class="kv-row">
+        <span class="kv-label">P2. Détection des pertes d'efficacité</span>
+        <span class="kv-value {{#if bms.meets_r175_3_p2}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.meets_r175_3_p2}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.meets_r175_3_p2}}
+        </span>
+      </div>
+    </div>
   </div>
 </div>
 
-<h3>R175-5 — Formation de l'exploitant</h3>
-<div class="kv-list">
-  <div class="kv-row">
-    <span class="kv-label">Exploitant formé au paramétrage{{#if bms.operator_training_date}} <span class="muted">(formation : {{bms.operator_training_date}})</span>{{/if}}</span>
-    <span class="kv-value {{#if bms.operator_trained}}kv-yes{{else}}kv-no{{/if}}">
-      <span class="kv-ico">{{#if bms.operator_trained}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.operator_trained}}
-    </span>
+{{!-- Card 4 — R175-3 Mise à disposition des données --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">R175-3 — Mise à disposition des données <span class="panel-title-meta">(dernier alinéa)</span></h3>
+  </div>
+  <div class="panel-body">
+    <div class="kv-list">
+      <div class="kv-row">
+        <span class="kv-label">Procédure de mise à disposition au gestionnaire du bâtiment</span>
+        <span class="kv-value {{#if bms.data_provision_to_manager}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.data_provision_to_manager}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.data_provision_to_manager}}
+        </span>
+      </div>
+      <div class="kv-row">
+        <span class="kv-label">Procédure de transmission aux exploitants des systèmes techniques</span>
+        <span class="kv-value {{#if bms.data_provision_to_operators}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.data_provision_to_operators}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.data_provision_to_operators}}
+        </span>
+      </div>
+    </div>
+    {{#if bms.notes_data_provision}}
+    <div class="panel-inline-note">
+      <strong>Mécanisme :</strong> {{bms.notes_data_provision}}
+    </div>
+    {{/if}}
   </div>
 </div>
-{{#if buildySolution}}
-<div class="callout callout-reco">
-  <span class="callout-icon">✅</span>
-  <div class="callout-body">
-    <strong>Solution Buildy déployée.</strong> L'exigence R175-5 est nativement couverte par le support utilisateur intégré (assistance contextuelle, documentation embarquée, support continu). Cf. Annexe B point 8.
+
+{{!-- Card 5 — R175-4 Vérifications périodiques --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">R175-4 — Vérifications périodiques</h3>
+  </div>
+  <div class="panel-body">
+    <div class="kv-list">
+      <div class="kv-row">
+        <span class="kv-label">Consignes écrites de maintenance présentes</span>
+        <span class="kv-value {{#if bms.has_maintenance_procedures}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.has_maintenance_procedures}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.has_maintenance_procedures}}
+        </span>
+      </div>
+    </div>
   </div>
 </div>
-{{/if}}
+
+{{!-- Card 6 — R175-5 Formation de l'exploitant --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">R175-5 — Formation de l'exploitant</h3>
+  </div>
+  <div class="panel-body">
+    <div class="kv-list">
+      <div class="kv-row">
+        <span class="kv-label">Exploitant formé au paramétrage{{#if bms.operator_training_date}} <span class="muted">(formation : {{bms.operator_training_date}})</span>{{/if}}</span>
+        <span class="kv-value {{#if bms.operator_trained}}kv-yes{{else}}kv-no{{/if}}">
+          <span class="kv-ico">{{#if bms.operator_trained}}✓{{else}}✗{{/if}}</span>{{boolLabel bms.operator_trained}}
+        </span>
+      </div>
+    </div>
+    {{#if buildySolution}}
+    <div class="callout callout-reco" style="margin: 3mm 0 0;">
+      <span class="callout-icon">✅</span>
+      <div class="callout-body">
+        <strong>Solution Buildy déployée.</strong> L'exigence R175-5 est nativement couverte par le support utilisateur intégré (assistance contextuelle, documentation embarquée, support continu). Cf. Annexe B point 8.
+      </div>
+    </div>
+    {{/if}}
+  </div>
+</div>
 {{/if}}
 
 {{#if bmsManagedDevices.length}}
-<h3>Équipements intégrés à la GTB ({{bmsManagedDevices.length}})</h3>
-<div class="bms-list">
-  {{#each bmsManagedDevices}}
-    <div class="bms-row">
-      <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
-      <span class="bms-row-name">{{name}}</span>
-      <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
-      {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
+{{!-- Card 7 — Équipements intégrés à la GTB --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Équipements intégrés à la GTB <span class="panel-title-meta">({{bmsManagedDevices.length}})</span></h3>
+  </div>
+  <div class="panel-body panel-body-flush">
+    <div class="bms-list">
+      {{#each bmsManagedDevices}}
+        <div class="bms-row">
+          <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
+          <span class="bms-row-name">{{name}}</span>
+          <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
+          {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
+        </div>
+      {{/each}}
     </div>
-  {{/each}}
+  </div>
 </div>
 {{/if}}
 
 {{#if bmsManagedMeters.length}}
-<h3>Compteurs intégrés à la GTB ({{bmsManagedMeters.length}})</h3>
-<div class="bms-list">
-  {{#each bmsManagedMeters}}
-    <div class="bms-row">
-      <span class="bms-row-icon">{{{faIcon "gauge" "#10b981" "14"}}}</span>
-      <span class="bms-row-name">{{typeLabel}}</span>
-      <span class="bms-row-meta">{{usageLabel}} · {{zoneLabel}}</span>
+{{!-- Card 8 — Compteurs intégrés à la GTB --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Compteurs intégrés à la GTB <span class="panel-title-meta">({{bmsManagedMeters.length}})</span></h3>
+  </div>
+  <div class="panel-body panel-body-flush">
+    <div class="bms-list">
+      {{#each bmsManagedMeters}}
+        <div class="bms-row">
+          <span class="bms-row-icon">{{{faIcon "gauge" "#10b981" "14"}}}</span>
+          <span class="bms-row-name">{{typeLabel}}</span>
+          <span class="bms-row-meta">{{usageLabel}} · {{zoneLabel}}</span>
+        </div>
+      {{/each}}
     </div>
-  {{/each}}
+  </div>
 </div>
 {{/if}}
 
-{{#if bms.notes_html}}
-<div class="entity-block">
-  <h3>Notes GTB</h3>
-  <div class="rich-notes">{{{bms.notes_html}}}</div>
-</div>
-{{/if}}
-{{#if bms.photos.length}}
-<div class="entity-block">
-  <h3>Photos GTB</h3>
-  <div class="photo-grid">
-    {{#each bms.photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+{{#if (or bms.notes_html bms.photos.length)}}
+{{!-- Card 9 — Notes & photos GTB --}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Notes terrain &amp; photos GTB</h3>
+  </div>
+  <div class="panel-body">
+    {{#if bms.notes_html}}<div class="rich-notes">{{{bms.notes_html}}}</div>{{/if}}
+    {{#if bms.photos.length}}
+      <div class="photo-grid">
+        {{#each bms.photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+      </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}

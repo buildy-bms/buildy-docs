@@ -1066,6 +1066,28 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
 .panel-body { padding: 3mm 4mm; }
 .panel-body table { margin: 0; }
 .panel-body-center { text-align: center; padding: 3mm 4mm; }
+/* Variante sans padding (les enfants — bms-list, kv-list — ont déjà
+   leur propre rythme et alternance). Évite la double bordure visuelle. */
+.panel-body-flush { padding: 0; }
+.panel-body-flush .bms-list { margin: 0; }
+.panel-body-flush .bms-row { padding-left: 4mm; padding-right: 4mm; }
+.panel-title-meta {
+  font-weight: 400;
+  font-size: 8.5pt;
+  color: #6b7280;
+  margin-left: 1.5mm;
+}
+.panel-inline-note {
+  margin-top: 2.5mm;
+  padding: 2mm 3mm;
+  background: #f1f5f9;
+  border-left: 1.5pt solid #1b2842;
+  border-radius: 0.5mm;
+  font-size: 8pt;
+  color: #1f2937;
+  line-height: 1.5;
+}
+.panel-inline-note strong { color: #1b2842; font-weight: 600; }
 
 /* ── Chapitre 3 — zone heading + carte par catégorie de système ───
    Chaque catégorie présente est une vraie card autonome :

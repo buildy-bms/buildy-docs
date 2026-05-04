@@ -55,6 +55,17 @@ const APPLICABILITY_LABEL = {
   not_subject: 'Non assujetti (puissance < 70 kW)',
 };
 const COMPLIANCE_LABEL = { compliant:'Conforme', partial:'Partiellement conforme', non_compliant:'Non conforme' };
+// Aligne sur ZONE_NATURES dans frontend/src/views/BacsAuditDetailView.vue.
+const ZONE_NATURE_LABEL = {
+  'shared-office':'Bureau partagé', 'private-office':'Bureau privé',
+  'open-space':'Open-space', 'commercial-space':'Espace commercial',
+  'meeting-room':'Salle de réunion', 'workshop':'Atelier',
+  'switchboard':'Tableau électrique', 'technical-area':'Local technique',
+  'classroom':'Salle de classe', 'leasure-space':'Espace loisirs',
+  'foyer':'Foyer', 'corridor':'Couloir', 'outdoor':'Extérieur',
+  'meters':'Local compteurs', 'shared-space':'Espace partagé',
+  'logistic-cell':'Cellule logistique', 'stock':'Stock',
+};
 
 /**
  * Construit le bundle de donnees a passer au template bacs-audit.hbs.
@@ -70,7 +81,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   // Donnees principales
   const site = af.site_id ? db.sites.getById(af.site_id) : null;
-  const zones = site ? db.zones.listBySite(site.site_id) : [];
+  const zones = (site ? db.zones.listBySite(site.site_id) : []).map(z => ({
+    ...z,
+    natureLabel: z.nature ? (ZONE_NATURE_LABEL[z.nature] || z.nature) : '—',
+  }));
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
     FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
