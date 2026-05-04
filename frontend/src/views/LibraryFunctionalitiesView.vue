@@ -34,17 +34,16 @@ const showCreate = ref(false)
 const showBulk = ref(false)
 const offeringsPreviewOpen = ref(false)
 const generatingOfferings = ref(false)
-async function downloadOfferingsPdf() {
-  generatingOfferings.value = true
+const generatingBrochure = ref(false)
+
+async function downloadPdfFromRoute(route, fallbackName, loadingRef, errorMsg) {
+  loadingRef.value = true
   try {
-    // Import paresseux pour ne pas charger axios deux fois
     const { default: api } = await import('@/api')
-    const response = await api.post('/offerings/export-pdf', {}, { responseType: 'blob' })
-    // Recupere le nom de fichier suggere par le serveur (Content-Disposition)
+    const response = await api.post(route, {}, { responseType: 'blob' })
     const dispo = response.headers['content-disposition'] || ''
     const match = /filename="([^"]+)"/.exec(dispo)
-    const filename = match ? match[1] : `offres-buildy-${new Date().getFullYear()}.pdf`
-    // Trigger telechargement
+    const filename = match ? match[1] : fallbackName
     const url = URL.createObjectURL(response.data)
     const a = document.createElement('a')
     a.href = url
@@ -54,11 +53,24 @@ async function downloadOfferingsPdf() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   } catch (e) {
-    notifyError('Échec de la génération du PDF des offres')
+    notifyError(errorMsg)
   } finally {
-    generatingOfferings.value = false
+    loadingRef.value = false
   }
 }
+
+const downloadOfferingsPdf = () => downloadPdfFromRoute(
+  '/offerings/export-pdf',
+  `offres-buildy-${new Date().getFullYear()}.pdf`,
+  generatingOfferings,
+  'Échec de la génération du PDF des offres',
+)
+const downloadBrochurePdf = () => downloadPdfFromRoute(
+  '/offerings/brochure-pdf',
+  `brochure-buildy-${new Date().getFullYear()}.pdf`,
+  generatingBrochure,
+  'Échec de la génération de la brochure',
+)
 
 // Items mappes au format attendu par BulkRegenerateModal
 const bulkItems = computed(() => items.value
@@ -232,10 +244,15 @@ onBeforeUnmount(teardownSortables)
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg whitespace-nowrap transition">
           <EyeIcon class="w-4 h-4" /> Aperçu offres
         </button>
-        <button @click="downloadOfferingsPdf"
+        <button @click="downloadOfferingsPdf" :disabled="generatingOfferings"
                 title="Télécharger le PDF du catalogue Buildy 2026 (régénéré depuis la base)"
-                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition">
-          <DocumentArrowDownIcon class="w-4 h-4" /> Tableau des offres
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+          <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingOfferings ? 'Génération…' : 'Tableau des offres' }}
+        </button>
+        <button @click="downloadBrochurePdf" :disabled="generatingBrochure"
+                title="Télécharger la brochure : référentiel détaillé de chaque fonctionnalité (annexe au tableau des offres)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
+          <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingBrochure ? 'Génération…' : 'Brochure détaillée' }}
         </button>
         <button @click="showBulk = true" :disabled="!bulkItems.length"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">

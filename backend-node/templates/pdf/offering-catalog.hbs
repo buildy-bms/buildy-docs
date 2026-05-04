@@ -28,75 +28,7 @@
     </div>
   </header>
 
-  <table class="comparison-table">
-    <colgroup>
-      <col class="col-feature" />
-      {{#each levels}}<col class="col-level" />{{/each}}
-    </colgroup>
-    <thead>
-      <tr>
-        <th class="th-feature">Fonctionnalité</th>
-        {{#each levels}}
-        <th class="th-level th-{{slug}} {{#if is_highlighted}}th-highlighted{{/if}}"
-            {{#if color_hex}}style="background:{{color_hex}};"{{/if}}>
-          {{#if is_highlighted}}
-            {{#if highlight_label}}
-              <div class="th-level-badge">{{highlight_label}}</div>
-            {{else}}
-              <div class="th-level-badge-ph"></div>
-            {{/if}}
-          {{else}}
-            <div class="th-level-badge-ph"></div>
-          {{/if}}
-          <div class="th-level-name">{{name}}</div>
-          {{#if tagline}}<div class="th-level-tagline">{{tagline}}</div>{{/if}}
-        </th>
-        {{/each}}
-      </tr>
-    </thead>
-    <tbody>
-      {{#each rows}}
-      {{#if (eq kind "category")}}
-      <tr class="category-row category-row-d{{depth}}">
-        <td colspan="{{../colspan}}">
-          <span class="cat-marker cat-marker-d{{depth}}">{{#if (eq depth 0)}}▸{{else}}·{{/if}}</span>
-          {{title}}
-        </td>
-      </tr>
-      {{else}}
-      <tr>
-        <td class="td-feature td-feature-d{{depth}}">
-          {{title}}
-          {{#if all_option}}<span class="opt-badge">+ Option payante</span>{{/if}}
-        </td>
-        {{#each ../levels}}
-        {{#if (eq slug "E")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
-            {{#if (eq ../avail_e "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_e "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
-            {{#if (eq ../avail_e "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
-          </td>
-        {{/if}}
-        {{#if (eq slug "S")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
-            {{#if (eq ../avail_s "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_s "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
-            {{#if (eq ../avail_s "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
-          </td>
-        {{/if}}
-        {{#if (eq slug "P")}}
-          <td class="td-level td-level-{{slug}} {{#if is_highlighted}}td-level-highlighted{{/if}}">
-            {{#if (eq ../avail_p "included")}}<span class="avail avail-included">✓</span>{{/if}}
-            {{#if (eq ../avail_p "paid_option")}}<span class="avail-text">€&nbsp;Option</span>{{/if}}
-            {{#if (eq ../avail_p "unavailable")}}<span class="avail avail-unavailable">—</span>{{/if}}
-          </td>
-        {{/if}}
-        {{/each}}
-      </tr>
-      {{/if}}
-      {{/each}}
-    </tbody>
-  </table>
+  {{> _offerings-table}}
 
   <div class="cta-block">
     <p class="cta-line">{{{ctaTitle}}}</p>

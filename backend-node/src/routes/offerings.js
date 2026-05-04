@@ -18,7 +18,12 @@ const fs = require('fs');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
-const { renderPdf, renderHtml, loadAssetDataUrl } = require('../lib/pdf');
+const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
+
+// Filigrane Buildy (favicon en gris pale) — meme constante que les
+// autres PDF (cf routes/export.js).
+const WATERMARK_PATH = path.resolve(__dirname, '../../templates/pdf/assets/watermark-buildy.png');
+const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.85, heightRatio: 0.85, opacity: 0.03 };
 
 // Lit un boilerplate par kind (texte editable depuis pdf_boilerplate).
 // Retourne le body_html du 1er actif, ou la valeur par defaut si absent.
@@ -90,6 +95,7 @@ function buildOfferingsData() {
       rows.push({
         kind: 'feature',
         depth: visualDepth,
+        id: node.id,            // permet le wrap <a href="#toc-feature-{id}"> en brochure
         title: node.title,
         avail_e: ae,
         avail_s: as,
@@ -151,6 +157,193 @@ function stripWrapperParagraph(html) {
   const trimmed = html.trim();
   const m = /^<p>([\s\S]*)<\/p>$/.exec(trimmed);
   return m ? m[1] : html;
+}
+
+// Sanitize body_html pour rendu dans la brochure :
+//  - retire <aside>...</aside> (souvent un encart "Cette fonctionnalité
+//    est incluse dans Smart et Premium..." rentre directement dans le
+//    body_html, qui peut CONTREDIRE la matrice E/S/P actuelle si avail_*
+//    a evolue. La brochure regenere le recap automatiquement).
+//  - retire <blockquote class="callout">...</blockquote> idem.
+//  - retire les <p> vides Tiptap.
+function cleanBodyHtml(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<aside\b[^>]*>[\s\S]*?<\/aside>/gi, '')
+    .replace(/<blockquote\b[^>]*?(?:class="[^"]*callout[^"]*"|data-callout)[\s\S]*?<\/blockquote>/gi, '')
+    .replace(/<p>\s*<\/p>/gi, '')
+    .replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '')
+    .trim();
+}
+
+// Libelle clair de disponibilite par niveau, texte court pour tenir
+// dans la cellule a cote de l'icone (cf brochure).
+function availabilityLabel(avail) {
+  if (avail === 'included') return 'Inclus';
+  if (avail === 'paid_option') return 'Option';
+  return 'Indispo.';
+}
+function availabilityIcon(avail) {
+  if (avail === 'included') return '✓';
+  if (avail === 'paid_option') return '€';
+  return '✗';
+}
+
+/**
+ * Brochure commerciale Buildy : groupement par categorie racine + detail
+ * de chaque fonctionnalite (description courte extraite du body_html).
+ * Diffère du catalog (matrice E/S/P plate) par son format narratif/marketing.
+ */
+async function buildBrochureData() {
+  const allTemplates = db.db.prepare(`
+    SELECT id, slug, title, body_html, bacs_articles, parent_template_id, position,
+           is_functionality, service_level, avail_e, avail_s, avail_p
+    FROM section_templates
+    ORDER BY position, id
+  `).all();
+  const byId = new Map(allTemplates.map(t => [t.id, { ...t, children: [] }]));
+  const roots = [];
+  for (const node of byId.values()) {
+    const parent = node.parent_template_id ? byId.get(node.parent_template_id) : null;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  const sortKids = (n) => {
+    n.children.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+    n.children.forEach(sortKids);
+  };
+  roots.sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.id - b.id);
+  roots.forEach(sortKids);
+
+  const hasFeatureDescendant = (n) => n.is_functionality || n.children.some(hasFeatureDescendant);
+
+  // Charge les captures d'ecran d'un section_template (ASYNC car
+  // loadFileAsDataUrl appelle sharp pour optimiser les images) :
+  //  1. Attachments directement attaches au template (data/attachments/_tpl/section/)
+  //  2. Heritage : attachments des sections AF qui utilisent ce template
+  //     (data/attachments/<af_id>/) — utile car peu de captures sont
+  //     remontees au niveau template, la majorite est sur les sections.
+  // Deduplique par filename. Embed en data URL pour autonomie du PDF.
+  async function loadScreenshots(templateId) {
+    const direct = db.attachments.listBySectionTemplate(templateId).map(a => ({
+      ...a, _origin: 'template',
+    }));
+    const fromAfSections = db.db.prepare(`
+      SELECT a.*, s.af_id FROM attachments a
+      JOIN sections s ON s.id = a.section_id
+      WHERE s.section_template_id = ?
+      ORDER BY a.position, a.id
+    `).all(templateId).map(a => ({ ...a, _origin: 'af-section' }));
+    const seen = new Set();
+    const merged = [...direct, ...fromAfSections].filter(a => {
+      if (seen.has(a.filename)) return false;
+      seen.add(a.filename);
+      return true;
+    });
+    const out = [];
+    for (const att of merged) {
+      const absPath = att._origin === 'template'
+        ? path.resolve(config.attachmentsDir, '_tpl', 'section', att.filename)
+        : path.resolve(config.attachmentsDir, String(att.af_id || ''), att.filename);
+      try {
+        const dataUrl = await loadFileAsDataUrl(absPath);
+        out.push({
+          dataUrl,
+          caption: att.caption || '',
+          width: att.width,
+          height: att.height,
+        });
+      } catch (err) {
+        log.warn(`Brochure : impossible de charger ${att.filename} (${att._origin}) : ${err.message}`);
+      }
+    }
+    return out;
+  }
+
+  async function collectFeatures(node, out = [], depth = 0) {
+    if (node.is_functionality) {
+      const ae = node.avail_e || 'unavailable';
+      const as = node.avail_s || 'unavailable';
+      const ap = node.avail_p || 'unavailable';
+      const cleanedBody = cleanBodyHtml(node.body_html);
+      const screenshots = await loadScreenshots(node.id);
+      out.push({
+        id: node.id,
+        slug: node.slug,
+        title: node.title,
+        body_html: cleanedBody,
+        has_body: !!cleanedBody,
+        bacs_articles: node.bacs_articles || null,
+        service_level: node.service_level,
+        avail_e: ae, avail_s: as, avail_p: ap,
+        avail_e_label: availabilityLabel(ae),
+        avail_s_label: availabilityLabel(as),
+        avail_p_label: availabilityLabel(ap),
+        avail_e_icon: availabilityIcon(ae),
+        avail_s_icon: availabilityIcon(as),
+        avail_p_icon: availabilityIcon(ap),
+        all_option: ae === 'paid_option' && as === 'paid_option' && ap === 'paid_option',
+        screenshots,
+        has_screenshots: screenshots.length > 0,
+        depth,
+      });
+      depth++;
+    }
+    for (const c of node.children) await collectFeatures(c, out, depth);
+    return out;
+  }
+
+  // Categories = racines avec au moins une feature dans la descendance.
+  // Pour chaque, on liste toutes ses features (aplaties).
+  const categories = [];
+  for (const r of roots.filter(hasFeatureDescendant)) {
+    const features = await collectFeatures(r);
+    if (features.length > 0) {
+      categories.push({ id: r.id, title: r.title, features });
+    }
+  }
+
+  const features = allTemplates.filter(t => t.is_functionality);
+  const levels = db.offeringLevels.list();
+
+  // Boilerplate (reutilise les memes textes que le catalog pour cohérence).
+  const coverPromise = stripWrapperParagraph(getBoilerplate('offerings_cover_promise'));
+  const coverSubtitle = stripWrapperParagraph(getBoilerplate('offerings_cover_subtitle'));
+  const ctaTitle = stripWrapperParagraph(getBoilerplate('offerings_cta_title', 'Vous avez un projet ?'));
+  const ctaSub = stripWrapperParagraph(getBoilerplate('offerings_cta_sub', 'On vous accompagne pour cadrer votre supervision et choisir le bon niveau d\'offre.'));
+  const ctaContact = stripWrapperParagraph(getBoilerplate('offerings_cta_contact', 'commercial@buildy.fr'));
+
+  const exportDate = new Date().toLocaleDateString('fr-FR', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+  const year = new Date().getFullYear();
+
+  // Reutilise les rows + colspan + levels de la matrice E/S/P du
+  // catalog d'offres pour le partial _offerings-table.hbs (mutualise).
+  const offeringsData = buildOfferingsData();
+
+  return {
+    categories,
+    levels,
+    totalFeatures: features.length,
+    totalCategories: categories.length,
+    // Sous-contexte pour le partial _offerings-table : meme forme que
+    // les data offering-catalog (levels, rows, colspan). Utilise via
+    // {{#with offeringsTable}}{{> _offerings-table}}{{/with}}.
+    offeringsTable: {
+      levels: offeringsData.levels,
+      rows: offeringsData.rows,
+      colspan: offeringsData.colspan,
+    },
+    coverPromise,
+    coverSubtitle,
+    ctaTitle,
+    ctaSub,
+    ctaContact,
+    exportDate,
+    year,
+    logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+  };
 }
 
 async function routes(fastify) {
@@ -221,6 +414,66 @@ async function routes(fastify) {
       payload: { file_size_bytes: result.sizeBytes, total_features: data.totalFeatures },
     });
     log.info(`Offerings PDF exported: ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
+
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .send(fs.createReadStream(outputPath));
+  });
+
+  // ─── Preview HTML brochure ─────────────────────────────────────────
+  fastify.get('/offerings/brochure/preview', async (request, reply) => {
+    const data = await buildBrochureData();
+    const html = renderHtml({
+      template: 'brochure',
+      styles: 'styles-brochure',
+      data,
+    });
+    return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
+  });
+
+  // ─── Export PDF brochure (format narratif/marketing) ───────────────
+  fastify.post('/offerings/brochure-pdf', async (request, reply) => {
+    const data = await buildBrochureData();
+    const userId = request.authUser?.id;
+
+    const exportsDir = path.resolve(config.exportsDir, '_offerings');
+    fs.mkdirSync(exportsDir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `brochure-buildy-${data.year}-${ts}.pdf`;
+    const outputPath = path.join(exportsDir, filename);
+
+    let result;
+    try {
+      result = await renderPdf({
+        template: 'brochure',
+        styles: 'styles-brochure',
+        data,
+        outputPath,
+        pageFormat: 'A4',
+        coverFullBleed: true,
+        populateToc: true,
+        skipFirstPageHeaderFooter: true,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
+        pdfOptions: buildHeaderFooter({
+          clientName: 'Buildy',
+          projectName: 'Référentiel des fonctionnalités',
+          docType: 'Brochure',
+          version: String(data.year),
+          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+          footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+        }),
+      });
+    } catch (err) {
+      log.error(`Brochure PDF render failed: ${err.message}`);
+      return reply.code(500).send({ detail: `Echec generation PDF : ${err.message}` });
+    }
+
+    db.auditLog.add({
+      userId, action: 'export.brochure',
+      payload: { file_size_bytes: result.sizeBytes, total_features: data.totalFeatures, total_categories: data.totalCategories },
+    });
+    log.info(`Brochure PDF exported: ${filename} (${(result.sizeBytes/1024).toFixed(1)} KB) by user #${userId}`);
 
     return reply
       .header('Content-Type', 'application/pdf')

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Référentiel des fonctionnalités Buildy {{year}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════════════ COVER (sobre, type referentiel) ═══════════════════ --}}
+<section class="cover">
+  <div class="cover-top">
+    <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <p class="cover-doc-type">Référentiel {{year}}</p>
+    <h1 class="cover-title">Détail des fonctionnalités</h1>
+    <p class="cover-subtitle">Annexe au tableau des offres Buildy — descriptif complet et niveau de disponibilité de chaque fonctionnalité, regroupés par catégorie.</p>
+  </div>
+
+  <div class="cover-kpis">
+    <div class="cover-kpi">
+      <p class="cover-kpi-num">{{totalFeatures}}</p>
+      <p class="cover-kpi-label">Fonctionnalités<br />décrites</p>
+    </div>
+    <div class="cover-kpi">
+      <p class="cover-kpi-num">{{totalCategories}}</p>
+      <p class="cover-kpi-label">Catégories<br />de regroupement</p>
+    </div>
+    <div class="cover-kpi">
+      <p class="cover-kpi-num">3</p>
+      <p class="cover-kpi-label">Niveaux<br />d'offre</p>
+    </div>
+  </div>
+
+  <div class="cover-legend">
+    <p class="cover-legend-title">Comment lire ce document</p>
+    <p class="cover-legend-text">Chaque fonctionnalité affiche sa disponibilité pour les 3 niveaux d'offre Buildy :</p>
+    <div class="cover-legend-row">
+      <span class="legend-item"><span class="legend-icon legend-icon-included">✓</span><span class="legend-label"><strong>Inclus</strong> dans le niveau souscrit</span></span>
+      <span class="legend-item"><span class="legend-icon legend-icon-paid">€</span><span class="legend-label"><strong>Option payante</strong> à activer en avenant</span></span>
+      <span class="legend-item"><span class="legend-icon legend-icon-no">✗</span><span class="legend-label"><strong>Non disponible</strong> à ce niveau</span></span>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <p class="cover-legal">© Buildy SAS — {{year}} · Document confidentiel</p>
+    <p class="cover-legal">Régénéré le {{exportDate}} depuis la base de référence</p>
+  </div>
+</section>
+
+{{!-- ═══════════════════ TABLE DES MATIÈRES ═══════════════════ --}}
+<section class="page page-toc">
+  <h1 class="section-h1">Sommaire</h1>
+  <p class="section-lede">Ce document détaille chaque fonctionnalité Buildy et son niveau de disponibilité dans les 3 offres. Les liens du sommaire sont cliquables.</p>
+  <ul class="toc-list">
+    <li class="toc-item toc-item-highlight" data-toc-link="offerings-table">
+      <span class="toc-number">01</span>
+      <span class="toc-label">Tableau des offres Buildy</span>
+      <span class="toc-dots"></span>
+      <span class="toc-page"></span>
+    </li>
+    {{#each categories}}
+    <li class="toc-item toc-item-cat" data-toc-link="cat-{{@index}}">
+      <span class="toc-number">{{add @index 2}}</span>
+      <span class="toc-label">{{title}}</span>
+      <span class="toc-dots"></span>
+      <span class="toc-page"></span>
+    </li>
+      {{#each features}}
+      <li class="toc-item toc-item-feature toc-item-depth-{{depth}}" data-toc-link="feature-{{id}}">
+        <span class="toc-number"></span>
+        <span class="toc-label">{{title}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page"></span>
+      </li>
+      {{/each}}
+    {{/each}}
+  </ul>
+</section>
+
+{{!-- ═══════════════════ Sections numerotees (apres cover + TOC) ═══════════════════ --}}
+<div class="sections">
+
+{{!-- Tableau des offres : matrice E/S/P (synthese visuelle avant le detail) --}}
+<section class="page page-offerings" data-toc-anchor="offerings-table">
+  <header class="category-header">
+    <p class="category-eyebrow">Section 1 / {{add totalCategories 1}}</p>
+    <h1 class="category-title">Tableau des offres Buildy</h1>
+    <p class="category-count">{{totalFeatures}} fonctionnalités · 3 niveaux d'offre</p>
+  </header>
+
+  {{#with offeringsTable}}{{> _offerings-table}}{{/with}}
+</section>
+
+{{!-- ═══════════════════ DETAIL PAR CATEGORIE ═══════════════════ --}}
+{{#each categories}}
+<section class="page page-category" data-toc-anchor="cat-{{@index}}">
+  <header class="category-header">
+    <p class="category-eyebrow">Section {{add @index 2}} / {{add ../totalCategories 1}}</p>
+    <h1 class="category-title">{{title}}</h1>
+    <p class="category-count">{{features.length}} fonctionnalité{{#if (gt features.length 1)}}s{{/if}}</p>
+  </header>
+
+  {{#each features}}
+  <article class="feature-card depth-{{depth}}" data-toc-anchor="feature-{{id}}">
+    <div class="feature-title-row">
+      <h2 class="feature-title">{{title}}</h2>
+      {{#if bacs_articles}}<span class="badge-bacs" title="Liée au décret BACS">⚖ BACS · {{bacs_articles}}</span>{{/if}}
+    </div>
+
+    {{!-- Encart Disponibilite : 3 cellules en grille, libelle textuel
+         explicite. Aucune ambiguïte possible (✓ seul = trop court). --}}
+    <div class="feature-availability-grid">
+      <div class="avail-block avail-block-{{avail_e}}">
+        <span class="avail-block-icon">{{avail_e_icon}}</span>
+        <span class="avail-block-text"><span class="avail-block-level">Essentiel</span> <span class="avail-block-status">{{avail_e_label}}</span></span>
+      </div>
+      <div class="avail-block avail-block-{{avail_s}}">
+        <span class="avail-block-icon">{{avail_s_icon}}</span>
+        <span class="avail-block-text"><span class="avail-block-level">Smart</span> <span class="avail-block-status">{{avail_s_label}}</span></span>
+      </div>
+      <div class="avail-block avail-block-{{avail_p}}">
+        <span class="avail-block-icon">{{avail_p_icon}}</span>
+        <span class="avail-block-text"><span class="avail-block-level">Premium</span> <span class="avail-block-status">{{avail_p_label}}</span></span>
+      </div>
+    </div>
+
+    {{#if has_body}}
+    <div class="feature-body">{{{body_html}}}</div>
+    {{else}}
+    <p class="feature-body-empty">Description à venir.</p>
+    {{/if}}
+
+    {{#if has_screenshots}}
+    <div class="feature-screenshots">
+      {{#each screenshots}}
+      <figure class="feature-screenshot">
+        <img src="{{dataUrl}}" alt="{{caption}}" />
+        {{#if caption}}<figcaption>{{caption}}</figcaption>{{/if}}
+      </figure>
+      {{/each}}
+    </div>
+    {{/if}}
+  </article>
+  {{/each}}
+</section>
+{{/each}}
+
+</div>{{!-- /.sections --}}
+
+</body>
+</html>

@@ -11,6 +11,7 @@ Handlebars.registerHelper('gt', (a, b) => a > b);
 Handlebars.registerHelper('lt', (a, b) => a < b);
 Handlebars.registerHelper('eq', (a, b) => a === b);
 Handlebars.registerHelper('minus', (a, b) => Number(a) - Number(b));
+Handlebars.registerHelper('add', (a, b) => Number(a) + Number(b));
 
 // FontAwesome icons inline en SVG, parametrables (couleur + taille).
 // Utilisation : {{{faIcon "building" "#4f46e5" "16"}}}
