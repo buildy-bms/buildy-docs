@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
     "@fontsource/manrope": "^5.2.8",
     "@fontsource/poppins": "^5.2.7",
     "@fortawesome/fontawesome-svg-core": "^7.2.0",

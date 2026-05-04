@@ -7,48 +7,160 @@
 </head>
 <body>
 
-{{!-- ═══════════ Page de garde ═══════════ --}}
+{{!-- ═══════════ Page de garde — affirmation, verdict en accroche ═══════════ --}}
 <section class="cover">
-  <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
-  <p class="cover-doc-type">{{#if isBacs}}Audit BACS — Décret R175{{else}}Audit GTB (Classique) — Préparation devis Buildy{{/if}}</p>
-  <h1 class="cover-title">{{document.project_name}}</h1>
-  <p class="cover-client">{{document.client_name}}</p>
-  {{#if site.name}}<p class="cover-project">Site : {{site.name}}</p>{{/if}}
-  {{#if site.address}}<p class="cover-address">{{site.address}}</p>{{/if}}
+  <header class="cover-top">
+    <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <span class="cover-eyebrow">{{#if isBacs}}Audit de conformité BACS · Décret R175{{else}}Audit GTB · Préparation devis Buildy{{/if}}</span>
+  </header>
 
-  {{#if isBacs}}{{#if applicabilityLabel}}
-  <div class="cover-deadline-block">
-    <p class="cover-deadline-label">Applicabilité R175-2</p>
-    <p class="cover-deadline-value">{{applicabilityLabel}}</p>
-    {{#if document.bacs_total_power_kw}}
-    <p class="cover-deadline-detail">
-      Puissance nominale utile cumulée chauffage + climatisation : <strong>{{document.bacs_total_power_kw}} kW</strong>
-    </p>
+  <main class="cover-main">
+    <h1 class="cover-title">{{document.project_name}}</h1>
+    <p class="cover-client">{{document.client_name}}</p>
+    {{#if site.address}}<p class="cover-address">{{site.address}}</p>{{/if}}
+  </main>
+
+  {{#if compliance.verdict}}
+  <div class="cover-verdict cover-verdict-{{compliance.verdict}}">
+    <span class="cover-verdict-eyebrow">{{#if isBacs}}État de conformité{{else}}Couverture GTB existante{{/if}}</span>
+    <span class="cover-verdict-icon">{{compliance.verdictIcon}}</span>
+    <span class="cover-verdict-value">{{compliance.verdictLabel}}</span>
+    {{#if isBacs}}
+      {{#if applicabilityLabel}}
+      <span class="cover-verdict-applicability">Applicabilité R175-2 · {{applicabilityLabel}}</span>
+      {{/if}}
+    {{else}}
+      {{#if compliance.coverage}}
+      <span class="cover-verdict-applicability">{{compliance.coverage.integrated}} équipements intégrés sur {{compliance.coverage.present}} ({{compliance.coverage.ratio}}%) — préconisations Buildy pour le devis d'extension</span>
+      {{/if}}
     {{/if}}
   </div>
-  {{/if}}{{/if}}
+  {{/if}}
 
-  <div class="cover-meta">
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Date d'audit</span>
-      <span class="cover-meta-value">{{exportDate}}</span>
+  <footer class="cover-footer">
+    <div class="cover-footer-cell">
+      <span class="cover-footer-label">Date d'audit</span>
+      <span class="cover-footer-value">{{exportDate}}</span>
     </div>
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Auteur</span>
-      <span class="cover-meta-value">{{authorName}}</span>
+    <div class="cover-footer-cell">
+      <span class="cover-footer-label">Auditeur</span>
+      <span class="cover-footer-value">{{authorName}}</span>
     </div>
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Version</span>
-      <span class="cover-meta-value"><span class="cover-version-tag">{{version}}</span></span>
+    <div class="cover-footer-cell">
+      <span class="cover-footer-label">Version</span>
+      <span class="cover-footer-value cover-footer-version">{{version}}</span>
     </div>
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Type de document</span>
-      <span class="cover-meta-value">{{#if isBacs}}Audit de conformité au décret BACS{{else}}Audit GTB classique (préparation devis Buildy){{/if}}</span>
+  </footer>
+</section>
+
+{{!-- ═══════════ Page L'essentiel — synthèse en 1 page (page 2) ═══════════ --}}
+<section class="essential">
+  <header class="essential-header">
+    <span class="essential-eyebrow">L'essentiel</span>
+    <h1 class="essential-title">Synthèse de l'audit en une page</h1>
+  </header>
+
+  <div class="essential-verdict-banner essential-verdict-{{compliance.verdict}}">
+    <span class="essential-verdict-icon">{{compliance.verdictIcon}}</span>
+    <div class="essential-verdict-body">
+      <span class="essential-verdict-label">{{compliance.verdictLabel}}{{#if isBacs}} au décret BACS{{else}} de la GTB existante{{/if}}</span>
+      <span class="essential-verdict-detail">
+        {{#if isBacs}}
+          {{#if (eq compliance.verdict "non_compliant")}}{{compliance.stats.blocking}} action{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}} bloquante{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}} empêchent la conformité au décret. Plan de mise en conformité estimé à 6-12 mois selon les arbitrages.{{else}}{{#if (eq compliance.verdict "partial")}}{{compliance.stats.major}} action{{#unless (eq compliance.stats.major 1)}}s{{/unless}} majeure{{#unless (eq compliance.stats.major 1)}}s{{/unless}} restante{{#unless (eq compliance.stats.major 1)}}s{{/unless}} pour atteindre la conformité complète.{{else}}Aucune action bloquante ni majeure identifiée — site conforme au décret BACS.{{/if}}{{/if}}
+        {{else}}
+          {{compliance.coverage.integrated}} équipement{{#unless (eq compliance.coverage.integrated 1)}}s{{/unless}} intégré{{#unless (eq compliance.coverage.integrated 1)}}s{{/unless}} sur {{compliance.coverage.present}} présent{{#unless (eq compliance.coverage.present 1)}}s{{/unless}} ({{compliance.coverage.ratio}} %). {{compliance.stats.total}} préconisations Buildy pour étendre la couverture de la GTB.
+        {{/if}}
+      </span>
     </div>
   </div>
+
+  <div class="essential-grid">
+    {{#if isBacs}}
+    <div class="essential-applicability">
+      <h3 class="essential-block-title">Calcul d'assujettissement R175-2</h3>
+      <ol class="applicability-steps">
+        <li>
+          <span class="step-num">1</span>
+          <span class="step-body">Puissance cumulée chauffage + climatisation : <strong>{{compliance.assujettissement.powerKw}} kW</strong></span>
+        </li>
+        {{#if compliance.assujettissement.pcDateLabel}}
+        <li>
+          <span class="step-num">2</span>
+          <span class="step-body">Date du permis de construire : <strong>{{compliance.assujettissement.pcDateLabel}}</strong></span>
+        </li>
+        {{/if}}
+        <li>
+          <span class="step-num">{{#if compliance.assujettissement.pcDateLabel}}3{{else}}2{{/if}}</span>
+          <span class="step-body">Seuil applicable : <strong>{{compliance.assujettissement.threshold}} kW</strong> → {{compliance.assujettissement.conclusion}}</span>
+        </li>
+      </ol>
+    </div>
+    {{else}}
+    <div class="essential-applicability">
+      <h3 class="essential-block-title">Couverture GTB existante</h3>
+      <ol class="applicability-steps">
+        <li>
+          <span class="step-num">1</span>
+          <span class="step-body">GTB déployée : <strong>{{bms.existing_solution}}</strong>{{#if bms.existing_solution_brand}} ({{bms.existing_solution_brand}}){{/if}}</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span class="step-body">Équipements supervisés : <strong>{{compliance.coverage.integrated}} sur {{compliance.coverage.present}}</strong> ({{compliance.coverage.ratio}} %)</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span class="step-body">Verdict Buildy : <strong>{{compliance.verdictLabel}}</strong> — extension recommandée pour couvrir l'ensemble du périmètre fonctionnel.</span>
+        </li>
+      </ol>
+    </div>
+    {{/if}}
+
+    <div class="essential-stats">
+      <h3 class="essential-block-title">{{#if isBacs}}Plan d'action en chiffres{{else}}Préconisations Buildy{{/if}}</h3>
+      <div class="stats-grid">
+        <div class="stat stat-blocking">
+          <div class="stat-num">{{compliance.stats.blocking}}</div>
+          <div class="stat-label">{{#if isBacs}}Bloquante{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{else}}Essentielle{{#unless (eq compliance.stats.blocking 1)}}s{{/unless}}{{/if}}</div>
+        </div>
+        <div class="stat stat-major">
+          <div class="stat-num">{{compliance.stats.major}}</div>
+          <div class="stat-label">{{#if isBacs}}Majeure{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{else}}Recommandée{{#unless (eq compliance.stats.major 1)}}s{{/unless}}{{/if}}</div>
+        </div>
+        <div class="stat stat-minor">
+          <div class="stat-num">{{compliance.stats.minor}}</div>
+          <div class="stat-label">{{#if isBacs}}Mineure{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{else}}Optimisation{{#unless (eq compliance.stats.minor 1)}}s{{/unless}}{{/if}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{#if compliance.headlineActions.length}}
+  <div class="essential-headlines">
+    <h3 class="essential-block-title">{{#if isBacs}}Actions phares à engager en priorité{{else}}Préconisations phares pour le devis{{/if}}</h3>
+    <ol class="headlines-list">
+      {{#each compliance.headlineActions}}
+      <li class="headline">
+        <span class="headline-num">{{display_number}}</span>
+        <div class="headline-body">
+          <div class="headline-title">{{title}}</div>
+          <div class="headline-meta">
+            <span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}{{#if ../isBacs}}Bloquante{{else}}Essentielle{{/if}}{{else}}{{#if (eq severity "major")}}{{#if ../isBacs}}Majeure{{else}}Recommandée{{/if}}{{else}}{{#if ../isBacs}}Mineure{{else}}Optimisation{{/if}}{{/if}}{{/if}}</span>
+            {{#if r175_article}}<span class="r175-tag">{{r175_article}}</span>{{/if}}
+            {{#if zone_name}}<span class="zone-tag">{{zone_name}}</span>{{/if}}
+          </div>
+        </div>
+      </li>
+      {{/each}}
+    </ol>
+    <p class="essential-footnote">Détail complet {{#if isBacs}}du plan de mise en conformité{{else}}des préconisations Buildy{{/if}} au chapitre 7.</p>
+  </div>
+  {{/if}}
 </section>
 
 {{!-- ═══════════ Table des matieres (charte AF/Synthèse) ═══════════ --}}
+{{!-- Cover + L'essentiel + Tableau de bord conformite sont des pages de
+     synthese hors sommaire (frontmatter) — le sommaire ne liste que les
+     chapitres numerotés. --}}
 <section class="toc">
   <h1>Sommaire</h1>
   <ul class="toc-list">
@@ -57,16 +169,6 @@
       <a href="#synthesis" class="toc-link">
         <span class="toc-num">00</span>
         <span class="toc-title">Note de synthèse</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{/if}}
-    {{#if isBacs}}
-    <li class="toc-row lvl-1" data-toc-link="conformity">
-      <a href="#conformity" class="toc-link">
-        <span class="toc-num">00</span>
-        <span class="toc-title">Synthèse de conformité</span>
         <span class="toc-dots"></span>
         <span class="toc-page">···</span>
       </a>
@@ -135,58 +237,57 @@
   </ul>
 </section>
 
+{{!-- ═══════════ Tableau de bord conformité R175 (après sommaire) ═══════════ --}}
+{{#if isBacs}}
+<section class="r175-dashboard">
+  <header class="dashboard-header">
+    <span class="dashboard-eyebrow">Tableau de bord</span>
+    <h1 class="dashboard-title">Conformité par exigence du décret R175</h1>
+    <p class="dashboard-intro">
+      Lecture rapide de l'état du site, exigence par exigence du décret BACS.
+      Chaque ligne renvoie au chapitre où l'évaluation est détaillée et justifiée.
+    </p>
+  </header>
+
+  <ul class="r175-rows">
+    {{#each compliance.r175Dashboard}}
+    <li class="r175-row r175-row-{{verdict}}">
+      <span class="r175-row-code">{{code}}</span>
+      <div class="r175-row-content">
+        <div class="r175-row-label">{{label}}</div>
+        <div class="r175-row-summary">{{summary}}</div>
+      </div>
+      <span class="r175-row-verdict r175-row-verdict-{{verdict}}">
+        <span class="r175-row-verdict-icon">{{verdictIcon}}</span>
+        {{verdictLabel}}
+      </span>
+      <span class="r175-row-actions{{#unless actionsCount}} r175-row-actions-empty{{/unless}}">
+        {{#if actionsCount}}{{actionsCount}} action{{#unless (eq actionsCount 1)}}s{{/unless}}{{else}}—{{/if}}
+      </span>
+    </li>
+    {{/each}}
+  </ul>
+
+  <p class="dashboard-footnote">
+    Détail des actions correctives et préconisations Buildy : chapitre 7 « Plan de mise en conformité ».
+  </p>
+</section>
+{{/if}}
+
 <div class="sections">
 
 {{#if synthesisHtml}}
 {{!-- ═══════════ Synthèse executive ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="synthesis">{{{faIcon "sparkles" "#7c3aed" "22"}}} Note de synthèse</h1>
+<h1 class="chapter" data-toc-anchor="synthesis">{{{faIcon "sparkles" "#1b2842" "16"}}} Note de synthèse</h1>
 <div class="synthesis-block">{{{synthesisHtml}}}</div>
 {{/if}}
 
-{{#if isBacs}}
-{{!-- ═══════════ Synthèse de conformité (anciennement chapitre 7, remontée au début) ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="conformity">{{{faIcon "shield" "#10b981" "22"}}} Synthèse de conformité</h1>
-{{#if bms.overall_compliance}}
-<div class="conformity-banner conformity-{{bms.overall_compliance}}">
-  <span class="conformity-icon">{{#if (eq bms.overall_compliance "compliant")}}✓{{else}}{{#if (eq bms.overall_compliance "partial")}}!{{else}}✗{{/if}}{{/if}}</span>
-  <div class="conformity-body">
-    <span class="conformity-label">État global de la conformité au décret BACS</span>
-    <span class="conformity-value">{{complianceLabel}}</span>
-  </div>
-</div>
-{{/if}}
-
-<div class="panel">
-  <div class="panel-head">
-    <h3 class="panel-title">Actions correctives par sévérité</h3>
-    <p class="panel-subtitle">Détail complet et préconisations Buildy : voir chapitre 7 « Plan de mise en conformité ».</p>
-  </div>
-  <div class="panel-body">
-    <div class="severity-stats">
-      <div class="sev-stat">
-        <span class="sev sev-blocking">Bloquantes</span>
-        <span class="sev-stat-count">{{actionStats.blocking}}</span>
-      </div>
-      <div class="sev-stat">
-        <span class="sev sev-major">Majeures</span>
-        <span class="sev-stat-count">{{actionStats.major}}</span>
-      </div>
-      <div class="sev-stat">
-        <span class="sev sev-minor">Mineures</span>
-        <span class="sev-stat-count">{{actionStats.minor}}</span>
-      </div>
-      {{#if sevDonutDataUrl}}
-      <div class="sev-stat-chart">
-        <img src="{{sevDonutDataUrl}}" alt="Répartition des actions par sévérité" />
-      </div>
-      {{/if}}
-    </div>
-  </div>
-</div>
-{{/if}}
+{{!-- L'ancienne section « Synthèse de conformité » à l'intérieur de
+     .sections est remplacée par la page « L'essentiel » + le tableau de
+     bord conformité R175 placés AVANT .sections (cf. en-tête du document). --}}
 
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#4f46e5" "22"}}} 1. Identification du site</h1>
+<h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#1b2842" "16"}}} 1. Identification du site</h1>
 
 <div class="info-cards">
   <div class="info-card">
@@ -227,14 +328,6 @@
       <span class="info-card-value info-card-value-strong">{{applicabilityLabel}}</span>
     </div>
     {{/if}}
-    <div class="info-card info-card-wide">
-      <span class="info-card-label">Analyse fonctionnelle de la GTB existante</span>
-      {{#if (eq document.audit_existing_af_status "absent")}}
-        <span class="info-card-value info-card-value-warn">Aucun document d'AF disponible</span>
-      {{else}}
-        <span class="info-card-value">Document fourni par le propriétaire ou son exploitant</span>
-      {{/if}}
-    </div>
   {{/if}}
 </div>
 
@@ -284,7 +377,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#4f46e5" "22"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
@@ -313,7 +406,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#1b2842" "16"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
 {{#each systemsByZone}}
 <h2 class="zone-heading">{{zone_name}}</h2>
 {{#each items}}
@@ -412,7 +505,7 @@
 {{/each}}
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "22"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "16"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
 {{#if meters.length}}
 <table>
   <thead>
@@ -425,8 +518,8 @@
     {{#each meters}}
       <tr>
         <td>{{zoneLabel}}</td>
-        <td>{{usageLabel}}</td>
-        <td>{{typeLabel}}</td>
+        <td>{{{meterUsagePill usage}}}</td>
+        <td>{{{meterTypePill meter_type}}}</td>
         <td class="bool-cell"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
         <td class="bool-cell"><span class="{{#if present_actual}}bool-yes{{else}}bool-no{{/if}}">{{#if present_actual}}✓{{else}}✗{{/if}}</span></td>
         <td class="bool-cell"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
@@ -442,9 +535,9 @@
 {{#each metersWithDetails}}
   <div class="detail-card">
     <div class="detail-card-head">
-      {{{faIcon "gauge" "#10b981" "13"}}}
-      <span class="detail-card-title">{{zoneLabel}} — {{usageLabel}}</span>
-      <span class="detail-card-meta">{{typeLabel}}</span>
+      {{{meterTypePill meter_type}}}
+      {{{meterUsagePill usage}}}
+      <span class="detail-card-title">{{zoneLabel}}</span>
     </div>
     <div class="detail-card-body">
       {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
@@ -464,7 +557,7 @@
 
 {{#if isBacs}}
 {{!-- ═══════════ Chapitre 5 — Régulation thermique ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#dc2626" "22"}}} 5. Régulation thermique automatique (R175-6)</h1>
+<h1 class="chapter" data-toc-anchor="thermal">{{{faIcon "fire" "#dc2626" "16"}}} 5. Régulation thermique automatique (R175-6)</h1>
 
 {{#if r175_6_applicable.applies}}
 <div class="callout callout-warn">
@@ -506,7 +599,7 @@
 {{/if}}
 
 {{!-- ═══════════ Chapitre 6 — GTB / Supervision ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#7c3aed" "22"}}} {{#if isBacs}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
+<h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#1b2842" "16"}}} {{#if isBacs}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
 {{#if bms}}
 {{#if bms.out_of_service}}
 <div class="callout callout-warn">
@@ -541,21 +634,29 @@
     <span class="info-card-value">{{bms.location}}</span>
   </div>
   {{/if}}
+  <div class="info-card info-card-wide">
+    <span class="info-card-label">Analyse fonctionnelle de la GTB existante</span>
+    {{#if (eq document.audit_existing_af_status "absent")}}
+      <span class="info-card-value info-card-value-warn">Aucun document d'AF disponible</span>
+    {{else}}
+      <span class="info-card-value">Document fourni par le propriétaire ou son exploitant</span>
+    {{/if}}
+  </div>
 </div>
 
-{{!-- Card 2 — Usages traités par la GTB --}}
+{{!-- Card 2 — Usages couverts vs non couverts par la GTB --}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Usages traités par la GTB</h3>
+    <h3 class="panel-title">Usages couverts par la GTB</h3>
+    <p class="panel-subtitle">Pastille colorée = usage piloté par la GTB. Pastille grisée = usage présent sur le site mais hors périmètre GTB actuel (à intégrer pour conformité R175-3).</p>
   </div>
   <div class="panel-body">
-    <div class="usage-tags">
-      {{#if bms.manages_heating}}<span class="usage-tag">Chauffage</span>{{/if}}
-      {{#if bms.manages_cooling}}<span class="usage-tag">Refroidissement</span>{{/if}}
-      {{#if bms.manages_ventilation}}<span class="usage-tag">Ventilation</span>{{/if}}
-      {{#if bms.manages_dhw}}<span class="usage-tag">ECS</span>{{/if}}
-      {{#if bms.manages_lighting}}<span class="usage-tag">Éclairage</span>{{/if}}
-      {{#unless bms.manages_heating}}{{#unless bms.manages_cooling}}{{#unless bms.manages_ventilation}}{{#unless bms.manages_dhw}}{{#unless bms.manages_lighting}}<span class="muted">Aucun usage déclaré.</span>{{/unless}}{{/unless}}{{/unless}}{{/unless}}{{/unless}}
+    <div class="usage-pills">
+      <span class="usage-pill {{#if bms.manages_heating}}usage-pill-heating{{else}}usage-pill-off{{/if}}">{{{categoryIcon "heating" "12"}}}Chauffage{{#unless bms.manages_heating}} · non couvert{{/unless}}</span>
+      <span class="usage-pill {{#if bms.manages_cooling}}usage-pill-cooling{{else}}usage-pill-off{{/if}}">{{{categoryIcon "cooling" "12"}}}Refroidissement{{#unless bms.manages_cooling}} · non couvert{{/unless}}</span>
+      <span class="usage-pill {{#if bms.manages_ventilation}}usage-pill-ventilation{{else}}usage-pill-off{{/if}}">{{{categoryIcon "ventilation" "12"}}}Ventilation{{#unless bms.manages_ventilation}} · non couvert{{/unless}}</span>
+      <span class="usage-pill {{#if bms.manages_dhw}}usage-pill-dhw{{else}}usage-pill-off{{/if}}">{{{categoryIcon "dhw" "12"}}}ECS{{#unless bms.manages_dhw}} · non couvert{{/unless}}</span>
+      <span class="usage-pill {{#if bms.manages_lighting}}usage-pill-lighting{{else}}usage-pill-off{{/if}}">{{{categoryIcon "lighting_indoor" "12"}}}Éclairage{{#unless bms.manages_lighting}} · non couvert{{/unless}}</span>
     </div>
   </div>
 </div>
@@ -656,13 +757,20 @@
 </div>
 {{/if}}
 
-{{#if bmsManagedDevices.length}}
-{{!-- Card 7 — Équipements intégrés à la GTB --}}
+{{!-- Card 7 — Équipements : intégrés vs à intégrer --}}
+{{#if (or bmsManagedDevices.length bmsUnmanagedDevices.length)}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Équipements intégrés à la GTB <span class="panel-title-meta">({{bmsManagedDevices.length}})</span></h3>
+    <h3 class="panel-title">Équipements et leur intégration à la GTB</h3>
+    <p class="panel-subtitle">Inventaire des équipements présents avec leur statut d'intégration. Les équipements à intégrer sont à chiffrer dans le devis (passerelle, retrofit ou remplacement selon le cas).</p>
   </div>
   <div class="panel-body panel-body-flush">
+    {{#if bmsManagedDevices.length}}
+    <div class="bms-section-head">
+      <span class="bms-section-icon bms-section-icon-ok">✓</span>
+      <span class="bms-section-title">Intégrés à la GTB</span>
+      <span class="bms-section-count">{{bmsManagedDevices.length}}</span>
+    </div>
     <div class="bms-list">
       {{#each bmsManagedDevices}}
         <div class="bms-row">
@@ -673,26 +781,66 @@
         </div>
       {{/each}}
     </div>
+    {{/if}}
+    {{#if bmsUnmanagedDevices.length}}
+    <div class="bms-section-head bms-section-head-gap">
+      <span class="bms-section-icon bms-section-icon-gap">!</span>
+      <span class="bms-section-title">À intégrer (hors GTB)</span>
+      <span class="bms-section-count bms-section-count-gap">{{bmsUnmanagedDevices.length}}</span>
+    </div>
+    <div class="bms-list">
+      {{#each bmsUnmanagedDevices}}
+        <div class="bms-row bms-row-gap">
+          <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
+          <span class="bms-row-name">{{name}}</span>
+          <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
+          {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
+        </div>
+      {{/each}}
+    </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}
 
-{{#if bmsManagedMeters.length}}
-{{!-- Card 8 — Compteurs intégrés à la GTB --}}
+{{!-- Card 8 — Compteurs : intégrés vs à intégrer --}}
+{{#if (or bmsManagedMeters.length bmsUnmanagedMeters.length)}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Compteurs intégrés à la GTB <span class="panel-title-meta">({{bmsManagedMeters.length}})</span></h3>
+    <h3 class="panel-title">Compteurs et leur intégration à la GTB</h3>
+    <p class="panel-subtitle">Compteurs présents sur le site avec leur statut. Les compteurs à intégrer manquent à la conformité R175-3 1° (suivi pas horaire).</p>
   </div>
   <div class="panel-body panel-body-flush">
+    {{#if bmsManagedMeters.length}}
+    <div class="bms-section-head">
+      <span class="bms-section-icon bms-section-icon-ok">✓</span>
+      <span class="bms-section-title">Intégrés à la GTB</span>
+      <span class="bms-section-count">{{bmsManagedMeters.length}}</span>
+    </div>
     <div class="bms-list">
       {{#each bmsManagedMeters}}
         <div class="bms-row">
-          <span class="bms-row-icon">{{{faIcon "gauge" "#10b981" "14"}}}</span>
-          <span class="bms-row-name">{{typeLabel}}</span>
-          <span class="bms-row-meta">{{usageLabel}} · {{zoneLabel}}</span>
+          <span class="bms-row-pills">{{{meterTypePill meter_type}}}{{{meterUsagePill usage}}}</span>
+          <span class="bms-row-meta">{{zoneLabel}}</span>
         </div>
       {{/each}}
     </div>
+    {{/if}}
+    {{#if bmsUnmanagedMeters.length}}
+    <div class="bms-section-head bms-section-head-gap">
+      <span class="bms-section-icon bms-section-icon-gap">!</span>
+      <span class="bms-section-title">À intégrer (présents mais hors GTB)</span>
+      <span class="bms-section-count bms-section-count-gap">{{bmsUnmanagedMeters.length}}</span>
+    </div>
+    <div class="bms-list">
+      {{#each bmsUnmanagedMeters}}
+        <div class="bms-row bms-row-gap">
+          <span class="bms-row-pills">{{{meterTypePill meter_type}}}{{{meterUsagePill usage}}}</span>
+          <span class="bms-row-meta">{{zoneLabel}}</span>
+        </div>
+      {{/each}}
+    </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}
@@ -717,15 +865,14 @@
 <p class="muted">Évaluation de la GTB non renseignée.</p>
 {{/if}}
 
-{{#if isBacs}}
-{{!-- ═══════════ Chapitre 7 — Plan de mise en conformité ═══════════ --}}
-<h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "22"}}} 7. Plan de mise en conformité</h1>
+{{!-- ═══════════ Chapitre 7 — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}
+<h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "16"}}} 7. {{#if isBacs}}Plan de mise en conformité{{else}}Préconisations Buildy pour le devis{{/if}}</h1>
 
 {{#if actionItems.blocking.length}}
-<h2>Actions bloquantes</h2>
+<h2>{{#if isBacs}}Actions bloquantes{{else}}Préconisations essentielles{{/if}}</h2>
 <div class="callout callout-warn">
   <span class="callout-icon">⚠️</span>
-  <div class="callout-body">Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.</div>
+  <div class="callout-body">{{#if isBacs}}Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.{{else}}Préconisations à intégrer en priorité dans le devis Buildy — extension critique de la couverture GTB.{{/if}}</div>
 </div>
 {{#each actionItems.blocking}}
 <div class="action-card">
@@ -752,17 +899,17 @@
 {{/if}}
 
 {{#if actionItems.major.length}}
-<h2>Actions majeures</h2>
+<h2>{{#if isBacs}}Actions majeures{{else}}Préconisations recommandées{{/if}}</h2>
 <div class="callout callout-r175">
   <span class="callout-icon">📖</span>
-  <div class="callout-body">Impact direct sur les exigences fonctionnelles R175-3.</div>
+  <div class="callout-body">{{#if isBacs}}Impact direct sur les exigences fonctionnelles R175-3.{{else}}Améliorations significatives de la couverture GTB recommandées dans le devis.{{/if}}</div>
 </div>
 {{#each actionItems.major}}
 <div class="action-card">
   <div class="action-card-head">
     <span class="action-num">{{display_number}}</span>
-    <span class="sev sev-major">Majeure</span>
-    <span class="muted action-card-article">{{r175_article}}</span>
+    <span class="sev sev-major">{{#if ../isBacs}}Majeure{{else}}Recommandée{{/if}}</span>
+    {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
     {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
   </div>
   <div class="action-card-title"><strong>{{title}}</strong></div>
@@ -782,17 +929,17 @@
 {{/if}}
 
 {{#if actionItems.minor.length}}
-<h2>Optimisations</h2>
+<h2>{{#if isBacs}}Optimisations{{else}}Optimisations complémentaires{{/if}}</h2>
 <div class="callout callout-info">
   <span class="callout-icon">📌</span>
-  <div class="callout-body">Bonnes pratiques, hors strict décret.</div>
+  <div class="callout-body">{{#if isBacs}}Bonnes pratiques, hors strict décret.{{else}}Bonnes pratiques optionnelles, à proposer en option dans le devis.{{/if}}</div>
 </div>
 {{#each actionItems.minor}}
 <div class="action-card action-card-minor">
   <div class="action-card-head">
     <span class="action-num">{{display_number}}</span>
-    <span class="sev sev-minor">Mineure</span>
-    <span class="muted action-card-article">{{r175_article}}</span>
+    <span class="sev sev-minor">{{#if ../isBacs}}Mineure{{else}}Optimisation{{/if}}</span>
+    {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
     {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
   </div>
   <div class="action-card-title"><strong>{{title}}</strong></div>
@@ -804,16 +951,15 @@
 {{#unless actionItems.blocking.length}}
 {{#unless actionItems.major.length}}
 {{#unless actionItems.minor.length}}
-<p>Aucune action corrective à ce stade.</p>
+<p>{{#if isBacs}}Aucune action corrective à ce stade.{{else}}Aucune préconisation à ce stade — la GTB couvre l'intégralité du périmètre.{{/if}}</p>
 {{/unless}}
 {{/unless}}
 {{/unless}}
 
 <div class="callout callout-reco" style="margin-top: 8mm;">
   <span class="callout-icon">✅</span>
-  <div class="callout-body"><strong>Pour la mise en conformité</strong>, l'équipe commerciale Buildy se tient à votre disposition pour établir un devis chiffré.</div>
+  <div class="callout-body"><strong>{{#if isBacs}}Pour la mise en conformité{{else}}Pour le devis détaillé{{/if}}</strong>, l'équipe commerciale Buildy se tient à votre disposition pour établir un devis chiffré.</div>
 </div>
-{{/if}}
 </div>{{!-- /.sections --}}
 
 {{#if isBacs}}

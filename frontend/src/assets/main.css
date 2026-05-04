@@ -17,10 +17,13 @@
   --color-indigo-900: #0a0f1a;
   --color-indigo-950: #050810;
 
-  /* Polices Buildy : Poppins partout dans l'UI (titres + texte) + Manrope option longue lecture */
+  /* Polices Buildy : Poppins (titres / accents) + Inter (corps).
+     Aligne sur les PDF (cf. docs/pdf-design-system.md). */
   --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-serif: 'Manrope', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  /* Compatibilite descendante : --font-serif pointe sur Inter (anciennement Manrope) */
+  --font-serif: var(--font-body);
 }
 
 @layer base {

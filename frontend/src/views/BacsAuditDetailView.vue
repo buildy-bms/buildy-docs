@@ -17,7 +17,7 @@ import {
   getBacsBms, updateBacsBms,
   getBacsThermal, updateBacsThermal,
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
-  getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsChecklistPdf, deliverBacsAudit,
+  getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsTablesPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice, createBacsDevice,
@@ -919,6 +919,22 @@ async function exportPdf() {
   }
 }
 
+// Export PDF tableaux de synthèse (A3 paysage, 4 grands tableaux denses
+// destinés à l'intégrateur pour bâtir le devis).
+const exportingTables = ref(false)
+async function exportTablesPdf() {
+  exportingTables.value = true
+  try {
+    const { data } = await exportBacsTablesPdf(docId)
+    success(`Tableaux de synthèse générés (${(data.file_size_bytes / 1024).toFixed(0)} Ko)`)
+    window.location.href = data.download_url
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de l\'export tableaux')
+  } finally {
+    exportingTables.value = false
+  }
+}
+
 // Aperçu HTML in-browser (sans Puppeteer) — permet de valider visuellement
 // le contenu avant de declencher l'export PDF qui prend ~3-5s.
 const previewOpen = ref(false)
@@ -1077,9 +1093,14 @@ onBeforeUnmount(() => {
           <EyeIcon class="w-3.5 h-3.5 shrink-0" /> Aperçu
         </button>
         <button @click="exportPdf" :disabled="exporting"
-          title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF"
+          title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF A4"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
           <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'Générer le rapport' }}
+        </button>
+        <button @click="exportTablesPdf" :disabled="exportingTables"
+          title="Génère les tableaux de synthèse (A3 paysage, 4 tableaux denses : zones, systèmes, compteurs, régulation, plan d'action) — format scannable destiné à l'intégrateur Buildy pour bâtir le devis."
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exportingTables ? 'Génération…' : 'Tableaux de synthèse' }}
         </button>
         <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}

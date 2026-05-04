@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Audit BACS — Tableaux de synthèse — {{document.client_name}} — {{document.project_name}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- ═══════════ En-tête (banderole de doc) ═══════════ --}}
+<header class="doc-header">
+  <div class="doc-header-left">
+    <img class="doc-header-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <div class="doc-header-meta">
+      <div class="doc-header-eyebrow">Audit BACS — Tableaux de synthèse</div>
+      <div class="doc-header-title">{{document.project_name}}</div>
+      <div class="doc-header-sub">{{document.client_name}} · {{site.address}}</div>
+    </div>
+  </div>
+  <div class="doc-header-right">
+    <span class="doc-header-tag">{{exportDate}}</span>
+    <span class="doc-header-tag doc-header-tag-version">{{version}}</span>
+  </div>
+</header>
+
+{{!-- ═══════════ Bandeau récap chiffré ═══════════ --}}
+<section class="recap-tiles">
+  {{#if isBacs}}
+  <div class="tile">
+    <span class="tile-label">Puissance R175-2</span>
+    <span class="tile-value">{{document.bacs_total_power_kw}} <span class="tile-unit">kW</span></span>
+    <span class="tile-sub">{{applicabilityLabel}}</span>
+  </div>
+  {{else}}
+  <div class="tile">
+    <span class="tile-label">Couverture GTB</span>
+    <span class="tile-value">{{compliance.coverage.ratio}} <span class="tile-unit">%</span></span>
+    <span class="tile-sub">{{compliance.verdictLabel}}</span>
+  </div>
+  {{/if}}
+  <div class="tile">
+    <span class="tile-label">Équipements</span>
+    <span class="tile-value">{{recapStats.devicesPresent}}<span class="tile-of"> / {{recapStats.devicesTotal}}</span></span>
+    <span class="tile-sub">{{recapStats.devicesIntegrated}} intégrés GTB · {{recapStats.devicesHs}} HS</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Compteurs</span>
+    <span class="tile-value">{{recapStats.metersPresent}}<span class="tile-of"> / {{recapStats.metersRequired}}</span></span>
+    <span class="tile-sub">{{recapStats.metersIntegrated}} intégrés GTB · {{recapStats.metersMissing}} à installer</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">{{#if isBacs}}Plan d'action{{else}}Préconisations Buildy{{/if}}</span>
+    <span class="tile-value">{{compliance.stats.total}}</span>
+    <span class="tile-sub">
+      <span class="sev-dot sev-dot-blocking"></span>{{compliance.stats.blocking}} {{#if isBacs}}bloq.{{else}}essent.{{/if}}
+      <span class="sev-dot sev-dot-major"></span>{{compliance.stats.major}} {{#if isBacs}}maj.{{else}}recom.{{/if}}
+      <span class="sev-dot sev-dot-minor"></span>{{compliance.stats.minor}} {{#if isBacs}}min.{{else}}option{{/if}}
+    </span>
+  </div>
+</section>
+
+{{!-- ═══════════ Bandeau GTB existante en synthèse ═══════════ --}}
+{{#if bms}}
+<section class="gtb-summary">
+  <div class="gtb-summary-head">
+    <span class="gtb-summary-eyebrow">GTB existante</span>
+    <span class="gtb-summary-name">{{bms.existing_solution}}</span>
+    {{#if bms.existing_solution_brand}}<span class="gtb-summary-brand">{{bms.existing_solution_brand}}</span>{{/if}}
+    {{#if bms.model_reference}}<span class="gtb-summary-model">· {{bms.model_reference}}</span>{{/if}}
+  </div>
+  <div class="gtb-summary-body">
+    <div class="gtb-summary-cell">
+      <span class="gtb-cell-label">Usages couverts</span>
+      <div class="gtb-cell-value usage-pills usage-pills-compact">
+        <span class="usage-pill {{#if bms.manages_heating}}usage-pill-heating{{else}}usage-pill-off{{/if}}">{{{categoryIcon "heating" "10"}}}Chauf.</span>
+        <span class="usage-pill {{#if bms.manages_cooling}}usage-pill-cooling{{else}}usage-pill-off{{/if}}">{{{categoryIcon "cooling" "10"}}}Clim.</span>
+        <span class="usage-pill {{#if bms.manages_ventilation}}usage-pill-ventilation{{else}}usage-pill-off{{/if}}">{{{categoryIcon "ventilation" "10"}}}Vent.</span>
+        <span class="usage-pill {{#if bms.manages_dhw}}usage-pill-dhw{{else}}usage-pill-off{{/if}}">{{{categoryIcon "dhw" "10"}}}ECS</span>
+        <span class="usage-pill {{#if bms.manages_lighting}}usage-pill-lighting{{else}}usage-pill-off{{/if}}">{{{categoryIcon "lighting_indoor" "10"}}}Éclair.</span>
+      </div>
+    </div>
+    <div class="gtb-summary-cell">
+      <span class="gtb-cell-label">R175-3 supervision</span>
+      <div class="gtb-cell-value gtb-checks">
+        <span class="check {{#if bms.meets_r175_3_p1}}check-ok{{else}}check-ko{{/if}}">{{#if bms.meets_r175_3_p1}}✓{{else}}✗{{/if}} P1 horaire 5 ans</span>
+        <span class="check {{#if bms.meets_r175_3_p2}}check-ok{{else}}check-ko{{/if}}">{{#if bms.meets_r175_3_p2}}✓{{else}}✗{{/if}} P2 anomalies</span>
+      </div>
+    </div>
+    <div class="gtb-summary-cell">
+      <span class="gtb-cell-label">R175-3 mise à dispo</span>
+      <div class="gtb-cell-value gtb-checks">
+        <span class="check {{#if bms.data_provision_to_manager}}check-ok{{else}}check-ko{{/if}}">{{#if bms.data_provision_to_manager}}✓{{else}}✗{{/if}} Gestionnaire</span>
+        <span class="check {{#if bms.data_provision_to_operators}}check-ok{{else}}check-ko{{/if}}">{{#if bms.data_provision_to_operators}}✓{{else}}✗{{/if}} Exploitants</span>
+      </div>
+    </div>
+    <div class="gtb-summary-cell">
+      <span class="gtb-cell-label">R175-4 maintenance</span>
+      <div class="gtb-cell-value gtb-checks">
+        <span class="check {{#if bms.has_maintenance_procedures}}check-ok{{else}}check-ko{{/if}}">{{#if bms.has_maintenance_procedures}}✓{{else}}✗{{/if}} Procédure</span>
+        {{#if bms.maintenance_periodicity}}<span class="gtb-meta">{{bms.maintenance_periodicity}}</span>{{/if}}
+      </div>
+    </div>
+    <div class="gtb-summary-cell">
+      <span class="gtb-cell-label">R175-5 formation</span>
+      <div class="gtb-cell-value gtb-checks">
+        <span class="check {{#if bms.operator_trained}}check-ok{{else}}check-ko{{/if}}">{{#if bms.operator_trained}}✓{{else}}✗{{/if}} Exploitant formé</span>
+        {{#if bms.operator_training_date}}<span class="gtb-meta">{{bms.operator_training_date}}</span>{{/if}}
+      </div>
+    </div>
+  </div>
+</section>
+{{/if}}
+
+{{!-- ═══════════ Mini-tableau zones fonctionnelles ═══════════ --}}
+{{#if zones.length}}
+<section class="table-section">
+  <header class="section-head">
+    <span class="section-eyebrow">Référence</span>
+    <h2 class="section-title">Zones fonctionnelles (R175-1 6°)</h2>
+  </header>
+  <table class="syn syn-zones">
+    <thead>
+      <tr>
+        <th class="col-ref">Réf</th>
+        <th class="col-name">Nom</th>
+        <th class="col-nature">Nature</th>
+        <th class="col-surface">Surface (m²)</th>
+        <th class="col-notes">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each zones}}
+        <tr>
+          <td class="col-ref">{{ref}}</td>
+          <td class="col-name"><strong>{{name}}</strong></td>
+          <td class="col-nature">{{natureLabel}}</td>
+          <td class="col-surface">{{surface_m2}}</td>
+          <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+
+{{!-- ═══════════ Tableau 1 — Systèmes techniques par zone ═══════════ --}}
+<section class="table-section table-section-break">
+  <header class="section-head">
+    <span class="section-eyebrow">Tableau 1 / 4</span>
+    <h2 class="section-title">Systèmes techniques par zone fonctionnelle</h2>
+    <p class="section-intro">
+      Inventaire complet des équipements présents sur le site, regroupés par zone fonctionnelle puis par catégorie d'usage. Conformité R175-3 (interopérabilité + arrêt manuel + autonome) évaluée par équipement.
+    </p>
+  </header>
+
+  <table class="syn syn-systems">
+    <thead>
+      <tr>
+        <th class="col-ref">Réf</th>
+        <th class="col-usage">Usage</th>
+        <th class="col-name">Équipement</th>
+        <th class="col-brand">Marque</th>
+        <th class="col-model">Modèle / réf.</th>
+        <th class="col-energy">Énergie</th>
+        <th class="col-power">P (kW)</th>
+        <th class="col-role">Rôle</th>
+        <th class="col-comm">Communication</th>
+        <th class="col-loc">Localisation</th>
+        <th class="col-bool">Interop.</th>
+        <th class="col-bool">Arrêt manuel</th>
+        <th class="col-bool">Autonome</th>
+        <th class="col-bool">GTB</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each systemsByZone}}
+        <tr class="zone-row"><th colspan="14">{{zone_name}}</th></tr>
+        {{#each items}}
+          {{#if present}}
+            {{#each devices}}
+              <tr {{#if out_of_service}}class="row-hs"{{/if}}>
+                <td class="col-ref">{{ref}}</td>
+                <td class="col-usage">{{{categoryIcon ../system_category "11"}}}<span class="cat-label">{{../categoryLabel}}</span></td>
+                <td class="col-name">
+                  <strong>{{name}}</strong>
+                  {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
+                </td>
+                <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-energy">{{energyLabel}}</td>
+                <td class="col-power">{{power_kw}}</td>
+                <td class="col-role">{{roleLabel}}</td>
+                <td class="col-comm">{{commLabel}}</td>
+                <td class="col-loc">{{location}}</td>
+                <td class="col-bool"><span class="{{#if meets_r175_3_p3}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p3}}✓{{else}}✗{{/if}}</span></td>
+                <td class="col-bool"><span class="{{#if meets_r175_3_p4}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p4}}✓{{else}}✗{{/if}}</span></td>
+                <td class="col-bool"><span class="{{#if meets_r175_3_p4_autonomous}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}}</span></td>
+                <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
+              </tr>
+            {{/each}}
+          {{/if}}
+        {{/each}}
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+
+{{!-- ═══════════ Tableau 2 — Compteurs par zone ═══════════ --}}
+<section class="table-section table-section-break">
+  <header class="section-head">
+    <span class="section-eyebrow">Tableau 2 / 4</span>
+    <h2 class="section-title">Compteurs et mesurage par zone fonctionnelle</h2>
+    <p class="section-intro">
+      Compteurs requis sur le site (R175-3 §1° — suivi continu pas horaire des consommations par usage et par zone). Les compteurs requis mais non présents constituent autant d'actions de mise en conformité.
+    </p>
+  </header>
+
+  <table class="syn syn-meters">
+    <thead>
+      <tr>
+        <th class="col-ref">Réf</th>
+        <th class="col-type">Type</th>
+        <th class="col-usage">Usage</th>
+        <th class="col-bool">Requis</th>
+        <th class="col-bool">Présent</th>
+        <th class="col-bool">Communicant</th>
+        <th class="col-bool">Intégré GTB</th>
+        <th class="col-bool">Statut</th>
+        <th class="col-notes">Notes terrain</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each metersByZone}}
+        <tr class="zone-row"><th colspan="9">{{zone_name}}</th></tr>
+        {{#each items}}
+          <tr class="{{#if out_of_service}}row-hs{{else}}{{#unless present_actual}}row-missing{{/unless}}{{/if}}">
+            <td class="col-ref">{{ref}}</td>
+            <td class="col-type">{{{meterTypePill meter_type}}}</td>
+            <td class="col-usage">{{{meterUsagePill usage}}}</td>
+            <td class="col-bool"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
+            <td class="col-bool">
+              {{#if present_actual}}
+                <span class="bool-yes">✓</span>
+              {{else}}
+                <span class="bool-no">✗</span>
+                {{#if required}}<span class="missing-tag">à installer</span>{{/if}}
+              {{/if}}
+            </td>
+            <td class="col-bool"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
+            <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
+            <td class="col-bool">{{#if out_of_service}}<span class="hs-tag">HS</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+          </tr>
+        {{/each}}
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+
+{{!-- ═══════════ Tableau 3 — Régulation thermique ═══════════ --}}
+{{#if thermal.length}}
+<section class="table-section table-section-break">
+  <header class="section-head">
+    <span class="section-eyebrow">Tableau 3 / 4</span>
+    <h2 class="section-title">Régulation thermique automatique{{#if isBacs}} (R175-6){{/if}}</h2>
+    <p class="section-intro">
+      Évaluation de la régulation thermique automatique par zone fonctionnelle pour le chauffage et le refroidissement.{{#if isBacs}} Le R175-6 exige une régulation différenciée (par pièce ou zone) selon l'usage.{{else}} Information utile pour dimensionner les actions de zoning et de pilotage thermique du devis.{{/if}}
+    </p>
+  </header>
+
+  <table class="syn syn-thermal">
+    <thead>
+      <tr>
+        <th class="col-ref">Réf</th>
+        <th class="col-zone">Zone</th>
+        <th class="col-usage">Usage</th>
+        <th class="col-bool">Régul. auto</th>
+        <th class="col-type">Type régulation</th>
+        <th class="col-gen">Type générateur</th>
+        <th class="col-age">Âge</th>
+        <th class="col-bool">Exempté bois</th>
+        <th class="col-sensor">Sonde</th>
+        <th class="col-thermo">Thermostat</th>
+        <th class="col-bool">Robinets th.</th>
+        <th class="col-notes">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each thermal}}
+        <tr>
+          <td class="col-ref">{{ref}}</td>
+          <td class="col-zone">{{zone_name}}</td>
+          <td class="col-usage">{{{categoryIcon category "11"}}}<span class="cat-label">{{categoryLabel}}</span></td>
+          <td class="col-bool"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-type">{{regulationLabel}}</td>
+          <td class="col-gen">{{generatorLabel}}</td>
+          <td class="col-age">{{#if generator_age_years}}{{generator_age_years}} ans{{else}}<span class="muted">—</span>{{/if}}</td>
+          <td class="col-bool"><span class="{{#if generator_exempt_wood}}bool-yes{{else}}bool-no{{/if}}">{{#if generator_exempt_wood}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-sensor">{{#if sensor_position}}{{sensor_position}}{{else}}<span class="muted">—</span>{{/if}}</td>
+          <td class="col-thermo">{{#if thermostat_type}}{{thermostat_type}}{{else}}<span class="muted">—</span>{{/if}}</td>
+          <td class="col-bool"><span class="{{#if has_thermostatic_valves}}bool-yes{{else}}bool-no{{/if}}">{{#if has_thermostatic_valves}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-notes">{{notes}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+
+{{!-- ═══════════ Tableau 4 — Plan d'action / Préconisations Buildy ═══════════ --}}
+{{#if actionItemsRaw.length}}
+<section class="table-section table-section-break">
+  <header class="section-head">
+    <span class="section-eyebrow">Tableau 4 / 4</span>
+    <h2 class="section-title">{{#if isBacs}}Plan d'action récapitulatif{{else}}Préconisations Buildy récapitulatives{{/if}}</h2>
+    <p class="section-intro">
+      Vue scannable des {{actionItemsRaw.length}} {{#if isBacs}}actions correctives{{else}}préconisations{{/if}} identifiées, regroupées par sévérité. Chaque ligne référence l'item d'inventaire concerné (E-XXX équipement, M-XXX compteur). Détail et {{#if isBacs}}préconisations Buildy{{else}}plan détaillé{{/if}} : voir le rapport principal.
+    </p>
+  </header>
+
+  <table class="syn syn-actions">
+    <thead>
+      <tr>
+        <th class="col-ref">Réf</th>
+        <th class="col-sev">Sévérité</th>
+        <th class="col-r175">R175</th>
+        <th class="col-zone">Zone</th>
+        <th class="col-title">Titre de l'action</th>
+        <th class="col-source">Item source</th>
+        <th class="col-status">Statut</th>
+        <th class="col-comm-notes">Note commerciale</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each actionItemsRaw}}
+        <tr class="action-row action-row-{{severity}}">
+          <td class="col-ref">{{display_number}}</td>
+          <td class="col-sev"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span></td>
+          <td class="col-r175">{{r175_article}}</td>
+          <td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>
+          <td class="col-title">{{title}}</td>
+          <td class="col-source">
+            {{#if source_table}}
+              {{#if (eq source_table "bacs_audit_system_devices")}}E-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_meters")}}M-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_thermal_regulation")}}T-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_bms")}}GTB{{else}}<span class="muted">—</span>{{/if}}{{/if}}{{/if}}{{/if}}
+            {{else}}
+              <span class="muted">—</span>
+            {{/if}}
+          </td>
+          <td class="col-status"><span class="status-pill status-pill-{{status}}">{{#if (eq status "open")}}Ouverte{{else}}{{#if (eq status "quoted")}}Chiffrée{{else}}{{#if (eq status "in_progress")}}En cours{{else}}{{status}}{{/if}}{{/if}}{{/if}}</span></td>
+          <td class="col-comm-notes">{{#if commercial_notes}}{{commercial_notes}}{{else}}<span class="muted">—</span>{{/if}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</section>
+{{/if}}
+
+</body>
+</html>

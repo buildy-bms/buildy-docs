@@ -1,0 +1,513 @@
+/* ──────────────────────────────────────────────────────────────────
+   Audit BACS — Tableaux de synthèse — A3 paysage — Buildy
+   Document complementaire au PDF audit BACS principal : 2 grands
+   tableaux denses (systemes par zone × usage, compteurs par zone)
+   destines a l'integrateur pour bâtir son devis. Reprend strictement
+   les tokens / pastilles / icones du PDF principal.
+   ────────────────────────────────────────────────────────────────── */
+
+:root {
+  --buildy-navy: #1b2842;
+  --buildy-green: #00cd92;
+  --neutral-50: #f9fafb;
+  --neutral-100: #f3f4f6;
+  --neutral-200: #e5e7eb;
+  --neutral-300: #d1d5db;
+  --neutral-400: #9ca3af;
+  --neutral-500: #6b7280;
+  --neutral-600: #4b5563;
+  --neutral-700: #374151;
+  --neutral-800: #1f2937;
+  --neutral-900: #111827;
+  --sev-blocking: #dc2626;
+  --sev-major: #ea580c;
+  --sev-minor: #f59e0b;
+  --verdict-ok: #059669;
+  --verdict-warn: #d97706;
+  --verdict-bad: #dc2626;
+}
+
+@page {
+  size: A3 landscape;
+  margin: 12mm 14mm 12mm 14mm;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 8pt;
+  color: var(--neutral-800);
+  line-height: 1.4;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+a { color: inherit; text-decoration: none; }
+
+h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
+.muted { color: var(--neutral-400); }
+
+/* ── En-tête de document ──────────────────────────────────────────── */
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6mm;
+  padding: 0 0 4mm;
+  border-bottom: 0.6pt solid var(--neutral-200);
+  margin-bottom: 6mm;
+}
+.doc-header-left { display: flex; align-items: center; gap: 5mm; flex: 1; min-width: 0; }
+.doc-header-logo { width: 24mm; flex-shrink: 0; }
+.doc-header-meta { display: flex; flex-direction: column; gap: 1mm; min-width: 0; }
+.doc-header-eyebrow {
+  font-size: 7.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--buildy-green);
+}
+.doc-header-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: var(--buildy-navy);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-header-sub {
+  font-size: 8.5pt;
+  color: var(--neutral-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-header-right { display: flex; flex-direction: column; gap: 1.5mm; align-items: flex-end; flex-shrink: 0; }
+.doc-header-tag {
+  font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace;
+  font-size: 8pt;
+  color: var(--neutral-600);
+  background: var(--neutral-100);
+  padding: 0.8mm 2.5mm;
+  border-radius: 2mm;
+  font-weight: 600;
+}
+.doc-header-tag-version {
+  background: var(--buildy-green);
+  color: var(--buildy-navy);
+}
+
+/* ── Récap chiffré (4 tuiles d'en-tête) ──────────────────────────── */
+.recap-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4mm;
+  margin-bottom: 5mm;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+  padding: 4mm 5mm;
+  background: var(--neutral-50);
+  border: 0.4pt solid var(--neutral-200);
+  border-left: 2.5pt solid var(--buildy-green);
+  border-radius: 2mm;
+  page-break-inside: avoid;
+}
+.tile-label {
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--neutral-500);
+}
+.tile-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22pt;
+  font-weight: 700;
+  color: var(--buildy-navy);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.tile-unit { font-size: 11pt; font-weight: 500; color: var(--neutral-500); margin-left: 1mm; }
+.tile-of   { font-size: 14pt; font-weight: 500; color: var(--neutral-400); }
+.tile-sub  { font-size: 8pt; color: var(--neutral-600); margin-top: 0.5mm; display: flex; align-items: center; gap: 1.5mm; flex-wrap: wrap; }
+.sev-dot {
+  display: inline-block;
+  width: 2mm; height: 2mm;
+  border-radius: 50%;
+  margin-right: 0.5mm;
+}
+.sev-dot-blocking { background: var(--sev-blocking); }
+.sev-dot-major    { background: var(--sev-major); }
+.sev-dot-minor    { background: var(--sev-minor); }
+
+/* ── Bandeau GTB existante en synthèse ────────────────────────────── */
+.gtb-summary {
+  background: white;
+  border: 0.4pt solid var(--neutral-200);
+  border-left: 2.5pt solid var(--buildy-navy);
+  border-radius: 2mm;
+  padding: 4mm 5mm;
+  margin-bottom: 6mm;
+  page-break-inside: avoid;
+}
+.gtb-summary-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  flex-wrap: wrap;
+  margin-bottom: 3mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 0.4pt solid var(--neutral-200);
+}
+.gtb-summary-eyebrow {
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--buildy-green);
+  margin-right: 2mm;
+}
+.gtb-summary-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11pt;
+  font-weight: 600;
+  color: var(--buildy-navy);
+}
+.gtb-summary-brand { font-size: 9pt; color: var(--neutral-600); }
+.gtb-summary-model { font-size: 8.5pt; color: var(--neutral-500); }
+
+.gtb-summary-body {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4mm;
+}
+.gtb-summary-cell { display: flex; flex-direction: column; gap: 1.5mm; min-width: 0; }
+.gtb-cell-label {
+  font-size: 6.8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--neutral-500);
+}
+.gtb-cell-value { font-size: 8pt; }
+.gtb-checks { display: flex; flex-direction: column; gap: 1mm; }
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+  font-size: 8pt;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.check-ok { color: var(--verdict-ok); }
+.check-ko { color: var(--sev-blocking); }
+.gtb-meta {
+  font-size: 7pt;
+  color: var(--neutral-500);
+  font-style: italic;
+}
+
+/* Variante compacte des usage-pills pour le bandeau GTB */
+.usage-pills-compact { gap: 1mm; }
+.usage-pills-compact .usage-pill {
+  font-size: 7pt;
+  padding: 0.5mm 1.8mm 0.5mm 1.5mm;
+  gap: 0.8mm;
+}
+
+/* ── Sections de tableau ──────────────────────────────────────────── */
+.table-section { margin-bottom: 8mm; }
+.table-section-break { page-break-before: always; }
+.section-head { margin-bottom: 4mm; }
+.section-eyebrow {
+  display: block;
+  font-size: 7.5pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--buildy-green);
+  margin-bottom: 1mm;
+}
+.section-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: var(--buildy-navy);
+  letter-spacing: -0.01em;
+  margin-bottom: 1.5mm;
+}
+.section-intro {
+  font-size: 8.5pt;
+  color: var(--neutral-600);
+  line-height: 1.5;
+  max-width: 230mm;
+  margin: 0;
+}
+
+/* ── Tableaux compacts paysage ────────────────────────────────────── */
+table.syn {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 3mm;
+  font-size: 7.8pt;
+  table-layout: fixed;
+  border: 0.4pt solid var(--neutral-200);
+  border-radius: 2mm;
+  overflow: hidden;
+}
+table.syn thead {
+  background: var(--buildy-navy);
+}
+table.syn thead th {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white;
+  text-align: left;
+  padding: 2.5mm 2mm;
+  border: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+table.syn thead th.col-bool { text-align: center; }
+
+/* Ligne de groupe par zone — banderole discrete neutre, accent vert
+   Buildy en barre verticale gauche pour rappeler la hierarchie. */
+table.syn tr.zone-row th {
+  background: var(--neutral-50);
+  color: var(--buildy-navy);
+  font-family: 'Poppins', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 2.2mm 3mm;
+  border-top: 0.6pt solid var(--neutral-200);
+  border-bottom: 0.4pt solid var(--neutral-200);
+  border-left: 2pt solid var(--buildy-green);
+  text-align: left;
+}
+
+table.syn tbody td {
+  padding: 1.6mm 2mm;
+  border-bottom: 0.3pt solid var(--neutral-100);
+  vertical-align: middle;
+  white-space: nowrap;            /* default : pas de retour ligne */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+table.syn tbody tr:nth-child(odd) td { background: #fafbfc; }
+table.syn tbody tr.zone-row + tr td,
+table.syn tbody tr.zone-row + tr + tr td { /* reset alternance après zone-row */ }
+table.syn tbody tr:last-child td { border-bottom: none; }
+table.syn tbody tr.row-hs td {
+  opacity: 0.55;
+  font-style: italic;
+}
+/* Ligne "compteur requis mais absent" : fond rouge pâle pour signaler le gap */
+table.syn tbody tr.row-missing td {
+  background: #fff1f2;
+}
+table.syn tbody tr.row-missing:nth-child(odd) td { background: #ffe4e6; }
+
+table.syn tbody td strong {
+  color: var(--buildy-navy);
+  font-weight: 600;
+}
+
+/* Cellules booleennes ✓/✗ */
+table.syn td.col-bool { text-align: center; }
+.bool-yes, .bool-no, .bool-na {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 9pt;
+  line-height: 1;
+}
+.bool-yes { color: var(--verdict-ok); }
+.bool-no  { color: var(--sev-blocking); }
+.bool-na  { color: var(--neutral-400); }
+
+/* Tag HS sur les equipements/compteurs hors-service */
+.hs-tag {
+  display: inline-block;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 6.8pt;
+  font-weight: 700;
+  padding: 0.3mm 1.5mm;
+  border-radius: 1.5mm;
+  margin-left: 1mm;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+/* Tag "à installer" pour compteurs requis mais absents */
+.missing-tag {
+  display: inline-block;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 6.5pt;
+  font-weight: 600;
+  padding: 0.3mm 1.5mm;
+  border-radius: 1.5mm;
+  margin-left: 1mm;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Pastille catégorie (icone + label texte court) — colonne Usage table 1 */
+.cat-label {
+  display: inline-block;
+  font-size: 7.5pt;
+  color: var(--neutral-700);
+  font-weight: 500;
+  margin-left: 1mm;
+  vertical-align: middle;
+}
+
+/* ── Pastilles compteurs (m-pill) — alignées sur le PDF principal ── */
+.m-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6mm 1.8mm;
+  border-radius: 999px;
+  font-size: 7pt;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* ── Largeurs colonnes — Tableau Systèmes (A3 paysage utile ~390mm) ─
+   Total = 14+30+42+22+32+18+12+18+26+40+(15×4) = 314mm. Marge confortable
+   pour respirer côté droit, eviter le sentiment de débordement. */
+table.syn-systems .col-ref    { width: 14mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--neutral-600); font-weight: 600; }
+table.syn-systems .col-usage  { width: 30mm; }
+table.syn-systems .col-name   { width: 42mm; }
+table.syn-systems .col-brand  { width: 22mm; }
+table.syn-systems .col-model  { width: 32mm; }
+table.syn-systems .col-energy { width: 18mm; }
+table.syn-systems .col-power  { width: 12mm; text-align: right; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.5pt; }
+table.syn-systems .col-role   { width: 18mm; }
+table.syn-systems .col-comm   { width: 26mm; }
+table.syn-systems .col-loc    { width: 40mm; color: var(--neutral-600); }
+table.syn-systems .col-bool   { width: 17mm; text-align: center; }
+
+/* Notes : on autorise le wrap sur la colonne notes du tableau compteurs */
+table.syn-meters .col-notes { white-space: normal; }
+table.syn-meters .col-notes p { margin: 0; }
+table.syn-zones .col-notes,
+table.syn-thermal .col-notes,
+table.syn-actions .col-comm-notes,
+table.syn-actions .col-title { white-space: normal; }
+
+/* ── Largeurs colonnes — Tableau Zones (référence court) ─────────── */
+table.syn-zones .col-ref     { width: 16mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--neutral-600); font-weight: 600; }
+table.syn-zones .col-name    { width: 60mm; }
+table.syn-zones .col-nature  { width: 36mm; }
+table.syn-zones .col-surface { width: 24mm; text-align: right; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; }
+table.syn-zones .col-notes   { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-zones .col-notes p { margin: 0; }
+
+/* ── Largeurs colonnes — Tableau Régulation thermique ────────────── */
+table.syn-thermal .col-ref    { width: 14mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--neutral-600); font-weight: 600; }
+table.syn-thermal .col-zone   { width: 36mm; }
+table.syn-thermal .col-usage  { width: 30mm; }
+table.syn-thermal .col-bool   { width: 18mm; text-align: center; }
+table.syn-thermal .col-type   { width: 32mm; }
+table.syn-thermal .col-gen    { width: 36mm; }
+table.syn-thermal .col-age    { width: 16mm; text-align: right; }
+table.syn-thermal .col-sensor { width: 32mm; color: var(--neutral-600); }
+table.syn-thermal .col-thermo { width: 26mm; color: var(--neutral-600); }
+table.syn-thermal .col-notes  { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+table.syn-thermal .col-notes p { margin: 0; }
+
+/* ── Largeurs colonnes — Tableau Plan d'action récap ─────────────── */
+table.syn-actions .col-ref         { width: 18mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--buildy-navy); font-weight: 700; }
+table.syn-actions .col-sev         { width: 20mm; }
+table.syn-actions .col-r175        { width: 22mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7pt; color: var(--neutral-600); }
+table.syn-actions .col-zone        { width: 36mm; }
+table.syn-actions .col-title       { width: 110mm; }
+table.syn-actions .col-source      { width: 18mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--neutral-700); font-weight: 600; }
+table.syn-actions .col-status      { width: 22mm; }
+table.syn-actions .col-comm-notes  { width: auto; color: var(--neutral-600); font-size: 7.4pt; }
+
+/* Lignes plan d'action : accent gauche par sévérité */
+table.syn-actions tbody tr.action-row td:first-child { border-left: 2pt solid transparent; }
+table.syn-actions tbody tr.action-row-blocking td:first-child { border-left-color: var(--sev-blocking); }
+table.syn-actions tbody tr.action-row-major td:first-child    { border-left-color: var(--sev-major); }
+table.syn-actions tbody tr.action-row-minor td:first-child    { border-left-color: var(--sev-minor); }
+
+/* Pastilles sévérité dans le tableau plan d'action */
+.sev {
+  display: inline-block;
+  padding: 0.4mm 1.8mm;
+  border-radius: 999px;
+  font-size: 6.8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.sev-blocking { background: #fee2e2; color: #991b1b; }
+.sev-major    { background: #ffedd5; color: #9a3412; }
+.sev-minor    { background: #fef3c7; color: #854d0e; }
+
+/* Pastilles statut commercial */
+.status-pill {
+  display: inline-block;
+  padding: 0.4mm 1.8mm;
+  border-radius: 999px;
+  font-size: 7pt;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-pill-open        { background: var(--neutral-100); color: var(--neutral-700); }
+.status-pill-quoted      { background: #ede9fe; color: #5b21b6; }
+.status-pill-in_progress { background: #ecfdf5; color: var(--verdict-ok); }
+
+/* Pastilles usage-pill (variantes) — déjà dans le PDF principal, on les
+   déclare ici aussi pour le bandeau GTB compact. */
+.usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2mm;
+  padding: 1mm 2.5mm 1mm 2mm;
+  border-radius: 999px;
+  font-size: 7.5pt;
+  font-weight: 500;
+  border: 0.4pt solid;
+  white-space: nowrap;
+}
+.usage-pill svg { margin-right: 0 !important; }
+.usage-pill-heating     { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.usage-pill-cooling     { background: #ecfeff; color: #155e75; border-color: #a5f3fc; }
+.usage-pill-ventilation { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+.usage-pill-dhw         { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+.usage-pill-lighting    { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.usage-pill-off {
+  background: var(--neutral-100);
+  color: var(--neutral-500);
+  border-color: var(--neutral-200);
+}
+.usage-pill-off svg { opacity: 0.45; }
+.usage-pills { display: flex; flex-wrap: wrap; gap: 1.5mm; }
+
+/* ── Largeurs colonnes — Tableau Compteurs (A3 paysage utile ~390mm) ─ */
+table.syn-meters .col-ref   { width: 16mm; font-family: "SFMono-Regular", Menlo, ui-monospace, Consolas, monospace; font-size: 7.2pt; color: var(--neutral-600); font-weight: 600; }
+table.syn-meters .col-type  { width: 36mm; }
+table.syn-meters .col-usage { width: 30mm; }
+table.syn-meters .col-bool  { width: 22mm; text-align: center; }
+/* Colonne Présent un peu plus large pour accueillir le tag "à installer" */
+table.syn-meters thead th.col-bool:nth-of-type(5),
+table.syn-meters tbody td.col-bool:nth-of-type(5) { width: 32mm; }
+table.syn-meters .col-notes { width: auto; color: var(--neutral-600); font-size: 7.4pt; }

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 75;
+const TARGET_VERSION = 76;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2881,6 +2881,34 @@ function runMigrations() {
     `);
     db.pragma('user_version = 75');
     log.info('Migration 75 appliquee : section_template_versions');
+  }
+
+  if (current < 76) {
+    // Ajout du kind 'pdf-bacs-tables' pour les exports tableaux de synthèse
+    // (A3 paysage, complement du PDF audit BACS principal). SQLite ne supporte
+    // pas ALTER TABLE ... ADD CHECK, donc on recree la table avec la nouvelle
+    // contrainte (pattern standard SQLite).
+    db.exec(`
+      CREATE TABLE exports_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('pdf-af', 'pdf-points-list', 'pdf-bacs-audit', 'pdf-bacs-tables')),
+        file_path TEXT NOT NULL,
+        sections_snapshot TEXT,
+        options TEXT,
+        motif TEXT,
+        git_tag TEXT,
+        exported_by INTEGER REFERENCES users(id),
+        exported_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        file_size_bytes INTEGER
+      );
+      INSERT INTO exports_new SELECT * FROM exports;
+      DROP TABLE exports;
+      ALTER TABLE exports_new RENAME TO exports;
+      CREATE INDEX IF NOT EXISTS idx_exports_af ON exports(af_id, exported_at DESC);
+    `);
+    db.pragma('user_version = 76');
+    log.info('Migration 76 appliquee : exports.kind accepte pdf-bacs-tables');
   }
 
   if (current > TARGET_VERSION) {

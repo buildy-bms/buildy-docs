@@ -1,6 +1,6 @@
 /* ──────────────────────────────────────────────────────────────────
    Analyse Fonctionnelle — A4 portrait — DOE Buildy
-   Polices : Poppins (titres) / Manrope (corps) — embed local en data:
+   Polices : Poppins (titres) / Inter (corps) — embed local en data:
    (les @font-face sont prepended par lib/pdf.js getEmbeddedFontsCss)
    ────────────────────────────────────────────────────────────────── */
 
@@ -13,7 +13,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 9.5pt;
   color: #1f2937;
   line-height: 1.55;
@@ -27,7 +27,7 @@ code {
   font-size: 8.5pt;
   background: #f1f3f6;
   padding: 0.2mm 1mm;
-  border-radius: 0.5mm;
+  border-radius: 2.5mm;
 }
 
 h1, h2, h3, h4, h5 {
@@ -129,7 +129,7 @@ h1, h2, h3, h4, h5 {
   padding: 1mm 2.5mm;
   background: rgba(255,255,255,0.08);
   border: 0.3mm solid rgba(255,255,255,0.15);
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-size: 8pt; color: rgba(255,255,255,0.9);
   white-space: nowrap;
 }
@@ -158,12 +158,12 @@ h1, h2, h3, h4, h5 {
 .cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
 .cover-version-tag {
   display: inline-block;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 9pt;
   background: #00cd92;
   color: #051428;
   padding: 1mm 3mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -321,14 +321,14 @@ h1, h2, h3, h4, h5 {
 .section h3 .section-icon svg { width: 11px; height: 11px; }
 .section h4 .section-icon svg { width: 10px; height: 10px; }
 
-.section-badges { display: inline-flex; gap: 2mm; align-items: center; margin-left: 3mm; vertical-align: middle; font-family: 'Manrope', sans-serif; }
+.section-badges { display: inline-flex; gap: 2mm; align-items: center; margin-left: 3mm; vertical-align: middle; font-family: 'Inter', sans-serif; }
 .badge-level {
   display: inline-block;
   font-size: 7pt;
   font-weight: 700;
   padding: 0.6mm 2mm;
   border: 1px solid;
-  border-radius: 1mm;
+  border-radius: 2mm;
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
@@ -344,7 +344,7 @@ h1, h2, h3, h4, h5 {
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
   padding: 0.6mm 2mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-weight: 600;
 }
 
@@ -377,7 +377,7 @@ table.zones-table {
 table.zones-table th {
   background: #f1f3f6;
   color: #1b2842;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6.8pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -403,7 +403,7 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   padding: 5mm 6mm;
   margin: 3mm 0 5mm;
   page-break-inside: avoid;
-  border-radius: 1mm;
+  border-radius: 2mm;
 }
 .section-opted-out-title {
   font-family: 'Poppins', sans-serif;
@@ -424,7 +424,9 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
    filet navy a gauche, fond gris tres leger, label navy. Pas de violet. */
 .bacs-context {
   background: #f8fafc;
+  border: 0.4pt solid #e5e7eb;
   border-left: 0.8mm solid #1b2842;
+  border-radius: 2mm;
   padding: 2.5mm 4mm;
   margin: 2mm 0 4mm;
   page-break-inside: avoid;
@@ -482,7 +484,7 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   background: #f3f4f6;
   color: #374151;
   padding: 0.2mm 1.2mm;
-  border-radius: 0.5mm;
+  border-radius: 2.5mm;
   font-size: 7pt;
 }
 .points-mini td.nature {
@@ -493,7 +495,7 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 .badge-nature {
   display: inline-block;
   padding: 0.3mm 1.6mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-size: 7pt;
   font-weight: 500;
   white-space: nowrap;
@@ -528,7 +530,7 @@ table.points-mini th {
   padding: 0.8mm 2mm;
   background: #f8f9fb;
   border-bottom: 1px solid #1b2842;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6.5pt;
   font-weight: 700;
   color: #475569;
@@ -547,7 +549,7 @@ table.points-mini .badge-type {
   font-size: 6.5pt;
   font-weight: 600;
   padding: 0.2mm 1.5mm;
-  border-radius: 0.8mm;
+  border-radius: 2mm;
   white-space: nowrap;
   letter-spacing: 0.02em;
   line-height: 1.4;
@@ -570,7 +572,7 @@ table.points-mini .badge-type {
   margin-bottom: 2mm;
 }
 .capture { page-break-inside: avoid; margin-bottom: 4mm; }
-.capture img { max-width: 100%; max-height: 90mm; border: 1px solid #e8ebf0; }
+.capture img { max-width: 100%; max-height: 90mm; border: 1px solid #e8ebf0; border-radius: 2mm; }
 .capture-caption {
   font-size: 8.5pt;
   color: #6b7280;
@@ -613,7 +615,7 @@ table.points-mini .badge-type {
 .synthesis-systems thead th {
   background: #1b2842;
   color: rgba(255, 255, 255, 0.85);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6pt;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -716,7 +718,7 @@ table.points-mini .badge-type {
   background: #fff7ed;
   color: #c2410c;
   border: 0.4pt solid #fed7aa;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 6pt;
   font-weight: 600;
 }
@@ -760,7 +762,7 @@ table.points-mini .badge-type {
    badges plus visibles, padding généreux. */
 .annex-offerings-table thead th {
   color: rgba(255, 255, 255, 0.85);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6.6pt;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -797,7 +799,7 @@ table.points-mini .badge-type {
   line-height: 1.1;
 }
 .annex-th-tagline {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6pt;
   font-weight: 400;
   font-style: italic;
@@ -822,7 +824,7 @@ table.points-mini .badge-type {
   /* Badges header colonne : style medaille / pilule, identique au catalog. */
   display: inline-block;
   margin: 0 auto 2mm;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 5.4pt;
   font-weight: 800;
   text-transform: uppercase;
@@ -914,7 +916,7 @@ table.points-mini .badge-type {
   background: #ffedd5;
   color: #9a3412;
   border: 0.4pt solid #fdba74;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -928,7 +930,7 @@ table.points-mini .badge-type {
   background: #d1fae5;
   color: #065f46;
   border: 0.4pt solid #6ee7b7;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -952,7 +954,7 @@ table.points-mini .badge-type {
   background: #fee2e2;
   color: #991b1b;
   border: 0.4pt solid #fca5a5;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -992,12 +994,12 @@ table.points-mini .badge-type {
   background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
   border: 0.6pt solid #6ee7b7;
   border-left: 1.5mm solid #00cd92;
-  border-radius: 1.5mm;
+  border-radius: 2.5mm;
   padding: 4mm 5mm;
   margin-bottom: 4mm;
 }
 .contractual-recommended-label {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6.5pt;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -1018,7 +1020,7 @@ table.points-mini .badge-type {
   color: #78350f;
   background: #fef3c7;
   border: 0.4pt solid #fde68a;
-  border-radius: 1mm;
+  border-radius: 2mm;
   padding: 2mm 3mm;
   line-height: 1.4;
 }
@@ -1034,7 +1036,7 @@ table.points-mini .badge-type {
 .contractual-block-warn {
   background: #fef2f2;
   border: 0.4pt solid #fecaca;
-  border-radius: 1mm;
+  border-radius: 2mm;
   padding: 2mm 3mm;
 }
 .contractual-block-title {
@@ -1060,7 +1062,7 @@ table.points-mini .badge-type {
 .contractual-pill {
   display: inline-block;
   padding: 0.4mm 1.5mm;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 6.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -1081,7 +1083,7 @@ table.points-mini .badge-type {
 .contractual-noinput {
   background: #f9fafb;
   border: 0.4pt solid #e5e7eb;
-  border-radius: 1.5mm;
+  border-radius: 2.5mm;
   padding: 4mm 5mm;
   font-size: 9pt;
   color: #4b5563;
@@ -1100,7 +1102,7 @@ table.points-mini .badge-type {
   padding: 2mm 2.5mm;
   background: #1b2842;
   color: white;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 7pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -1123,11 +1125,11 @@ table.points-mini .badge-type {
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
   padding: 0.5mm 1.5mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   white-space: nowrap;
 }
 .synthesis-table .row-level {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 7.5pt;
   font-weight: 700;
   color: #475569;
@@ -1178,7 +1180,7 @@ table.points-mini .badge-type {
   font-size: 8.5pt;
   font-weight: 700;
   padding: 0.5mm 2mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   margin-right: 3mm;
   vertical-align: middle;
 }

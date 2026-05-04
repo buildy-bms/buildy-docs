@@ -81,6 +81,49 @@ Handlebars.registerHelper('categoryIcon', (category, size) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:2mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
   return new Handlebars.SafeString(svg);
 });
+
+// ── Pastilles type / usage compteur — alignées sur l'UI ─────────────
+// Source : frontend/src/components/MeterTypePill.vue + MeterUsagePill.vue
+// Mêmes icônes FA, mêmes couleurs (Tailwind → hex tenu).
+const METER_TYPE_PILL = {
+  electric:            { icon: 'bolt',             label: 'Électrique',       bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' },
+  electric_production: { icon: 'solar-panel',      label: 'Élec. production', bg: '#d1fae5', fg: '#065f46', border: '#6ee7b7' },
+  gas:                 { icon: 'fire',             label: 'Gaz',              bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' },
+  water:               { icon: 'droplet',          label: 'Eau',              bg: '#e0f2fe', fg: '#075985', border: '#7dd3fc' },
+  thermal:             { icon: 'temperature-half', label: 'Thermique',        bg: '#ede9fe', fg: '#5b21b6', border: '#c4b5fd' },
+  other:               { icon: 'gauge',            label: 'Autre',            bg: '#f3f4f6', fg: '#374151', border: '#d1d5db' },
+};
+const METER_USAGE_PILL = {
+  heating:  { icon: 'fire',         label: 'Chauffage',     bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+  cooling:  { icon: 'snowflake',    label: 'Climatisation', bg: '#ecfeff', fg: '#155e75', border: '#a5f3fc' },
+  dhw:      { icon: 'faucet',       label: 'ECS',           bg: '#f0f9ff', fg: '#0369a1', border: '#bae6fd' },
+  pv:       { icon: 'solar-panel',  label: 'PV',            bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  lighting: { icon: 'lightbulb',    label: 'Éclairage',     bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
+  other:    { icon: 'circle-notch', label: 'Général',       bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
+};
+function renderMeterPill(cfg, size = '11') {
+  if (!cfg) return '';
+  const def = lookupFaIcon(cfg.icon);
+  let svgHtml = '';
+  if (def) {
+    const [w, h, , , p] = def.icon;
+    const d = Array.isArray(p) ? p[p.length - 1] : p;
+    svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" style="vertical-align:-1px;flex-shrink:0;margin-right:1.2mm"><path fill="${cfg.fg}" d="${d}"/></svg>`;
+  }
+  return new Handlebars.SafeString(
+    `<span class="m-pill" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${svgHtml}${cfg.label}</span>`
+  );
+}
+// {{{meterTypePill type}}} -> pastille type compteur (élec, gaz, eau, etc.)
+Handlebars.registerHelper('meterTypePill', (type) => {
+  const cfg = METER_TYPE_PILL[type] || METER_TYPE_PILL.other;
+  return renderMeterPill(cfg);
+});
+// {{{meterUsagePill usage}}} -> pastille usage compteur (chauffage, ECS, PV...)
+Handlebars.registerHelper('meterUsagePill', (usage) => {
+  const cfg = METER_USAGE_PILL[usage] || METER_USAGE_PILL.other;
+  return renderMeterPill(cfg);
+});
 Handlebars.registerHelper('or', function(...args) {
   // Handlebars passe l'options en dernier argument, on l'exclut
   return args.slice(0, -1).some(v => !!v);
@@ -121,7 +164,14 @@ registerPartials();
 // Cache des templates compilés (évite de recompiler à chaque export)
 const templateCache = new Map();
 
-function loadTemplate(name) {
+function loadTemplate(name, { fresh = false } = {}) {
+  // fresh:true = bypass du cache + reload partials (atelier de design PDF :
+  // edition .hbs sans pm2 restart). N'utiliser qu'en dev (route preview).
+  if (fresh) {
+    registerPartials();
+    const tplPath = path.resolve(templatesDir, `${name}.hbs`);
+    return Handlebars.compile(fs.readFileSync(tplPath, 'utf-8'));
+  }
   if (templateCache.has(name)) return templateCache.get(name);
   const tplPath = path.resolve(templatesDir, `${name}.hbs`);
   const compiled = Handlebars.compile(fs.readFileSync(tplPath, 'utf-8'));
@@ -138,9 +188,21 @@ function loadStyles(name) {
 // On embed Poppins + Manrope WOFF2 directement dans le CSS pour eviter
 // tout fetch reseau (Google Fonts est bloque par le firewall Jelastic).
 const FONT_FILES = [
+  // Titres : Poppins (geometric sans, modern)
   { family: 'Poppins', weight: 500, file: '@fontsource/poppins/files/poppins-latin-500-normal.woff2' },
   { family: 'Poppins', weight: 600, file: '@fontsource/poppins/files/poppins-latin-600-normal.woff2' },
   { family: 'Poppins', weight: 700, file: '@fontsource/poppins/files/poppins-latin-700-normal.woff2' },
+  // Corps : Inter (reference editoriale Stripe / Linear / Vercel / GitHub).
+  // Source de verite cross-app : `frontend/src/main.js` charge les memes
+  // poids cote UI Vue. Voir `docs/pdf-design-system.md` section Typographie.
+  { family: 'Inter', weight: 400, file: '@fontsource/inter/files/inter-latin-400-normal.woff2' },
+  { family: 'Inter', weight: 500, file: '@fontsource/inter/files/inter-latin-500-normal.woff2' },
+  { family: 'Inter', weight: 600, file: '@fontsource/inter/files/inter-latin-600-normal.woff2' },
+  { family: 'Inter', weight: 700, file: '@fontsource/inter/files/inter-latin-700-normal.woff2' },
+  // Manrope embed pour COMPATIBILITE DESCENDANTE uniquement — plus utilisee
+  // dans aucun template PDF actuel (migration mai 2026 vers Inter). Conservee
+  // 30 jours au cas ou un export historique serait ouvert ; a retirer apres
+  // ce delai si rien ne casse.
   { family: 'Manrope', weight: 400, file: '@fontsource/manrope/files/manrope-latin-400-normal.woff2' },
   { family: 'Manrope', weight: 500, file: '@fontsource/manrope/files/manrope-latin-500-normal.woff2' },
   { family: 'Manrope', weight: 600, file: '@fontsource/manrope/files/manrope-latin-600-normal.woff2' },
@@ -284,8 +346,8 @@ async function renderPdf(opts) {
   return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
 }
 
-async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page' }) {
-  const tpl = loadTemplate(template);
+async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false }) {
+  const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
   const html = tpl({ ...data, styles: fullCss });
@@ -315,14 +377,26 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       //    le contenu des items TOC dans <a href="#X"> (Puppeteer genere
       //    alors des liens internes cliquables dans le PDF).
       // Note : margins @page CSS = 22mm/18mm. Hauteur utile A4 ≈ 257mm = 971px,
-      // A3 ≈ 380mm = 1436px. Cover + TOC = 2 pages avant les sections.
+      // A3 ≈ 380mm = 1436px. Le numero de premiere page de .sections est
+      // calcule dynamiquement en comptant les elements de frontmatter qui
+      // forcent un saut de page (cover + L'essentiel + TOC + dashboard...).
+      // On ne peut pas se baser sur scrollY car les `page-break-after` ne
+      // creent pas d'espace en viewport (juste un break dans le PDF final).
       const pageInnerPx = pageFormat === 'A3' ? 1436 : 971;
-      const FIRST_SECTION_PAGE = 3; // page 1 = cover, page 2 = TOC
-      await page.evaluate((innerPx, firstPage) => {
-        // Trouve le scroll-top du container des sections (apres cover + TOC)
+      await page.evaluate((innerPx) => {
+        // Trouve le scroll-top du container des sections
         const sectionsContainer = document.querySelector('.sections');
         if (!sectionsContainer) return;
         const sectionsTop = sectionsContainer.getBoundingClientRect().top + window.scrollY;
+        // firstPage = nombre d'elements frontmatter (page-break-after:always)
+        // avant .sections + 1 (la page sur laquelle .sections commence).
+        // Selecteur explicite des frontmatter connus du template BACS audit
+        // + .cover (commun a tous les PDF). Robuste aux variantes (essential
+        // present uniquement en isBacs, dashboard idem, etc.).
+        const frontmatterEls = document.querySelectorAll(
+          '.cover, .essential, .toc, .r175-dashboard'
+        );
+        const firstPage = frontmatterEls.length + 1;
 
         const anchors = document.querySelectorAll('[data-toc-anchor]');
         const anchorPages = new Map();
@@ -353,7 +427,7 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
             link.appendChild(a);
           }
         }
-      }, pageInnerPx, FIRST_SECTION_PAGE);
+      }, pageInnerPx);
     }
 
     const dir = path.dirname(outputPath);
@@ -674,8 +748,8 @@ function buildHeaderFooter({
   };
 }
 
-function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation = 'portrait' }) {
-  const tpl = loadTemplate(template);
+function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation = 'portrait', fresh = false }) {
+  const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css + '\n' + buildPreviewOverride({ pageFormat, pageOrientation });
   return tpl({ ...data, styles: fullCss });

@@ -51,6 +51,39 @@ Tous les PDF passent par `backend-node/src/lib/pdf.js::renderPdf()`. Options en 
 - **Cover-level-band partial** : `templates/pdf/_cover-level-band.hbs` est l'unique source pour le bandeau "Required vs Vise + justif + verdict" (AF, Synthese, Liste de points).
 - **populateToc 2-passes** : `setContent` -> `page.evaluate` calcule pages via scrollY + mute le DOM `.toc-page` -> `pdf()`. Une seule passe DOM. La TOC est cliquable car les ancres recoivent leur `id` injecte.
 
+### Design system PDF (référence centrale)
+
+**Voir `docs/pdf-design-system.md`** — référence vivante des conventions visuelles de tous les PDF Buildy : tokens (palette, typographie Poppins+Inter, espacements, bords arrondis), vocabulaire de composants (panel, info-card, system-card, m-pill, usage-pill, headline, stat, recap-tile, gtb-summary, dashboard-row, action-card, callout, etc.), patterns de layout (cover, page L'essentiel, sommaire, dashboard R175, opener chapitre, annexes), formats de page par type de doc, helpers Handlebars, conventions de code.
+
+Tout nouveau template ou modification visuelle doit s'aligner sur ce document.
+
+### Atelier de design PDF (preview fixtures, dev only)
+
+Pour itérer sur le design des PDF audit BACS et GTB classique sans cycle "créer audit → exporter Puppeteer ~30 s" :
+
+**URLs preview** (404 en `NODE_ENV=production` sans `DEV_BYPASS_AUTH=1`) :
+
+| URL | Format | Contenu |
+|---|---|---|
+| `/api/bacs-audit/__preview-fixture` | HTML | Audit BACS principal (≈33 pages A4) |
+| `/api/bacs-audit/__preview-fixture/pdf` | PDF | Idem en PDF Puppeteer |
+| `/api/bacs-audit/__preview-fixture/tables` | HTML | Tableaux de synthèse BACS (5 pages A3 paysage) |
+| `/api/bacs-audit/__preview-fixture/tables/pdf` | PDF | Idem en PDF |
+| `/api/bacs-audit/__preview-fixture-classique` | HTML | Audit GTB classique (≈23 pages A4) |
+| `/api/bacs-audit/__preview-fixture-classique/pdf` | PDF | Idem en PDF |
+| `/api/bacs-audit/__preview-fixture-classique/tables` | HTML | Tableaux de synthèse classique (5 pages A3 paysage) |
+| `/api/bacs-audit/__preview-fixture-classique/tables/pdf` | PDF | Idem en PDF |
+
+**Hot reload** : éditer `.css` ou `.hbs` dans `backend-node/templates/pdf/` → refresh navigateur — **pas de `pm2 restart`** (flag `fresh: true` propagé dans `loadTemplate()` / `renderHtml()` / `renderPdf()` pour les routes preview).
+
+**Bandeau dev** : injecté en haut à droite (caché en `@media print`). Boutons Reload / Print / 4 boutons groupe BACS (vert) / 4 boutons groupe Classique (orange) + timestamp.
+
+**Fixture Atlas Sud** : dataset partagé entre BACS et classique — `backend-node/src/routes/bacs-audit/_preview-fixture.js` accepte `{ kind: 'bacs_audit' | 'site_audit' }`. Profil : Plateforme Logistique Atlas Sud à Saint-Quentin-Fallavier, GTB Schneider EcoStruxure partielle, 14 équipements (DRV Daikin → CoolMaster Pro, aérothermes Reznor), 8 compteurs, 4 régulations thermiques, 15 actions correctives, photos skeleton dans `data/fixtures/photos/` (régénérables via `node data/fixtures/photos/_generate.js`).
+
+**Polices PDF** : Poppins (titres) + **Inter** (corps, alignée Stripe / Linear / GitHub / Vercel). Migration mai 2026 — Manrope encore embed dans `lib/pdf.js` 30 jours pour compat descendante, à retirer après si rien ne casse.
+
+**Limite v1 fixture** : charts (`sevDonutDataUrl`, `barUsagePowerDataUrl`) non générés — apparaissent à blanc.
+
 ## Convention chemins
 - Backend Node : `backend-node/src/{lib,routes,services}/` (meme convention FM)
 - Frontend Vue : `frontend/src/{components,views,composables,stores}/`

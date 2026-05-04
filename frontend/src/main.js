@@ -1,12 +1,14 @@
-// Polices Buildy (Poppins pour UI/titres, Manrope pour corps long)
+// Polices Buildy : Poppins (titres) + Inter (corps).
+// Inter = reference editoriale moderne (Stripe, Linear, Vercel, GitHub),
+// alignement strict avec les PDF (cf. backend-node/src/lib/pdf.js).
 import '@fontsource/poppins/400.css'
 import '@fontsource/poppins/500.css'
 import '@fontsource/poppins/600.css'
 import '@fontsource/poppins/700.css'
-import '@fontsource/manrope/400.css'
-import '@fontsource/manrope/500.css'
-import '@fontsource/manrope/600.css'
-import '@fontsource/manrope/700.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '@fontsource/inter/700.css'
 
 import './assets/main.css'
 import { createApp } from 'vue'

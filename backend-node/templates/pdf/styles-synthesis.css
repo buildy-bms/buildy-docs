@@ -15,7 +15,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 9pt;
   color: #1f2937;
   line-height: 1.45;
@@ -125,7 +125,7 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   padding: 1mm 2.5mm;
   background: rgba(255,255,255,0.08);
   border: 0.3mm solid rgba(255,255,255,0.15);
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-size: 8.5pt; color: rgba(255,255,255,0.9);
   white-space: nowrap;
 }
@@ -152,12 +152,12 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
 .cover-meta-value { font-size: 10pt; color: white; font-weight: 500; }
 .cover-version-tag {
   display: inline-block;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 9pt;
   background: #00cd92;
   color: #051428;
   padding: 1mm 3mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -203,8 +203,8 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   letter-spacing: 0.1em; margin-right: 1.5mm;
 }
 .version-tag {
-  font-family: 'Manrope', sans-serif; background: #00cd92;
-  color: #1b2842; padding: 0.5mm 2mm; border-radius: 0.8mm;
+  font-family: 'Inter', sans-serif; background: #00cd92;
+  color: #1b2842; padding: 0.5mm 2mm; border-radius: 2mm;
   font-weight: 600; font-size: 8.5pt;
 }
 
@@ -254,7 +254,7 @@ table.summary-2col td {
 table.summary-2col strong { color: #1b2842; }
 
 .verdict-inline {
-  display: inline-block; padding: 1.5mm 3mm; border-radius: 1mm;
+  display: inline-block; padding: 1.5mm 3mm; border-radius: 2mm;
   font-size: 8.5pt; line-height: 1.45;
 }
 .verdict-inline.verdict-ok          { background: #ecfdf5; color: #065f46; }
@@ -374,7 +374,7 @@ table.features-table tfoot td {
 .status-pill {
   display: inline-block;
   padding: 0.6mm 2mm;
-  border-radius: 1mm;
+  border-radius: 2mm;
   font-size: 8pt;
   font-weight: 500;
   white-space: nowrap;
@@ -440,7 +440,7 @@ table.systems-table tfoot td {
 
 .m-bacs-tag {
   display: inline-block; background: #faf5ff; color: #6d28d9;
-  font-size: 7.5pt; padding: 0.6mm 1.8mm; border-radius: 0.6mm;
+  font-size: 7.5pt; padding: 0.6mm 1.8mm; border-radius: 2.5mm;
   font-weight: 600; border: 0.2mm solid #d8b4fe;
 }
 
@@ -510,7 +510,7 @@ table.systems-table tfoot td {
   background: #fff7ed;
   color: #c2410c;
   border: 0.4pt solid #fed7aa;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 6pt;
   font-weight: 600;
 }
@@ -554,7 +554,7 @@ table.systems-table tfoot td {
    badges plus visibles, padding généreux. */
 .annex-offerings-table thead th {
   color: rgba(255, 255, 255, 0.85);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6.6pt;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -591,7 +591,7 @@ table.systems-table tfoot td {
   line-height: 1.1;
 }
 .annex-th-tagline {
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 6pt;
   font-weight: 400;
   font-style: italic;
@@ -616,7 +616,7 @@ table.systems-table tfoot td {
   /* Badges header colonne : style medaille / pilule, identique au catalog. */
   display: inline-block;
   margin: 0 auto 2mm;
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 5.4pt;
   font-weight: 800;
   text-transform: uppercase;
@@ -708,7 +708,7 @@ table.systems-table tfoot td {
   background: #ffedd5;
   color: #9a3412;
   border: 0.4pt solid #fdba74;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -722,7 +722,7 @@ table.systems-table tfoot td {
   background: #d1fae5;
   color: #065f46;
   border: 0.4pt solid #6ee7b7;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -746,7 +746,7 @@ table.systems-table tfoot td {
   background: #fee2e2;
   color: #991b1b;
   border: 0.4pt solid #fca5a5;
-  border-radius: 0.6mm;
+  border-radius: 2.5mm;
   font-size: 5.4pt;
   font-weight: 700;
   text-transform: uppercase;

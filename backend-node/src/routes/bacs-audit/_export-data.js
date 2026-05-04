@@ -24,48 +24,15 @@ function getCharts() {
   return _charts;
 }
 
-// Labels d'enums (pour eviter les codes anglais bruts dans le PDF)
-const SYSTEM_LABEL = { heating:'Chauffage', cooling:'Refroidissement', ventilation:'Ventilation',
-  dhw:'Eau chaude sanitaire', lighting_indoor:'Éclairage intérieur',
-  lighting_outdoor:'Éclairage extérieur', electricity_production:'Production photovoltaïque' };
-const SYSTEM_NEGATIVE_LABEL = { heating:'Pas de chauffage', cooling:'Pas de refroidissement',
-  ventilation:'Pas de ventilation', dhw:'Pas d\'ECS',
-  lighting_indoor:'Pas d\'éclairage intérieur', lighting_outdoor:'Pas d\'éclairage extérieur',
-  electricity_production:'Pas de production photovoltaïque' };
-const COMM_LABEL = { modbus_tcp:'Modbus TCP', modbus_rtu:'Modbus RTU', bacnet_ip:'BACnet IP',
-  bacnet_mstp:'BACnet MS/TP', knx:'KNX', mbus:'M-Bus', mqtt:'MQTT', lorawan:'LoRaWAN',
-  autre:'Autre', non_communicant:'Non communicant', absent:'Absent' };
-const ENERGY_LABEL = { gas:'Gaz', electric:'Électrique', wood:'Bois', heat_pump:'PAC',
-  district_heating:'Réseau de chaleur', fuel_oil:'Fioul', solar:'Solaire',
-  biomass:'Biomasse', autre:'Autre' };
-const ROLE_LABEL = { production:'Production', distribution:'Distribution',
-  emission:'Émission', regulation:'Régulation', autre:'Autre' };
-const METER_TYPE_LABEL = { electric:'Électrique', electric_production:'Électrique de production',
-  gas:'Gaz', water:'Eau', thermal:'Thermique', other:'Autre' };
-const METER_USAGE_LABEL = { heating:'Chauffage', cooling:'Refroidissement',
-  dhw:'ECS', pv:'Production PV', lighting:'Éclairage', other:'Général' };
-const REGULATION_LABEL = { per_room:'Par pièce', per_zone:'Par zone',
-  central_only:'Centrale uniquement', none:'Aucune' };
-const GENERATOR_LABEL = { gas:'Gaz', electric:'Effet Joule', heat_pump:'Pompe à chaleur',
-  wood_appliance:'Appareil bois (exempté R175-6)', district_heating:'Réseau de chaleur', other:'Autre' };
-const APPLICABILITY_LABEL = {
-  subject_immediate: 'Immédiate (bâtiment > 290 kW déjà existant)',
-  subject_2025: '1er janvier 2025 (puissance > 290 kW)',
-  subject_2027: '1er janvier 2027 (puissance > 70 kW)',
-  not_subject: 'Non assujetti (puissance < 70 kW)',
-};
-const COMPLIANCE_LABEL = { compliant:'Conforme', partial:'Partiellement conforme', non_compliant:'Non conforme' };
-// Aligne sur ZONE_NATURES dans frontend/src/views/BacsAuditDetailView.vue.
-const ZONE_NATURE_LABEL = {
-  'shared-office':'Bureau partagé', 'private-office':'Bureau privé',
-  'open-space':'Open-space', 'commercial-space':'Espace commercial',
-  'meeting-room':'Salle de réunion', 'workshop':'Atelier',
-  'switchboard':'Tableau électrique', 'technical-area':'Local technique',
-  'classroom':'Salle de classe', 'leasure-space':'Espace loisirs',
-  'foyer':'Foyer', 'corridor':'Couloir', 'outdoor':'Extérieur',
-  'meters':'Local compteurs', 'shared-space':'Espace partagé',
-  'logistic-cell':'Cellule logistique', 'stock':'Stock',
-};
+// Labels d'enums extraits dans _labels.js pour partage avec _preview-fixture.js
+// (l'atelier de design PDF). Source de verite des libelles FR — toute modif
+// d'enum DB doit etre repercutee dans _labels.js.
+const {
+  SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
+  METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
+  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL,
+} = require('./_labels');
+const { buildComplianceSummary } = require('./_compliance-summary');
 
 /**
  * Construit le bundle de donnees a passer au template bacs-audit.hbs.
@@ -217,13 +184,41 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (bms) bms.photos = bmsPhotos;
   }
 
-  // Listes GTB integration : devices + meters integres (enrichis avec
-  // libelles/categories pour parite UI : icone + label systeme + zone).
+  // Listes GTB integration : devices + meters integres ET ce qui reste a
+  // integrer (gap analysis pour l'integrateur Buildy — c'est la partie a
+  // chiffrer dans le devis).
   const bmsManagedDevices = devices.filter(d => d.managed_by_bms).map(d => ({
     ...d,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   }));
+  const bmsUnmanagedDevices = devices.filter(d => !d.managed_by_bms && !d.out_of_service).map(d => ({
+    ...d,
+    categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
+  }));
   const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
+  const bmsUnmanagedMeters = enrichedMeters.filter(m => !m.managed_by_bms && m.present_actual && !m.out_of_service);
+
+  // Compteurs groupes par zone fonctionnelle (pour le PDF tableaux de
+  // synthese paysage). Les compteurs sans zone (general batiment) vont
+  // dans une zone fictive "Général bâtiment" placee en derniere position.
+  const metersByZoneMap = new Map();
+  for (const m of enrichedMeters) {
+    const key = m.zone_id || '__general';
+    if (!metersByZoneMap.has(key)) {
+      metersByZoneMap.set(key, {
+        zone_id: m.zone_id,
+        zone_name: m.zone_id ? m.zone_name : 'Général bâtiment',
+        items: [],
+      });
+    }
+    metersByZoneMap.get(key).items.push(m);
+  }
+  // Ordre : zones avec id en premier (suivant l'ordre d'apparition), puis general
+  const metersByZone = [...metersByZoneMap.values()].sort((a, b) => {
+    if (a.zone_id == null) return 1;
+    if (b.zone_id == null) return -1;
+    return 0;
+  });
   // Compteurs avec notes ou photos : pour le sous-bloc "Notes terrain"
   // de la section 4 (sinon on n'affiche rien, plutot que des cards vides).
   const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
@@ -368,6 +363,29 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }));
   const barUsagePowerDataUrl = barItems.length ? await getCharts().barUsagePower({ items: barItems }) : null;
 
+  // Recap chiffre pour le PDF tableaux de synthese (4 tuiles d'en-tete)
+  const recapStats = {
+    devicesTotal: devices.length,
+    devicesPresent: devices.filter(d => !d.out_of_service).length,
+    devicesIntegrated: devices.filter(d => d.managed_by_bms).length,
+    devicesHs: devices.filter(d => d.out_of_service).length,
+    metersRequired: enrichedMeters.filter(m => m.required).length,
+    metersPresent: enrichedMeters.filter(m => m.present_actual && !m.out_of_service).length,
+    metersIntegrated: enrichedMeters.filter(m => m.managed_by_bms).length,
+    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
+  };
+
+  // Synthese de conformite (cover + page L'essentiel + tableau de bord R175)
+  const applicabilityLabelForSummary = af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null;
+  const compliance = buildComplianceSummary({
+    document: af,
+    actionItems,
+    actionItemsRaw: numberedItems,
+    bms,
+    r175_6_applicable,
+    applicabilityLabel: applicabilityLabelForSummary,
+  });
+
   return {
     document: af,
     isBacs,
@@ -375,16 +393,25 @@ async function buildBacsAuditExportData(af, opts = {}) {
     site,
     zones,
     systemsByZone,
+    compliance,
     meters: enrichedMeters,
     metersWithDetails,
     thermal,
     bms,
     bmsManagedDevices,
+    bmsUnmanagedDevices,
     bmsManagedMeters,
+    bmsUnmanagedMeters,
+    metersByZone,
+    recapStats,
     buildySolution,
     actionItems,
     actionStats,
-    actionItemsRaw, // utile pour audit log et stats
+    // actionItemsRaw expose en realite les items NUMEROTES (BACS-XXX) pour
+    // que les tableaux de synthese puissent les afficher en forme finale.
+    // Si on a besoin des bruts sans numerotation, ils sont reconstitubles
+    // depuis numberedItems.
+    actionItemsRaw: numberedItems,
     synthesisHtml: af.audit_synthesis_html || null,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
