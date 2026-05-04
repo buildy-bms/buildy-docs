@@ -203,12 +203,18 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (bms) bms.photos = bmsPhotos;
   }
 
-  // Listes GTB integration : devices + meters integres
-  const bmsManagedDevices = devices.filter(d => d.managed_by_bms);
+  // Listes GTB integration : devices + meters integres (enrichis avec
+  // libelles/categories pour parite UI : icone + label systeme + zone).
+  const bmsManagedDevices = devices.filter(d => d.managed_by_bms).map(d => ({
+    ...d,
+    categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
+  }));
   const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
 
   const thermal = thermalRaw.map(t => ({
     ...t,
+    category: t.category || 'heating',
+    categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
     regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
     generatorLabel: t.generator_type ? (GENERATOR_LABEL[t.generator_type] || t.generator_type) : '—',
   }));

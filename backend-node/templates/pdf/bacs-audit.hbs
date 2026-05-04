@@ -48,28 +48,91 @@
   </div>
 </section>
 
-{{!-- ═══════════ Table des matieres ═══════════ --}}
+{{!-- ═══════════ Table des matieres (charte AF/Synthèse) ═══════════ --}}
 <section class="toc">
-  <h1 class="toc-title">Sommaire</h1>
-  <ol class="toc-list">
+  <h1>Sommaire</h1>
+  <ul class="toc-list">
     {{#if synthesisHtml}}
-    <li data-toc-link="synthesis"><span class="toc-label">Note de synthèse</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="synthesis">
+      <a href="#synthesis" class="toc-link">
+        <span class="toc-num">00</span>
+        <span class="toc-title">Note de synthèse</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{/if}}
     {{#if isBacs}}
-    <li data-toc-link="conformity"><span class="toc-label">Synthèse de conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="conformity">
+      <a href="#conformity" class="toc-link">
+        <span class="toc-num">00</span>
+        <span class="toc-title">Synthèse de conformité</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{/if}}
-    <li data-toc-link="identification"><span class="toc-label">Identification du site</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="zones"><span class="toc-label">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 6°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="systems"><span class="toc-label">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 4°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
-    <li data-toc-link="meters"><span class="toc-label">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 1°</span>{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="identification">
+      <a href="#identification" class="toc-link">
+        <span class="toc-num">1</span>
+        <span class="toc-title">Identification du site</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="zones">
+      <a href="#zones" class="toc-link">
+        <span class="toc-num">2</span>
+        <span class="toc-title">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 6°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="systems">
+      <a href="#systems" class="toc-link">
+        <span class="toc-num">3</span>
+        <span class="toc-title">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 4°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="meters">
+      <a href="#meters" class="toc-link">
+        <span class="toc-num">4</span>
+        <span class="toc-title">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 1°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{#if isBacs}}
-    <li data-toc-link="thermal"><span class="toc-label">Régulation thermique automatique <span class="toc-ref">R175-6</span></span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="thermal">
+      <a href="#thermal" class="toc-link">
+        <span class="toc-num">5</span>
+        <span class="toc-title">Régulation thermique automatique <span class="toc-ref">R175-6</span></span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{/if}}
-    <li data-toc-link="bms"><span class="toc-label">{{#if isBacs}}Solution GTB / GTC <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="bms">
+      <a href="#bms" class="toc-link">
+        <span class="toc-num">{{#if isBacs}}6{{else}}5{{/if}}</span>
+        <span class="toc-title">{{#if isBacs}}Solution GTB / GTC <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{#if isBacs}}
-    <li data-toc-link="plan"><span class="toc-label">Plan de mise en conformité</span><span class="toc-dots"></span><span class="toc-page">—</span></li>
+    <li class="toc-row lvl-1" data-toc-link="plan">
+      <a href="#plan" class="toc-link">
+        <span class="toc-num">7</span>
+        <span class="toc-title">Plan de mise en conformité</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
     {{/if}}
-  </ol>
+  </ul>
 </section>
 
 <div class="sections">
@@ -116,41 +179,56 @@
 
 {{!-- ═══════════ Chapitre 1 — Identification site ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="identification">{{{faIcon "building" "#4f46e5" "22"}}} 1. Identification du site</h1>
-<table class="meta-table">
-  <tr><th>Site</th><td>{{site.name}}</td></tr>
-  <tr><th>Client</th><td>{{document.client_name}}</td></tr>
-  <tr><th>Adresse</th><td>{{site.address}}</td></tr>
+
+<div class="info-cards">
+  <div class="info-card">
+    <span class="info-card-label">Site</span>
+    <span class="info-card-value">{{site.name}}</span>
+  </div>
+  <div class="info-card">
+    <span class="info-card-label">Client</span>
+    <span class="info-card-value">{{document.client_name}}</span>
+  </div>
+  <div class="info-card info-card-wide">
+    <span class="info-card-label">Adresse</span>
+    <span class="info-card-value">{{site.address}}</span>
+  </div>
   {{#if isBacs}}
-  {{#if document.bacs_total_power_kw}}
-  <tr><th>Puissance cumulée<br>chauffage + clim</th><td><strong>{{document.bacs_total_power_kw}} kW</strong></td></tr>
-  {{/if}}
-  {{#if document.bacs_district_heating_substation_kw}}
-  <tr>
-    <th>Puissance station d'échange</th>
-    <td>
-      <strong>{{document.bacs_district_heating_substation_kw}} kW</strong>
-      <span class="muted">— référence R175-2 (bâtiment raccordé à un réseau urbain)</span>
-    </td>
-  </tr>
-  {{/if}}
-  {{#if document.bacs_building_permit_date}}
-  <tr><th>Date de permis de construire</th><td>{{document.bacs_building_permit_date}}</td></tr>
-  {{/if}}
-  {{#if applicabilityLabel}}
-  <tr><th>Applicabilité BACS (R175-2)</th><td><strong>{{applicabilityLabel}}</strong></td></tr>
-  {{/if}}
-  <tr>
-    <th>AF de la GTB existante</th>
-    <td>
+    {{#if document.bacs_total_power_kw}}
+    <div class="info-card info-card-accent">
+      <span class="info-card-label">Puissance chauffage + clim</span>
+      <span class="info-card-value info-card-value-strong">{{document.bacs_total_power_kw}} kW</span>
+    </div>
+    {{/if}}
+    {{#if document.bacs_district_heating_substation_kw}}
+    <div class="info-card info-card-accent">
+      <span class="info-card-label">Station d'échange (réseau urbain)</span>
+      <span class="info-card-value info-card-value-strong">{{document.bacs_district_heating_substation_kw}} kW</span>
+      <span class="info-card-note">Référence R175-2</span>
+    </div>
+    {{/if}}
+    {{#if document.bacs_building_permit_date}}
+    <div class="info-card">
+      <span class="info-card-label">Permis de construire</span>
+      <span class="info-card-value">{{document.bacs_building_permit_date}}</span>
+    </div>
+    {{/if}}
+    {{#if applicabilityLabel}}
+    <div class="info-card info-card-wide info-card-accent">
+      <span class="info-card-label">Applicabilité BACS (R175-2)</span>
+      <span class="info-card-value info-card-value-strong">{{applicabilityLabel}}</span>
+    </div>
+    {{/if}}
+    <div class="info-card info-card-wide">
+      <span class="info-card-label">Analyse fonctionnelle de la GTB existante</span>
       {{#if (eq document.audit_existing_af_status "absent")}}
-        <span style="color:#9a3412">Aucun document d'AF disponible pour la GTB existante.</span>
+        <span class="info-card-value info-card-value-warn">Aucun document d'AF disponible</span>
       {{else}}
-        Document fourni par le propriétaire ou son exploitant.
+        <span class="info-card-value">Document fourni par le propriétaire ou son exploitant</span>
       {{/if}}
-    </td>
-  </tr>
+    </div>
   {{/if}}
-</table>
+</div>
 
 {{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
 <h3>Détail du calcul automatique de la puissance</h3>
@@ -220,10 +298,10 @@
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#4f46e5" "22"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
 {{#each systemsByZone}}
-<h2>{{zone_name}} <span class="muted">({{zone_nature}})</span></h2>
+<h2 class="zone-heading">{{zone_name}}</h2>
 {{#each items}}
   {{#if present}}
-    <h3>{{{categoryIcon system_category "18"}}}{{categoryLabel}}{{#if total_power_kw}} <span class="muted">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
+    <h3 class="system-heading">{{{categoryIcon system_category "18"}}}<span class="system-heading-label">{{categoryLabel}}</span>{{#if total_power_kw}} <span class="system-heading-meta">— {{total_power_kw}} kW total ({{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}})</span>{{/if}}</h3>
     {{#if devices.length}}
       <table class="device-table">
         <thead>
@@ -293,11 +371,11 @@
       {{/if}}
     {{/each}}
   {{else}}
-    {{#if not_concerned}}
-      <h3 class="muted">{{negativeLabel}}</h3>
-    {{else}}
-      <h3 class="muted">{{categoryLabel}} — non présent</h3>
-    {{/if}}
+    <div class="system-absent">
+      {{{categoryIcon system_category "16"}}}
+      <span class="system-absent-label">{{categoryLabel}}</span>
+      <span class="system-absent-status">{{#if not_concerned}}{{negativeLabel}}{{else}}Non présent{{/if}}</span>
+    </div>
   {{/if}}
 {{/each}}
 {{/each}}
@@ -363,11 +441,16 @@
 
 {{#if thermal.length}}
 <table>
-  <thead><tr><th>Zone</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Exempté bois</th><th>Notes</th></tr></thead>
+  <thead><tr><th>Zone</th><th>Usage</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Exempté bois</th><th>Notes</th></tr></thead>
   <tbody>
     {{#each thermal}}
       <tr>
         <td>{{zone_name}}</td>
+        <td>
+          <span class="usage-inline">
+            {{{categoryIcon category "14"}}}<span class="usage-inline-label">{{categoryLabel}}</span>
+          </span>
+        </td>
         <td class="bool-cell"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
         <td>{{regulationLabel}}</td>
         <td>{{generatorLabel}}</td>
@@ -483,12 +566,13 @@
 
 {{#if bmsManagedDevices.length}}
 <h3>Équipements intégrés à la GTB ({{bmsManagedDevices.length}})</h3>
-<div class="compact-list">
+<div class="bms-list">
   {{#each bmsManagedDevices}}
-    <div class="row">
-      <strong>{{name}}</strong>
-      <span class="meta">{{#if brand}}{{brand}} · {{/if}}zone « {{zone_name}} »</span>
-      {{#if power_kw}}<span class="pwr">{{power_kw}} kW</span>{{/if}}
+    <div class="bms-row">
+      <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
+      <span class="bms-row-name">{{name}}</span>
+      <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
+      {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
     </div>
   {{/each}}
 </div>
@@ -496,11 +580,12 @@
 
 {{#if bmsManagedMeters.length}}
 <h3>Compteurs intégrés à la GTB ({{bmsManagedMeters.length}})</h3>
-<div class="compact-list">
+<div class="bms-list">
   {{#each bmsManagedMeters}}
-    <div class="row">
-      <strong>{{typeLabel}}</strong>
-      <span class="meta">{{zoneLabel}} · {{usageLabel}}</span>
+    <div class="bms-row">
+      <span class="bms-row-icon">{{{faIcon "gauge" "#10b981" "14"}}}</span>
+      <span class="bms-row-name">{{typeLabel}}</span>
+      <span class="bms-row-meta">{{usageLabel}} · {{zoneLabel}}</span>
     </div>
   {{/each}}
 </div>
