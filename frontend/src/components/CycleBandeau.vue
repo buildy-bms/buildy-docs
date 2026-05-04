@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import {
   CheckBadgeIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
@@ -45,6 +45,18 @@ const lastExportInfo = ref(null)
 // Lot 28 — partage AF
 const showShare = ref(false)
 const showInstances = ref(false)
+
+// Menu deroulant du bouton Points (split button : action principale a gauche
+// = export PDF, chevron a droite ouvre les actions secondaires comme XLSX).
+const showPointsMenu = ref(false)
+const pointsMenuRef = ref(null)
+function onWindowMouseDown(e) {
+  if (showPointsMenu.value && pointsMenuRef.value && !pointsMenuRef.value.contains(e.target)) {
+    showPointsMenu.value = false
+  }
+}
+onMounted(() => window.addEventListener('mousedown', onWindowMouseDown))
+onUnmounted(() => window.removeEventListener('mousedown', onWindowMouseDown))
 
 // Lot 29 — édition des métadonnées AF
 const showEdit = ref(false)
@@ -351,23 +363,37 @@ const exportDescription = computed(() => {
       <DocumentArrowDownIcon class="w-4 h-4" />
       AF
     </button>
-    <div class="inline-flex rounded-lg overflow-hidden">
+    <div ref="pointsMenuRef" class="relative inline-flex">
       <button
         @click="openExport('points-list')"
-        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-l-lg hover:bg-indigo-700"
         title="Exporter la liste de points contractuelle en PDF A4 paysage"
       >
         <TableCellsIcon class="w-4 h-4" />
         Points
       </button>
-      <a
-        :href="`/api/afs/${af.id}/exports/points-list.xlsx`"
-        download
-        class="inline-flex items-center px-2.5 py-1.5 bg-indigo-700 text-white text-xs font-medium hover:bg-indigo-800 border-l border-indigo-500"
-        title="Télécharger la liste de points en Excel (XLSX, intégrateur GTB)"
+      <button
+        type="button"
+        @click="showPointsMenu = !showPointsMenu"
+        class="inline-flex items-center px-1.5 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-r-lg hover:bg-indigo-700 border-l border-indigo-500"
+        title="Plus d'options"
       >
-        XLSX
-      </a>
+        <ChevronDownIcon class="w-4 h-4" />
+      </button>
+      <div
+        v-if="showPointsMenu"
+        class="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-55 py-1 whitespace-nowrap"
+      >
+        <a
+          :href="`/api/afs/${af.id}/exports/points-list.xlsx`"
+          download
+          @click="showPointsMenu = false"
+          class="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <TableCellsIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Télécharger en Excel (XLSX)
+        </a>
+      </div>
     </div>
     <button
       @click="openExport('synthesis')"

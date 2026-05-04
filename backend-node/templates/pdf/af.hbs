@@ -20,12 +20,12 @@
     <p class="cover-service-level-label">Niveau de service requis pour cette AF</p>
     <p class="cover-service-level-value">{{serviceLevel.label}}</p>
     {{#if serviceLevel.justifications.length}}
-    <p class="cover-service-level-justif">
-      Justifié par :
+    <p class="cover-service-level-justif">Justifié par :</p>
+    <ul class="cover-service-level-justif-list">
       {{#each serviceLevel.justifications}}
-        §{{number}} {{title}}{{#unless @last}} · {{/unless}}
+      <li>{{title}}</li>
       {{/each}}
-    </p>
+    </ul>
     {{/if}}
   </div>
   {{/if}}

@@ -92,11 +92,20 @@ h1, h2, h3, h4, h5 {
   margin: 0;
 }
 .cover-service-level-justif {
-  margin-top: 3mm;
+  margin: 3mm 0 1.5mm;
   font-size: 8.5pt;
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.5;
 }
+.cover-service-level-justif-list {
+  margin: 0;
+  padding-left: 5mm;
+  font-size: 8.5pt;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.6;
+  list-style: disc;
+}
+.cover-service-level-justif-list li { margin: 0; }
 
 .cover-meta {
   margin-top: auto;

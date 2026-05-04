@@ -83,10 +83,9 @@ defineExpose({ refresh })
         :key="(j.number || '?') + j.title"
         type="button"
         @click="emit('goto-section', { number: j.number, id: j.section_id })"
-        class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
+        class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
         title="Aller à cette section"
       >
-        <code class="font-mono text-gray-500">§{{ j.number || '?' }}</code>
         <span class="text-gray-700 font-medium">{{ j.title }}</span>
         <span :class="['inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-full', LEVEL_COLOR[j.level]]">{{ LEVEL_LABEL[j.level] || j.level }}</span>
       </button>
