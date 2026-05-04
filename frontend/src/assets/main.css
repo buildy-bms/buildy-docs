@@ -17,27 +17,29 @@
   --color-indigo-900: #0a0f1a;
   --color-indigo-950: #050810;
 
-  /* Polices Buildy : Poppins (titres / accents) + Inter (corps).
+  /* Polices Buildy : Inter (corps / utilities Tailwind font-sans) +
+     Poppins (titres uniquement, via font-display ou h1-h6).
      Aligne sur les PDF (cf. docs/pdf-design-system.md). */
-  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: var(--font-sans); /* alias historique */
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   /* Compatibilite descendante : --font-serif pointe sur Inter (anciennement Manrope) */
-  --font-serif: var(--font-body);
+  --font-serif: var(--font-sans);
 }
 
 @layer base {
   html {
     font-size: 14px;
-    font-family: var(--font-sans);
+    font-family: var(--font-sans); /* Inter — corps par defaut */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   body {
-    font-family: var(--font-sans);
+    font-family: var(--font-sans); /* Inter */
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-sans);
+    font-family: var(--font-display); /* Poppins — titres uniquement */
     letter-spacing: -0.01em;
   }
   code, kbd, samp, pre {
@@ -45,7 +47,7 @@
   }
 
   button, a, input, select, textarea {
-    font-family: var(--font-sans);
+    font-family: inherit; /* Heritera Inter du body */
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
