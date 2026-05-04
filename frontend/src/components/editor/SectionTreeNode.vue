@@ -69,6 +69,15 @@ const canOptOut = computed(() =>
 )
 const canDemand = canOptOut
 
+// Niveau minimum pour acceder a cette section (= niveau le plus accessible).
+// Les valeurs service_level sont ordonnees E -> S -> P : on prend la premiere
+// lettre du token. Ex : "E/S/P" -> "E", "S/P" -> "S", "P" -> "P".
+const minServiceLevel = computed(() => {
+  const lvl = (props.node.service_level || '').toUpperCase().trim()
+  if (!lvl) return null
+  return lvl.split('/')[0].trim() || null
+})
+
 const hasChildren = computed(() => Array.isArray(props.node.children) && props.node.children.length > 0)
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
 const isSelected = computed(() => props.selectedId === props.node.id)
@@ -162,9 +171,11 @@ const titleHtml = computed(() => {
         {{ displayedNumber }}
       </span>
 
-      <!-- Indicateurs de niveau (a cote du numero) : niveau de service +
-           pill option payante. -->
-      <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
+      <!-- Indicateurs de niveau (a cote du numero) : on n'affiche que le
+           niveau MINIMUM requis pour acceder a la section (gain de place
+           dans l'arborescence). Le detail complet reste visible dans la
+           fiche section et l'annexe Tableau des fonctionnalites. -->
+      <ServiceLevelBadge v-if="minServiceLevel" :level="minServiceLevel" />
       <Tooltip
         v-if="hasPaidOption"
         :text="allPaidOption
