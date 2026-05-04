@@ -17,6 +17,7 @@ import RichTextEditor from './RichTextEditor.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import EquipmentTemplatePicker from './EquipmentTemplatePicker.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
+import FaIconPicker from './FaIconPicker.vue'
 import {
   createSectionTemplate,
   updateSectionTemplate,
@@ -64,6 +65,7 @@ const form = ref({
   kind: 'standard',
   parent_template_id: null,
   equipment_template_id: null,
+  icon_name: null,
   // Disponibilite par niveau de contrat (Lot 36) : null = pas dispo,
   // 'included' = inclus dans le contrat, 'paid_option' = option payante
   avail_e: null,
@@ -177,6 +179,7 @@ watch(() => props.template, (t) => {
     kind: (t && t.kind) || 'standard',
     parent_template_id: (t && t.parent_template_id) || null,
     equipment_template_id: (t && t.equipment_template_id) || null,
+    icon_name: (t && t.icon_name) || null,
     avail_e: (t && t.avail_e) || null,
     avail_s: (t && t.avail_s) || null,
     avail_p: (t && t.avail_p) || null,
@@ -203,6 +206,7 @@ async function submit() {
       equipment_template_id: form.value.kind === 'equipment'
         ? (form.value.equipment_template_id || null)
         : null,
+      icon_name: form.value.icon_name || null,
     }
     // Pour les fonctionnalites : on envoie la matrice de disponibilite,
     // le backend en derive automatiquement le service_level.
@@ -276,6 +280,17 @@ async function destroy() {
         <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+      </div>
+
+      <!-- Icone FontAwesome (uniquement pour les fonctionnalites — pas pour
+           les sections types narratives). Visible dans la liste de la
+           bibliotheque et dans la brochure PDF. -->
+      <div v-if="mode === 'functionality'">
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+          Icône
+          <span class="text-gray-400 font-normal">— affichée dans la liste, la brochure et le tableau des offres</span>
+        </label>
+        <FaIconPicker v-model="form.icon_name" />
       </div>
 
       <!-- Pour les fonctionnalites, kind est toujours 'standard' (texte) : on cache le picker -->

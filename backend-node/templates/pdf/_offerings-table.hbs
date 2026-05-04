@@ -48,7 +48,10 @@
              quand la brochure rend le detail de cette feature. Sur le PDF
              catalog (sans detail), le lien retombe a la racine du PDF
              (silent fallback) — non bloquant. --}}
-        <a href="#toc-feature-{{id}}" class="td-feature-link">{{title}}</a>
+        <a href="#toc-feature-{{id}}" class="td-feature-link">
+          {{#if icon_name}}<span class="td-feature-icon">{{{faIcon icon_name "#475569" "12"}}}</span>{{/if}}
+          {{title}}
+        </a>
         {{#if all_option}}<span class="opt-badge">+ Option payante</span>{{/if}}
       </td>
       {{#each ../levels}}

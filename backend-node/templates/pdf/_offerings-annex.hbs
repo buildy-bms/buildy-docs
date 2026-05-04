@@ -63,7 +63,10 @@
       </tr>
       {{else}}
       <tr class="{{#if refused}}annex-row-refused{{/if}}{{#if demanded}}annex-row-demanded{{/if}}">
-        <td class="annex-feature annex-feature-d{{depth}}">{{title}}</td>
+        <td class="annex-feature annex-feature-d{{depth}}">
+          {{#if icon_name}}<span class="annex-feature-icon">{{{faIcon icon_name "#475569" "10"}}}</span>{{/if}}
+          {{title}}
+        </td>
         <td class="annex-status">
           {{#if demanded}}<span class="annex-demanded-pill">★ Exigée</span>{{/if}}
           {{#if refused}}<span class="annex-refused-pill">Refusée</span>{{/if}}

@@ -687,6 +687,11 @@ table.systems-table tfoot td {
 .annex-feature-d1 { padding-left: 5mm; }
 .annex-feature-d2 { padding-left: 8mm; }
 .annex-feature-d3 { padding-left: 11mm; }
+.annex-feature-icon {
+  display: inline-block; width: 3mm; margin-right: 1mm;
+  vertical-align: -0.4mm;
+  color: #475569;
+}
 .annex-cell {
   padding: 0.5mm 0;
   border-bottom: 0.3pt solid #f3f4f6;

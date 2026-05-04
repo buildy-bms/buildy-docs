@@ -7,15 +7,55 @@ import {
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
-  previewOfferingsUrl, exportOfferingsPdfUrl,
+  uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
 } from '@/api'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
+import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
+library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
 import { useNotification } from '@/composables/useNotification'
 
-const { error: notifyError } = useNotification()
+const { error: notifyError, success: notifySuccess } = useNotification()
+
+// Modal "Captures d'ecran" : ouvert quand on clique sur l'icone camera
+// d'une feature dans la liste. Reutilise TemplateAttachmentsGrid.
+const photosModalTemplate = ref(null)
+function openPhotos(t) { photosModalTemplate.value = t }
+function closePhotos() {
+  photosModalTemplate.value = null
+  // Refresh des items pour propager le nouveau attachments_count
+  refresh()
+}
+
+// Drag-drop d'une image sur une ligne -> upload direct sur ce template.
+const dragOverRowId = ref(null)
+function onRowDragOver(e, t) {
+  if (!e.dataTransfer?.types?.includes('Files')) return
+  e.preventDefault()
+  dragOverRowId.value = t.id
+}
+function onRowDragLeave() { dragOverRowId.value = null }
+async function onRowDrop(e, t) {
+  dragOverRowId.value = null
+  const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
+  if (!files.length) return
+  e.preventDefault()
+  try {
+    for (const f of files) {
+      await uploadSectionTemplateAttachment(t.id, f)
+    }
+    notifySuccess(`${files.length} capture${files.length > 1 ? 's' : ''} ajoutée${files.length > 1 ? 's' : ''} à « ${t.title} »`)
+    await refresh()
+  } catch {
+    notifyError('Échec de l\'upload')
+  }
+}
 
 // Statuts visuels pour la matrice de disponibilite
 const AVAIL_STYLES = {
@@ -135,14 +175,42 @@ const parentInfoById = computed(() => {
   return map
 })
 
-// Items enrichis du parent_title + path pour affichage et regroupement
-const enrichedItems = computed(() => items.value.map(t => {
-  const p = t.parent_template_id ? parentInfoById.value.get(t.parent_template_id) : null
-  return { ...t, parent_title: p?.title || null, parent_path: p?.path || null }
-}))
+// Items enrichis du parent_title + path pour affichage et regroupement.
+// feature_depth = nb d'ancetres qui sont aussi des features (is_functionality=1).
+// Permet d'indenter visuellement les sous-fonctionnalites sous leur parent
+// (ex: "Surveillance et controle" sous "Fonctionnalites Gojee de base").
+// Le groupement par parent racine (categorie non-feature) reste sur la
+// classification deja existante via parent_path.
+const enrichedItems = computed(() => {
+  const byId = new Map(allTemplates.value.map(t => [t.id, t]))
+  function featureDepth(t) {
+    let d = 0
+    let cur = t.parent_template_id ? byId.get(t.parent_template_id) : null
+    while (cur) {
+      if (cur.is_functionality) d++
+      cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
+    }
+    return d
+  }
+  return items.value.map(t => {
+    const p = t.parent_template_id ? parentInfoById.value.get(t.parent_template_id) : null
+    return {
+      ...t,
+      parent_title: p?.title || null,
+      parent_path: p?.path || null,
+      feature_depth: featureDepth(t),
+    }
+  })
+})
 
-// Groupes : key = parent_template_id || 'orphelins', valeur = liste de fonctionnalites
-const groupedItems = computed(() => {
+// Liste plate ordonnee en DFS de l'arbre des fonctionnalites :
+// chaque feature parente est immediatement suivie de ses enfants
+// (transitif), puis on passe au sibling suivant. Les indentations
+// (feature_depth) rendent la hierarchie lisible.
+//
+// En mode recherche, on garde l'ordre plat brut (la hierarchie n'a
+// plus de sens quand on filtre).
+const flatItems = computed(() => {
   const q = search.value.trim().toLowerCase()
   const filtered = q
     ? enrichedItems.value.filter(t =>
@@ -151,66 +219,97 @@ const groupedItems = computed(() => {
         (t.parent_title || '').toLowerCase().includes(q)
       )
     : enrichedItems.value
-  const groups = new Map()
+  if (q) return filtered
+
+  // Index par parent_template_id, trie par position ascendante
+  const byParent = new Map()
   for (const t of filtered) {
-    const key = t.parent_template_id || 'orphans'
-    if (!groups.has(key)) groups.set(key, { id: key, parent_path: t.parent_path, items: [] })
-    groups.get(key).items.push(t)
+    const k = t.parent_template_id || 'orphans'
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(t)
   }
-  // Ordre des groupes : par parent_path alphabetiquement, orphelins a la fin
-  return [...groups.values()].sort((a, b) => {
-    if (a.id === 'orphans') return 1
-    if (b.id === 'orphans') return -1
-    return (a.parent_path || '').localeCompare(b.parent_path || '', 'fr')
+  for (const arr of byParent.values()) arr.sort((a, b) => (a.position || 0) - (b.position || 0))
+
+  const featureIds = new Set(filtered.map(t => t.id))
+  const out = []
+  const seen = new Set()
+  function emit(parentKey) {
+    const arr = byParent.get(parentKey)
+    if (!arr) return
+    for (const t of arr) {
+      if (seen.has(t.id)) continue
+      seen.add(t.id)
+      out.push(t)
+      if (byParent.has(t.id)) emit(t.id)
+    }
+  }
+  // Racines : groupes dont la cle n'est PAS un id de feature affiche
+  // (donc 'orphans' ou bien un parent_template_id qui pointe vers une
+  // section non-functionality — categorie de regroupement).
+  const rootKeys = []
+  for (const k of byParent.keys()) {
+    if (k === 'orphans' || !featureIds.has(k)) rootKeys.push(k)
+  }
+  rootKeys.sort((a, b) => {
+    if (a === 'orphans') return 1
+    if (b === 'orphans') return -1
+    const pa = byParent.get(a)?.[0]?.parent_path || ''
+    const pb = byParent.get(b)?.[0]?.parent_path || ''
+    return pa.localeCompare(pb, 'fr')
   })
+  for (const k of rootKeys) emit(k)
+  return out
 })
-// Drag-drop : un Sortable par <tbody> de groupe (ref dynamique). Le drag
-// au sein d'un groupe (meme parent) reorganise via reorderSectionTemplates.
-const groupRefs = new Map()
-const sortables = []
-function setGroupRef(groupId) {
-  return (el) => {
-    if (el) groupRefs.set(groupId, el)
-    else groupRefs.delete(groupId)
-  }
-}
+
+// Drag-drop : un seul Sortable sur le tbody plat. onMove valide que
+// le drop reste au sein de la meme fratrie (meme parent_template_id),
+// sinon on rejette (pas de re-parentage par drag).
+const tbodyRef = ref(null)
+let sortableInstance = null
 function teardownSortables() {
-  while (sortables.length) {
-    try { sortables.pop().destroy() } catch { /* ignore */ }
+  if (sortableInstance) {
+    try { sortableInstance.destroy() } catch { /* ignore */ }
+    sortableInstance = null
   }
 }
 function setupSortables() {
   teardownSortables()
   if (search.value.trim()) return // pas de drag-drop pendant la recherche
-  for (const g of groupedItems.value) {
-    const el = groupRefs.get(g.id)
-    if (!el) continue
-    const parentId = g.id === 'orphans' ? null : g.id
-    const s = Sortable.create(el, {
-      animation: 150,
-      handle: '.drag-handle',
-      ghostClass: 'sortable-ghost',
-      chosenClass: 'sortable-chosen',
-      dragClass: 'sortable-drag',
-      onEnd: async (evt) => {
-        if (evt.oldIndex === evt.newIndex) return
-        const ids = Array.from(el.children)
-          .map(li => parseInt(li.getAttribute('data-id'), 10))
-          .filter(Boolean)
-        try {
-          await reorderSectionTemplates({ ids, parent_template_id: parentId })
-          await refresh()
-        } catch {
-          notifyError('Échec de la réorganisation')
-          await refresh()
-        }
-      },
-    })
-    sortables.push(s)
-  }
+  const el = tbodyRef.value
+  if (!el) return
+  sortableInstance = Sortable.create(el, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onMove(evt) {
+      // Refuse tout drop sur une ligne d'un autre parent
+      const a = evt.dragged?.getAttribute('data-parent-id') || ''
+      const b = evt.related?.getAttribute('data-parent-id') || ''
+      return a === b
+    },
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const draggedParent = evt.item.getAttribute('data-parent-id') || ''
+      // Recolte les ids de la fratrie dans le nouvel ordre DOM
+      const ids = Array.from(el.children)
+        .filter(li => (li.getAttribute('data-parent-id') || '') === draggedParent)
+        .map(li => parseInt(li.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      const parentId = draggedParent === '' ? null : parseInt(draggedParent, 10)
+      try {
+        await reorderSectionTemplates({ ids, parent_template_id: parentId })
+        await refresh()
+      } catch {
+        notifyError('Échec de la réorganisation')
+        await refresh()
+      }
+    },
+  })
 }
 
-watch([groupedItems, search], async () => {
+watch([flatItems, search], async () => {
   await nextTick()
   setupSortables()
 }, { deep: false })
@@ -282,6 +381,7 @@ onBeforeUnmount(teardownSortables)
           <tr>
             <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
+            <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Essentials</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Premium</th>
@@ -290,27 +390,43 @@ onBeforeUnmount(teardownSortables)
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
-        <template v-for="g in groupedItems" :key="g.id">
-          <!-- En-tete de groupe (tbody dedie pour rester hors du drag-drop) -->
-          <tbody>
-            <tr class="bg-indigo-50/60 border-t border-indigo-100">
-              <td colspan="8" class="px-4 py-1.5 text-[11px] uppercase tracking-wider font-semibold text-indigo-700">
-                <span v-if="g.id === 'orphans'" class="text-gray-500">Sans section parente</span>
-                <span v-else>{{ g.parent_path }}</span>
-                <span class="ml-2 text-gray-400 normal-case font-normal">· {{ g.items.length }}</span>
-              </td>
-            </tr>
-          </tbody>
-          <!-- Lignes data du groupe (sortable par groupe) -->
-          <tbody :ref="setGroupRef(g.id)">
-            <tr v-for="t in g.items" :key="t.id" :data-id="t.id"
-                class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
-                @click="openEditor(t)">
+        <!-- Un seul tbody : items en ordre DFS (parent suivi de ses enfants).
+             Drag-drop scopage par data-parent-id (cf. setupSortables.onMove). -->
+        <tbody ref="tbodyRef">
+            <tr v-for="t in flatItems" :key="t.id" :data-id="t.id"
+                :data-parent-id="t.parent_template_id || ''"
+                :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                         dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                @click="openEditor(t)"
+                @dragover="onRowDragOver($event, t)"
+                @dragleave="onRowDragLeave"
+                @drop="onRowDrop($event, t)">
               <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
                   @click.stop>
                 <Bars3Icon class="w-4 h-4 inline-block" />
               </td>
-              <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{{ t.title }}</td>
+              <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap"
+                  :style="t.feature_depth ? `padding-left: ${16 + t.feature_depth * 18}px` : ''">
+                <span v-if="t.feature_depth" class="text-gray-400 mr-1.5">↳</span>
+                <FontAwesomeIcon v-if="t.icon_name" :icon="['fas', t.icon_name]" class="w-4 h-4 text-gray-500 mr-2 inline-block align-[-2px]" />
+                {{ t.title }}
+              </td>
+              <td class="px-2 py-2 text-center align-middle" @click.stop>
+                <button
+                  type="button"
+                  @click="openPhotos(t)"
+                  :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition',
+                           t.attachments_count > 0
+                             ? 'text-emerald-600 hover:bg-emerald-100'
+                             : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
+                  :title="t.attachments_count > 0
+                    ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
+                    : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
+                >
+                  <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
+                  <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
+                </button>
+              </td>
               <td v-for="lvl in ['avail_e','avail_s','avail_p']" :key="lvl"
                   class="px-3 py-2 text-center whitespace-nowrap">
                 <span v-if="availCell(t[lvl])"
@@ -334,11 +450,10 @@ onBeforeUnmount(teardownSortables)
                 <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
               </td>
             </tr>
-          </tbody>
-        </template>
-        <tbody v-if="!groupedItems.length">
+        </tbody>
+        <tbody v-if="!flatItems.length">
           <tr>
-            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+            <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
             </td>
           </tr>
@@ -372,6 +487,26 @@ onBeforeUnmount(teardownSortables)
       @close="showBulk = false; refresh()"
       @done="refresh()"
     />
+
+    <!-- Modal Captures d'écran (separe de la modal d'edition pour pouvoir
+         gerer les photos sans ouvrir tout l'editeur). -->
+    <BaseModal
+      v-if="photosModalTemplate"
+      :title="`Captures d'écran — ${photosModalTemplate.title}`"
+      size="lg"
+      @close="closePhotos"
+    >
+      <TemplateAttachmentsGrid
+        template-kind="section"
+        :template-id="photosModalTemplate.id"
+      />
+      <template #footer>
+        <button @click="closePhotos"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition">
+          Fermer
+        </button>
+      </template>
+    </BaseModal>
 
     <PdfPreviewModal
       v-if="offeringsPreviewOpen"

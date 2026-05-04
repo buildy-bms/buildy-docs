@@ -37,7 +37,7 @@ function buildLevelVerdict({ requiredLevel, contractLevel }) {
   };
   if (RANK[requiredLevel] > RANK[contractLevel]) return {
     kind: 'shortfall',
-    text: 'Le niveau visé est insuffisant — certaines fonctionnalités de l\'AF ne seront pas activables au contrat actuel.',
+    text: 'Le niveau visé est insuffisant — certaines fonctionnalités de l\'AF ne seront pas disponibles à la livraison du projet. Un avenant est nécessaire.',
   };
   if (RANK[requiredLevel] < RANK[contractLevel]) return {
     kind: 'over',
@@ -249,6 +249,7 @@ async function buildAfExportData(af, opts = {}) {
           id: s.id,
           number: s.number || '',
           title: s.title,
+          icon_name: s.tpl_icon_name || null,
           service_level: sl,
           service_level_label: formatLevelFull(sl),
           badgeClass: badgeClass || 'ESP',
@@ -383,7 +384,7 @@ function buildOfferingsAnnexForAf(af) {
 
   // Recupere tous les section_templates pour construire l'arbre
   const allTemplates = db.db.prepare(`
-    SELECT id, title, parent_template_id, position, is_functionality,
+    SELECT id, title, icon_name, parent_template_id, position, is_functionality,
            avail_e, avail_s, avail_p
     FROM section_templates
     ORDER BY position, id
@@ -425,6 +426,7 @@ function buildOfferingsAnnexForAf(af) {
         kind: 'feature',
         depth: visualDepth,
         title: node.title,
+        icon_name: node.icon_name || null,
         avail_e: ae,
         avail_s: as,
         avail_p: ap,

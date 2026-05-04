@@ -26,6 +26,7 @@ const updateSchema = z.object({
   kind: z.enum(['standard', 'equipment', 'synthesis', 'zones', 'hyperveez_page']).optional(),
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
+  icon_name: z.string().nullable().optional(),
 });
 
 const createSchema = z.object({
@@ -273,6 +274,7 @@ async function routes(fastify) {
       availE: body.avail_e,
       availS: body.avail_s,
       availP: body.avail_p,
+      iconName: body.icon_name,
       // Service level : derive de avail_* si fourni, sinon valeur explicite
       serviceLevel: availProvided ? derivedLevel : body.service_level,
       updatedBy: userId || null,

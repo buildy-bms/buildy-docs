@@ -38,7 +38,7 @@ function buildOfferingsData() {
   //   - des features (is_functionality = 1)
   //   - OU des ancetres de features (categories de regroupement)
   const allTemplates = db.db.prepare(`
-    SELECT id, title, parent_template_id, position, is_functionality,
+    SELECT id, title, icon_name, parent_template_id, position, is_functionality,
            avail_e, avail_s, avail_p
     FROM section_templates
     ORDER BY position, id
@@ -97,6 +97,7 @@ function buildOfferingsData() {
         depth: visualDepth,
         id: node.id,            // permet le wrap <a href="#toc-feature-{id}"> en brochure
         title: node.title,
+        icon_name: node.icon_name || null,
         avail_e: ae,
         avail_s: as,
         avail_p: ap,
@@ -196,7 +197,7 @@ function availabilityIcon(avail) {
  */
 async function buildBrochureData() {
   const allTemplates = db.db.prepare(`
-    SELECT id, slug, title, body_html, bacs_articles, parent_template_id, position,
+    SELECT id, slug, title, body_html, bacs_articles, icon_name, parent_template_id, position,
            is_functionality, service_level, avail_e, avail_s, avail_p
     FROM section_templates
     ORDER BY position, id
@@ -252,6 +253,7 @@ async function buildBrochureData() {
           caption: att.caption || '',
           width: att.width,
           height: att.height,
+          full_width: att.full_width === 1,
         });
       } catch (err) {
         log.warn(`Brochure : impossible de charger ${att.filename} (${att._origin}) : ${err.message}`);
@@ -274,6 +276,7 @@ async function buildBrochureData() {
         body_html: cleanedBody,
         has_body: !!cleanedBody,
         bacs_articles: node.bacs_articles || null,
+        icon_name: node.icon_name || null,
         service_level: node.service_level,
         avail_e: ae, avail_s: as, avail_p: ap,
         avail_e_label: availabilityLabel(ae),

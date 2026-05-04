@@ -65,6 +65,7 @@ function extFor(mime) {
 const updateSchema = z.object({
   caption: z.string().nullable().optional(),
   position: z.number().int().optional(),
+  full_width: z.boolean().optional(),
 });
 
 async function routes(fastify) {

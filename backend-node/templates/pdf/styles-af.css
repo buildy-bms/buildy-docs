@@ -306,6 +306,21 @@ h1, h2, h3, h4, h5 {
 }
 .section h1 .section-num { color: #94a3b8; }
 
+/* Icone FontAwesome optionnelle, posee entre le numero et le titre.
+   Couleur = currentColor (heritee du h1/h2/...) pour s'integrer sans
+   detonner. Taille rendue cote helper (16/14/12 selon depth ideal,
+   on prend 16 par defaut, suffisamment fin pour ne pas dominer). */
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2.5mm;
+  vertical-align: -0.5mm;
+  color: inherit;
+}
+.section h2 .section-icon svg { width: 13px; height: 13px; }
+.section h3 .section-icon svg { width: 11px; height: 11px; }
+.section h4 .section-icon svg { width: 10px; height: 10px; }
+
 .section-badges { display: inline-flex; gap: 2mm; align-items: center; margin-left: 3mm; vertical-align: middle; font-family: 'Manrope', sans-serif; }
 .badge-level {
   display: inline-block;
@@ -881,6 +896,11 @@ table.points-mini .badge-type {
 .annex-feature-d1 { padding-left: 5mm; }
 .annex-feature-d2 { padding-left: 8mm; }
 .annex-feature-d3 { padding-left: 11mm; }
+.annex-feature-icon {
+  display: inline-block; width: 3mm; margin-right: 1mm;
+  vertical-align: -0.4mm;
+  color: #475569;
+}
 .annex-cell {
   padding: 0.5mm 0;
   border-bottom: 0.3pt solid #f3f4f6;

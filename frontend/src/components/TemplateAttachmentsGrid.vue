@@ -13,6 +13,10 @@ import Sortable from 'sortablejs'
 import {
   PhotoIcon, TrashIcon, CloudArrowUpIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faArrowsLeftRightToLine } from '@fortawesome/pro-solid-svg-icons'
+library.add(faArrowsLeftRightToLine)
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import {
   listSectionTemplateAttachments, uploadSectionTemplateAttachment, reorderSectionTemplateAttachments,
@@ -136,6 +140,15 @@ async function saveCaption(att) {
   try { await updateAttachment(att.id, { caption: att.caption }) }
   catch { notifyError('Échec sauvegarde légende') }
 }
+async function toggleFullWidth(att) {
+  const newVal = att.full_width === 1 ? 0 : 1
+  att.full_width = newVal // optimistic local
+  try { await updateAttachment(att.id, { full_width: !!newVal }) }
+  catch {
+    att.full_width = newVal === 1 ? 0 : 1 // rollback
+    notifyError('Échec sauvegarde mode pleine largeur')
+  }
+}
 
 async function removeAttachment(att) {
   const ok = await confirm({ title: 'Supprimer la capture ?', message: `« ${att.original_name || att.filename} »\n\nCette suppression s'applique au modèle et sera reflétée dans toutes les AFs.`, confirmLabel: 'Supprimer', danger: true })
@@ -247,6 +260,18 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           <p class="text-[10px] text-indigo-600">Cliquer pour réessayer</p>
         </div>
         <button
+          type="button"
+          @click.stop="toggleFullWidth(att)"
+          :class="['absolute top-1.5 right-9 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition z-10',
+                   att.full_width === 1
+                     ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+                     : 'bg-white/90 hover:bg-indigo-500 hover:text-white text-gray-600']"
+          :title="att.full_width === 1 ? 'Capture en pleine largeur (PDF brochure) — cliquer pour repasser en auto' : 'Verrouiller en pleine largeur dans le PDF brochure (au lieu de auto-fit 1-2 colonnes)'"
+        >
+          <FontAwesomeIcon :icon="['fas', 'arrows-left-right-to-line']" class="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
           @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
           title="Supprimer (impacte toutes les AFs)"

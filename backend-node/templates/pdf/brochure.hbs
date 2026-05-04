@@ -103,7 +103,10 @@
   {{#each features}}
   <article class="feature-card depth-{{depth}}" data-toc-anchor="feature-{{id}}">
     <div class="feature-title-row">
-      <h2 class="feature-title">{{title}}</h2>
+      <h2 class="feature-title">
+        {{#if icon_name}}<span class="feature-icon">{{{faIcon icon_name "#1b2842" "16"}}}</span>{{/if}}
+        {{title}}
+      </h2>
       {{#if bacs_articles}}<span class="badge-bacs" title="Liée au décret BACS">⚖ BACS · {{bacs_articles}}</span>{{/if}}
     </div>
 
@@ -133,7 +136,7 @@
     {{#if has_screenshots}}
     <div class="feature-screenshots">
       {{#each screenshots}}
-      <figure class="feature-screenshot">
+      <figure class="feature-screenshot{{#if full_width}} feature-screenshot-fullwidth{{/if}}">
         <img src="{{dataUrl}}" alt="{{caption}}" />
         {{#if caption}}<figcaption>{{caption}}</figcaption>{{/if}}
       </figure>

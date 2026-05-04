@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 72;
+const TARGET_VERSION = 74;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2835,6 +2835,32 @@ function runMigrations() {
     log.info('Migration 72 appliquee : deduplication globale templates + sections');
   }
 
+  if (current < 73) {
+    // Lot — Capture pleine largeur (PDF brochure) : permet de
+    // verrouiller une capture en 1 seule colonne au lieu du auto-fit
+    // 1-2 colonnes par defaut. Utile pour les screenshots wide
+    // (cartographie pleine carte, plans 2D/3D, dashboards complets)
+    // qui ne sont pas lisibles a moitie de la largeur de page.
+    try {
+      db.exec('ALTER TABLE attachments ADD COLUMN full_width INTEGER NOT NULL DEFAULT 0');
+    } catch (e) { /* deja presente */ }
+    db.pragma('user_version = 73');
+    log.info('Migration 73 appliquee : attachments.full_width');
+  }
+
+  if (current < 74) {
+    // Lot — icone FontAwesome optionnelle par section_template (typiquement
+    // sur les fonctionnalites is_functionality=1). Affichee dans la liste
+    // de la bibliotheque, dans la brochure PDF, dans le tableau d'offres,
+    // et sur la fiche d'edition. Pas de gestion de couleur (decision user
+    // 2026-05-04 : la couleur reste celle des classes CSS du contexte).
+    try {
+      db.exec('ALTER TABLE section_templates ADD COLUMN icon_name TEXT');
+    } catch (e) { /* deja presente */ }
+    db.pragma('user_version = 74');
+    log.info('Migration 74 appliquee : section_templates.icon_name');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3037,7 +3063,9 @@ const sectionTemplates = {
              (SELECT COUNT(*) FROM sections s
                 JOIN afs a ON a.id = s.af_id
                 WHERE s.section_template_id = st.id AND a.deleted_at IS NULL
-                  AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)) AS outdated_count
+                  AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)) AS outdated_count,
+             (SELECT COUNT(*) FROM attachments
+                WHERE section_template_id = st.id) AS attachments_count
       FROM section_templates st
       ${whereClause}
       ORDER BY st.position, st.id
@@ -3106,7 +3134,7 @@ const sectionTemplates = {
     }
     return false;
   },
-  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP }) {
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName }) {
     const fields = [], params = [];
     if (title !== undefined) { fields.push('title = ?'); params.push(title); }
     if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
@@ -3118,6 +3146,7 @@ const sectionTemplates = {
     if (availE !== undefined) { fields.push('avail_e = ?'); params.push(availE); }
     if (availS !== undefined) { fields.push('avail_s = ?'); params.push(availS); }
     if (availP !== undefined) { fields.push('avail_p = ?'); params.push(availP); }
+    if (iconName !== undefined) { fields.push('icon_name = ?'); params.push(iconName); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
     if (!fields.length) return this.getById(id);
     fields.push('updated_at = CURRENT_TIMESTAMP');
@@ -3235,7 +3264,8 @@ const sections = {
       SELECT s.*,
              stt.avail_e AS tpl_avail_e,
              stt.avail_s AS tpl_avail_s,
-             stt.avail_p AS tpl_avail_p
+             stt.avail_p AS tpl_avail_p,
+             stt.icon_name AS tpl_icon_name
       FROM sections s
       LEFT JOIN section_templates stt ON stt.id = s.section_template_id
       WHERE s.af_id = ?
@@ -3250,7 +3280,8 @@ const sections = {
              stt.is_functionality AS section_template_is_functionality,
              stt.avail_e AS tpl_avail_e,
              stt.avail_s AS tpl_avail_s,
-             stt.avail_p AS tpl_avail_p
+             stt.avail_p AS tpl_avail_p,
+             stt.icon_name AS tpl_icon_name
       FROM sections s
       LEFT JOIN users u ON u.id = s.updated_by
       LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
@@ -3422,10 +3453,11 @@ const attachments = {
       width || null, height || null, uploadedBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { caption, position }) {
+  update(id, { caption, position, full_width }) {
     const sets = [], params = [];
     if (caption !== undefined) { sets.push('caption = ?'); params.push(caption); }
     if (position !== undefined) { sets.push('position = ?'); params.push(position); }
+    if (full_width !== undefined) { sets.push('full_width = ?'); params.push(full_width ? 1 : 0); }
     if (!sets.length) return this.getById(id);
     params.push(id);
     db.prepare(`UPDATE attachments SET ${sets.join(', ')} WHERE id = ?`).run(...params);

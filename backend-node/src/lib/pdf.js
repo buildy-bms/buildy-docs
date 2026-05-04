@@ -15,29 +15,38 @@ Handlebars.registerHelper('add', (a, b) => Number(a) + Number(b));
 
 // FontAwesome icons inline en SVG, parametrables (couleur + taille).
 // Utilisation : {{{faIcon "building" "#4f46e5" "16"}}}
-const faIcons = require('@fortawesome/free-solid-svg-icons');
+//
+// Resolution :
+// 1. Pro Solid en priorite (meme jeu que le picker frontend
+//    @fortawesome/pro-solid-svg-icons), sinon Free Solid en fallback
+// 2. Conversion kebab-case → CamelCase prefixee 'fa' (ex: "chart-line"
+//    → "faChartLine"). Ainsi le helper accepte n'importe quel nom FA
+//    saisi via FaIconPicker.vue, sans alias manuel.
+// 3. Alias historique conserve pour les libelles deja utilises dans
+//    les CSS / templates qui ne suivent pas la regle FA standard.
+const faIconsFree = require('@fortawesome/free-solid-svg-icons');
+let faIconsPro = null;
+try { faIconsPro = require('@fortawesome/pro-solid-svg-icons'); } catch { /* pas dispo */ }
 const FA_ALIAS = {
-  'building': 'faBuilding',
-  'map-pin': 'faMapPin',
-  'wrench': 'faWrench',
-  'fire': 'faFire',
-  'snowflake': 'faSnowflake',
-  'fan': 'faFan',
-  'faucet': 'faFaucet',
-  'lightbulb': 'faLightbulb',
-  'tower-cell': 'faTowerCell',
-  'solar-panel': 'faSolarPanel',
-  'bolt': 'faBolt',
-  'gauge': 'faGauge',
-  'sparkles': 'faWandMagicSparkles',
-  'check-circle': 'faCircleCheck',
-  'triangle-exclamation': 'faTriangleExclamation',
-  'clipboard-list': 'faClipboardList',
-  'list-check': 'faListCheck',
-  'plug': 'faPlug',
-  'shield': 'faShieldHalved',
   'temperature': 'faTemperatureHalf',
+  'shield':      'faShieldHalved',
+  'sparkles':    'faWandMagicSparkles',
 };
+function kebabToFaKey(name) {
+  if (!name) return null;
+  if (FA_ALIAS[name]) return FA_ALIAS[name];
+  // Deja en CamelCase prefixe (ex: faBuilding) -> tel quel
+  if (name.startsWith('fa') && name[2] === name[2]?.toUpperCase()) return name;
+  // kebab-case -> faCamelCase
+  return 'fa' + name.split('-').map(p => p ? p[0].toUpperCase() + p.slice(1) : '').join('');
+}
+function lookupFaIcon(name) {
+  const key = kebabToFaKey(name);
+  if (!key) return null;
+  if (faIconsPro && faIconsPro[key]?.icon) return faIconsPro[key];
+  if (faIconsFree[key]?.icon) return faIconsFree[key];
+  return null;
+}
 // Mapping categorie BACS -> icone + couleur (aligne avec
 // frontend/components/SystemCategoryIcon.vue).
 const CATEGORY_ICON = {
@@ -50,24 +59,26 @@ const CATEGORY_ICON = {
   electricity_production: { name: 'solar-panel',  color: '#16a34a' },
 };
 Handlebars.registerHelper('faIcon', (name, color, size) => {
-  const key = FA_ALIAS[name] || name;
-  const def = faIcons[key];
-  if (!def || !def.icon) return '';
+  const def = lookupFaIcon(name);
+  if (!def) return '';
   const [w, h, , , path] = def.icon;
+  // FA peut renvoyer path = string (icone simple) ou array (icone duotone) — on prend la string
+  const d = Array.isArray(path) ? path[path.length - 1] : path;
   const px = size || '16';
   const fill = color || 'currentColor';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;"><path fill="${fill}" d="${path}"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;"><path fill="${fill}" d="${d}"/></svg>`;
   return new Handlebars.SafeString(svg);
 });
 // {{{categoryIcon "heating" "16"}}} -> icone + couleur dediees a la categorie BACS
 Handlebars.registerHelper('categoryIcon', (category, size) => {
   const cfg = CATEGORY_ICON[category];
   if (!cfg) return '';
-  const def = faIcons[FA_ALIAS[cfg.name] || cfg.name];
-  if (!def || !def.icon) return '';
+  const def = lookupFaIcon(cfg.name);
+  if (!def) return '';
   const [w, h, , , path] = def.icon;
+  const d = Array.isArray(path) ? path[path.length - 1] : path;
   const px = size || '16';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:2mm"><path fill="${cfg.color}" d="${path}"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:2mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
   return new Handlebars.SafeString(svg);
 });
 Handlebars.registerHelper('or', function(...args) {

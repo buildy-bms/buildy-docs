@@ -3,6 +3,10 @@ import { computed, ref, watch, nextTick, inject } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
+library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
 
 // Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
 // (sections seedees avant le passage en numerotation auto).
@@ -194,6 +198,12 @@ const titleHtml = computed(() => {
         <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 block"></span>
       </Tooltip>
 
+      <FontAwesomeIcon
+        v-if="node.tpl_icon_name"
+        :icon="['fas', node.tpl_icon_name]"
+        class="w-3 h-3 shrink-0 text-gray-500"
+        :class="isSelected ? 'text-indigo-700' : ''"
+      />
       <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
