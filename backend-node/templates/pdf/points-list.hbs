@@ -7,7 +7,7 @@
 </head>
 <body>
 
-{{!-- ═══════════ Page de garde ═══════════ --}}
+{{!-- ═══════════ Page de garde — structure copiee de synthesis.hbs ═══════════ --}}
 <section class="cover">
   <div class="cover-top">
     <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
@@ -17,18 +17,35 @@
     {{#if af.site_address}}<p class="cover-address">{{af.site_address}}</p>{{/if}}
   </div>
 
-  <div class="cover-totals">
-    <div class="cover-totals-item">
-      <p class="cover-totals-value">{{totals.instances}}</p>
-      <p class="cover-totals-label">instance{{#if (gt totals.instances 1)}}s{{/if}} d'équipement</p>
+  {{!-- KPI cards : memes classes que synthesis pour beneficier de la meme cover --}}
+  <div class="cover-kpi-grid">
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{totals.instances}}</p>
+      <p class="cover-kpi-label">Instance{{#if (gt totals.instances 1)}}s{{/if}} d'équipement</p>
     </div>
-    <div class="cover-totals-sep"></div>
-    <div class="cover-totals-item">
-      <p class="cover-totals-value">{{totals.points}}</p>
-      <p class="cover-totals-label">point{{#if (gt totals.points 1)}}s{{/if}} de donnée attendu{{#if (gt totals.points 1)}}s{{/if}}</p>
+    <div class="cover-kpi-card">
+      <p class="cover-kpi-value">{{totals.points}}</p>
+      <p class="cover-kpi-label">Point{{#if (gt totals.points 1)}}s{{/if}} de donnée attendu{{#if (gt totals.points 1)}}s{{/if}}</p>
     </div>
   </div>
 
+  {{!-- Bandeau niveau de service (analogue cover-level-band synthese) --}}
+  <div class="cover-level-band">
+    <div class="cover-level-band-row">
+      <div class="cover-level-band-item">
+        <p class="cover-level-band-label">Niveau de service</p>
+        <p class="cover-level-band-value">{{serviceLevelLabel}}</p>
+      </div>
+    </div>
+    <p class="cover-verdict-text">
+      Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
+      Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
+      La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
+      en avant-projet ou validés par Buildy avant mise en production.
+    </p>
+  </div>
+
+  {{!-- Meta projet (3 colonnes comme synthesis) --}}
   <div class="cover-meta">
     <div class="cover-meta-row">
       <span class="cover-meta-label">Version</span>
@@ -43,24 +60,12 @@
       <span class="cover-meta-label">Auteur</span>
       <span class="cover-meta-value">{{authorName}}</span>
     </div>
-    <div class="cover-meta-row">
-      <span class="cover-meta-label">Niveau de service</span>
-      <span class="cover-meta-value">{{serviceLevelLabel}}</span>
-    </div>
   </div>
 
-  <div class="cover-bottom">
-    <p class="cover-disclaimer">
-      <em>Ce document liste l'ensemble des points de données attendus par instance d'équipement déclarée sur le site.
-      Il fait foi pour la phase de commissionnement et l'intégration par les partenaires terrain.
-      La colonne « Nom technique » impose une nomenclature commune côté intégrateur ; les écarts doivent être justifiés
-      en avant-projet ou validés par Buildy avant mise en production.</em>
-    </p>
-    <p class="cover-legal">
-      © Buildy SAS — Document confidentiel. Toute reproduction, transmission ou diffusion à des tiers, même partielle,
-      est interdite sans autorisation écrite préalable.
-    </p>
-  </div>
+  <p class="cover-legal">
+    © Buildy SAS — Document confidentiel. Toute reproduction, transmission ou diffusion à des tiers, même partielle,
+    est interdite sans autorisation écrite préalable.
+  </p>
 </section>
 
 {{!-- ═══════════ Tableau global de tous les points ═══════════ --}}
