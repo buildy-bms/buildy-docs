@@ -310,6 +310,54 @@ async function routes(fastify) {
     const updated = db.sectionTemplates.getById(id);
     return { ...updated, propagated_count: propagatedCount + bacsSynced + levelSynced };
   });
+
+  // ── Versionnage / restauration du body_html ───────────────────────────
+  // GET /api/section-templates/:id/versions
+  // Liste les snapshots du body_html, du plus recent au plus ancien.
+  // Le payload `snapshot` n'est pas renvoye ici : la liste reste legere
+  // (utilisee dans le panneau historique). Pour lire un snapshot complet,
+  // POST /restore qui le charge dans la modale d'edition.
+  fastify.get('/section-templates/:id/versions', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const t = db.sectionTemplates.getById(id);
+    if (!t) return reply.code(404).send({ detail: 'Modèle non trouvé' });
+    const versions = db.sectionTemplateVersions.listByTemplate(id);
+    // Decode le snapshot pour exposer body_html (texte brut tronque pour preview)
+    return versions.map(v => {
+      let body_html = null;
+      try {
+        const row = db.db.prepare('SELECT snapshot FROM section_template_versions WHERE id = ?').get(v.id);
+        const parsed = row && row.snapshot ? JSON.parse(row.snapshot) : null;
+        body_html = parsed?.body_html || null;
+      } catch { /* ignore */ }
+      const text = (body_html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return {
+        id: v.id,
+        version: v.version,
+        author_name: v.author_name,
+        created_at: v.created_at,
+        preview: text.length > 240 ? text.slice(0, 240) + '…' : text,
+        body_length: (body_html || '').length,
+      };
+    });
+  });
+
+  // GET /api/section-templates/:id/versions/:versionId — snapshot complet
+  // (pour l'apercu plein texte avant de restaurer).
+  fastify.get('/section-templates/:id/versions/:versionId', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const versionId = parseInt(request.params.versionId, 10);
+    const row = db.sectionTemplateVersions.getById(versionId);
+    if (!row || row.template_id !== id) return reply.code(404).send({ detail: 'Version non trouvée' });
+    let snapshot;
+    try { snapshot = JSON.parse(row.snapshot); }
+    catch { return reply.code(500).send({ detail: 'Snapshot illisible' }); }
+    return {
+      id: row.id, version: row.version, created_at: row.created_at,
+      body_html: snapshot.body_html || null,
+      title: snapshot.title || null,
+    };
+  });
 }
 
 module.exports = routes;

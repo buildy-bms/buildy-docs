@@ -10,7 +10,7 @@
  * de la vue arbre permet aussi de re-parenter visuellement.
  */
 import { ref, computed, watch, onMounted } from 'vue'
-import { TrashIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, ClockIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
 import RichTextEditor from './RichTextEditor.vue'
@@ -24,6 +24,8 @@ import {
   deleteSectionTemplate,
   listSectionTemplates,
   listEquipmentTemplates,
+  listSectionTemplateVersions,
+  getSectionTemplateVersion,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -185,6 +187,48 @@ watch(() => props.template, (t) => {
     avail_p: (t && t.avail_p) || null,
   }
 }, { immediate: true })
+
+// Historique des versions du body_html. Charge a la demande quand l'user
+// clique sur "Historique". La restauration recopie le snapshot dans le
+// champ body_html (sans sauvegarder) — l'user revoit/edite puis Enregistre,
+// ce qui re-snapshote le texte courant avant ecrasement.
+const showHistory = ref(false)
+const historyVersions = ref([])
+const historyLoading = ref(false)
+async function openHistory() {
+  if (!props.template?.id) return
+  showHistory.value = true
+  historyLoading.value = true
+  try {
+    const { data } = await listSectionTemplateVersions(props.template.id)
+    historyVersions.value = data
+  } catch {
+    notifyError('Impossible de charger l\'historique')
+  } finally {
+    historyLoading.value = false
+  }
+}
+async function restoreVersion(v) {
+  const ok = await confirm({
+    title: `Restaurer cette version ?`,
+    message: `Le texte actuel sera remplacé par celui du ${formatDate(v.created_at)}.\n\nLa version remplacée sera elle-même versionnée à l'enregistrement, donc rien ne sera perdu.`,
+    confirmLabel: 'Restaurer ce texte',
+  })
+  if (!ok) return
+  try {
+    const { data } = await getSectionTemplateVersion(props.template.id, v.id)
+    form.value.body_html = data.body_html || ''
+    showHistory.value = false
+    success(`Texte du ${formatDate(v.created_at)} restauré — pense à enregistrer.`)
+  } catch {
+    notifyError('Échec de la restauration')
+  }
+}
+function formatDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso.replace(' ', 'T') + (iso.includes('Z') || iso.includes('+') ? '' : 'Z'))
+  return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
 
 const modalTitle = computed(() => {
   if (!isEdit.value) {
@@ -363,10 +407,17 @@ async function destroy() {
 
       <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
       <div v-if="form.kind === 'standard'">
-        <label class="block text-xs font-medium text-gray-600 mb-1">
-          Contenu canonique
-          <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
-        </label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs font-medium text-gray-600">
+            Contenu canonique
+            <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
+          </label>
+          <button v-if="isEdit" type="button" @click="openHistory"
+                  class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1 rounded transition whitespace-nowrap"
+                  title="Voir l'historique des modifications du texte et restaurer une version antérieure">
+            <ClockIcon class="w-3.5 h-3.5" /> Historique
+          </button>
+        </div>
         <RichTextEditor
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
@@ -419,5 +470,45 @@ async function destroy() {
       :templates="equipmentTemplates"
       @update:model-value="(v) => { form.equipment_template_id = v; showEquipmentPicker = false }"
     />
+  </BaseModal>
+
+  <!-- Modale "Historique" : liste des versions anterieures du body_html.
+       Affiche un apercu texte + bouton restaurer. La restauration ne
+       sauvegarde pas : le snapshot atterit dans la form, l'user clique
+       Enregistrer pour confirmer (ce qui versionne le texte actuel). -->
+  <BaseModal v-if="showHistory" title="Historique du texte" size="lg" @close="showHistory = false">
+    <div v-if="historyLoading" class="py-12 text-center text-sm text-gray-400">
+      Chargement…
+    </div>
+    <div v-else-if="!historyVersions.length" class="py-12 text-center">
+      <ClockIcon class="w-10 h-10 text-gray-200 mx-auto mb-3" />
+      <p class="text-sm text-gray-500">Aucune version antérieure enregistrée pour ce texte.</p>
+      <p class="text-xs text-gray-400 mt-2">Une version sera figée à chaque modification du contenu.</p>
+    </div>
+    <ul v-else class="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto -mx-1">
+      <li v-for="v in historyVersions" :key="v.id" class="py-3 px-1 flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 text-xs text-gray-500 mb-1">
+            <span class="font-medium text-gray-700">{{ formatDate(v.created_at) }}</span>
+            <span v-if="v.author_name">· par {{ v.author_name }}</span>
+            <span class="text-gray-300">·</span>
+            <span>{{ v.body_length }} caractères</span>
+          </div>
+          <p class="text-sm text-gray-600 line-clamp-3 leading-relaxed">
+            {{ v.preview || '(texte vide)' }}
+          </p>
+        </div>
+        <button type="button" @click="restoreVersion(v)"
+                class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition">
+          <ArrowUturnLeftIcon class="w-3.5 h-3.5" /> Restaurer ce texte
+        </button>
+      </li>
+    </ul>
+    <template #footer>
+      <button @click="showHistory = false"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition">
+        Fermer
+      </button>
+    </template>
   </BaseModal>
 </template>

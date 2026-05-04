@@ -80,6 +80,12 @@ export const deleteAttachment = (id) => api.delete(`/attachments/${id}`)
 export const moveAttachment = (id, targetSectionId) =>
   api.post(`/attachments/${id}/move`, { section_id: targetSectionId })
 
+// Historique des versions du body_html d'un section_template (pour
+// restaurer un texte ecrase depuis la modale d'edition).
+export const listSectionTemplateVersions = (id) => api.get(`/section-templates/${id}/versions`)
+export const getSectionTemplateVersion = (id, versionId) =>
+  api.get(`/section-templates/${id}/versions/${versionId}`)
+
 // Captures rattachees a un section_template (heritees automatiquement par
 // toutes les sections AF qui referencent ce template).
 export const listSectionTemplateAttachments = (id) => api.get(`/section-templates/${id}/attachments`)

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 74;
+const TARGET_VERSION = 75;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2861,6 +2861,28 @@ function runMigrations() {
     log.info('Migration 74 appliquee : section_templates.icon_name');
   }
 
+  if (current < 75) {
+    // Versionnage des section_templates : avant chaque modification du
+    // body_html, on fige l'etat courant dans cette table. Permet de
+    // restaurer un texte ecrase depuis la modale d'edition.
+    // Pattern aligne sur equipment_template_versions (migration 5).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS section_template_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        template_id INTEGER NOT NULL REFERENCES section_templates(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        snapshot TEXT NOT NULL,
+        changelog TEXT,
+        author_id INTEGER REFERENCES users(id),
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(template_id, version)
+      );
+      CREATE INDEX IF NOT EXISTS idx_stv_template ON section_template_versions(template_id, version DESC);
+    `);
+    db.pragma('user_version = 75');
+    log.info('Migration 75 appliquee : section_template_versions');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3023,6 +3045,34 @@ const equipmentTemplateVersions = {
   },
 };
 
+// Versionnage des section_templates : un snapshot est insere AVANT chaque
+// ecrasement du body_html (cf. sectionTemplates.update). Permet la restauration
+// depuis l'UI. La version stockee est l'ancienne version (avant ecrasement),
+// donc lister par version DESC montre la version la plus recemment remplacee
+// en premier.
+const sectionTemplateVersions = {
+  listByTemplate(templateId) {
+    return db.prepare(`
+      SELECT v.id, v.template_id, v.version, v.changelog, v.created_at,
+             v.author_id, u.display_name AS author_name
+      FROM section_template_versions v
+      LEFT JOIN users u ON u.id = v.author_id
+      WHERE template_id = ?
+      ORDER BY v.id DESC
+    `).all(templateId);
+  },
+  getById(id) {
+    return db.prepare(`SELECT * FROM section_template_versions WHERE id = ?`).get(id);
+  },
+  create({ templateId, version, snapshot, changelog, authorId }) {
+    const r = db.prepare(`
+      INSERT INTO section_template_versions (template_id, version, snapshot, changelog, author_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(templateId, version, JSON.stringify(snapshot), changelog || null, authorId || null);
+    return r.lastInsertRowid;
+  },
+};
+
 const equipmentTemplatePoints = {
   listByTemplate(templateId) {
     return db.prepare(`
@@ -3134,7 +3184,21 @@ const sectionTemplates = {
     }
     return false;
   },
-  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName }) {
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName, changelog }) {
+    // Snapshot du body_html courant AVANT ecrasement, ssi le body change
+    // reellement. Permet la restauration depuis l'UI (modale d'edition).
+    if (bodyHtml !== undefined) {
+      const cur = this.getById(id);
+      if (cur && (cur.body_html || '') !== (bodyHtml || '')) {
+        sectionTemplateVersions.create({
+          templateId: id,
+          version: cur.current_version,
+          snapshot: { body_html: cur.body_html, title: cur.title },
+          changelog: changelog || null,
+          authorId: updatedBy || null,
+        });
+      }
+    }
     const fields = [], params = [];
     if (title !== undefined) { fields.push('title = ?'); params.push(title); }
     if (bodyHtml !== undefined) { fields.push('body_html = ?'); params.push(bodyHtml); }
@@ -4204,6 +4268,7 @@ module.exports = {
   equipmentTemplatePoints,
   equipmentTemplateVersions,
   sectionTemplates,
+  sectionTemplateVersions,
   deletedSectionTemplateSlugs,
   sectionPointOverrides,
   equipmentInstances,
