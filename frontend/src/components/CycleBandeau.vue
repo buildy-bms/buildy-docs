@@ -349,7 +349,7 @@ const exportDescription = computed(() => {
       title="Exporter l'analyse fonctionnelle complète en PDF A4"
     >
       <DocumentArrowDownIcon class="w-4 h-4" />
-      AF (A4)
+      AF
     </button>
     <div class="inline-flex rounded-lg overflow-hidden">
       <button
@@ -358,7 +358,7 @@ const exportDescription = computed(() => {
         title="Exporter la liste de points contractuelle en PDF A4 paysage"
       >
         <TableCellsIcon class="w-4 h-4" />
-        Points (A4)
+        Points
       </button>
       <a
         :href="`/api/afs/${af.id}/exports/points-list.xlsx`"
@@ -375,7 +375,7 @@ const exportDescription = computed(() => {
       title="Exporter le tableau de synthèse en PDF A4 paysage"
     >
       <TableCellsIcon class="w-4 h-4" />
-      Synthèse (A4)
+      Synthèse
     </button>
     <button
       @click="showInstances = true"
