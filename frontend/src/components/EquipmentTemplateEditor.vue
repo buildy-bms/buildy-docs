@@ -35,6 +35,7 @@ import {
   deleteSectionTemplate,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
@@ -46,20 +47,14 @@ const { confirm } = useConfirm()
 
 const isEdit = computed(() => !!props.template?.id)
 
-const CATEGORIES = [
-  { value: 'ventilation',     label: 'Ventilation',                icon: 'fa-fan',             color: '#3b82f6' },
-  { value: 'chauffage',       label: 'Chauffage',                  icon: 'fa-fire',            color: '#dc2626' },
-  { value: 'climatisation',   label: 'Climatisation',              icon: 'fa-snowflake',       color: '#0ea5e9' },
-  { value: 'thermique_mixte', label: 'Chauffage + Climatisation',  icon: 'fa-temperature-half', color: '#a855f7' },
-  { value: 'ecs',             label: 'Eau chaude sanitaire',       icon: 'fa-faucet-drip',     color: '#0284c7' },
-  { value: 'eclairage',       label: 'Éclairage',                  icon: 'fa-lightbulb',       color: '#eab308' },
-  { value: 'electricite',     label: 'Électricité',                icon: 'fa-bolt',            color: '#a855f7' },
-  { value: 'comptage',        label: 'Comptage énergétique',       icon: 'fa-gauge',           color: '#22c55e' },
-  { value: 'qai',             label: 'Qualité de l\'air',          icon: 'fa-leaf',            color: '#16a34a' },
-  { value: 'occultation',     label: 'Occultation',                icon: 'fa-window-maximize', color: '#64748b' },
-  { value: 'process',         label: 'Process industriel',         icon: 'fa-industry',        color: '#475569' },
-  { value: 'autres',          label: 'Autres équipements',         icon: 'fa-cube',            color: '#6b7280' },
-]
+// Catalogue dynamique : alimenté par le composable useSystemCategories qui
+// charge `system_categories_db` (table éditable via /library/equipments
+// ?tab=categories). Pas de liste hardcodée — toute catégorie créée par
+// l'admin apparaît automatiquement ici. `value` = `key` DB.
+const { categories: dbCategories } = useSystemCategories()
+const CATEGORIES = computed(() =>
+  dbCategories.value.map(c => ({ value: c.key, label: c.label, icon: c.icon, color: c.color }))
+)
 
 const PROTOCOLS_PRESETS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']
 // Liste affichee = presets + tout protocole custom deja sur le template
@@ -98,7 +93,11 @@ const form = ref({
   icon_color: '#6b7280',
 })
 
-const selectedCategory = computed(() => CATEGORIES.find(c => c.value === form.value.category) || CATEGORIES[CATEGORIES.length - 1])
+const selectedCategory = computed(() =>
+  CATEGORIES.value.find(c => c.value === form.value.category) ||
+  CATEGORIES.value[CATEGORIES.value.length - 1] ||
+  { value: 'autres', label: 'Autres', icon: 'fa-cube', color: '#6b7280' }
+)
 const categoryOpen = ref(false)
 const categoryRef = ref(null)
 const categorySearch = ref('')
@@ -108,8 +107,8 @@ function normalizeSearch(s) {
 }
 const filteredCategories = computed(() => {
   const q = normalizeSearch(categorySearch.value.trim())
-  if (!q) return CATEGORIES
-  return CATEGORIES.filter(c => normalizeSearch(c.label).includes(q))
+  if (!q) return CATEGORIES.value
+  return CATEGORIES.value.filter(c => normalizeSearch(c.label).includes(q))
 })
 function toggleCategory() {
   categoryOpen.value = !categoryOpen.value

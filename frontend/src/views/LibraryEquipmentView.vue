@@ -19,6 +19,7 @@ import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
+import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useRouter, useRoute } from 'vue-router'
 
 const { error: notifyError, success: notifySuccess } = useNotification()
@@ -171,19 +172,21 @@ const flatEquipmentItems = computed(() => {
     if (!byCat.has(k)) byCat.set(k, [])
     byCat.get(k).push(t)
   }
-  // Tri des categories : ordre de CATEGORY_LABELS sinon alphabetique
-  const labelOrder = Object.keys(CATEGORY_LABELS)
+  // Tri des categories : ordre `position` du catalogue DB sinon alphabetique.
+  // Les categories presentes en DB sont prioritaires (ordre stable defini par
+  // l'admin), les valeurs legacy ('eclairage', 'electricite') tombent en fin.
+  const labelOrder = dbCategories.value.map(c => c.key)
   const cats = [...byCat.keys()].sort((a, b) => {
     const ia = labelOrder.indexOf(a), ib = labelOrder.indexOf(b)
     if (ia !== -1 && ib !== -1) return ia - ib
     if (ia !== -1) return -1
     if (ib !== -1) return 1
-    return (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'fr')
+    return categoryLabel(a).localeCompare(categoryLabel(b), 'fr')
   })
   const out = []
   for (const cat of cats) {
     const items = byCat.get(cat)
-    out.push({ kind: 'category', cat, label: CATEGORY_LABELS[cat] || cat, count: items.length })
+    out.push({ kind: 'category', cat, label: categoryLabel(cat), count: items.length })
     for (const t of items) out.push({ kind: 'template', t, visual_depth: 1 })
   }
   return out
@@ -244,20 +247,11 @@ const grouped = computed(() => {
   return groups
 })
 
-const CATEGORY_LABELS = {
-  ventilation: 'Ventilation',
-  chauffage: 'Chauffage',
-  climatisation: 'Climatisation',
-  thermique_mixte: 'Chauffage + Climatisation',
-  ecs: 'Eau chaude sanitaire',
-  eclairage: 'Éclairage',
-  electricite: 'Électricité',
-  comptage: 'Comptage énergétique',
-  qai: 'Qualité de l\'air',
-  occultation: 'Occultation',
-  process: 'Process industriel',
-  autres: 'Autres équipements',
-}
+// Catalogue dynamique : alimenté par le composable useSystemCategories
+// (table `system_categories_db`). Plus de liste hardcodée — toute catégorie
+// créée par l'admin apparaît automatiquement dans les groupements et la
+// vue détail. Le tri suit `position` du catalogue DB.
+const { categories: dbCategories, labelOf: categoryLabel } = useSystemCategories()
 
 async function refresh() {
   loading.value = true
@@ -447,7 +441,7 @@ onMounted(async () => {
 
       <div v-else v-for="(items, cat) in grouped" :key="cat" class="mb-8">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-          {{ CATEGORY_LABELS[cat] || cat }} <span class="text-gray-400">· {{ items.length }}</span>
+          {{ categoryLabel(cat) }} <span class="text-gray-400">· {{ items.length }}</span>
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button v-for="t in items" :key="t.id" @click="openTemplate(t)"
@@ -479,7 +473,7 @@ onMounted(async () => {
         <div class="min-w-0 flex-1">
           <h1 class="text-2xl font-semibold text-gray-800">{{ selected.name }}</h1>
           <p class="text-sm text-gray-500 mt-1">
-            <span class="capitalize">{{ CATEGORY_LABELS[selected.category] || selected.category }}</span>
+            <span class="capitalize">{{ categoryLabel(selected.category) }}</span>
             · v{{ selected.current_version }} · slug <code class="bg-gray-100 px-1.5 py-0.5 rounded">{{ selected.slug }}</code>
           </p>
           <div v-if="selected.preferred_protocols" class="mt-3">

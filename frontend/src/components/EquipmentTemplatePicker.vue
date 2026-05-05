@@ -16,20 +16,11 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
-const CATEGORY_LABELS = {
-  ventilation: 'Ventilation',
-  chauffage: 'Chauffage',
-  climatisation: 'Climatisation',
-  thermique_mixte: 'Chauffage + Climatisation',
-  ecs: 'Eau chaude sanitaire',
-  eclairage: 'Éclairage',
-  electricite: 'Électricité',
-  comptage: 'Comptage énergétique',
-  qai: 'Qualité de l\'air',
-  occultation: 'Occultation',
-  process: 'Process industriel',
-  autres: 'Autres équipements',
-}
+// Catalogue dynamique alimenté par useSystemCategories (table éditable
+// system_categories_db). Toute catégorie créée par l'admin apparaît
+// automatiquement dans les filtres et le détail des templates.
+import { useSystemCategories } from '@/composables/useSystemCategories'
+const { labelOf: categoryLabel } = useSystemCategories()
 
 const selectedCategory = ref('all')
 const sortBy = ref('name')
@@ -37,7 +28,7 @@ const sortDir = ref('asc')
 
 const categories = computed(() => {
   const cats = new Set(props.templates.map(t => t.category || 'autres'))
-  return ['all', ...[...cats].sort((a, b) => (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b, 'fr'))]
+  return ['all', ...[...cats].sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), 'fr'))]
 })
 
 const filteredSorted = computed(() => {
@@ -79,7 +70,7 @@ function select(t) { emit('update:modelValue', t.id) }
             : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
         ]"
       >
-        {{ cat === 'all' ? `Tous (${templates.length})` : CATEGORY_LABELS[cat] || cat }}
+        {{ cat === 'all' ? `Tous (${templates.length})` : categoryLabel(cat) }}
       </button>
     </div>
 
@@ -113,7 +104,7 @@ function select(t) { emit('update:modelValue', t.id) }
           >
             <td class="px-2 py-1.5 text-center w-8"><EquipmentIcon :template="t" size="sm" /></td>
             <td class="px-2 py-1.5 text-gray-800 whitespace-nowrap">{{ t.name }}</td>
-            <td class="px-2 py-1.5 text-[11px] text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ CATEGORY_LABELS[t.category] || t.category || '—' }}</td>
+            <td class="px-2 py-1.5 text-[11px] text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ t.category ? categoryLabel(t.category) : '—' }}</td>
             <td class="px-2 py-1.5 text-center">
               <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-medium tabular-nums">{{ t.points_count }}</span>
             </td>
