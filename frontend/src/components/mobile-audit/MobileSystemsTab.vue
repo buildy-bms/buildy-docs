@@ -16,6 +16,12 @@ import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
+import {
+  PRODUCTION_REGULATION_OPTIONS,
+  DISTRIBUTION_REGULATION_OPTIONS,
+  EMISSION_REGULATION_OPTIONS,
+} from '@/composables/thermalRegulationOptions'
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -56,6 +62,21 @@ async function patchThermal(t, patch) {
 // Régulation thermique pour un (zone, catégorie) donné
 function thermalFor(zoneId, category) {
   return thermal.value.find(t => t.zone_id === zoneId && (t.category || 'heating') === category)
+}
+
+// Options de devices (chaud/froid) d'une zone, formatées pour
+// SearchableSelect. Sert aux 3 niveaux Production / Distribution / Émission.
+function deviceOptions(zoneId, category) {
+  const sysIds = systems.value
+    .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
+    .map(s => s.id)
+  return devices.value
+    .filter(d => sysIds.includes(d.system_id))
+    .map(d => ({
+      value: d.id,
+      label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,
+      hint: d.brand && d.model_reference ? `${d.brand} ${d.model_reference}` : (d.brand || d.model_reference || ''),
+    }))
 }
 
 const SYSTEM_LABEL = {
@@ -305,48 +326,90 @@ async function removeDevice(d) {
 
               <template v-if="thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation">
                 <div>
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type de régulation</p>
-                  <select
-                    :value="thermalFor(s.zone_id, s.system_category)?.regulation_type ?? ''"
-                    @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: e.target.value || null })"
-                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
-                  >
-                    <option value="" disabled>— Sélectionner —</option>
-                    <option v-for="o in REGULATION_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
-                  </select>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Granularité</p>
+                  <SearchableSelect
+                    :model-value="thermalFor(s.zone_id, s.system_category)?.regulation_type"
+                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: v || null })"
+                    :options="REGULATION_OPTIONS.filter(x => x.value)"
+                    placeholder="— Sélectionner —" />
                 </div>
+
+                <!-- Production : équipement + (si rempli) Type, Âge, Régulation -->
                 <div>
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type de générateur</p>
-                  <select
-                    :value="thermalFor(s.zone_id, s.system_category)?.generator_type ?? ''"
-                    @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: e.target.value || null })"
-                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
-                  >
-                    <option value="" disabled>— Sélectionner —</option>
-                    <option v-for="o in GENERATOR_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
-                  </select>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Production</p>
+                  <SearchableSelect
+                    :model-value="thermalFor(s.zone_id, s.system_category)?.generator_device_id"
+                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_device_id: v != null ? parseInt(v, 10) : null })"
+                    :options="deviceOptions(s.zone_id, s.system_category)"
+                    placeholder="— aucun équipement"
+                    search-placeholder="Rechercher un équipement…" />
+                  <div v-if="thermalFor(s.zone_id, s.system_category)?.generator_device_id" class="mt-2 space-y-2 pl-3 border-l-2 border-amber-200">
+                    <SearchableSelect
+                      :model-value="thermalFor(s.zone_id, s.system_category)?.generator_type"
+                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: v || null })"
+                      :options="GENERATOR_OPTIONS.filter(x => x.value)"
+                      creatable placeholder="Type production…" />
+                    <div class="flex items-center gap-2">
+                      <label class="text-xs text-gray-500 shrink-0 w-16">Âge (ans)</label>
+                      <input
+                        type="number" inputmode="numeric" pattern="[0-9]*" min="0"
+                        :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
+                        @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
+                        placeholder="ex : 8"
+                        class="flex-1 px-3 py-2 text-base border border-gray-200 rounded-lg bg-white" />
+                    </div>
+                    <SearchableSelect
+                      :model-value="thermalFor(s.zone_id, s.system_category)?.production_regulation"
+                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { production_regulation: v || null })"
+                      :options="PRODUCTION_REGULATION_OPTIONS"
+                      creatable placeholder="Régulation production…" />
+                  </div>
                 </div>
+
+                <!-- Distribution : équipement + (si rempli) Régulation -->
                 <div>
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Âge du générateur (ans)</p>
-                  <input
-                    type="number"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    min="0"
-                    :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
-                    @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                    placeholder="ex : 8"
-                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
-                  />
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Distribution</p>
+                  <SearchableSelect
+                    :model-value="thermalFor(s.zone_id, s.system_category)?.distribution_device_id"
+                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { distribution_device_id: v != null ? parseInt(v, 10) : null })"
+                    :options="deviceOptions(s.zone_id, s.system_category)"
+                    placeholder="— aucune"
+                    search-placeholder="Rechercher un équipement…" />
+                  <div v-if="thermalFor(s.zone_id, s.system_category)?.distribution_device_id" class="mt-2 pl-3 border-l-2 border-amber-200">
+                    <SearchableSelect
+                      :model-value="thermalFor(s.zone_id, s.system_category)?.distribution_regulation"
+                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { distribution_regulation: v || null })"
+                      :options="DISTRIBUTION_REGULATION_OPTIONS"
+                      creatable placeholder="Régulation distribution…" />
+                  </div>
+                </div>
+
+                <!-- Émission : équipement + (si rempli) Régulation -->
+                <div>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Émission</p>
+                  <SearchableSelect
+                    :model-value="thermalFor(s.zone_id, s.system_category)?.emission_device_id"
+                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { emission_device_id: v != null ? parseInt(v, 10) : null })"
+                    :options="deviceOptions(s.zone_id, s.system_category)"
+                    placeholder="— aucun"
+                    search-placeholder="Rechercher un équipement…" />
+                  <div v-if="thermalFor(s.zone_id, s.system_category)?.emission_device_id" class="mt-2 pl-3 border-l-2 border-amber-200">
+                    <SearchableSelect
+                      :model-value="thermalFor(s.zone_id, s.system_category)?.emission_regulation"
+                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { emission_regulation: v || null })"
+                      :options="EMISSION_REGULATION_OPTIONS"
+                      creatable placeholder="Régulation émission…" />
+                  </div>
                 </div>
               </template>
 
-              <!-- Exempté bois avec explication -->
-              <label class="flex items-start justify-between gap-3 px-3 py-3 bg-white rounded-lg cursor-pointer">
+              <!-- Exempté bois — uniquement pour le chauffage (R175-6 II ne traite que les appareils de chauffage au bois) -->
+              <label v-if="s.system_category === 'heating'"
+                     class="flex items-start justify-between gap-3 px-3 py-3 bg-white rounded-lg cursor-pointer">
                 <div class="flex-1 min-w-0">
                   <p class="text-base text-gray-900 font-medium">Exempté — appareil bois</p>
                   <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Cocher si le générateur est un appareil <strong>indépendant</strong> de chauffage au bois (poêle, insert). Exempté de R175-6 (II du décret).
+                    Cocher si la production est un appareil <strong>indépendant</strong> de chauffage au bois (poêle, insert). Exempté de R175-6 (II du décret).
                   </p>
                 </div>
                 <input

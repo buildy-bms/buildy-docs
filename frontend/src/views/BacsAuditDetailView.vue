@@ -61,11 +61,39 @@ import { useViewport } from '@/composables/useViewport'
 import MobileAuditNav from '@/components/MobileAuditNav.vue'
 import OpenOnPhoneButton from '@/components/OpenOnPhoneButton.vue'
 import ShareAfModal from '@/components/ShareAfModal.vue'
-import { UserPlusIcon } from '@heroicons/vue/24/outline'
+import { UserPlusIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 
 const auditStore = useAuditStore()
 const { isNarrow } = useViewport()
 const showShare = ref(false)
+const showSettingsMenu = ref(false)
+const settingsMenuRef = ref(null)
+
+// Click-away pour fermer le menu engrenage
+function onDocClickSettings(e) {
+  if (!showSettingsMenu.value) return
+  if (settingsMenuRef.value && !settingsMenuRef.value.contains(e.target)) {
+    showSettingsMenu.value = false
+  }
+}
+
+async function deleteAudit() {
+  const ok = await confirm({
+    title: `Supprimer « ${document.value?.project_name || 'cet audit'} » ?`,
+    message: 'Action irréversible. Toutes les données saisies (zones, compteurs, systèmes, photos) seront perdues.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    const { deleteAf } = await import('@/api')
+    await deleteAf(docId)
+    success('Audit supprimé')
+    router.push('/')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Suppression impossible')
+  }
+}
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -984,6 +1012,9 @@ watch(loading, async (isLoading) => {
 onBeforeUnmount(() => {
   if (_spyObserver) { _spyObserver.disconnect(); _spyObserver = null }
 })
+
+onMounted(() => window.document.addEventListener('mousedown', onDocClickSettings))
+onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClickSettings))
 </script>
 
 <template>
@@ -1087,6 +1118,26 @@ onBeforeUnmount(() => {
         <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
         </button>
+        <!-- Menu engrenage : actions audit (kind switch déjà dans le titre, supprimer ici) -->
+        <div ref="settingsMenuRef" class="relative">
+          <button @click="showSettingsMenu = !showSettingsMenu"
+            title="Paramètres de l'audit"
+            :class="['inline-flex items-center justify-center w-8 h-8 rounded-lg border whitespace-nowrap',
+                     showSettingsMenu ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']">
+            <Cog6ToothIcon class="w-4 h-4" />
+          </button>
+          <div v-if="showSettingsMenu"
+               class="absolute right-0 top-full mt-1 z-30 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+               @click.stop>
+            <button
+              @click="showSettingsMenu = false; deleteAudit()"
+              class="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
+            >
+              <TrashIcon class="w-4 h-4 shrink-0" />
+              Supprimer cet audit
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
