@@ -454,7 +454,7 @@ onMounted(refresh)
               <td class="px-4 py-2.5 text-gray-700">
                 <div class="flex items-center gap-2">
                   <span
-                    v-if="(row.af.kind || 'af') === 'bacs_audit'"
+                    v-if="row.af.kind === 'bacs_audit'"
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
                     title="Audit BACS — décret R175"
                   >BACS</span>
@@ -467,6 +467,11 @@ onMounted(refresh)
                     v-else-if="row.af.kind === 'brochure'"
                     class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
                   >Brochure</span>
+                  <span
+                    v-else
+                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-indigo-100 text-indigo-700"
+                    title="Analyse fonctionnelle — livrable de chantier"
+                  >AF</span>
                   {{ row.af.project_name }}
                 </div>
                 <p v-if="row.af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
@@ -493,19 +498,22 @@ onMounted(refresh)
                 <p v-if="row.af.updated_by_name" class="text-[10px] text-gray-400 truncate">par {{ row.af.updated_by_name }}</p>
               </td>
               <td class="px-4 py-2.5 text-right">
-                <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)" class="text-gray-400 hover:text-indigo-600 p-1" title="Versions">
+                <div class="inline-flex items-center gap-1">
+                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)"
+                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Versions">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
                   <button v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'"
                           @click.stop="router.push(`${row.af.kind === 'site_audit' ? '/site-audit' : '/bacs-audit'}/${row.af.id}/audit-trail`)"
-                          class="text-gray-400 hover:text-indigo-600 p-1" title="Historique">
+                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Historique">
                     <ClockIcon class="w-4 h-4" />
                   </button>
-                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)" class="text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
+                  <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)"
+                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
-                  <button @click.stop="confirmDelete(row.af)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">
+                  <button @click.stop="confirmDelete(row.af)"
+                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-red-600 p-1" title="Supprimer">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>
