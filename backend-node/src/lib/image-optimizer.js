@@ -5,6 +5,14 @@ const path = require('path');
 const sharp = require('sharp');
 const log = require('./logger').system;
 
+// exifr est require lazy (seulement quand on parse de l'EXIF complet) pour
+// ne pas pénaliser le boot de l'app.
+let _exifr = null;
+function getExifr() {
+  if (!_exifr) _exifr = require('exifr');
+  return _exifr;
+}
+
 const PHOTO_MAX_DIM = 1600;
 const PHOTO_JPEG_QUALITY = 82;
 
@@ -132,6 +140,49 @@ function readExifTakenAt(buffer) {
   return matches[0].iso;
 }
 
+// Lit les métadonnées EXIF utiles d'un buffer image (JPEG, HEIC, TIFF…).
+// Renvoie { taken_at, gps_latitude, gps_longitude, camera_make, camera_model }
+// avec les champs manquants à null. JAMAIS de throw : si le parser échoue
+// ou si le fichier n'a pas d'EXIF, on retourne tout à null. Fallback sur
+// readExifTakenAt() pour la date si exifr ne la trouve pas (regex sur les
+// 256k premiers bytes — moins précis mais plus tolérant aux EXIF tronqués).
+async function readExifMetadata(buffer) {
+  const result = {
+    taken_at: null,
+    gps_latitude: null,
+    gps_longitude: null,
+    camera_make: null,
+    camera_model: null,
+  };
+  if (!buffer || buffer.length < 32) return result;
+  try {
+    const exifr = getExifr();
+    const data = await exifr.parse(buffer, {
+      pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate',
+             'GPSLatitude', 'GPSLongitude', 'latitude', 'longitude',
+             'Make', 'Model'],
+      reviveValues: true,
+    });
+    if (data) {
+      // exifr expose latitude/longitude déjà en degrés décimaux signés.
+      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        result.gps_latitude = data.latitude;
+        result.gps_longitude = data.longitude;
+      }
+      const dt = data.DateTimeOriginal || data.CreateDate || data.ModifyDate;
+      if (dt instanceof Date && !isNaN(dt.getTime())) {
+        result.taken_at = dt.toISOString();
+      }
+      if (typeof data.Make === 'string')  result.camera_make = data.Make.trim() || null;
+      if (typeof data.Model === 'string') result.camera_model = data.Model.trim() || null;
+    }
+  } catch (err) {
+    log.debug?.(`exifr failed: ${err.message}`);
+  }
+  if (!result.taken_at) result.taken_at = readExifTakenAt(buffer);
+  return result;
+}
+
 module.exports = {
   PHOTO_MAX_DIM,
   PHOTO_JPEG_QUALITY,
@@ -140,4 +191,5 @@ module.exports = {
   optimizeFileToDataUrl,
   bufferToDataUrl,
   readExifTakenAt,
+  readExifMetadata,
 };

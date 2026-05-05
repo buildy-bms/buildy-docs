@@ -8,7 +8,7 @@ const { z } = require('zod');
 const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
-const { createOptimizerStream, optimizeBuffer, readExifTakenAt } = require('../lib/image-optimizer');
+const { createOptimizerStream, optimizeBuffer, readExifTakenAt, readExifMetadata } = require('../lib/image-optimizer');
 
 const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
   'datasheet','manuel_utilisateur','rapport_essais','photo','autre'];
@@ -106,10 +106,18 @@ async function routes(fastify) {
     const fullPath = path.join(dir, filename);
     let storedMime = isImage ? 'image/jpeg' : (file.mimetype || 'application/octet-stream');
 
+    // Pour les images on bufferise pour pouvoir parser l'EXIF (GPS, date,
+    // appareil) AVANT optimisation — sharp strip les EXIF par défaut, donc
+    // l'optimisé ne contient plus rien d'exploitable. PDF/DWG/etc. restent
+    // streamés (pas d'EXIF à lire).
+    let exifMeta = null;
     try {
       if (isImage) {
-        await pipeline(file.file, createOptimizerStream(), fs.createWriteStream(fullPath));
+        const original = await file.toBuffer();
         if (file.file.truncated) throw new Error('FILE_TOO_LARGE');
+        exifMeta = await readExifMetadata(original);
+        const optimized = await optimizeBuffer(original);
+        fs.writeFileSync(fullPath, optimized);
       } else {
         await new Promise((resolve, reject) => {
           const ws = fs.createWriteStream(fullPath);
@@ -149,8 +157,9 @@ async function routes(fastify) {
       INSERT INTO site_documents
         (site_id, title, category, filename, original_name, size_bytes, mime_type,
          bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
-         bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by,
+         taken_at, gps_latitude, gps_longitude, camera_make, camera_model)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       site.site_id, title, category, filename, file.filename, sizeBytes, storedMime,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
@@ -159,6 +168,11 @@ async function routes(fastify) {
       bacs_audit_zone_id ? parseInt(bacs_audit_zone_id, 10) : null,
       bacs_audit_meter_id ? parseInt(bacs_audit_meter_id, 10) : null,
       userId || null,
+      exifMeta?.taken_at || null,
+      exifMeta?.gps_latitude ?? null,
+      exifMeta?.gps_longitude ?? null,
+      exifMeta?.camera_make || null,
+      exifMeta?.camera_model || null,
     );
     db.auditLog.add({ userId, action: 'site_document.upload',
       payload: { site_uuid: site.site_uuid, title, category, filename: file.filename } });
@@ -190,7 +204,7 @@ async function routes(fastify) {
       try {
         const original = await part.toBuffer();
         if (part.file.truncated) throw new Error('FILE_TOO_LARGE');
-        const takenAt = readExifTakenAt(original);
+        const exifMeta = await readExifMetadata(original);
         const optimized = await optimizeBuffer(original);
         const filename = crypto.randomUUID() + '.jpg';
         const fullPath = path.join(dir, filename);
@@ -199,15 +213,20 @@ async function routes(fastify) {
         const r = db.db.prepare(`
           INSERT INTO site_documents
             (site_id, title, category, filename, original_name, size_bytes,
-             mime_type, taken_at, uploaded_by)
-          VALUES (?, ?, 'photo', ?, ?, ?, 'image/jpeg', ?, ?)
+             mime_type, taken_at, gps_latitude, gps_longitude,
+             camera_make, camera_model, uploaded_by)
+          VALUES (?, ?, 'photo', ?, ?, ?, 'image/jpeg', ?, ?, ?, ?, ?, ?)
         `).run(
           site.site_id,
           part.filename || 'photo',
           filename,
           part.filename || filename,
           sizeBytes,
-          takenAt,
+          exifMeta.taken_at || null,
+          exifMeta.gps_latitude ?? null,
+          exifMeta.gps_longitude ?? null,
+          exifMeta.camera_make || null,
+          exifMeta.camera_model || null,
           userId || null,
         );
         inserted.push(db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(r.lastInsertRowid));

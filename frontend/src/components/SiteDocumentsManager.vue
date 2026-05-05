@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
   DocumentIcon, TrashIcon, ArrowDownTrayIcon, PaperClipIcon,
-  PlusIcon, EyeIcon, XMarkIcon,
+  PlusIcon, EyeIcon, XMarkIcon, MapPinIcon, ClockIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments, uploadSiteDocument, updateSiteDocument, deleteSiteDocument,
@@ -135,6 +135,31 @@ function fmtSize(b) {
   if (b < 1024) return b + ' B'
   if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' Ko'
   return (b / 1024 / 1024).toFixed(1) + ' Mo'
+}
+
+// EXIF helpers — `taken_at` est une string ISO, `gps_latitude/longitude`
+// sont des floats en degrés décimaux (WGS84). Le pin GPS ouvre Google Maps
+// dans un nouvel onglet.
+function fmtTakenAt(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+function gpsMapUrl(d) {
+  if (d.gps_latitude == null || d.gps_longitude == null) return null
+  return `https://www.google.com/maps/search/?api=1&query=${d.gps_latitude},${d.gps_longitude}`
+}
+function exifTooltip(d) {
+  const parts = []
+  if (d.taken_at) parts.push('Pris le ' + fmtTakenAt(d.taken_at))
+  if (d.camera_make || d.camera_model) {
+    parts.push([d.camera_make, d.camera_model].filter(Boolean).join(' '))
+  }
+  if (d.gps_latitude != null && d.gps_longitude != null) {
+    parts.push(`GPS ${d.gps_latitude.toFixed(5)}, ${d.gps_longitude.toFixed(5)}`)
+  }
+  return parts.join(' · ')
 }
 
 function categoryLabel(v) {
@@ -337,7 +362,21 @@ onBeforeUnmount(() => {
             <input type="text" :value="d.title"
                    @blur="e => e.target.value !== d.title && patchDoc(d, { title: e.target.value })"
                    class="w-full px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded text-sm" />
-            <p class="text-[11px] text-gray-400 px-2 truncate">{{ d.original_name }}</p>
+            <div class="px-2 mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-gray-400">
+              <span class="truncate">{{ d.original_name }}</span>
+              <span v-if="d.taken_at" :title="exifTooltip(d)"
+                    class="inline-flex items-center gap-0.5 text-gray-500 shrink-0">
+                <ClockIcon class="w-3 h-3" />
+                {{ fmtTakenAt(d.taken_at) }}
+              </span>
+              <a v-if="gpsMapUrl(d)" :href="gpsMapUrl(d)" target="_blank" rel="noopener"
+                 :title="`Voir sur Google Maps — ${exifTooltip(d)}`"
+                 class="inline-flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 shrink-0"
+                 @click.stop>
+                <MapPinIcon class="w-3 h-3" />
+                GPS
+              </a>
+            </div>
           </td>
           <td class="px-3 py-2 align-middle">
             <select :value="d.category"
@@ -387,6 +426,21 @@ onBeforeUnmount(() => {
               {{ attachmentLabel(previewDoc).kind }} : {{ attachmentLabel(previewDoc).label }}
               · {{ fmtSize(previewDoc.size_bytes) }}
             </p>
+            <div v-if="previewDoc.taken_at || gpsMapUrl(previewDoc) || previewDoc.camera_make || previewDoc.camera_model"
+                 class="mt-1 flex items-center gap-3 flex-wrap text-[11px] opacity-80">
+              <span v-if="previewDoc.taken_at" class="inline-flex items-center gap-1">
+                <ClockIcon class="w-3 h-3" />
+                {{ fmtTakenAt(previewDoc.taken_at) }}
+              </span>
+              <a v-if="gpsMapUrl(previewDoc)" :href="gpsMapUrl(previewDoc)" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1 text-indigo-200 hover:text-white">
+                <MapPinIcon class="w-3 h-3" />
+                {{ previewDoc.gps_latitude.toFixed(5) }}, {{ previewDoc.gps_longitude.toFixed(5) }}
+              </a>
+              <span v-if="previewDoc.camera_make || previewDoc.camera_model" class="text-white/60">
+                {{ [previewDoc.camera_make, previewDoc.camera_model].filter(Boolean).join(' ') }}
+              </span>
+            </div>
           </div>
           <a :href="getSiteDocumentDownloadUrl(previewDoc.id)" target="_blank"
              class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10">
