@@ -419,6 +419,11 @@ async function routes(fastify) {
       // facultatifs — certaines configs (DRV) sautent la distribution.
       distribution_device_id: z.number().int().nullable().optional(),
       emission_device_id: z.number().int().nullable().optional(),
+      // Migration 88 : régulation par niveau (sonde extérieure, V3V,
+      // robinets thermo…). Texte libre avec suggestions côté UI.
+      production_regulation: z.string().nullable().optional(),
+      distribution_regulation: z.string().nullable().optional(),
+      emission_regulation: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       // Migration 84 : notes riches via la modale partagée (system / device /
       // meter / thermal — même UX). `notes` legacy conservé pour les saisies

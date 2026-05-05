@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 87;
+const TARGET_VERSION = 88;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3284,6 +3284,21 @@ function runMigrations() {
     }
     log.info('Migration 87 : bacs_audit_thermal_regulation.{distribution_device_id,emission_device_id} ajoutées');
     db.pragma('user_version = 87');
+  }
+
+  if (current < 88) {
+    // Lot — Régulation par niveau (R175-6) : pour chaque équipement
+    // (production / distribution / émission) l'auditeur peut décrire la
+    // boucle de régulation associée (sonde extérieure, V3V, robinets
+    // thermo…). Champs TEXT libres avec liste de suggestions côté UI
+    // (composant SearchableSelect creatable). Tous facultatifs.
+    const cols = db.prepare("PRAGMA table_info(bacs_audit_thermal_regulation)").all();
+    const has = (n) => cols.some(c => c.name === n);
+    if (!has('production_regulation'))   db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN production_regulation TEXT');
+    if (!has('distribution_regulation')) db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN distribution_regulation TEXT');
+    if (!has('emission_regulation'))     db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN emission_regulation TEXT');
+    log.info('Migration 88 : bacs_audit_thermal_regulation.{production,distribution,emission}_regulation ajoutées');
+    db.pragma('user_version = 88');
   }
 
   if (current > TARGET_VERSION) {

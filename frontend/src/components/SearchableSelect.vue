@@ -37,6 +37,11 @@ const props = defineProps({
   // 'md' (defaut) = px-3 py-2 ~38px ; 'sm' = px-2 py-1 ~28px pour les
   // formulaires denses (SystemDevicesTable, inline editing).
   size: { type: String, default: 'md' },
+  // Si true : permet d'ajouter une valeur libre non listée. Quand la
+  // recherche ne match rien (ou même si match), un item "+ Ajouter «X»"
+  // apparaît et émet update:modelValue avec la chaîne saisie. La valeur
+  // courante non listée s'affiche aussi telle quelle dans le trigger.
+  creatable: { type: Boolean, default: false },
 })
 
 const triggerCls = computed(() => [
@@ -46,8 +51,9 @@ const triggerCls = computed(() => [
 ])
 
 // Recherche auto-desactivee si la liste est courte (UX : eviter le focus
-// trap sur 4 options visibles d'un coup d'oeil).
-const showSearch = computed(() => props.options.length >= 6)
+// trap sur 4 options visibles d'un coup d'oeil). En mode creatable la
+// recherche est toujours visible — c'est aussi le champ de saisie libre.
+const showSearch = computed(() => props.creatable || props.options.length >= 6)
 // Toute option avec une icone -> on reserve la colonne icone pour aligner
 // les labels meme sur les options sans icone (sinon ca saute visuellement).
 const hasAnyIcon = computed(() => props.options.some(o => o.icon))
@@ -80,6 +86,21 @@ function updatePopoverPosition() {
 const selectedOption = computed(() =>
   props.options.find(o => o.value === props.modelValue) || null
 )
+// En mode creatable, une valeur courante non listée doit quand même
+// s'afficher dans le trigger (sinon elle paraît "perdue").
+const customLabel = computed(() => {
+  if (!props.creatable || selectedOption.value || props.modelValue == null
+      || props.modelValue === '') return null
+  return String(props.modelValue)
+})
+const canCreate = computed(() => {
+  if (!props.creatable) return false
+  const q = search.value.trim()
+  if (!q) return false
+  // Évite le doublon : si une option existante a exactement ce label.
+  return !props.options.some(o => normalize(o.label) === normalize(q)
+                                || normalize(o.value) === normalize(q))
+})
 
 function normalize(s) {
   return (s || '')
@@ -126,6 +147,16 @@ function pick(option) {
   window.removeEventListener('resize', updatePopoverPosition)
 }
 
+function createCustom() {
+  const q = search.value.trim()
+  if (!q) return
+  emit('update:modelValue', q)
+  open.value = false
+  search.value = ''
+  window.removeEventListener('scroll', updatePopoverPosition, true)
+  window.removeEventListener('resize', updatePopoverPosition)
+}
+
 function onKeydown(e) {
   if (!open.value) return
   if (e.key === 'ArrowDown') {
@@ -140,6 +171,7 @@ function onKeydown(e) {
     e.preventDefault()
     const opt = filteredOptions.value[activeIndex.value]
     if (opt) pick(opt)
+    else if (canCreate.value) createCustom()
   } else if (e.key === 'Escape') {
     e.preventDefault()
     open.value = false
@@ -181,10 +213,11 @@ function clear() {
         :style="{ color: selectedOption.color || '#6b7280' }"
         class="w-4 h-4 shrink-0"
       />
-      <span class="flex-1 text-left truncate" :class="selectedOption ? 'text-gray-900' : 'text-gray-400 italic'">
-        {{ selectedOption?.label || placeholder }}
+      <span class="flex-1 text-left truncate"
+            :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
+        {{ selectedOption?.label || customLabel || placeholder }}
       </span>
-      <button v-if="clearable && selectedOption && !disabled" type="button"
+      <button v-if="clearable && (selectedOption || customLabel) && !disabled" type="button"
               @click.stop="clear"
               class="text-gray-400 hover:text-gray-600 -my-1 p-0.5 rounded"
               title="Effacer la sélection">
@@ -226,9 +259,13 @@ function clear() {
             <span v-if="o.hint" class="text-[11px] text-gray-400 truncate">{{ o.hint }}</span>
             <CheckIcon v-if="o.value === modelValue" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
-          <div v-if="!filteredOptions.length" class="px-3 py-3 text-xs text-gray-400 italic text-center">
+          <div v-if="!filteredOptions.length && !canCreate" class="px-3 py-3 text-xs text-gray-400 italic text-center">
             Aucun résultat
           </div>
+          <button v-if="canCreate" type="button" @click="createCustom"
+                  class="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left transition border-t border-gray-100 text-indigo-700 hover:bg-indigo-50">
+            <span class="flex-1 truncate">+ Ajouter «&nbsp;<strong>{{ search.trim() }}</strong>&nbsp;»</span>
+          </button>
         </div>
       </div>
     </Teleport>
