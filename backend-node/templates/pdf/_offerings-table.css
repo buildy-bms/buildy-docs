@@ -156,3 +156,63 @@
 .comparison-table tbody tr:not(.category-row):nth-child(odd) td {
   background: #fafbfc;
 }
+
+/* ═══════════ Wrapper page « Tableau des offres » ═══════════
+   Partage entre offering-catalog.hbs et brochure.hbs via le partial
+   _offerings-page.hbs. Garantit des marges et un header identiques
+   dans les 2 PDFs. */
+.page-offerings { page-break-inside: auto; page-break-after: always; }
+.page-offerings .category-header {
+  margin-bottom: 4mm; padding-bottom: 3mm;
+  border-bottom: 0.4pt solid #e5e7eb;
+}
+.page-offerings .category-eyebrow {
+  font-family: 'Inter', sans-serif;
+  font-size: 7pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: #6b7280; margin: 0 0 1mm;
+}
+.page-offerings .category-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16pt; font-weight: 700;
+  color: #1b2842; margin: 0;
+  letter-spacing: -0.01em;
+}
+.page-offerings .category-count {
+  font-family: 'Inter', sans-serif;
+  font-size: 8pt; color: #6b7280;
+  margin-top: 1mm;
+}
+
+/* Override compact du tableau dans page-offerings (densite plus elevee
+   pour tenir sur une page A4 sans casser la lisibilite). */
+.page-offerings .col-level { width: 17mm; }
+.page-offerings .th-feature { padding: 3mm 2mm 2mm; font-size: 5.8pt; }
+.page-offerings .th-level { padding: 1mm 1.5mm 1.5mm; }
+.page-offerings .th-level-name { font-size: 7.5pt; }
+.page-offerings .th-level-tagline { font-size: 5pt; }
+.page-offerings .th-level-badge { font-size: 4.6pt; padding: 0.5mm 2mm; margin-bottom: 1.5mm; }
+.page-offerings .th-level-badge-ph { height: 4.5mm; }
+.page-offerings .category-row-d0 td { padding: 1mm 2mm 0.7mm; font-size: 6pt; }
+.page-offerings .category-row-d1 td { padding: 0.8mm 2mm 0.5mm 5mm; font-size: 5.4pt; }
+.page-offerings .category-row-d2 td { padding: 0.6mm 2mm 0.4mm 8mm; font-size: 5.1pt; }
+.page-offerings .td-feature { padding: 0.8mm 2.5mm; font-size: 6.4pt; }
+.page-offerings .td-feature-d1 { padding-left: 7mm; }
+.page-offerings .td-feature-d2 { padding-left: 10mm; }
+.page-offerings .td-level { padding: 0.5mm 0; }
+.page-offerings .avail { width: 4mm; height: 4mm; font-size: 6.5pt; }
+.page-offerings .avail-text { font-size: 5pt; padding: 0.3mm 1mm; }
+.page-offerings .opt-badge { font-size: 4.8pt; padding: 0.2mm 1mm; margin-left: 1mm; }
+.page-offerings .comparison-table { margin: 3mm 0 0; font-size: 6pt; }
+
+.page-offerings-legend {
+  display: flex; gap: 4mm; flex-wrap: wrap;
+  margin: 4mm 0 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 6.5pt; color: #6b7280;
+}
+.page-offerings-legend .legend-item {
+  display: inline-flex; align-items: center; gap: 1.5mm;
+}
+.page-offerings-legend .avail { width: 3mm; height: 3mm; font-size: 5pt; }
+.page-offerings-legend .avail-text { font-size: 4.5pt; padding: 0.2mm 1mm; }

@@ -80,16 +80,10 @@
 {{!-- ═══════════════════ Sections numerotees (apres cover + TOC) ═══════════════════ --}}
 <div class="sections">
 
-{{!-- Tableau des offres : matrice E/S/P (synthese visuelle avant le detail) --}}
-<section class="page page-offerings" data-toc-anchor="offerings-table">
-  <header class="category-header">
-    <p class="category-eyebrow">Section 1 / {{add totalCategories 1}}</p>
-    <h1 class="category-title">Tableau des offres Buildy</h1>
-    <p class="category-count">{{totalFeatures}} fonctionnalités · 3 niveaux d'offre</p>
-  </header>
-
-  {{#with offeringsTable}}{{> _offerings-table}}{{/with}}
-</section>
+{{!-- Tableau des offres : matrice E/S/P (synthese visuelle avant le detail).
+     Bloc complet partage avec offering-catalog via _offerings-page.hbs pour
+     garantir un rendu strictement identique entre les 2 PDFs. --}}
+{{> _offerings-page}}
 
 {{!-- ═══════════════════ DETAIL PAR CATEGORIE ═══════════════════ --}}
 {{#each categories}}

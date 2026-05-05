@@ -17,19 +17,14 @@
   <p class="cover-meta">Édition du {{exportDate}}</p>
 </section>
 
-{{!-- ═══════════ Tableau comparatif ═══════════ --}}
-<section class="comparison">
-  <header class="comparison-head">
-    <h1 class="page-title">Tableau des fonctionnalités Buildy</h1>
-    <div class="comparison-legend">
-      <span class="legend-item"><span class="avail avail-included">✓</span> Inclus</span>
-      <span class="legend-item"><span class="avail avail-unavailable">—</span> Non dispo</span>
-      <span class="legend-item"><span class="avail-text">€&nbsp;Option</span> Option payante</span>
-    </div>
-  </header>
+{{!-- ═══════════ Page Tableau des offres (partial partage avec brochure) ═══════════
+     Le wrapper, le header (eyebrow + titre + count) et la legende sont mutualises
+     via _offerings-page.hbs pour garantir un rendu strictement identique entre
+     ce catalogue d'offres et la page « Tableau des offres » de la brochure. --}}
+{{> _offerings-page}}
 
-  {{> _offerings-table}}
-
+{{!-- ═══════════ CTA ═══════════ --}}
+<section class="cta-section">
   <div class="cta-block">
     <p class="cta-line">{{{ctaTitle}}}</p>
     <p class="cta-sub">{{{ctaSub}}}</p>

@@ -134,11 +134,16 @@ function buildOfferingsData() {
   });
   const year = new Date().getFullYear();
 
+  const colspan = levels.length + 1;
   return {
+    // Top-level (legacy : utilise par offering-catalog.hbs en direct)
     rows,
     levels,
-    colspan: levels.length + 1, // pour les rows de categorie (td colspan)
+    colspan,
     totalFeatures: features.length,
+    // Sous-objet `offeringsTable` partage avec brochure : permet au partial
+    // _offerings-page.hbs d'utiliser la meme structure dans les 2 templates.
+    offeringsTable: { rows, levels, colspan },
     coverPromise,
     coverSubtitle,
     ctaTitle,
@@ -405,7 +410,18 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         coverFullBleed: true,
-        pdfOptions: { format: 'A4', printBackground: true },
+        // Header/footer Puppeteer alignes sur la brochure pour que la page
+        // tableau soit strictement identique. skipFirstPageHeaderFooter pour
+        // que la cover reste full-bleed sans surimpression.
+        skipFirstPageHeaderFooter: true,
+        pdfOptions: buildHeaderFooter({
+          clientName: 'Buildy',
+          projectName: 'Référentiel des fonctionnalités',
+          docType: 'Catalogue',
+          version: String(data.year),
+          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+          footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+        }),
       });
     } catch (err) {
       log.error(`Offerings PDF render failed: ${err.message}`);

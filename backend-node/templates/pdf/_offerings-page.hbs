@@ -1,0 +1,23 @@
+{{!-- Bloc complet « page Tableau des offres Buildy » — partial partage entre
+     offering-catalog.hbs et brochure.hbs pour garantir un rendu strictement
+     identique (marges, header, tableau, sans aucune divergence visuelle).
+
+     Attendu dans le contexte parent :
+       offeringsTable : { levels, rows, colspan }
+       totalFeatures  : nombre total de fonctionnalites
+--}}
+<section class="page page-offerings" data-toc-anchor="offerings-table">
+  <div class="category-header">
+    <p class="category-eyebrow">Référentiel des fonctionnalités</p>
+    <h1 class="category-title">Tableau des offres Buildy</h1>
+    <p class="category-count">{{totalFeatures}} fonctionnalités · 3 niveaux d'offre</p>
+  </div>
+
+  {{#with offeringsTable}}{{> _offerings-table}}{{/with}}
+
+  <div class="page-offerings-legend">
+    <span class="legend-item"><span class="avail avail-included">✓</span> Inclus</span>
+    <span class="legend-item"><span class="avail avail-unavailable">—</span> Non disponible</span>
+    <span class="legend-item"><span class="avail-text">€&nbsp;Option</span> Option payante</span>
+  </div>
+</section>
