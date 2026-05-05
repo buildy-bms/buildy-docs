@@ -29,8 +29,8 @@ const INDOOR_CATEGORIES = [
 ];
 
 const INDOOR_NATURES = [
-  'shared-office', 'private-office', 'open-space', 'commercial-space',
-  'meeting-room', 'workshop', 'switchboard', 'technical-area',
+  'office', 'shared-office', 'private-office', 'open-space', 'commercial-space',
+  'meeting-room', 'workshop', 'switchboard', 'technical-area', 'server-room',
   'classroom', 'leasure-space', 'foyer', 'corridor',
   'meters', 'shared-space', 'logistic-cell', 'stock',
 ];

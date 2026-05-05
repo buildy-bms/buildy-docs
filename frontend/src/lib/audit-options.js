@@ -29,6 +29,32 @@ export const ROLE_OPTIONS = [
   { value: 'autre',        label: 'Autre',        icon: 'fa-circle-question',   color: '#6b7280' },
 ]
 
+// Natures de zones — couvre l'enum bacs_requirements_by_zone_nature côté
+// backend (cf. backend-node/src/seeds/bacs-requirements.js). Ajouter une
+// entrée ici sans l'ajouter dans bacs-requirements.js : la nature ne
+// génère aucune ligne bacs_audit_systems (cascade vide).
+export const ZONE_NATURES = [
+  { value: 'office',           label: 'Bureaux',              icon: 'fa-briefcase',         color: '#1e40af' },
+  { value: 'shared-office',    label: 'Bureau partagé',       icon: 'fa-people-group',      color: '#3b82f6' },
+  { value: 'private-office',   label: 'Bureau privé',         icon: 'fa-user-tie',          color: '#1d4ed8' },
+  { value: 'open-space',       label: 'Open-space',           icon: 'fa-table-cells-large', color: '#0ea5e9' },
+  { value: 'meeting-room',     label: 'Salle de réunion',     icon: 'fa-handshake',         color: '#0d9488' },
+  { value: 'commercial-space', label: 'Espace commercial',    icon: 'fa-shop',              color: '#9333ea' },
+  { value: 'classroom',        label: 'Salle de classe',      icon: 'fa-chalkboard-user',   color: '#a855f7' },
+  { value: 'workshop',         label: 'Atelier',              icon: 'fa-screwdriver-wrench', color: '#92400e' },
+  { value: 'leasure-space',    label: 'Espace loisirs',       icon: 'fa-couch',             color: '#f59e0b' },
+  { value: 'foyer',            label: 'Foyer',                icon: 'fa-mug-hot',           color: '#d97706' },
+  { value: 'shared-space',     label: 'Espace partagé',       icon: 'fa-users',             color: '#0891b2' },
+  { value: 'corridor',         label: 'Couloir',              icon: 'fa-arrows-left-right', color: '#64748b' },
+  { value: 'logistic-cell',    label: 'Cellule logistique',   icon: 'fa-boxes-stacked',     color: '#475569' },
+  { value: 'stock',            label: 'Stock',                icon: 'fa-warehouse',         color: '#374151' },
+  { value: 'switchboard',      label: 'Tableau électrique',   icon: 'fa-bolt-lightning',    color: '#eab308' },
+  { value: 'technical-area',   label: 'Local technique',      icon: 'fa-gears',             color: '#6b7280' },
+  { value: 'server-room',      label: 'Local informatique',   icon: 'fa-server',            color: '#0f766e' },
+  { value: 'meters',           label: 'Local compteurs',      icon: 'fa-gauge',             color: '#059669' },
+  { value: 'outdoor',          label: 'Extérieur',            icon: 'fa-tree-city',         color: '#16a34a' },
+]
+
 export const COMM_OPTIONS = [
   { value: 'modbus_tcp',      label: 'Modbus TCP',      icon: 'fa-network-wired',     color: '#1e40af' },
   { value: 'modbus_rtu',      label: 'Modbus RTU',      icon: 'fa-network-wired',     color: '#1d4ed8' },

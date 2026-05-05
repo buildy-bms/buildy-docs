@@ -108,7 +108,7 @@ const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES } from '@/lib/audit-options'
 
 async function submitAddDevice(payload) {
   if (!addDeviceModalSystem.value) return
@@ -126,25 +126,6 @@ const hiddenNotConcernedCount = computed(() =>
   systems.value.filter(s => s.not_concerned).length
 )
 
-const ZONE_NATURES = [
-  { value: 'shared-office', label: 'Bureau partagé' },
-  { value: 'private-office', label: 'Bureau privé' },
-  { value: 'open-space', label: 'Open-space' },
-  { value: 'commercial-space', label: 'Espace commercial' },
-  { value: 'meeting-room', label: 'Salle de réunion' },
-  { value: 'workshop', label: 'Atelier' },
-  { value: 'switchboard', label: 'Tableau électrique' },
-  { value: 'technical-area', label: 'Local technique' },
-  { value: 'classroom', label: 'Salle de classe' },
-  { value: 'leasure-space', label: 'Espace loisirs' },
-  { value: 'foyer', label: 'Foyer' },
-  { value: 'corridor', label: 'Couloir' },
-  { value: 'outdoor', label: 'Extérieur' },
-  { value: 'meters', label: 'Local compteurs' },
-  { value: 'shared-space', label: 'Espace partagé' },
-  { value: 'logistic-cell', label: 'Cellule logistique' },
-  { value: 'stock', label: 'Stock' },
-]
 const newZone = ref({ name: '', nature: null, surface_m2: null })
 
 // Compteurs (R175-3 1°)

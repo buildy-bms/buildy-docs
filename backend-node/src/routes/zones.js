@@ -3,10 +3,12 @@
 const { z } = require('zod');
 const db = require('../database');
 
-// 17 valeurs alignees Directus + cas Buildy
+// Valeurs alignees Directus + cas Buildy. Doit rester synchro avec :
+//   - frontend/src/lib/audit-options.js ZONE_NATURES (libellés FR)
+//   - backend-node/src/seeds/bacs-requirements.js INDOOR_NATURES (assujettissement R175)
 const ZONE_NATURES = [
-  'shared-office', 'private-office', 'open-space', 'commercial-space',
-  'meeting-room', 'workshop', 'switchboard', 'technical-area',
+  'office', 'shared-office', 'private-office', 'open-space', 'commercial-space',
+  'meeting-room', 'workshop', 'switchboard', 'technical-area', 'server-room',
   'classroom', 'leasure-space', 'foyer', 'corridor',
   'outdoor', 'meters', 'shared-space', 'logistic-cell', 'stock',
 ];
@@ -61,6 +63,7 @@ async function routes(fastify) {
       nature: body.nature || null,
       position: body.position || 0,
       notes: body.notes || null,
+      surfaceM2: body.surface_m2 ?? null,
     });
     db.auditLog.add({
       userId: request.authUser?.id,

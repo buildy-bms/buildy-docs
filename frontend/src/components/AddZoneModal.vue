@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
+import SearchableSelect from './SearchableSelect.vue'
 
 const props = defineProps({
   zoneNatures: { type: Array, required: true },
@@ -38,11 +39,11 @@ async function submit() {
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Nature de la zone</label>
-        <select v-model="form.nature"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
-          <option :value="null">— Sélectionner —</option>
-          <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
+        <SearchableSelect
+          v-model="form.nature"
+          :options="zoneNatures"
+          placeholder="Sélectionner une nature"
+        />
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Surface (m²)</label>

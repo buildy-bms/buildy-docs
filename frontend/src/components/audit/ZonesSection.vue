@@ -6,6 +6,7 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -112,13 +113,13 @@ function hasNotes(html) {
                      @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
                      class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
             </td>
-            <td class="py-2">
-              <select :value="z.nature"
-                      @change="e => patchZone(z, { nature: e.target.value || null })"
-                      class="text-xs px-2 py-1 border border-gray-200 rounded">
-                <option :value="null">—</option>
-                <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-              </select>
+            <td class="py-2 min-w-44">
+              <SearchableSelect
+                :model-value="z.nature"
+                @update:model-value="v => patchZone(z, { nature: v || null })"
+                :options="zoneNatures"
+                placeholder="Nature de la zone"
+              />
             </td>
             <td class="py-2">
               <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
@@ -179,12 +180,12 @@ function hasNotes(html) {
           </button>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <select :value="z.nature"
-                  @change="e => patchZone(z, { nature: e.target.value || null })"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg">
-            <option :value="null">Nature…</option>
-            <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+          <SearchableSelect
+            :model-value="z.nature"
+            @update:model-value="v => patchZone(z, { nature: v || null })"
+            :options="zoneNatures"
+            placeholder="Nature…"
+          />
           <input type="number" inputmode="decimal" pattern="[0-9.,]*" min="0" step="1"
                  :value="z.surface_m2" placeholder="Surface m²"
                  @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
