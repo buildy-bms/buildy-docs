@@ -218,6 +218,12 @@ export const updateSectionTemplate = (id, data, { cascadeDocumentKinds } = {}) =
 // Retourne array<{ kind, label, description }>. Utilise pour alimenter le multi-select
 // dans la modale d'edition d'une section type.
 export const listDocumentKinds = () => api.get('/section-templates/document-kinds')
+
+// Modification en bulk des document_kinds.
+// Payload : { ids: [...], action: 'add'|'remove'|'replace', kinds: [...], cascade: boolean }
+// Retourne : { ok, affected, cascaded }
+export const bulkUpdateSectionTemplateDocumentKinds = (payload) =>
+  api.post('/section-templates/bulk-document-kinds', payload)
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
 // reorder({ ids, parent_template_id? }). parent_template_id si re-parenting drag-drop.

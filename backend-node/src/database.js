@@ -3464,6 +3464,67 @@ const sectionTemplates = {
     });
     return tx();
   },
+
+  // Modification en bulk des document_kinds sur plusieurs sections types.
+  // Modes :
+  //   - 'add' : ajoute les `kinds` aux tags existants (INSERT OR IGNORE)
+  //   - 'remove' : retire les `kinds` des tags existants
+  //   - 'replace' : remplace tous les tags par la liste fournie (DELETE + INSERT)
+  // Si `cascade` est true, l'operation s'applique aussi aux descendants
+  // (CTE recursive sur parent_template_id) de chaque id selectionne.
+  bulkUpdateDocumentKinds({ ids, action, kinds, cascade = true }) {
+    if (!Array.isArray(ids) || !ids.length) return { affected: 0, cascaded: 0 };
+    if (!['add', 'remove', 'replace'].includes(action)) {
+      throw new Error(`Invalid bulk action: ${action}`);
+    }
+    if (!Array.isArray(kinds) || !kinds.length) {
+      throw new Error('At least one document_kind required');
+    }
+    const tx = db.transaction(() => {
+      const targets = new Set(ids);
+      let cascadedCount = 0;
+      if (cascade) {
+        const descStmt = db.prepare(`
+          WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM section_templates WHERE parent_template_id = ?
+            UNION ALL
+            SELECT st.id FROM section_templates st JOIN descendants d ON st.parent_template_id = d.id
+          )
+          SELECT id FROM descendants
+        `);
+        for (const id of ids) {
+          const descendants = descStmt.all(id);
+          for (const d of descendants) {
+            if (!targets.has(d.id)) {
+              targets.add(d.id);
+              cascadedCount++;
+            }
+          }
+        }
+      }
+      const insStmt = db.prepare(
+        'INSERT OR IGNORE INTO section_template_documents (section_template_id, document_kind) VALUES (?, ?)'
+      );
+      const delKindStmt = db.prepare(
+        'DELETE FROM section_template_documents WHERE section_template_id = ? AND document_kind = ?'
+      );
+      const delAllStmt = db.prepare(
+        'DELETE FROM section_template_documents WHERE section_template_id = ?'
+      );
+      for (const tid of targets) {
+        if (action === 'add') {
+          for (const k of kinds) insStmt.run(tid, k);
+        } else if (action === 'remove') {
+          for (const k of kinds) delKindStmt.run(tid, k);
+        } else { // 'replace'
+          delAllStmt.run(tid);
+          for (const k of kinds) insStmt.run(tid, k);
+        }
+      }
+      return { affected: targets.size, cascaded: cascadedCount };
+    });
+    return tx();
+  },
 };
 
 // ── AFs ──────────────────────────────────────────────────────────────

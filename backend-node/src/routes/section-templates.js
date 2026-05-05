@@ -71,6 +71,13 @@ const reorderSchema = z.object({
   parent_template_id: z.number().int().positive().nullable().optional(),
 });
 
+const bulkDocumentKindsSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, 'Au moins une section requise'),
+  action: z.enum(['add', 'remove', 'replace']),
+  kinds: z.array(z.enum(DOCUMENT_KINDS_VALUES)).min(1, 'Au moins un type de document requis'),
+  cascade: z.boolean().optional().default(true),
+});
+
 function slugify(s) {
   return (s || '')
     .toString()
@@ -341,6 +348,39 @@ async function routes(fastify) {
 
     const updated = db.sectionTemplates.getById(id);
     return { ...updated, propagated_count: propagatedCount + bacsSynced + levelSynced, document_kinds_cascaded: documentKindsCascaded };
+  });
+
+  // POST /api/section-templates/bulk-document-kinds — modification en bulk
+  // des tags document_kinds sur plusieurs sections types. Modes : 'add' /
+  // 'remove' / 'replace'. Cascade ON par defaut (les descendants suivent).
+  fastify.post('/section-templates/bulk-document-kinds', async (request, reply) => {
+    let body;
+    try { body = bulkDocumentKindsSchema.parse(request.body); }
+    catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
+
+    const result = db.sectionTemplates.bulkUpdateDocumentKinds({
+      ids: body.ids,
+      action: body.action,
+      kinds: body.kinds,
+      cascade: body.cascade !== false,
+    });
+
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'section_template.bulk_document_kinds',
+      payload: {
+        ids_count: body.ids.length,
+        bulk_action: body.action,
+        kinds: body.kinds,
+        cascade: body.cascade !== false,
+        affected: result.affected,
+        cascaded: result.cascaded,
+      },
+    });
+
+    log.info(`Bulk document_kinds : action=${body.action}, kinds=[${body.kinds.join(',')}], ids=${body.ids.length}, affected=${result.affected}, cascaded=${result.cascaded} (user #${request.authUser?.id})`);
+
+    return { ok: true, ...result };
   });
 
   // ── Versionnage / restauration du body_html ───────────────────────────

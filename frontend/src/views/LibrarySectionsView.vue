@@ -12,7 +12,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
-  PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilIcon, Bars3Icon, SparklesIcon,
+  PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilIcon, Bars3Icon, SparklesIcon, TagIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
@@ -25,6 +25,7 @@ library.add(faCamera)
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
+import BulkDocumentKindsModal from '@/components/BulkDocumentKindsModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
@@ -38,6 +39,46 @@ const allTemplates = ref([])    // tous les templates (pour parent_path / depth)
 const search = ref('')
 const editing = ref(null)
 const showCreate = ref(false)
+// Selection multiple pour le bulk-tagging des document_kinds.
+// Set d'IDs de section_templates ; tout est conserve a travers le filtre/tri.
+const selectedIds = ref(new Set())
+const showBulkDocKinds = ref(false)
+function toggleSelected(id) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedIds.value = next
+}
+function isSelected(id) { return selectedIds.value.has(id) }
+function clearSelection() { selectedIds.value = new Set() }
+// Master checkbox : check si toutes les lignes visibles (flatItems) sont selectionnees,
+// indeterminate si partiel. Toggle = tout cocher / tout decocher (sur la liste filtree).
+const allFlatSelected = computed(() => {
+  if (!flatItems.value.length) return false
+  return flatItems.value.every(t => selectedIds.value.has(t.id))
+})
+const someFlatSelected = computed(() => {
+  if (!flatItems.value.length) return false
+  return flatItems.value.some(t => selectedIds.value.has(t.id))
+})
+function toggleAllFlat() {
+  if (allFlatSelected.value) {
+    // Tout decocher (uniquement les visibles)
+    const next = new Set(selectedIds.value)
+    for (const t of flatItems.value) next.delete(t.id)
+    selectedIds.value = next
+  } else {
+    // Tout cocher (visibles)
+    const next = new Set(selectedIds.value)
+    for (const t of flatItems.value) next.add(t.id)
+    selectedIds.value = next
+  }
+}
+// Items selectionnes au format { id, title } pour la modale.
+const selectedItems = computed(() => {
+  const byId = new Map(allTemplates.value.map(t => [t.id, t]))
+  return [...selectedIds.value].map(id => byId.get(id)).filter(Boolean).map(t => ({ id: t.id, title: t.title }))
+})
 const showBulk = ref(false)
 
 // Modal Captures + drag-drop d'images sur une ligne
@@ -102,6 +143,11 @@ async function refresh() {
 }
 function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
+async function onBulkDocKindsDone() {
+  showBulkDocKinds.value = false
+  clearSelection()
+  await refresh()
+}
 async function onSaved() {
   editing.value = null
   showCreate.value = false
@@ -330,6 +376,12 @@ onBeforeUnmount(teardownSortables)
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
+            <th class="text-center px-2 py-2.5 w-8" title="Tout cocher / décocher (lignes visibles)">
+              <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30"
+                     :checked="allFlatSelected"
+                     :indeterminate.prop="!allFlatSelected && someFlatSelected"
+                     @click.stop="toggleAllFlat" />
+            </th>
             <th class="text-center px-2 py-2.5 w-8"></th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
             <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
@@ -343,11 +395,17 @@ onBeforeUnmount(teardownSortables)
           <tr v-for="t in flatItems" :key="t.id" :data-id="t.id"
               :data-parent-id="t.parent_template_id || ''"
               :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                       isSelected(t.id) ? 'bg-indigo-50/60' : '',
                        dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
               @click="openEditor(t)"
               @dragover="onRowDragOver($event, t)"
               @dragleave="onRowDragLeave"
               @drop="onRowDrop($event, t)">
+            <td class="px-2 py-2 text-center align-middle" @click.stop>
+              <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30"
+                     :checked="isSelected(t.id)"
+                     @change="toggleSelected(t.id)" />
+            </td>
             <td class="px-2 py-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
                 @click.stop>
               <Bars3Icon class="w-4 h-4 inline-block" />
@@ -400,13 +458,48 @@ onBeforeUnmount(teardownSortables)
             </td>
           </tr>
           <tr v-if="!flatItems.length">
-            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune section ne correspond à « ${search} ».` : 'Aucune section type.' }}
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <!-- Toolbar flottante de bulk-edit (apparait quand au moins une section est cochee) -->
+    <Transition
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 translate-y-4"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-100 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-4"
+    >
+      <div v-if="selectedIds.size > 0"
+           class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-200 shadow-xl rounded-full pl-4 pr-2 py-2 flex items-center gap-3">
+        <span class="text-sm font-medium text-gray-700 whitespace-nowrap">
+          {{ selectedIds.size }} section{{ selectedIds.size > 1 ? 's' : '' }} sélectionnée{{ selectedIds.size > 1 ? 's' : '' }}
+        </span>
+        <span class="w-px h-5 bg-gray-200" />
+        <button type="button" @click="showBulkDocKinds = true"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-full transition whitespace-nowrap">
+          <TagIcon class="w-4 h-4" /> Modifier les tags…
+        </button>
+        <button type="button" @click="clearSelection"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition whitespace-nowrap"
+                title="Annuler la sélection">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
+    </Transition>
+
+    <BulkDocumentKindsModal
+      v-if="showBulkDocKinds"
+      :selected="selectedItems"
+      :document-kinds-catalog="documentKindsCatalog"
+      @close="showBulkDocKinds = false"
+      @done="onBulkDocKindsDone"
+    />
 
     <SectionTemplateEditor
       v-if="editing"
