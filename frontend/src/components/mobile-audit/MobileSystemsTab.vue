@@ -88,6 +88,17 @@ const SYSTEM_LABEL = {
   lighting_outdoor: 'Éclairage extérieur',
   electricity_production: 'Production photovoltaïque',
 }
+// Phrase négative cohérente avec le label positif. Utilisée quand
+// l'auditeur a marqué l'usage "Absent" (= not_concerned=true).
+const SYSTEM_NEGATIVE_LABEL = {
+  heating: 'Pas de chauffage dans cette zone',
+  cooling: 'Pas de refroidissement',
+  ventilation: 'Pas de ventilation mécanique',
+  dhw: 'Pas d\'ECS',
+  lighting_indoor: 'Pas d\'éclairage intérieur',
+  lighting_outdoor: 'Pas d\'éclairage extérieur',
+  electricity_production: 'Pas de production photovoltaïque',
+}
 const ENERGY_OPTIONS = [
   { value: null, label: '—' },
   { value: 'gas', label: 'Gaz' },
@@ -246,30 +257,48 @@ async function removeDevice(d) {
 
         <!-- Systèmes -->
         <div v-show="!collapsedZones.has(g.zone_id)" class="divide-y divide-gray-100">
-          <div v-for="s in g.items" :key="s.id" class="px-4 py-4">
+          <div v-for="s in g.items" :key="s.id"
+               :class="['px-4 py-4 transition',
+                        s.not_concerned ? 'opacity-50 bg-gray-50' : '']">
             <div class="flex items-center gap-3">
               <SystemCategoryIcon :category="s.system_category" size="md" />
               <div class="flex-1 min-w-0">
                 <p class="text-base font-medium text-gray-900 truncate leading-tight">
                   {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
                 </p>
-                <p v-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
+                <p v-if="s.not_concerned" class="text-sm text-gray-500 mt-1 italic">
+                  {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || 'Non concerné' }}
+                </p>
+                <p v-else-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
                   {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
                 </p>
+                <p v-else-if="s.present" class="text-xs text-emerald-600 mt-1">
+                  Présent — ajoute des équipements ci-dessous
+                </p>
                 <p v-else class="text-xs text-gray-400 mt-1">
-                  Coche « Présent » si l'usage existe dans cette zone
+                  À renseigner : présent ou absent ?
                 </p>
               </div>
-              <label class="inline-flex items-center gap-2 cursor-pointer shrink-0"
-                     :title="`Cet usage (${SYSTEM_LABEL[s.system_category]}) est-il présent dans la zone ${g.zone_name} ?`">
-                <span class="text-sm text-gray-700">Présent</span>
-                <input
-                  type="checkbox"
-                  :checked="!!s.present"
-                  @change="e => patchSystem(s, { present: e.target.checked })"
-                  class="w-6 h-6"
-                />
-              </label>
+            </div>
+            <!-- Segmented control 2 états : Présent / Absent (= not_concerned).
+                 Le 3e cas (rien de coché) est l'état initial par défaut. -->
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button type="button"
+                      @click="patchSystem(s, { present: true, not_concerned: false })"
+                      :class="['py-3 px-3 text-sm font-medium rounded-xl border-2 transition',
+                               s.present && !s.not_concerned
+                                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                 : 'border-gray-200 bg-white text-gray-600']">
+                ✓ Présent
+              </button>
+              <button type="button"
+                      @click="patchSystem(s, { present: false, not_concerned: true })"
+                      :class="['py-3 px-3 text-sm font-medium rounded-xl border-2 transition',
+                               s.not_concerned
+                                 ? 'border-gray-400 bg-gray-100 text-gray-700'
+                                 : 'border-gray-200 bg-white text-gray-600']">
+                ✕ Absent
+              </button>
             </div>
 
             <!-- Devices nested -->
