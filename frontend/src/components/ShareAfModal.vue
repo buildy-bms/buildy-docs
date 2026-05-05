@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { TrashIcon, UserCircleIcon, EyeIcon, PencilIcon } from '@heroicons/vue/24/outline'
-import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers } from '@/api'
+import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers, ensureUserFromPocketId } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from './BaseModal.vue'
@@ -41,7 +41,13 @@ const candidateUsers = computed(() => {
 async function grant(user) {
   submitting.value = true
   try {
-    await grantAfPermission(props.afId, user.id, newRole.value)
+    let userId = user.id
+    // PocketID user pas encore loggé sur Docs : on crée son enregistrement local d'abord
+    if (typeof userId === 'string' && userId.startsWith('pocketid:')) {
+      const { data: localUser } = await ensureUserFromPocketId(user.pocketid_id)
+      userId = localUser.id
+    }
+    await grantAfPermission(props.afId, userId, newRole.value)
     success(`${user.display_name || user.email} ajouté en ${newRole.value === 'write' ? 'écriture' : 'lecture'}`)
     search.value = ''
     selectedUserId.value = null

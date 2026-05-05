@@ -48,6 +48,11 @@ const config = Object.freeze({
   oidcClientId: process.env.OIDC_CLIENT_ID || '',
   oidcClientSecret: process.env.OIDC_CLIENT_SECRET || '',
   oidcRedirectUri: process.env.OIDC_REDIRECT_URI || '',
+  // PocketID admin API key (X-API-Key). Si présent, /api/users complète
+  // sa liste avec TOUS les utilisateurs PocketID (pour le partage d'audits
+  // à des collègues qui ne se sont pas encore loggés sur Docs).
+  pocketidApiKey: process.env.POCKETID_API_KEY || '',
+  pocketidApiUrl: process.env.POCKETID_API_URL || process.env.OIDC_ISSUER || '',
 
   // Public URL (utilise pour les redirects + emails). Ex: https://buildy-docs.buildy.wan
   publicUrl: process.env.PUBLIC_URL || 'http://localhost:5173',

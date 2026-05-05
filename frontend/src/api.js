@@ -269,6 +269,7 @@ export const getSite = (uuid) => api.get(`/sites/${uuid}`)
 export const createSite = (data) => api.post('/sites', data)
 export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
+export const ensureUserFromPocketId = (pocketid_id) => api.post('/users/ensure-by-pocketid-id', { pocketid_id })
 
 // ── Audit BACS — donnees structurees ──
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)

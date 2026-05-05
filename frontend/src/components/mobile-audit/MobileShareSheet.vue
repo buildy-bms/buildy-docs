@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { TrashIcon, UserCircleIcon, EyeIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
-import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers } from '@/api'
+import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers, ensureUserFromPocketId } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import MobileSheet from './MobileSheet.vue'
@@ -52,7 +52,13 @@ const candidateUsers = computed(() => {
 async function grant(user) {
   submitting.value = true
   try {
-    await grantAfPermission(props.docId, user.id, newRole.value)
+    let userId = user.id
+    // Si c'est un user PocketID pas encore en DB locale, on le crée d'abord
+    if (typeof userId === 'string' && userId.startsWith('pocketid:')) {
+      const { data: localUser } = await ensureUserFromPocketId(user.pocketid_id)
+      userId = localUser.id
+    }
+    await grantAfPermission(props.docId, userId, newRole.value)
     success(`${user.display_name || user.email} ajouté en ${newRole.value === 'write' ? 'écriture' : 'lecture'}`)
     search.value = ''
     await refresh()
