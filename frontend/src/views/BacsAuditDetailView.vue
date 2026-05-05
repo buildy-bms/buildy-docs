@@ -8,7 +8,7 @@ import {
   WrenchScrewdriverIcon, BoltIcon, FireIcon, PencilSquareIcon,
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
-  ClockIcon, EyeIcon,
+  ClockIcon, EyeIcon, TableCellsIcon, EllipsisHorizontalIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -1060,94 +1060,70 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
-        <!-- Actions principales toujours visibles -->
+        <!-- Aperçu HTML (avant export PDF) -->
         <button @click="openPreview"
           title="Aperçu HTML rapide du rapport (sans génération PDF)"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
-          <EyeIcon class="w-3.5 h-3.5 shrink-0" /> Aperçu
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap">
+          <EyeIcon class="w-4 h-4 shrink-0" />
+          Aperçu
         </button>
+
+        <!-- Exports PDF principaux (style cohérent avec AF : indigo solide) -->
+        <button @click="exportPdf" :disabled="exporting"
+          title="Génère le rapport d'audit complet en PDF A4"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 whitespace-nowrap">
+          <DocumentArrowDownIcon class="w-4 h-4" />
+          {{ exporting ? 'Génération…' : 'Rapport' }}
+        </button>
+        <button @click="exportTablesPdf" :disabled="exportingTables"
+          title="Génère les tableaux de synthèse (A3 paysage) destinés à l'intégrateur"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 whitespace-nowrap">
+          <TableCellsIcon class="w-4 h-4" />
+          {{ exportingTables ? 'Génération…' : 'Synthèse' }}
+        </button>
+
+        <!-- Livrer (CTA principal vert) -->
         <button @click="deliver" :disabled="delivering"
           title="Génère le PDF final + fige le snapshot Git"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
-          <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
+          <CheckCircleIcon class="w-4 h-4 shrink-0" />
+          {{ delivering ? 'Livraison…' : 'Livrer' }}
         </button>
 
-        <!-- Menu engrenage : tous les autres outils + actions admin -->
-        <div ref="settingsMenuRef" class="relative">
+        <!-- Menu Plus (cohérent avec AF) -->
+        <div ref="settingsMenuRef" class="relative inline-flex">
           <button @click="showSettingsMenu = !showSettingsMenu"
-            title="Plus d'options"
-            :class="['inline-flex items-center justify-center w-8 h-8 rounded-lg border whitespace-nowrap',
-                     showSettingsMenu ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']">
-            <Cog6ToothIcon class="w-4 h-4" />
+            title="Plus d'actions"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap">
+            <EllipsisHorizontalIcon class="w-4 h-4 shrink-0" />
+            Plus
           </button>
           <div v-if="showSettingsMenu"
-               class="absolute right-0 top-full mt-1 z-30 w-64 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden py-1"
+               class="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-56 py-1 whitespace-nowrap"
                @click.stop>
-            <!-- Partage & accès -->
             <button @click="showSettingsMenu = false; showShare = true"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <UserPlusIcon class="w-4 h-4 shrink-0 text-indigo-600" />
-              Partager cet audit
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <UserPlusIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              Partager
             </button>
-            <div class="px-3 py-1">
-              <OpenOnPhoneButton
-                v-if="!isNarrow"
-                :context-label="`${document?.client_name || ''} — ${document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB')}`"
-              />
-            </div>
-
-            <div class="border-t border-gray-100 my-1"></div>
-
-            <!-- Outils saisie -->
+            <button @click="showSettingsMenu = false; showActivity = true"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <ClockIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              Activité
+            </button>
             <button v-if="document?.site_uuid" @click="showSettingsMenu = false; openBulkUpload()"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <PhotoIcon class="w-4 h-4 shrink-0 text-emerald-600" />
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <PhotoIcon class="w-4 h-4 text-gray-400 shrink-0" />
               Photos terrain (import en masse)
             </button>
             <button @click="showSettingsMenu = false; openTranscript()"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <SparklesIcon class="w-4 h-4 shrink-0 text-purple-600" />
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <SparklesIcon class="w-4 h-4 text-gray-400 shrink-0" />
               Transcript IA (Plaud Pro)
             </button>
-            <button @click="showSettingsMenu = false; showActivity = true"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <ClockIcon class="w-4 h-4 shrink-0 text-indigo-600" />
-              Panneau d'activité
-            </button>
-
             <div class="border-t border-gray-100 my-1"></div>
-
-            <!-- Exports PDF -->
-            <button @click="showSettingsMenu = false; exportPdf()" :disabled="exporting"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left disabled:opacity-50">
-              <DocumentArrowDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
-              {{ exporting ? 'Génération…' : 'Générer le rapport (PDF A4)' }}
-            </button>
-            <button @click="showSettingsMenu = false; exportTablesPdf()" :disabled="exportingTables"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left disabled:opacity-50">
-              <DocumentArrowDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
-              {{ exportingTables ? 'Génération…' : 'Tableaux de synthèse (A3)' }}
-            </button>
-
-            <div class="border-t border-gray-100 my-1"></div>
-
-            <!-- Affichage -->
-            <button @click="showSettingsMenu = false; setAllSectionsCollapsed(true)"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <ChevronDoubleUpIcon class="w-4 h-4 shrink-0 text-gray-500" />
-              Tout replier
-            </button>
-            <button @click="showSettingsMenu = false; setAllSectionsCollapsed(false)"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
-              <ChevronDoubleDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
-              Tout déplier
-            </button>
-
-            <div class="border-t border-gray-100 my-1"></div>
-
-            <!-- Suppression -->
             <button @click="showSettingsMenu = false; deleteAudit()"
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 text-left">
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
               <TrashIcon class="w-4 h-4 shrink-0" />
               Supprimer cet audit
             </button>
