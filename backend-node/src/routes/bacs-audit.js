@@ -10,6 +10,7 @@ const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
