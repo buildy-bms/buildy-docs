@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 80;
+const TARGET_VERSION = 81;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3100,6 +3100,29 @@ function runMigrations() {
     }
     db.pragma('user_version = 80');
     log.info(`Migration 80 : ${linked}/${orphans.length} sections orphelines reliees a la biblio par titre (les ${orphans.length - linked} restantes n'ont pas de pendant et necessitent une promotion manuelle)`);
+  }
+
+  if (current < 81) {
+    // Lot — Sections "fantômes" : suppression des sections AF qui n'ont
+    // toujours pas de pendant biblio apres la migration 80 (link par titre).
+    // Ces sections viennent du backfill historique pour des slugs PLAN_AF
+    // que l'user a explicitement supprimes de la biblio (tombstone). Le
+    // ON DELETE CASCADE propage aux overrides, instances, attachments et
+    // sous-sections orphelines.
+    const orphans = db.prepare(`
+      SELECT id, title, af_id FROM sections
+      WHERE section_template_id IS NULL
+        AND equipment_template_id IS NULL
+        AND kind IN ('standard', 'zones')
+    `).all();
+    let deleted = 0;
+    const delStmt = db.prepare('DELETE FROM sections WHERE id = ?');
+    for (const o of orphans) {
+      delStmt.run(o.id);
+      deleted++;
+    }
+    db.pragma('user_version = 81');
+    log.info(`Migration 81 : ${deleted} sections orphelines supprimees (cascade sur overrides/instances/attachments)`);
   }
 
   if (current > TARGET_VERSION) {

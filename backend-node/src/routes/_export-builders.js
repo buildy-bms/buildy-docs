@@ -120,6 +120,35 @@ async function buildAfExportData(af, opts = {}) {
   );
   const resolveLiveBacs = buildLiveBacsResolver();
 
+  // Numérotation live : recalculée depuis les positions courantes dans
+  // l'arbre, identique à la logique frontend (`stores/af.js`). Le `number`
+  // figé en DB devient stale dès qu'une section est déplacée ou exclue,
+  // ce qui produisait des sommaires incohérents type « 1, 3, 4, 5, 2 ».
+  // On numérote sur la liste DEJA filtree (allSections) — les sections
+  // exclues sont déjà absentes, donc pas besoin du skip côté frontend.
+  const liveNumbering = (() => {
+    const map = new Map();
+    const byParent = new Map();
+    for (const s of allSections) {
+      const k = s.parent_id || 'root';
+      if (!byParent.has(k)) byParent.set(k, []);
+      byParent.get(k).push(s);
+    }
+    for (const arr of byParent.values()) {
+      arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    }
+    function walk(parentKey, prefix) {
+      const arr = byParent.get(parentKey) || [];
+      arr.forEach((s, idx) => {
+        const num = prefix ? `${prefix}.${idx + 1}` : String(idx + 1);
+        map.set(s.id, num);
+        walk(s.id, num);
+      });
+    }
+    walk('root', '');
+    return map;
+  })();
+
   const sectionData = new Map();
   for (const sec of allSections) {
     const attachmentRows = db.attachments.listEffectiveForSection(sec.id);
@@ -243,11 +272,16 @@ async function buildAfExportData(af, opts = {}) {
         // Le chapitre 13 "Engagement contractuel" reçoit la synthese
         // calculee (offre recommandee + options à souscrire). On la prepend
         // au body_html existant pour que le texte canonique reste editable.
-        const isContractualChapter = s.number === '13';
+        const liveNumber = liveNumbering.get(s.id) || '';
+        // Chapitre « Engagement contractuel » : on cible le slug du template
+        // plutot que le number figé (qui peut diverger de la position).
+        const isContractualChapter = s.section_template_id != null &&
+          (db.sectionTemplates.getById(s.section_template_id)?.slug === '13' ||
+           s.number === '13');
         const liveBacs = resolveLiveBacs(s);
         return {
           id: s.id,
-          number: s.number || '',
+          number: liveNumber,
           title: s.title,
           icon_name: s.tpl_icon_name || null,
           service_level: sl,
