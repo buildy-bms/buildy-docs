@@ -191,8 +191,8 @@ function toggleProtocol(p) {
         <div class="flex-1 min-w-0">
           <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
           <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-            <MeterUsagePill :usage="m.usage" />
             <MeterTypePill :type="m.meter_type" />
+            <MeterUsagePill :usage="m.usage" />
             <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
             <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
             <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
@@ -217,7 +217,7 @@ function toggleProtocol(p) {
       @save="save"
     >
       <div class="p-4 space-y-4">
-        <MobileField label="Zone">
+        <MobileField label="Zone" hint="Le local fonctionnel où se trouve ce compteur. « Compteur général » = compteur principal du site, pas attaché à une zone précise.">
           <select
             v-model="editForm.zone_id"
             class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
@@ -227,16 +227,7 @@ function toggleProtocol(p) {
           </select>
         </MobileField>
 
-        <MobileField label="Usage">
-          <select
-            v-model="editForm.usage"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
-          >
-            <option v-for="opt in METER_USAGES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </MobileField>
-
-        <MobileField label="Type">
+        <MobileField label="Type d'énergie" hint="Quelle énergie ce compteur mesure : électrique, gaz, eau, ou thermique (kWh chaud/froid via débit + ΔT).">
           <select
             v-model="editForm.meter_type"
             class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
@@ -245,30 +236,56 @@ function toggleProtocol(p) {
           </select>
         </MobileField>
 
-        <MobileField label="État">
+        <MobileField label="Catégorie" hint="À quoi sert l'énergie mesurée : chauffage, climatisation, ECS (eau chaude sanitaire), production photovoltaïque, éclairage…">
+          <select
+            v-model="editForm.usage"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+          >
+            <option v-for="opt in METER_USAGES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </MobileField>
+
+        <MobileField label="État du compteur">
           <div class="space-y-2">
-            <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
-              <span class="text-sm font-medium text-gray-700">Requis (R175)</span>
-              <input v-model="editForm.required" type="checkbox" class="w-5 h-5" />
+            <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+              <div class="flex-1 min-w-0">
+                <p class="text-base font-medium text-gray-700">Requis par R175</p>
+                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Coche si ce compteur EST requis.
+                </p>
+              </div>
+              <input v-model="editForm.required" type="checkbox" class="w-6 h-6 mt-1 shrink-0" />
             </label>
             <template v-if="editing?.mode === 'edit'">
-              <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
-                <span class="text-sm font-medium text-gray-700">Présent sur site</span>
-                <input v-model="editForm.present_actual" type="checkbox" class="w-5 h-5" />
+              <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base font-medium text-gray-700">Présent physiquement sur site</p>
+                  <p class="text-xs text-gray-500 mt-1">Le compteur existe et est installé, peu importe s'il communique ou pas.</p>
+                </div>
+                <input v-model="editForm.present_actual" type="checkbox" class="w-6 h-6 mt-1 shrink-0" />
               </label>
               <label v-if="editForm.present_actual"
-                     class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
-                <span class="text-sm font-medium text-gray-700">Communicant</span>
-                <input v-model="editForm.communicating" type="checkbox" class="w-5 h-5" />
+                     class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base font-medium text-gray-700">Communicant</p>
+                  <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
+                </div>
+                <input v-model="editForm.communicating" type="checkbox" class="w-6 h-6 mt-1 shrink-0" />
               </label>
               <label v-if="editForm.present_actual"
-                     class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
-                <span class="text-sm font-medium text-gray-700">Câblé vers GTB</span>
-                <input v-model="editForm.wired" type="checkbox" class="w-5 h-5" />
+                     class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base font-medium text-gray-700">Câblé vers la GTB</p>
+                  <p class="text-xs text-gray-500 mt-1">Le câble (RS485, Ethernet…) est physiquement raccordé à la GTB du site. Le compteur communique vraiment, pas seulement potentiellement.</p>
+                </div>
+                <input v-model="editForm.wired" type="checkbox" class="w-6 h-6 mt-1 shrink-0" />
               </label>
-              <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
-                <span class="text-sm font-medium text-red-600">Hors service</span>
-                <input v-model="editForm.out_of_service" type="checkbox" class="w-5 h-5" />
+              <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base font-medium text-red-600">Hors service</p>
+                  <p class="text-xs text-gray-500 mt-1">Compteur HS, débranché, ou inaccessible. Sera ignoré dans le plan d'action.</p>
+                </div>
+                <input v-model="editForm.out_of_service" type="checkbox" class="w-6 h-6 mt-1 shrink-0" />
               </label>
             </template>
           </div>

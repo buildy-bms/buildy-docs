@@ -208,10 +208,16 @@ async function saveCaptions() {
 }
 
 const btnCls = computed(() => {
-  const base = 'inline-flex items-center gap-1 rounded-md border transition-all'
-  const size = props.size === 'md'
-    ? 'px-2.5 py-1 text-xs'
-    : 'px-2 py-0.5 text-[11px]'
+  const base = 'inline-flex items-center justify-center gap-2 rounded-xl border transition-all font-medium'
+  // Mobile : gros bouton tactile lisible. Desktop : compact comme avant.
+  let size
+  if (isMobile.value) {
+    size = 'px-4 py-3 text-sm w-full'
+  } else if (props.size === 'md') {
+    size = 'px-2.5 py-1 text-xs'
+  } else {
+    size = 'px-2 py-0.5 text-[11px]'
+  }
   if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300 scale-105`
   const tone = photos.value.length
     ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
@@ -232,9 +238,12 @@ const btnCls = computed(() => {
       @dragleave.prevent="onDragLeave"
       @drop.prevent="onDrop"
     >
-      <CameraIcon :class="['transition-all', isDragOver ? 'w-5 h-5' : 'w-4 h-4']" />
-      <span v-if="photos.length && !isDragOver" class="font-medium">{{ photos.length }}</span>
-      <span v-if="isDragOver" class="font-semibold text-[11px] whitespace-nowrap">Deposer ici</span>
+      <CameraIcon :class="['transition-all shrink-0', isMobile ? 'w-5 h-5' : (isDragOver ? 'w-5 h-5' : 'w-4 h-4')]" />
+      <span v-if="isMobile" class="font-medium">
+        Photos<span v-if="photos.length"> ({{ photos.length }})</span>
+      </span>
+      <span v-else-if="photos.length && !isDragOver" class="font-medium">{{ photos.length }}</span>
+      <span v-if="isDragOver && !isMobile" class="font-semibold text-[11px] whitespace-nowrap">Deposer ici</span>
     </button>
 
     <input

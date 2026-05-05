@@ -180,55 +180,54 @@ async function patchThermal(t, patch) {
         </tr>
         <!-- Détail R175-6 — placé directement sous sa ligne parent pour
              que l'utilisateur sache à quelle zone/usage ça se rapporte.
-             Affiché uniquement si la régulation auto est cochée. -->
+             Affiché uniquement si la régulation auto est cochée. Layout
+             en flex compact avec labels inline (vs grid 3 cols qui faisait
+             des champs trop larges et illisibles). -->
         <tr v-if="t.has_automatic_regulation" class="bg-amber-50/30 text-xs">
-          <td class="px-5 py-2.5 text-gray-500 italic">
-            ↳ détail<br />
-            <span class="text-[10px] text-gray-400">{{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}</span>
-          </td>
-          <td colspan="8" class="py-2.5 pr-5">
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <Tooltip text="Où est physiquement placée la sonde de température ? Sa position influence la qualité de la régulation : en sortie d'air repris (gaine), au mur (1,5m du sol), au sol… Le décret n'impose pas une position précise mais une régulation effective.">
-                  <label class="text-[11px] font-medium text-gray-600 mb-1 inline-flex items-center gap-1">
-                    Position de la sonde
+          <td colspan="9" class="px-5 py-2.5">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span class="text-[11px] text-gray-400 italic shrink-0">
+                ↳ détail R175-6 · {{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
+              </span>
+              <div class="flex items-center gap-1.5">
+                <Tooltip text="Où est physiquement placée la sonde de température ? Murale 1,5m, gaine de reprise, plancher… Le décret n'impose pas une position précise mais une régulation effective.">
+                  <label class="text-[11px] font-medium text-gray-600 inline-flex items-center gap-0.5 cursor-help">
+                    Sonde
                     <InformationCircleIcon class="w-3 h-3 text-gray-400" />
                   </label>
                 </Tooltip>
-                <input type="text" :value="t.sensor_position" placeholder="ex : murale 1,5m, gaine reprise, plancher…"
+                <input type="text" :value="t.sensor_position" placeholder="ex : murale 1,5m, gaine reprise…"
                        @blur="e => patchThermal(t, { sensor_position: e.target.value || null })"
-                       class="w-full px-2 py-1 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 placeholder:italic placeholder:text-gray-300" />
+                       class="w-56 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 placeholder:italic placeholder:text-gray-300" />
               </div>
-              <div>
-                <Tooltip text="Type de thermostat installé. Plus il est avancé (programmable / adaptatif / connecté), plus la régulation est fine et l'économie d'énergie élevée. Manuel = thermostat à molette sans programmation horaire.">
-                  <label class="text-[11px] font-medium text-gray-600 mb-1 inline-flex items-center gap-1">
-                    Type de thermostat
+              <div class="flex items-center gap-1.5">
+                <Tooltip text="Manuel = molette sans programmation. Programmable = plages horaires. Adaptatif = auto-apprentissage. Connecté = smart, pilotable à distance.">
+                  <label class="text-[11px] font-medium text-gray-600 inline-flex items-center gap-0.5 cursor-help">
+                    Thermostat
                     <InformationCircleIcon class="w-3 h-3 text-gray-400" />
                   </label>
                 </Tooltip>
                 <select :value="t.thermostat_type"
                         @change="e => patchThermal(t, { thermostat_type: e.target.value || null })"
-                        class="w-full px-2 py-1 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+                        class="w-44 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
                   <option :value="null">— à choisir</option>
-                  <option value="manual">Manuel (molette, sans programmation)</option>
-                  <option value="programmable">Programmable (plages horaires)</option>
-                  <option value="adaptive">Adaptatif (auto-apprentissage)</option>
-                  <option value="connected">Connecté (smart, pilotable à distance)</option>
+                  <option value="manual">Manuel</option>
+                  <option value="programmable">Programmable</option>
+                  <option value="adaptive">Adaptatif</option>
+                  <option value="connected">Connecté</option>
                 </select>
               </div>
-              <div class="flex items-end">
-                <Tooltip text="Robinets thermostatiques présents sur les radiateurs/émetteurs ? Permettent une régulation pièce par pièce sans automate central. Comptent comme régulation R175-6 si présents et fonctionnels sur tous les émetteurs de la zone.">
-                  <label class="flex items-center gap-2 cursor-pointer text-gray-700">
-                    <input type="checkbox" :checked="!!t.has_thermostatic_valves"
-                           @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked })"
-                           class="rounded border-gray-300" />
-                    <span class="inline-flex items-center gap-1">
-                      Robinets thermostatiques
-                      <InformationCircleIcon class="w-3 h-3 text-gray-400" />
-                    </span>
-                  </label>
-                </Tooltip>
-              </div>
+              <Tooltip text="Robinets thermostatiques sur les radiateurs ? Comptent comme régulation R175-6 si présents et fonctionnels sur tous les émetteurs.">
+                <label class="flex items-center gap-1.5 cursor-pointer text-gray-700 text-xs">
+                  <input type="checkbox" :checked="!!t.has_thermostatic_valves"
+                         @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked })"
+                         class="rounded border-gray-300" />
+                  <span class="inline-flex items-center gap-0.5">
+                    Robinets thermostatiques
+                    <InformationCircleIcon class="w-3 h-3 text-gray-400" />
+                  </span>
+                </label>
+              </Tooltip>
             </div>
           </td>
         </tr>

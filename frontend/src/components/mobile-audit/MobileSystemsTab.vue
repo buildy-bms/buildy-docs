@@ -235,8 +235,12 @@ async function removeDevice(d) {
                 <p v-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
                   {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
                 </p>
+                <p v-else class="text-xs text-gray-400 mt-1">
+                  Coche « Présent » si l'usage existe dans cette zone
+                </p>
               </div>
-              <label class="inline-flex items-center gap-2 cursor-pointer shrink-0">
+              <label class="inline-flex items-center gap-2 cursor-pointer shrink-0"
+                     :title="`Cet usage (${SYSTEM_LABEL[s.system_category]}) est-il présent dans la zone ${g.zone_name} ?`">
                 <span class="text-sm text-gray-700">Présent</span>
                 <input
                   type="checkbox"
@@ -277,53 +281,79 @@ async function removeDevice(d) {
             <!-- Régulation thermique R175-6 (heating + cooling présents en mode BACS) -->
             <div
               v-if="isBacs && s.present && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
-              class="mt-3 p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2"
+              class="mt-3 p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-3"
             >
-              <p class="text-[11px] font-medium text-amber-800 uppercase tracking-wider">
+              <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider">
                 Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
               </p>
-              <label class="flex items-center justify-between gap-2 px-3 py-2 bg-white rounded-lg cursor-pointer">
-                <span class="text-sm text-gray-700 font-medium">Régulation automatique</span>
+
+              <!-- Régulation auto avec explication -->
+              <label class="flex items-start justify-between gap-3 px-3 py-3 bg-white rounded-lg cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base text-gray-900 font-medium">Régulation automatique présente ?</p>
+                  <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Système qui ajuste seul la température (thermostat connecté, sonde + vanne motorisée, GTB…).
+                  </p>
+                </div>
                 <input
                   type="checkbox"
                   :checked="!!thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation"
                   @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { has_automatic_regulation: e.target.checked })"
-                  class="w-5 h-5"
+                  class="w-6 h-6 mt-1 shrink-0"
                 />
               </label>
+
               <template v-if="thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation">
-                <select
-                  :value="thermalFor(s.zone_id, s.system_category)?.regulation_type"
-                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: e.target.value || null })"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                >
-                  <option v-for="o in REGULATION_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                </select>
-                <select
-                  :value="thermalFor(s.zone_id, s.system_category)?.generator_type"
-                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: e.target.value || null })"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                >
-                  <option v-for="o in GENERATOR_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-                </select>
-                <input
-                  type="number"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  min="0"
-                  :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
-                  @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                  placeholder="Âge du générateur (ans)"
-                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                />
+                <div>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type de régulation</p>
+                  <select
+                    :value="thermalFor(s.zone_id, s.system_category)?.regulation_type ?? ''"
+                    @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: e.target.value || null })"
+                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
+                  >
+                    <option value="" disabled>— Sélectionner —</option>
+                    <option v-for="o in REGULATION_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                  </select>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Type de générateur</p>
+                  <select
+                    :value="thermalFor(s.zone_id, s.system_category)?.generator_type ?? ''"
+                    @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: e.target.value || null })"
+                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
+                  >
+                    <option value="" disabled>— Sélectionner —</option>
+                    <option v-for="o in GENERATOR_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                  </select>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Âge du générateur (ans)</p>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    min="0"
+                    :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
+                    @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
+                    placeholder="ex : 8"
+                    class="w-full px-3 py-3 text-base border border-gray-200 rounded-lg bg-white"
+                  />
+                </div>
               </template>
-              <label class="flex items-center justify-between gap-2 px-3 py-2 bg-white rounded-lg cursor-pointer text-xs text-gray-700">
-                <span>Exempté bois (R175-6 II)</span>
+
+              <!-- Exempté bois avec explication -->
+              <label class="flex items-start justify-between gap-3 px-3 py-3 bg-white rounded-lg cursor-pointer">
+                <div class="flex-1 min-w-0">
+                  <p class="text-base text-gray-900 font-medium">Exempté — appareil bois</p>
+                  <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Cocher si le générateur est un appareil <strong>indépendant</strong> de chauffage au bois (poêle, insert). Exempté de R175-6 (II du décret).
+                  </p>
+                </div>
                 <input
                   type="checkbox"
                   :checked="!!thermalFor(s.zone_id, s.system_category)?.generator_exempt_wood"
                   @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_exempt_wood: e.target.checked })"
-                  class="w-5 h-5"
+                  class="w-6 h-6 mt-1 shrink-0"
                 />
               </label>
             </div>

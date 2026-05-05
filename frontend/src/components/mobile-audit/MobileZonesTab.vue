@@ -176,7 +176,7 @@ const totalSurface = computed(() =>
       @save="save"
     >
       <div class="p-4 space-y-4">
-        <MobileField label="Nom" required>
+        <MobileField label="Nom" hint="Nom court qui identifie la zone dans tout l'audit. Reste cohérent avec les plans du bâtiment si possible." required>
           <input
             v-model="editForm.name"
             type="text"
@@ -186,7 +186,7 @@ const totalSurface = computed(() =>
           />
         </MobileField>
 
-        <MobileField label="Nature de la zone">
+        <MobileField label="Nature de la zone" hint="Type d'usage (R175-1 6°). Une zone fonctionnelle = un local ou regroupement de locaux ayant le même type d'utilisation.">
           <select
             v-model="editForm.nature"
             class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
@@ -196,7 +196,7 @@ const totalSurface = computed(() =>
           </select>
         </MobileField>
 
-        <MobileField label="Surface (m²)">
+        <MobileField label="Surface (m²)" hint="Surface au sol approximative de la zone.">
           <input
             v-model.number="editForm.surface_m2"
             type="number"
@@ -205,7 +205,7 @@ const totalSurface = computed(() =>
             min="0"
             step="1"
             placeholder="—"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white text-right font-medium"
           />
         </MobileField>
 

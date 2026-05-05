@@ -150,7 +150,10 @@ const generatorWorksDone = computed({
             </p>
           </MobileField>
 
-          <MobileField label="Date du permis de construire" hint="Si > 8 avril 2024 → soumis dès la livraison">
+          <MobileField
+            label="Date du permis de construire"
+            hint="Date délivrance PC. Si postérieur au 8 avril 2024, le bâtiment est soumis BACS dès la livraison sans seuil de puissance."
+          >
             <input
               type="date"
               :value="document?.bacs_building_permit_date || ''"
@@ -163,15 +166,19 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : travaux générateur -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-center gap-3 px-4 py-5 cursor-pointer">
+        <label class="flex items-start gap-3 px-4 py-5 cursor-pointer">
           <input
             type="checkbox"
             v-model="generatorWorksDone"
-            class="w-5 h-5"
+            class="w-6 h-6 mt-1 shrink-0"
           />
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900">Travaux générateur réalisés</p>
-            <p class="text-xs text-gray-500 mt-0.5">Déclencheur R175-6 si après 21/07/2021</p>
+            <p class="text-base font-medium text-gray-900">Travaux générateur réalisés</p>
+            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+              Y a-t-il eu des travaux de remplacement / installation d'un générateur
+              (chaudière, PAC…) après le 21/07/2021 ? Si oui, R175-6 (régulation thermique)
+              s'applique en plus.
+            </p>
           </div>
         </label>
         <div v-if="document?.bacs_generator_works_date != null" class="px-4 pb-4 border-t border-gray-100 pt-3">
@@ -188,15 +195,19 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : réseau urbain -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-center gap-3 px-4 py-5 cursor-pointer">
+        <label class="flex items-start gap-3 px-4 py-5 cursor-pointer">
           <input
             type="checkbox"
             v-model="districtConnected"
-            class="w-5 h-5"
+            class="w-6 h-6 mt-1 shrink-0"
           />
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900">Raccordé à un réseau urbain</p>
-            <p class="text-xs text-gray-500 mt-0.5">Chaleur ou froid via station d'échange</p>
+            <p class="text-base font-medium text-gray-900">Raccordé à un réseau urbain</p>
+            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+              Le bâtiment reçoit son chauffage ou sa climatisation via une sous-station
+              connectée à un réseau de chaleur / froid de quartier. Dans ce cas, la
+              puissance retenue pour R175-2 = puissance de la station, pas des équipements aval.
+            </p>
           </div>
         </label>
         <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
