@@ -34,7 +34,16 @@ const props = defineProps({
   searchPlaceholder: { type: String, default: 'Rechercher…' },
   disabled: { type: Boolean, default: false },
   clearable: { type: Boolean, default: true },
+  // 'md' (defaut) = px-3 py-2 ~38px ; 'sm' = px-2 py-1 ~28px pour les
+  // formulaires denses (SystemDevicesTable, inline editing).
+  size: { type: String, default: 'md' },
 })
+
+const triggerCls = computed(() => [
+  'w-full flex items-center gap-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition',
+  props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
+  props.disabled ? 'opacity-50 cursor-not-allowed' : '',
+])
 
 // Recherche auto-desactivee si la liste est courte (UX : eviter le focus
 // trap sur 4 options visibles d'un coup d'oeil).
@@ -165,8 +174,7 @@ function clear() {
 <template>
   <div ref="rootRef" class="relative" @keydown="onKeydown">
     <button ref="triggerRef" type="button" @click="toggle" :disabled="disabled"
-            :class="['w-full flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition',
-                     disabled ? 'opacity-50 cursor-not-allowed' : '']">
+            :class="triggerCls">
       <FontAwesomeIcon
         v-if="selectedOption?.icon"
         :icon="['fas', faName(selectedOption.icon)]"

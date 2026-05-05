@@ -109,10 +109,11 @@ watch(() => props.devices.length, refreshPhotos)
 onMounted(refreshPhotos)
 
 // Classes CSS partagees pour coherence visuelle (inputs + selects)
-// Style moderne unifie (cf. feedback_form_style_modern.md) : rounded-lg,
-// padding genereux, focus ring/30 + border indigo, transitions douces.
-const inputCls = 'w-full text-sm px-2.5 py-1.5 border border-gray-200 rounded-lg hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white'
-const selectCls = 'w-full text-sm px-2.5 py-1.5 border border-gray-200 rounded-lg hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-center transition bg-white'
+// Compact : px-2 py-1 (28px hauteur) au lieu de la version large py-2
+// (40px). Cette card est dense, plus besoin du padding "premium" — on
+// reste sur rounded-md + ring/30 qui suffit visuellement.
+const inputCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white'
+const selectCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-center transition bg-white'
 const inputAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 placeholder:italic placeholder:text-gray-400'
 const selectAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center'
 
@@ -294,6 +295,7 @@ async function removeDevice(d) {
                 @update:model-value="v => patchDevice(d, { energy_source: v || null })"
                 :options="ENERGY_OPTIONS"
                 :clearable="false"
+                size="sm"
                 placeholder="Énergie"
               />
             </div>
@@ -304,6 +306,7 @@ async function removeDevice(d) {
                 @update:model-value="v => patchDevice(d, { device_role: v || null })"
                 :options="ROLE_OPTIONS"
                 :clearable="false"
+                size="sm"
                 placeholder="Rôle"
               />
             </div>
@@ -322,7 +325,7 @@ async function removeDevice(d) {
             </div>
             <div>
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Liaison GTB</label>
-              <div class="flex items-center gap-1.5 h-9">
+              <div class="flex items-center gap-1.5 h-7">
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
                         :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
