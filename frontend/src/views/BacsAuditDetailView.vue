@@ -1060,79 +1060,94 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
-        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden bg-white">
-          <button @click="setAllSectionsCollapsed(true)"
-                  class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 whitespace-nowrap"
-                  title="Replier toutes les sections">
-            <ChevronDoubleUpIcon class="w-3.5 h-3.5 shrink-0" /> Tout replier
-          </button>
-          <span class="w-px bg-gray-200"></span>
-          <button @click="setAllSectionsCollapsed(false)"
-                  class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 whitespace-nowrap"
-                  title="Déplier toutes les sections">
-            <ChevronDoubleDownIcon class="w-3.5 h-3.5 shrink-0" /> Tout déplier
-          </button>
-        </div>
-        <button @click="showActivity = !showActivity"
-                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-lg whitespace-nowrap',
-                         showActivity
-                           ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                           : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']"
-                title="Panneau d'activité">
-          <ClockIcon class="w-3.5 h-3.5 shrink-0" /> Activité
-        </button>
-        <OpenOnPhoneButton
-          v-if="!isNarrow"
-          :context-label="`${document?.client_name || ''} — ${document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB')}`"
-        />
-        <button @click="showShare = true"
-          title="Partager cet audit avec d'autres utilisateurs Buildy"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
-          <UserPlusIcon class="w-3.5 h-3.5 shrink-0" /> Partager
-        </button>
-        <button v-if="document?.site_uuid" @click="openBulkUpload"
-          title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
-          <PhotoIcon class="w-3.5 h-3.5 shrink-0" /> Photos terrain
-        </button>
-        <button @click="openTranscript"
-          title="Importer le transcript Plaud Pro et laisser Claude pré-remplir les champs"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 whitespace-nowrap">
-          <SparklesIcon class="w-3.5 h-3.5 shrink-0" /> Transcript IA
-        </button>
+        <!-- Actions principales toujours visibles -->
         <button @click="openPreview"
-          title="Aperçu HTML rapide du rapport (sans génération PDF, pour valider le contenu avant export)"
+          title="Aperçu HTML rapide du rapport (sans génération PDF)"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
           <EyeIcon class="w-3.5 h-3.5 shrink-0" /> Aperçu
         </button>
-        <button @click="exportPdf" :disabled="exporting"
-          title="Génère le rapport d'audit complet (synthèse + plan d'actions + annexes) au format PDF A4"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exporting ? 'Génération…' : 'Générer le rapport' }}
-        </button>
-        <button @click="exportTablesPdf" :disabled="exportingTables"
-          title="Génère les tableaux de synthèse (A3 paysage, 4 tableaux denses : zones, systèmes, compteurs, régulation, plan d'action) — format scannable destiné à l'intégrateur Buildy pour bâtir le devis."
-          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-3.5 h-3.5 shrink-0" /> {{ exportingTables ? 'Génération…' : 'Tableaux de synthèse' }}
-        </button>
-        <button @click="deliver" :disabled="delivering" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
+        <button @click="deliver" :disabled="delivering"
+          title="Génère le PDF final + fige le snapshot Git"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> {{ delivering ? 'Livraison…' : 'Livrer' }}
         </button>
-        <!-- Menu engrenage : actions audit (kind switch déjà dans le titre, supprimer ici) -->
+
+        <!-- Menu engrenage : tous les autres outils + actions admin -->
         <div ref="settingsMenuRef" class="relative">
           <button @click="showSettingsMenu = !showSettingsMenu"
-            title="Paramètres de l'audit"
+            title="Plus d'options"
             :class="['inline-flex items-center justify-center w-8 h-8 rounded-lg border whitespace-nowrap',
                      showSettingsMenu ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50']">
             <Cog6ToothIcon class="w-4 h-4" />
           </button>
           <div v-if="showSettingsMenu"
-               class="absolute right-0 top-full mt-1 z-30 w-56 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+               class="absolute right-0 top-full mt-1 z-30 w-64 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden py-1"
                @click.stop>
-            <button
-              @click="showSettingsMenu = false; deleteAudit()"
-              class="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
-            >
+            <!-- Partage & accès -->
+            <button @click="showSettingsMenu = false; showShare = true"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <UserPlusIcon class="w-4 h-4 shrink-0 text-indigo-600" />
+              Partager cet audit
+            </button>
+            <div class="px-3 py-1">
+              <OpenOnPhoneButton
+                v-if="!isNarrow"
+                :context-label="`${document?.client_name || ''} — ${document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB')}`"
+              />
+            </div>
+
+            <div class="border-t border-gray-100 my-1"></div>
+
+            <!-- Outils saisie -->
+            <button v-if="document?.site_uuid" @click="showSettingsMenu = false; openBulkUpload()"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <PhotoIcon class="w-4 h-4 shrink-0 text-emerald-600" />
+              Photos terrain (import en masse)
+            </button>
+            <button @click="showSettingsMenu = false; openTranscript()"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <SparklesIcon class="w-4 h-4 shrink-0 text-purple-600" />
+              Transcript IA (Plaud Pro)
+            </button>
+            <button @click="showSettingsMenu = false; showActivity = true"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <ClockIcon class="w-4 h-4 shrink-0 text-indigo-600" />
+              Panneau d'activité
+            </button>
+
+            <div class="border-t border-gray-100 my-1"></div>
+
+            <!-- Exports PDF -->
+            <button @click="showSettingsMenu = false; exportPdf()" :disabled="exporting"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left disabled:opacity-50">
+              <DocumentArrowDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
+              {{ exporting ? 'Génération…' : 'Générer le rapport (PDF A4)' }}
+            </button>
+            <button @click="showSettingsMenu = false; exportTablesPdf()" :disabled="exportingTables"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left disabled:opacity-50">
+              <DocumentArrowDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
+              {{ exportingTables ? 'Génération…' : 'Tableaux de synthèse (A3)' }}
+            </button>
+
+            <div class="border-t border-gray-100 my-1"></div>
+
+            <!-- Affichage -->
+            <button @click="showSettingsMenu = false; setAllSectionsCollapsed(true)"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <ChevronDoubleUpIcon class="w-4 h-4 shrink-0 text-gray-500" />
+              Tout replier
+            </button>
+            <button @click="showSettingsMenu = false; setAllSectionsCollapsed(false)"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <ChevronDoubleDownIcon class="w-4 h-4 shrink-0 text-gray-500" />
+              Tout déplier
+            </button>
+
+            <div class="border-t border-gray-100 my-1"></div>
+
+            <!-- Suppression -->
+            <button @click="showSettingsMenu = false; deleteAudit()"
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 text-left">
               <TrashIcon class="w-4 h-4 shrink-0" />
               Supprimer cet audit
             </button>
