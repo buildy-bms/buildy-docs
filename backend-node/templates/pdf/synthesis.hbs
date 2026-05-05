@@ -150,18 +150,23 @@
       <tr>
         <th class="sys-num">N°</th>
         <th class="sys-title">Système</th>
-        <th class="sys-bacs">Exigé par BACS</th>
+        <th class="sys-bacs">Exigé BACS</th>
         <th class="sys-status">Statut</th>
         <th class="sys-num-cell">Instances</th>
-        <th class="sys-num-cell">Pts lecture</th>
-        <th class="sys-num-cell">Pts écriture</th>
+        <th class="sys-num-cell">Pts lect.</th>
+        <th class="sys-num-cell">Pts écrit.</th>
       </tr>
     </thead>
     <tbody>
       {{#each systemsSummary}}
       <tr class="sys-row sys-row-{{statusClass}} {{#if bacsAlert}}sys-row-bacs-alert{{/if}}">
         <td class="sys-num"><code>§{{number}}</code></td>
-        <td class="sys-title">{{title}}</td>
+        <td class="sys-title">
+          <span class="cell-with-icon">
+            {{#if icon}}{{{faIcon icon iconColor "11"}}}{{/if}}
+            <span>{{title}}</span>
+          </span>
+        </td>
         <td class="sys-bacs">
           {{#if bacsRequired}}
             <span class="bacs-yes" title="{{bacs}}">Oui</span>
@@ -209,7 +214,7 @@
         <th>Référence</th>
         <th>Localisation</th>
         <th class="sys-num-cell">Qté</th>
-        <th>Zones fonctionnelles</th>
+        <th>Zones</th>
         <th>Catégories d'usage</th>
       </tr>
     </thead>
@@ -217,12 +222,28 @@
       {{#each instancesDetailed}}
       <tr class="sys-row {{#if isOptedOut}}sys-row-opted-out{{/if}}">
         <td class="sys-num"><code>§{{systemNumber}}</code></td>
-        <td class="sys-title">{{systemTitle}}</td>
+        <td class="sys-title">
+          <span class="cell-with-icon">
+            {{#if systemIcon}}{{{faIcon systemIcon systemIconColor "11"}}}{{/if}}
+            <span>{{systemTitle}}</span>
+          </span>
+        </td>
         <td><strong>{{reference}}</strong></td>
         <td>{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
         <td class="sys-num-cell">{{qty}}</td>
         <td>{{#if zones}}{{zones}}{{else}}<span class="muted">—</span>{{/if}}</td>
-        <td>{{#if categories}}{{categories}}{{else}}<span class="muted">—</span>{{/if}}</td>
+        <td>
+          {{#if categories.length}}
+            <span class="category-pills">
+              {{#each categories}}
+              <span class="category-pill">
+                {{#if icon}}{{{faIcon icon color "10"}}}{{/if}}
+                <span>{{label}}</span>
+              </span>
+              {{/each}}
+            </span>
+          {{else}}<span class="muted">—</span>{{/if}}
+        </td>
       </tr>
       {{/each}}
     </tbody>

@@ -399,6 +399,7 @@ table.systems-table th {
   background: #1b2842; color: white; padding: 3mm 3mm; text-align: left;
   font-family: 'Poppins', sans-serif; font-size: 8pt; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle;
+  white-space: nowrap;
 }
 table.systems-table td {
   padding: 1.8mm 3mm; border-bottom: 0.3mm solid #e5e7eb; vertical-align: middle;
@@ -437,6 +438,34 @@ table.systems-table tfoot td {
 
 .sys-row-opted-out td.sys-title { text-decoration: line-through; color: #92400e; }
 .sys-row-excluded  td.sys-title { color: #991b1b; }
+
+/* Cellule "Système" avec icône inline (chauffage, ventil, etc.) */
+.cell-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.cell-with-icon > svg { flex-shrink: 0; }
+
+/* Pills de catégories d'usage (avec icône colorée) — colonne instances */
+.category-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1.2mm;
+}
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8mm;
+  background: #f8fafc;
+  border: 0.2mm solid #e2e8f0;
+  border-radius: 999px;
+  padding: 0.4mm 1.8mm;
+  font-size: 7.5pt;
+  color: #1f2937;
+  white-space: nowrap;
+}
+.category-pill > svg { flex-shrink: 0; }
 
 .m-bacs-tag {
   display: inline-block; background: #faf5ff; color: #6d28d9;

@@ -763,6 +763,33 @@ async function routes(fastify) {
     const functionalitiesIncluded = functionalities.filter(f => f.included).length;
     const functionalitiesPaidOption = functionalities.filter(f => f.statusInAf === 'paid_option').length;
 
+    // Numérotation live (alignée arbo édition + PDF AF) calculée sur les
+    // sections incluses dans l'export et triées par position. Le `number`
+    // figé en DB ne reflète plus la position courante après déplacements.
+    const liveNumberingSynth = (() => {
+      const map = new Map();
+      const byParent = new Map();
+      const filtered = liveSections.filter(s => s.included_in_export);
+      for (const s of filtered) {
+        const k = s.parent_id || 'root';
+        if (!byParent.has(k)) byParent.set(k, []);
+        byParent.get(k).push(s);
+      }
+      for (const arr of byParent.values()) {
+        arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      }
+      function walk(parentKey, prefix) {
+        const arr = byParent.get(parentKey) || [];
+        arr.forEach((s, idx) => {
+          const num = prefix ? `${prefix}.${idx + 1}` : String(idx + 1);
+          map.set(s.id, num);
+          walk(s.id, num);
+        });
+      }
+      walk('root', '');
+      return map;
+    })();
+
     // ── Synthèse systèmes ──
     // Filtrage : on n'affiche QUE les systèmes pertinents pour la livraison.
     // Sont ecartes :
@@ -791,10 +818,13 @@ async function routes(fastify) {
         // Alerte rouge pale : système exigé par BACS, instancié, mais ecarte par MOA
         // (incoherence reglementaire potentielle a remonter au lecteur).
         const bacsAlert = bacsRequired && e.instances > 0 && isOptedOut;
+        const tpl = sec.equipment_template_id ? db.equipmentTemplates.getById(sec.equipment_template_id) : null;
 
         return {
-          number: sec.number,
+          number: liveNumberingSynth.get(sec.id) || '',
           title: sec.title,
+          icon: tpl?.icon_value || null,
+          iconColor: tpl?.icon_color || null,
           bacsRequired,
           bacs: liveBacs,
           isMetering: isMeteringSystem(sec),
@@ -820,20 +850,27 @@ async function routes(fastify) {
       .filter(e => e.sec.included_in_export && e.instances > 0)
       .flatMap(e => {
         const sec = e.sec;
+        const tpl = sec.equipment_template_id ? db.equipmentTemplates.getById(sec.equipment_template_id) : null;
         const instances = db.equipmentInstances.listBySection(sec.id);
         return instances.map(inst => {
           const zones = db.instanceZones.listForInstance(inst.id) || [];
           const cats = (db.instanceCategories.listForInstance(inst.id) || [])
-            .map(k => categoriesByKey.get(k)?.label || k);
+            .map(k => {
+              const c = categoriesByKey.get(k);
+              return c ? { label: c.label, icon: c.icon_value, color: c.icon_color } : { label: k, icon: null, color: null };
+            });
           return {
-            systemNumber: sec.number,
+            systemNumber: liveNumberingSynth.get(sec.id) || '',
             systemTitle: sec.title,
+            systemIcon: tpl?.icon_value || null,
+            systemIconColor: tpl?.icon_color || null,
+            systemIconKind: tpl?.icon_kind || null,
             isOptedOut: sec.opted_out_by_moa === 1,
             reference: inst.reference,
             location: inst.location || '',
             qty: inst.qty || 1,
             zones: zones.map(z => z.name).join(', '),
-            categories: cats.join(', '),
+            categories: cats,
           };
         });
       });
