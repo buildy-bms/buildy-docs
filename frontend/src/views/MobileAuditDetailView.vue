@@ -16,6 +16,7 @@ import {
   CheckCircleIcon,
   FireIcon,
   BuildingOffice2Icon,
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -132,6 +133,28 @@ async function deliver() {
   } finally {
     delivering.value = false
   }
+}
+
+// Forcer le rechargement complet : utile en PWA standalone iOS où le SW
+// peut servir un app-shell obsolète. Désinscrit le SW + purge les caches
+// + reload bypass-cache.
+const forcing = ref(false)
+async function forceRefresh() {
+  forcing.value = true
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map(r => r.unregister()))
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+    }
+  } catch { /* silencieux */ }
+  // Bypass cache HTTP via timestamp
+  const url = new URL(window.location.href)
+  url.searchParams.set('__t', Date.now().toString())
+  window.location.replace(url.toString())
 }
 
 async function removeAudit() {
@@ -324,6 +347,21 @@ async function removeAudit() {
           <CheckCircleIcon class="w-5 h-5" />
           {{ delivering ? 'Livraison…' : (document?.delivered_at ? 'Re-livrer (nouvelle version)' : 'Livrer cet audit') }}
         </button>
+
+        <!-- Action : Forcer le rechargement (cache PWA / SW) -->
+        <div class="pt-4 border-t border-gray-200">
+          <button
+            @click="forceRefresh"
+            :disabled="forcing"
+            class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-xl active:bg-gray-50 disabled:opacity-50"
+          >
+            <ArrowPathIcon :class="['w-5 h-5', forcing ? 'animate-spin' : '']" />
+            Forcer l'actualisation
+          </button>
+          <p class="text-xs text-gray-500 mt-2 leading-relaxed">
+            Recharge l'app en purgeant le cache. Utile si une mise à jour ne s'affiche pas.
+          </p>
+        </div>
 
         <!-- Action : Supprimer -->
         <div class="pt-4 border-t border-gray-200">

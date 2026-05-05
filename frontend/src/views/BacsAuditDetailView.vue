@@ -60,9 +60,12 @@ import { useAuditStore } from '@/stores/audit'
 import { useViewport } from '@/composables/useViewport'
 import MobileAuditNav from '@/components/MobileAuditNav.vue'
 import OpenOnPhoneButton from '@/components/OpenOnPhoneButton.vue'
+import ShareAfModal from '@/components/ShareAfModal.vue'
+import { UserPlusIcon } from '@heroicons/vue/24/outline'
 
 const auditStore = useAuditStore()
 const { isNarrow } = useViewport()
+const showShare = ref(false)
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -1051,6 +1054,11 @@ onBeforeUnmount(() => {
           v-if="!isNarrow"
           :context-label="`${document?.client_name || ''} — ${document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB')}`"
         />
+        <button @click="showShare = true"
+          title="Partager cet audit avec d'autres utilisateurs Buildy"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
+          <UserPlusIcon class="w-3.5 h-3.5 shrink-0" /> Partager
+        </button>
         <button v-if="document?.site_uuid" @click="openBulkUpload"
           title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
@@ -1341,6 +1349,9 @@ onBeforeUnmount(() => {
       @close="closePreview"
       @download="exportPdf"
     />
+
+    <!-- Partage audit (mêmes APIs que ShareAfModal AF — table documents unifiée) -->
+    <ShareAfModal v-if="showShare" :af-id="docId" @close="showShare = false" />
 
     <!-- Bottom navigation mobile/tablette portrait : raccourcis vers les sections principales -->
     <MobileAuditNav

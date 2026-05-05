@@ -447,28 +447,35 @@ const USAGES = [
               </p>
             </div>
             <p class="text-sm text-gray-500 mb-3">{{ SYSTEM_LABEL[d.system_category] || d.system_category }} · {{ d.zone_name }}</p>
-            <div class="flex items-center gap-3">
-              <label class="flex-1 inline-flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 rounded-xl cursor-pointer">
-                <span class="text-xs font-medium text-gray-700">Intégré</span>
+            <div class="grid grid-cols-2 gap-2">
+              <label
+                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
+                         d.managed_by_bms ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200',
+                         d.out_of_service ? 'opacity-40' : '']"
+              >
+                <span class="text-base font-medium text-gray-800">Intégré</span>
                 <input
                   type="checkbox"
                   :checked="!!d.managed_by_bms"
                   :disabled="d.out_of_service"
                   @change="e => patchDeviceBms(d, { managed_by_bms: e.target.checked })"
-                  class="w-5 h-5"
+                  class="w-7 h-7 shrink-0"
                 />
               </label>
               <label
-                :class="['flex-1 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl cursor-pointer',
-                         (!d.managed_by_bms || !d.wired) ? 'bg-gray-50 opacity-50' : 'bg-emerald-50']"
+                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
+                         (d.managed_by_bms && d.wired && !d.bms_integration_out_of_service)
+                           ? 'bg-emerald-50 border-emerald-300'
+                           : 'bg-white border-gray-200',
+                         (!d.managed_by_bms || !d.wired) ? 'opacity-40' : '']"
               >
-                <span class="text-xs font-medium text-gray-700">Opérationnel</span>
+                <span class="text-base font-medium text-gray-800">Opérationnel</span>
                 <input
                   type="checkbox"
                   :checked="d.managed_by_bms && d.wired && !d.bms_integration_out_of_service"
                   :disabled="!d.managed_by_bms || !d.wired"
                   @change="e => patchDeviceBms(d, { bms_integration_out_of_service: !e.target.checked })"
-                  class="w-5 h-5 accent-emerald-500"
+                  class="w-7 h-7 shrink-0 accent-emerald-500"
                 />
               </label>
             </div>
@@ -497,31 +504,35 @@ const USAGES = [
               <MeterUsagePill :usage="m.usage" />
               <span class="text-sm text-gray-500">{{ m.zone_name || 'général' }}</span>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="grid grid-cols-2 gap-2">
               <label
-                :class="['flex-1 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl cursor-pointer',
-                         !m.communicating ? 'bg-gray-50 opacity-50' : 'bg-gray-50']"
+                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
+                         m.managed_by_bms ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200',
+                         (m.out_of_service || !m.communicating) ? 'opacity-40' : '']"
               >
-                <span class="text-xs font-medium text-gray-700">Intégré</span>
+                <span class="text-base font-medium text-gray-800">Intégré</span>
                 <input
                   type="checkbox"
                   :checked="!!m.managed_by_bms"
                   :disabled="m.out_of_service || !m.communicating"
                   @change="e => patchMeterBms(m, { managed_by_bms: e.target.checked })"
-                  class="w-5 h-5"
+                  class="w-7 h-7 shrink-0"
                 />
               </label>
               <label
-                :class="['flex-1 inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl cursor-pointer',
-                         (!m.managed_by_bms || !m.wired) ? 'bg-gray-50 opacity-50' : 'bg-emerald-50']"
+                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
+                         (m.managed_by_bms && m.wired && !m.bms_integration_out_of_service)
+                           ? 'bg-emerald-50 border-emerald-300'
+                           : 'bg-white border-gray-200',
+                         (!m.managed_by_bms || !m.wired) ? 'opacity-40' : '']"
               >
-                <span class="text-xs font-medium text-gray-700">Opérationnel</span>
+                <span class="text-base font-medium text-gray-800">Opérationnel</span>
                 <input
                   type="checkbox"
                   :checked="m.managed_by_bms && m.wired && !m.bms_integration_out_of_service"
                   :disabled="!m.managed_by_bms || !m.wired"
                   @change="e => patchMeterBms(m, { bms_integration_out_of_service: !e.target.checked })"
-                  class="w-5 h-5 accent-emerald-500"
+                  class="w-7 h-7 shrink-0 accent-emerald-500"
                 />
               </label>
             </div>
