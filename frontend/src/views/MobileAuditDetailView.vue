@@ -23,6 +23,8 @@ import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useConfirm } from '@/composables/useConfirm'
 import { updateAf, deleteAf, deliverBacsAudit } from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
+import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
+import { UserPlusIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -86,8 +88,14 @@ function goBack() {
 
 // Sheet paramètres audit (kind, livrer, supprimer)
 const showSettings = ref(false)
+const showShare = ref(false)
 const switching = ref(false)
 const delivering = ref(false)
+
+function openShare() {
+  showSettings.value = false
+  showShare.value = true
+}
 
 async function switchKind(newKind) {
   if (!document.value || newKind === document.value.kind) return
@@ -298,6 +306,15 @@ async function removeAudit() {
           </div>
         </div>
 
+        <!-- Action : Partager -->
+        <button
+          @click="openShare"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl"
+        >
+          <UserPlusIcon class="w-5 h-5" />
+          Partager l'audit
+        </button>
+
         <!-- Action : Livrer -->
         <button
           @click="deliver"
@@ -323,6 +340,13 @@ async function removeAudit() {
         </div>
       </div>
     </MobileSheet>
+
+    <!-- Sheet Partager l'audit -->
+    <MobileShareSheet
+      :open="showShare"
+      :doc-id="docId"
+      @close="showShare = false"
+    />
   </div>
 </template>
 
