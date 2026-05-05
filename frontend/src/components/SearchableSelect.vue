@@ -2,16 +2,30 @@
 /**
  * Combobox recherchable. Props :
  *  - modelValue : valeur courante (peut etre null)
- *  - options    : Array<{ value, label, hint?, indent? }>
+ *  - options    : Array<{ value, label, hint?, indent?, icon?, color? }>
  *                  indent : nombre d'espaces de prefixe (rendu visuel hierarchie)
+ *                  icon   : 'fa-fire' / 'fa-bolt' / etc. (FontAwesome Solid Pro,
+ *                           prefixe 'fa-' optionnel) — affiche en tete de ligne
+ *                           ET dans le bouton trigger quand selectionne
+ *                  color  : couleur hex de l'icone (defaut #6b7280)
  *  - placeholder : texte affiche quand aucune option
  *  - searchPlaceholder : placeholder de l'input recherche
- *  - autofocus  : focus l'input au mount du popover
+ *  - clearable : afficher le bouton X pour reset a null (defaut true)
  *
  * Filtre simple sur label + hint, insensible aux accents et a la casse.
+ * Auto-recherche desactivee si <6 options (UX inutile sur listes courtes).
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
+library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+
+function faName(icon) {
+  if (!icon) return null
+  return icon.replace(/^fa-/, '')
+}
 
 const props = defineProps({
   modelValue: { type: [String, Number, null], default: null },
@@ -19,7 +33,15 @@ const props = defineProps({
   placeholder: { type: String, default: 'Sélectionner…' },
   searchPlaceholder: { type: String, default: 'Rechercher…' },
   disabled: { type: Boolean, default: false },
+  clearable: { type: Boolean, default: true },
 })
+
+// Recherche auto-desactivee si la liste est courte (UX : eviter le focus
+// trap sur 4 options visibles d'un coup d'oeil).
+const showSearch = computed(() => props.options.length >= 6)
+// Toute option avec une icone -> on reserve la colonne icone pour aligner
+// les labels meme sur les options sans icone (sinon ca saute visuellement).
+const hasAnyIcon = computed(() => props.options.some(o => o.icon))
 const emit = defineEmits(['update:modelValue'])
 
 const open = ref(false)
@@ -115,10 +137,16 @@ function clear() {
     <button type="button" @click="toggle" :disabled="disabled"
             :class="['w-full flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition',
                      disabled ? 'opacity-50 cursor-not-allowed' : '']">
+      <FontAwesomeIcon
+        v-if="selectedOption?.icon"
+        :icon="['fas', faName(selectedOption.icon)]"
+        :style="{ color: selectedOption.color || '#6b7280' }"
+        class="w-4 h-4 shrink-0"
+      />
       <span class="flex-1 text-left truncate" :class="selectedOption ? 'text-gray-900' : 'text-gray-400 italic'">
         {{ selectedOption?.label || placeholder }}
       </span>
-      <button v-if="selectedOption && !disabled" type="button"
+      <button v-if="clearable && selectedOption && !disabled" type="button"
               @click.stop="clear"
               class="text-gray-400 hover:text-gray-600 -my-1 p-0.5 rounded"
               title="Effacer la sélection">
@@ -129,7 +157,7 @@ function clear() {
     </button>
     <div v-if="open"
          class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-      <div class="relative border-b border-gray-100">
+      <div v-if="showSearch" class="relative border-b border-gray-100">
         <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
         <input ref="inputRef" v-model="search" type="text"
                :placeholder="searchPlaceholder"
@@ -141,12 +169,20 @@ function clear() {
                 type="button" @click="pick(o)"
                 @mouseenter="activeIndex = i"
                 :data-active="activeIndex === i"
-                :class="['w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left transition',
+                :class="['w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left transition',
                          o.value === modelValue ? 'bg-indigo-50 text-indigo-700 font-medium'
                            : (activeIndex === i ? 'bg-gray-50 text-gray-900' : 'text-gray-700 hover:bg-gray-50')]">
           <span v-if="o.indent" class="text-gray-300" :style="{ paddingLeft: `${(o.indent - 1) * 12}px` }">└─</span>
+          <FontAwesomeIcon
+            v-if="o.icon"
+            :icon="['fas', faName(o.icon)]"
+            :style="{ color: o.color || '#6b7280' }"
+            class="w-4 h-4 shrink-0"
+          />
+          <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
           <span class="flex-1 truncate">{{ o.label }}</span>
           <span v-if="o.hint" class="text-[11px] text-gray-400 truncate">{{ o.hint }}</span>
+          <CheckIcon v-if="o.value === modelValue" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
         </button>
         <div v-if="!filteredOptions.length" class="px-3 py-3 text-xs text-gray-400 italic text-center">
           Aucun résultat

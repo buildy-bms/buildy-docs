@@ -106,40 +106,9 @@ const showAddMeterModal = ref(false)
 const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
 
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
-const ENERGY_OPTIONS = [
-  { value: null, label: 'Énergie' },
-  { value: 'gas', label: 'Gaz' },
-  { value: 'electric', label: 'Électrique' },
-  { value: 'wood', label: 'Bois' },
-  { value: 'heat_pump', label: 'PAC' },
-  { value: 'district_heating', label: 'Réseau de chaleur' },
-  { value: 'fuel_oil', label: 'Fioul' },
-  { value: 'solar', label: 'Solaire' },
-  { value: 'biomass', label: 'Biomasse' },
-  { value: 'autre', label: 'Autre' },
-]
-const ROLE_OPTIONS = [
-  { value: null, label: 'Nature' },
-  { value: 'production', label: 'Production' },
-  { value: 'distribution', label: 'Distribution' },
-  { value: 'emission', label: 'Émission' },
-  { value: 'regulation', label: 'Régulation' },
-  { value: 'autre', label: 'Autre' },
-]
-const COMM_OPTIONS = [
-  { value: null, label: '—' },
-  { value: 'modbus_tcp', label: 'Modbus TCP' },
-  { value: 'modbus_rtu', label: 'Modbus RTU' },
-  { value: 'bacnet_ip', label: 'BACnet IP' },
-  { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
-  { value: 'knx', label: 'KNX' },
-  { value: 'mbus', label: 'M-Bus' },
-  { value: 'mqtt', label: 'MQTT' },
-  { value: 'lorawan', label: 'LoRaWAN' },
-  { value: 'autre', label: 'Autre' },
-  { value: 'non_communicant', label: 'Non communicant' },
-  { value: 'absent', label: 'Absent' },
-]
+// Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
+// SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
 
 async function submitAddDevice(payload) {
   if (!addDeviceModalSystem.value) return

@@ -10,6 +10,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropzone from './PhotoDropzone.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
+import SearchableSelect from './SearchableSelect.vue'
 
 /**
  * Sous-table éditable des équipements (devices) d'un système BACS donné.
@@ -36,40 +37,8 @@ function hasNotes(htmlOrText) {
 const { error } = useNotification()
 const { confirm } = useConfirm()
 
-const ENERGY_OPTIONS = [
-  { value: null, label: 'Énergie' },
-  { value: 'gas', label: 'Gaz' },
-  { value: 'electric', label: 'Électrique' },
-  { value: 'wood', label: 'Bois' },
-  { value: 'heat_pump', label: 'PAC' },
-  { value: 'district_heating', label: 'Réseau de chaleur' },
-  { value: 'fuel_oil', label: 'Fioul' },
-  { value: 'solar', label: 'Solaire' },
-  { value: 'biomass', label: 'Biomasse' },
-  { value: 'autre', label: 'Autre' },
-]
-const ROLE_OPTIONS = [
-  { value: null, label: 'Nature' },
-  { value: 'production', label: 'Production' },
-  { value: 'distribution', label: 'Distribution' },
-  { value: 'emission', label: 'Émission' },
-  { value: 'regulation', label: 'Régulation' },
-  { value: 'autre', label: 'Autre' },
-]
-const COMM_OPTIONS = [
-  { value: 'modbus_tcp', label: 'Modbus TCP' },
-  { value: 'modbus_rtu', label: 'Modbus RTU' },
-  { value: 'bacnet_ip', label: 'BACnet IP' },
-  { value: 'bacnet_mstp', label: 'BACnet MS/TP' },
-  { value: 'knx', label: 'KNX' },
-  { value: 'mbus', label: 'M-Bus' },
-  { value: 'lonworks', label: 'LonWorks' },
-  { value: 'mqtt', label: 'MQTT' },
-  { value: 'opcua', label: 'OPC-UA' },
-  { value: 'rest', label: 'API REST' },
-  { value: 'lorawan', label: 'LoRaWAN' },
-  { value: 'autre', label: 'Autre' },
-]
+// Source partagee : lib/audit-options.js (icones + couleurs synchronises)
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
 
 const newDevice = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
@@ -272,21 +241,21 @@ async function removeDevice(d) {
             </div>
             <div class="col-span-4 md:col-span-2">
               <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Énergie</label>
-              <select :value="d.energy_source"
-                      @change="e => patchDevice(d, { energy_source: e.target.value || null })"
-                      :class="selectCls">
-                <option :value="null">—</option>
-                <option v-for="o in ENERGY_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
-              </select>
+              <SearchableSelect
+                :model-value="d.energy_source"
+                @update:model-value="v => patchDevice(d, { energy_source: v || null })"
+                :options="ENERGY_OPTIONS"
+                placeholder="Énergie"
+              />
             </div>
             <div class="col-span-4 md:col-span-2">
               <label class="block text-[11px] font-medium text-gray-500 mb-0.5">Nature</label>
-              <select :value="d.device_role"
-                      @change="e => patchDevice(d, { device_role: e.target.value || null })"
-                      :class="selectCls">
-                <option :value="null">—</option>
-                <option v-for="o in ROLE_OPTIONS.filter(x => x.value)" :key="o.value" :value="o.value">{{ o.label }}</option>
-              </select>
+              <SearchableSelect
+                :model-value="d.device_role"
+                @update:model-value="v => patchDevice(d, { device_role: v || null })"
+                :options="ROLE_OPTIONS"
+                placeholder="Nature"
+              />
             </div>
           </div>
 

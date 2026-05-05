@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
+import SearchableSelect from './SearchableSelect.vue'
 
 const props = defineProps({
   systemLabel: { type: String, required: true },
@@ -60,10 +61,11 @@ async function submit() {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Énergie</label>
-          <select v-model="form.energy_source"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
-            <option v-for="o in energyOptions" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-          </select>
+          <SearchableSelect
+            v-model="form.energy_source"
+            :options="energyOptions"
+            placeholder="Sélectionner une énergie"
+          />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Puissance (kW)</label>
@@ -73,17 +75,19 @@ async function submit() {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Nature</label>
-          <select v-model="form.device_role"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
-            <option v-for="o in roleOptions" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-          </select>
+          <SearchableSelect
+            v-model="form.device_role"
+            :options="roleOptions"
+            placeholder="Sélectionner une nature"
+          />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Protocole de communication</label>
-          <select v-model="form.communication_protocol"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
-            <option v-for="o in commOptions" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-          </select>
+          <SearchableSelect
+            v-model="form.communication_protocol"
+            :options="commOptions"
+            placeholder="Sélectionner un protocole"
+          />
         </div>
         <div class="col-span-2">
           <label class="block text-xs font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optionnel)</span></label>
