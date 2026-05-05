@@ -416,7 +416,7 @@ watch(() => route.params.id, async (newId, oldId) => {
     <!-- Bandeau cycle de vie (en haut, full-width). pb-5 = même rythme
          vertical (20px) que le gap-5 entre les cards de l'editeur. -->
     <div class="px-5 lg:px-6 pt-4 pb-5 space-y-2">
-      <CycleBandeau :af="af" @updated="onAfUpdated" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @toggle-presentation="togglePresentation" @goto-section="selectSection" />
+      <CycleBandeau :af="af" @updated="onAfUpdated" @sections-changed="afStore.refreshSections" @back="router.push('/')" @toggle-activity="showActivity = !showActivity" @toggle-presentation="togglePresentation" @goto-section="selectSection" />
       <RequiredServiceLevelPanel :af-id="af.id" :contract-level="af.service_level" :refresh-key="requiredLevelKey" @goto-section="onGotoSection" />
       <TemplatePropagationBanner :af-id="af.id" @updated="afStore.refreshSections" />
     </div>

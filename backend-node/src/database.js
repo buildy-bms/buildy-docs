@@ -3690,6 +3690,7 @@ const sections = {
     if (targetRank == null || targetRank >= 2) return 0; // pas de niveau ou Premium → rien a opt-out
     const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
     const placeholders = above.map(() => '?').join(',');
+    // Etape 1 : opt-out direct des sections dont le service_level est superieur au niveau cible.
     const r = db.prepare(`
       UPDATE sections
          SET opted_out_by_moa = 1
@@ -3698,11 +3699,39 @@ const sections = {
          AND opted_out_by_moa = 0
          AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
     `).run(afId, ...above);
-    return r.changes;
+    // Etape 2 : cascade aux descendants (cf. feedback_section_flags_cascade.md).
+    // Une fonctionnalite ecartee implique que ses sous-sections le sont aussi
+    // (ex: 11 Gojee opt-out -> 11.1, 11.2, 11.3 suivent meme si elles n'ont
+    // pas de service_level propre). CTE recursive sur parent_id puis UPDATE
+    // ciblé sur les ids collectes.
+    const descendantsToOptOut = db.prepare(`
+      WITH RECURSIVE descendants(id) AS (
+        SELECT s.id FROM sections s
+          JOIN sections p ON p.id = s.parent_id
+         WHERE s.af_id = ? AND p.opted_out_by_moa = 1 AND s.opted_out_by_moa = 0
+        UNION ALL
+        SELECT s.id FROM sections s
+          JOIN descendants d ON s.parent_id = d.id
+         WHERE s.af_id = ? AND s.opted_out_by_moa = 0
+      )
+      SELECT id FROM descendants
+    `).all(afId, afId);
+    let cascadeChanges = 0;
+    if (descendantsToOptOut.length) {
+      const ids = descendantsToOptOut.map(x => x.id);
+      const idPlaceholders = ids.map(() => '?').join(',');
+      const r2 = db.prepare(
+        `UPDATE sections SET opted_out_by_moa = 1 WHERE id IN (${idPlaceholders})`
+      ).run(...ids);
+      cascadeChanges = r2.changes;
+    }
+    return r.changes + cascadeChanges;
   },
   // Preview : meme logique que optOutAboveLevel mais retourne la liste des
   // sections candidates au lieu d'appliquer l'UPDATE. Utilise par l'UI pour
-  // afficher un resume avant confirmation utilisateur.
+  // afficher un resume avant confirmation utilisateur. Le compteur include
+  // la cascade aux descendants (mais on ne renvoie que les sections "racines"
+  // dans la liste pour ne pas saturer l'apercu).
   previewOptOutAboveLevel(afId, afLevel) {
     const RANK = { E: 0, S: 1, P: 2 };
     const targetRank = RANK[(afLevel || '').toUpperCase()];

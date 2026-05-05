@@ -28,7 +28,7 @@ import ServiceLevelBadge from './ServiceLevelBadge.vue'
 const props = defineProps({
   af: { type: Object, required: true },
 })
-const emit = defineEmits(['updated', 'back', 'toggle-activity', 'toggle-presentation', 'goto-section'])
+const emit = defineEmits(['updated', 'sections-changed', 'back', 'toggle-activity', 'toggle-presentation', 'goto-section'])
 import { inject } from 'vue'
 const presentationMode = inject('presentationMode', null)
 
@@ -165,6 +165,10 @@ async function submitEdit() {
     success(`AF mise à jour${optOutMsg}`)
     showEdit.value = false
     emit('updated', data)
+    // Si des sections ont ete modifiees (auto opt-out), demande un refresh
+    // du store des sections pour que l'arborescence reflete le nouvel etat
+    // (sections rayees + encart "Ecartee par la MOA" en bas du PDF).
+    if (optOutCount > 0) emit('sections-changed')
   } catch (e) {
     error(e.response?.data?.detail || 'Échec de la mise à jour')
   } finally {
