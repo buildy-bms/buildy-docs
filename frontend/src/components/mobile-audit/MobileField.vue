@@ -7,12 +7,12 @@ defineProps({
 </script>
 
 <template>
-  <div class="space-y-1.5">
-    <label v-if="label" class="block text-xs font-medium text-gray-600 uppercase tracking-wider">
+  <div class="space-y-2">
+    <label v-if="label" class="block text-sm font-medium text-gray-700">
       {{ label }}
       <span v-if="required" class="text-red-500">*</span>
     </label>
     <slot />
-    <p v-if="hint" class="text-xs text-gray-500">{{ hint }}</p>
+    <p v-if="hint" class="text-sm text-gray-500 leading-relaxed">{{ hint }}</p>
   </div>
 </template>

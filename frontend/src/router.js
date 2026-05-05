@@ -28,7 +28,7 @@ const routes = [
   {
     path: '/bacs-audit/:id',
     name: 'bacs-audit-detail',
-    meta: { title: 'Audit BACS' },
+    meta: { title: 'Audit BACS', fullscreenMobile: true },
     component: () => import('@/views/AuditDetailRouter.vue'),
     props: true,
   },
@@ -38,7 +38,7 @@ const routes = [
     // affiche conditionnellement les blocs R175 selon ce kind.
     path: '/site-audit/:id',
     name: 'site-audit-detail',
-    meta: { title: 'Audit GTB (Classique)' },
+    meta: { title: 'Audit GTB (Classique)', fullscreenMobile: true },
     component: () => import('@/views/AuditDetailRouter.vue'),
     props: true,
   },

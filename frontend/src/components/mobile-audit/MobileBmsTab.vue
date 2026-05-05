@@ -107,7 +107,7 @@ const USAGES = [
 
     <!-- Hors-service toggle -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <label class="flex items-center justify-between gap-3 px-4 py-4 cursor-pointer">
+      <label class="flex items-center justify-between gap-3 px-4 py-5 cursor-pointer">
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-red-600">GTB hors-service</p>
           <p class="text-xs text-gray-500 mt-0.5">
@@ -137,7 +137,7 @@ const USAGES = [
               placeholder="ex : Schneider EcoStruxure, Niagara, Buildy"
               autocapitalize="words"
               @input="saveDebounced"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
           <MobileField label="Marque / éditeur">
@@ -147,7 +147,7 @@ const USAGES = [
               placeholder="—"
               autocapitalize="words"
               @input="saveDebounced"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
           <MobileField label="Référence modèle">
@@ -156,7 +156,7 @@ const USAGES = [
               type="text"
               placeholder="ex : JACE 8000"
               @input="saveDebounced"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
           <MobileField label="Localisation">
@@ -166,7 +166,7 @@ const USAGES = [
               placeholder="ex : Local technique sous-sol"
               autocapitalize="sentences"
               @input="saveDebounced"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
         </div>
@@ -364,7 +364,7 @@ const USAGES = [
                   v-model="bms.operator_training_date"
                   type="date"
                   @input="saveDebounced"
-                  class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+                  class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
                 />
               </MobileField>
               <MobileField label="Organisme / formateur">
@@ -373,7 +373,7 @@ const USAGES = [
                   type="text"
                   placeholder="ex : intégrateur GTB"
                   @input="saveDebounced"
-                  class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+                  class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
                 />
               </MobileField>
             </template>

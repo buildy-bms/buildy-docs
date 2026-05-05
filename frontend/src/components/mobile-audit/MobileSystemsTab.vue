@@ -225,24 +225,24 @@ async function removeDevice(d) {
 
         <!-- Systèmes -->
         <div v-show="!collapsedZones.has(g.zone_id)" class="divide-y divide-gray-100">
-          <div v-for="s in g.items" :key="s.id" class="px-4 py-3">
+          <div v-for="s in g.items" :key="s.id" class="px-4 py-4">
             <div class="flex items-center gap-3">
               <SystemCategoryIcon :category="s.system_category" size="md" />
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 truncate">
+                <p class="text-base font-medium text-gray-900 truncate leading-tight">
                   {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
                 </p>
-                <p v-if="devicesOf(s.id).length" class="text-xs text-gray-500 mt-0.5">
+                <p v-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
                   {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
                 </p>
               </div>
               <label class="inline-flex items-center gap-2 cursor-pointer shrink-0">
-                <span class="text-xs text-gray-600">Présent</span>
+                <span class="text-sm text-gray-700">Présent</span>
                 <input
                   type="checkbox"
                   :checked="!!s.present"
                   @change="e => patchSystem(s, { present: e.target.checked })"
-                  class="w-5 h-5"
+                  class="w-6 h-6"
                 />
               </label>
             </div>
@@ -253,24 +253,24 @@ async function removeDevice(d) {
                 v-for="d in devicesOf(s.id)"
                 :key="d.id"
                 @click="openEditDevice(d, s)"
-                class="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-left"
+                class="w-full flex items-center gap-2 px-3 py-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-left"
               >
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-800 truncate">
+                  <p class="text-base font-medium text-gray-800 truncate leading-tight">
                     {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
                   </p>
-                  <p class="text-xs text-gray-500 truncate">
+                  <p class="text-sm text-gray-500 truncate mt-0.5">
                     <span v-if="d.brand">{{ d.brand }}</span>
                     <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
                   </p>
                 </div>
-                <ChevronRightIcon class="w-4 h-4 text-gray-300" />
+                <ChevronRightIcon class="w-5 h-5 text-gray-300" />
               </button>
               <button
                 @click="openCreateDevice(s)"
-                class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium"
+                class="w-full inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium"
               >
-                <PlusIcon class="w-4 h-4" /> Ajouter un équipement
+                <PlusIcon class="w-5 h-5" /> Ajouter un équipement
               </button>
             </div>
 
@@ -357,7 +357,7 @@ async function removeDevice(d) {
             type="text"
             placeholder="ex : Chaudière gaz principale"
             autocapitalize="sentences"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
 
@@ -368,7 +368,7 @@ async function removeDevice(d) {
               type="text"
               placeholder="ex : Atlantic"
               autocapitalize="words"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
           <MobileField label="Référence">
@@ -376,7 +376,7 @@ async function removeDevice(d) {
               v-model="deviceForm.model_reference"
               type="text"
               placeholder="ex : Varmax 70"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
         </div>
@@ -397,7 +397,7 @@ async function removeDevice(d) {
         <MobileField label="Énergie">
           <select
             v-model="deviceForm.energy_source"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
           </select>
@@ -406,7 +406,7 @@ async function removeDevice(d) {
         <MobileField label="Nature">
           <select
             v-model="deviceForm.device_role"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
           </select>
@@ -418,7 +418,7 @@ async function removeDevice(d) {
             type="text"
             placeholder="ex : Local technique sous-sol"
             autocapitalize="sentences"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
 

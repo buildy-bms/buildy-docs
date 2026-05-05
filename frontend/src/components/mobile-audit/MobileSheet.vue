@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, onBeforeUnmount, watch } from 'vue'
-import { XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { onBeforeUnmount, watch } from 'vue'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -28,29 +28,29 @@ onBeforeUnmount(() => {
         v-if="open"
         class="fixed inset-0 z-50 flex flex-col bg-gray-50"
       >
-        <!-- Header -->
+        <!-- Header style iOS-natif : Annuler texte + Titre + Enregistrer texte bold -->
         <header
           class="shrink-0 bg-white border-b border-gray-200"
           :style="{ paddingTop: 'env(safe-area-inset-top)' }"
         >
-          <div class="flex items-center gap-2 h-12 px-2">
+          <div class="flex items-center gap-2 h-14 px-3">
             <button
               @click="emit('close')"
-              class="tap-target inline-flex items-center justify-center text-gray-600 hover:text-gray-900"
+              class="tap-target inline-flex items-center justify-center text-base text-gray-600 -ml-1"
               aria-label="Fermer"
             >
-              <XMarkIcon class="w-6 h-6" />
+              <XMarkIcon class="w-7 h-7" />
             </button>
-            <h2 class="flex-1 min-w-0 text-base font-medium truncate text-gray-900">{{ title }}</h2>
+            <h2 class="flex-1 min-w-0 text-center text-base font-medium truncate text-gray-900">{{ title }}</h2>
             <button
               v-if="!hideSave"
               @click="emit('save')"
               :disabled="saving"
-              class="tap-target inline-flex items-center justify-center gap-1 px-3 text-sm font-medium text-white bg-indigo-600 rounded-lg disabled:opacity-50"
+              class="tap-target inline-flex items-center justify-center px-2 text-base font-medium text-indigo-600 disabled:opacity-50 -mr-1"
             >
-              <CheckIcon class="w-4 h-4" />
-              {{ saving ? '…' : saveLabel }}
+              {{ saving ? 'Sauv.…' : saveLabel }}
             </button>
+            <span v-else class="w-7"></span>
           </div>
         </header>
 

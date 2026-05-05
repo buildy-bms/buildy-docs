@@ -102,7 +102,7 @@ const generatorWorksDone = computed({
             :value="document?.project_name || ''"
             @blur="e => e.target.value !== (document?.project_name || '') && saveDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit GTB') })"
             placeholder="Titre de l'audit"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
 
@@ -155,7 +155,7 @@ const generatorWorksDone = computed({
               type="date"
               :value="document?.bacs_building_permit_date || ''"
               @input="e => saveDebounced({ bacs_building_permit_date: e.target.value || null })"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
         </div>
@@ -163,7 +163,7 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : travaux générateur -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-center gap-3 px-4 py-4 cursor-pointer">
+        <label class="flex items-center gap-3 px-4 py-5 cursor-pointer">
           <input
             type="checkbox"
             v-model="generatorWorksDone"
@@ -180,7 +180,7 @@ const generatorWorksDone = computed({
               type="date"
               :value="document?.bacs_generator_works_date || ''"
               @input="e => saveDebounced({ bacs_generator_works_date: e.target.value || null })"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
             />
           </MobileField>
         </div>
@@ -188,7 +188,7 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : réseau urbain -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-center gap-3 px-4 py-4 cursor-pointer">
+        <label class="flex items-center gap-3 px-4 py-5 cursor-pointer">
           <input
             type="checkbox"
             v-model="districtConnected"

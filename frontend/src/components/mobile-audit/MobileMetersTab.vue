@@ -156,20 +156,20 @@ function toggleProtocol(p) {
   <div class="p-3 pb-24 space-y-3">
     <!-- Stats -->
     <div class="grid grid-cols-3 gap-2">
-      <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
-        <p class="text-2xl font-medium text-gray-900 leading-none">{{ stats.total }}</p>
-        <p class="text-[11px] text-gray-500 mt-1">Total</p>
+      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+        <p class="text-3xl font-medium text-gray-900 leading-none">{{ stats.total }}</p>
+        <p class="text-sm text-gray-500 mt-1.5">Total</p>
       </div>
-      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-        <p class="text-2xl font-medium text-emerald-700 leading-none">{{ stats.present }}</p>
-        <p class="text-[11px] text-emerald-600 mt-1">Présents</p>
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+        <p class="text-3xl font-medium text-emerald-700 leading-none">{{ stats.present }}</p>
+        <p class="text-sm text-emerald-600 mt-1.5">Présents</p>
       </div>
-      <div :class="['rounded-xl border p-3 text-center',
+      <div :class="['rounded-xl border p-4 text-center',
                     stats.missing > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200']">
-        <p :class="['text-2xl font-medium leading-none', stats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
+        <p :class="['text-3xl font-medium leading-none', stats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
           {{ stats.missing }}
         </p>
-        <p :class="['text-[11px] mt-1', stats.missing > 0 ? 'text-red-600' : 'text-gray-500']">Manquants</p>
+        <p :class="['text-sm mt-1.5', stats.missing > 0 ? 'text-red-600' : 'text-gray-500']">Manquants</p>
       </div>
     </div>
 
@@ -180,25 +180,25 @@ function toggleProtocol(p) {
         :key="m.id"
         type="button"
         @click="openEdit(m)"
-        :class="['w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50',
+        :class="['w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50',
                  m.out_of_service ? 'opacity-50' : '',
                  m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '']"
       >
         <ExclamationTriangleIcon
           v-if="m.required && !m.present_actual && !m.out_of_service"
-          class="w-5 h-5 text-red-500 shrink-0"
+          class="w-6 h-6 text-red-500 shrink-0"
         />
         <div class="flex-1 min-w-0">
-          <p class="text-base font-medium text-gray-900 truncate">{{ m.zone_name || 'Compteur général' }}</p>
-          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+          <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
+          <div class="flex items-center gap-1.5 mt-2 flex-wrap">
             <MeterUsagePill :usage="m.usage" />
             <MeterTypePill :type="m.meter_type" />
-            <span v-if="m.present_actual" class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-100 text-emerald-700">Présent</span>
-            <span v-if="m.communicating" class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-100 text-indigo-700">Communicant</span>
-            <span v-if="m.out_of_service" class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600">HS</span>
+            <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
+            <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
+            <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
           </div>
         </div>
-        <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0" />
+        <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
@@ -220,7 +220,7 @@ function toggleProtocol(p) {
         <MobileField label="Zone">
           <select
             v-model="editForm.zone_id"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option :value="null">Compteur général</option>
             <option v-for="z in zones" :key="z.zone_id" :value="z.zone_id">{{ z.name }}</option>
@@ -230,7 +230,7 @@ function toggleProtocol(p) {
         <MobileField label="Usage">
           <select
             v-model="editForm.usage"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option v-for="opt in METER_USAGES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
@@ -239,7 +239,7 @@ function toggleProtocol(p) {
         <MobileField label="Type">
           <select
             v-model="editForm.meter_type"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option v-for="opt in METER_TYPES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
@@ -247,26 +247,26 @@ function toggleProtocol(p) {
 
         <MobileField label="État">
           <div class="space-y-2">
-            <label class="flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+            <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
               <span class="text-sm font-medium text-gray-700">Requis (R175)</span>
               <input v-model="editForm.required" type="checkbox" class="w-5 h-5" />
             </label>
             <template v-if="editing?.mode === 'edit'">
-              <label class="flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+              <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
                 <span class="text-sm font-medium text-gray-700">Présent sur site</span>
                 <input v-model="editForm.present_actual" type="checkbox" class="w-5 h-5" />
               </label>
               <label v-if="editForm.present_actual"
-                     class="flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                     class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
                 <span class="text-sm font-medium text-gray-700">Communicant</span>
                 <input v-model="editForm.communicating" type="checkbox" class="w-5 h-5" />
               </label>
               <label v-if="editForm.present_actual"
-                     class="flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                     class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
                 <span class="text-sm font-medium text-gray-700">Câblé vers GTB</span>
                 <input v-model="editForm.wired" type="checkbox" class="w-5 h-5" />
               </label>
-              <label class="flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl cursor-pointer">
+              <label class="flex items-center justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
                 <span class="text-sm font-medium text-red-600">Hors service</span>
                 <input v-model="editForm.out_of_service" type="checkbox" class="w-5 h-5" />
               </label>

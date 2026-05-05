@@ -105,7 +105,7 @@ function goBack() {
     <!-- Contenu de l'onglet actif (scroll vertical, un seul visible) -->
     <main
       class="flex-1 overflow-y-auto overscroll-contain"
-      :style="{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }"
+      :style="{ paddingBottom: 'calc(68px + env(safe-area-inset-bottom))' }"
     >
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
       <template v-else-if="document">
@@ -124,20 +124,20 @@ function goBack() {
       role="navigation"
       aria-label="Navigation audit"
     >
-      <ul class="flex items-stretch h-16">
+      <ul class="flex items-stretch h-17">
         <li v-for="tab in visibleTabs" :key="tab.key" class="flex-1">
           <button
             type="button"
             @click="activeTab = tab.key"
             :class="[
-              'w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors select-none',
+              'w-full h-full flex flex-col items-center justify-center gap-1 transition-colors select-none',
               activeTab === tab.key
                 ? 'text-indigo-600'
                 : 'text-gray-500 active:text-gray-700'
             ]"
           >
-            <component :is="tab.icon" class="w-6 h-6 shrink-0" />
-            <span class="text-[10px] font-medium leading-none">{{ tab.label }}</span>
+            <component :is="tab.icon" class="w-7 h-7 shrink-0" />
+            <span class="text-[11px] font-medium leading-none">{{ tab.label }}</span>
           </button>
         </li>
       </ul>

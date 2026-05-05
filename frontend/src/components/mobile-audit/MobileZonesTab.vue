@@ -127,12 +127,12 @@ const totalSurface = computed(() =>
   <div class="p-3 pb-24 space-y-3">
     <!-- Stats résumé -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
-      <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 inline-flex items-center justify-center">
-        <Squares2X2Icon class="w-6 h-6" />
+      <div class="w-14 h-14 rounded-xl bg-indigo-50 text-indigo-600 inline-flex items-center justify-center">
+        <Squares2X2Icon class="w-7 h-7" />
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-2xl font-medium text-gray-900 leading-none">{{ zones.length }}</p>
-        <p class="text-xs text-gray-500 mt-1">
+        <p class="text-3xl font-medium text-gray-900 leading-none">{{ zones.length }}</p>
+        <p class="text-sm text-gray-500 mt-1.5">
           {{ zones.length > 1 ? 'zones' : 'zone' }}
           <span v-if="totalSurface"> · {{ totalSurface }} m² total</span>
         </p>
@@ -146,16 +146,16 @@ const totalSurface = computed(() =>
         :key="z.zone_id"
         type="button"
         @click="openEdit(z)"
-        class="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50"
+        class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-base font-medium text-gray-900 truncate">{{ z.name }}</p>
-          <p class="text-xs text-gray-500 truncate mt-0.5">
+          <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
+          <p class="text-sm text-gray-500 truncate mt-1">
             <span>{{ natureLabel(z.nature) }}</span>
             <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
           </p>
         </div>
-        <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0" />
+        <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
@@ -182,14 +182,14 @@ const totalSurface = computed(() =>
             type="text"
             placeholder="ex : Bureaux R+1"
             autocapitalize="sentences"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
 
         <MobileField label="Nature de la zone">
           <select
             v-model="editForm.nature"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           >
             <option :value="null">— Sélectionner —</option>
             <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
