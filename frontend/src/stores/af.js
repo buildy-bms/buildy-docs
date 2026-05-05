@@ -30,6 +30,10 @@ export const useAfStore = defineStore('af', () => {
 
   // Numerotation auto des sections (1, 1.1, 1.2, 2…) calculee depuis l'arbre
   // (parent_id + position). Map<sectionId, "1.2.3">.
+  // Aligne sur la numerotation du PDF AF : les sections exclues de l'export
+  // (`included_in_export = 0`) ne sont PAS numerotees et ne decalent pas leurs
+  // freres. Les sections opt-out (`opted_out_by_moa = 1`) restent numerotees
+  // (elles apparaissent dans le PDF avec un badge "Ecartee par MOA").
   const liveSectionNumbering = computed(() => {
     const map = new Map()
     const byParent = new Map()
@@ -43,11 +47,21 @@ export const useAfStore = defineStore('af', () => {
     }
     function walk(parentKey, prefix) {
       const arr = byParent.get(parentKey) || []
-      arr.forEach((s, i) => {
-        const num = prefix ? `${prefix}.${i + 1}` : String(i + 1)
+      let idx = 0
+      for (const s of arr) {
+        // Skip sections exclues de l'export : pas de numero et pas de
+        // decalage des suivantes (= meme comportement que le PDF).
+        if (s.included_in_export === 0) {
+          // Continue le walk pour numeroter les eventuels descendants
+          // visibles, en utilisant un prefix vide (pas de numero parent).
+          walk(s.id, '')
+          continue
+        }
+        idx++
+        const num = prefix ? `${prefix}.${idx}` : String(idx)
         map.set(s.id, num)
         walk(s.id, num)
-      })
+      }
     }
     walk('root', '')
     return map

@@ -24,7 +24,7 @@
     <span class="annex-legend-item"><span class="annex-avail-no">—</span> Non disponible</span>
     <span class="annex-legend-item"><span class="annex-avail-opt">€&nbsp;Option</span> Option payante</span>
     <span class="annex-legend-item"><span class="annex-demanded-pill">★ Exigée par la MOA</span> Inclure dans l'avenant</span>
-    <span class="annex-legend-item"><span class="annex-refused-pill">Refusée par la MOA</span> Hors périmètre</span>
+    <span class="annex-legend-item"><span class="annex-refused-pill">Non retenue par la MOA</span> Hors périmètre</span>
   </div>
 
   <table class="annex-offerings-table">
@@ -69,7 +69,7 @@
         </td>
         <td class="annex-status">
           {{#if demanded}}<span class="annex-demanded-pill">★ Exigée</span>{{/if}}
-          {{#if refused}}<span class="annex-refused-pill">Refusée</span>{{/if}}
+          {{#if refused}}<span class="annex-refused-pill">Non retenue</span>{{/if}}
           {{#if all_option}}<span class="annex-opt-badge">€&nbsp;Option</span>{{/if}}
         </td>
         {{#each ../offeringsAnnex.levels}}

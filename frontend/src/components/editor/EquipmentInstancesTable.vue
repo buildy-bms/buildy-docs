@@ -26,8 +26,6 @@ const instanceCatsMap = ref(new Map()) // instance_id → [catKey, ...]
 const allCategories = ref([]) // catalogue complet
 const templateSlug = ref(null)
 const loading = ref(false)
-const draft = ref({ reference: '', location: '', qty: 1, notes: '' })
-const showAdd = ref(false)
 
 // Catégories candidates pour ce template
 const candidateCategories = computed(() => {
@@ -68,21 +66,19 @@ async function refresh() {
   }
 }
 
-async function submitAdd() {
-  if (!draft.value.reference.trim()) return
-  try {
-    await addSectionInstance(props.sectionId, {
-      reference: draft.value.reference.trim(),
-      location: draft.value.location?.trim() || undefined,
-      qty: draft.value.qty || 1,
-      notes: draft.value.notes?.trim() || undefined,
-      position: instances.value.length,
-    })
-    draft.value = { reference: '', location: '', qty: 1, notes: '' }
-    showAdd.value = false
-    await refresh()
-  } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
+// Ouvre la modale d'edition en mode CREATION (instance vide avec defaults).
+// Au submit, l'instance est creee + ses zones/categories liees en cascade.
+function openCreate() {
+  editing.value = { id: null, _isCreating: true } // sentinel pour distinguer create/edit
+  editForm.value = {
+    reference: '',
+    location: '',
+    qty: 1,
+    notes: '',
+    zone_ids: [],
+    // Pre-selectionne par defaut TOUS les candidats du template (comportement
+    // existant pour les nouvelles instances : 1 instance = toutes les usages).
+    category_keys: candidateCategories.value.map(c => c.key),
   }
 }
 
@@ -105,21 +101,34 @@ function openEdit(inst) {
 async function submitEdit() {
   if (!editForm.value.reference.trim()) return
   try {
-    await updateInstance(editing.value.id, {
-      reference: editForm.value.reference.trim(),
-      location: editForm.value.location?.trim() || null,
-      qty: editForm.value.qty || 1,
-      notes: editForm.value.notes?.trim() || null,
-    })
+    let instanceId = editing.value.id
+    // Mode creation : on cree l'instance d'abord, puis on lie zones/categories.
+    if (editing.value._isCreating) {
+      const { data } = await addSectionInstance(props.sectionId, {
+        reference: editForm.value.reference.trim(),
+        location: editForm.value.location?.trim() || undefined,
+        qty: editForm.value.qty || 1,
+        notes: editForm.value.notes?.trim() || undefined,
+        position: instances.value.length,
+      })
+      instanceId = data.id
+    } else {
+      await updateInstance(instanceId, {
+        reference: editForm.value.reference.trim(),
+        location: editForm.value.location?.trim() || null,
+        qty: editForm.value.qty || 1,
+        notes: editForm.value.notes?.trim() || null,
+      })
+    }
     await Promise.all([
-      setInstanceZones(editing.value.id, editForm.value.zone_ids),
-      setInstanceCategories(editing.value.id, editForm.value.category_keys),
+      setInstanceZones(instanceId, editForm.value.zone_ids),
+      setInstanceCategories(instanceId, editForm.value.category_keys),
     ])
-    notifySuccess('Instance mise à jour')
+    notifySuccess(editing.value._isCreating ? 'Instance créée' : 'Instance mise à jour')
     editing.value = null
     await refresh()
   } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec de la mise à jour')
+    notifyError(e.response?.data?.detail || 'Échec de l\'enregistrement')
   }
 }
 
@@ -159,28 +168,16 @@ onMounted(refresh)
           <span class="ml-2 text-xs font-normal text-gray-500">({{ instances.length }})</span>
         </h3>
         <p class="text-xs text-gray-500 mt-0.5">
-          Référence et localisation de chaque équipement réel. La liste de points contractuelle
-          (PDF A3) sera générée pour chaque instance. Cliquer le crayon pour éditer + lier des zones.
+          Référence, localisation, zones et catégories d'usage de chaque équipement réel. La liste
+          de points contractuelle (PDF A3) sera générée pour chaque instance.
         </p>
       </div>
       <button
-        @click="showAdd = !showAdd"
-        class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium shrink-0"
+        @click="openCreate"
+        class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium shrink-0 whitespace-nowrap"
       >
-        <PlusCircleIcon class="w-4 h-4" /> Ajouter une instance
+        <PlusCircleIcon class="w-4 h-4 shrink-0" /> Ajouter une instance
       </button>
-    </div>
-
-    <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
-      <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
-        <input v-model="draft.reference" type="text" required placeholder="Référence (ex : CTA-N1-EST)" autocomplete="off" data-1p-ignore="true"
-               class="w-44 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model="draft.location" type="text" placeholder="Localisation libre" autocomplete="off" data-1p-ignore="true"
-               class="flex-1 min-w-40 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model.number="draft.qty" type="number" min="1" class="w-16 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
-        <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
-      </form>
     </div>
 
     <div v-if="loading" class="text-center py-6 text-sm text-gray-400">Chargement…</div>
@@ -244,25 +241,26 @@ onMounted(refresh)
       </tbody>
     </table>
 
-    <BaseModal v-if="editing" :title="`Éditer l'instance ${editing.reference}`" size="lg" @close="editing = null">
+    <BaseModal v-if="editing" :title="editing._isCreating ? 'Nouvelle instance' : `Éditer l'instance ${editing.reference}`" size="lg" @close="editing = null">
       <form @submit.prevent="submitEdit" class="space-y-3">
         <div class="grid grid-cols-3 gap-3">
           <div class="col-span-2">
             <label class="block text-xs font-medium text-gray-700 mb-1">Référence *</label>
             <input v-model="editForm.reference" type="text" required autocomplete="off" data-1p-ignore="true"
-                   class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                   placeholder="ex : CTA-N1-EST"
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Quantité</label>
             <input v-model.number="editForm.qty" type="number" min="1"
-                   class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
           </div>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Localisation libre</label>
           <input v-model="editForm.location" type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="Texte libre — utile en complément des zones structurées"
-                 class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
         <div v-if="candidateCategories.length">
           <label class="block text-xs font-medium text-gray-700 mb-1">
@@ -299,14 +297,14 @@ onMounted(refresh)
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
           <textarea v-model="editForm.notes" rows="2" autocomplete="off"
-                    class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"></textarea>
         </div>
       </form>
       <template #footer>
-        <button @click="editing = null" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
+        <button @click="editing = null" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 whitespace-nowrap">Annuler</button>
         <button @click="submitEdit" :disabled="!editForm.reference.trim()"
-                class="px-3 py-1.5 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
-          Enregistrer
+                class="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+          {{ editing._isCreating ? 'Créer l\'instance' : 'Enregistrer' }}
         </button>
       </template>
     </BaseModal>

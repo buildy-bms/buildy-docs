@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 78;
+const TARGET_VERSION = 79;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3048,6 +3048,28 @@ function runMigrations() {
     log.info(`Migration 78 appliquee : section_template_documents + backfill (${ch14Ids.length} sections du ch.14 retaguees)`);
   }
 
+  if (current < 79) {
+    // Refonte du tableau R175 ↔ Buildy (section 14.1.12) : design moderne
+    // (stats en haut, badges colores Couvert/Renforce, niveau requis colore).
+    // On force l'UPDATE du body_html du template + bump current_version.
+    // Les AFs existantes verront le banner de propagation et pourront
+    // appliquer manuellement la nouvelle version.
+    const { BODIES_BY_SLUG } = require('./seeds/chapter-14-bodies');
+    const newBody = BODIES_BY_SLUG['14.1.12'];
+    if (newBody) {
+      const r = db.prepare(`
+        UPDATE section_templates
+           SET body_html = ?,
+               current_version = current_version + 1,
+               updated_at = CURRENT_TIMESTAMP
+         WHERE slug = '14.1.12'
+      `).run(newBody);
+      log.info(`Migration 79 : tableau R175 ↔ Buildy (section 14.1.12) refresh (${r.changes} template mis a jour)`);
+    }
+    db.pragma('user_version = 79');
+    log.info('Migration 79 appliquee : refresh body_html section 14.1.12 (tableau R175 redesign)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3182,6 +3204,56 @@ const equipmentTemplates = {
   },
   bumpVersion(id) {
     db.prepare('UPDATE equipment_templates SET current_version = current_version + 1 WHERE id = ?').run(id);
+  },
+  // Clone à plat d'un equipment_template : le template + ses points +
+  // ses attachments. Slug unique généré via slugifyName (callback). Les
+  // attachments référencent les mêmes fichiers sur disque.
+  clone(sourceId, { newName, slugifyName, userId }) {
+    const src = this.getById(sourceId);
+    if (!src) throw new Error(`Equipment template #${sourceId} introuvable`);
+    const tx = db.transaction(() => {
+      let baseSlug = slugifyName(newName);
+      let candidate = baseSlug || 'equipment';
+      let suffix = 2;
+      while (db.prepare('SELECT 1 FROM equipment_templates WHERE slug = ?').get(candidate)) {
+        candidate = `${baseSlug}-${suffix++}`;
+      }
+      const r = db.prepare(`
+        INSERT INTO equipment_templates
+          (slug, name, category, bacs_articles, bacs_justification, description_html,
+           icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        candidate, newName, src.category, src.bacs_articles, src.bacs_justification,
+        src.description_html, src.icon_kind, src.icon_value, src.icon_color,
+        src.preferred_protocols, userId || null, userId || null,
+      );
+      const newId = r.lastInsertRowid;
+      // Points
+      const points = db.prepare(
+        'SELECT * FROM equipment_template_points WHERE template_id = ? ORDER BY position, id'
+      ).all(sourceId);
+      for (const p of points) {
+        db.prepare(`
+          INSERT INTO equipment_template_points
+            (template_id, slug, position, label, data_type, direction, unit, notes, is_optional, tech_name, nature)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(newId, p.slug, p.position, p.label, p.data_type, p.direction, p.unit, p.notes, p.is_optional || 0, p.tech_name, p.nature);
+      }
+      // Attachments
+      const atts = db.prepare(
+        'SELECT * FROM attachments WHERE equipment_template_id = ? ORDER BY position, id'
+      ).all(sourceId);
+      for (const a of atts) {
+        db.prepare(`
+          INSERT INTO attachments
+            (equipment_template_id, filename, original_name, caption, position, width, height, full_width, uploaded_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(newId, a.filename, a.original_name, a.caption, a.position, a.width, a.height, a.full_width || 0, userId || null);
+      }
+      return { newId, pointsCount: points.length, attachmentsCount: atts.length };
+    });
+    return tx();
   },
 };
 
@@ -3524,6 +3596,89 @@ const sectionTemplates = {
       return { affected: targets.size, cascaded: cascadedCount };
     });
     return tx();
+  },
+
+  // Clone récursif d'une section type avec tout son sous-arbre. Le titre du
+  // root est remplacé par newTitle (suffixé « (copie) » par le caller). Les
+  // descendants conservent leur titre. Slug unique généré pour chaque node
+  // via la callback `slugifyTitle` (passée par le caller pour partager la
+  // logique avec le seeder). Attachments clonées en référençant les mêmes
+  // fichiers sur disque (pas de copie binaire).
+  cloneSubtree(rootId, { newTitle, slugifyTitle, userId }) {
+    const root = this.getById(rootId);
+    if (!root) throw new Error(`Section template #${rootId} introuvable`);
+    const tx = db.transaction(() => {
+      const idMap = new Map(); // oldId -> newId
+      const insertOne = (src, overrideTitle, parentNewId) => {
+        const title = overrideTitle ?? src.title;
+        let baseSlug = slugifyTitle(title);
+        let candidate = baseSlug;
+        let suffix = 2;
+        while (db.prepare('SELECT 1 FROM section_templates WHERE slug = ?').get(candidate)) {
+          candidate = `${baseSlug}-${suffix++}`;
+        }
+        const maxRow = db.prepare(
+          'SELECT COALESCE(MAX(position), 0) AS m FROM section_templates WHERE parent_template_id IS ?'
+        ).get(parentNewId || null);
+        const position = (maxRow?.m || 0) + 10;
+        const r = db.prepare(`
+          INSERT INTO section_templates
+            (slug, title, kind, body_html, bacs_articles, service_level, service_level_source,
+             features, is_functionality, position, parent_template_id, equipment_template_id,
+             avail_e, avail_s, avail_p, icon_name)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          candidate, title, src.kind || 'standard',
+          src.body_html, src.bacs_articles, src.service_level, src.service_level_source,
+          src.features, src.is_functionality ? 1 : 0, position,
+          parentNewId || null, src.equipment_template_id || null,
+          src.avail_e, src.avail_s, src.avail_p, src.icon_name,
+        );
+        const newId = r.lastInsertRowid;
+        idMap.set(src.id, newId);
+        // Document kinds
+        const kinds = db.prepare(
+          'SELECT document_kind FROM section_template_documents WHERE section_template_id = ?'
+        ).all(src.id).map(k => k.document_kind);
+        if (kinds.length) {
+          const ins = db.prepare(
+            'INSERT INTO section_template_documents (section_template_id, document_kind) VALUES (?, ?)'
+          );
+          for (const k of kinds) ins.run(newId, k);
+        } else {
+          db.prepare(
+            'INSERT INTO section_template_documents (section_template_id, document_kind) VALUES (?, ?)'
+          ).run(newId, 'af');
+        }
+        // Attachments (référencent les mêmes filename sur disque)
+        const atts = db.prepare(
+          'SELECT * FROM attachments WHERE section_template_id = ? ORDER BY position, id'
+        ).all(src.id);
+        for (const a of atts) {
+          db.prepare(`
+            INSERT INTO attachments
+              (section_template_id, filename, original_name, caption, position, width, height, full_width, uploaded_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(newId, a.filename, a.original_name, a.caption, a.position, a.width, a.height, a.full_width || 0, userId || null);
+        }
+        return newId;
+      };
+      // Walk récursif : on insère src + descendants, en mappant les parents.
+      const walk = (src, parentNewId, overrideTitle) => {
+        const newId = insertOne(src, overrideTitle, parentNewId);
+        const children = db.prepare(
+          'SELECT * FROM section_templates WHERE parent_template_id = ? ORDER BY position, id'
+        ).all(src.id);
+        for (const child of children) walk(child, newId, undefined);
+      };
+      walk(root, root.parent_template_id, newTitle);
+      return idMap;
+    });
+    const idMap = tx();
+    return {
+      newRootId: idMap.get(rootId),
+      clonedCount: idMap.size,
+    };
   },
 };
 

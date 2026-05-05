@@ -26,7 +26,7 @@ const props = defineProps({
     type: Object,
     default: () => ({
       open: 'Ouverte', quoted: 'Chiffrée', in_progress: 'En cours',
-      done: 'Terminée', declined: 'Refusée',
+      done: 'Terminée', declined: 'Non retenue',
     }),
   },
 })

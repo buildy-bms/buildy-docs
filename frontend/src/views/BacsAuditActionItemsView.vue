@@ -34,7 +34,7 @@ const STATUS_OPTS = [
   { value: 'quoted', label: 'Chiffrée' },
   { value: 'in_progress', label: 'En cours' },
   { value: 'done', label: 'Terminée' },
-  { value: 'declined', label: 'Refusée' },
+  { value: 'declined', label: 'Non retenue' },
 ]
 const EFFORT_OPTS = [
   { value: null, label: '—' },
@@ -149,7 +149,7 @@ async function submitNew() {
 
 async function removeItem(it) {
   if (it.auto_generated) {
-    error('Items auto-générés ne peuvent pas être supprimés. Utilise "Refusée" comme statut.')
+    error('Items auto-générés ne peuvent pas être supprimés. Utilise "Non retenue" comme statut.')
     return
   }
   const ok = await confirm({

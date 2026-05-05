@@ -130,6 +130,62 @@ async function routes(fastify) {
     return created;
   });
 
+  // POST /api/sections/:id/promote-to-library — transforme une section AF
+  // ad-hoc (sans section_template_id ni equipment_template_id) en section
+  // type biblio + lie l'AF au nouveau template. Le sous-arbre AF n'est pas
+  // dupliqué côté biblio (seul le node ciblé devient un template).
+  fastify.post('/sections/:id/promote-to-library', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const section = db.sections.getById(id);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
+
+    if (section.section_template_id || section.equipment_template_id) {
+      return reply.code(400).send({ detail: 'Cette section est déjà liée à la bibliothèque' });
+    }
+
+    const userId = request.authUser?.id;
+    const { slugify } = require('../lib/slug');
+    let baseSlug = slugify(section.title) || 'section';
+    let candidate = baseSlug;
+    let suffix = 2;
+    while (db.sectionTemplates.getBySlug(candidate)) {
+      candidate = `${baseSlug}-${suffix++}`;
+    }
+
+    const tx = db.db.transaction(() => {
+      const created = db.sectionTemplates.create({
+        slug: candidate,
+        title: section.title,
+        kind: 'standard',
+        bodyHtml: section.body_html || null,
+        bacsArticles: section.bacs_articles || null,
+        serviceLevel: section.service_level || null,
+        isFunctionality: false,
+        parentTemplateId: null,
+        equipmentTemplateId: null,
+      });
+      db.sectionTemplates.setDocumentKinds(created.id, ['af'], { cascade: false });
+      // Lie la section AF au nouveau template (sans toucher au body — l'AF
+      // garde son contenu actuel, qui est désormais aussi la base du template).
+      db.db.prepare(`
+        UPDATE sections
+           SET section_template_id = ?, section_template_version = ?
+         WHERE id = ?
+      `).run(created.id, created.current_version || 1, id);
+      return created;
+    });
+    const created = tx();
+
+    db.auditLog.add({
+      afId: section.af_id, userId,
+      action: 'section.promote_to_library',
+      payload: { section_id: id, new_template_id: created.id, new_slug: created.slug },
+    });
+    log.info(`Section #${id} promue à la biblio → template #${created.id} (${created.slug}) by user #${userId}`);
+    return reply.code(201).send(created);
+  });
+
   // DELETE /api/sections/:id — suppression cascade (children + overrides + instances + attachments)
   fastify.delete('/sections/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);

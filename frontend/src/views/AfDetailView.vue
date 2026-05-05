@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments } from '@/api'
+import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAfStore } from '@/stores/af'
@@ -288,6 +288,22 @@ async function handleToggleOptOut(node) {
   }
 }
 
+async function handlePromoteToLibrary(node) {
+  const ok = await confirm({
+    title: 'Promouvoir à la bibliothèque ?',
+    message: `« ${node.title} » deviendra une section type partagée. Le contenu actuel servira de base au nouveau template.`,
+    confirmLabel: 'Promouvoir',
+  })
+  if (!ok) return
+  try {
+    await promoteSectionToLibrary(node.id)
+    notifySuccess(`« ${node.title} » ajoutée à la bibliothèque`)
+    await afStore.refreshSections()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la promotion')
+  }
+}
+
 async function handleToggleDemanded(node) {
   const newVal = node.demanded_by_moa === 1 ? 0 : 1
   try {
@@ -512,6 +528,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               @toggle-opt-out="handleToggleOptOut"
               @toggle-demanded="handleToggleDemanded"
               @attachment-drop="handleAttachmentDrop"
+              @promote-to-library="handlePromoteToLibrary"
             />
           </div>
         </div>

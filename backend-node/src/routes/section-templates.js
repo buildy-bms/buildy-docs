@@ -186,6 +186,36 @@ async function routes(fastify) {
     return reply.code(201).send(db.sectionTemplates.getById(created.id));
   });
 
+  // POST /api/section-templates/:id/clone — duplique la section type + tout
+  // son sous-arbre (récursif). Le titre du root est suffixé (par défaut
+  // « (copie) ») ; les descendants conservent leur titre. Slug unique
+  // généré pour chaque node. Attachments répliquées (mêmes fichiers).
+  fastify.post('/section-templates/:id/clone', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const src = db.sectionTemplates.getById(id);
+    if (!src) return reply.code(404).send({ detail: 'Section type non trouvée' });
+    const newTitle = (request.body?.title || `${src.title} (copie)`).trim();
+    if (!newTitle) return reply.code(400).send({ detail: 'Titre requis' });
+    try {
+      const { newRootId, clonedCount } = db.sectionTemplates.cloneSubtree(id, {
+        newTitle,
+        slugifyTitle: slugify,
+        userId: request.authUser?.id,
+      });
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'section_template.clone',
+        payload: { source_id: id, source_slug: src.slug, new_id: newRootId, cloned_count: clonedCount },
+      });
+      log.info(`Section template cloned: #${id} → #${newRootId} (${clonedCount} node(s)) by user #${request.authUser?.id}`);
+      const created = db.sectionTemplates.getById(newRootId);
+      return reply.code(201).send({ ...created, cloned_count: clonedCount });
+    } catch (err) {
+      log.error({ err }, 'Clone section_template failed');
+      return reply.code(500).send({ detail: err.message || 'Échec du clonage' });
+    }
+  });
+
   fastify.delete('/section-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const tpl = db.sectionTemplates.getById(id);

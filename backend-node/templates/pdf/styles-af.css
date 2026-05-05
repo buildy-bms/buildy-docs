@@ -395,30 +395,34 @@ table.zones-table td {
 }
 table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 
-/* Lot 31 — Encart "Section ecartee par la maitrise d'ouvrage" (mode opt-out) */
-.section-opted-out {
+/* Badge compact "Non retenue par la MOA" en tete de section.
+   Le contenu (body_html, articles BACS) reste visible — le badge sert
+   uniquement a signaler l'ecart pour la tracabilite. */
+.section-badge-opted-out {
+  display: flex;
+  align-items: center;
+  gap: 2.5mm;
   background: #fffbeb;
-  border: 1px solid #fcd34d;
-  border-left: 4px solid #f59e0b;
-  padding: 5mm 6mm;
-  margin: 3mm 0 5mm;
+  border: 0.4pt solid #fcd34d;
+  border-left: 1.2mm solid #f59e0b;
+  padding: 2mm 3.5mm;
+  margin: 2mm 0 3mm;
+  border-radius: 1.8mm;
+  font-size: 8.5pt;
   page-break-inside: avoid;
-  border-radius: 2mm;
 }
-.section-opted-out-title {
-  font-family: 'Poppins', sans-serif;
-  font-size: 10pt;
-  font-weight: 700;
+.section-badge-opted-out-icon { font-size: 10pt; line-height: 1; }
+.section-badge-opted-out-text {
+  font-family: 'Inter', sans-serif;
   color: #92400e;
-  margin: 0 0 2mm;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
-.section-opted-out-text {
-  font-size: 9pt;
+.section-badge-opted-out-detail {
+  font-weight: 400;
   color: #78350f;
-  margin: 0;
-  line-height: 1.55;
+  font-style: normal;
 }
-.section-opted-out-text strong { color: #451a03; font-weight: 600; }
 
 /* Encart contextualisé "lien avec le décret BACS" — charte PDF Buildy :
    filet navy a gauche, fond gris tres leger, label navy. Pas de violet. */
@@ -451,6 +455,156 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 .bacs-context-text ul { padding-left: 4mm; margin: 1mm 0; list-style-type: disc; }
 .bacs-context-text li { margin: 0.5mm 0; line-height: 1.45; }
 
+/* ═══════════ Tableau R175 ↔ Buildy (section 14.1.12) ═══════════
+   Tableau de synthèse de la couverture du décret BACS, design moderne
+   avec stats en haut, badges colorés, lignes alternées. */
+.r175-intro {
+  font-size: 9.5pt;
+  color: #4b5563;
+  margin: 2mm 0 4mm;
+  font-style: italic;
+}
+.r175-stats {
+  display: flex;
+  gap: 4mm;
+  margin: 4mm 0 5mm;
+}
+.r175-stat {
+  flex: 1;
+  padding: 4mm 5mm;
+  border-radius: 2mm;
+  text-align: center;
+  page-break-inside: avoid;
+}
+.r175-stat-renforce {
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 0.4pt solid #6ee7b7;
+}
+.r175-stat-couvert {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 0.4pt solid #93c5fd;
+}
+.r175-stat-level {
+  background: linear-gradient(135deg, #1b2842 0%, #0f172a 100%);
+  border: 0.4pt solid #1e293b;
+  color: white;
+}
+.r175-stat-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22pt;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 1.5mm;
+}
+.r175-stat-renforce .r175-stat-value { color: #047857; }
+.r175-stat-couvert .r175-stat-value { color: #1d4ed8; }
+.r175-stat-level .r175-stat-value { color: #fde68a; }
+.r175-stat-label {
+  font-size: 7.5pt;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.r175-stat-renforce .r175-stat-label { color: #065f46; }
+.r175-stat-couvert .r175-stat-label { color: #1e3a8a; }
+.r175-stat-level .r175-stat-label { color: rgba(255,255,255,0.85); }
+
+.r175-coverage-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 3mm 0;
+  font-size: 8pt;
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 2mm;
+  overflow: hidden;
+}
+.r175-coverage-table thead {
+  background: #1b2842;
+  color: white;
+}
+.r175-coverage-table thead th {
+  padding: 2.5mm 3mm;
+  font-family: 'Inter', sans-serif;
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  vertical-align: middle;
+}
+.r175-th-article { width: 18mm; }
+.r175-th-status  { width: 22mm; text-align: center !important; }
+.r175-th-level   { width: 16mm; text-align: center !important; }
+.r175-coverage-table tbody tr {
+  border-top: 0.3pt solid #f1f5f9;
+}
+.r175-coverage-table tbody tr:nth-child(odd) {
+  background: #fafbfc;
+}
+.r175-coverage-table tbody td {
+  padding: 2mm 3mm;
+  vertical-align: middle;
+  line-height: 1.4;
+  color: #1f2937;
+}
+.r175-td-article { color: #1b2842; font-size: 8.5pt; white-space: nowrap; }
+.r175-coverage-table tbody td:nth-child(4),
+.r175-coverage-table tbody td:nth-child(5) { text-align: center; }
+
+.r175-badge {
+  display: inline-block;
+  padding: 0.6mm 2mm;
+  font-size: 6.8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 1.5mm;
+  font-family: 'Inter', sans-serif;
+}
+.r175-badge-couvert {
+  background: #dbeafe; color: #1e3a8a;
+  border: 0.3pt solid #93c5fd;
+}
+.r175-badge-renforce {
+  background: #d1fae5; color: #047857;
+  border: 0.3pt solid #6ee7b7;
+}
+
+.r175-level {
+  display: inline-block;
+  padding: 0.5mm 1.8mm;
+  font-size: 7pt;
+  font-weight: 700;
+  border-radius: 1.5mm;
+  font-family: 'Poppins', sans-serif;
+  letter-spacing: 0.04em;
+}
+.r175-level-esp {
+  background: #f1f5f9; color: #475569;
+  border: 0.3pt solid #cbd5e1;
+}
+.r175-level-sp {
+  background: #ede9fe; color: #5b21b6;
+  border: 0.3pt solid #c4b5fd;
+}
+.r175-level-p {
+  background: #fde68a; color: #78350f;
+  border: 0.3pt solid #fbbf24;
+}
+
+.r175-summary {
+  margin: 4mm 0 0;
+  padding: 3mm 4mm;
+  background: #f8fafc;
+  border-left: 1mm solid #1b2842;
+  border-radius: 1.5mm;
+  font-size: 8.5pt;
+  color: #1f2937;
+  line-height: 1.55;
+}
+.r175-summary strong { color: #1b2842; font-weight: 700; }
+
 /* Bandeau protocoles préférés (Lot 18) */
 .protocols-bar {
   margin: 2mm 0 1mm;
@@ -477,6 +631,24 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   margin-right: 1.5mm;
   margin-bottom: 0.5mm;
 }
+/* Couleurs par famille de protocole — aligne sur ProtocolPills.vue
+   (cohérence visuelle frontend ↔ PDF). */
+.protocol-pill[data-protocol="Modbus TCP"]    { background: #dbeafe; color: #1e3a8a; border-color: #bfdbfe; }
+.protocol-pill[data-protocol="Modbus RTU"]    { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.protocol-pill[data-protocol="BACnet/IP"]     { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+.protocol-pill[data-protocol="BACnet MS/TP"]  { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+.protocol-pill[data-protocol="KNX/IP"]        { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+.protocol-pill[data-protocol="KNX TP"]        { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.protocol-pill[data-protocol="M-Bus IP"]      { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.protocol-pill[data-protocol="M-Bus filaire"] { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.protocol-pill[data-protocol="MQTT"]          { background: #ffe4e6; color: #9f1239; border-color: #fecdd3; }
+.protocol-pill[data-protocol="OPC-UA"]        { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+.protocol-pill[data-protocol="LoRaWAN"]       { background: #ccfbf1; color: #115e59; border-color: #99f6e4; }
+.protocol-pill[data-protocol="DALI"]          { background: #fef3c7; color: #854d0e; border-color: #fde68a; }
+.protocol-pill[data-protocol="SNMP"]          { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.protocol-pill[data-protocol="REST API"]      { background: #cffafe; color: #155e75; border-color: #a5f3fc; }
+.protocol-pill[data-protocol="OCPP"]          { background: #fae8ff; color: #86198f; border-color: #f5d0fe; }
+.protocol-pill[data-protocol="SunSpec"]       { background: #fef9c3; color: #713f12; border-color: #fef08a; }
 
 /* Colonne Nom technique (monospace) + colonne Nature */
 .points-mini td.tech-name code {

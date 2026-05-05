@@ -545,7 +545,7 @@ async function routes(fastify) {
         .filter(s => s.number === ch.code || s.number.split('.').length >= 2);
       const items = sections.map(s => {
         let statusKey, statusLabel;
-        if (s.opted_out_by_moa) { statusKey = 'opted-out'; statusLabel = 'Écartée par la MOA'; }
+        if (s.opted_out_by_moa) { statusKey = 'opted-out'; statusLabel = 'Non retenue par la MOA'; }
         else if (!s.included_in_export) { statusKey = 'excluded'; statusLabel = 'Exclue de l\'export'; }
         else { statusKey = 'active'; statusLabel = 'Active'; }
         const sl = s.service_level;
@@ -720,7 +720,7 @@ async function routes(fastify) {
         reason = 'Section retirée de l\'AF par l\'auteur';
       } else if (isOptedOut) {
         statusInAf = 'opted_out';
-        reason = `Écartée par la MOA — nécessite un contrat ${levelToLabel(requiredMin)} pour être activée`;
+        reason = `Non retenue par la MOA — nécessite un contrat ${levelToLabel(requiredMin)} pour être activée`;
       } else {
         // Niveau effectif retenu : contrat visé sinon Essentials (baseline garantie)
         const effective = contractLevel || 'E';
@@ -763,38 +763,48 @@ async function routes(fastify) {
     const functionalitiesIncluded = functionalities.filter(f => f.included).length;
     const functionalitiesPaidOption = functionalities.filter(f => f.statusInAf === 'paid_option').length;
 
-    // ── Synthèse systèmes (toutes les sections equipement listées) ──
-    const systemsSummary = equipmentEnriched.map(e => {
-      const sec = e.sec;
-      const isOptedOut = sec.opted_out_by_moa === 1;
-      const isExcluded = !sec.included_in_export;
-      const totalReads = (isOptedOut || isExcluded) ? 0 : e.reads * e.instances;
-      const totalWrites = (isOptedOut || isExcluded) ? 0 : e.writes * e.instances;
-      let status, statusClass;
-      if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
-      else if (isExcluded) { status = 'Exclue'; statusClass = 'excluded'; }
-      else if (e.instances === 0) { status = 'Aucune instance'; statusClass = 'no-instance'; }
-      else { status = 'Couverte'; statusClass = 'covered'; }
+    // ── Synthèse systèmes ──
+    // Filtrage : on n'affiche QUE les systèmes pertinents pour la livraison.
+    // Sont ecartes :
+    //   - les systemes exclus de l'export (`included_in_export = 0`)
+    //   - les systemes sans instances (e.instances === 0)
+    // Les systemes opted_out_by_moa restent listes (avec statut "Ecartee par MOA")
+    // pour tracabilite contractuelle (pour la MOA, pas pour la realisation technique).
+    const systemsSummary = equipmentEnriched
+      .filter(e => {
+        const sec = e.sec;
+        if (!sec.included_in_export) return false;
+        if (e.instances === 0) return false;
+        return true;
+      })
+      .map(e => {
+        const sec = e.sec;
+        const isOptedOut = sec.opted_out_by_moa === 1;
+        const totalReads = isOptedOut ? 0 : e.reads * e.instances;
+        const totalWrites = isOptedOut ? 0 : e.writes * e.instances;
+        let status, statusClass;
+        if (isOptedOut) { status = 'Non retenue par la MOA'; statusClass = 'opted-out'; }
+        else { status = 'Couverte'; statusClass = 'covered'; }
 
-      const liveBacs = resolveLiveBacs(sec);
-      const bacsRequired = !!(liveBacs && liveBacs.trim());
-      // Alerte rouge pale : système exigé par BACS, instancié, mais exclu de l'AF
-      // (incoherence reglementaire potentielle a remonter au lecteur).
-      const bacsAlert = bacsRequired && e.instances > 0 && (isExcluded || isOptedOut);
+        const liveBacs = resolveLiveBacs(sec);
+        const bacsRequired = !!(liveBacs && liveBacs.trim());
+        // Alerte rouge pale : système exigé par BACS, instancié, mais ecarte par MOA
+        // (incoherence reglementaire potentielle a remonter au lecteur).
+        const bacsAlert = bacsRequired && e.instances > 0 && isOptedOut;
 
-      return {
-        number: sec.number,
-        title: sec.title,
-        bacsRequired,
-        bacs: liveBacs,
-        isMetering: isMeteringSystem(sec),
-        instances: e.instances,
-        totalReads,
-        totalWrites,
-        status, statusClass,
-        bacsAlert,
-      };
-    });
+        return {
+          number: sec.number,
+          title: sec.title,
+          bacsRequired,
+          bacs: liveBacs,
+          isMetering: isMeteringSystem(sec),
+          instances: e.instances,
+          totalReads,
+          totalWrites,
+          status, statusClass,
+          bacsAlert,
+        };
+      });
     const systemsTotals = systemsSummary.reduce((a, s) => ({
       instances: a.instances + s.instances,
       totalReads: a.totalReads + s.totalReads,
@@ -810,7 +820,7 @@ async function routes(fastify) {
       const isOptedOut = sec.opted_out_by_moa === 1;
       const isExcluded = !sec.included_in_export;
       let status, statusClass;
-      if (isOptedOut) { status = 'Écartée par la MOA'; statusClass = 'opted-out'; }
+      if (isOptedOut) { status = 'Non retenue par la MOA'; statusClass = 'opted-out'; }
       else if (isExcluded) { status = 'Exclue de l\'export'; statusClass = 'excluded'; }
       else if (instances === 0) { status = 'Non instanciée'; statusClass = 'not-instanced'; }
       else { status = 'Couverte'; statusClass = 'covered'; }

@@ -4,8 +4,8 @@ import { ref, onMounted, computed } from 'vue'
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
 
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment } from '@/api'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate } from '@/api'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faCamera } from '@fortawesome/pro-solid-svg-icons'
@@ -31,6 +31,26 @@ const editorTemplate = ref(null)
 
 function openCreate() { editorTemplate.value = null; showEditor.value = true }
 function openEdit() { editorTemplate.value = selected.value; showEditor.value = true }
+
+// Clonage : duplique le système technique avec ses points et captures.
+const cloning = ref(null) // { id, name, originalName }
+function openClone(t) {
+  cloning.value = { id: t.id, name: `${t.name} (copie)`, originalName: t.name }
+}
+async function submitClone() {
+  if (!cloning.value || !cloning.value.name.trim()) return
+  try {
+    const { data } = await cloneEquipmentTemplate(cloning.value.id, { name: cloning.value.name.trim() })
+    const parts = []
+    if (data.points_count) parts.push(`${data.points_count} point${data.points_count > 1 ? 's' : ''}`)
+    if (data.attachments_count) parts.push(`${data.attachments_count} capture${data.attachments_count > 1 ? 's' : ''}`)
+    notifySuccess(`« ${cloning.value.originalName} » dupliqué${parts.length ? ` (${parts.join(', ')})` : ''}`)
+    cloning.value = null
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du clonage')
+  }
+}
 async function onSaved(savedTpl) {
   showEditor.value = false
   await refresh()
@@ -346,6 +366,7 @@ onMounted(async () => {
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
                 Version {{ sortBy === 'current_version' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
             </tr>
           </thead>
           <tbody>
@@ -355,7 +376,7 @@ onMounted(async () => {
               <tr v-if="it.kind === 'category'"
                   class="border-t border-gray-100 bg-gray-50/40">
                 <td class="px-4 py-1.5"></td>
-                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="7">
+                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="8">
                   {{ it.label }}
                   <span class="text-gray-400 normal-case font-normal ml-2">· {{ it.count }}</span>
                 </td>
@@ -405,10 +426,17 @@ onMounted(async () => {
                   <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
                 </td>
                 <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ it.t.current_version }}</td>
+                <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
+                  <button type="button" @click="openClone(it.t)"
+                          class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                          title="Dupliquer ce système technique (avec ses points et captures)">
+                    <DocumentDuplicateIcon class="w-4 h-4" />
+                  </button>
+                </td>
               </tr>
             </template>
             <tr v-if="!flatEquipmentItems.length">
-              <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
             </tr>
@@ -634,6 +662,36 @@ onMounted(async () => {
         <button @click="closePhotos"
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition">
           Fermer
+        </button>
+      </template>
+    </BaseModal>
+
+    <BaseModal
+      v-if="cloning"
+      title="Dupliquer le système technique"
+      size="md"
+      @close="cloning = null"
+    >
+      <form @submit.prevent="submitClone" class="space-y-3">
+        <p class="text-xs text-gray-600">
+          Le système
+          <span class="font-medium text-gray-800">« {{ cloning.originalName }} »</span>
+          sera dupliqué avec ses points et ses captures d'écran.
+        </p>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Nom de la copie</label>
+          <input v-model="cloning.name" type="text" required autocomplete="off"
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        </div>
+      </form>
+      <template #footer>
+        <button @click="cloning = null"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition whitespace-nowrap">
+          Annuler
+        </button>
+        <button @click="submitClone" :disabled="!cloning.name.trim()"
+                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
+          Dupliquer
         </button>
       </template>
     </BaseModal>

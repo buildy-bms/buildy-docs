@@ -199,6 +199,7 @@ export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`
 export const createEquipmentTemplate = (data) => api.post('/equipment-templates', data)
 export const updateEquipmentTemplate = (id, data) => api.patch(`/equipment-templates/${id}`, data)
 export const deleteEquipmentTemplate = (id) => api.delete(`/equipment-templates/${id}`)
+export const cloneEquipmentTemplate = (id, data) => api.post(`/equipment-templates/${id}/clone`, data)
 export const addTemplatePoint = (templateId, data) =>
   api.post(`/equipment-templates/${templateId}/points`, data)
 export const updateTemplatePoint = (templateId, pointId, data) =>
@@ -232,6 +233,12 @@ export const bulkUpdateSectionTemplateDocumentKinds = (payload) =>
   api.post('/section-templates/bulk-document-kinds', payload)
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
+export const cloneSectionTemplate = (id, data) => api.post(`/section-templates/${id}/clone`, data)
+
+// Promotion d'une section AF ad-hoc (sans template) vers la bibliothèque.
+// Crée un section_template depuis la section + lie l'AF au nouveau template.
+export const promoteSectionToLibrary = (sectionId) =>
+  api.post(`/sections/${sectionId}/promote-to-library`)
 // reorder({ ids, parent_template_id? }). parent_template_id si re-parenting drag-drop.
 export const reorderSectionTemplates = ({ ids, parent_template_id } = {}) =>
   api.patch('/section-templates/reorder', { ids, ...(parent_template_id !== undefined ? { parent_template_id } : {}) })

@@ -163,112 +163,115 @@ const BODY_14_1_11 = `${cite('R175-6', null, 'Sont assujettis à l\'obligation [
 
 <p>L'obligation R175-6 cible le <em>propriétaire des émetteurs reliés au générateur</em> ; la solution Buildy lui fournit la couche supervision et pilotage nécessaire à la mise en œuvre de cette régulation par zone.</p>`;
 
-const BODY_14_1_12 = `<p>Tableau de synthèse de la couverture du décret BACS par la solution Buildy. Lecture rapide pour défense d'inspection ou évaluation commerciale.</p>
+const BODY_14_1_12 = `<p class="r175-intro">Synthèse de la couverture du décret BACS par la solution Buildy — pièce de défense d'inspection R175-5-1 et matière commerciale.</p>
 
-<table class="bacs-coverage-table">
+<div class="r175-stats">
+  <div class="r175-stat r175-stat-renforce">
+    <div class="r175-stat-value">8/11</div>
+    <div class="r175-stat-label">Alinéas renforcés</div>
+  </div>
+  <div class="r175-stat r175-stat-couvert">
+    <div class="r175-stat-value">3/11</div>
+    <div class="r175-stat-label">Strictement couverts</div>
+  </div>
+  <div class="r175-stat r175-stat-level">
+    <div class="r175-stat-value">P</div>
+    <div class="r175-stat-label">Conformité pleine = Premium</div>
+  </div>
+</div>
+
+<table class="r175-coverage-table">
   <thead>
     <tr>
-      <th>Article</th>
-      <th>Exigence (synthèse)</th>
-      <th>Réponse Buildy</th>
-      <th>Chapitres</th>
-      <th>Couverture</th>
-      <th>Niveau requis</th>
+      <th class="r175-th-article">Article</th>
+      <th class="r175-th-exigence">Exigence</th>
+      <th class="r175-th-buildy">Réponse Buildy</th>
+      <th class="r175-th-status">Couverture</th>
+      <th class="r175-th-level">Niveau</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>R175-1</td>
-      <td>Définitions des systèmes techniques et du BACS</td>
-      <td>Tous les systèmes nommés sont supervisables ; découpage zonal natif</td>
-      <td>2, Zones</td>
-      <td><span class="badge-couvert">Couvert</span></td>
-      <td>E/S/P</td>
+      <td class="r175-td-article"><strong>R175-1</strong></td>
+      <td>Définitions systèmes techniques et BACS</td>
+      <td>Tous supervisables — découpage zonal natif</td>
+      <td><span class="r175-badge r175-badge-couvert">Couvert</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
     <tr>
-      <td>R175-2</td>
-      <td>Champ d'application &gt; 70 kW + clause TRI 10 ans</td>
-      <td>Solution applicable. TRI = responsabilité du propriétaire</td>
-      <td>14.1.2</td>
-      <td><span class="badge-couvert">Couvert</span></td>
-      <td>E/S/P</td>
+      <td class="r175-td-article"><strong>R175-2</strong></td>
+      <td>Champ &gt; 70 kW + clause TRI 10 ans</td>
+      <td>Solution applicable. TRI = propriétaire</td>
+      <td><span class="r175-badge r175-badge-couvert">Couvert</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
     <tr>
-      <td>R175-3 §1</td>
+      <td class="r175-td-article"><strong>R175-3 §1</strong></td>
       <td>Pas horaire + 5 ans mensuels</td>
-      <td>Pas infra-horaire ; rétention 5 ans (Smart) ou 10 ans (Premium)</td>
-      <td>3.1, 3.2, 6.1</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td><strong>S</strong> mini / P étendu</td>
+      <td>Pas infra-horaire — rétention 5 ans (S) / 10 ans (P)</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-sp">S/P</span></td>
     </tr>
     <tr>
-      <td>R175-3 §2</td>
-      <td>Efficacité vs valeurs de référence + détection des pertes</td>
-      <td>Seuils paramétrables × 3 contextes + DJU/DHU + comparaisons inter-périodes</td>
-      <td>6.2, 6.3</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td>S/P</td>
+      <td class="r175-td-article"><strong>R175-3 §2</strong></td>
+      <td>Efficacité vs valeurs réf. + détection pertes</td>
+      <td>Seuils paramétrables × 3 contextes + DJU/DHU</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-sp">S/P</span></td>
     </tr>
     <tr>
-      <td>R175-3 §3</td>
+      <td class="r175-td-article"><strong>R175-3 §3</strong></td>
       <td>Interopérabilité</td>
-      <td>9 protocoles ouverts simultanés (BACnet, Modbus, KNX, DALI, SNMP, REST, M-Bus, LoRaWAN, MQTT)</td>
-      <td>2, 14.1.5</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td>E/S/P</td>
+      <td>9 protocoles ouverts simultanément</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
     <tr>
-      <td>R175-3 §4</td>
+      <td class="r175-td-article"><strong>R175-3 §4</strong></td>
       <td>Arrêt manuel + gestion autonome</td>
-      <td>Commandes manuelles + programmations horaires en autonomie terrain + commandes virtuelles groupées</td>
-      <td>4.1, 4.2, 4.3</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td>E/S/P</td>
+      <td>Commandes manuelles + programmations horaires + virtuelles</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
     <tr>
-      <td>R175-3 fin</td>
-      <td>Accessibilité + transmission aux exploitants</td>
-      <td>Hyperveez + Gojee + API Buildy Connect (transmission structurée automatique)</td>
-      <td>8</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td><strong>P</strong> (l'alinéa qui force Premium)</td>
+      <td class="r175-td-article"><strong>R175-3 fin</strong></td>
+      <td>Transmission aux exploitants tiers</td>
+      <td>API Buildy Connect — transmission structurée</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-p">P</span></td>
     </tr>
     <tr>
-      <td>R175-4</td>
-      <td>Vérifications périodiques + consignes écrites</td>
-      <td>Contrat maintenance + monitoring proactif passerelles 24/7</td>
-      <td>10.1</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td>S/P</td>
+      <td class="r175-td-article"><strong>R175-4</strong></td>
+      <td>Vérifications périodiques + consignes</td>
+      <td>Contrat maintenance + monitoring proactif 24/7</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-sp">S/P</span></td>
     </tr>
     <tr>
-      <td>R175-5</td>
+      <td class="r175-td-article"><strong>R175-5</strong></td>
       <td>Formation de l'exploitant</td>
-      <td>Support intégré Crisp + gestion active des comptes par l'équipe Buildy</td>
-      <td>9, 14.1.9</td>
-      <td><span class="badge-couvert">Couvert</span></td>
-      <td>S/P</td>
+      <td>Support intégré + gestion active comptes par Buildy</td>
+      <td><span class="r175-badge r175-badge-couvert">Couvert</span></td>
+      <td><span class="r175-level r175-level-sp">S/P</span></td>
     </tr>
     <tr>
-      <td>R175-5-1</td>
-      <td>Inspection périodique : examen AF + vérif + recommandations</td>
-      <td>AF livrée nativement (ce document) + journal horodaté + données mobilisables</td>
-      <td>1.1, 7</td>
-      <td><span class="badge-renforce">Renforcé</span></td>
-      <td>E/S/P</td>
+      <td class="r175-td-article"><strong>R175-5-1</strong></td>
+      <td>Inspection périodique : AF + vérif + recos</td>
+      <td>AF native + journal horodaté + données mobilisables</td>
+      <td><span class="r175-badge r175-badge-renforce">Renforcé</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
     <tr>
-      <td>R175-6</td>
+      <td class="r175-td-article"><strong>R175-6</strong></td>
       <td>Régulation auto température par zone</td>
-      <td>Régulation côté terrain + supervision/pilotage Buildy par zone</td>
-      <td>2.1, 4.2</td>
-      <td><span class="badge-couvert">Couvert</span></td>
-      <td>E/S/P</td>
+      <td>Régulation terrain + supervision/pilotage par zone</td>
+      <td><span class="r175-badge r175-badge-couvert">Couvert</span></td>
+      <td><span class="r175-level r175-level-esp">E/S/P</span></td>
     </tr>
   </tbody>
 </table>
 
-<p><strong>Synthèse</strong> : sur 11 alinéas, <strong>8 sont renforcés</strong> par rapport au minimum réglementaire et 3 sont strictement couverts. La conformité pleine et entière est atteinte au niveau <strong>Premium</strong> (R175-3 alinéa final, transmission structurée aux exploitants). Le niveau <em>Smart</em> couvre 9 alinéas sur 11 ; le niveau <em>Essentials</em> ne couvre pas R175-3 §1 (rétention insuffisante).</p>`;
+<p class="r175-summary">Conformité pleine atteinte au niveau <strong>Premium</strong> (R175-3 alinéa final, transmission structurée). Smart couvre 9 alinéas sur 11. Essentials ne couvre pas R175-3 §1 (rétention insuffisante).</p>`;
 
 // ─── 14.2 Cybersécurité (placeholders) ───────────────────────────────────
 

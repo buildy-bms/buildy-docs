@@ -12,7 +12,7 @@ const props = defineProps({
   selectedId: { type: Number, default: null },
   afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop'])
+const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop', 'promote-to-library'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -240,6 +240,7 @@ watch(matchedIds, (ids) => {
       @toggle-opt-out="emit('toggle-opt-out', $event)"
       @toggle-demanded="emit('toggle-demanded', $event)"
       @attachment-drop="emit('attachment-drop', $event)"
+      @promote-to-library="emit('promote-to-library', $event)"
     />
   </div>
 </template>

@@ -3,11 +3,12 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import Sortable from 'sortablejs'
 import {
   MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
-  EyeIcon, DocumentArrowDownIcon,
+  EyeIcon, DocumentArrowDownIcon, DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
   uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
+  cloneSectionTemplate,
 } from '@/api'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
@@ -136,6 +137,23 @@ async function bulkSaveHtml(it, html) {
 }
 function openEditor(t) { editing.value = t }
 function openCreate() { showCreate.value = true }
+
+// Clonage : duplique la fonctionnalité + son sous-arbre.
+const cloning = ref(null)
+function openClone(t) {
+  cloning.value = { id: t.id, title: `${t.title} (copie)`, originalTitle: t.title }
+}
+async function submitClone() {
+  if (!cloning.value || !cloning.value.title.trim()) return
+  try {
+    const { data } = await cloneSectionTemplate(cloning.value.id, { title: cloning.value.title.trim() })
+    notifySuccess(`« ${cloning.value.originalTitle} » dupliquée${data.cloned_count > 1 ? ` avec ${data.cloned_count - 1} sous-fonctionnalité${data.cloned_count - 1 > 1 ? 's' : ''}` : ''}`)
+    cloning.value = null
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du clonage')
+  }
+}
 async function onSaved() {
   editing.value = null
   showCreate.value = false
@@ -446,8 +464,17 @@ onBeforeUnmount(teardownSortables)
                 <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
                 <span v-else class="text-gray-300 italic" title="Jamais utilisée — candidate au nettoyage">∅</span>
               </td>
-              <td class="px-4 py-2 text-center whitespace-nowrap">
-                <PencilIcon class="w-4 h-4 text-gray-400 inline-block" />
+              <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
+                <button type="button" @click="openClone(t)"
+                        class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition mr-1"
+                        title="Dupliquer cette fonctionnalité (avec son sous-arbre)">
+                  <DocumentDuplicateIcon class="w-4 h-4" />
+                </button>
+                <button type="button" @click="openEditor(t)"
+                        class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                        title="Éditer">
+                  <PencilIcon class="w-4 h-4" />
+                </button>
               </td>
             </tr>
         </tbody>
@@ -517,6 +544,36 @@ onBeforeUnmount(teardownSortables)
       @close="offeringsPreviewOpen = false"
       @download="downloadOfferingsPdf"
     />
+
+    <BaseModal
+      v-if="cloning"
+      title="Dupliquer la fonctionnalité"
+      size="md"
+      @close="cloning = null"
+    >
+      <form @submit.prevent="submitClone" class="space-y-3">
+        <p class="text-xs text-gray-600">
+          Toute la sous-arborescence de
+          <span class="font-medium text-gray-800">« {{ cloning.originalTitle }} »</span>
+          sera dupliquée. Les captures sont également répliquées.
+        </p>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Titre de la copie</label>
+          <input v-model="cloning.title" type="text" required autocomplete="off"
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        </div>
+      </form>
+      <template #footer>
+        <button @click="cloning = null"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition whitespace-nowrap">
+          Annuler
+        </button>
+        <button @click="submitClone" :disabled="!cloning.title.trim()"
+                class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50 whitespace-nowrap">
+          Dupliquer
+        </button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 

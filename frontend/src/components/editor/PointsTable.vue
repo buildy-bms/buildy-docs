@@ -16,7 +16,15 @@ const { confirm } = useConfirm()
 const points = ref([])
 const loading = ref(false)
 const showAdd = ref(false)
-const draftPoint = ref({ label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '' })
+const draftPoint = ref({ label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '', is_optional: false })
+
+// Couleurs des badges de nature (chip dans la table)
+const NATURE_COLORS = {
+  'Booléen':              { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  'Numérique':            { bg: 'bg-cyan-50',   text: 'text-cyan-700',   border: 'border-cyan-200' },
+  'Enum':                 { bg: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-200' },
+  'Chaîne de caractères': { bg: 'bg-slate-50',  text: 'text-slate-700',  border: 'border-slate-200' },
+}
 
 const TYPE_COLORS = {
   Mesure:   { bg: 'bg-blue-50',     text: 'text-blue-700' },
@@ -106,13 +114,48 @@ async function submitAdd() {
       unit: draftPoint.value.unit?.trim() || null,
       tech_name: draftPoint.value.tech_name?.trim() || null,
       nature: draftPoint.value.nature || null,
+      is_optional: draftPoint.value.is_optional || false,
       position: maxPos + 10,
     })
-    draftPoint.value = { label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '' }
+    draftPoint.value = { label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '', is_optional: false }
     showAdd.value = false
     await refresh()
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
+  }
+}
+
+// Toggle rapide « optionnel » sur un point existant.
+// Pour un point template : crée un override action='edit' avec base_point_id.
+// Pour un point déjà custom (local-add ou local-edit) : crée un nouvel
+// override edit qui met à jour is_optional (le backend remplace l'override).
+async function toggleOptional(p) {
+  try {
+    if (p.source === 'template') {
+      await addSectionOverride(props.sectionId, {
+        action: 'edit',
+        base_point_id: p.base_point_id,
+        is_optional: !p.is_optional,
+      })
+    } else if (p.source === 'local-add') {
+      // Point créé localement : on supprime l'add puis on recrée avec is_optional inversé.
+      // Plus simple : on update via edit avec base_point_id null mais ça ne marche pas.
+      // Workaround : delete + add (pas idéal mais fonctionnel).
+      // Pour l'instant : on signale via notification.
+      notifyError('Pour modifier un point ajouté localement, supprime-le et recrée-le.')
+      return
+    } else if (p.source === 'local-edit') {
+      // Cas rare : éditer un override existant. On crée un nouvel override edit
+      // avec le base_point_id et is_optional inversé.
+      await addSectionOverride(props.sectionId, {
+        action: 'edit',
+        base_point_id: p.base_point_id,
+        is_optional: !p.is_optional,
+      })
+    }
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la mise à jour')
   }
 }
 
@@ -147,28 +190,64 @@ function tableFor(direction) {
       <ProtocolPills :protocols="preferredProtocols" />
     </div>
 
-    <!-- Formulaire ajout inline -->
+    <!-- Formulaire ajout inline en grid (2 lignes, pas de chevauchement) -->
     <div v-if="showAdd" class="px-5 py-3 bg-gray-50 border-b border-gray-100">
-      <form @submit.prevent="submitAdd" class="flex items-center gap-2 flex-wrap">
-        <input v-model="draftPoint.label" type="text" required placeholder="Libellé du point (ex : Pression filtre)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="flex-1 min-w-[180px] px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <select v-model="draftPoint.data_type" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option>Mesure</option><option>État</option><option>Alarme</option><option>Commande</option><option>Consigne</option>
-        </select>
-        <select v-model="draftPoint.direction" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="read">Lecture</option>
-          <option value="write">Écriture</option>
-        </select>
-        <input v-model="draftPoint.unit" type="text" placeholder="Unité" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <input v-model="draftPoint.tech_name" type="text" placeholder="Nom technique (T_AIR_NEUF…)" autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-               class="w-44 px-2 py-1.5 border border-gray-200 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <select v-model="draftPoint.nature" class="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="">Nature…</option>
-          <option>Booléen</option><option>Numérique</option><option>Enum</option><option>Chaîne</option>
-        </select>
-        <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Ajouter</button>
-        <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
+      <form @submit.prevent="submitAdd" class="space-y-2">
+        <!-- Ligne 1 : libellé pleine largeur + nom technique -->
+        <div class="grid grid-cols-[1fr_220px] gap-2">
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Libellé du point *</label>
+            <input v-model="draftPoint.label" type="text" required
+                   placeholder="ex : Pression filtre"
+                   autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                   class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Nom technique</label>
+            <input v-model="draftPoint.tech_name" type="text"
+                   placeholder="T_AIR_NEUF…"
+                   autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                   class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
+          </div>
+        </div>
+        <!-- Ligne 2 : type, direction, nature, unité, optionnel -->
+        <div class="grid grid-cols-[110px_110px_140px_80px_1fr_auto] gap-2 items-end">
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Type</label>
+            <select v-model="draftPoint.data_type" class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+              <option>Mesure</option><option>État</option><option>Alarme</option><option>Commande</option><option>Consigne</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Direction</label>
+            <select v-model="draftPoint.direction" class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+              <option value="read">Lecture</option>
+              <option value="write">Écriture</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Nature</label>
+            <select v-model="draftPoint.nature" class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
+              <option value="">—</option>
+              <option>Booléen</option><option>Numérique</option><option>Enum</option><option>Chaîne de caractères</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Unité</label>
+            <input v-model="draftPoint.unit" type="text" placeholder="°C"
+                   autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+                   class="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500" />
+          </div>
+          <label class="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none mb-1.5">
+            <input v-model="draftPoint.is_optional" type="checkbox"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+            <span>Optionnel</span>
+          </label>
+          <div class="flex items-center gap-1.5 mb-0.5">
+            <button type="button" @click="showAdd = false" class="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-800">Annuler</button>
+            <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">Ajouter</button>
+          </div>
+        </div>
       </form>
     </div>
 
@@ -187,8 +266,9 @@ function tableFor(direction) {
               <th class="py-1.5 px-2 text-center">Donnée</th>
               <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
               <th class="py-1.5 px-2 text-center w-28">Type</th>
-              <th class="py-1.5 px-2 text-center w-24">Nature</th>
+              <th class="py-1.5 px-2 text-center w-32">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
+              <th class="py-1.5 px-2 text-center w-20" title="Optionnel — la MOA peut décider de ne pas exiger ce point">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -207,8 +287,20 @@ function tableFor(direction) {
               <td class="py-1.5 px-2 text-center">
                 <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
-              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.nature || '—' }}</td>
+              <td class="py-1.5 px-2 text-center text-xs">
+                <span v-if="p.nature && NATURE_COLORS[p.nature]"
+                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">
+                  {{ p.nature }}
+                </span>
+                <span v-else class="text-gray-300 italic">—</span>
+              </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
+              <td class="py-1.5 px-2 text-center" @click.stop>
+                <label class="inline-flex items-center justify-center cursor-pointer" title="Marquer comme optionnel">
+                  <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
+                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+                </label>
+              </td>
               <td class="py-1.5 px-2 text-center">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" title="Restaurer la valeur du template">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
@@ -234,8 +326,9 @@ function tableFor(direction) {
               <th class="py-1.5 px-2 text-center">Donnée</th>
               <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
               <th class="py-1.5 px-2 text-center w-28">Type</th>
-              <th class="py-1.5 px-2 text-center w-24">Nature</th>
+              <th class="py-1.5 px-2 text-center w-32">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
+              <th class="py-1.5 px-2 text-center w-20" title="Optionnel — la MOA peut décider de ne pas exiger ce point">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -254,8 +347,20 @@ function tableFor(direction) {
               <td class="py-1.5 px-2 text-center">
                 <span :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', TYPE_COLORS[p.data_type]?.bg, TYPE_COLORS[p.data_type]?.text]">{{ p.data_type }}</span>
               </td>
-              <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.nature || '—' }}</td>
+              <td class="py-1.5 px-2 text-center text-xs">
+                <span v-if="p.nature && NATURE_COLORS[p.nature]"
+                      :class="['inline-block px-1.5 py-0.5 text-[10px] font-medium rounded border whitespace-nowrap', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">
+                  {{ p.nature }}
+                </span>
+                <span v-else class="text-gray-300 italic">—</span>
+              </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
+              <td class="py-1.5 px-2 text-center" @click.stop>
+                <label class="inline-flex items-center justify-center cursor-pointer" title="Marquer comme optionnel">
+                  <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
+                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+                </label>
+              </td>
               <td class="py-1.5 px-2 text-center">
                 <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />

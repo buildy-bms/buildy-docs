@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, nextTick, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
@@ -24,7 +24,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop', 'promote-to-library'])
 
 // Drag-drop accueille les captures depuis l'editeur. On reagit uniquement
 // si le payload contient 'application/x-buildy-attachment' (l'id de la
@@ -47,6 +47,15 @@ function onDrop(e) {
 
 const displayedNumber = computed(() =>
   (liveNumbering?.value && liveNumbering.value.get(props.node.id)) || props.node.number || ''
+)
+
+// Section ad-hoc = créée à la volée dans cette AF (« Ajouter une sous-section »)
+// sans pendant biblio. La promotion vers la biblio en crée un section_template
+// dédié et lie cette section au nouveau template.
+const isAdHoc = computed(() =>
+  !props.node.section_template_id &&
+  !props.node.equipment_template_id &&
+  props.node.kind === 'standard'
 )
 
 const excluded = computed(() => props.node.included_in_export === 0)
@@ -257,6 +266,18 @@ const titleHtml = computed(() => {
             <PlusIcon class="w-3 h-3" />
           </button>
         </Tooltip>
+        <Tooltip
+          v-if="isAdHoc"
+          text="Promouvoir cette section dans la bibliothèque (création d'un section type)"
+        >
+          <button
+            type="button"
+            @click.stop="emit('promote-to-library', node)"
+            class="p-0.5 rounded hover:bg-violet-200 text-violet-600"
+          >
+            <ArrowUpOnSquareIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
         <Tooltip text="Supprimer cette section (et ses enfants)">
           <button
             type="button"
@@ -267,6 +288,10 @@ const titleHtml = computed(() => {
           </button>
         </Tooltip>
       </span>
+      <!-- Badge permanent : section ad-hoc (sans pendant biblio). -->
+      <Tooltip v-if="isAdHoc" text="Spécifique à cette AF — sans pendant dans la bibliothèque">
+        <span class="shrink-0 px-1 py-0 text-[9px] font-medium bg-violet-100 text-violet-700 rounded uppercase tracking-wide">AF</span>
+      </Tooltip>
       <!-- Indicateur permanent si section demandee, ecartee, ou exclue -->
       <Tooltip v-if="demanded" text="Fonction exigée par la MOA — à inclure dans l'avenant contractuel">
         <span class="shrink-0 text-emerald-700">
@@ -304,6 +329,7 @@ const titleHtml = computed(() => {
         @toggle-opt-out="emit('toggle-opt-out', $event)"
         @toggle-demanded="emit('toggle-demanded', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
+        @promote-to-library="emit('promote-to-library', $event)"
       />
     </div>
   </div>

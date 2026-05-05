@@ -265,7 +265,7 @@ const STATUS_LABEL = {
   quoted: 'Chiffrée',
   in_progress: 'En cours',
   done: 'Terminée',
-  declined: 'Refusée',
+  declined: 'Non retenue',
 }
 
 const systemsByZone = computed(() => {

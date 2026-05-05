@@ -163,6 +163,36 @@ async function routes(fastify) {
     return db.equipmentTemplates.getById(id);
   });
 
+  // POST /api/equipment-templates/:id/clone — duplique un système technique
+  // de la bibliothèque (template + points + attachments). Slug unique
+  // généré ; les fichiers d'attachments sont partagés (référencés).
+  fastify.post('/equipment-templates/:id/clone', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const src = db.equipmentTemplates.getById(id);
+    if (!src) return reply.code(404).send({ detail: 'Template non trouvé' });
+    const newName = (request.body?.name || `${src.name} (copie)`).trim();
+    if (!newName) return reply.code(400).send({ detail: 'Nom requis' });
+    try {
+      const { newId, pointsCount, attachmentsCount } = db.equipmentTemplates.clone(id, {
+        newName,
+        slugifyName: slugify,
+        userId: request.authUser?.id,
+      });
+      db.auditLog.add({
+        templateId: newId,
+        userId: request.authUser?.id,
+        action: 'template.clone',
+        payload: { source_id: id, source_slug: src.slug, points: pointsCount, attachments: attachmentsCount },
+      });
+      log.info(`Equipment template cloned: #${id} → #${newId} (${pointsCount} points, ${attachmentsCount} attachments) by user #${request.authUser?.id}`);
+      const created = db.equipmentTemplates.getById(newId);
+      return reply.code(201).send({ ...created, points_count: pointsCount, attachments_count: attachmentsCount });
+    } catch (err) {
+      log.error({ err }, 'Clone equipment_template failed');
+      return reply.code(500).send({ detail: err.message || 'Échec du clonage' });
+    }
+  });
+
   // DELETE /api/equipment-templates/:id — suppression
   fastify.delete('/equipment-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);

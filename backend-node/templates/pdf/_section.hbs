@@ -38,18 +38,21 @@
 
   {{!-- Disclaimer générique retiré (Lot 14.3) — désormais affiché une seule fois en page de garde --}}
 
-  {{!-- Lot 31 — Section ecartee par la MOA : remplace tout le contenu par un encart prominent.
-       Le header (titre, n°, badges) reste visible plus haut pour la tracabilite. --}}
+  {{!-- Section ecartee par la MOA : on conserve TOUT le contenu (titre,
+       body, articles BACS) pour la tracabilite, et on ajoute un badge
+       compact en tete pour signaler l'ecart. La MOA peut consulter les
+       details meme si la fonctionnalite n'est pas activee dans le contrat. --}}
   {{#if opted_out_by_moa}}
-  <div class="section-opted-out">
-    <p class="section-opted-out-title">⚠️ Fonctionnalité écartée par la maîtrise d'ouvrage</p>
-    <p class="section-opted-out-text">
-      Cette fonctionnalité ne sera <strong>pas disponible à la livraison</strong> du chantier.
-      Pour l'activer, un <strong>contrat {{requiredContractLabel service_level}}</strong> doit être
-      conclu entre Buildy et l'exploitant du bâtiment.
-    </p>
+  <div class="section-badge-opted-out">
+    <span class="section-badge-opted-out-icon">⚠️</span>
+    <span class="section-badge-opted-out-text">
+      Non retenue par la MOA
+      <span class="section-badge-opted-out-detail">
+        — non incluse à la livraison ; nécessite un contrat {{requiredContractLabel service_level}} pour activation
+      </span>
+    </span>
   </div>
-  {{else}}
+  {{/if}}
 
   {{!-- Encart contextualisé "lien avec le décret BACS" (Lot 17b) --}}
   {{#if bacs_articles_label}}
@@ -111,7 +114,7 @@
     <p class="protocols-bar">
       <span class="protocols-label">Protocoles exigés :</span>
       {{#each equipment.preferred_protocols}}
-      <span class="protocol-pill">{{this}}</span>
+      <span class="protocol-pill" data-protocol="{{this}}">{{this}}</span>
       {{/each}}
     </p>
     {{/if}}
@@ -167,7 +170,6 @@
     {{/each}}
   </div>
   {{/if}}
-  {{/if}} {{!-- /if opted_out_by_moa --}}
 
   {{!-- Les enfants restent affiches meme si la section parent est ecartee --}}
   {{#each children}}
