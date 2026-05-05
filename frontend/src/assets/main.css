@@ -254,14 +254,20 @@ strong, b { font-weight: 500; }
     font-size: 14px;
     opacity: 0.7;
   }
-  /* Checkbox plus grosse sur mobile (24px) — confortable au pouce.
-     Désactive cet override si le composant impose explicitement w-* h-*
-     via Tailwind (ex : la version label-card en w-6/w-7) en utilisant
-     `!` sur les classes Tailwind du parent. Ici on rentre dans le cas
-     par défaut : les checkboxes sans classe explicite passent à 24px. */
-  input[type='checkbox']:not([class*='w-']):not([class*='h-']) {
-    width: 1.5rem;
-    height: 1.5rem;
+  /* Checkbox tactile : on force 1.75rem (28px) sur mobile partout, peu
+     importe les classes Tailwind du composant. iOS HIG = 44pt minimum
+     pour la cible cliquable, mais l'élément visuel peut être plus petit
+     tant que le label/parent autour offre la zone tactile. 28px sur le
+     visuel + label/padding parent → confort au pouce. */
+  input[type='checkbox'] {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+  /* Pseudo coche : adapter la taille du tick au nouveau format. */
+  input[type='checkbox']:checked::after {
+    width: 0.45rem;
+    height: 0.75rem;
+    border-width: 0 2.2px 2.2px 0;
   }
 }
 
