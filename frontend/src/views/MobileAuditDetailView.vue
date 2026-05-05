@@ -130,7 +130,7 @@ function goBack() {
     <!-- Contenu de l'onglet actif (scroll vertical, un seul visible) -->
     <main
       class="flex-1 overflow-y-auto overscroll-contain"
-      :style="{ paddingBottom: 'calc(68px + env(safe-area-inset-bottom))' }"
+      :style="{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom))' }"
     >
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
       <template v-else-if="document">
@@ -144,12 +144,11 @@ function goBack() {
 
     <!-- Bottom tab bar : sticky, safe-area bottom -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200"
-      :style="{ paddingBottom: 'env(safe-area-inset-bottom)' }"
+      class="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 flex flex-col"
       role="navigation"
       aria-label="Navigation audit"
     >
-      <ul class="flex items-stretch h-17">
+      <ul class="flex items-stretch h-14">
         <li v-for="tab in visibleTabs" :key="tab.key" class="flex-1">
           <button
             type="button"
@@ -166,6 +165,8 @@ function goBack() {
           </button>
         </li>
       </ul>
+      <!-- Spacer safe-area bottom : home indicator iOS, mêmes bg que la nav -->
+      <div :style="{ height: 'env(safe-area-inset-bottom)' }"></div>
     </nav>
   </div>
 </template>
