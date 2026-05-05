@@ -4,11 +4,12 @@
  * SearchableSelect.vue. Une seule source de vérité partagée entre
  * BacsAuditDetailView.vue, SystemDevicesTable.vue et AddDeviceModal.vue.
  *
- * La première entrée { value: null } sert au reset clearable du dropdown.
+ * Pas d'entrée { value: null } : le SearchableSelect gère le placeholder
+ * (prop `placeholder`) et le reset (bouton X "clearable"). Inclure null
+ * en option afficherait le placeholder comme item sélectionnable.
  */
 
 export const ENERGY_OPTIONS = [
-  { value: null,               label: 'Énergie' },
   { value: 'gas',              label: 'Gaz',                icon: 'fa-fire-flame-curved', color: '#f97316' },
   { value: 'electric',         label: 'Électrique',         icon: 'fa-bolt',              color: '#eab308' },
   { value: 'heat_pump',        label: 'PAC',                icon: 'fa-temperature-half',  color: '#0ea5e9' },
@@ -21,7 +22,6 @@ export const ENERGY_OPTIONS = [
 ]
 
 export const ROLE_OPTIONS = [
-  { value: null,           label: 'Nature' },
   { value: 'production',   label: 'Production',   icon: 'fa-industry',          color: '#dc2626' },
   { value: 'distribution', label: 'Distribution', icon: 'fa-route',             color: '#0ea5e9' },
   { value: 'emission',     label: 'Émission',     icon: 'fa-fan',               color: '#3b82f6' },
@@ -30,7 +30,6 @@ export const ROLE_OPTIONS = [
 ]
 
 export const COMM_OPTIONS = [
-  { value: null,              label: '—' },
   { value: 'modbus_tcp',      label: 'Modbus TCP',      icon: 'fa-network-wired',     color: '#1e40af' },
   { value: 'modbus_rtu',      label: 'Modbus RTU',      icon: 'fa-network-wired',     color: '#1d4ed8' },
   { value: 'bacnet_ip',       label: 'BACnet IP',       icon: 'fa-network-wired',     color: '#7c3aed' },
