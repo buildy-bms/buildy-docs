@@ -18,22 +18,12 @@
 </section>
 
 {{!-- ═══════════ Page Tableau des offres (partial partage avec brochure) ═══════════
-     Le wrapper, le header (eyebrow + titre + count) et la legende sont mutualises
-     via _offerings-page.hbs pour garantir un rendu strictement identique entre
-     ce catalogue d'offres et la page « Tableau des offres » de la brochure. --}}
+     Le wrapper, le header, le tableau et la legende sont mutualises via
+     _offerings-page.hbs pour garantir un rendu strictement identique entre
+     ce catalogue d'offres et la page « Tableau des offres » de la brochure.
+     Le CTA et le footer custom ont ete supprimes : le footer Puppeteer
+     (logo + mention confidentielle) suffit comme info de bas de page. --}}
 {{> _offerings-page}}
-
-{{!-- ═══════════ CTA ═══════════ --}}
-<section class="cta-section">
-  <div class="cta-block">
-    <p class="cta-line">{{{ctaTitle}}}</p>
-    <p class="cta-sub">{{{ctaSub}}}</p>
-    <p class="cta-contact">{{{ctaContact}}}</p>
-  </div>
-  <p class="comparison-footer">
-    Buildy · catalogue édité le {{exportDate}}
-  </p>
-</section>
 
 </body>
 </html>
