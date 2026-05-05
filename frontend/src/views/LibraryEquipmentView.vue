@@ -248,6 +248,7 @@ const CATEGORY_LABELS = {
   ventilation: 'Ventilation',
   chauffage: 'Chauffage',
   climatisation: 'Climatisation',
+  thermique_mixte: 'Chauffage + Climatisation',
   ecs: 'Eau chaude sanitaire',
   eclairage: 'Éclairage',
   electricite: 'Électricité',

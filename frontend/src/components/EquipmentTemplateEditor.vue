@@ -47,17 +47,18 @@ const { confirm } = useConfirm()
 const isEdit = computed(() => !!props.template?.id)
 
 const CATEGORIES = [
-  { value: 'ventilation',   label: 'Ventilation',          icon: 'fa-fan',             color: '#3b82f6' },
-  { value: 'chauffage',     label: 'Chauffage',            icon: 'fa-fire',            color: '#dc2626' },
-  { value: 'climatisation', label: 'Climatisation',        icon: 'fa-snowflake',       color: '#0ea5e9' },
-  { value: 'ecs',           label: 'Eau chaude sanitaire', icon: 'fa-faucet-drip',     color: '#0284c7' },
-  { value: 'eclairage',     label: 'Éclairage',            icon: 'fa-lightbulb',       color: '#eab308' },
-  { value: 'electricite',   label: 'Électricité',          icon: 'fa-bolt',            color: '#a855f7' },
-  { value: 'comptage',      label: 'Comptage énergétique', icon: 'fa-gauge',           color: '#22c55e' },
-  { value: 'qai',           label: 'Qualité de l\'air',    icon: 'fa-leaf',            color: '#16a34a' },
-  { value: 'occultation',   label: 'Occultation',          icon: 'fa-window-maximize', color: '#64748b' },
-  { value: 'process',       label: 'Process industriel',   icon: 'fa-industry',        color: '#475569' },
-  { value: 'autres',        label: 'Autres équipements',   icon: 'fa-cube',            color: '#6b7280' },
+  { value: 'ventilation',     label: 'Ventilation',                icon: 'fa-fan',             color: '#3b82f6' },
+  { value: 'chauffage',       label: 'Chauffage',                  icon: 'fa-fire',            color: '#dc2626' },
+  { value: 'climatisation',   label: 'Climatisation',              icon: 'fa-snowflake',       color: '#0ea5e9' },
+  { value: 'thermique_mixte', label: 'Chauffage + Climatisation',  icon: 'fa-temperature-half', color: '#a855f7' },
+  { value: 'ecs',             label: 'Eau chaude sanitaire',       icon: 'fa-faucet-drip',     color: '#0284c7' },
+  { value: 'eclairage',       label: 'Éclairage',                  icon: 'fa-lightbulb',       color: '#eab308' },
+  { value: 'electricite',     label: 'Électricité',                icon: 'fa-bolt',            color: '#a855f7' },
+  { value: 'comptage',        label: 'Comptage énergétique',       icon: 'fa-gauge',           color: '#22c55e' },
+  { value: 'qai',             label: 'Qualité de l\'air',          icon: 'fa-leaf',            color: '#16a34a' },
+  { value: 'occultation',     label: 'Occultation',                icon: 'fa-window-maximize', color: '#64748b' },
+  { value: 'process',         label: 'Process industriel',         icon: 'fa-industry',        color: '#475569' },
+  { value: 'autres',          label: 'Autres équipements',         icon: 'fa-cube',            color: '#6b7280' },
 ]
 
 const PROTOCOLS_PRESETS = ['Modbus TCP', 'Modbus RTU', 'BACnet/IP', 'BACnet MS/TP', 'KNX/IP', 'KNX TP', 'M-Bus IP', 'M-Bus filaire', 'MQTT', 'OPC-UA', 'LoRaWAN', 'DALI', 'Zigbee']

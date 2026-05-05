@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 82;
+const TARGET_VERSION = 83;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3192,6 +3192,22 @@ function runMigrations() {
     }
     db.pragma('user_version = 82');
     log.info(`Migration 82 : ${migrated} instance(s) repassee(s) de chauffage+climatisation -> thermique_mixte (catalogue mis a jour)`);
+  }
+
+  if (current < 83) {
+    // Lot — Réassignation du champ `equipment_templates.category` (groupement
+    // principal de la biblio) sur les templates intrinsèquement mixtes :
+    // DRV et Rooftop. CTA reste en 'ventilation' (sa fonction principale).
+    // Conservateur : on ne réassigne que les templates qui étaient
+    // explicitement en 'climatisation' (le DRV était l'exemple typique).
+    const upd = db.prepare(`
+      UPDATE equipment_templates
+         SET category = 'thermique_mixte', updated_at = CURRENT_TIMESTAMP
+       WHERE slug IN ('drv', 'rooftop')
+         AND category IN ('chauffage', 'climatisation')
+    `).run();
+    db.pragma('user_version = 83');
+    log.info(`Migration 83 : ${upd.changes} template(s) DRV/Rooftop reassignes a la categorie thermique_mixte`);
   }
 
   if (current > TARGET_VERSION) {
