@@ -145,12 +145,10 @@ onBeforeUnmount(teardownSortables)
       <span v-else class="italic">Pas encore de systèmes saisis</span>
     </template>
     <div class="px-3 py-3 bg-gray-50">
-      <div v-if="hiddenNotConcernedCount" class="flex items-center justify-end mb-2 gap-2">
-        <label class="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-          <input type="checkbox" v-model="showNotConcernedSystems" class="rounded border-gray-300" />
-          Afficher les {{ hiddenNotConcernedCount }} usage{{ hiddenNotConcernedCount > 1 ? 's' : '' }} marqué{{ hiddenNotConcernedCount > 1 ? 's' : '' }} « non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }} »
-        </label>
-      </div>
+      <!-- Les usages "non concerné" restent toujours visibles (grisés et
+           atténués via la classe opacity-60 + bordure dashed sur la card),
+           pour permettre à l'auditeur de les remettre actifs facilement
+           sans avoir à toggle un flag d'affichage. -->
       <div class="space-y-3">
         <div v-for="g in systemsByZone" :key="g.zone_id"
              class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
@@ -167,16 +165,17 @@ onBeforeUnmount(teardownSortables)
             <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ zoneNatures.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
             <span class="ml-auto text-[10px] text-gray-400">
               {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
-              / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
+              / {{ g.items.length }}
             </span>
           </div>
           <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2"
                :ref="el => setZoneListRef(g.zone_id, el)">
             <template v-for="s in g.items" :key="s.id">
               <!-- Pas de PhotoDropzone autour de la catégorie : drops scopés
-                   au système (device card) uniquement, voir SystemDevicesTable. -->
-              <div v-if="!s.not_concerned || showNotConcernedSystems"
-                   :data-id="s.id"
+                   au système (device card) uniquement, voir SystemDevicesTable.
+                   Les usages "non concerné" restent visibles (grisés via
+                   opacity-60 + bordure dashed dans le :class plus bas). -->
+              <div :data-id="s.id"
                    :class="['system-card rounded-lg overflow-hidden border bg-white',
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
