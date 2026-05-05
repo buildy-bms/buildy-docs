@@ -60,11 +60,24 @@ const verdict = computed(() => {
   return { kind: 'ok', contract: contract_level, required }
 })
 
+// Couleur de la card selon le verdict :
+//   - 'ok' (niveau requis ≤ contrat) → vert
+//   - 'shortfall' (niveau requis > contrat) → rouge
+//   - 'no-contract' (pas de contrat fixé) → ambre (rappel)
+//   - default → blanc neutre
+const cardClass = computed(() => {
+  const k = verdict.value?.kind
+  if (k === 'ok') return 'border-emerald-300 bg-emerald-50/60'
+  if (k === 'shortfall') return 'border-red-300 bg-red-50/60'
+  if (k === 'no-contract') return 'border-amber-200 bg-amber-50/60'
+  return 'border-gray-200 bg-white'
+})
+
 defineExpose({ refresh })
 </script>
 
 <template>
-  <div v-if="data && data.required" class="border border-gray-200 rounded-lg bg-white shadow-xs px-4 py-2.5">
+  <div v-if="data && data.required" :class="['border rounded-lg shadow-xs px-4 py-2.5 transition-colors', cardClass]">
     <div class="flex items-center gap-3 flex-wrap">
       <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0">Niveau requis</p>
       <ServiceLevelBadge :level="data.required" variant="full" />
