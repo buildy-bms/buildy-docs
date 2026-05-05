@@ -3,6 +3,7 @@ import { computed, ref, watch, nextTick, inject } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
@@ -194,8 +195,14 @@ const titleHtml = computed(() => {
         </span>
       </Tooltip>
 
+      <!-- Icone equipement coloree (kind='equipment') prioritaire sur tpl_icon_name. -->
+      <EquipmentIcon
+        v-if="node.kind === 'equipment' && node.eq_icon_value"
+        :template="{ icon_kind: node.eq_icon_kind, icon_value: node.eq_icon_value, icon_color: node.eq_icon_color }"
+        size="xs"
+      />
       <FontAwesomeIcon
-        v-if="node.tpl_icon_name"
+        v-else-if="node.tpl_icon_name"
         :icon="['fas', node.tpl_icon_name]"
         class="w-3 h-3 shrink-0 text-gray-500"
         :class="isSelected ? 'text-indigo-700' : ''"

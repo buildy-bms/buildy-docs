@@ -3595,17 +3595,22 @@ const afs = {
 // ── Sections ─────────────────────────────────────────────────────────
 const sections = {
   listByAf(afId) {
-    // Joint avail_e/s/p depuis le section_template pour permettre a l'UI
-    // de distinguer "inclus" / "option payante" / "indisponible" sans avoir
-    // a refaire un appel par section.
+    // Joint :
+    //   - section_templates pour avail_e/s/p (UI distingue inclus / paid_option / null) + icon_name
+    //   - equipment_templates pour les icones colorees des systemes techniques
+    //     (kind='equipment'), exposees via EquipmentIcon.vue dans l'arborescence.
     return db.prepare(`
       SELECT s.*,
              stt.avail_e AS tpl_avail_e,
              stt.avail_s AS tpl_avail_s,
              stt.avail_p AS tpl_avail_p,
-             stt.icon_name AS tpl_icon_name
+             stt.icon_name AS tpl_icon_name,
+             eqt.icon_kind AS eq_icon_kind,
+             eqt.icon_value AS eq_icon_value,
+             eqt.icon_color AS eq_icon_color
       FROM sections s
       LEFT JOIN section_templates stt ON stt.id = s.section_template_id
+      LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
       WHERE s.af_id = ?
       ORDER BY s.parent_id NULLS FIRST, s.position, s.id
     `).all(afId);

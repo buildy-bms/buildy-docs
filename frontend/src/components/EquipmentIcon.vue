@@ -11,11 +11,11 @@ library.add(...iconObjs)
 
 const props = defineProps({
   template: { type: Object, required: true },
-  size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg'
+  size: { type: String, default: 'md' }, // 'xs' | 'sm' | 'md' | 'lg'
 })
 
 const sizeClass = computed(() => ({
-  sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8',
+  xs: 'w-3 h-3', sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8',
 }[props.size] || 'w-6 h-6'))
 
 const iconKind = computed(() => props.template?.icon_kind || 'fa')
