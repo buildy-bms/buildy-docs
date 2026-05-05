@@ -161,3 +161,72 @@ Statuts brochure : `'draft' | 'published'`
 - Token de service Bearer `BUILDY_SITES_SYNC_TOKEN` (memes valeurs cote FM et Buildy Docs)
 - Endpoint reciproque `/api/sites/sync` cote chaque app
 - Worker queue avec retry exponentiel pour resilience reseau
+- **Champs synchronisés** : `name`, `customer_name` (Docs) ↔ `client` (FM), `address`, `notes`, `deleted_at`. La source de vérité de l'**adresse** est la table `sites` ; les documents (`afs`, `bacs_audit`, `site_audit`) ne stockent PAS de duplicata. La colonne legacy `documents.site_address` est lue mais plus écrite côté mobile/audit-store. Édition possible côté Docs (audit Site tab + AfsListView desktop) ou côté FM (modale create/edit Site → champ Adresse).
+
+## Vue Mobile / PWA (audit BACS / GTB sur iPhone-iPad)
+
+### Architecture
+- **Routage** : `views/AuditDetailRouter.vue` choisit dynamiquement entre `BacsAuditDetailView.vue` (desktop ≥ 1024px) et `views/MobileAuditDetailView.vue` (mobile < 1024px) via `useViewport().isNarrow`. Routes `/bacs-audit/:id` et `/site-audit/:id` ont `meta.fullscreenMobile: true` → `App.vue` skip `AppLayout` (header navy + sidebar) en mobile pour donner tout l'écran à la vue native.
+- **Idem home** : `views/HomeRouter.vue` → `MobileHomeView.vue` (audits uniquement, pas d'AF/brochures) sur mobile, `AfsListView.vue` sur desktop.
+- **5 onglets bottom nav** : Site / Zones / Compteurs / Systèmes / GTB. Régulation thermique R175-6 nichée dans Systèmes (panneau ambré sous chaque heating/cooling). Plan d'action et synthèse Claude restent desktop-only.
+- **Composants mobiles** dans `frontend/src/components/mobile-audit/` : `MobileSheet` (slide-up plein écran avec close+save iOS-natif), `MobileField` (label uppercase tracking-wider + slot), `MobileFab`, `MobileShareSheet`, et 5 `Mobile<Tab>.vue` (Site / Zones / Meters / Systems / Bms).
+- **Store partagé** : `stores/audit.js` charge le site via `getSite(site_uuid)` au boot, expose `updateSiteFields(patch)` qui appelle `PATCH /api/sites/:uuid` (propagation FM via sync existant).
+
+### Breakpoints (`composables/useViewport.js`)
+- `isMobile` : `(max-width: 767px)` — phone portrait/landscape, déclenche les rendus cards stack
+- `isNarrow` : `(max-width: 1023px)` — phone + iPad portrait, masque le stepper sidebar et active la bottom nav
+- `isCoarsePointer` : `(pointer: coarse)` — détection touch
+- `isDesktop` / `isWide` : inverses
+
+### Conventions tactile iOS
+- Tap targets ≥ 44pt (utility class `.tap-target` dans `assets/main.css`)
+- Inputs forcés à `font-size: 16px` en mobile (anti-zoom Safari focus). Placeholders réduits à 14px opacity 0.7 pour hiérarchie label/valeur
+- Champs nombre : `inputmode="decimal"` + `pattern="[0-9.,]*"` (jamais `type="number"` qui sort double clavier)
+- Date : `<input type="date">` natif (picker iOS)
+- Selects courts (≤ 6 options) : `<select>` natif. Plus longs : modal plein écran avec recherche
+- Bottom safe-area : tous les conteneurs sticky/fixed bas utilisent `env(safe-area-inset-bottom)` pour ne pas être cachés par la home indicator iPhone X+
+- Bottom nav : h-14 (56px) + safe-area = ~90px (proche du standard Apple ~83px)
+- Body bg #ffffff explicite dans `main.css` pour éviter tout bleed gris dans la zone safe-area en PWA standalone
+
+### PWA standalone iOS / Android
+- `frontend/public/manifest.webmanifest` : `display: standalone`, `theme_color: #ffffff`, icons 180/192/512 générés depuis `img/favicon-buildy-fond-blanc.png` via `sharp`
+- Meta tags `apple-mobile-web-app-capable=yes` + `status-bar-style=default` (texte sombre sur fond blanc) dans `frontend/index.html`
+- `frontend/public/sw.js` : SW minimal et conservateur, n'intercepte PAS navigation / api / auth (incident 2026-05-05 où v1 cassait la chaîne de redirects OIDC sur Safari iOS). Cache uniquement assets statiques en StaleWhileRevalidate
+- `components/InstallBanner.vue` : bannière non intrusive iOS Safari après 5s qui dit « Tap 📤 puis Sur l'écran d'accueil ». Auto-dismiss 30 jours via localStorage. Capture aussi `beforeinstallprompt` Android pour install 1-clic
+- **Force refresh** : bouton dans le sheet « Paramètres de l'audit » mobile (icône engrenage en topbar) qui désinscrit le SW + purge `caches.keys()` + reload bypass-cache. Indispensable car le SW peut servir un app-shell obsolète sur iOS standalone.
+
+### Cert TLS Let's Encrypt + DNS-01 OVH
+Le domaine `docs.buildy.fr` résout vers une IP NetBird interne (`100.64.x.x`), donc HTTP-01 impossible. On utilise DNS-01 :
+- `acme.sh` installé dans `/root/.acme.sh/` sur le VPS Hosteur (cron auto-renew 60j)
+- Plugin OVH natif `dns_ovh` configuré via env vars `OVH_AK`, `OVH_AS`, `OVH_CK`, `OVH_END_POINT=ovh-eu`
+- **Scope token OVH** : `GET=/domain/zone/* POST=/domain/zone/* PUT=/domain/zone/* DELETE=/domain/zone/*` (le scope par-zone `/buildy.fr/*` ne suffit pas car le plugin teste `GET /domain/zone/buildy.fr` sans path)
+- Cert installé via `acme.sh --install-cert -d docs.buildy.fr --ecc --fullchain-file /opt/buildy-docs/certs/server.crt --key-file /opt/buildy-docs/certs/server.key --reloadcmd "pm2 restart buildy-docs"`
+- L'ancien cert auto-signé est sauvegardé en `server.crt.selfsigned-bak` / `server.key.selfsigned-bak`
+- Renouvellement test : `/root/.acme.sh/acme.sh --cron --home /root/.acme.sh`
+
+## Partage d'audit (et AF)
+
+### Modèle
+Mêmes routes pour AF et audits car la table `documents` est unifiée :
+- `GET /api/afs/:id/permissions` — owner_id + grants
+- `POST /api/afs/:id/permissions` — body `{ user_id, role }` (role ∈ 'read' | 'write')
+- `DELETE /api/afs/:id/permissions/:userId`
+
+### Côté UI
+- **Desktop** : `components/ShareAfModal.vue` ouvert depuis :
+  - AF : bouton dans `CycleBandeau.vue` menu « Plus »
+  - Audit : bouton « Plus » → « Partager » dans `BacsAuditDetailView.vue` topbar
+- **Mobile** : `components/mobile-audit/MobileShareSheet.vue` ouvert depuis le sheet Paramètres audit (icône engrenage)
+
+### Toolbar audit desktop (cohérent avec AF)
+Pattern unifié : actions d'export visibles + menu « Plus » :
+- Boutons visibles : `Aperçu` (gris outline) | `Rapport` (PDF A4 indigo plein) | `Synthèse` (PDF A3 indigo plein) | `Livrer` (vert)
+- Menu `Plus` (icône `EllipsisHorizontalIcon`) : Partager / Activité / Photos terrain / Transcript IA / ─── / Supprimer cet audit (rouge)
+- Le kind switch BACS/GTB reste dans le `<select>` du `<h1>` titre
+- **Pas de Tout replier/déplier dans la toolbar globale** — c'est une action par section gérée par les `CollapsibleSection`
+
+### Liste utilisateurs PocketID
+- Backend `routes/users.js` : `GET /api/users` complète sa liste avec les utilisateurs PocketID via `X-API-Key` header (env `POCKETID_API_KEY`). Cache 60s in-memory pour ne pas hammer l'admin API. Dédup par email avec les users locaux.
+- Backend `POST /api/users/ensure-by-pocketid-id` : crée un placeholder local (oidc_sub = pocketid id) pour pouvoir grant à un collègue qui ne s'est pas encore loggé sur Docs. Au prochain login OIDC, `getByOidcSub` retrouve l'enregistrement et complète le profil via `updateProfile`.
+- Frontend (ShareAfModal + MobileShareSheet) : si l'user sélectionné est PocketID (id préfixé `pocketid:`), appelle d'abord `ensureUserFromPocketId(pocketid_id)` pour obtenir l'id local, puis `grantAfPermission`.
+- Env var requise prod : `POCKETID_API_KEY=...` dans `/opt/buildy-docs/.env`. Token créé dans PocketID admin (Paramètres → API Keys) avec scope minimum `users:read`.
