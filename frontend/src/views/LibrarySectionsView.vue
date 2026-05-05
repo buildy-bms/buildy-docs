@@ -262,19 +262,53 @@ function setupSortables() {
   if (search.value.trim()) return
   const el = tbodyRef.value
   if (!el) return
+  // Buffer des descendants visuellement masques pendant le drag (UX : "le bloc
+  // parent + enfants se deplace comme un tout"). Stockes au onStart, replaces
+  // dans le DOM juste apres le parent au onEnd. Les attributs data-visual-depth
+  // permettent d'identifier les descendants directs/indirects (toutes les <tr>
+  // qui suivent le dragged et dont la profondeur > celle du dragged).
+  let draggedDescendants = []
   sortableInstance = Sortable.create(el, {
     animation: 150,
     handle: '.drag-handle',
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
+    onStart(evt) {
+      draggedDescendants = []
+      const draggedDepth = parseInt(evt.item.getAttribute('data-visual-depth') || '0', 10)
+      let next = evt.item.nextElementSibling
+      while (next) {
+        const d = parseInt(next.getAttribute('data-visual-depth') || '0', 10)
+        if (d <= draggedDepth) break
+        draggedDescendants.push(next)
+        next = next.nextElementSibling
+      }
+      // Masque visuellement les descendants : ils suivront le parent au drop.
+      for (const tr of draggedDescendants) tr.style.display = 'none'
+    },
     onMove(evt) {
+      // Empeche le drop sur l'un des descendants masques (cas theorique : on
+      // ne devrait pas pouvoir, mais securite).
+      if (draggedDescendants.includes(evt.related)) return false
       const a = evt.dragged?.getAttribute('data-parent-id') || ''
       const b = evt.related?.getAttribute('data-parent-id') || ''
       return a === b
     },
     onEnd: async (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
+      // Replace les descendants juste apres leur parent, dans l'ordre original.
+      let insertAfter = evt.item
+      for (const tr of draggedDescendants) {
+        insertAfter.insertAdjacentElement('afterend', tr)
+        tr.style.display = ''
+        insertAfter = tr
+      }
+      const movedDescendants = draggedDescendants.length
+      draggedDescendants = []
+
+      // Si rien n'a bouge dans la fratrie ET pas de descendants a deplacer, skip.
+      if (evt.oldIndex === evt.newIndex && movedDescendants === 0) return
+
       const draggedParent = evt.item.getAttribute('data-parent-id') || ''
       const ids = Array.from(el.children)
         .filter(li => (li.getAttribute('data-parent-id') || '') === draggedParent)
@@ -394,6 +428,7 @@ onBeforeUnmount(teardownSortables)
         <tbody ref="tbodyRef">
           <tr v-for="t in flatItems" :key="t.id" :data-id="t.id"
               :data-parent-id="t.parent_template_id || ''"
+              :data-visual-depth="t.visual_depth || 0"
               :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
                        isSelected(t.id) ? 'bg-indigo-50/60' : '',
                        dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
