@@ -23,7 +23,7 @@ const createAfSchema = z.object({
 const updateAfSchema = z.object({
   client_name: z.string().min(1).optional(),
   project_name: z.string().min(1).optional(),
-  site_address: z.string().optional(),
+  site_address: z.string().nullable().optional(),
   // Permet de réassocier l'AF à un autre site (ou la détacher en passant null
   // pour les kinds qui le supportent, p.ex. 'af'). Pour 'bacs_audit' /
   // 'site_audit', la route refuse silencieusement le null (cf db.afs.update
