@@ -214,6 +214,13 @@ function seedSectionTemplatesOnBoot() {
       });
       id = created.id;
       createdCount++;
+      // Lot — Migration 78 : tagging document_kinds depuis le node du seed
+      // (defaut ['af'] si non specifie). Pas de cascade ici : chaque enfant
+      // se taggue lui-meme via son propre document_kinds.
+      const docKinds = Array.isArray(node.document_kinds) && node.document_kinds.length
+        ? node.document_kinds
+        : ['af'];
+      db.sectionTemplates.setDocumentKinds(id, docKinds, { cascade: false });
     }
     if (Array.isArray(node.children)) {
       for (const c of node.children) walk(c, id || parentTemplateId);
@@ -235,7 +242,12 @@ function seedAfStructure(afId) {
   // devenue la source de verite (parent_template_id + equipment_template_id +
   // position). La numerotation est calculee a la volee depuis la position
   // dans la fratrie (1, 1.1, 1.2, 2…).
-  const allTemplates = db.sectionTemplates.list({});
+  // Lot — Migration 78 : filtre sur document_kinds contient 'af'. Les sections
+  // marquees brochure-only ou bacs_audit-only ne sont PAS instanciees dans
+  // l'AF (ex: ch.14.4 Buildy Box reserve a la brochure commerciale).
+  const allTemplates = db.sectionTemplates.list({}).filter(t =>
+    Array.isArray(t.document_kinds) && t.document_kinds.includes('af')
+  );
   const byParentTpl = new Map();
   for (const t of allTemplates) {
     const k = t.parent_template_id || 0;
@@ -373,6 +385,11 @@ function backfillNewPlanSections() {
       // Lookup section_template d'abord (sert au dedup)
       const slug = sectionTemplateSlug(node);
       const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
+
+      // Lot — Migration 78 : filtre sur document_kinds contient 'af'. Les
+      // sections marquees brochure-only ou bacs_audit-only ne sont pas
+      // backfilees dans les AFs (ex: ch.14.4 Buildy Box).
+      if (tpl && Array.isArray(tpl.document_kinds) && !tpl.document_kinds.includes('af')) continue;
 
       // Dedup principal : section_template_id deja present pour cette AF
       if (tpl && existingTemplateIds.has(tpl.id)) continue;

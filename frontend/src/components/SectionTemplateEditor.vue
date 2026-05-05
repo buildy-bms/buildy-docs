@@ -26,6 +26,7 @@ import {
   listEquipmentTemplates,
   listSectionTemplateVersions,
   getSectionTemplateVersion,
+  listDocumentKinds,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -73,7 +74,43 @@ const form = ref({
   avail_e: null,
   avail_s: null,
   avail_p: null,
+  // Multi-tagging par type de document Buildy (Lot — migration 78).
+  // Liste de strings parmi document_kinds catalogue (af / brochure / bacs_audit / site_audit).
+  // Defaut a la creation : ['af']. Une section avec liste vide n'apparait nulle part.
+  document_kinds: ['af'],
 })
+
+// Cascade des tags aux descendants ON par defaut (coherent avec la cascade
+// existante opted_out_by_moa). L'utilisateur peut decocher pour overrider
+// uniquement la section courante (cas avance).
+const cascadeDocumentKinds = ref(true)
+// Catalogue des kinds disponibles charge au mount (alimente les boutons toggle).
+const documentKindsCatalog = ref([])
+async function loadDocumentKinds() {
+  try {
+    const { data } = await listDocumentKinds()
+    documentKindsCatalog.value = data || []
+  } catch {
+    // Fallback statique si le endpoint n'est pas dispo (deploy en cours)
+    documentKindsCatalog.value = [
+      { kind: 'af', label: 'Analyse fonctionnelle' },
+      { kind: 'brochure', label: 'Brochure commerciale' },
+      { kind: 'bacs_audit', label: 'Audit BACS' },
+      { kind: 'site_audit', label: 'Audit GTB' },
+    ]
+  }
+}
+function toggleDocumentKind(kind) {
+  const list = form.value.document_kinds || []
+  if (list.includes(kind)) {
+    form.value.document_kinds = list.filter(k => k !== kind)
+  } else {
+    form.value.document_kinds = [...list, kind]
+  }
+}
+function isDocumentKindActive(kind) {
+  return (form.value.document_kinds || []).includes(kind)
+}
 
 // Niveaux de contrat avec leurs labels affiches
 const CONTRACT_LEVELS = [
@@ -109,6 +146,7 @@ async function loadEquipmentTemplates() {
 onMounted(() => {
   loadTemplates()
   loadEquipmentTemplates()
+  loadDocumentKinds()
 })
 
 const parentOptions = computed(() => {
@@ -185,6 +223,9 @@ watch(() => props.template, (t) => {
     avail_e: (t && t.avail_e) || null,
     avail_s: (t && t.avail_s) || null,
     avail_p: (t && t.avail_p) || null,
+    document_kinds: (t && Array.isArray(t.document_kinds) && t.document_kinds.length)
+      ? [...t.document_kinds]
+      : ['af'],
   }
 }, { immediate: true })
 
@@ -239,6 +280,10 @@ const modalTitle = computed(() => {
 
 async function submit() {
   if (!form.value.title.trim()) return
+  if (!form.value.document_kinds?.length) {
+    notifyError('Sélectionne au moins un type de document.')
+    return
+  }
   submitting.value = true
   try {
     const payload = {
@@ -251,6 +296,7 @@ async function submit() {
         ? (form.value.equipment_template_id || null)
         : null,
       icon_name: form.value.icon_name || null,
+      document_kinds: form.value.document_kinds,
     }
     // Pour les fonctionnalites : on envoie la matrice de disponibilite,
     // le backend en derive automatiquement le service_level.
@@ -260,8 +306,12 @@ async function submit() {
       payload.avail_p = form.value.avail_p || null
     }
     if (isEdit.value) {
-      const { data } = await updateSectionTemplate(props.template.id, payload)
-      success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} enregistrée`)
+      const { data } = await updateSectionTemplate(props.template.id, payload, {
+        cascadeDocumentKinds: cascadeDocumentKinds.value,
+      })
+      const cascaded = data?.document_kinds_cascaded || 0
+      const cascadeMsg = cascaded > 0 ? ` (tags propagés à ${cascaded} sous-section${cascaded > 1 ? 's' : ''})` : ''
+      success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} enregistrée${cascadeMsg}`)
       emit('saved', data)
     } else {
       const { data } = await createSectionTemplate({
@@ -374,6 +424,37 @@ async function destroy() {
       <div v-if="showBacs">
         <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
         <BacsArticlesPicker v-model="form.bacs_articles" />
+      </div>
+
+      <!-- Multi-tagging par type de document Buildy (Lot — migration 78).
+           Permet de definir dans quels documents la section apparait : AF
+           livree au client, brochure technico-commerciale, audit BACS, etc.
+           Heritage parent -> enfants en cascade a la sauvegarde. -->
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1.5">
+          Documents où cette {{ labelEntity }} apparaît
+          <span class="text-gray-400 font-normal">— sélectionner un ou plusieurs types</span>
+        </label>
+        <div class="flex flex-wrap gap-1.5">
+          <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
+                  @click="toggleDocumentKind(dk.kind)"
+                  :title="dk.description"
+                  :class="['inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition whitespace-nowrap',
+                           isDocumentKindActive(dk.kind)
+                             ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
+                             : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
+            <span :class="['w-1.5 h-1.5 rounded-full shrink-0', isDocumentKindActive(dk.kind) ? 'bg-indigo-600' : 'bg-gray-300']" />
+            <span class="font-medium">{{ dk.label }}</span>
+          </button>
+        </div>
+        <label v-if="isEdit" class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+          <input v-model="cascadeDocumentKinds" type="checkbox"
+                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0" />
+          <span>Propager ces tags aux sous-sections (recommandé)</span>
+        </label>
+        <p v-if="!form.document_kinds?.length" class="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
+          ⚠ Sans aucun tag, cette section n'apparaîtra dans aucun document.
+        </p>
       </div>
 
       <!-- Matrice de disponibilite par niveau de contrat (Lot 36) -->

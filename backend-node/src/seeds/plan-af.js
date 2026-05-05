@@ -368,61 +368,72 @@ const PLAN_AF = [
   //   14.2 Cybersécurité et protection des données (placeholders, rédaction Kevin + IA)
   //   14.3 Avantages de l'architecture cloud (placeholders, rédaction Kevin + IA)
   //   14.4 Buildy Box — coffret GTB tout-compris (body_html depuis buildy.fr)
+  //
+  // Migration 78 : multi-tagging document_kinds (af / brochure / bacs_audit / site_audit).
+  // 14.4 (Buildy Box) est explicitement EXCLU de l'AF (brochure-only).
   {
     number: '14', title: 'Pourquoi Buildy', kind: 'standard',
+    document_kinds: ['af', 'brochure'],
     children: [
       // ── 14.1 Couverture intégrale du décret BACS ──
       {
         number: '14.1', title: 'Couverture intégrale du décret BACS', kind: 'standard',
         bacs_articles: 'R175-1 à R175-6',
+        document_kinds: ['af', 'brochure', 'bacs_audit'],
         children: [
-          { number: '14.1.1', title: 'R175-1 — Définitions et périmètre des systèmes techniques', kind: 'standard', bacs_articles: 'R175-1' },
-          { number: '14.1.2', title: 'R175-2 — Champ d\'application et calendrier d\'assujettissement', kind: 'standard', bacs_articles: 'R175-2' },
-          { number: '14.1.3', title: 'R175-3 §1 — Suivi, enregistrement et analyse en continu', kind: 'standard', bacs_articles: 'R175-3 §1' },
-          { number: '14.1.4', title: 'R175-3 §2 — Situer l\'efficacité énergétique et détecter les dérives', kind: 'standard', bacs_articles: 'R175-3 §2' },
-          { number: '14.1.5', title: 'R175-3 §3 — Interopérabilité avec les systèmes techniques', kind: 'standard', bacs_articles: 'R175-3 §3' },
-          { number: '14.1.6', title: 'R175-3 §4 — Arrêt manuel et gestion autonome', kind: 'standard', bacs_articles: 'R175-3 §4' },
-          { number: '14.1.7', title: 'R175-3 alinéa final — Accessibilité et transmission des données', kind: 'standard', bacs_articles: 'R175-3' },
-          { number: '14.1.8', title: 'R175-4 — Vérifications périodiques et consignes écrites', kind: 'standard', bacs_articles: 'R175-4' },
-          { number: '14.1.9', title: 'R175-5 — Formation de l\'exploitant', kind: 'standard', bacs_articles: 'R175-5' },
-          { number: '14.1.10', title: 'R175-5-1 — Inspection périodique du système BACS', kind: 'standard', bacs_articles: 'R175-5-1' },
-          { number: '14.1.11', title: 'R175-6 — Régulation automatique de la température par zone', kind: 'standard', bacs_articles: 'R175-6' },
-          { number: '14.1.12', title: 'Synthèse — tableau de couverture R175 ↔ Buildy', kind: 'standard' },
+          { number: '14.1.1', title: 'R175-1 — Définitions et périmètre des systèmes techniques', kind: 'standard', bacs_articles: 'R175-1', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.2', title: 'R175-2 — Champ d\'application et calendrier d\'assujettissement', kind: 'standard', bacs_articles: 'R175-2', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.3', title: 'R175-3 §1 — Suivi, enregistrement et analyse en continu', kind: 'standard', bacs_articles: 'R175-3 §1', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.4', title: 'R175-3 §2 — Situer l\'efficacité énergétique et détecter les dérives', kind: 'standard', bacs_articles: 'R175-3 §2', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.5', title: 'R175-3 §3 — Interopérabilité avec les systèmes techniques', kind: 'standard', bacs_articles: 'R175-3 §3', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.6', title: 'R175-3 §4 — Arrêt manuel et gestion autonome', kind: 'standard', bacs_articles: 'R175-3 §4', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.7', title: 'R175-3 alinéa final — Accessibilité et transmission des données', kind: 'standard', bacs_articles: 'R175-3', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.8', title: 'R175-4 — Vérifications périodiques et consignes écrites', kind: 'standard', bacs_articles: 'R175-4', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.9', title: 'R175-5 — Formation de l\'exploitant', kind: 'standard', bacs_articles: 'R175-5', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.10', title: 'R175-5-1 — Inspection périodique du système BACS', kind: 'standard', bacs_articles: 'R175-5-1', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.11', title: 'R175-6 — Régulation automatique de la température par zone', kind: 'standard', bacs_articles: 'R175-6', document_kinds: ['af', 'brochure', 'bacs_audit'] },
+          { number: '14.1.12', title: 'Synthèse — tableau de couverture R175 ↔ Buildy', kind: 'standard', document_kinds: ['af', 'brochure', 'bacs_audit'] },
         ],
       },
 
       // ── 14.2 Cybersécurité et protection des données ──
       {
         number: '14.2', title: 'Cybersécurité et protection des données', kind: 'standard',
+        document_kinds: ['af', 'brochure'],
         children: [
-          { number: '14.2.1', title: 'Authentification et contrôle d\'accès', kind: 'standard' },
-          { number: '14.2.2', title: 'Chiffrement et protection des données', kind: 'standard' },
-          { number: '14.2.3', title: 'Architecture défensive et isolation réseau', kind: 'standard' },
-          { number: '14.2.4', title: 'Hébergement souverain et conformité RGPD', kind: 'standard' },
+          { number: '14.2.1', title: 'Authentification et contrôle d\'accès', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.2.2', title: 'Chiffrement et protection des données', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.2.3', title: 'Architecture défensive et isolation réseau', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.2.4', title: 'Hébergement souverain et conformité RGPD', kind: 'standard', document_kinds: ['af', 'brochure'] },
         ],
       },
 
       // ── 14.3 Avantages de l'architecture cloud ──
       {
         number: '14.3', title: 'Avantages de l\'architecture cloud face à une GTB on-premise', kind: 'standard',
+        document_kinds: ['af', 'brochure'],
         children: [
-          { number: '14.3.1', title: 'Supervision de l\'ensemble du parc immobilier depuis un seul accès', kind: 'standard' },
-          { number: '14.3.2', title: 'Mises à jour et nouvelles fonctionnalités sans intervention terrain', kind: 'standard' },
-          { number: '14.3.3', title: 'Mise en service automatisée des passerelles', kind: 'standard' },
-          { number: '14.3.4', title: 'Sauvegarde et restauration en quelques clics', kind: 'standard' },
-          { number: '14.3.5', title: 'Surveillance proactive 24/7 sans surconsommation 4G', kind: 'standard' },
-          { number: '14.3.6', title: 'Modèle économique SaaS sans CAPEX serveur', kind: 'standard' },
-          { number: '14.3.7', title: 'Accès mobile multi-sites (Gojee)', kind: 'standard' },
+          { number: '14.3.1', title: 'Supervision de l\'ensemble du parc immobilier depuis un seul accès', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.2', title: 'Mises à jour et nouvelles fonctionnalités sans intervention terrain', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.3', title: 'Mise en service automatisée des passerelles', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.4', title: 'Sauvegarde et restauration en quelques clics', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.5', title: 'Surveillance proactive 24/7 sans surconsommation 4G', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.6', title: 'Modèle économique SaaS sans CAPEX serveur', kind: 'standard', document_kinds: ['af', 'brochure'] },
+          { number: '14.3.7', title: 'Accès mobile multi-sites (Gojee)', kind: 'standard', document_kinds: ['af', 'brochure'] },
         ],
       },
 
       // ── 14.4 Buildy Box — coffret GTB tout-compris ──
+      // Brochure-only : la Buildy Box n'a pas sa place dans une AF (livrable
+      // chantier orienté technique fonctionnelle), mais c'est un argument
+      // commercial central de la brochure technico-commerciale.
       {
         number: '14.4', title: 'Buildy Box — coffret GTB tout-compris', kind: 'standard',
+        document_kinds: ['brochure'],
         children: [
-          { number: '14.4.1', title: 'Un coffret GTB pré-assemblé et prêt-à-raccorder', kind: 'standard' },
-          { number: '14.4.2', title: 'Une mise en service rapide et facile sur site', kind: 'standard' },
-          { number: '14.4.3', title: 'Compatibilité avec les systèmes existants', kind: 'standard' },
+          { number: '14.4.1', title: 'Un coffret GTB pré-assemblé et prêt-à-raccorder', kind: 'standard', document_kinds: ['brochure'] },
+          { number: '14.4.2', title: 'Une mise en service rapide et facile sur site', kind: 'standard', document_kinds: ['brochure'] },
+          { number: '14.4.3', title: 'Compatibilité avec les systèmes existants', kind: 'standard', document_kinds: ['brochure'] },
         ],
       },
     ],

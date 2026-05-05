@@ -210,8 +210,14 @@ export const listSectionTemplates = ({ kind, tree } = {}) =>
   api.get('/section-templates', { params: { ...(kind ? { kind } : {}), ...(tree ? { tree: 1 } : {}) } })
 export const getSectionTemplate = (id) => api.get(`/section-templates/${id}`)
 export const createSectionTemplate = (data) => api.post('/section-templates', data)
-export const updateSectionTemplate = (id, data) =>
-  api.patch(`/section-templates/${id}`, data)
+export const updateSectionTemplate = (id, data, { cascadeDocumentKinds } = {}) =>
+  api.patch(`/section-templates/${id}`, data, {
+    params: cascadeDocumentKinds === false ? { cascade_document_kinds: 0 } : {},
+  })
+// Catalogue des types de documents Buildy (af / brochure / bacs_audit / site_audit).
+// Retourne array<{ kind, label, description }>. Utilise pour alimenter le multi-select
+// dans la modale d'edition d'une section type.
+export const listDocumentKinds = () => api.get('/section-templates/document-kinds')
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
 // reorder({ ids, parent_template_id? }). parent_template_id si re-parenting drag-drop.

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 77;
+const TARGET_VERSION = 78;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2984,6 +2984,70 @@ function runMigrations() {
     log.info('Migration 77 appliquee : chapitre 14 Pourquoi Buildy (BACS + Cybersecurite + Cloud + Buildy Box)');
   }
 
+  if (current < 78) {
+    // Lot — Multi-tagging des section_templates par type de document.
+    // Chaque section type peut etre rattachee a un ou plusieurs types de
+    // documents Buildy (af / brochure / bacs_audit / site_audit). Permet
+    // de definir ou` une section apparait : par exemple, le ch.14.4
+    // (Buildy Box) n'a pas sa place dans une AF mais doit figurer dans
+    // la brochure commerciale.
+    //
+    // Heritage parent -> enfants : la cascade est appliquee a l'ecriture
+    // (cf. db.sectionTemplates.setDocumentKinds) sur le pattern existant
+    // de opted_out_by_moa / demanded_by_moa via CTE recursive.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS section_template_documents (
+        section_template_id INTEGER NOT NULL REFERENCES section_templates(id) ON DELETE CASCADE,
+        document_kind TEXT NOT NULL,
+        PRIMARY KEY (section_template_id, document_kind)
+      );
+      CREATE INDEX IF NOT EXISTS idx_stp_docs_kind ON section_template_documents(document_kind);
+    `);
+
+    // Backfill : par defaut, toutes les sections existantes sont rattachees
+    // a 'af' (le seul type de document qui consommait section_templates jusqu'a
+    // present, via seedAfStructure et backfillNewPlanSections).
+    db.exec(`
+      INSERT OR IGNORE INTO section_template_documents (section_template_id, document_kind)
+      SELECT id, 'af' FROM section_templates;
+    `);
+
+    // Repartition specifique du chapitre 14 « Pourquoi Buildy » :
+    //   14, 14.1, 14.1.x, 14.2, 14.2.x, 14.3, 14.3.x : af + brochure
+    //   14.1, 14.1.x : aussi bacs_audit (annexe potentielle du rapport d'audit)
+    //   14.4, 14.4.x : brochure SEULEMENT (retire 'af')
+    const ch14Ids = db.prepare(`
+      SELECT id, slug FROM section_templates
+       WHERE slug = '14' OR slug LIKE '14.%'
+    `).all();
+
+    const insertKind = db.prepare(`
+      INSERT OR IGNORE INTO section_template_documents (section_template_id, document_kind)
+      VALUES (?, ?)
+    `);
+    const deleteKind = db.prepare(`
+      DELETE FROM section_template_documents
+       WHERE section_template_id = ? AND document_kind = ?
+    `);
+
+    for (const row of ch14Ids) {
+      const slug = row.slug;
+      // Toute la branche 14 -> brochure
+      insertKind.run(row.id, 'brochure');
+      // 14.1 + ses 12 enfants -> aussi bacs_audit
+      if (slug === '14.1' || slug.startsWith('14.1.')) {
+        insertKind.run(row.id, 'bacs_audit');
+      }
+      // 14.4 + ses 3 enfants -> retire 'af' (brochure-only)
+      if (slug === '14.4' || slug.startsWith('14.4.')) {
+        deleteKind.run(row.id, 'af');
+      }
+    }
+
+    db.pragma('user_version = 78');
+    log.info(`Migration 78 appliquee : section_template_documents + backfill (${ch14Ids.length} sections du ch.14 retaguees)`);
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3206,7 +3270,7 @@ const sectionTemplates = {
     if (kind === 'functionality') { where.push('st.is_functionality = 1'); }
     else if (kind === 'standard') { where.push('st.is_functionality = 0'); }
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT st.*,
              (SELECT COUNT(*) FROM sections s
                 JOIN afs a ON a.id = s.af_id
@@ -3216,14 +3280,23 @@ const sectionTemplates = {
                 WHERE s.section_template_id = st.id AND a.deleted_at IS NULL
                   AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)) AS outdated_count,
              (SELECT COUNT(*) FROM attachments
-                WHERE section_template_id = st.id) AS attachments_count
+                WHERE section_template_id = st.id) AS attachments_count,
+             (SELECT GROUP_CONCAT(document_kind) FROM section_template_documents
+                WHERE section_template_id = st.id) AS document_kinds_csv
       FROM section_templates st
       ${whereClause}
       ORDER BY st.position, st.id
     `).all(...params);
+    // Splitte la csv en array. Defaut : ['af'] si rien (cohérent avec backfill mig 78).
+    return rows.map(r => ({
+      ...r,
+      document_kinds: r.document_kinds_csv ? r.document_kinds_csv.split(',').sort() : [],
+    }));
   },
   getById(id) {
-    return db.prepare('SELECT * FROM section_templates WHERE id = ?').get(id);
+    const row = db.prepare('SELECT * FROM section_templates WHERE id = ?').get(id);
+    if (!row) return null;
+    return { ...row, document_kinds: this.getDocumentKinds(id) };
   },
   getBySlug(slug) {
     return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
@@ -3351,6 +3424,45 @@ const sectionTemplates = {
        WHERE section_template_id = ?
     `).run(newLevel, newVersion, templateId);
     return r.changes;
+  },
+
+  // ── Multi-tagging par type de document (Lot — migration 78) ──────────
+  // Chaque section type peut etre rattachee a 1+ types de documents Buildy
+  // (cf. seeds/document-kinds.js). 'af' par defaut. Heritage parent → enfants
+  // en cascade a l'ecriture (CTE recursive sur parent_template_id).
+  getDocumentKinds(id) {
+    return db.prepare(
+      'SELECT document_kind FROM section_template_documents WHERE section_template_id = ? ORDER BY document_kind'
+    ).all(id).map(r => r.document_kind);
+  },
+
+  setDocumentKinds(id, kinds, { cascade = true } = {}) {
+    const tx = db.transaction(() => {
+      const targets = [id];
+      let cascadedCount = 0;
+      if (cascade) {
+        const descendants = db.prepare(`
+          WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM section_templates WHERE parent_template_id = ?
+            UNION ALL
+            SELECT st.id FROM section_templates st JOIN descendants d ON st.parent_template_id = d.id
+          )
+          SELECT id FROM descendants
+        `).all(id);
+        for (const d of descendants) targets.push(d.id);
+        cascadedCount = descendants.length;
+      }
+      const del = db.prepare('DELETE FROM section_template_documents WHERE section_template_id = ?');
+      const ins = db.prepare(
+        'INSERT INTO section_template_documents (section_template_id, document_kind) VALUES (?, ?)'
+      );
+      for (const tid of targets) {
+        del.run(tid);
+        for (const k of kinds) ins.run(tid, k);
+      }
+      return { updated: targets.length, cascaded: cascadedCount };
+    });
+    return tx();
   },
 };
 

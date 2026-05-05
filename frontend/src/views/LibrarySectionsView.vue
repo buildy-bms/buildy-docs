@@ -16,7 +16,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
-  uploadSectionTemplateAttachment,
+  uploadSectionTemplateAttachment, listDocumentKinds,
 } from '@/api'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -251,8 +251,38 @@ watch([flatItems, search], async () => {
   setupSortables()
 }, { deep: false })
 
+// Catalogue des types de documents (Lot — migration 78). Charge au mount
+// pour mapper kind -> label et appliquer la couleur du badge dans la liste.
+const documentKindsCatalog = ref([])
+const KIND_BADGE_CLASS = {
+  af:         'bg-indigo-50 text-indigo-700 border-indigo-200',
+  brochure:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  bacs_audit: 'bg-amber-50 text-amber-800 border-amber-200',
+  site_audit: 'bg-rose-50 text-rose-700 border-rose-200',
+}
+const KIND_SHORT_LABEL = {
+  af: 'AF',
+  brochure: 'Brochure',
+  bacs_audit: 'Audit BACS',
+  site_audit: 'Audit GTB',
+}
+function documentKindBadgeClass(kind) {
+  return KIND_BADGE_CLASS[kind] || 'bg-gray-50 text-gray-600 border-gray-200'
+}
+function documentKindShortLabel(kind) {
+  return KIND_SHORT_LABEL[kind] || kind
+}
+function documentKindLabel(kind) {
+  const meta = documentKindsCatalog.value.find(d => d.kind === kind)
+  return meta?.label || kind
+}
+
 onMounted(async () => {
   await refresh()
+  try {
+    const { data } = await listDocumentKinds()
+    documentKindsCatalog.value = data || []
+  } catch { /* silent — fallback sur les short labels */ }
   if (route.query.open) {
     const target = items.value.find(t => t.slug === route.query.open)
     if (target) openEditor(target)
@@ -304,6 +334,7 @@ onBeforeUnmount(teardownSortables)
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
             <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" title="Documents où cette section apparaît (AF / Brochure / Audit BACS / Audit GTB)">Documents</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
@@ -346,6 +377,17 @@ onBeforeUnmount(teardownSortables)
               <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
               <span v-else class="text-gray-300 italic text-xs">—</span>
             </td>
+            <td class="px-4 py-2 whitespace-nowrap">
+              <div v-if="t.document_kinds?.length" class="flex flex-wrap gap-1">
+                <span v-for="dk in t.document_kinds" :key="dk"
+                      :class="['inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
+                               documentKindBadgeClass(dk)]"
+                      :title="documentKindLabel(dk)">
+                  {{ documentKindShortLabel(dk) }}
+                </span>
+              </div>
+              <span v-else class="text-amber-700 italic text-[11px]" title="Cette section n'apparaît dans aucun document">⚠ aucun</span>
+            </td>
             <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
               <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" title="AFs utilisant cette section / AFs avec mise à jour en attente">
                 {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
@@ -358,7 +400,7 @@ onBeforeUnmount(teardownSortables)
             </td>
           </tr>
           <tr v-if="!flatItems.length">
-            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune section ne correspond à « ${search} ».` : 'Aucune section type.' }}
             </td>
           </tr>

@@ -12,8 +12,10 @@
 const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
+const { DOCUMENT_KINDS, DOCUMENT_KINDS_VALUES } = require('../seeds/document-kinds');
 
 const availEnum = z.enum(['included', 'paid_option']).nullable().optional();
+const documentKindsSchema = z.array(z.enum(DOCUMENT_KINDS_VALUES)).min(1, 'Au moins un type de document requis');
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -27,6 +29,7 @@ const updateSchema = z.object({
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
   icon_name: z.string().nullable().optional(),
+  document_kinds: documentKindsSchema.optional(),
 });
 
 const createSchema = z.object({
@@ -42,6 +45,7 @@ const createSchema = z.object({
   is_functionality: z.boolean().optional(),
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
+  document_kinds: documentKindsSchema.optional(),
 });
 
 // Service level derive de la matrice avail_e/s/p :
@@ -98,6 +102,12 @@ function buildTree(rows) {
 }
 
 async function routes(fastify) {
+  // GET /api/section-templates/document-kinds — catalogue des types de documents
+  // (kind + label + description) pour alimenter le multi-select de l'UI biblio.
+  fastify.get('/section-templates/document-kinds', async () => {
+    return DOCUMENT_KINDS;
+  });
+
   fastify.get('/section-templates', async (request) => {
     const kind = String(request.query?.kind || '').toLowerCase();
     const asTree = String(request.query?.tree || '') === '1';
@@ -153,13 +163,20 @@ async function routes(fastify) {
       equipmentTemplateId: body.equipment_template_id ?? null,
     });
 
+    // Tagging document_kinds : pris du body si fourni, sinon defaut ['af'].
+    // Pas de cascade sur create (pas d'enfants encore).
+    const kinds = Array.isArray(body.document_kinds) && body.document_kinds.length
+      ? body.document_kinds
+      : ['af'];
+    db.sectionTemplates.setDocumentKinds(created.id, kinds, { cascade: false });
+
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.create',
-      payload: { id: created.id, slug: created.slug, is_functionality: created.is_functionality },
+      payload: { id: created.id, slug: created.slug, is_functionality: created.is_functionality, document_kinds: kinds },
     });
 
-    return reply.code(201).send(created);
+    return reply.code(201).send(db.sectionTemplates.getById(created.id));
   });
 
   fastify.delete('/section-templates/:id', async (request, reply) => {
@@ -280,6 +297,17 @@ async function routes(fastify) {
       updatedBy: userId || null,
     });
 
+    // Multi-tagging des types de documents : si fourni, MAJ + cascade aux
+    // descendants (pattern feedback_section_flags_cascade.md). Le query param
+    // `?cascade_document_kinds=0` desactive la cascade pour les cas avances
+    // (override d'un enfant). Defaut : cascade activee.
+    let documentKindsCascaded = 0;
+    if (body.document_kinds !== undefined) {
+      const cascade = String(request.query.cascade_document_kinds || '1') !== '0';
+      const result = db.sectionTemplates.setDocumentKinds(id, body.document_kinds, { cascade });
+      documentKindsCascaded = result.cascaded;
+    }
+
     let propagatedCount = 0;
     let levelSynced = 0;
     let bacsSynced = 0;
@@ -304,11 +332,15 @@ async function routes(fastify) {
     db.auditLog.add({
       userId,
       action: 'section_template.update',
-      payload: { id, fields: Object.keys(body), body_propagated: propagatedCount, bacs_propagated: bacsSynced, level_synced: levelSynced },
+      payload: {
+        id, fields: Object.keys(body),
+        body_propagated: propagatedCount, bacs_propagated: bacsSynced, level_synced: levelSynced,
+        document_kinds_cascaded: documentKindsCascaded,
+      },
     });
 
     const updated = db.sectionTemplates.getById(id);
-    return { ...updated, propagated_count: propagatedCount + bacsSynced + levelSynced };
+    return { ...updated, propagated_count: propagatedCount + bacsSynced + levelSynced, document_kinds_cascaded: documentKindsCascaded };
   });
 
   // ── Versionnage / restauration du body_html ───────────────────────────
