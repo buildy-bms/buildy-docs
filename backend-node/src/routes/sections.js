@@ -633,10 +633,12 @@ async function routes(fastify) {
       // Re-index FTS (le body change)
       const bodyText = (tpl.body_html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
       db.sections.reindexFts(id, section.af_id, section.title, bodyText);
+      // Note : audit_log.template_id a une FK vers equipment_templates(id), donc
+      // on ne peut PAS y mettre un section_template_id. On le stocke dans payload.
       db.auditLog.add({
-        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        afId: section.af_id, sectionId: id, userId,
         action: 'section.template.sync',
-        payload: { source: 'section_template', from: section.section_template_version, to: tpl.current_version },
+        payload: { source: 'section_template', section_template_id: tpl.id, from: section.section_template_version, to: tpl.current_version },
       });
       return updated;
     }
@@ -674,10 +676,11 @@ async function routes(fastify) {
         sectionTemplateVersion: tpl.current_version,
         updatedBy: userId,
       });
+      // Cf. note plus haut : audit_log.template_id n'accepte que des equipment_templates.
       db.auditLog.add({
-        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        afId: section.af_id, sectionId: id, userId,
         action: 'section.template.dismiss',
-        payload: { source: 'section_template', from: section.section_template_version, to: tpl.current_version },
+        payload: { source: 'section_template', section_template_id: tpl.id, from: section.section_template_version, to: tpl.current_version },
       });
       return updated;
     }

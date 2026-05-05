@@ -194,10 +194,6 @@ const titleHtml = computed(() => {
         </span>
       </Tooltip>
 
-      <Tooltip v-if="empty && !excluded" text="Section vide — à rédiger" placement="top">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 block"></span>
-      </Tooltip>
-
       <FontAwesomeIcon
         v-if="node.tpl_icon_name"
         :icon="['fas', node.tpl_icon_name]"
