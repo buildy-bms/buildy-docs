@@ -88,7 +88,13 @@ async function routes(fastify) {
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
 
     const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id,
-      bacs_audit_device_id, bacs_audit_zone_id, bacs_audit_meter_id } = request.query;
+      bacs_audit_device_id, bacs_audit_zone_id, bacs_audit_meter_id,
+      // EXIF optionnel envoyé en query par le client (extrait avant la
+      // compression côté navigateur qui strip l'EXIF). Prioritaire sur
+      // ce que le serveur peut extraire du buffer reçu.
+      taken_at: clientTakenAt, gps_latitude: clientGpsLat,
+      gps_longitude: clientGpsLng, camera_make: clientCameraMake,
+      camera_model: clientCameraModel } = request.query;
     if (!title) return reply.code(400).send({ detail: 'Title requis (query string)' });
     if (!category || !CATEGORIES.includes(category)) {
       return reply.code(400).send({ detail: 'Categorie invalide' });
@@ -152,6 +158,19 @@ async function routes(fastify) {
       return reply.code(500).send({ detail: 'Echec ecriture fichier' });
     }
 
+    // EXIF effectif : priorité au client (extrait du fichier original
+    // avant compression canvas) si fourni, sinon ce que le serveur a pu
+    // lire du buffer reçu (sera vide si le navigateur a déjà compressé).
+    const finalTakenAt = clientTakenAt || exifMeta?.taken_at || null;
+    const parseFloatOrNull = (v) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+    const finalGpsLat = clientGpsLat != null ? parseFloatOrNull(clientGpsLat) : (exifMeta?.gps_latitude ?? null);
+    const finalGpsLng = clientGpsLng != null ? parseFloatOrNull(clientGpsLng) : (exifMeta?.gps_longitude ?? null);
+    const finalCameraMake  = clientCameraMake  || exifMeta?.camera_make  || null;
+    const finalCameraModel = clientCameraModel || exifMeta?.camera_model || null;
+
     const userId = request.authUser?.id;
     const r = db.db.prepare(`
       INSERT INTO site_documents
@@ -168,11 +187,7 @@ async function routes(fastify) {
       bacs_audit_zone_id ? parseInt(bacs_audit_zone_id, 10) : null,
       bacs_audit_meter_id ? parseInt(bacs_audit_meter_id, 10) : null,
       userId || null,
-      exifMeta?.taken_at || null,
-      exifMeta?.gps_latitude ?? null,
-      exifMeta?.gps_longitude ?? null,
-      exifMeta?.camera_make || null,
-      exifMeta?.camera_model || null,
+      finalTakenAt, finalGpsLat, finalGpsLng, finalCameraMake, finalCameraModel,
     );
     db.auditLog.add({ userId, action: 'site_document.upload',
       payload: { site_uuid: site.site_uuid, title, category, filename: file.filename } });

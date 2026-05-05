@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 86;
+const TARGET_VERSION = 87;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3264,6 +3264,26 @@ function runMigrations() {
     if (!has('camera_model'))  db.exec('ALTER TABLE site_documents ADD COLUMN camera_model TEXT');
     log.info('Migration 86 : site_documents.{gps_latitude,gps_longitude,camera_make,camera_model} ajoutées');
     db.pragma('user_version = 86');
+  }
+
+  if (current < 87) {
+    // Lot — Régulation thermique R175-6 : passer de 1 niveau (générateur)
+    // à 3 niveaux Production / Distribution / Émission, comme le décrit le
+    // métier. `generator_device_id` historique reste utilisé comme niveau
+    // "Production" (pas renommé en DB pour éviter une refonte risquée du
+    // code qui le lit), on ajoute juste 2 nouvelles colonnes pour les
+    // niveaux supplémentaires. Tous facultatifs : un DRV n'a pas de
+    // distribution, un poêle bois n'a ni distribution ni émission séparée.
+    const cols = db.prepare("PRAGMA table_info(bacs_audit_thermal_regulation)").all();
+    const has = (n) => cols.some(c => c.name === n);
+    if (!has('distribution_device_id')) {
+      db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN distribution_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL');
+    }
+    if (!has('emission_device_id')) {
+      db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN emission_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL');
+    }
+    log.info('Migration 87 : bacs_audit_thermal_regulation.{distribution_device_id,emission_device_id} ajoutées');
+    db.pragma('user_version = 87');
   }
 
   if (current > TARGET_VERSION) {
