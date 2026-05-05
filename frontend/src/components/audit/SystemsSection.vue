@@ -6,7 +6,6 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
-import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -121,43 +120,47 @@ function hasNotes(html) {
           </div>
           <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2">
             <template v-for="s in g.items" :key="s.id">
-              <PhotoDropzone
-                v-if="!s.not_concerned || showNotConcernedSystems"
-                :site-uuid="document?.site_uuid || ''"
-                :attach-to="{ system_id: s.id }"
-                :enabled="!!document?.site_uuid"
-                @changed="refreshAuditData">
-                <div :class="['rounded-lg overflow-hidden border bg-white',
-                              s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
-                                        : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
-                                                            : 'border-gray-200 bg-gray-50/40')]">
-                  <div class="px-3 py-2 flex flex-wrap items-center gap-2 sm:gap-3 bg-white">
-                    <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
-                            class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
-                            :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
-                      <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
-                      <ChevronUpIcon v-else class="w-3.5 h-3.5" />
-                    </button>
-                    <SystemCategoryIcon :category="s.system_category" size="md" />
-                    <span class="font-medium text-sm text-gray-800 whitespace-nowrap sm:min-w-45 cursor-pointer"
-                          @click="s.present && emit('toggle-system-collapsed', s.id)">
-                      {{ systemLabels[s.system_category] || s.system_category }}
-                    </span>
-                    <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
-                      <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
-                             @change="e => patchSystem(s, { present: e.target.checked })"
-                             class="rounded border-gray-300" />
-                      <span class="text-gray-700">Présent</span>
-                    </label>
-                    <!-- Toggle "Non concerne" cache si systeme present : evite le bruit visuel.
-                         Quand le systeme est marque present, ce flag n'a pas de sens. -->
-                    <label v-if="!s.present"
-                           class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer">
-                      <input type="checkbox" :checked="!!s.not_concerned"
-                             @change="e => patchSystem(s, { not_concerned: e.target.checked })"
-                             class="rounded border-gray-300" />
-                      <span class="text-gray-500 italic">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
-                    </label>
+              <!-- Pas de PhotoDropzone autour de la catégorie : drops scopés
+                   au système (device card) uniquement, voir SystemDevicesTable. -->
+              <div v-if="!s.not_concerned || showNotConcernedSystems"
+                   :class="['rounded-lg overflow-hidden border bg-white',
+                            s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
+                                      : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
+                                                          : 'border-gray-200 bg-gray-50/40')]">
+                <!-- Header de catégorie : grid pour aligner verticalement les
+                     « Présent / Pas de XXX » à travers les rows malgré les
+                     longueurs de label différentes (ECS vs Production
+                     photovoltaïque). -->
+                <div class="px-3 py-2 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_auto_minmax(180px,1fr)_auto_auto_auto] items-center gap-2 sm:gap-3 bg-white">
+                  <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
+                          class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
+                          :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
+                    <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
+                    <ChevronUpIcon v-else class="w-3.5 h-3.5" />
+                  </button>
+                  <span v-else class="w-4 shrink-0"></span>
+                  <SystemCategoryIcon :category="s.system_category" size="md" />
+                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate"
+                        @click="s.present && emit('toggle-system-collapsed', s.id)">
+                    {{ systemLabels[s.system_category] || s.system_category }}
+                  </span>
+                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap shrink-0">
+                    <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
+                           @change="e => patchSystem(s, { present: e.target.checked })"
+                           class="rounded border-gray-300" />
+                    <span class="text-gray-700">Présent</span>
+                  </label>
+                  <!-- Toggle "Non concerne" : largeur fixe pour alignement
+                       inter-rows. Caché (mais espace réservé) si système
+                       déjà marqué présent. -->
+                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer shrink-0 min-w-52"
+                         :class="s.present ? 'invisible' : ''">
+                    <input type="checkbox" :checked="!!s.not_concerned"
+                           @change="e => patchSystem(s, { not_concerned: e.target.checked })"
+                           class="rounded border-gray-300" />
+                    <span class="text-gray-500 italic">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
+                  </label>
+                  <div class="flex items-center gap-2 shrink-0 ml-auto">
                     <button
                       type="button"
                       :disabled="!s.present"
@@ -175,23 +178,23 @@ function hasNotes(html) {
                       :attach-to="{ system_id: s.id }"
                       :label="(systemLabels[s.system_category] || s.system_category) + ' - ' + g.zone_name" />
                   </div>
-                  <SystemDevicesTable
-                    v-if="s.present && !collapsedSystems.has(s.id)"
-                    :system="s"
-                    :devices="devicesBySystem[s.id] || []"
-                    :system-label="systemLabels[s.system_category] || s.system_category"
-                    :site-uuid="document?.site_uuid"
-                    @changed="refreshAuditData"
-                    @system-updated="patch => patchSystem(s, patch)"
-                    @open-device-notes="d => emit('open-notes', {
-                      title: 'Notes equipement',
-                      contextLabel: (d.name || 'Equipement') + ' - ' + (systemLabels[s.system_category] || s.system_category) + ' / ' + g.zone_name,
-                      entityType: 'device', entityRef: d,
-                      currentHtml: d.notes_html || d.notes || ''
-                    })"
-                    @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })" />
                 </div>
-              </PhotoDropzone>
+                <SystemDevicesTable
+                  v-if="s.present && !collapsedSystems.has(s.id)"
+                  :system="s"
+                  :devices="devicesBySystem[s.id] || []"
+                  :system-label="systemLabels[s.system_category] || s.system_category"
+                  :site-uuid="document?.site_uuid"
+                  @changed="refreshAuditData"
+                  @system-updated="patch => patchSystem(s, patch)"
+                  @open-device-notes="d => emit('open-notes', {
+                    title: 'Notes equipement',
+                    contextLabel: (d.name || 'Equipement') + ' - ' + (systemLabels[s.system_category] || s.system_category) + ' / ' + g.zone_name,
+                    entityType: 'device', entityRef: d,
+                    currentHtml: d.notes_html || d.notes || ''
+                  })"
+                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })" />
+              </div>
             </template>
           </div>
         </div>

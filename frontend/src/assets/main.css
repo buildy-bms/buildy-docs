@@ -207,6 +207,13 @@ strong, b { font-weight: 500; }
     @apply bg-gray-50 text-gray-400 border-gray-200
            hover:bg-gray-100 hover:text-gray-600;
   }
+  /* Variante "danger-on" : sémantiquement destructive (HS, hors service…)
+     mêmes dimensions que flag-on/off pour rester aligné, fond rouge clair
+     pour signaler que le système est exclu du plan d'action. */
+  .flag-danger-on {
+    @apply bg-red-50 text-red-700 border-red-200
+           hover:bg-red-100;
+  }
   .flag-ico { @apply font-bold text-[11px]; }
 
   /**
