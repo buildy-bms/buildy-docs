@@ -45,9 +45,16 @@ function onDrop(e) {
   emit('attachment-drop', { attachmentId: parseInt(id, 10), sectionId: props.node.id })
 }
 
-const displayedNumber = computed(() =>
-  (liveNumbering?.value && liveNumbering.value.get(props.node.id)) || props.node.number || ''
-)
+const excluded = computed(() => props.node.included_in_export === 0)
+
+// Pas de numéro affiché pour les sections exclues (elles sortent de la
+// numérotation, l'arbo doit être cohérente avec le PDF). Le fallback
+// `node.number` est volontairement contourné car la valeur figée en DB
+// au seed peut diverger fortement de la position courante.
+const displayedNumber = computed(() => {
+  if (excluded.value) return ''
+  return (liveNumbering?.value && liveNumbering.value.get(props.node.id)) || ''
+})
 
 // Section ad-hoc = créée à la volée dans cette AF (« Ajouter une sous-section »)
 // sans pendant biblio. La promotion vers la biblio en crée un section_template
@@ -57,8 +64,6 @@ const isAdHoc = computed(() =>
   !props.node.equipment_template_id &&
   props.node.kind === 'standard'
 )
-
-const excluded = computed(() => props.node.included_in_export === 0)
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
 const demanded = computed(() => props.node.demanded_by_moa === 1)
 // Disponibilites par niveau (depuis le section_template). Permet de
