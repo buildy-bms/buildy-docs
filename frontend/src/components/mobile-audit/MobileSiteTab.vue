@@ -13,7 +13,7 @@ import { updateAf, getBacsPowerSummary } from '@/api'
 import MobileField from './MobileField.vue'
 
 const audit = useAuditStore()
-const { document, powerSummary } = storeToRefs(audit)
+const { document, site, powerSummary } = storeToRefs(audit)
 const { error, success } = useNotification()
 
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
@@ -37,6 +37,17 @@ function saveDebounced(patch) {
       error('Sauvegarde impossible')
     }
   }, 400)
+}
+
+async function saveSiteAddress(addr) {
+  const next = (addr || '').trim() || null
+  if (next === (site.value?.address || null)) return
+  try {
+    await audit.updateSiteFields({ address: next })
+    success('Adresse du site mise à jour')
+  } catch {
+    error('Sauvegarde de l\'adresse impossible')
+  }
 }
 
 const recomputing = ref(false)
@@ -89,11 +100,11 @@ const generatorWorksDone = computed({
       </div>
     </div>
 
-    <!-- Card : Identification -->
+    <!-- Card : Audit -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
         <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
-        <h3 class="text-base font-medium text-gray-900">Identification du site</h3>
+        <h3 class="text-base font-medium text-gray-900">Audit</h3>
       </div>
       <div class="p-4 space-y-4">
         <MobileField label="Nom du projet">
@@ -105,10 +116,39 @@ const generatorWorksDone = computed({
             class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
+      </div>
+    </div>
 
-        <MobileField label="Client">
-          <div class="px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
-            {{ document?.client_name || '—' }}
+    <!-- Card : Site (source de vérité = table sites, propagée à FM via sync) -->
+    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+        <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
+        <h3 class="text-base font-medium text-gray-900">Site</h3>
+      </div>
+      <div class="p-4 space-y-4">
+        <MobileField label="Nom du site">
+          <div class="px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 text-base text-gray-700">
+            {{ site?.name || document?.client_name || '—' }}
+          </div>
+        </MobileField>
+
+        <MobileField
+          label="Adresse"
+          hint="Modifiable ici ou dans Fleet Manager. Tous les audits du site partagent cette adresse."
+        >
+          <textarea
+            :value="site?.address || ''"
+            @blur="e => saveSiteAddress(e.target.value)"
+            placeholder="ex : 12 rue de la Paix, 75002 Paris"
+            rows="2"
+            autocapitalize="sentences"
+            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white leading-relaxed"
+          ></textarea>
+        </MobileField>
+
+        <MobileField v-if="site?.customer_name" label="Client">
+          <div class="px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 text-base text-gray-700">
+            {{ site.customer_name }}
           </div>
         </MobileField>
       </div>
