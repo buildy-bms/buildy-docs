@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 85;
+const TARGET_VERSION = 86;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3248,6 +3248,22 @@ function runMigrations() {
       }
     }
     db.pragma('user_version = 85');
+  }
+
+  if (current < 86) {
+    // Lot — EXIF photos : enrichir site_documents avec GPS et appareil.
+    // taken_at existe déjà depuis la migration 62. On ajoute la position
+    // (lat/lng en degrés décimaux WGS84) et la marque/modèle de l'appareil
+    // pour : afficher un pin Google Maps sur les tiles photos, identifier
+    // d'où vient une photo et avec quel appareil.
+    const cols = db.prepare("PRAGMA table_info(site_documents)").all();
+    const has = (n) => cols.some(c => c.name === n);
+    if (!has('gps_latitude'))  db.exec('ALTER TABLE site_documents ADD COLUMN gps_latitude REAL');
+    if (!has('gps_longitude')) db.exec('ALTER TABLE site_documents ADD COLUMN gps_longitude REAL');
+    if (!has('camera_make'))   db.exec('ALTER TABLE site_documents ADD COLUMN camera_make TEXT');
+    if (!has('camera_model'))  db.exec('ALTER TABLE site_documents ADD COLUMN camera_model TEXT');
+    log.info('Migration 86 : site_documents.{gps_latitude,gps_longitude,camera_make,camera_model} ajoutées');
+    db.pragma('user_version = 86');
   }
 
   if (current > TARGET_VERSION) {
