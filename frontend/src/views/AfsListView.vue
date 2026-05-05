@@ -31,6 +31,9 @@ const loading = ref(false)
 
 const showCreate = ref(false)
 const seedingFixture = ref(false)
+// Bouton « Audit BACS de test » : visible en dev uniquement (outil de demo,
+// utile en local pour les demos commerciales — masque en prod).
+const isDev = import.meta.env.DEV
 
 async function createBacsFixture() {
   if (seedingFixture.value) return
@@ -328,10 +331,11 @@ onMounted(refresh)
       </div>
       <div class="flex items-center gap-2">
         <button
+          v-if="isDev"
           @click="createBacsFixture"
           :disabled="seedingFixture"
           class="inline-flex items-center gap-2 px-3 py-2 bg-violet-50 text-violet-700 text-sm font-medium rounded-lg hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
-          title="Crée un site + audit BACS de démonstration entièrement rempli pour tester l'outil"
+          title="Crée un site + audit BACS de démonstration entièrement rempli pour tester l'outil (dev only)"
         >
           ✨ {{ seedingFixture ? 'Création…' : 'Audit BACS de test' }}
         </button>
@@ -469,7 +473,7 @@ onMounted(refresh)
                   >Brochure</span>
                   <span
                     v-else
-                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-indigo-100 text-indigo-700"
+                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-green-100 text-green-800"
                     title="Analyse fonctionnelle — livrable de chantier"
                   >AF</span>
                   {{ row.af.project_name }}
@@ -500,20 +504,20 @@ onMounted(refresh)
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1">
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="router.push(`/afs/${row.af.id}/versions`)"
-                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Versions">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" title="Versions">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
                   <button v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'"
                           @click.stop="router.push(`${row.af.kind === 'site_audit' ? '/site-audit' : '/bacs-audit'}/${row.af.id}/audit-trail`)"
-                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Historique">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" title="Historique">
                     <ClockIcon class="w-4 h-4" />
                   </button>
                   <button v-if="(row.af.kind || 'af') === 'af'" @click.stop="openClone(row.af)"
-                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-indigo-600 p-1" title="Cloner">
+                          class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" title="Cloner">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
                   <button @click.stop="confirmDelete(row.af)"
-                          class="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-red-600 p-1" title="Supprimer">
+                          class="text-gray-300 hover:text-red-600 p-1 transition-colors" title="Supprimer">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>
@@ -596,7 +600,9 @@ onMounted(refresh)
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
                 { value: 'site_audit', label: 'Audit GTB (Classique)', desc: 'Préparation devis Buildy (hors décret)' },
-                { value: 'brochure', label: 'Brochure', desc: 'Document commercial composé' },
+                // Brochure : option masquee — feature pas encore prete.
+                // Les brochures existantes (kind='brochure' en DB) restent visibles dans la liste.
+                // { value: 'brochure', label: 'Brochure', desc: 'Document commercial composé' },
               ]"
               :key="opt.value"
               :class="[

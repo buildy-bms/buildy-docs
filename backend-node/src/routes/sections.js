@@ -575,58 +575,114 @@ async function routes(fastify) {
     return { ok: true };
   });
 
-  // GET /api/sections/:id/template-update — diff entre version pinnee et version courante
+  // GET /api/sections/:id/template-update — diff entre version pinnee et version courante.
+  // Supporte 2 sources : equipment_template (diff de points) + section_template (diff body).
   fastify.get('/sections/:id/template-update', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
-    if (section.kind !== 'equipment' || !section.equipment_template_id) {
-      return reply.code(400).send({ detail: 'Section sans template équipement' });
+    if (section.kind === 'equipment' && section.equipment_template_id) {
+      return diffSectionVsTemplate(id);
     }
-    return diffSectionVsTemplate(id);
+    if (section.section_template_id) {
+      const tpl = db.sectionTemplates.getById(section.section_template_id);
+      if (!tpl) return reply.code(404).send({ detail: 'Template introuvable' });
+      return {
+        source: 'section_template',
+        from_version: section.section_template_version,
+        to_version: tpl.current_version,
+        body_changed: (section.body_html || '') !== (tpl.body_html || ''),
+        new_body_html: tpl.body_html,
+      };
+    }
+    return reply.code(400).send({ detail: 'Section sans template lie' });
   });
 
-  // POST /api/sections/:id/template-update/apply — synchronise la section sur la version courante
+  // POST /api/sections/:id/template-update/apply — synchronise la section sur la version courante.
+  // - Equipement : bumpe equipment_template_version (les points sont resolus dynamiquement).
+  // - Section narrative / fonctionnalite : copie body_html du template vers la section
+  //   et bumpe section_template_version. Le contenu local est ecrase (cf. confirmation cote UI).
   fastify.post('/sections/:id/template-update/apply', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
-    if (!section.equipment_template_id) return reply.code(400).send({ detail: 'Section sans template' });
-
-    const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
     const userId = request.authUser?.id;
-    const updated = db.sections.update(id, {
-      equipmentTemplateVersion: tpl.current_version,
-      updatedBy: userId,
-    });
-    db.auditLog.add({
-      afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
-      action: 'section.template.sync',
-      payload: { from: section.equipment_template_version, to: tpl.current_version },
-    });
-    return updated;
+
+    if (section.equipment_template_id) {
+      const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
+      const updated = db.sections.update(id, {
+        equipmentTemplateVersion: tpl.current_version,
+        updatedBy: userId,
+      });
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        action: 'section.template.sync',
+        payload: { source: 'equipment', from: section.equipment_template_version, to: tpl.current_version },
+      });
+      return updated;
+    }
+
+    if (section.section_template_id) {
+      const tpl = db.sectionTemplates.getById(section.section_template_id);
+      if (!tpl) return reply.code(404).send({ detail: 'Template introuvable' });
+      const updated = db.sections.update(id, {
+        bodyHtml: tpl.body_html,
+        sectionTemplateVersion: tpl.current_version,
+        updatedBy: userId,
+      });
+      // Re-index FTS (le body change)
+      const bodyText = (tpl.body_html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      db.sections.reindexFts(id, section.af_id, section.title, bodyText);
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        action: 'section.template.sync',
+        payload: { source: 'section_template', from: section.section_template_version, to: tpl.current_version },
+      });
+      return updated;
+    }
+
+    return reply.code(400).send({ detail: 'Section sans template' });
   });
 
-  // POST /api/sections/:id/template-update/dismiss — meme effet (acquitte sans changer le contenu)
-  // (le contenu est deja synchronise dynamiquement via points-resolver, ce flag n'est qu'un pin)
+  // POST /api/sections/:id/template-update/dismiss — acquitte sans toucher au contenu.
+  // Bumpe juste la version pinnee : l'utilisateur garde son body_html actuel mais ne sera
+  // plus alerte tant que le template ne change pas a nouveau.
   fastify.post('/sections/:id/template-update/dismiss', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
-    if (!section.equipment_template_id) return reply.code(400).send({ detail: 'Section sans template' });
-
-    const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
     const userId = request.authUser?.id;
-    const updated = db.sections.update(id, {
-      equipmentTemplateVersion: tpl.current_version,
-      updatedBy: userId,
-    });
-    db.auditLog.add({
-      afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
-      action: 'section.template.dismiss',
-      payload: { from: section.equipment_template_version, to: tpl.current_version },
-    });
-    return updated;
+
+    if (section.equipment_template_id) {
+      const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
+      const updated = db.sections.update(id, {
+        equipmentTemplateVersion: tpl.current_version,
+        updatedBy: userId,
+      });
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        action: 'section.template.dismiss',
+        payload: { source: 'equipment', from: section.equipment_template_version, to: tpl.current_version },
+      });
+      return updated;
+    }
+
+    if (section.section_template_id) {
+      const tpl = db.sectionTemplates.getById(section.section_template_id);
+      if (!tpl) return reply.code(404).send({ detail: 'Template introuvable' });
+      const updated = db.sections.update(id, {
+        sectionTemplateVersion: tpl.current_version,
+        updatedBy: userId,
+      });
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
+        action: 'section.template.dismiss',
+        payload: { source: 'section_template', from: section.section_template_version, to: tpl.current_version },
+      });
+      return updated;
+    }
+
+    return reply.code(400).send({ detail: 'Section sans template' });
   });
 }
 

@@ -3683,6 +3683,23 @@ const sections = {
       ORDER BY s.position, s.id
     `).all(afId);
   },
+  // Sections narratives + fonctionnalites de l'AF dont le section_template lie
+  // a evolue depuis la version pinnee. Le banner global de propagation utilise
+  // cette methode en plus de outdatedByAf (qui ne couvre que les equipements).
+  outdatedSectionTemplatesByAf(afId) {
+    return db.prepare(`
+      SELECT s.id, s.number, s.title, s.section_template_id, s.section_template_version,
+             s.body_html AS section_body_html,
+             st.title AS template_title, st.slug AS template_slug, st.current_version,
+             st.body_html AS template_body_html, st.is_functionality
+      FROM sections s
+      JOIN section_templates st ON st.id = s.section_template_id
+      WHERE s.af_id = ?
+        AND s.section_template_id IS NOT NULL
+        AND (s.section_template_version IS NULL OR s.section_template_version < st.current_version)
+      ORDER BY s.position, s.id
+    `).all(afId);
+  },
   // AFs (non supprimees) qui referencent un template, groupees par version pinnee
   affectedAfsByTemplate(templateId) {
     return db.prepare(`

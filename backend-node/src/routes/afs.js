@@ -656,16 +656,23 @@ async function routes(fastify) {
     return db.auditLog.recent(id, 50);
   });
 
-  // GET /api/afs/:id/template-updates — sections avec une mise a jour de template disponible
+  // GET /api/afs/:id/template-updates — sections avec une mise a jour de template disponible.
+  // Couvre les TROIS sources :
+  //   - kind='equipment' avec equipment_template_id (diff = points ajoutes/retires/modifies)
+  //   - kind='standard' avec section_template_id (diff = body_html modifie)
+  //   - is_functionality avec section_template_id (idem section_template, badge fonctionnalite)
   fastify.get('/afs/:id/template-updates', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
     const { diffSectionVsTemplate } = require('../lib/template-propagation');
-    const outdated = db.sections.outdatedByAf(id);
-    const items = outdated.map(s => {
+
+    // Source 1 — equipements (existant)
+    const outdatedEquipment = db.sections.outdatedByAf(id);
+    const equipmentItems = outdatedEquipment.map(s => {
       const diff = diffSectionVsTemplate(s.id);
       return {
+        source: 'equipment',
         section_id: s.id,
         section_number: s.number,
         section_title: s.title,
@@ -681,6 +688,29 @@ async function routes(fastify) {
         description_changed: diff?.description_changed || false,
       };
     });
+
+    // Source 2 — sections narratives + fonctionnalites liees a un section_template
+    const outdatedSections = db.sections.outdatedSectionTemplatesByAf(id);
+    const sectionItems = outdatedSections.map(s => {
+      const bodyChanged = (s.section_body_html || '') !== (s.template_body_html || '');
+      return {
+        source: s.is_functionality ? 'functionality' : 'section_template',
+        section_id: s.id,
+        section_number: s.number,
+        section_title: s.title,
+        template_id: s.section_template_id,
+        template_name: s.template_title,
+        template_slug: s.template_slug,
+        from_version: s.section_template_version,
+        to_version: s.current_version,
+        body_changed: bodyChanged,
+        // Compteur de "changements" : 1 si le body a change, 0 sinon. Garde un total > 0
+        // si on est outdated (au pire la version a bouge meme sans changement de body).
+        total_changes: bodyChanged ? 1 : 0,
+      };
+    });
+
+    const items = [...equipmentItems, ...sectionItems];
     return { count: items.length, items };
   });
 }
