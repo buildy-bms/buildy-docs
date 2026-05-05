@@ -312,18 +312,17 @@ async function removeDevice(d) {
             </div>
           </div>
 
-          <!-- LIGNE 2 : Localisation + GTB pills + Protocoles. Containers
-               de hauteur uniforme (h-9) pour aligner les labels au-dessus
-               et les contenus en bas malgré les hauteurs intrinsèques
-               différentes (input 38px / pills 24px / dropdown 38px). -->
-          <div class="mt-2 flex flex-wrap items-start gap-x-3 gap-y-2">
-            <div class="flex-1 min-w-44">
+          <!-- LIGNE 2 : Localisation (4/12) + Liaison GTB (auto) + Protocoles
+               (le reste). Grid 12 colonnes cohérent avec la ligne 1, plus
+               de flex-1 qui étirait Localisation sur toute la largeur. -->
+          <div class="mt-2 grid grid-cols-12 gap-x-3 gap-y-2 items-start">
+            <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Localisation</label>
               <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol, Toiture…"
                      @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
             </div>
-            <div>
+            <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Liaison GTB</label>
               <div class="flex items-center gap-1.5 h-7">
                 <button type="button"
@@ -346,7 +345,7 @@ async function removeDevice(d) {
                 </button>
               </div>
             </div>
-            <div class="min-w-44">
+            <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Protocole(s)</label>
               <ProtocolMultiPicker
                 :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
