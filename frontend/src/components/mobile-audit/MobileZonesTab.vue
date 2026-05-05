@@ -7,13 +7,13 @@ import {
   TrashIcon,
   CameraIcon,
   PencilSquareIcon,
+  PlusIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { createZone, updateZone, deleteZone, listZones, resyncBacsAudit } from '@/api'
 import MobileField from './MobileField.vue'
-import MobileFab from './MobileFab.vue'
 import MobileSheet from './MobileSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
@@ -139,8 +139,8 @@ const totalSurface = computed(() =>
       </div>
     </div>
 
-    <!-- Liste -->
-    <div v-if="zones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+    <!-- Liste + bouton Ajouter inline -->
+    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
       <button
         v-for="z in zones"
         :key="z.zone_id"
@@ -157,15 +157,19 @@ const totalSurface = computed(() =>
         </div>
         <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
+      <button
+        type="button"
+        @click="openCreate"
+        class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-emerald-700 active:bg-emerald-50"
+      >
+        <PlusIcon class="w-5 h-5" />
+        Ajouter une zone
+      </button>
     </div>
-    <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
+    <div v-if="!zones.length" class="text-center py-6">
       <Squares2X2Icon class="w-10 h-10 text-gray-300 mx-auto" />
-      <p class="text-sm text-gray-500 mt-3">Aucune zone définie</p>
-      <p class="text-xs text-gray-400 mt-1">Tape le bouton + en bas pour ajouter une zone</p>
+      <p class="text-sm text-gray-500 mt-2">Aucune zone définie pour l'instant</p>
     </div>
-
-    <!-- FAB Ajouter -->
-    <MobileFab label="Ajouter une zone" @click="openCreate" />
 
     <!-- Sheet édition -->
     <MobileSheet

@@ -209,15 +209,13 @@ async function saveCaptions() {
 
 const btnCls = computed(() => {
   const base = 'inline-flex items-center justify-center gap-2 rounded-xl border transition-all font-medium'
-  // Mobile : gros bouton tactile lisible. Desktop : compact comme avant.
-  let size
+  // Mobile : gros bouton tactile bleu plein-largeur. Desktop : compact ghost.
   if (isMobile.value) {
-    size = 'px-4 py-3 text-sm w-full'
-  } else if (props.size === 'md') {
-    size = 'px-2.5 py-1 text-xs'
-  } else {
-    size = 'px-2 py-0.5 text-[11px]'
+    return `${base} px-4 py-3.5 text-base w-full bg-indigo-600 border-indigo-600 text-white active:bg-indigo-700`
   }
+  const size = props.size === 'md'
+    ? 'px-2.5 py-1 text-xs'
+    : 'px-2 py-0.5 text-[11px]'
   if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300 scale-105`
   const tone = photos.value.length
     ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
