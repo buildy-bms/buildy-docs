@@ -331,7 +331,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto">
+  <div class="max-w-screen-2xl mx-auto">
     <!-- Header -->
     <div class="flex items-start justify-between mb-6">
       <div>
