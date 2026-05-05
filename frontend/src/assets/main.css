@@ -241,6 +241,11 @@ strong, b { font-weight: 500; }
   select,
   textarea {
     font-size: 16px;
+    /* Tap target iOS HIG (44pt mini) : tous les inputs / selects /
+       textarea de la PWA mobile atteignent 44px de hauteur. Les
+       composants peuvent override via min-h-* ou hauteur fixe si
+       besoin (rare). */
+    min-height: 44px;
   }
   /* Placeholder réduit : 14px, plus discret que le texte saisi (16px).
      Le zoom iOS dépend du font-size de l'input, pas du placeholder. */
@@ -248,6 +253,15 @@ strong, b { font-weight: 500; }
   textarea::placeholder {
     font-size: 14px;
     opacity: 0.7;
+  }
+  /* Checkbox plus grosse sur mobile (24px) — confortable au pouce.
+     Désactive cet override si le composant impose explicitement w-* h-*
+     via Tailwind (ex : la version label-card en w-6/w-7) en utilisant
+     `!` sur les classes Tailwind du parent. Ici on rentre dans le cas
+     par défaut : les checkboxes sans classe explicite passent à 24px. */
+  input[type='checkbox']:not([class*='w-']):not([class*='h-']) {
+    width: 1.5rem;
+    height: 1.5rem;
   }
 }
 
