@@ -1,6 +1,7 @@
 <script setup>
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { WrenchScrewdriverIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, PencilSquareIcon, DocumentArrowUpIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -15,7 +16,7 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsDevice, updateBacsMeter } from '@/api'
+import { updateBacsDevice, updateBacsMeter, uploadSiteDocument } from '@/api'
 
 // Section "Solution GTB / GTC en place" (R175-3 / R175-4 / R175-5).
 // Lit l'etat depuis useAuditStore (bms, document, meters, devices) et
@@ -37,7 +38,46 @@ const emit = defineEmits([
 
 const audit = useAuditStore()
 const { bms, document, meters } = storeToRefs(audit)
-const { error } = useNotification()
+const { success, error } = useNotification()
+
+// Dropzone "Analyse fonctionnelle GTB existante" — accepte PDF/Word/image
+// (contrairement à PhotoDropzone qui n'accepte que les images). Catégorie
+// fixée à 'analyse_fonctionnelle', rattachement à `bacs_audit_bms_document_id`.
+const afDragOver = ref(false)
+const afFileInput = ref(null)
+const afUploading = ref(false)
+async function uploadAfFiles(files) {
+  if (!document.value?.site_uuid || !files?.length) return
+  afUploading.value = true
+  try {
+    for (const f of files) {
+      const fd = new FormData()
+      fd.append('file', f)
+      await uploadSiteDocument(document.value.site_uuid, fd, {
+        title: f.name.replace(/\.[^.]+$/, ''),
+        category: 'analyse_fonctionnelle',
+        bacs_audit_bms_document_id: bms.value?.document_id || null,
+      })
+    }
+    success(files.length > 1 ? `${files.length} documents téléversés` : 'Document téléversé')
+    window.dispatchEvent(new CustomEvent('site-documents:changed'))
+    emit('refresh-audit-data')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Upload impossible')
+  } finally {
+    afUploading.value = false
+  }
+}
+function onAfDrop(e) {
+  afDragOver.value = false
+  const files = Array.from(e.dataTransfer?.files || [])
+  if (!files.length) return
+  uploadAfFiles(files)
+}
+function onAfPick(e) {
+  uploadAfFiles(Array.from(e.target.files || []))
+  e.target.value = ''
+}
 
 let saveTimer = null
 function saveBmsDebounced() {
@@ -187,15 +227,38 @@ function hasNotes(html) {
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
               Analyse fonctionnelle de la GTB existante
             </h3>
-            <div v-if="document?.audit_existing_af_status !== 'absent'" class="flex items-center gap-3 flex-wrap">
-              <BacsPhotoButton
-                v-if="document?.site_uuid"
-                :site-uuid="document.site_uuid"
-                :attach-to="{ bms_document_id: bms.document_id }"
-                label="Analyse fonctionnelle GTB" size="md" />
-              <p class="text-xs text-gray-500 italic flex-1">
-                Glisse ici le document d'AF de la GTB existante (PDF, Word, schéma) si le propriétaire ou l'exploitant le fournit.
-              </p>
+            <div v-if="document?.audit_existing_af_status !== 'absent'">
+              <div
+                :class="[
+                  'border-2 border-dashed rounded-lg px-4 py-5 text-center transition cursor-pointer',
+                  afDragOver
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-300 bg-gray-50/40 hover:border-indigo-400 hover:bg-indigo-50/30',
+                ]"
+                @dragover.prevent="afDragOver = true"
+                @dragleave.prevent="afDragOver = false"
+                @drop.prevent="onAfDrop"
+                @click="afFileInput?.click()"
+              >
+                <input ref="afFileInput" type="file" class="hidden" multiple
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
+                       @change="onAfPick" />
+                <DocumentArrowUpIcon :class="['w-8 h-8 mx-auto', afDragOver ? 'text-indigo-500' : 'text-gray-400']" />
+                <p class="mt-2 text-sm text-gray-700">
+                  <span v-if="afUploading">Téléversement en cours…</span>
+                  <span v-else>
+                    Glisser le document d'AF ici ou
+                    <span class="text-indigo-600 font-semibold">parcourir</span>
+                  </span>
+                </p>
+                <p class="mt-1 text-[11px] text-gray-400">PDF, Word, schéma, image…</p>
+              </div>
+              <div v-if="document?.site_uuid" class="mt-2 flex justify-end">
+                <BacsPhotoButton
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ bms_document_id: bms.document_id }"
+                  label="Photo du schéma" size="sm" />
+              </div>
             </div>
             <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
