@@ -27,12 +27,11 @@ export function usePhotoCompression() {
 export async function extractExifMeta(file) {
   if (!file || !file.type?.startsWith('image/')) return null
   try {
-    const data = await exifr.parse(file, {
-      pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate',
-             'GPSLatitude', 'GPSLongitude', 'latitude', 'longitude',
-             'Make', 'Model'],
-      reviveValues: true,
-    })
+    // gps:true force le décodage du segment GPS séparé. Sans ça, certains
+    // JPEG iOS retournent Make/Model mais pas latitude/longitude.
+    const data = await exifr.parse(file, { gps: true, ifd0: true, exif: true })
+    // eslint-disable-next-line no-console
+    console.info('[extractExifMeta]', file.name, file.type, file.size, 'keys=', data ? Object.keys(data) : null)
     if (!data) return null
     const meta = {}
     const dt = data.DateTimeOriginal || data.CreateDate || data.ModifyDate
@@ -44,9 +43,39 @@ export async function extractExifMeta(file) {
     if (typeof data.Make === 'string' && data.Make.trim())   meta.camera_make = data.Make.trim()
     if (typeof data.Model === 'string' && data.Model.trim()) meta.camera_model = data.Model.trim()
     return Object.keys(meta).length ? meta : null
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[extractExifMeta] failed:', err?.message)
     return null
   }
+}
+
+/**
+ * Fallback Geolocation : si l'EXIF est strippé (iOS Safari le fait souvent
+ * lors d'un upload de fichier), on peut demander la position du device au
+ * moment de la prise. C'est une approximation : ce n'est PAS la position
+ * exacte de la photo, mais celle du téléphone à l'instant T (typiquement
+ * suffisant pour un audit de site puisqu'on est sur place).
+ *
+ * Ne pose pas la prompt si l'utilisateur l'a déjà refusée. Timeout court
+ * (~5s) pour ne pas bloquer l'upload.
+ */
+export function getDeviceGeolocation({ timeoutMs = 5000 } = {}) {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
+    const timer = setTimeout(() => resolve(null), timeoutMs)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(timer)
+        resolve({
+          gps_latitude: pos.coords.latitude,
+          gps_longitude: pos.coords.longitude,
+        })
+      },
+      () => { clearTimeout(timer); resolve(null) },
+      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60000 },
+    )
+  })
 }
 
 export async function compressBeforeUpload(file, opts = {}) {

@@ -9,7 +9,7 @@ import {
   getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
-import { compressBeforeUpload, extractExifMeta } from '@/composables/usePhotoCompression'
+import { compressBeforeUpload, extractExifMeta, getDeviceGeolocation } from '@/composables/usePhotoCompression'
 import { useViewport } from '@/composables/useViewport'
 
 /**
@@ -108,7 +108,24 @@ async function uploadFiles(files) {
     for (const rawFile of files) {
       // Extraire l'EXIF AVANT compression (la passe canvas re-encode et
       // strip l'EXIF, on perdrait GPS / date / appareil sinon).
-      const exifMeta = await extractExifMeta(rawFile)
+      let exifMeta = await extractExifMeta(rawFile) || {}
+      // Fallback date : iOS Safari strip souvent les EXIF lors d'un upload
+      // file. file.lastModified reste disponible (= date de création du
+      // fichier sur le filesystem du navigateur, proche de la prise).
+      if (!exifMeta.taken_at && rawFile.lastModified) {
+        const d = new Date(rawFile.lastModified)
+        if (!isNaN(d.getTime()) && d.getTime() > 946684800000 /* 2000-01-01 */) {
+          exifMeta.taken_at = d.toISOString()
+        }
+      }
+      // Fallback GPS : si l'EXIF n'a pas la position (typique iOS Safari)
+      // mais que le navigateur l'a déjà accordée, on prend la position du
+      // device au moment du upload. Approximation acceptable sur un audit
+      // de site puisque l'auditeur est physiquement sur place.
+      if (exifMeta.gps_latitude == null) {
+        const geo = await getDeviceGeolocation()
+        if (geo) Object.assign(exifMeta, geo)
+      }
       // Compression côté client : économie réseau 4G en gardant l'orig
       // si la compression échoue ou n'apporte rien (cf. composable).
       const f = await compressBeforeUpload(rawFile)
@@ -119,7 +136,7 @@ async function uploadFiles(files) {
         title: defaultTitle,
         category: 'photo',
         ...filterParams.value,
-        ...(exifMeta || {}),
+        ...exifMeta,
       })
       uploaded.push({
         id: data.id,

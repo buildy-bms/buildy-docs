@@ -155,15 +155,16 @@ async function readExifMetadata(buffer) {
     camera_model: null,
   };
   if (!buffer || buffer.length < 32) return result;
+  let parsedKeys = [];
+  let parseError = null;
   try {
     const exifr = getExifr();
-    const data = await exifr.parse(buffer, {
-      pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate',
-             'GPSLatitude', 'GPSLongitude', 'latitude', 'longitude',
-             'Make', 'Model'],
-      reviveValues: true,
-    });
+    // gps:true demande explicitement à exifr de décoder le segment GPS
+    // (séparé de IFD0/Exif). Sans ça, certains JPEG iOS retournent les
+    // tags Make/Model mais pas latitude/longitude.
+    const data = await exifr.parse(buffer, { gps: true, ifd0: true, exif: true });
     if (data) {
+      parsedKeys = Object.keys(data);
       // exifr expose latitude/longitude déjà en degrés décimaux signés.
       if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         result.gps_latitude = data.latitude;
@@ -177,9 +178,13 @@ async function readExifMetadata(buffer) {
       if (typeof data.Model === 'string') result.camera_model = data.Model.trim() || null;
     }
   } catch (err) {
-    log.debug?.(`exifr failed: ${err.message}`);
+    parseError = err.message;
   }
   if (!result.taken_at) result.taken_at = readExifTakenAt(buffer);
+  // Log de diagnostic temporaire : permet de voir, pour chaque upload,
+  // ce que exifr a réussi à extraire du buffer original. À retirer une
+  // fois l'origine du strip EXIF iPhone identifiée.
+  log.info(`exif-debug: buffer=${buffer.length}B keys=${parsedKeys.join(',') || '(none)'} err=${parseError || 'null'} → date=${result.taken_at} gps=${result.gps_latitude},${result.gps_longitude} cam=${result.camera_make}/${result.camera_model}`);
   return result;
 }
 
