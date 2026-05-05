@@ -15,8 +15,8 @@ const routes = [
   {
     path: '/',
     name: 'afs',
-    meta: { title: 'Mes AFs' },
-    component: () => import('@/views/AfsListView.vue'),
+    meta: { title: 'Mes documents', fullscreenMobile: true },
+    component: () => import('@/views/HomeRouter.vue'),
   },
   {
     path: '/afs/:id',
