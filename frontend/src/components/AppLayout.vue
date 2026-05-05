@@ -83,13 +83,20 @@ async function logout() {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Mobile header -->
-    <div class="lg:hidden flex items-center justify-between bg-indigo-600 px-4 py-3">
+    <!-- Mobile header sticky avec safe-area top -->
+    <div
+      class="lg:hidden sticky top-0 z-30 flex items-center justify-between bg-indigo-600 px-4 py-3"
+      :style="{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }"
+    >
       <div class="flex items-center gap-2">
         <img src="/logo-buildy-blanc.svg" alt="Buildy" class="h-6" />
         <span class="text-white font-semibold text-sm">Buildy Docs</span>
       </div>
-      <button @click="sidebarOpen = !sidebarOpen" class="text-white/70 hover:text-white">
+      <button
+        @click="sidebarOpen = !sidebarOpen"
+        class="text-white/70 hover:text-white tap-target inline-flex items-center justify-center"
+        aria-label="Menu"
+      >
         <Bars3Icon v-if="!sidebarOpen" class="w-6 h-6" />
         <XMarkIcon v-else class="w-6 h-6" />
       </button>
@@ -211,7 +218,7 @@ async function logout() {
       <div v-if="sidebarOpen" class="fixed inset-0 z-20 bg-black/40 lg:hidden" @click="sidebarOpen = false" />
 
       <!-- Main content -->
-      <main class="flex-1 min-w-0 px-5 py-4 lg:px-6 lg:py-5">
+      <main class="flex-1 min-w-0 px-2 py-3 lg:px-6 lg:py-5">
         <slot />
       </main>
     </div>

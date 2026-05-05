@@ -56,7 +56,8 @@ async function patchThermal(t, patch) {
       </span>
       <span v-else class="italic">Aucune régulation thermique relevée</span>
     </template>
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-225">
       <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
           <th class="text-center px-5 py-2">Zone</th>
@@ -166,5 +167,6 @@ async function patchThermal(t, patch) {
         </tr>
       </tbody>
     </table>
+    </div>
   </CollapsibleSection>
 </template>

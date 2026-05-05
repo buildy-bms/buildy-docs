@@ -57,8 +57,12 @@ import CredentialsSection from '@/components/audit/CredentialsSection.vue'
 import IdentificationSection from '@/components/audit/IdentificationSection.vue'
 import ZonesSection from '@/components/audit/ZonesSection.vue'
 import { useAuditStore } from '@/stores/audit'
+import { useViewport } from '@/composables/useViewport'
+import MobileAuditNav from '@/components/MobileAuditNav.vue'
+import OpenOnPhoneButton from '@/components/OpenOnPhoneButton.vue'
 
 const auditStore = useAuditStore()
+const { isNarrow } = useViewport()
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -1014,7 +1018,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="w-full mx-auto px-3 pb-12">
+  <div class="w-full mx-auto px-3 pb-12" :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
@@ -1077,6 +1081,10 @@ onBeforeUnmount(() => {
                 title="Panneau d'activité">
           <ClockIcon class="w-3.5 h-3.5 shrink-0" /> Activité
         </button>
+        <OpenOnPhoneButton
+          v-if="!isNarrow"
+          :context-label="`${document?.client_name || ''} — ${document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB')}`"
+        />
         <button v-if="document?.site_uuid" @click="openBulkUpload"
           title="Importer en masse les photos prises sur site (tri par horodatage EXIF + mapping)"
           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
@@ -1111,14 +1119,14 @@ onBeforeUnmount(() => {
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
     <div v-else class="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4 items-start">
-      <!-- Stepper vertical sticky : visible tout au long du scroll de la page -->
+      <!-- Stepper vertical sticky : visible tout au long du scroll de la page (desktop uniquement) -->
       <BacsAuditStepper
         :steps="stepperSteps"
         :active-step-key="activeStepKey"
         @step-click="onStepClick"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
-        class="sticky top-4 self-start"
+        class="hidden lg:block sticky top-4 self-start"
       />
 
       <!-- Colonne principale : contenu de l'audit -->
@@ -1365,6 +1373,14 @@ onBeforeUnmount(() => {
       download-label="Télécharger le PDF"
       @close="closePreview"
       @download="exportPdf"
+    />
+
+    <!-- Bottom navigation mobile/tablette portrait : raccourcis vers les sections principales -->
+    <MobileAuditNav
+      v-if="!loading"
+      :active-step-key="activeStepKey"
+      :show-compliance="isBacs"
+      @navigate="onStepClick"
     />
   </div>
 </template>

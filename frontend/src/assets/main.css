@@ -208,7 +208,30 @@ strong, b { font-weight: 500; }
            hover:bg-gray-100 hover:text-gray-600;
   }
   .flag-ico { @apply font-bold text-[11px]; }
+
+  /**
+   * Tap target iOS HIG : 44pt minimum (cliquable au pouce).
+   * À appliquer sur les boutons mobiles, items de bottom nav, FAB, etc.
+   */
+  .tap-target { min-height: 44px; min-width: 44px; }
 }
+
+/**
+ * Prévention du zoom iOS Safari sur focus input : lorsque la taille de
+ * police est < 16px, iOS zoome automatiquement. On force 16px en mobile
+ * (< 768px) sur tous les controls de saisie.
+ *
+ * En desktop, on conserve les tailles définies par les composants
+ * (text-sm, text-xs) pour la densité d'information.
+ */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 
 /* ─── Checkboxes Buildy : rondes, vert #00cd92 quand cochees ─────────
  * Surcharge globale du style Tailwind par defaut. S'applique a tous les

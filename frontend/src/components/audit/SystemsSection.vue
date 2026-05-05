@@ -131,7 +131,7 @@ function hasNotes(html) {
                               s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                         : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
                                                             : 'border-gray-200 bg-gray-50/40')]">
-                  <div class="px-3 py-2 flex items-center gap-3 bg-white">
+                  <div class="px-3 py-2 flex flex-wrap items-center gap-2 sm:gap-3 bg-white">
                     <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
                             class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
                             :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
@@ -139,7 +139,7 @@ function hasNotes(html) {
                       <ChevronUpIcon v-else class="w-3.5 h-3.5" />
                     </button>
                     <SystemCategoryIcon :category="s.system_category" size="md" />
-                    <span class="font-medium text-sm text-gray-800 whitespace-nowrap min-w-45 cursor-pointer"
+                    <span class="font-medium text-sm text-gray-800 whitespace-nowrap sm:min-w-45 cursor-pointer"
                           @click="s.present && emit('toggle-system-collapsed', s.id)">
                       {{ systemLabels[s.system_category] || s.system_category }}
                     </span>

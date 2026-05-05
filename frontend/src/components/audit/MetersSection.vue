@@ -88,7 +88,8 @@ function hasNotes(html) {
       </span>
       <span v-else class="italic">Aucun compteur listé</span>
     </template>
-    <table class="w-full text-sm">
+    <!-- Desktop : tableau (>=768px) -->
+    <table class="hidden md:table w-full text-sm">
       <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
           <th class="text-center px-5 py-2.5 w-44">Zone</th>
@@ -208,5 +209,106 @@ function hasNotes(html) {
         </tr>
       </tfoot>
     </table>
+
+    <!-- Mobile : cards empilées (<768px) -->
+    <div class="md:hidden divide-y divide-gray-100">
+      <div v-for="m in meters" :key="`m-${m.id}`"
+           :class="['p-3 space-y-2',
+             m.out_of_service ? 'opacity-60' : '',
+             m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40 border-l-4 border-l-red-300' : '']">
+        <!-- Header card : zone + actions -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span v-if="m.required && !m.present_actual && !m.out_of_service"
+                    class="text-red-600" title="Compteur requis non présent">⚠</span>
+              <span class="font-medium text-sm text-gray-800 truncate">
+                {{ m.zone_name || 'Compteur général' }}
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 mt-1">
+              <MeterUsagePill :usage="m.usage" />
+              <MeterTypePill :type="m.meter_type" />
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button @click="dupMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg" aria-label="Dupliquer">
+              <DocumentDuplicateIcon class="w-5 h-5" />
+            </button>
+            <button @click="removeMeter(m)" class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-red-600 rounded-lg" aria-label="Supprimer">
+              <TrashIcon class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <!-- État compteur : flags -->
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button"
+                  @click="patchMeter(m, { required: !m.required })"
+                  :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']">
+            <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span> Requis
+          </button>
+          <button type="button"
+                  @click="patchMeter(m, { present_actual: !m.present_actual })"
+                  :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']">
+            <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span> Présent
+          </button>
+          <button v-if="m.present_actual" type="button"
+                  @click="patchMeter(m, m.communicating
+                    ? { communicating: false, communication_protocols: null, communication_protocol: null }
+                    : { communicating: true })"
+                  :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']">
+            <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span> Comm.
+          </button>
+          <button v-if="m.present_actual" type="button"
+                  @click="patchMeter(m, { wired: !m.wired })"
+                  :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']">
+            <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
+          </button>
+          <label class="flag-pill flag-off cursor-pointer">
+            <input type="checkbox" :checked="!!m.out_of_service"
+                   @change="e => patchMeter(m, { out_of_service: e.target.checked })"
+                   class="w-3! h-3!" />
+            HS
+          </label>
+        </div>
+        <!-- Protocole(s) -->
+        <div v-if="m.communicating">
+          <ProtocolMultiPicker
+            :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
+            :options="protocolOptions"
+            size="xs"
+            @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
+          />
+        </div>
+        <!-- Notes + Photos -->
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
+            :class="['flex-1 tap-target inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition',
+              hasNotes(m.notes_html || m.notes)
+                ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
+                : 'border-gray-200 text-gray-600 bg-white']">
+            <PencilSquareIcon class="w-4 h-4" />
+            {{ hasNotes(m.notes_html || m.notes) ? 'Notes' : '+ Notes' }}
+          </button>
+          <BacsPhotoButton
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :attach-to="{ meter_id: m.id }"
+            :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
+            class="flex-1"
+          />
+        </div>
+      </div>
+      <div v-if="!meters.length" class="px-5 py-6 text-center text-xs text-gray-500">
+        Aucun compteur listé. Renseigne les compteurs requis à mesure de la visite.
+      </div>
+      <div class="p-3">
+        <button @click="emit('add-meter')" class="w-full tap-target btn-success justify-center">
+          <PlusIcon class="w-4 h-4" /> Ajouter un compteur
+        </button>
+      </div>
+    </div>
   </CollapsibleSection>
 </template>

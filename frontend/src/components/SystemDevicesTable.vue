@@ -369,12 +369,12 @@ async function removeDevice(d) {
               </div>
             </div>
 
-            <div class="flex items-center gap-1 ml-auto opacity-0 group-hover:opacity-100 transition pb-1">
-              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
-                <DocumentDuplicateIcon class="w-4 h-4" />
+            <div class="flex items-center gap-1 ml-auto opacity-100 md:opacity-0 md:group-hover:opacity-100 transition pb-1">
+              <button @click="dupDevice(d)" class="tap-target text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+                <DocumentDuplicateIcon class="w-5 h-5 md:w-4 md:h-4" />
               </button>
-              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
-                <TrashIcon class="w-4 h-4" />
+              <button @click="removeDevice(d)" class="tap-target text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                <TrashIcon class="w-5 h-5 md:w-4 md:h-4" />
               </button>
             </div>
           </div>

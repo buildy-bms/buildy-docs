@@ -81,7 +81,7 @@ async function removeInspection(ins) {
         Trace ici les inspections officielles réalisées par un tiers (organisme indépendant). L'audit Buildy est interne et ne se substitue pas à cette obligation.
       </p>
       <div v-for="ins in inspections" :key="ins.id" class="border border-gray-200 rounded-lg p-3">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-[11px] text-gray-600 mb-1">Date de l'inspection</label>
             <input :value="ins.last_inspection_date || ''" type="date"

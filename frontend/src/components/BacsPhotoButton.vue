@@ -9,6 +9,8 @@ import {
   getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { compressBeforeUpload } from '@/composables/usePhotoCompression'
+import { useViewport } from '@/composables/useViewport'
 
 /**
  * Bouton compact (icone camera + compteur) qui sert aussi de zone de drop
@@ -30,10 +32,12 @@ const props = defineProps({
 const emit = defineEmits(['changed'])
 
 const { success, error: notifyError } = useNotification()
+const { isMobile } = useViewport()
 const photos = ref([])
 const loading = ref(false)
 const showGallery = ref(false)
 const fileInput = ref(null)
+const cameraInput = ref(null)
 const uploading = ref(false)
 const isDragOver = ref(false)
 const dragDepth = ref(0) // counter pour eviter le flicker dragenter/dragleave sur enfants
@@ -87,15 +91,22 @@ function pickFile() {
   fileInput.value?.click()
 }
 
+function takePhoto() {
+  cameraInput.value?.click()
+}
+
 async function uploadFiles(files) {
   if (!files.length) return
   uploading.value = true
   const uploaded = []
   try {
-    for (const f of files) {
+    for (const rawFile of files) {
+      // Compression côté client : économie réseau 4G en gardant l'orig
+      // si la compression échoue ou n'apporte rien (cf. composable).
+      const f = await compressBeforeUpload(rawFile)
       const fd = new FormData()
       fd.append('file', f)
-      const defaultTitle = f.name.replace(/\.[^.]+$/, '')
+      const defaultTitle = (rawFile.name || 'photo').replace(/\.[^.]+$/, '')
       const { data } = await uploadSiteDocument(props.siteUuid, fd, {
         title: defaultTitle,
         category: 'photo',
@@ -229,6 +240,17 @@ const btnCls = computed(() => {
       class="hidden"
       @change="onFileChosen"
     />
+    <!-- Caméra native iOS : capture="environment" déclenche directement
+         l'appareil photo arrière (pas de choix Pellicule). Pas de multiple,
+         on prend une photo à la fois. -->
+    <input
+      ref="cameraInput"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      class="hidden"
+      @change="onFileChosen"
+    />
 
     <!-- Galerie inline (popover) -->
     <div
@@ -240,13 +262,24 @@ const btnCls = computed(() => {
         <span class="text-xs font-medium text-gray-700">
           Photos {{ label ? `- ${label}` : '' }}
         </span>
-        <button
-          @click="pickFile"
-          :disabled="uploading"
-          class="px-2 py-0.5 text-[11px] font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {{ uploading ? 'Envoi…' : '+ Ajouter' }}
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            v-if="isMobile"
+            @click="takePhoto"
+            :disabled="uploading"
+            class="px-2 py-1 text-[11px] font-medium rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1"
+            title="Ouvre l'appareil photo arrière"
+          >
+            <CameraIcon class="w-3.5 h-3.5" /> {{ uploading ? '…' : 'Photo' }}
+          </button>
+          <button
+            @click="pickFile"
+            :disabled="uploading"
+            class="px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {{ uploading ? 'Envoi…' : (isMobile ? 'Pellicule' : '+ Ajouter') }}
+          </button>
+        </div>
       </div>
 
       <div v-if="loading" class="text-center text-xs text-gray-500 py-3">Chargement…</div>

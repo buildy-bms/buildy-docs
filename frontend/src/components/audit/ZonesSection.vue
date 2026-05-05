@@ -88,78 +88,137 @@ function hasNotes(html) {
       </span>
       <span v-else class="italic">Aucune zone définie</span>
     </template>
-    <table class="w-full text-sm">
-      <thead class="text-xs text-gray-500 font-medium bg-gray-50">
-        <tr>
-          <th class="text-center px-5 py-2">Nom</th>
-          <th class="text-center py-2 w-48">Nature</th>
-          <th class="text-center py-2 w-24">Surface (m²)</th>
-          <th class="text-center py-2 w-32">Notes</th>
-          <th class="text-center py-2 w-24">Photos</th>
-          <th class="text-center px-5 py-2 w-12"></th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
-        <PhotoDropTr v-for="z in zones" :key="z.zone_id" row-class="group"
-                     :site-uuid="document?.site_uuid || ''"
-                     :attach-to="{ zone_id: z.zone_id }"
-                     :enabled="!!document?.site_uuid"
-                     @changed="refreshAuditData">
-          <td class="px-5 py-2">
-            <input type="text" :value="z.name"
-                   @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                   class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-          </td>
-          <td class="py-2">
-            <select :value="z.nature"
-                    @change="e => patchZone(z, { nature: e.target.value || null })"
-                    class="text-xs px-2 py-1 border border-gray-200 rounded">
-              <option :value="null">—</option>
-              <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </td>
-          <td class="py-2">
-            <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
-                   @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                   class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-          </td>
-          <td class="py-2 text-center">
-            <button
-              type="button"
-              @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
-              :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
-                hasNotes(z.notes_html || z.notes)
-                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-              title="Editer les notes (avec assistance Claude)">
-              <PencilSquareIcon class="w-4 h-4" />
-              {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
-            </button>
-          </td>
-          <td class="py-2 text-center">
-            <BacsPhotoButton
-              v-if="document?.site_uuid"
-              :site-uuid="document.site_uuid"
-              :attach-to="{ zone_id: z.zone_id }"
-              :label="z.name" />
-          </td>
-          <td class="px-5 py-2 text-right whitespace-nowrap">
-            <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
-              <DocumentDuplicateIcon class="w-4 h-4" />
-            </button>
-            <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
-              <TrashIcon class="w-4 h-4" />
-            </button>
-          </td>
-        </PhotoDropTr>
-        <tr class="bg-emerald-50/30">
-          <td colspan="6" class="px-5 py-3 text-center">
-            <button @click="emit('add-zone')" class="btn-success">
-              <PlusIcon class="w-4 h-4" /> Ajouter une zone
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Desktop : tableau (>=768px) -->
+    <div class="hidden md:block">
+      <table class="w-full text-sm">
+        <thead class="text-xs text-gray-500 font-medium bg-gray-50">
+          <tr>
+            <th class="text-center px-5 py-2">Nom</th>
+            <th class="text-center py-2 w-48">Nature</th>
+            <th class="text-center py-2 w-24">Surface (m²)</th>
+            <th class="text-center py-2 w-32">Notes</th>
+            <th class="text-center py-2 w-24">Photos</th>
+            <th class="text-center px-5 py-2 w-12"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <PhotoDropTr v-for="z in zones" :key="z.zone_id" row-class="group"
+                       :site-uuid="document?.site_uuid || ''"
+                       :attach-to="{ zone_id: z.zone_id }"
+                       :enabled="!!document?.site_uuid"
+                       @changed="refreshAuditData">
+            <td class="px-5 py-2">
+              <input type="text" :value="z.name"
+                     @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
+                     class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            </td>
+            <td class="py-2">
+              <select :value="z.nature"
+                      @change="e => patchZone(z, { nature: e.target.value || null })"
+                      class="text-xs px-2 py-1 border border-gray-200 rounded">
+                <option :value="null">—</option>
+                <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </td>
+            <td class="py-2">
+              <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
+                     @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                     class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            </td>
+            <td class="py-2 text-center">
+              <button
+                type="button"
+                @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
+                :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
+                  hasNotes(z.notes_html || z.notes)
+                    ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
+                title="Editer les notes (avec assistance Claude)">
+                <PencilSquareIcon class="w-4 h-4" />
+                {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
+              </button>
+            </td>
+            <td class="py-2 text-center">
+              <BacsPhotoButton
+                v-if="document?.site_uuid"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ zone_id: z.zone_id }"
+                :label="z.name" />
+            </td>
+            <td class="px-5 py-2 text-right whitespace-nowrap">
+              <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+                <DocumentDuplicateIcon class="w-4 h-4" />
+              </button>
+              <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                <TrashIcon class="w-4 h-4" />
+              </button>
+            </td>
+          </PhotoDropTr>
+          <tr class="bg-emerald-50/30">
+            <td colspan="6" class="px-5 py-3 text-center">
+              <button @click="emit('add-zone')" class="btn-success">
+                <PlusIcon class="w-4 h-4" /> Ajouter une zone
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile : cards empilées (<768px) -->
+    <div class="md:hidden divide-y divide-gray-100">
+      <div v-for="z in zones" :key="`m-${z.zone_id}`" class="p-3 space-y-2">
+        <div class="flex items-start gap-2">
+          <input type="text" :value="z.name" placeholder="Nom de la zone"
+                 @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
+                 class="flex-1 px-3 py-2 border border-gray-200 rounded-lg" />
+          <button @click="removeZone(z)"
+                  class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-red-600 rounded-lg"
+                  aria-label="Supprimer la zone">
+            <TrashIcon class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <select :value="z.nature"
+                  @change="e => patchZone(z, { nature: e.target.value || null })"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg">
+            <option :value="null">Nature…</option>
+            <option v-for="opt in zoneNatures" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <input type="number" inputmode="decimal" pattern="[0-9.,]*" min="0" step="1"
+                 :value="z.surface_m2" placeholder="Surface m²"
+                 @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg" />
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
+            :class="['flex-1 tap-target inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition',
+              hasNotes(z.notes_html || z.notes)
+                ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
+                : 'border-gray-200 text-gray-600 bg-white']">
+            <PencilSquareIcon class="w-4 h-4" />
+            {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
+          </button>
+          <BacsPhotoButton
+            v-if="document?.site_uuid"
+            :site-uuid="document.site_uuid"
+            :attach-to="{ zone_id: z.zone_id }"
+            :label="z.name"
+            class="flex-1" />
+          <button @click="dupZone(z)"
+                  class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg border border-gray-200 px-3"
+                  aria-label="Dupliquer">
+            <DocumentDuplicateIcon class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <div class="p-3">
+        <button @click="emit('add-zone')" class="w-full tap-target btn-success justify-center">
+          <PlusIcon class="w-4 h-4" /> Ajouter une zone
+        </button>
+      </div>
+    </div>
   </CollapsibleSection>
 </template>
