@@ -195,5 +195,47 @@
   </p>
 </section>
 
+{{#if instancesDetailed.length}}
+<section class="page">
+  <h1 class="page-title">5. Inventaire des instances</h1>
+
+  <p class="section-intro">Liste exhaustive des références déployées sur le site, par système, avec la localisation, les zones fonctionnelles rattachées et les catégories d'usage. Total : <strong>{{instancesTotalQty}}</strong> instance(s).</p>
+
+  <table class="systems-table compact instances-table">
+    <thead>
+      <tr>
+        <th class="sys-num">N°</th>
+        <th class="sys-title">Système</th>
+        <th>Référence</th>
+        <th>Localisation</th>
+        <th class="sys-num-cell">Qté</th>
+        <th>Zones fonctionnelles</th>
+        <th>Catégories d'usage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each instancesDetailed}}
+      <tr class="sys-row {{#if isOptedOut}}sys-row-opted-out{{/if}}">
+        <td class="sys-num"><code>§{{systemNumber}}</code></td>
+        <td class="sys-title">{{systemTitle}}</td>
+        <td><strong>{{reference}}</strong></td>
+        <td>{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
+        <td class="sys-num-cell">{{qty}}</td>
+        <td>{{#if zones}}{{zones}}{{else}}<span class="muted">—</span>{{/if}}</td>
+        <td>{{#if categories}}{{categories}}{{else}}<span class="muted">—</span>{{/if}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4">Total instances</td>
+        <td class="sys-num-cell"><strong>{{instancesTotalQty}}</strong></td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+</section>
+{{/if}}
+
 </body>
 </html>

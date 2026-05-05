@@ -386,13 +386,20 @@ function backfillNewPlanSections() {
       const slug = sectionTemplateSlug(node);
       const tpl = slug ? db.sectionTemplates.getBySlug(slug) : null;
 
+      // Pas de template → on ne backfill PAS la section. Sinon on créerait
+      // une section "fantôme" sans pendant biblio (impossible à retrouver
+      // depuis l'UI bibliothèque). Les templates manquants viennent en
+      // général d'une suppression utilisateur (tombstone) — il a fait un
+      // choix conscient de ne pas avoir cette section.
+      if (!tpl) continue;
+
       // Lot — Migration 78 : filtre sur document_kinds contient 'af'. Les
       // sections marquees brochure-only ou bacs_audit-only ne sont pas
       // backfilees dans les AFs (ex: ch.14.4 Buildy Box).
-      if (tpl && Array.isArray(tpl.document_kinds) && !tpl.document_kinds.includes('af')) continue;
+      if (Array.isArray(tpl.document_kinds) && !tpl.document_kinds.includes('af')) continue;
 
       // Dedup principal : section_template_id deja present pour cette AF
-      if (tpl && existingTemplateIds.has(tpl.id)) continue;
+      if (existingTemplateIds.has(tpl.id)) continue;
       // Dedup secondaire : fallback par title (couvre les sections heritees
       // sans link vers un template, ex: AFs creees avant Lot 33).
       if (existingTitles.has(node.title)) continue;
@@ -408,7 +415,7 @@ function backfillNewPlanSections() {
         ? formatServiceLevel(node.features)
         : (node.service_level || null);
       const serviceLevelSource = node.features ? 'pdf-offres-2026' : (node.service_level ? 'manual' : null);
-      const bodyHtml = tpl?.body_html || (node.body_placeholder
+      const bodyHtml = tpl.body_html || (node.body_placeholder
         ? `<p><em class="text-gray-400">${escapeHtml(node.body_placeholder)}</em></p>`
         : null);
 
@@ -420,16 +427,14 @@ function backfillNewPlanSections() {
         title: node.title,
         serviceLevel,
         serviceLevelSource,
-        bacsArticles: tpl?.bacs_articles || node.bacs_articles || null,
+        bacsArticles: tpl.bacs_articles || node.bacs_articles || null,
         bodyHtml,
         kind: node.kind,
         genericNote: node.generic_note || 0,
       });
-      if (tpl) {
-        db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
-          .run(tpl.id, tpl.current_version, created.id);
-        existingTemplateIds.add(tpl.id);
-      }
+      db.db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+        .run(tpl.id, tpl.current_version, created.id);
+      existingTemplateIds.add(tpl.id);
       existingTitles.add(node.title);
       totalInserted++;
     }

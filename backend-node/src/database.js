@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 79;
+const TARGET_VERSION = 80;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3068,6 +3068,38 @@ function runMigrations() {
     }
     db.pragma('user_version = 79');
     log.info('Migration 79 appliquee : refresh body_html section 14.1.12 (tableau R175 redesign)');
+  }
+
+  if (current < 80) {
+    // Lot — Sections "fantômes" : sections AF sans section_template_id (et
+    // sans equipment_template_id), créées via backfillNewPlanSections quand
+    // un template manquait. Backfill par titre exact contre section_templates.
+    // Les sections qui restent orphelines après ce passage ont été créées
+    // pour une raison non automatique (titre divergent vs PLAN_AF, ou
+    // anciennes AFs pré-Lot 33) ; on les laisse en place pour que l'user
+    // puisse les promouvoir / supprimer manuellement.
+    const orphans = db.prepare(`
+      SELECT s.id, s.title FROM sections s
+      WHERE s.section_template_id IS NULL
+        AND s.equipment_template_id IS NULL
+        AND s.kind IN ('standard', 'zones')
+    `).all();
+    let linked = 0;
+    const linkStmt = db.prepare(`
+      UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?
+    `);
+    const lookupByTitle = db.prepare(`
+      SELECT id, current_version FROM section_templates WHERE title = ? LIMIT 1
+    `);
+    for (const o of orphans) {
+      const tpl = lookupByTitle.get(o.title);
+      if (tpl) {
+        linkStmt.run(tpl.id, tpl.current_version || 1, o.id);
+        linked++;
+      }
+    }
+    db.pragma('user_version = 80');
+    log.info(`Migration 80 : ${linked}/${orphans.length} sections orphelines reliees a la biblio par titre (les ${orphans.length - linked} restantes n'ont pas de pendant et necessitent une promotion manuelle)`);
   }
 
   if (current > TARGET_VERSION) {

@@ -811,6 +811,34 @@ async function routes(fastify) {
       totalWrites: a.totalWrites + s.totalWrites,
     }), { instances: 0, totalReads: 0, totalWrites: 0 });
 
+    // ── Synthèse instances : tableau detaille des references reelles deployees
+    // sur le site, regroupees par systeme. Filtre identique a systemsSummary :
+    // systeme inclus dans l'export ET qui a au moins une instance.
+    const allCategories = db.systemCategoriesDb.list();
+    const categoriesByKey = new Map(allCategories.map(c => [c.key, c]));
+    const instancesDetailed = equipmentEnriched
+      .filter(e => e.sec.included_in_export && e.instances > 0)
+      .flatMap(e => {
+        const sec = e.sec;
+        const instances = db.equipmentInstances.listBySection(sec.id);
+        return instances.map(inst => {
+          const zones = db.instanceZones.listForInstance(inst.id) || [];
+          const cats = (db.instanceCategories.listForInstance(inst.id) || [])
+            .map(k => categoriesByKey.get(k)?.label || k);
+          return {
+            systemNumber: sec.number,
+            systemTitle: sec.title,
+            isOptedOut: sec.opted_out_by_moa === 1,
+            reference: inst.reference,
+            location: inst.location || '',
+            qty: inst.qty || 1,
+            zones: zones.map(z => z.name).join(', '),
+            categories: cats.join(', '),
+          };
+        });
+      });
+    const instancesTotalQty = instancesDetailed.reduce((a, i) => a + (i.qty || 1), 0);
+
     // ── PAGE 4 (legacy) : Matrice systemes (filtree strict, gardee pour compat) ──
     const relevantEquipment = equipmentEnriched.filter(({ sec, instances }) =>
       instances > 0 || sec.opted_out_by_moa
@@ -866,6 +894,7 @@ async function routes(fastify) {
       zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
       functionalities, functionalitiesIncluded, functionalitiesPaidOption,
       systemsSummary, systemsTotals,
+      instancesDetailed, instancesTotalQty,
       // Tableau des offres avec badges Offre cible / Offre requise (charte
       // alignee sur l'annexe AF, consomme le partial _offerings-annex.hbs).
       offeringsAnnex: buildOfferingsAnnexForAf(af),
