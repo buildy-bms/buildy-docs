@@ -10,9 +10,11 @@ import {
   WrenchScrewdriverIcon,
   ClipboardDocumentListIcon,
   EllipsisHorizontalIcon,
+  SignalSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -35,6 +37,7 @@ const router = useRouter()
 const auditStore = useAuditStore()
 const { document, loading } = storeToRefs(auditStore)
 const { error } = useNotification()
+const { isOnline } = useOnlineStatus()
 
 const docId = parseInt(route.params.id, 10)
 
@@ -96,10 +99,32 @@ function goBack() {
             {{ document.client_name }}
           </p>
         </div>
+        <!-- Indicateur connexion : signal barré rouge pulse si hors-ligne -->
+        <div
+          v-if="!isOnline"
+          class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
+          title="Hors-ligne — les modifications ne sont pas sauvegardées"
+          aria-label="Hors-ligne"
+        >
+          <SignalSlashIcon class="w-5 h-5" />
+        </div>
         <div class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/15 text-white/90">
           {{ isBacs ? 'BACS' : 'GTB' }}
         </div>
       </div>
+
+      <!-- Bandeau hors-ligne complet sous le header -->
+      <transition name="slide-down">
+        <div
+          v-if="!isOnline"
+          class="px-3 py-2 bg-red-600 text-white text-xs flex items-center gap-2 leading-tight"
+        >
+          <SignalSlashIcon class="w-4 h-4 shrink-0" />
+          <span class="flex-1">
+            <strong>Hors-ligne.</strong> Tes modifications ne seront pas sauvegardées tant que la connexion n'est pas rétablie.
+          </span>
+        </div>
+      </transition>
     </header>
 
     <!-- Contenu de l'onglet actif (scroll vertical, un seul visible) -->
@@ -144,3 +169,17 @@ function goBack() {
     </nav>
   </div>
 </template>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: max-height 220ms ease, opacity 200ms;
+  overflow: hidden;
+  max-height: 80px;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+</style>

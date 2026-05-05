@@ -237,6 +237,13 @@ strong, b { font-weight: 500; }
   textarea {
     font-size: 16px;
   }
+  /* Placeholder réduit : 14px, plus discret que le texte saisi (16px).
+     Le zoom iOS dépend du font-size de l'input, pas du placeholder. */
+  input::placeholder,
+  textarea::placeholder {
+    font-size: 14px;
+    opacity: 0.7;
+  }
 }
 
 

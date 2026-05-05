@@ -216,11 +216,21 @@ function hasNotes(html) {
           <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
             <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
-              <label v-for="(usage, key) in { manages_heating: 'Chauffage', manages_cooling: 'Refroidissement', manages_ventilation: 'Ventilation', manages_dhw: 'ECS', manages_lighting: 'Éclairage' }"
-                     :key="key"
-                     class="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
-                <input type="checkbox" v-model="bms[key]" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
-                {{ usage }}
+              <label v-for="u in [
+                       { key: 'manages_heating', cat: 'heating', label: 'Chauffage' },
+                       { key: 'manages_cooling', cat: 'cooling', label: 'Refroidissement' },
+                       { key: 'manages_ventilation', cat: 'ventilation', label: 'Ventilation' },
+                       { key: 'manages_dhw', cat: 'dhw', label: 'ECS' },
+                       { key: 'manages_lighting', cat: 'lighting_indoor', label: 'Éclairage' },
+                     ]"
+                     :key="u.key"
+                     :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition whitespace-nowrap',
+                              bms[u.key]
+                                ? 'border-indigo-200 bg-indigo-50/60 hover:bg-indigo-50'
+                                : 'border-gray-200 bg-white hover:border-gray-300']">
+                <input type="checkbox" v-model="bms[u.key]" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded shrink-0" />
+                <SystemCategoryIcon :category="u.cat" size="sm" />
+                <span class="text-gray-700">{{ u.label }}</span>
               </label>
             </div>
           </div>

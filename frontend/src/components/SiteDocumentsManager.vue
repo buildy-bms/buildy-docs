@@ -242,11 +242,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <!-- Drop zone -->
+    <!-- Drop zone — pleine largeur, point d'entrée principal -->
     <div
       :class="[
-        'border-2 border-dashed rounded-lg px-4 py-6 text-center transition cursor-pointer',
-        dragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400',
+        'w-full border-2 border-dashed rounded-xl px-6 py-12 text-center transition-all cursor-pointer',
+        dragOver
+          ? 'border-indigo-500 bg-indigo-50 scale-[1.01] shadow-sm'
+          : 'border-gray-300 bg-gray-50/40 hover:border-indigo-400 hover:bg-indigo-50/30',
       ]"
       @dragover.prevent="dragOver = true"
       @dragleave.prevent="dragOver = false"
@@ -255,12 +257,14 @@ onBeforeUnmount(() => {
     >
       <input ref="fileInput" type="file" class="hidden" @change="onPick"
              accept=".pdf,.dwg,.png,.jpg,.jpeg,.webp,.xls,.xlsx,.doc,.docx,.txt" />
-      <PaperClipIcon class="w-8 h-8 mx-auto text-gray-400" />
-      <p class="mt-2 text-sm text-gray-600">
-        Glisse-dépose un fichier ici ou
-        <span class="text-indigo-600 font-medium">parcours</span>
+      <PaperClipIcon :class="['w-12 h-12 mx-auto transition', dragOver ? 'text-indigo-500' : 'text-gray-400']" />
+      <p class="mt-3 text-base font-medium text-gray-700">
+        Glisser-déposer un fichier ici
       </p>
-      <p class="text-[11px] text-gray-400 mt-1">PDF, DWG, images, Office… 25 Mo max</p>
+      <p class="mt-1 text-sm text-gray-500">
+        ou <span class="text-indigo-600 font-semibold underline-offset-2 hover:underline">parcourir l'ordinateur</span>
+      </p>
+      <p class="mt-3 text-[11px] text-gray-400">PDF, DWG, images, Office… 25 Mo max</p>
     </div>
 
     <!-- Liste -->
@@ -291,27 +295,37 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <table v-if="!loading && documents.length" class="w-full text-sm mt-4">
+    <div v-if="!loading && documents.length" class="mt-4 overflow-x-auto">
+    <table class="w-full text-sm table-fixed">
+      <colgroup>
+        <col class="w-10" />
+        <col class="w-20" />
+        <col />
+        <col class="w-48" />
+        <col class="w-60" />
+        <col class="w-24" />
+        <col class="w-28" />
+      </colgroup>
       <thead class="text-xs uppercase text-gray-500 tracking-wider bg-gray-50">
         <tr>
-          <th class="text-center py-2 w-10">
+          <th class="text-center py-2 px-2">
             <input type="checkbox" :checked="allSelected" @change="toggleAll" class="rounded" />
           </th>
-          <th class="text-center px-3 py-2 w-16">Aperçu</th>
-          <th class="text-center px-3 py-2">Titre</th>
-          <th class="text-center py-2 w-44">Catégorie</th>
-          <th class="text-center py-2 w-56">Rattaché à</th>
-          <th class="text-center py-2 w-24">Taille</th>
-          <th class="text-center px-3 py-2 w-28">Actions</th>
+          <th class="text-center px-3 py-2">Aperçu</th>
+          <th class="text-left px-3 py-2">Titre</th>
+          <th class="text-left px-3 py-2">Catégorie</th>
+          <th class="text-left px-3 py-2">Rattaché à</th>
+          <th class="text-right px-3 py-2">Taille</th>
+          <th class="text-center px-3 py-2">Actions</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         <tr v-for="d in documents" :key="d.id"
-            :class="['group hover:bg-gray-50/60', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
-          <td class="text-center py-2">
+            :class="['group hover:bg-gray-50/60 align-middle', selectedIds.has(d.id) ? 'bg-indigo-50/40' : '']">
+          <td class="text-center py-2 px-2 align-middle">
             <input type="checkbox" :checked="selectedIds.has(d.id)" @change="toggleOne(d.id)" class="rounded" />
           </td>
-          <td class="px-3 py-2 text-center">
+          <td class="px-3 py-2 text-center align-middle">
             <button v-if="isImage(d)" @click="openPreview(d)" class="inline-block">
               <img :src="getSiteDocumentDownloadUrl(d.id)" :alt="d.title || d.original_name || 'Document'"
                    loading="lazy" decoding="async"
@@ -319,46 +333,47 @@ onBeforeUnmount(() => {
             </button>
             <DocumentIcon v-else class="w-6 h-6 text-gray-400 mx-auto" />
           </td>
-          <td class="px-3 py-2 text-gray-700">
+          <td class="px-3 py-2 text-gray-700 align-middle min-w-0">
             <input type="text" :value="d.title"
                    @blur="e => e.target.value !== d.title && patchDoc(d, { title: e.target.value })"
-                   class="w-full px-2 py-0.5 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
-            <p class="text-[11px] text-gray-400">{{ d.original_name }}</p>
+                   class="w-full px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded text-sm" />
+            <p class="text-[11px] text-gray-400 px-2 truncate">{{ d.original_name }}</p>
           </td>
-          <td class="py-2 text-center">
+          <td class="px-3 py-2 align-middle">
             <select :value="d.category"
                     @change="e => patchDoc(d, { category: e.target.value })"
-                    class="text-xs px-2 py-1 border border-gray-200 rounded text-center">
+                    class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
               <option v-for="c in CATEGORIES" :key="c.value" :value="c.value">{{ c.label }}</option>
               <option value="photo">Photo</option>
             </select>
           </td>
-          <td class="py-2 text-center">
-            <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border',
+          <td class="px-3 py-2 align-middle">
+            <span :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full border max-w-full whitespace-nowrap',
               attachmentLabel(d).kind === 'Site'
                 ? 'border-gray-200 text-gray-500 bg-gray-50 italic'
                 : 'border-indigo-200 text-indigo-700 bg-indigo-50']">
-              <span class="font-semibold">{{ attachmentLabel(d).kind }}</span>
-              <span class="truncate max-w-40">{{ attachmentLabel(d).label }}</span>
+              <span class="font-semibold shrink-0">{{ attachmentLabel(d).kind }}</span>
+              <span class="truncate">{{ attachmentLabel(d).label }}</span>
             </span>
           </td>
-          <td class="py-2 text-center text-xs text-gray-500">{{ fmtSize(d.size_bytes) }}</td>
-          <td class="px-3 py-2 text-center whitespace-nowrap">
+          <td class="px-3 py-2 text-right text-xs text-gray-500 tabular-nums align-middle whitespace-nowrap">{{ fmtSize(d.size_bytes) }}</td>
+          <td class="px-3 py-2 text-center whitespace-nowrap align-middle">
             <button v-if="isImage(d)" @click="openPreview(d)"
-                    class="text-gray-400 hover:text-indigo-600 mx-1" title="Aperçu">
+                    class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" title="Aperçu">
               <EyeIcon class="w-4 h-4" />
             </button>
             <a :href="getSiteDocumentDownloadUrl(d.id)" target="_blank"
-               class="inline-block text-gray-400 hover:text-indigo-600 mx-1" title="Télécharger">
+               class="inline-block text-gray-400 hover:text-indigo-600 mx-0.5 p-1" title="Télécharger">
               <ArrowDownTrayIcon class="w-4 h-4" />
             </a>
-            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-1" title="Supprimer">
+            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-0.5 p-1" title="Supprimer">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>
         </tr>
       </tbody>
     </table>
+    </div>
 
     <!-- Modal lightbox preview -->
     <div v-if="previewDoc"
