@@ -379,7 +379,7 @@ async function routes(fastify) {
     const data = buildOfferingsData();
     const html = renderHtml({
       template: 'offering-catalog',
-      styles: 'styles-offering-catalog',
+      styles: ['styles-offering-catalog', '_offerings-table'],
       data,
     });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
@@ -400,7 +400,7 @@ async function routes(fastify) {
     try {
       result = await renderPdf({
         template: 'offering-catalog',
-        styles: 'styles-offering-catalog',
+        styles: ['styles-offering-catalog', '_offerings-table'],
         data,
         outputPath,
         pageFormat: 'A4',
@@ -429,7 +429,7 @@ async function routes(fastify) {
     const data = await buildBrochureData();
     const html = renderHtml({
       template: 'brochure',
-      styles: 'styles-brochure',
+      styles: ['styles-brochure', '_offerings-table'],
       data,
     });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
@@ -450,7 +450,7 @@ async function routes(fastify) {
     try {
       result = await renderPdf({
         template: 'brochure',
-        styles: 'styles-brochure',
+        styles: ['styles-brochure', '_offerings-table'],
         data,
         outputPath,
         pageFormat: 'A4',

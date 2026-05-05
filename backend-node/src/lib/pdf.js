@@ -180,8 +180,14 @@ function loadTemplate(name, { fresh = false } = {}) {
 }
 
 function loadStyles(name) {
-  const cssPath = path.resolve(templatesDir, `${name}.css`);
-  return fs.readFileSync(cssPath, 'utf-8');
+  // Accepte un nom unique (string) ou une liste (array) de fichiers CSS
+  // (sans extension). Les fichiers sont concatenes dans l'ordre — utile
+  // pour appliquer un partial CSS partage en *override* a la fin (cas
+  // _offerings-table.css mutualise entre offering-catalog et brochure).
+  const names = Array.isArray(name) ? name : [name];
+  return names
+    .map(n => fs.readFileSync(path.resolve(templatesDir, `${n}.css`), 'utf-8'))
+    .join('\n');
 }
 
 // ── Fonts embed (data URL base64) ────────────────────────────────────

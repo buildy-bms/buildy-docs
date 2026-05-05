@@ -1,0 +1,158 @@
+/* ═══════════════════════════════════════════════════════════════════════
+ * Tableau des offres Buildy (matrice E/S/P) — partial CSS mutualise.
+ *
+ * Charge en *override* a la fin de styles-offering-catalog.css ET de
+ * styles-brochure.css pour garantir que le rendu du <table class="comparison-table">
+ * est strictement identique dans les 2 PDFs (catalogue d'offres pleine
+ * page + page "Tableau des offres" de la brochure detaillee).
+ *
+ * Version de reference : aspect brochure (plus aere, icones a gauche des
+ * features, gradient de couleurs par profondeur).
+ *
+ * NOTE : ce fichier ne contient PAS les overrides specifiques a la
+ * brochure (.page-offerings .*) qui adaptent le tableau au format compact
+ * d'une page A4 dans la brochure. Ces overrides restent dans styles-brochure.css.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.comparison-table {
+  width: 100%; border-collapse: collapse;
+  margin: 4mm 0 3mm; font-size: 7pt;
+  border: 0.4pt solid #e5e7eb;
+}
+.col-feature { width: auto; }
+.col-level   { width: 22mm; }
+.comparison-table thead { display: table-header-group; }
+.comparison-table tr { page-break-inside: avoid; }
+
+.th-feature {
+  text-align: left; padding: 4mm 3mm 3mm;
+  background: #1b2842; color: rgba(255,255,255,0.85);
+  font-family: 'Inter', sans-serif; font-size: 6.6pt;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  font-weight: 700; vertical-align: bottom;
+}
+.th-level {
+  text-align: center; padding: 1.5mm 2mm 2.5mm;
+  color: white; vertical-align: bottom;
+}
+.th-level-badge {
+  display: inline-block; margin: 0 auto 2mm;
+  font-family: 'Inter', sans-serif;
+  font-size: 5.4pt; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  background: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%);
+  color: #1b2842;
+  padding: 0.7mm 2.5mm; border-radius: 4mm;
+  white-space: nowrap;
+  box-shadow: 0 0.4mm 1mm rgba(180,130,0,0.25);
+  border: 0.4pt solid #d97706;
+}
+.th-level-badge-ph { display: block; height: 5.5mm; }
+.th-level-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 9pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  line-height: 1.1;
+}
+.th-level-tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 6pt; font-weight: 400; font-style: italic;
+  opacity: 0.85; margin-top: 0.8mm;
+  letter-spacing: 0; text-transform: none; line-height: 1.2;
+}
+.th-E { background: #64748b; }
+.th-S { background: #4f46e5; }
+.th-P { background: #7c3aed; }
+.th-highlighted { padding-top: 1mm; }
+
+.td-level-highlighted { background: #fff8e7 !important; }
+.comparison-table tbody tr:not(.category-row):nth-child(odd) td.td-level-highlighted {
+  background: #fef3d4 !important;
+}
+.td-level-highlighted .avail-included { background: #6ee7b7; color: #064e3b; }
+.td-level-highlighted .avail-text { background: #fffaf0; border-color: #fbbf24; }
+
+.category-row td {
+  background: #f8fafc !important;
+  color: #1b2842;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 0.4pt solid #e2e8f0;
+  border-top: 0.4pt solid #e2e8f0;
+}
+.category-row-d0 td { padding: 1.4mm 2mm 1mm; font-size: 6.8pt; }
+.category-row-d1 td {
+  padding: 1mm 2mm 0.8mm 5mm;
+  background: #fafbfc !important;
+  color: #475569; font-size: 6pt; font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.category-row-d2 td {
+  padding: 0.8mm 2mm 0.6mm 8mm;
+  background: #ffffff !important;
+  color: #64748b; font-size: 5.6pt; font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.category-row-d3 td {
+  padding: 0.6mm 2mm 0.4mm 11mm;
+  background: #ffffff !important;
+  color: #94a3b8; font-size: 5.4pt;
+}
+.cat-marker { margin-right: 1.2mm; font-weight: 900; }
+.cat-marker-d0 { color: #00cd92; font-size: 7.5pt; }
+.cat-marker-d1 { color: #cbd5e1; font-size: 7pt; }
+.cat-marker-d2 { color: #cbd5e1; font-size: 6.5pt; }
+.cat-marker-d3 { color: #e2e8f0; font-size: 6pt; }
+
+.td-feature {
+  padding: 1.5mm 3mm; border-bottom: 0.3pt solid #f3f4f6;
+  color: #1f2937; font-size: 7.5pt;
+}
+.td-feature-link { color: inherit; text-decoration: none; }
+.td-feature-link:hover { color: inherit; }
+.td-feature-icon {
+  display: inline-block; width: 3.5mm; margin-right: 1.5mm;
+  vertical-align: -0.5mm;
+  color: #475569;
+}
+.td-feature-d0 { padding-left: 5mm; }
+.td-feature-d1 { padding-left: 8mm; color: #4b5563; }
+.td-feature-d2 { padding-left: 11mm; color: #6b7280; }
+.td-feature-d3 { padding-left: 14mm; color: #9ca3af; font-size: 7pt; }
+
+.td-level {
+  text-align: center; padding: 1mm 0;
+  border-bottom: 0.3pt solid #f3f4f6;
+}
+
+.avail {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 5mm; height: 5mm; border-radius: 50%;
+  font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 8pt;
+}
+.avail-included { background: #d1fae5; color: #047857; }
+.avail-unavailable {
+  background: transparent; color: #cbd5e1;
+  font-weight: 400; font-size: 9pt;
+}
+.avail-text {
+  display: inline-block;
+  padding: 0.5mm 1.5mm; border: 0.4pt solid #fde68a;
+  background: #fffbeb; color: #b45309;
+  border-radius: 2.5mm;
+  font-size: 6pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.opt-badge {
+  display: inline-block; margin-left: 2mm;
+  padding: 0.3mm 1.5mm;
+  background: #fff7ed; color: #c2410c;
+  border: 0.3mm solid #fed7aa; border-radius: 2.5mm;
+  font-size: 5.5pt; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+.comparison-table tbody tr:not(.category-row):nth-child(odd) td {
+  background: #fafbfc;
+}
