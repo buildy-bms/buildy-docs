@@ -18,7 +18,7 @@ import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
 import MobileMetersTab from '@/components/mobile-audit/MobileMetersTab.vue'
 import MobileSystemsTab from '@/components/mobile-audit/MobileSystemsTab.vue'
-import MobilePlanTab from '@/components/mobile-audit/MobilePlanTab.vue'
+import MobileBmsTab from '@/components/mobile-audit/MobileBmsTab.vue'
 
 /**
  * Vue mobile native de l'audit BACS / GTB.
@@ -43,7 +43,7 @@ const TABS = [
   { key: 'zones',    label: 'Zones',    icon: Squares2X2Icon },
   { key: 'meters',   label: 'Compteurs',icon: BoltIcon },
   { key: 'systems',  label: 'Systèmes', icon: WrenchScrewdriverIcon },
-  { key: 'plan',     label: 'Plan',     icon: ClipboardDocumentListIcon },
+  { key: 'bms',      label: 'GTB',      icon: ClipboardDocumentListIcon },
 ]
 
 const STORAGE_KEY = `mobile-audit-tab:${docId}`
@@ -52,8 +52,10 @@ watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
-// Filtre les onglets : pas de "Plan" en mode site_audit (R175 spécifique)
-const visibleTabs = computed(() => TABS.filter(t => isBacs.value || t.key !== 'plan'))
+// Tous les onglets visibles dans les deux modes (BACS + site_audit).
+// La logique R175-spécifique (régulation thermique, capacités GTB R175-3/4/5)
+// se masque à l'intérieur des onglets concernés selon le kind.
+const visibleTabs = computed(() => TABS)
 
 async function refresh() {
   try {
@@ -111,7 +113,7 @@ function goBack() {
         <MobileZonesTab   v-show="activeTab === 'zones'" />
         <MobileMetersTab  v-show="activeTab === 'meters'" />
         <MobileSystemsTab v-show="activeTab === 'systems'" />
-        <MobilePlanTab    v-if="isBacs" v-show="activeTab === 'plan'" />
+        <MobileBmsTab     v-show="activeTab === 'bms'" />
       </template>
     </main>
 

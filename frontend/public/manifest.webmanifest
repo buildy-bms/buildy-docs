@@ -1,0 +1,33 @@
+{
+  "name": "Buildy Docs — Audit BACS / GTB",
+  "short_name": "Buildy Audit",
+  "description": "Saisie d'audits BACS et GTB sur le terrain",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1b2842",
+  "theme_color": "#1b2842",
+  "lang": "fr",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "/icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

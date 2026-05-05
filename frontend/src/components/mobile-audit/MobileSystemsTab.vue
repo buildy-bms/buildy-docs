@@ -11,16 +11,52 @@ import {
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsSystem, createBacsDevice, updateBacsDevice, deleteBacsDevice } from '@/api'
+import { updateBacsSystem, createBacsDevice, updateBacsDevice, deleteBacsDevice, updateBacsThermal } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
 const audit = useAuditStore()
-const { document, systems, devices, zones, powerSummary } = storeToRefs(audit)
+const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
+
+const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
+
+const REGULATION_OPTIONS = [
+  { value: null, label: '— Sélectionner —' },
+  { value: 'per_room', label: 'Par pièce' },
+  { value: 'per_zone', label: 'Par zone' },
+  { value: 'central_only', label: 'Centrale uniquement' },
+  { value: 'none', label: 'Aucune' },
+]
+const GENERATOR_OPTIONS = [
+  { value: null, label: '— Sélectionner —' },
+  { value: 'gas', label: 'Gaz' },
+  { value: 'electric', label: 'Effet Joule' },
+  { value: 'heat_pump', label: 'Pompe à chaleur' },
+  { value: 'wood_appliance', label: 'Appareil bois (exempté R175-6)' },
+  { value: 'district_heating', label: 'Réseau de chaleur' },
+  { value: 'other', label: 'Autre' },
+]
+
+let thermalSaveTimer = null
+async function patchThermal(t, patch) {
+  Object.assign(t, patch)
+  clearTimeout(thermalSaveTimer)
+  thermalSaveTimer = setTimeout(async () => {
+    try {
+      await updateBacsThermal(t.id, patch)
+      await audit.refreshActionItems()
+    } catch { error('Sauvegarde régulation impossible') }
+  }, 400)
+}
+
+// Régulation thermique pour un (zone, catégorie) donné
+function thermalFor(zoneId, category) {
+  return thermal.value.find(t => t.zone_id === zoneId && (t.category || 'heating') === category)
+}
 
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
@@ -236,6 +272,60 @@ async function removeDevice(d) {
               >
                 <PlusIcon class="w-4 h-4" /> Ajouter un équipement
               </button>
+            </div>
+
+            <!-- Régulation thermique R175-6 (heating + cooling présents en mode BACS) -->
+            <div
+              v-if="isBacs && s.present && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
+              class="mt-3 p-3 bg-amber-50/60 border border-amber-200 rounded-xl space-y-2"
+            >
+              <p class="text-[11px] font-medium text-amber-800 uppercase tracking-wider">
+                Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
+              </p>
+              <label class="flex items-center justify-between gap-2 px-3 py-2 bg-white rounded-lg cursor-pointer">
+                <span class="text-sm text-gray-700 font-medium">Régulation automatique</span>
+                <input
+                  type="checkbox"
+                  :checked="!!thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation"
+                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { has_automatic_regulation: e.target.checked })"
+                  class="w-5 h-5"
+                />
+              </label>
+              <template v-if="thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation">
+                <select
+                  :value="thermalFor(s.zone_id, s.system_category)?.regulation_type"
+                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: e.target.value || null })"
+                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                >
+                  <option v-for="o in REGULATION_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+                </select>
+                <select
+                  :value="thermalFor(s.zone_id, s.system_category)?.generator_type"
+                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: e.target.value || null })"
+                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                >
+                  <option v-for="o in GENERATOR_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
+                </select>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  min="0"
+                  :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
+                  @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
+                  placeholder="Âge du générateur (ans)"
+                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                />
+              </template>
+              <label class="flex items-center justify-between gap-2 px-3 py-2 bg-white rounded-lg cursor-pointer text-xs text-gray-700">
+                <span>Exempté bois (R175-6 II)</span>
+                <input
+                  type="checkbox"
+                  :checked="!!thermalFor(s.zone_id, s.system_category)?.generator_exempt_wood"
+                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_exempt_wood: e.target.checked })"
+                  class="w-5 h-5"
+                />
+              </label>
             </div>
           </div>
         </div>

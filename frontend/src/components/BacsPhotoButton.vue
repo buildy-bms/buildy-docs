@@ -252,9 +252,9 @@ const btnCls = computed(() => {
       @change="onFileChosen"
     />
 
-    <!-- Galerie inline (popover) -->
+    <!-- Desktop : Galerie inline (popover absolute) -->
     <div
-      v-if="showGallery"
+      v-if="showGallery && !isMobile"
       class="absolute right-0 top-full mt-1 z-30 w-72 bg-white border border-gray-200 rounded-lg shadow-xl p-3"
       @click.stop
     >
@@ -262,24 +262,13 @@ const btnCls = computed(() => {
         <span class="text-xs font-medium text-gray-700">
           Photos {{ label ? `- ${label}` : '' }}
         </span>
-        <div class="flex items-center gap-1">
-          <button
-            v-if="isMobile"
-            @click="takePhoto"
-            :disabled="uploading"
-            class="px-2 py-1 text-[11px] font-medium rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1"
-            title="Ouvre l'appareil photo arrière"
-          >
-            <CameraIcon class="w-3.5 h-3.5" /> {{ uploading ? '…' : 'Photo' }}
-          </button>
-          <button
-            @click="pickFile"
-            :disabled="uploading"
-            class="px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {{ uploading ? 'Envoi…' : (isMobile ? 'Pellicule' : '+ Ajouter') }}
-          </button>
-        </div>
+        <button
+          @click="pickFile"
+          :disabled="uploading"
+          class="px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {{ uploading ? 'Envoi…' : '+ Ajouter' }}
+        </button>
       </div>
 
       <div v-if="loading" class="text-center text-xs text-gray-500 py-3">Chargement…</div>
@@ -309,6 +298,83 @@ const btnCls = computed(() => {
         class="mt-2 w-full text-[11px] text-gray-500 hover:text-gray-700"
       >Fermer</button>
     </div>
+
+    <!-- Mobile : Galerie en sheet plein-écran (Teleport pour éviter overflow parent) -->
+    <Teleport to="body">
+      <transition name="slide-up">
+        <div
+          v-if="showGallery && isMobile"
+          class="fixed inset-0 z-60 flex flex-col bg-gray-50"
+        >
+          <header
+            class="shrink-0 bg-white border-b border-gray-200"
+            :style="{ paddingTop: 'env(safe-area-inset-top)' }"
+          >
+            <div class="flex items-center gap-2 h-12 px-3">
+              <button
+                @click="showGallery = false"
+                class="tap-target inline-flex items-center justify-center text-gray-600"
+                aria-label="Fermer"
+              >
+                <XMarkIcon class="w-6 h-6" />
+              </button>
+              <h2 class="flex-1 min-w-0 text-base font-medium truncate text-gray-900">
+                Photos<span v-if="label"> · {{ label }}</span>
+              </h2>
+              <span class="text-xs text-gray-500">{{ photos.length }}</span>
+            </div>
+          </header>
+
+          <div
+            class="flex-1 overflow-y-auto p-3 space-y-3"
+            :style="{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom))' }"
+          >
+            <!-- Boutons capture / pellicule -->
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                @click="takePhoto"
+                :disabled="uploading"
+                class="inline-flex items-center justify-center gap-2 px-4 py-4 text-white bg-emerald-600 rounded-xl font-medium disabled:opacity-50"
+              >
+                <CameraIcon class="w-5 h-5" /> {{ uploading ? '…' : 'Prendre une photo' }}
+              </button>
+              <button
+                @click="pickFile"
+                :disabled="uploading"
+                class="inline-flex items-center justify-center gap-2 px-4 py-4 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl font-medium disabled:opacity-50"
+              >
+                Pellicule
+              </button>
+            </div>
+
+            <!-- Grille photos -->
+            <div v-if="loading" class="text-center text-sm text-gray-500 py-12">Chargement…</div>
+            <div v-else-if="!photos.length" class="text-center py-12">
+              <CameraIcon class="w-12 h-12 text-gray-300 mx-auto" />
+              <p class="text-sm text-gray-500 mt-3">Aucune photo</p>
+              <p class="text-xs text-gray-400 mt-1">Tape un bouton ci-dessus pour ajouter</p>
+            </div>
+            <div v-else class="grid grid-cols-2 gap-2">
+              <div v-for="p in photos" :key="p.id" class="relative">
+                <button type="button" @click="previewPhoto = p" class="block w-full">
+                  <img :src="thumbUrl(p)" :alt="p.title || 'Photo'"
+                       loading="lazy" decoding="async"
+                       class="w-full aspect-square object-cover rounded-xl border border-gray-200" />
+                </button>
+                <button
+                  @click="removePhoto(p)"
+                  class="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow"
+                  title="Supprimer"
+                >
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+                <p v-if="p.title" class="text-[11px] text-gray-600 truncate mt-1 px-1">{{ p.title }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
 
     <!-- Modal captions apres upload -->
     <div
@@ -397,3 +463,14 @@ const btnCls = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 220ms ease-out;
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+</style>

@@ -42,3 +42,12 @@ window.addEventListener('vite:preloadError', (ev) => handleChunkLoadError(ev?.pa
 router.onError((err) => handleChunkLoadError(err))
 
 createApp(App).use(createPinia()).use(router).mount('#app')
+
+// Service worker (PWA standalone iOS / Android).
+// On ne register qu'en prod : en dev avec Vite HMR, le SW intercepte les
+// modules et casse le hot reload.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* silencieux */ })
+  })
+}
