@@ -85,7 +85,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('site-documents:changed', onDocsChanged)
   document.removeEventListener('mousedown', onDocClick)
 })
-watch(() => filterParams.value, refresh, { deep: true })
+// On watch la sérialisation des params plutôt que l'objet pour éviter
+// les refetches en boucle quand le parent recrée l'objet attachTo à
+// chaque render (cas typique : `:attach-to="{ system_id: s.id }"` dans
+// un v-for, qui produit un nouveau littéral à chaque cycle réactif —
+// mais avec les mêmes valeurs). Avant : 50+ GET en cascade par clic.
+watch(() => JSON.stringify(filterParams.value), refresh)
 
 function pickFile() {
   fileInput.value?.click()

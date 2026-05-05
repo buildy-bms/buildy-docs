@@ -66,11 +66,14 @@ async function main() {
   });
 
   await fastify.register(require('@fastify/rate-limit'), {
-    max: 300,
+    max: 600,
     timeWindow: '1 minute',
     // On exclut les assets statiques (chunks JS/CSS, logo, fonts, /assets/*)
     // pour eviter de declencher 429 sur le chargement initial de la SPA qui
-    // demande facilement >100 fichiers en une rafale.
+    // demande facilement >100 fichiers en une rafale. La limite est
+    // dimensionnee pour un audit BACS riche (10 zones x 6 categories x
+    // ~3 GET par categorie photos + actions/items resync = ~200 reqs en
+    // chargement initial, plus marge pour edits successifs rapides).
     allowList: (req) => {
       if (req.ip === '127.0.0.1' || req.ip === '::1') return true;
       const url = req.url || '';
