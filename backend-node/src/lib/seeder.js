@@ -477,9 +477,10 @@ function seedSystemCategoriesOnBoot() {
   const { SYSTEM_CATEGORIES } = require('./system-categories');
   // Icones par defaut suggerees par categorie (FA Solid Pro)
   const ICONS = {
-    chauffage:     { icon: 'fa-fire',          color: '#dc2626' },
-    climatisation: { icon: 'fa-snowflake',     color: '#0ea5e9' },
-    ventilation:   { icon: 'fa-fan',           color: '#3b82f6' },
+    chauffage:       { icon: 'fa-fire',             color: '#dc2626' },
+    climatisation:   { icon: 'fa-snowflake',        color: '#0ea5e9' },
+    thermique_mixte: { icon: 'fa-temperature-half', color: '#a855f7' },
+    ventilation:     { icon: 'fa-fan',              color: '#3b82f6' },
     ecs:           { icon: 'fa-faucet-drip',   color: '#0284c7' },
     pv:            { icon: 'fa-solar-panel',   color: '#facc15' },
     eclairage_int: { icon: 'fa-lightbulb',     color: '#eab308' },

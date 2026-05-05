@@ -7,9 +7,10 @@
  * - slugs : equipment_template.slug qui appartiennent à cette catégorie
  */
 const SYSTEM_CATEGORIES = [
-  { key: 'chauffage',     label: 'Chauffage',         bacs: 'R175-1 §1', slugs: ['chaudiere', 'aerotherme', 'destratificateur', 'drv', 'rooftop', 'cta'] },
-  { key: 'climatisation', label: 'Climatisation',     bacs: 'R175-1 §2', slugs: ['drv', 'rooftop', 'cta'] },
-  { key: 'ventilation',   label: 'Ventilation',       bacs: 'R175-1 §3', slugs: ['cta', 'ventilation-generique', 'rooftop'] },
+  { key: 'chauffage',       label: 'Chauffage',                 bacs: 'R175-1 §1',     slugs: ['chaudiere', 'aerotherme', 'destratificateur'] },
+  { key: 'climatisation',   label: 'Climatisation',             bacs: 'R175-1 §2',     slugs: [] }, // pure clim — peuplé quand on ajoutera des templates groupe-froid / chiller
+  { key: 'thermique_mixte', label: 'Chauffage + Climatisation', bacs: 'R175-1 §1, §2', slugs: ['drv', 'rooftop', 'cta'] },
+  { key: 'ventilation',     label: 'Ventilation',               bacs: 'R175-1 §3',     slugs: ['cta', 'ventilation-generique', 'rooftop'] },
   { key: 'ecs',           label: 'ECS',               bacs: 'R175-1 §4', slugs: ['ecs'] },
   { key: 'pv',            label: 'Production PV',     bacs: 'R175-1 §4', slugs: ['production-electricite'] },
   { key: 'eclairage_int', label: 'Éclairage int.',    bacs: 'R175-1 §4', slugs: ['eclairage-interieur'] },

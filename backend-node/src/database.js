@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 81;
+const TARGET_VERSION = 82;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3123,6 +3123,75 @@ function runMigrations() {
     }
     db.pragma('user_version = 81');
     log.info(`Migration 81 : ${deleted} sections orphelines supprimees (cascade sur overrides/instances/attachments)`);
+  }
+
+  if (current < 82) {
+    // Lot — Catégorie 'thermique_mixte' (Chauffage + Climatisation) pour les
+    // systèmes réversibles (DRV, rooftop, CTA…). Évite à l'utilisateur de
+    // cocher manuellement les 2 cases distinctes pour ces équipements.
+    //
+    // (a) Met à jour le catalogue system_categories_db :
+    //     - insère la nouvelle ligne thermique_mixte si absente
+    //     - retire ['drv','rooftop','cta'] des slugs de chauffage et de
+    //       climatisation pour qu'ils soient candidats UNIQUEMENT via
+    //       thermique_mixte (idempotent : on ne touche pas aux autres slugs).
+    // (b) Pour chaque instance qui a actuellement chauffage ET climatisation
+    //     cochées simultanément, on remplace par une seule ligne thermique_mixte
+    //     (DELETE des 2 + INSERT). Les instances qui n'ont qu'une seule des 2
+    //     restent inchangées.
+    const cat = (key) => db.prepare('SELECT id, slugs FROM system_categories_db WHERE key = ?').get(key);
+    const stripSlugs = (key, toRemove) => {
+      const row = cat(key);
+      if (!row) return;
+      const slugs = row.slugs ? JSON.parse(row.slugs) : [];
+      const next = slugs.filter(s => !toRemove.includes(s));
+      db.prepare('UPDATE system_categories_db SET slugs = ? WHERE id = ?')
+        .run(JSON.stringify(next), row.id);
+    };
+
+    if (!cat('thermique_mixte')) {
+      // Position : juste après climatisation pour que la matrice PDF affiche
+      // les 3 colonnes thermiques côte-à-côte.
+      const climPos = db.prepare("SELECT position FROM system_categories_db WHERE key = 'climatisation'").get();
+      const newPos = (climPos?.position ?? 10) + 5;
+      db.prepare(`
+        INSERT INTO system_categories_db (key, label, bacs, slugs, icon_value, icon_color, position)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'thermique_mixte',
+        'Chauffage + Climatisation',
+        'R175-1 §1, §2',
+        JSON.stringify(['drv', 'rooftop', 'cta']),
+        'fa-temperature-half',
+        '#a855f7',
+        newPos,
+      );
+    }
+    stripSlugs('chauffage', ['drv', 'rooftop', 'cta']);
+    stripSlugs('climatisation', ['drv', 'rooftop', 'cta']);
+
+    // (b) Migration des instances : chauffage + climatisation → thermique_mixte
+    const mixed = db.prepare(`
+      SELECT instance_id FROM equipment_instance_categories WHERE category_key = 'chauffage'
+      INTERSECT
+      SELECT instance_id FROM equipment_instance_categories WHERE category_key = 'climatisation'
+    `).all();
+    let migrated = 0;
+    const delPair = db.prepare(`
+      DELETE FROM equipment_instance_categories
+      WHERE instance_id = ? AND category_key IN ('chauffage','climatisation')
+    `);
+    const insMixed = db.prepare(`
+      INSERT OR IGNORE INTO equipment_instance_categories (instance_id, category_key)
+      VALUES (?, 'thermique_mixte')
+    `);
+    for (const row of mixed) {
+      delPair.run(row.instance_id);
+      insMixed.run(row.instance_id);
+      migrated++;
+    }
+    db.pragma('user_version = 82');
+    log.info(`Migration 82 : ${migrated} instance(s) repassee(s) de chauffage+climatisation -> thermique_mixte (catalogue mis a jour)`);
   }
 
   if (current > TARGET_VERSION) {

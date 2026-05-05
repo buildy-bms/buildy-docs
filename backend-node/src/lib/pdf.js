@@ -54,13 +54,14 @@ function lookupFaIcon(name) {
 // Mapping categorie BACS -> icone + couleur (aligne avec
 // frontend/components/SystemCategoryIcon.vue).
 const CATEGORY_ICON = {
-  heating:                { name: 'fire',         color: '#dc2626' },
-  cooling:                { name: 'snowflake',    color: '#0891b2' },
-  ventilation:            { name: 'fan',          color: '#64748b' },
-  dhw:                    { name: 'faucet',       color: '#0284c7' },
-  lighting_indoor:        { name: 'lightbulb',    color: '#f59e0b' },
-  lighting_outdoor:       { name: 'tower-cell',   color: '#f59e0b' },
-  electricity_production: { name: 'solar-panel',  color: '#16a34a' },
+  heating:                { name: 'fire',             color: '#dc2626' },
+  cooling:                { name: 'snowflake',        color: '#0891b2' },
+  thermique_mixte:        { name: 'temperature-half', color: '#a855f7' },
+  ventilation:            { name: 'fan',              color: '#64748b' },
+  dhw:                    { name: 'faucet',           color: '#0284c7' },
+  lighting_indoor:        { name: 'lightbulb',        color: '#f59e0b' },
+  lighting_outdoor:       { name: 'tower-cell',       color: '#f59e0b' },
+  electricity_production: { name: 'solar-panel',      color: '#16a34a' },
 };
 Handlebars.registerHelper('faIcon', (name, color, size) => {
   const def = lookupFaIcon(name);
