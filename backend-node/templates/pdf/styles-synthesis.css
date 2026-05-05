@@ -294,21 +294,22 @@ table.zones-matrix th.zones-name {
   text-align: left; padding-left: 3mm; width: 38mm;
   vertical-align: middle;
 }
-/* Headers de catégorie rotés 60° pour tenir 14 colonnes en A4 paysage
-   sans aucun retour à la ligne. Hauteur fixe pour aligner toutes les
-   labels au même niveau de base. */
+/* Headers de catégorie verticaux (90°) — lisibles bottom-to-top, le
+   format permet d'aligner 14 colonnes en A4 paysage sans aucun retour
+   ligne. Hauteur fixe pour que toutes les labels alignent leur base. */
 table.zones-matrix th.zones-cat {
-  height: 28mm;
-  padding: 1mm 0.5mm 1.5mm;
+  height: 32mm;
+  padding: 1.5mm 0.5mm 1.5mm;
   vertical-align: bottom;
   white-space: nowrap;
+  text-align: center;
 }
 table.zones-matrix th.zones-cat .zones-cat-rotated {
   display: inline-flex;
   align-items: center;
   gap: 1mm;
-  transform: rotate(-60deg);
-  transform-origin: 50% 100%;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   white-space: nowrap;
 }
 table.zones-matrix th.zones-cat .zones-cat-label { white-space: nowrap; }
