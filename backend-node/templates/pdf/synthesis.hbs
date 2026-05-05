@@ -94,8 +94,10 @@
         <th class="zones-name">Zone</th>
         {{#each systemCategories}}
           <th class="zones-cat">
-            {{label}}
-            {{#if bacs}}<span class="bacs-col-marker" title="{{bacs}}">⚖️ BACS</span>{{/if}}
+            <span class="zones-cat-rotated">
+              <span class="zones-cat-label">{{label}}</span>
+              {{#if bacs}}<span class="bacs-col-marker" title="{{bacs}}">⚖️</span>{{/if}}
+            </span>
           </th>
         {{/each}}
         <th class="zones-total">Total</th>

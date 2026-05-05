@@ -97,21 +97,26 @@ defineExpose({ refresh })
         <span class="text-xs text-gray-500 italic">Aucun contrat fixé — à choisir au bon de commande.</span>
       </template>
 
-      <span v-if="data.justifications.length" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold ml-2 shrink-0">Justifié par</span>
-      <button
-        v-for="j in data.justifications.slice(0, 6)"
-        :key="(j.number || '?') + j.title"
-        type="button"
-        @click="emit('goto-section', { number: j.number, id: j.section_id })"
-        class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
-        title="Aller à cette section"
-      >
-        <span class="text-gray-700 font-medium">{{ j.title }}</span>
-        <ServiceLevelBadge v-if="minServiceLevel(j.level)" :level="minServiceLevel(j.level)" />
-      </button>
-      <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic">
-        +{{ data.justifications.length - 6 }} autres
-      </span>
+      <!-- Pas de justifications quand le niveau requis est Essentiel : la
+           licence E est vendue par défaut, lister ce qui l'exige n'apporte
+           aucune valeur (c'est tout). On garde l'affichage pour S et P. -->
+      <template v-if="data.required !== 'E'">
+        <span v-if="data.justifications.length" class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold ml-2 shrink-0">Justifié par</span>
+        <button
+          v-for="j in data.justifications.slice(0, 6)"
+          :key="(j.number || '?') + j.title"
+          type="button"
+          @click="emit('goto-section', { number: j.number, id: j.section_id })"
+          class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
+          title="Aller à cette section"
+        >
+          <span class="text-gray-700 font-medium">{{ j.title }}</span>
+          <ServiceLevelBadge v-if="minServiceLevel(j.level)" :level="minServiceLevel(j.level)" />
+        </button>
+        <span v-if="data.justifications.length > 6" class="text-[11px] text-gray-400 italic">
+          +{{ data.justifications.length - 6 }} autres
+        </span>
+      </template>
 
       <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1 ml-auto" title="Recalculer">
         <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />

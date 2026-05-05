@@ -4,7 +4,7 @@ import {
   CheckBadgeIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
   RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
-  EyeIcon,
+  EllipsisHorizontalIcon, Cog6ToothIcon, RectangleStackIcon, EyeIcon,
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
@@ -55,9 +55,16 @@ const showInstances = ref(false)
 // = export PDF, chevron a droite ouvre les actions secondaires comme XLSX).
 const showPointsMenu = ref(false)
 const pointsMenuRef = ref(null)
+// Menu « Plus » regroupant Partager / Activité / Versions / Paramètres pour
+// alléger la barre principale (sinon trop de boutons côte à côte).
+const showMoreMenu = ref(false)
+const moreMenuRef = ref(null)
 function onWindowMouseDown(e) {
   if (showPointsMenu.value && pointsMenuRef.value && !pointsMenuRef.value.contains(e.target)) {
     showPointsMenu.value = false
+  }
+  if (showMoreMenu.value && moreMenuRef.value && !moreMenuRef.value.contains(e.target)) {
+    showMoreMenu.value = false
   }
 }
 onMounted(() => window.addEventListener('mousedown', onWindowMouseDown))
@@ -401,13 +408,6 @@ const exportDescription = computed(() => {
           class="cursor-text hover:bg-gray-100 rounded px-1 -mx-1"
           title="Cliquer pour renommer rapidement (Entrée valide, Esc annule)"
         >{{ af.project_name }}</span>
-        <button
-          @click="openEdit"
-          class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 bg-white border border-gray-300 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 rounded-md shrink-0 transition-colors"
-        >
-          <PencilSquareIcon class="w-3.5 h-3.5" />
-          <span class="whitespace-nowrap">Paramètres</span>
-        </button>
       </h2>
       <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
     </div>
@@ -465,48 +465,63 @@ const exportDescription = computed(() => {
     </button>
     <button
       @click="showInstances = true"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
       title="Vue tableau de toutes les instances d'équipements de l'AF"
     >
-      <ListBulletIcon class="w-4 h-4" />
+      <ListBulletIcon class="w-4 h-4 shrink-0" />
       Instances
     </button>
-    <button
-      @click="showShare = true"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
-      title="Partager cette AF avec d'autres utilisateurs"
-    >
-      <UserGroupIcon class="w-4 h-4" />
-      Partager
-    </button>
-    <button
-      @click="emit('toggle-activity')"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
-      title="Panneau d'activité"
-    >
-      <ClockIcon class="w-4 h-4" />
-      Activité
-    </button>
-    <button
-      @click="emit('toggle-presentation')"
-      :class="[
-        'inline-flex items-center gap-1.5 px-3 py-1.5 border text-xs font-medium rounded-lg',
-        presentationMode?.value
-          ? 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'
-          : 'border-gray-200 text-gray-700 hover:bg-gray-50',
-      ]"
-      title="Mode présentation : masque les boutons d'édition (utile en réunion)"
-    >
-      👁️ {{ presentationMode?.value ? 'Quitter présentation' : 'Présentation' }}
-    </button>
-    <button
-      @click="router.push(`/afs/${af.id}/versions`)"
-      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50"
-      title="Historique des versions Git"
-    >
-      <ClockIcon class="w-4 h-4" />
-      Versions
-    </button>
+    <!-- Plus d'actions (Partager, Activité, Versions) regroupées dans
+         un menu pour limiter le nombre de boutons visibles dans la barre. -->
+    <div ref="moreMenuRef" class="relative inline-flex">
+      <button
+        type="button"
+        @click="showMoreMenu = !showMoreMenu"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
+        title="Plus d'actions"
+      >
+        <EllipsisHorizontalIcon class="w-4 h-4 shrink-0" />
+        Plus
+      </button>
+      <div
+        v-if="showMoreMenu"
+        class="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-48 py-1 whitespace-nowrap"
+      >
+        <button
+          type="button"
+          @click="showShare = true; showMoreMenu = false"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <UserGroupIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Partager
+        </button>
+        <button
+          type="button"
+          @click="emit('toggle-activity'); showMoreMenu = false"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <ClockIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Activité
+        </button>
+        <button
+          type="button"
+          @click="router.push(`/afs/${af.id}/versions`); showMoreMenu = false"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <RectangleStackIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Versions
+        </button>
+        <div class="border-t border-gray-100 my-1"></div>
+        <button
+          type="button"
+          @click="openEdit(); showMoreMenu = false"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <Cog6ToothIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Paramètres de l'AF
+        </button>
+      </div>
+    </div>
     <!-- Bouton "Faire avancer la phase" (Lot 15) -->
     <div v-if="nextPhase" class="relative">
       <button

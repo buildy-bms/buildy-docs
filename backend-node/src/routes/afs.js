@@ -177,7 +177,37 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
-    return db.equipmentInstances.listByAf(id);
+    // Numerotation live (memes regles que arbo edition + PDF AF) : on recalcule
+    // depuis la position courante. Le `s.number` figé en DB ne reflete plus
+    // la position apres reordonnancement.
+    const allSections = db.sections.listByAf(id);
+    const liveNum = (() => {
+      const map = new Map();
+      const byParent = new Map();
+      for (const s of allSections) {
+        if (s.included_in_export === 0) continue;
+        const k = s.parent_id || 'root';
+        if (!byParent.has(k)) byParent.set(k, []);
+        byParent.get(k).push(s);
+      }
+      for (const arr of byParent.values()) {
+        arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      }
+      function walk(parentKey, prefix) {
+        const arr = byParent.get(parentKey) || [];
+        arr.forEach((s, idx) => {
+          const num = prefix ? `${prefix}.${idx + 1}` : String(idx + 1);
+          map.set(s.id, num);
+          walk(s.id, num);
+        });
+      }
+      walk('root', '');
+      return map;
+    })();
+    return db.equipmentInstances.listByAf(id).map(i => ({
+      ...i,
+      section_number: liveNum.get(i.section_id) || i.section_number || '',
+    }));
   });
 
   // POST /api/afs — creation

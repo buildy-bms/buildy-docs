@@ -171,7 +171,14 @@ export const useAfStore = defineStore('af', () => {
 
   function patchSelectedAfUpdate(updated) {
     if (!af.value) return
+    const before = af.value.service_level
     af.value = { ...af.value, ...updated }
+    // Si le niveau contractuel change, on force le recalcul du panel
+    // « Niveau requis » (verdict OK / Dépasse / Aucun contrat) — sinon
+    // l'utilisateur doit refresh la page après un changement de contrat.
+    if (updated.service_level !== undefined && updated.service_level !== before) {
+      requiredLevelKey.value++
+    }
   }
 
   // Patch local + serveur d'une section. Optimiste : si l'API echoue,

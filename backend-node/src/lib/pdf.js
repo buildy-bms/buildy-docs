@@ -35,10 +35,14 @@ const FA_ALIAS = {
 function kebabToFaKey(name) {
   if (!name) return null;
   if (FA_ALIAS[name]) return FA_ALIAS[name];
-  // Deja en CamelCase prefixe (ex: faBuilding) -> tel quel
-  if (name.startsWith('fa') && name[2] === name[2]?.toUpperCase()) return name;
+  // Deja en CamelCase prefixe (ex: faBuilding) -> tel quel.
+  // /^fa[A-Z]/ et non `name[2] === toUpperCase` qui passait sur "fa-fire"
+  // (le '-' est sa propre majuscule -> bug : icone non resolue).
+  if (/^fa[A-Z]/.test(name)) return name;
+  // Strip prefixe "fa-" si present (icon_value DB = 'fa-fire' / 'fa-snowflake'…)
+  const base = name.startsWith('fa-') ? name.slice(3) : name;
   // kebab-case -> faCamelCase
-  return 'fa' + name.split('-').map(p => p ? p[0].toUpperCase() + p.slice(1) : '').join('');
+  return 'fa' + base.split('-').map(p => p ? p[0].toUpperCase() + p.slice(1) : '').join('');
 }
 function lookupFaIcon(name) {
   const key = kebabToFaKey(name);
