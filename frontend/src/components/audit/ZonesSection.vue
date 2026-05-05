@@ -1,6 +1,8 @@
 <script setup>
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
-import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import Sortable from 'sortablejs'
+import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
@@ -10,7 +12,7 @@ import SearchableSelect from '@/components/SearchableSelect.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateZone, deleteZone, listZones, resyncBacsAudit } from '@/api'
+import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones } from '@/api'
 
 // Section 2 — Zones fonctionnelles (R175-1 6°). Editable in-situ.
 const props = defineProps({
@@ -64,6 +66,50 @@ function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
+
+// Drag & drop des zones (desktop uniquement). Sortable sur le <tbody>,
+// la ligne « + Ajouter une zone » est filtrée. L'API persiste via
+// `reorderBacsZones(docId, ids)` puis on refresh les zones du store.
+const zonesBodyRef = ref(null)
+let zonesSortable = null
+function teardownZonesSortable() {
+  if (zonesSortable) { try { zonesSortable.destroy() } catch { /* ignore */ } zonesSortable = null }
+}
+function setupZonesSortable() {
+  teardownZonesSortable()
+  const el = zonesBodyRef.value
+  if (!el) return
+  zonesSortable = Sortable.create(el, {
+    draggable: 'tr.zone-row',
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(el.querySelectorAll('tr.zone-row'))
+        .map(tr => parseInt(tr.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      try {
+        await reorderBacsZones(audit.docId, ids)
+        if (document.value?.site_id) {
+          const r = await listZones(document.value.site_id)
+          zones.value = r.data
+        }
+      } catch {
+        error('Réorganisation impossible')
+        if (document.value?.site_id) {
+          const r = await listZones(document.value.site_id)
+          zones.value = r.data
+        }
+      }
+    },
+  })
+}
+watch(zones, async () => {
+  await nextTick()
+  setupZonesSortable()
+}, { immediate: true, flush: 'post' })
+onBeforeUnmount(teardownZonesSortable)
 </script>
 
 <template>
@@ -94,6 +140,7 @@ function hasNotes(html) {
       <table class="w-full text-sm">
         <thead class="text-xs text-gray-500 font-medium bg-gray-50">
           <tr>
+            <th class="w-8"></th>
             <th class="text-center px-5 py-2">Nom</th>
             <th class="text-center py-2 w-48">Nature</th>
             <th class="text-center py-2 w-24">Surface (m²)</th>
@@ -102,12 +149,21 @@ function hasNotes(html) {
             <th class="text-center px-5 py-2 w-12"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          <PhotoDropTr v-for="z in zones" :key="z.zone_id" row-class="group"
+        <tbody ref="zonesBodyRef" class="divide-y divide-gray-100">
+          <PhotoDropTr v-for="z in zones" :key="z.zone_id"
+                       :row-class="'group zone-row'"
+                       :data-id="z.zone_id"
                        :site-uuid="document?.site_uuid || ''"
                        :attach-to="{ zone_id: z.zone_id }"
                        :enabled="!!document?.site_uuid"
                        @changed="refreshAuditData">
+            <td class="text-center align-middle">
+              <button type="button"
+                      class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                      title="Glisser pour réordonner">
+                <Bars3Icon class="w-4 h-4" />
+              </button>
+            </td>
             <td class="px-5 py-2">
               <input type="text" :value="z.name"
                      @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
@@ -156,7 +212,7 @@ function hasNotes(html) {
             </td>
           </PhotoDropTr>
           <tr class="bg-emerald-50/30">
-            <td colspan="6" class="px-5 py-3 text-center">
+            <td colspan="7" class="px-5 py-3 text-center">
               <button @click="emit('add-zone')" class="btn-success">
                 <PlusIcon class="w-4 h-4" /> Ajouter une zone
               </button>

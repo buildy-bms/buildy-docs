@@ -173,8 +173,18 @@ function toggleProtocol(p) {
       </div>
     </div>
 
-    <!-- Liste + bouton Ajouter inline -->
-    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+    <!-- Bouton Ajouter prominent en haut -->
+    <button
+      type="button"
+      @click="openCreate"
+      class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
+    >
+      <PlusIcon class="w-5 h-5" />
+      Ajouter un compteur
+    </button>
+
+    <!-- Liste -->
+    <div v-if="meters.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
       <button
         v-for="m in meters"
         :key="m.id"
@@ -200,16 +210,8 @@ function toggleProtocol(p) {
         </div>
         <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
-      <button
-        type="button"
-        @click="openCreate"
-        class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-emerald-700 active:bg-emerald-50"
-      >
-        <PlusIcon class="w-5 h-5" />
-        Ajouter un compteur
-      </button>
     </div>
-    <div v-if="!meters.length" class="text-center py-6">
+    <div v-else class="text-center py-6">
       <BoltIcon class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-2">Aucun compteur listé pour l'instant</p>
     </div>

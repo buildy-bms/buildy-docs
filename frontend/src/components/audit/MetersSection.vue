@@ -1,6 +1,8 @@
 <script setup>
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
-import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import Sortable from 'sortablejs'
+import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -13,7 +15,7 @@ import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsMeter, deleteBacsMeter, duplicateBacsMeter } from '@/api'
+import { updateBacsMeter, deleteBacsMeter, duplicateBacsMeter, reorderBacsMeters } from '@/api'
 
 // Section 4 — Compteurs et mesurage (R175-3 1°).
 const props = defineProps({
@@ -65,6 +67,42 @@ function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
+
+// Drag & drop des compteurs (desktop). API : reorderBacsMeters(docId, ids).
+const metersBodyRef = ref(null)
+let metersSortable = null
+function teardownMetersSortable() {
+  if (metersSortable) { try { metersSortable.destroy() } catch { /* ignore */ } metersSortable = null }
+}
+function setupMetersSortable() {
+  teardownMetersSortable()
+  const el = metersBodyRef.value
+  if (!el) return
+  metersSortable = Sortable.create(el, {
+    draggable: 'tr.meter-row',
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(el.querySelectorAll('tr.meter-row'))
+        .map(tr => parseInt(tr.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      try {
+        await reorderBacsMeters(audit.docId, ids)
+        await audit.refreshAuditCore()
+      } catch {
+        error('Réorganisation impossible')
+        await audit.refreshAuditCore()
+      }
+    },
+  })
+}
+watch(meters, async () => {
+  await nextTick()
+  setupMetersSortable()
+}, { immediate: true, flush: 'post' })
+onBeforeUnmount(teardownMetersSortable)
 </script>
 
 <template>
@@ -92,6 +130,7 @@ function hasNotes(html) {
     <table class="hidden md:table w-full text-sm">
       <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
+          <th class="w-8"></th>
           <th class="text-center px-5 py-2.5 w-44">Zone</th>
           <th class="text-center py-2.5 w-40">Énergie</th>
           <th class="text-center py-2.5 w-32">Usage</th>
@@ -103,16 +142,24 @@ function hasNotes(html) {
           <th class="text-center px-5 py-2.5 w-12"></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100">
+      <tbody ref="metersBodyRef" class="divide-y divide-gray-100">
         <PhotoDropTr v-for="m in meters" :key="m.id"
-                     :row-class="['group',
+                     :row-class="['group meter-row',
                        m.out_of_service ? 'opacity-50' : '',
                        m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40 border-l-2 border-l-red-300' : ''
                      ].join(' ')"
+                     :data-id="m.id"
                      :site-uuid="document?.site_uuid || ''"
                      :attach-to="{ meter_id: m.id }"
                      :enabled="!!document?.site_uuid"
                      @changed="refreshAuditData">
+          <td class="text-center align-middle">
+            <button type="button"
+                    class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                    title="Glisser pour réordonner">
+              <Bars3Icon class="w-4 h-4" />
+            </button>
+          </td>
           <td class="px-5 py-2 text-gray-700 text-center">
             <span v-if="m.required && !m.present_actual && !m.out_of_service"
                   class="text-red-600 mr-1" title="Compteur requis non présent">⚠</span>
@@ -194,7 +241,7 @@ function hasNotes(html) {
           </td>
         </PhotoDropTr>
         <tr class="bg-emerald-50/30">
-          <td colspan="9" class="px-5 py-3 text-center">
+          <td colspan="10" class="px-5 py-3 text-center">
             <button @click="emit('add-meter')" class="btn-success">
               <PlusIcon class="w-4 h-4" /> Ajouter un compteur
             </button>

@@ -225,7 +225,7 @@ const btnCls = computed(() => {
 </script>
 
 <template>
-  <div class="relative inline-block" ref="rootEl">
+  <div :class="['relative', isMobile ? 'block w-full' : 'inline-block']" ref="rootEl">
     <button
       type="button"
       :class="btnCls"

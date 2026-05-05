@@ -1,6 +1,8 @@
 <script setup>
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import Sortable from 'sortablejs'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -9,7 +11,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsSystem } from '@/api'
+import { updateBacsSystem, reorderBacsSystems } from '@/api'
 
 // Couleur d'accent par categorie de systeme : aligne avec
 // SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
@@ -61,6 +63,56 @@ function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
+
+// Drag & drop des cartes système, INTRA-zone uniquement (le système ne
+// change pas de zone — la zone_id est une FK invariante ici). À chaque
+// onEnd, on relit l'ordre du DOM sur l'ENSEMBLE des zones et on POST.
+const zoneListRefs = ref({})
+const sortables = []
+function setZoneListRef(zoneId, el) {
+  if (el) zoneListRefs.value[zoneId] = el
+  else delete zoneListRefs.value[zoneId]
+}
+function teardownSortables() {
+  while (sortables.length) { try { sortables.pop().destroy() } catch { /* ignore */ } }
+}
+function setupSortables() {
+  teardownSortables()
+  for (const [, el] of Object.entries(zoneListRefs.value)) {
+    if (!el) continue
+    const s = Sortable.create(el, {
+      draggable: '.system-card',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: async (evt) => {
+        if (evt.oldIndex === evt.newIndex) return
+        // Récupère l'ordre global (toutes zones, dans l'ordre du DOM).
+        const allIds = []
+        for (const zoneEl of Object.values(zoneListRefs.value)) {
+          if (!zoneEl) continue
+          for (const card of zoneEl.querySelectorAll('.system-card')) {
+            const id = parseInt(card.getAttribute('data-id'), 10)
+            if (id) allIds.push(id)
+          }
+        }
+        try {
+          await reorderBacsSystems(audit.docId, allIds)
+          await audit.refreshAuditCore()
+        } catch {
+          error('Réorganisation impossible')
+          await audit.refreshAuditCore()
+        }
+      },
+    })
+    sortables.push(s)
+  }
+}
+watch(() => props.systemsByZone, async () => {
+  await nextTick()
+  setupSortables()
+}, { immediate: true, flush: 'post', deep: true })
+onBeforeUnmount(teardownSortables)
 </script>
 
 <template>

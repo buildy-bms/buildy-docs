@@ -1,5 +1,7 @@
 <script setup>
-import { FireIcon, PencilSquareIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import Sortable from 'sortablejs'
+import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -7,11 +9,13 @@ import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsThermal } from '@/api'
+import { updateBacsThermal, reorderBacsThermal } from '@/api'
 
 // Section 5 — Régulation thermique automatique (R175-6).
 // 1 ligne par couple (zone, catégorie heating/cooling) avec un détail
 // déplié (sonde / thermostat / robinets) si la régulation est active.
+// Chaque couple a son propre <tbody> pour permettre un drag & drop
+// (ligne principale + ligne détail réordonnées ensemble).
 const props = defineProps({
   thermalFiltered: { type: Array, required: true },
   regulationOptions: { type: Array, required: true },
@@ -37,6 +41,45 @@ async function patchThermal(t, patch) {
     await audit.refreshActionItems()
   } catch { error('Sauvegarde impossible') }
 }
+
+// Drag & drop des lignes thermiques. Sortable sur la <table> avec
+// draggable="tbody" — chaque tbody contient la ligne principale + sa
+// ligne de détail repliable, donc les deux suivent le drag ensemble.
+const tableRef = ref(null)
+let sortable = null
+function teardownSortable() {
+  if (sortable) { try { sortable.destroy() } catch { /* ignore */ } sortable = null }
+}
+function setupSortable() {
+  teardownSortable()
+  const el = tableRef.value
+  if (!el) return
+  sortable = Sortable.create(el, {
+    draggable: 'tbody.thermal-row',
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(el.querySelectorAll('tbody.thermal-row'))
+        .map(tb => parseInt(tb.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      try {
+        await reorderBacsThermal(audit.docId, ids)
+        await audit.refreshAuditCore()
+      } catch {
+        error('Réorganisation impossible')
+        await audit.refreshAuditCore()
+      }
+    },
+  })
+}
+watch(() => props.thermalFiltered, async () => {
+  await nextTick()
+  setupSortable()
+}, { immediate: true, flush: 'post' })
+onBeforeUnmount(teardownSortable)
 </script>
 
 <template>
@@ -79,9 +122,10 @@ async function patchThermal(t, patch) {
     </div>
 
     <div class="overflow-x-auto">
-    <table class="w-full text-sm min-w-225">
+    <table ref="tableRef" class="w-full text-sm min-w-225">
       <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
+          <th class="w-8"></th>
           <th class="text-center px-5 py-2">Zone</th>
           <th class="text-center py-2 w-32">
             <Tooltip text="Chauffage ou refroidissement — chaque ligne = 1 usage thermique sur 1 zone. Une zone peut donc apparaître 2 fois (1 ligne chaud + 1 ligne froid)."><span>Usage</span></Tooltip>
@@ -107,9 +151,17 @@ async function patchThermal(t, patch) {
           <th class="text-center px-5 py-2">Notes</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100">
-        <template v-for="t in thermalFiltered" :key="t.id">
-        <tr>
+      <tbody v-for="t in thermalFiltered" :key="t.id"
+             :data-id="t.id"
+             class="thermal-row divide-y divide-gray-100 border-b border-gray-100">
+        <tr class="hover:bg-gray-50/40">
+          <td class="text-center align-middle">
+            <button type="button"
+                    class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                    title="Glisser pour réordonner">
+              <Bars3Icon class="w-4 h-4" />
+            </button>
+          </td>
           <td class="px-5 py-2 text-gray-700 text-center">{{ t.zone_name }}</td>
           <td class="py-2 text-center">
             <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
@@ -184,7 +236,7 @@ async function patchThermal(t, patch) {
              en flex compact avec labels inline (vs grid 3 cols qui faisait
              des champs trop larges et illisibles). -->
         <tr v-if="t.has_automatic_regulation" class="bg-amber-50/30 text-xs">
-          <td colspan="9" class="px-5 py-2.5">
+          <td colspan="10" class="px-5 py-2.5">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span class="text-[11px] text-gray-400 italic shrink-0">
                 ↳ détail R175-6 · {{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
@@ -231,7 +283,6 @@ async function patchThermal(t, patch) {
             </div>
           </td>
         </tr>
-        </template>
       </tbody>
     </table>
     </div>

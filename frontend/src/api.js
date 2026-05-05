@@ -346,6 +346,12 @@ export const reorderBacsDevices = (systemId, ids) =>
   api.post(`/bacs-audit/systems/${systemId}/devices/reorder`, { ids })
 export const reorderBacsZones = (docId, ids) =>
   api.post(`/bacs-audit/${docId}/zones/reorder`, { ids })
+export const reorderBacsSystems = (docId, ids) =>
+  api.post(`/bacs-audit/${docId}/systems/reorder`, { ids })
+export const reorderBacsMeters = (docId, ids) =>
+  api.post(`/bacs-audit/${docId}/meters/reorder`, { ids })
+export const reorderBacsThermal = (docId, ids) =>
+  api.post(`/bacs-audit/${docId}/thermal-regulation/reorder`, { ids })
 export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
 export const validateBacsAuditStep = (docId, step, validated) =>
   api.post(`/bacs-audit/${docId}/validate-step`, { step, validated })
