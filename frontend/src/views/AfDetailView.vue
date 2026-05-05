@@ -516,13 +516,22 @@ watch(() => route.params.id, async (newId, oldId) => {
           </div>
         </div>
         <!-- Poignée de drag-resize (cachee en compact). Hors du conteneur
-             scrollable pour ne pas etre cachee par la scrollbar verticale. -->
+             scrollable pour ne pas etre cachee par la scrollbar verticale.
+             Indicateur visuel permanent (3 dots verticaux) pour signaler que
+             la zone est interactive ; au hover, le fond et les dots passent en
+             indigo pour confirmer. -->
         <div
           v-if="!isCompact"
           @mousedown.prevent="onTreeResize"
-          class="shrink-0 w-2 cursor-col-resize bg-transparent hover:bg-indigo-300 transition-colors"
-          title="Glisser pour redimensionner"
-        ></div>
+          class="group/resize shrink-0 w-3 cursor-col-resize flex items-center justify-center hover:bg-indigo-50 transition-colors"
+          title="Glisser pour redimensionner l'arborescence"
+        >
+          <div class="flex flex-col gap-1 opacity-70 group-hover/resize:opacity-100 transition-opacity">
+            <span class="block w-1 h-1 rounded-full bg-gray-400 group-hover/resize:bg-indigo-500 transition-colors"></span>
+            <span class="block w-1 h-1 rounded-full bg-gray-400 group-hover/resize:bg-indigo-500 transition-colors"></span>
+            <span class="block w-1 h-1 rounded-full bg-gray-400 group-hover/resize:bg-indigo-500 transition-colors"></span>
+          </div>
+        </div>
       </aside>
 
       <!-- Éditeur principal (scrollable). flex+gap garantit un espacement
