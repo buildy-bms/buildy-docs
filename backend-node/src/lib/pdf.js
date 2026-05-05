@@ -352,7 +352,7 @@ async function renderPdf(opts) {
   return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
 }
 
-async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false }) {
+async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
   const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -382,13 +382,13 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       // 4. Rend la TOC cliquable : ajoute id="X" sur les ancres et wrappe
       //    le contenu des items TOC dans <a href="#X"> (Puppeteer genere
       //    alors des liens internes cliquables dans le PDF).
-      // Note : margins @page CSS = 22mm/18mm. Hauteur utile A4 ≈ 257mm = 971px,
-      // A3 ≈ 380mm = 1436px. Le numero de premiere page de .sections est
-      // calcule dynamiquement en comptant les elements de frontmatter qui
-      // forcent un saut de page (cover + L'essentiel + TOC + dashboard...).
-      // On ne peut pas se baser sur scrollY car les `page-break-after` ne
-      // creent pas d'espace en viewport (juste un break dans le PDF final).
-      const pageInnerPx = pageFormat === 'A3' ? 1436 : 971;
+      // Hauteur utile = format - margins haut/bas. Defaut 22+18 (AF/BACS) ;
+      // la brochure utilise 14+14 par exemple. On calcule dynamiquement
+      // pour que populateToc reste juste quand les marges varient.
+      // 1mm = 3.7795px (96 DPI Puppeteer)
+      const pageHeightMm = pageFormat === 'A3' ? 420 : 297;
+      const innerHeightMm = pageHeightMm - pageMarginTopMm - pageMarginBottomMm;
+      const pageInnerPx = Math.round(innerHeightMm * 3.7795);
       await page.evaluate((innerPx) => {
         // Trouve le scroll-top du container des sections
         const sectionsContainer = document.querySelector('.sections');

@@ -1,10 +1,15 @@
 {{!-- Bloc complet « page Tableau des offres Buildy » — partial partage entre
      offering-catalog.hbs et brochure.hbs pour garantir un rendu strictement
-     identique (marges, header, tableau, sans aucune divergence visuelle).
+     identique (marges, header, tableau, legende, CTA, footer).
 
      Attendu dans le contexte parent :
        offeringsTable : { levels, rows, colspan }
        totalFeatures  : nombre total de fonctionnalites
+       ctaTitle, ctaSub, ctaContact : boilerplates CTA
+       exportDate : date d'edition (utilisee dans le footer custom)
+
+     Tout doit tenir sur une seule page A4 — les overrides .page-offerings
+     dans _offerings-table.css imposent une typo compacte du tableau.
 --}}
 <section class="page page-offerings" data-toc-anchor="offerings-table">
   <div class="category-header">
@@ -19,5 +24,11 @@
     <span class="legend-item"><span class="avail avail-included">✓</span> Inclus</span>
     <span class="legend-item"><span class="avail avail-unavailable">—</span> Non disponible</span>
     <span class="legend-item"><span class="avail-text">€&nbsp;Option</span> Option payante</span>
+  </div>
+
+  <div class="cta-block">
+    <p class="cta-line">{{{ctaTitle}}}</p>
+    <p class="cta-sub">{{{ctaSub}}}</p>
+    <p class="cta-contact">{{{ctaContact}}}</p>
   </div>
 </section>

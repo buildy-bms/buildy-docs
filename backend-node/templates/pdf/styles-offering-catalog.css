@@ -6,10 +6,10 @@
 
 @page {
   size: A4 portrait;
-  /* margins alignes sur styles-brochure.css pour que la page tableau
-     soit visuellement identique entre catalog et brochure (cf. partial
-     _offerings-page.hbs partage). */
-  margin: 22mm 14mm 18mm;
+  /* Marges reduites et uniformes : 14mm partout. Identiques a
+     styles-brochure.css pour que la page tableau soit visuellement
+     identique catalog ↔ brochure. */
+  margin: 14mm 14mm 14mm 14mm;
 }
 @page :first {
   margin: 0;

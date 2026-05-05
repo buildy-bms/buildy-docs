@@ -410,6 +410,9 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A4',
         coverFullBleed: true,
+        // Marges 14/14 alignees avec styles-offering-catalog.css @page.
+        pageMarginTopMm: 14,
+        pageMarginBottomMm: 14,
         // Header/footer Puppeteer alignes sur la brochure pour que la page
         // tableau soit strictement identique. skipFirstPageHeaderFooter pour
         // que la cover reste full-bleed sans surimpression.
@@ -472,6 +475,10 @@ async function routes(fastify) {
         pageFormat: 'A4',
         coverFullBleed: true,
         populateToc: true,
+        // Marges 14/14 alignees avec styles-brochure.css @page (necessaire
+        // pour que populateToc calcule le bon numero de page).
+        pageMarginTopMm: 14,
+        pageMarginBottomMm: 14,
         skipFirstPageHeaderFooter: true,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
         pdfOptions: buildHeaderFooter({

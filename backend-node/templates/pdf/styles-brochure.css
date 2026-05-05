@@ -7,9 +7,10 @@
 
 @page {
   size: A4 portrait;
-  /* margins 22/18 alignes sur populateToc dans lib/pdf.js (sinon le
-     calcul du numero de page de la TOC derive). */
-  margin: 22mm 14mm 18mm;
+  /* Marges reduites et uniformes : 14mm partout. Pour que populateToc
+     calcule correctement les numeros de page, le builder PDF passe
+     pageMarginTopMm/pageMarginBottomMm = 14 dans renderPdf options. */
+  margin: 14mm 14mm 14mm 14mm;
 }
 @page :first {
   margin: 0;

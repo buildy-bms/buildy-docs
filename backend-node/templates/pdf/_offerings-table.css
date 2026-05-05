@@ -160,8 +160,11 @@
 /* ═══════════ Wrapper page « Tableau des offres » ═══════════
    Partage entre offering-catalog.hbs et brochure.hbs via le partial
    _offerings-page.hbs. Garantit des marges et un header identiques
-   dans les 2 PDFs. */
-.page-offerings { page-break-inside: auto; page-break-after: always; }
+   dans les 2 PDFs.
+   page-break-after: always n'est applique que dans la brochure (qui a
+   du contenu apres) — pas force ici pour eviter une page vide en
+   catalog ou le tableau est la derniere chose. */
+.page-offerings { page-break-inside: auto; }
 .page-offerings .category-header {
   margin-bottom: 4mm; padding-bottom: 3mm;
   border-bottom: 0.4pt solid #e5e7eb;
@@ -207,7 +210,7 @@
 
 .page-offerings-legend {
   display: flex; gap: 4mm; flex-wrap: wrap;
-  margin: 4mm 0 0;
+  margin: 3mm 0 0;
   font-family: 'Inter', sans-serif;
   font-size: 6.5pt; color: #6b7280;
 }
@@ -216,3 +219,35 @@
 }
 .page-offerings-legend .avail { width: 3mm; height: 3mm; font-size: 5pt; }
 .page-offerings-legend .avail-text { font-size: 4.5pt; padding: 0.2mm 1mm; }
+
+/* CTA bas de page (mutualise catalog/brochure pour rendu identique).
+   Compact : tout doit tenir sur la meme page A4 que le tableau. */
+.page-offerings .cta-block {
+  margin: 3mm 0 0;
+  padding: 2.5mm 4mm;
+  background: #1b2842;
+  color: white;
+  border-radius: 2mm;
+  text-align: center;
+  page-break-inside: avoid;
+}
+.page-offerings .cta-line {
+  font-family: 'Poppins', sans-serif;
+  font-size: 9.5pt; font-weight: 700;
+  margin: 0 0 0.6mm;
+  color: white;
+  letter-spacing: -0.01em;
+}
+.page-offerings .cta-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 6.5pt; font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0 0 1.5mm;
+}
+.page-offerings .cta-contact {
+  font-family: 'Inter', sans-serif;
+  font-size: 7.5pt; font-weight: 600;
+  color: white;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
