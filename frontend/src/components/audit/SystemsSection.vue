@@ -170,12 +170,14 @@ onBeforeUnmount(teardownSortables)
               / {{ g.items.filter(s => !s.not_concerned || showNotConcernedSystems).length }}
             </span>
           </div>
-          <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2">
+          <div v-show="!collapsedZones.has(g.zone_id)" class="space-y-2"
+               :ref="el => setZoneListRef(g.zone_id, el)">
             <template v-for="s in g.items" :key="s.id">
               <!-- Pas de PhotoDropzone autour de la catégorie : drops scopés
                    au système (device card) uniquement, voir SystemDevicesTable. -->
               <div v-if="!s.not_concerned || showNotConcernedSystems"
-                   :class="['rounded-lg overflow-hidden border bg-white',
+                   :data-id="s.id"
+                   :class="['system-card rounded-lg overflow-hidden border bg-white',
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
                                                           : 'border-gray-200 bg-gray-50/40')]">
@@ -188,7 +190,12 @@ onBeforeUnmount(teardownSortables)
                      Pas de XXX 240px (couvre « Pas de production photovoltaïque »),
                      puis 1fr pour pousser les actions à droite. -->
                 <div class="px-3 py-2 grid items-center gap-3 bg-white"
-                     :style="'grid-template-columns: 20px 28px 240px 90px 240px minmax(0, 1fr);'">
+                     :style="'grid-template-columns: 20px 20px 28px 240px 90px 240px minmax(0, 1fr);'">
+                  <button type="button"
+                          class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+                          title="Glisser pour réordonner">
+                    <Bars3Icon class="w-3.5 h-3.5" />
+                  </button>
                   <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
                           class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
                           :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">

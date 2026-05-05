@@ -34,9 +34,14 @@
     font-family: var(--font-sans); /* Inter — corps par defaut */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Fond blanc global : évite tout bleed indésirable dans la zone
+       safe-area bottom (home indicator) en PWA standalone iOS. */
+    background: #ffffff;
   }
   body {
     font-family: var(--font-sans); /* Inter */
+    background: #ffffff;
+    /* Fond identique au top bar et bottom nav pour gestion safe-area */
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display); /* Poppins — titres uniquement */

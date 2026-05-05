@@ -33,7 +33,7 @@ async function routes(fastify) {
       FROM bacs_audit_systems s
       LEFT JOIN zones z ON z.zone_id = s.zone_id
       WHERE s.document_id = ?
-      ORDER BY z.position, z.name, s.system_category
+      ORDER BY z.position, z.name, s.position, s.system_category
     `).all(id);
   });
 
@@ -98,7 +98,7 @@ async function routes(fastify) {
       SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
       LEFT JOIN zones z ON z.zone_id = m.zone_id
       WHERE m.document_id = ?
-      ORDER BY z.position NULLS LAST, m.usage, m.meter_type
+      ORDER BY z.position NULLS LAST, m.position, m.usage, m.meter_type
     `).all(id);
   });
 
@@ -396,7 +396,7 @@ async function routes(fastify) {
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.zone_id = t.zone_id
       WHERE t.document_id = ?
-      ORDER BY z.position, z.name,
+      ORDER BY t.position, z.position, z.name,
                CASE t.category WHEN 'heating' THEN 0 ELSE 1 END
     `).all(id);
   });
@@ -707,6 +707,45 @@ async function routes(fastify) {
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
     const upd = db.db.prepare('UPDATE zones SET position = ? WHERE zone_id = ? AND site_id = ?');
     for (let i = 0; i < ids.length; i++) upd.run((i + 1) * 10, ids[i], af.site_id);
+    return { ok: true };
+  });
+
+  // POST /bacs-audit/:documentId/systems/reorder { ids: [...] }
+  fastify.post('/bacs-audit/:documentId/systems/reorder', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
+    const upd = db.db.prepare('UPDATE bacs_audit_systems SET position = ? WHERE id = ? AND document_id = ?');
+    const tx = db.db.transaction((arr) => {
+      for (let i = 0; i < arr.length; i++) upd.run((i + 1) * 10, arr[i], id);
+    });
+    tx(ids);
+    return { ok: true };
+  });
+
+  // POST /bacs-audit/:documentId/meters/reorder { ids: [...] }
+  fastify.post('/bacs-audit/:documentId/meters/reorder', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
+    const upd = db.db.prepare('UPDATE bacs_audit_meters SET position = ? WHERE id = ? AND document_id = ?');
+    const tx = db.db.transaction((arr) => {
+      for (let i = 0; i < arr.length; i++) upd.run((i + 1) * 10, arr[i], id);
+    });
+    tx(ids);
+    return { ok: true };
+  });
+
+  // POST /bacs-audit/:documentId/thermal-regulation/reorder { ids: [...] }
+  fastify.post('/bacs-audit/:documentId/thermal-regulation/reorder', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
+    const upd = db.db.prepare('UPDATE bacs_audit_thermal_regulation SET position = ? WHERE id = ? AND document_id = ?');
+    const tx = db.db.transaction((arr) => {
+      for (let i = 0; i < arr.length; i++) upd.run((i + 1) * 10, arr[i], id);
+    });
+    tx(ids);
     return { ok: true };
   });
 
