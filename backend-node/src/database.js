@@ -3687,18 +3687,43 @@ const sections = {
   optOutAboveLevel(afId, afLevel) {
     const RANK = { E: 0, S: 1, P: 2 };
     const targetRank = RANK[(afLevel || '').toUpperCase()];
-    if (targetRank == null || targetRank >= 2) return 0; // pas de niveau ou Premium → rien a opt-out
-    const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
-    const placeholders = above.map(() => '?').join(',');
     // Etape 1 : opt-out direct des sections dont le service_level est superieur au niveau cible.
-    const r = db.prepare(`
+    let directChanges = 0;
+    if (targetRank != null && targetRank < 2) {
+      const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
+      const placeholders = above.map(() => '?').join(',');
+      const r = db.prepare(`
+        UPDATE sections
+           SET opted_out_by_moa = 1
+         WHERE af_id = ?
+           AND service_level IS NOT NULL
+           AND opted_out_by_moa = 0
+           AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
+      `).run(afId, ...above);
+      directChanges = r.changes;
+    }
+    // Etape 1bis : opt-out des fonctionnalites « options payantes pures »
+    // (les 3 niveaux a 'paid_option' — exemple : Option Serenite). Ces
+    // sections ont service_level=null donc ne sont pas capturees par
+    // l'etape 1, mais elles ne devraient pas etre activees par defaut
+    // (la MOA doit les demander explicitement via demanded_by_moa).
+    // Applicable a tous les niveaux d'AF (E/S/P) : une option payante
+    // est par definition un add-on hors contrat de base.
+    const r1b = db.prepare(`
       UPDATE sections
          SET opted_out_by_moa = 1
        WHERE af_id = ?
-         AND service_level IS NOT NULL
          AND opted_out_by_moa = 0
-         AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
-    `).run(afId, ...above);
+         AND demanded_by_moa = 0
+         AND section_template_id IN (
+           SELECT id FROM section_templates
+            WHERE avail_e = 'paid_option'
+              AND avail_s = 'paid_option'
+              AND avail_p = 'paid_option'
+         )
+    `).run(afId);
+    const optionPaidChanges = r1b.changes;
+    const r = { changes: directChanges + optionPaidChanges };
     // Etape 2 : cascade aux descendants (cf. feedback_section_flags_cascade.md).
     // Une fonctionnalite ecartee implique que ses sous-sections le sont aussi
     // (ex: 11 Gojee opt-out -> 11.1, 11.2, 11.3 suivent meme si elles n'ont
@@ -3735,18 +3760,39 @@ const sections = {
   previewOptOutAboveLevel(afId, afLevel) {
     const RANK = { E: 0, S: 1, P: 2 };
     const targetRank = RANK[(afLevel || '').toUpperCase()];
-    if (targetRank == null || targetRank >= 2) return [];
-    const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
-    const placeholders = above.map(() => '?').join(',');
-    return db.prepare(`
-      SELECT id, number, title, service_level
-        FROM sections
-       WHERE af_id = ?
-         AND service_level IS NOT NULL
-         AND opted_out_by_moa = 0
-         AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
-       ORDER BY position, id
-    `).all(afId, ...above);
+    const out = [];
+    // Sections dont le service_level est superieur au niveau cible
+    if (targetRank != null && targetRank < 2) {
+      const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
+      const placeholders = above.map(() => '?').join(',');
+      out.push(...db.prepare(`
+        SELECT id, number, title, service_level
+          FROM sections
+         WHERE af_id = ?
+           AND service_level IS NOT NULL
+           AND opted_out_by_moa = 0
+           AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
+         ORDER BY position, id
+      `).all(afId, ...above));
+    }
+    // Options payantes pures (Sérénité etc.) — toujours candidates a l'opt-out.
+    out.push(...db.prepare(`
+      SELECT s.id, s.number, s.title, s.service_level
+        FROM sections s
+       WHERE s.af_id = ?
+         AND s.opted_out_by_moa = 0
+         AND s.demanded_by_moa = 0
+         AND s.section_template_id IN (
+           SELECT id FROM section_templates
+            WHERE avail_e = 'paid_option'
+              AND avail_s = 'paid_option'
+              AND avail_p = 'paid_option'
+         )
+       ORDER BY s.position, s.id
+    `).all(afId));
+    // Dedup par id (au cas ou)
+    const seen = new Set();
+    return out.filter(s => seen.has(s.id) ? false : (seen.add(s.id), true));
   },
   outdatedByAf(afId) {
     return db.prepare(`
