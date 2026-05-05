@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 84;
+const TARGET_VERSION = 85;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3221,6 +3221,33 @@ function runMigrations() {
       log.info('Migration 84 : colonne notes_html ajoutee a bacs_audit_thermal_regulation');
     }
     db.pragma('user_version = 84');
+  }
+
+  if (current < 85) {
+    // Lot — Réordonnancement utilisateur : colonnes `position` sur les
+    // entités audit BACS qui n'en avaient pas (systems, meters, thermal).
+    // Backfill par id pour conserver l'ordre actuel. Tri par
+    // (position ASC, id ASC) ensuite. Espacement *10 pour permettre des
+    // insertions sans renumérotation globale.
+    const tables = ['bacs_audit_systems', 'bacs_audit_meters', 'bacs_audit_thermal_regulation'];
+    for (const t of tables) {
+      const cols = db.prepare(`PRAGMA table_info(${t})`).all();
+      if (!cols.some(c => c.name === 'position')) {
+        db.exec(`ALTER TABLE ${t} ADD COLUMN position INTEGER NOT NULL DEFAULT 0`);
+        // Backfill : position = rang dans le document * 10
+        db.exec(`
+          UPDATE ${t}
+          SET position = (
+            SELECT COUNT(*) * 10
+            FROM ${t} t2
+            WHERE t2.document_id = ${t}.document_id
+              AND t2.id <= ${t}.id
+          )
+        `);
+        log.info(`Migration 85 : colonne position ajoutee a ${t} et backfillee`);
+      }
+    }
+    db.pragma('user_version = 85');
   }
 
   if (current > TARGET_VERSION) {
