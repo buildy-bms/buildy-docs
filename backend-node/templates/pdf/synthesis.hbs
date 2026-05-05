@@ -95,6 +95,7 @@
         {{#each systemCategories}}
           <th class="zones-cat">
             <span class="zones-cat-rotated">
+              {{#if icon_value}}<span class="zones-cat-icon">{{{faIcon icon_value icon_color "10"}}}</span>{{/if}}
               <span class="zones-cat-label">{{label}}</span>
               {{#if bacs}}<span class="bacs-col-marker" title="{{bacs}}">⚖️</span>{{/if}}
             </span>

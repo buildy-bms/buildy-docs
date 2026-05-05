@@ -296,10 +296,12 @@ table.zones-matrix th.zones-name {
 }
 /* Headers de catégorie verticaux (90°) — lisibles bottom-to-top, le
    format permet d'aligner 14 colonnes en A4 paysage sans aucun retour
-   ligne. Hauteur fixe pour que toutes les labels alignent leur base. */
+   ligne. Hauteur fixe pour que toutes les labels alignent leur base.
+   La cellule devient un flex container qui centre horizontalement le
+   bloc rotaté ; le texte rotaté empile icone + label + marker BACS. */
 table.zones-matrix th.zones-cat {
   height: 32mm;
-  padding: 1.5mm 0.5mm 1.5mm;
+  padding: 1.5mm 0;
   vertical-align: bottom;
   white-space: nowrap;
   text-align: center;
@@ -307,14 +309,27 @@ table.zones-matrix th.zones-cat {
 table.zones-matrix th.zones-cat .zones-cat-rotated {
   display: inline-flex;
   align-items: center;
-  gap: 1mm;
+  justify-content: flex-start;
+  gap: 1.5mm;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   white-space: nowrap;
+  margin: 0 auto;
+}
+table.zones-matrix th.zones-cat .zones-cat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+table.zones-matrix th.zones-cat .zones-cat-icon svg {
+  /* En writing-mode vertical, on derote l'icone pour qu'elle reste
+     dans son orientation naturelle (lisible droite, pas couchée). */
+  transform: rotate(90deg);
 }
 table.zones-matrix th.zones-cat .zones-cat-label { white-space: nowrap; }
 table.zones-matrix th.zones-cat .bacs-col-marker {
-  display: inline-block; font-size: 7pt; font-weight: 700;
+  display: inline-block; font-size: 8pt; font-weight: 700;
   color: #00cd92; letter-spacing: 0.02em; white-space: nowrap;
 }
 table.zones-matrix th.zones-total {
