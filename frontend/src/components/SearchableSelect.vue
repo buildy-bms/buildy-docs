@@ -45,7 +45,10 @@ const props = defineProps({
 })
 
 const triggerCls = computed(() => [
-  'w-full flex items-center gap-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition',
+  // min-h-11 (44px) garantit la cible tactile iOS HIG sur mobile pour
+  // toutes les variantes (sm/md). Sur desktop le visuel reste compact
+  // car le contenu ne dépasse pas la hauteur intrinsèque du texte.
+  'w-full flex items-center gap-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-0',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',
 ])
@@ -244,7 +247,7 @@ function clear() {
                   type="button" @click="pick(o)"
                   @mouseenter="activeIndex = i"
                   :data-active="activeIndex === i"
-                  :class="['w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left transition',
+                  :class="['w-full flex items-center gap-2.5 px-3 py-1.5 sm:py-1.5 text-sm text-left transition min-h-11 sm:min-h-0',
                            o.value === modelValue ? 'bg-indigo-50 text-indigo-700 font-medium'
                              : (activeIndex === i ? 'bg-gray-50 text-gray-900' : 'text-gray-700 hover:bg-gray-50')]">
             <span v-if="o.indent" class="text-gray-300" :style="{ paddingLeft: `${(o.indent - 1) * 12}px` }">└─</span>
@@ -263,7 +266,7 @@ function clear() {
             Aucun résultat
           </div>
           <button v-if="canCreate" type="button" @click="createCustom"
-                  class="w-full flex items-center gap-2.5 px-3 py-1.5 text-sm text-left transition border-t border-gray-100 text-indigo-700 hover:bg-indigo-50">
+                  class="w-full flex items-center gap-2.5 px-3 py-1.5 sm:py-1.5 text-sm text-left transition border-t border-gray-100 text-indigo-700 hover:bg-indigo-50 min-h-11 sm:min-h-0">
             <span class="flex-1 truncate">+ Ajouter «&nbsp;<strong>{{ search.trim() }}</strong>&nbsp;»</span>
           </button>
         </div>
