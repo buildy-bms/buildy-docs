@@ -210,62 +210,79 @@ const titleHtml = computed(() => {
       <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
-           hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre. -->
+           hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre.
+           Tooltips via <Tooltip> (instantanes, fond sombre) pour remplacer les
+           native title= qui ont un delai de ~500ms et un style basique. -->
       <span class="hidden group-hover:flex items-center gap-0.5 shrink-0">
-        <button
+        <Tooltip
           v-if="canDemand"
-          type="button"
-          @click.stop="emit('toggle-demanded', node)"
-          :class="['p-0.5 rounded', demanded ? 'hover:bg-gray-200 text-emerald-700' : 'hover:bg-emerald-200 text-emerald-600']"
-          :title="demanded ? 'Annuler la validation' : 'Marquer comme fonction exigée par la maîtrise d\'ouvrage (à inclure dans l\'avenant contractuel)'"
+          :text="demanded ? 'Annuler la validation MOA' : 'Marquer comme fonction exigée par la MOA (à inclure dans l\'avenant contractuel)'"
         >
-          <CheckBadgeIcon class="w-3 h-3" />
-        </button>
-        <button
+          <button
+            type="button"
+            @click.stop="emit('toggle-demanded', node)"
+            :class="['p-0.5 rounded', demanded ? 'hover:bg-gray-200 text-emerald-700' : 'hover:bg-emerald-200 text-emerald-600']"
+          >
+            <CheckBadgeIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip
           v-if="canOptOut"
-          type="button"
-          @click.stop="emit('toggle-opt-out', node)"
-          :class="['p-0.5 rounded', optedOut ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
-          :title="optedOut ? 'Réactiver cette fonctionnalité' : 'Marquer comme écartée par la maîtrise d\'ouvrage (visible dans le PDF avec encart)'"
+          :text="optedOut ? 'Réactiver cette fonctionnalité' : 'Écarter cette fonctionnalité (par la MOA — visible dans le PDF avec encart)'"
         >
-          <NoSymbolIcon class="w-3 h-3" />
-        </button>
-        <button
-          type="button"
-          @click.stop="emit('toggle-include', node)"
-          :class="['p-0.5 rounded', excluded ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
-          :title="excluded ? 'Inclure cette section dans les exports' : 'Exclure cette section des exports'"
-        >
-          <EyeIcon v-if="excluded" class="w-3 h-3" />
-          <EyeSlashIcon v-else class="w-3 h-3" />
-        </button>
-        <button
-          type="button"
-          @click.stop="emit('add-child', node)"
-          class="p-0.5 rounded hover:bg-indigo-200 text-indigo-600"
-          title="Ajouter une sous-section"
-        >
-          <PlusIcon class="w-3 h-3" />
-        </button>
-        <button
-          type="button"
-          @click.stop="emit('delete', node)"
-          class="p-0.5 rounded hover:bg-red-200 text-red-500"
-          title="Supprimer cette section (et ses enfants)"
-        >
-          <TrashIcon class="w-3 h-3" />
-        </button>
+          <button
+            type="button"
+            @click.stop="emit('toggle-opt-out', node)"
+            :class="['p-0.5 rounded', optedOut ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
+          >
+            <NoSymbolIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip :text="excluded ? 'Inclure cette section dans les exports' : 'Exclure cette section des exports'">
+          <button
+            type="button"
+            @click.stop="emit('toggle-include', node)"
+            :class="['p-0.5 rounded', excluded ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
+          >
+            <EyeIcon v-if="excluded" class="w-3 h-3" />
+            <EyeSlashIcon v-else class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Ajouter une sous-section">
+          <button
+            type="button"
+            @click.stop="emit('add-child', node)"
+            class="p-0.5 rounded hover:bg-indigo-200 text-indigo-600"
+          >
+            <PlusIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Supprimer cette section (et ses enfants)">
+          <button
+            type="button"
+            @click.stop="emit('delete', node)"
+            class="p-0.5 rounded hover:bg-red-200 text-red-500"
+          >
+            <TrashIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
       </span>
       <!-- Indicateur permanent si section demandee, ecartee, ou exclue -->
-      <span v-if="demanded" class="shrink-0 text-emerald-700" title="Fonction exigée par la maîtrise d'ouvrage — à inclure dans l'avenant contractuel">
-        <CheckBadgeIcon class="w-3 h-3" />
-      </span>
-      <span v-else-if="optedOut" class="shrink-0 text-amber-700" title="Écartée par la MOA — visible dans le PDF avec encart">
-        <NoSymbolIcon class="w-3 h-3" />
-      </span>
-      <span v-else-if="excluded" class="shrink-0 text-amber-600" title="Exclue des exports">
-        <EyeSlashIcon class="w-3 h-3" />
-      </span>
+      <Tooltip v-if="demanded" text="Fonction exigée par la MOA — à inclure dans l'avenant contractuel">
+        <span class="shrink-0 text-emerald-700">
+          <CheckBadgeIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
+      <Tooltip v-else-if="optedOut" text="Écartée par la MOA — visible dans le PDF avec encart">
+        <span class="shrink-0 text-amber-700">
+          <NoSymbolIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
+      <Tooltip v-else-if="excluded" text="Exclue des exports">
+        <span class="shrink-0 text-amber-600">
+          <EyeSlashIcon class="w-3 h-3" />
+        </span>
+      </Tooltip>
     </button>
 
     <div v-if="hasChildren && !isCollapsed">

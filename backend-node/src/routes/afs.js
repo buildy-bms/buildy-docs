@@ -224,8 +224,16 @@ async function routes(fastify) {
     // car la structure (zones / systemes / compteurs) est identique — c'est
     // uniquement l'affichage des blocs reglementaires R175 qui differe en UI.
     let sectionsCount = 0;
+    let autoOptOutCount = 0;
     if (body.kind === 'af') {
       sectionsCount = seedAfStructure(af.id);
+      // Auto opt-out : si l'AF cible un niveau d'offre (E/S/P), on ecarte
+      // automatiquement les fonctionnalites necessitant un niveau superieur
+      // (la MOA ne pourra de toute facon pas les activer). L'utilisateur peut
+      // toujours les reactiver individuellement dans l'arborescence.
+      if (af.service_level) {
+        autoOptOutCount = db.sections.optOutAboveLevel(af.id, af.service_level);
+      }
     } else if (body.kind === 'bacs_audit' || body.kind === 'site_audit') {
       const seedResult = seedBacsAuditStructure(af.id, body.site_id);
       sectionsCount = seedResult.sections_count;
@@ -233,9 +241,9 @@ async function routes(fastify) {
 
     db.auditLog.add({
       afId: af.id, userId, action: `${body.kind}.create`,
-      payload: { slug: af.slug, kind: body.kind, site_id: body.site_id, sections_count: sectionsCount },
+      payload: { slug: af.slug, kind: body.kind, site_id: body.site_id, sections_count: sectionsCount, auto_opt_out_count: autoOptOutCount },
     });
-    log.info(`Document created: #${af.id} ${af.slug} (kind=${body.kind}, ${sectionsCount} sections) by user #${userId}`);
+    log.info(`Document created: #${af.id} ${af.slug} (kind=${body.kind}, ${sectionsCount} sections${autoOptOutCount ? `, ${autoOptOutCount} auto opt-out > ${af.service_level}` : ''}) by user #${userId}`);
 
     return { ...af, sections_count: sectionsCount };
   });

@@ -3676,6 +3676,30 @@ const sections = {
   },
   // Sections d'une AF qui referencent un template a une version anterieure
   // a la version courante du template (= une mise a jour est disponible).
+  // Marque opted_out_by_moa = 1 sur les sections de l'AF dont le niveau de
+  // service requis est *strictement superieur* au niveau cible de l'AF.
+  // Utilise a la creation d'une AF avec un service_level defini (ex: 'S')
+  // pour ecarter automatiquement les fonctionnalites Premium-only que la
+  // MOA ne pourra pas activer dans son contrat.
+  // Logique : on prend la 1ere lettre du service_level de chaque section
+  // (ex: 'E/S/P' -> 'E', 'S/P' -> 'S', 'P' -> 'P') et on compare au rang
+  // RANK={E:0,S:1,P:2} ; si rang section > rang cible AF, opt-out.
+  optOutAboveLevel(afId, afLevel) {
+    const RANK = { E: 0, S: 1, P: 2 };
+    const targetRank = RANK[(afLevel || '').toUpperCase()];
+    if (targetRank == null || targetRank >= 2) return 0; // pas de niveau ou Premium → rien a opt-out
+    const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
+    const placeholders = above.map(() => '?').join(',');
+    const r = db.prepare(`
+      UPDATE sections
+         SET opted_out_by_moa = 1
+       WHERE af_id = ?
+         AND service_level IS NOT NULL
+         AND opted_out_by_moa = 0
+         AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
+    `).run(afId, ...above);
+    return r.changes;
+  },
   outdatedByAf(afId) {
     return db.prepare(`
       SELECT s.id, s.number, s.title, s.equipment_template_id, s.equipment_template_version,
