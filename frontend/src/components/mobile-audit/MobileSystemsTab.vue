@@ -130,7 +130,9 @@ function toggleZone(zoneId) {
 const systemsByZone = computed(() => {
   const groups = new Map()
   for (const s of systems.value) {
-    if (s.not_concerned) continue
+    // Garder les usages "non concerné" (= Absent dans le toggle mobile) :
+    // ils sont rendus grisés / atténués dans le template au lieu d'être
+    // cachés, pour que l'auditeur puisse les réactiver d'un clic.
     const k = s.zone_id
     if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, items: [] })
     groups.get(k).items.push(s)
