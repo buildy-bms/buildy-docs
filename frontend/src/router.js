@@ -29,7 +29,7 @@ const routes = [
     path: '/bacs-audit/:id',
     name: 'bacs-audit-detail',
     meta: { title: 'Audit BACS' },
-    component: () => import('@/views/BacsAuditDetailView.vue'),
+    component: () => import('@/views/AuditDetailRouter.vue'),
     props: true,
   },
   {
@@ -39,7 +39,7 @@ const routes = [
     path: '/site-audit/:id',
     name: 'site-audit-detail',
     meta: { title: 'Audit GTB (Classique)' },
-    component: () => import('@/views/BacsAuditDetailView.vue'),
+    component: () => import('@/views/AuditDetailRouter.vue'),
     props: true,
   },
   {

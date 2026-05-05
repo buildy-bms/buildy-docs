@@ -1,0 +1,221 @@
+<script setup>
+import { computed, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import {
+  BuildingOffice2Icon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ArrowPathIcon,
+} from '@heroicons/vue/24/outline'
+import { useAuditStore } from '@/stores/audit'
+import { useNotification } from '@/composables/useNotification'
+import { updateAf, getBacsPowerSummary } from '@/api'
+import MobileField from './MobileField.vue'
+
+const audit = useAuditStore()
+const { document, powerSummary } = storeToRefs(audit)
+const { error, success } = useNotification()
+
+const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
+
+const APPLICABILITY_LABEL = {
+  subject_immediate: { label: 'Soumis immédiatement', icon: ExclamationTriangleIcon, cls: 'bg-red-50 text-red-800 border-red-200' },
+  subject_2025: { label: 'Soumis — échéance 1er janvier 2025', icon: ExclamationTriangleIcon, cls: 'bg-orange-50 text-orange-800 border-orange-200' },
+  subject_2027: { label: 'Soumis — échéance 1er janvier 2027', icon: ExclamationTriangleIcon, cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  not_subject: { label: 'Non assujetti (puissance < 70 kW)', icon: CheckCircleIcon, cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+}
+
+let saveTimer = null
+function saveDebounced(patch) {
+  Object.assign(document.value, patch)
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      const { data } = await updateAf(document.value.id, patch)
+      document.value = data
+    } catch {
+      error('Sauvegarde impossible')
+    }
+  }, 400)
+}
+
+const recomputing = ref(false)
+async function recomputePower() {
+  recomputing.value = true
+  try {
+    const { data } = await getBacsPowerSummary(document.value.id)
+    saveDebounced({
+      bacs_total_power_kw: data.heating_cooling_total_kw,
+      bacs_total_power_source: 'auto',
+    })
+    success(`Puissance recalculée : ${data.heating_cooling_total_kw} kW`)
+  } catch {
+    error('Calcul impossible')
+  } finally {
+    recomputing.value = false
+  }
+}
+
+const districtConnected = computed({
+  get: () => document.value?.bacs_district_heating_substation_kw != null,
+  set: (v) => saveDebounced({
+    bacs_district_heating_substation_kw: v
+      ? (document.value?.bacs_district_heating_substation_kw ?? 0)
+      : null,
+  }),
+})
+
+const generatorWorksDone = computed({
+  get: () => document.value?.bacs_generator_works_date != null,
+  set: (v) => saveDebounced({
+    bacs_generator_works_date: v
+      ? (document.value?.bacs_generator_works_date ?? new Date().toISOString().slice(0, 10))
+      : null,
+  }),
+})
+</script>
+
+<template>
+  <div class="p-3 space-y-3">
+    <!-- Hero : applicabilité R175-2 -->
+    <div v-if="isBacs && document?.bacs_applicability_status"
+         :class="['rounded-2xl border p-4 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status]?.cls]">
+      <component :is="APPLICABILITY_LABEL[document.bacs_applicability_status]?.icon || ExclamationTriangleIcon" class="w-7 h-7 shrink-0 mt-0.5" />
+      <div class="flex-1 min-w-0">
+        <p class="text-[11px] uppercase tracking-wider opacity-75 font-medium">Applicabilité R175-2</p>
+        <p class="text-base font-medium leading-tight mt-0.5">
+          {{ APPLICABILITY_LABEL[document.bacs_applicability_status]?.label }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Card : Identification -->
+    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+        <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
+        <h3 class="text-base font-medium text-gray-900">Identification du site</h3>
+      </div>
+      <div class="p-4 space-y-4">
+        <MobileField label="Nom du projet">
+          <input
+            type="text"
+            :value="document?.project_name || ''"
+            @blur="e => e.target.value !== (document?.project_name || '') && saveDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit GTB') })"
+            placeholder="Titre de l'audit"
+            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+          />
+        </MobileField>
+
+        <MobileField label="Client">
+          <div class="px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+            {{ document?.client_name || '—' }}
+          </div>
+        </MobileField>
+      </div>
+    </div>
+
+    <!-- BACS only : puissance + dates -->
+    <template v-if="isBacs">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100">
+          <h3 class="text-base font-medium text-gray-900">Puissance & dates</h3>
+        </div>
+        <div class="p-4 space-y-4">
+          <MobileField
+            label="Puissance chauffage + clim (kW)"
+            hint="Cumul nominal utile cumulée (R175-2)"
+          >
+            <div class="flex gap-2">
+              <input
+                type="number"
+                inputmode="decimal"
+                pattern="[0-9.,]*"
+                min="0"
+                step="0.1"
+                :value="document?.bacs_total_power_kw"
+                @input="e => saveDebounced({ bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
+                class="flex-1 px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+                placeholder="—"
+              />
+              <button
+                @click="recomputePower"
+                :disabled="recomputing"
+                class="tap-target px-3 py-3 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl disabled:opacity-50"
+              >
+                <ArrowPathIcon :class="['w-5 h-5', recomputing ? 'animate-spin' : '']" />
+              </button>
+            </div>
+            <p v-if="document?.bacs_total_power_source === 'manual_override'" class="text-xs text-amber-700 mt-1">
+              Override manuel
+            </p>
+          </MobileField>
+
+          <MobileField label="Date du permis de construire" hint="Si > 8 avril 2024 → soumis dès la livraison">
+            <input
+              type="date"
+              :value="document?.bacs_building_permit_date || ''"
+              @input="e => saveDebounced({ bacs_building_permit_date: e.target.value || null })"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            />
+          </MobileField>
+        </div>
+      </div>
+
+      <!-- Toggle : travaux générateur -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <label class="flex items-center gap-3 px-4 py-4 cursor-pointer">
+          <input
+            type="checkbox"
+            v-model="generatorWorksDone"
+            class="w-5 h-5"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900">Travaux générateur réalisés</p>
+            <p class="text-xs text-gray-500 mt-0.5">Déclencheur R175-6 si après 21/07/2021</p>
+          </div>
+        </label>
+        <div v-if="document?.bacs_generator_works_date != null" class="px-4 pb-4 border-t border-gray-100 pt-3">
+          <MobileField label="Date des derniers travaux">
+            <input
+              type="date"
+              :value="document?.bacs_generator_works_date || ''"
+              @input="e => saveDebounced({ bacs_generator_works_date: e.target.value || null })"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white"
+            />
+          </MobileField>
+        </div>
+      </div>
+
+      <!-- Toggle : réseau urbain -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <label class="flex items-center gap-3 px-4 py-4 cursor-pointer">
+          <input
+            type="checkbox"
+            v-model="districtConnected"
+            class="w-5 h-5"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900">Raccordé à un réseau urbain</p>
+            <p class="text-xs text-gray-500 mt-0.5">Chaleur ou froid via station d'échange</p>
+          </div>
+        </label>
+        <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
+             class="px-4 pb-4 border-t border-gray-100 pt-3">
+          <MobileField label="Puissance station d'échange (kW)">
+            <input
+              type="number"
+              inputmode="decimal"
+              pattern="[0-9.,]*"
+              min="0"
+              step="0.1"
+              :value="document?.bacs_district_heating_substation_kw"
+              @input="e => saveDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
+              placeholder="—"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+            />
+          </MobileField>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
