@@ -664,6 +664,40 @@ async function routes(fastify) {
     return db.auditLog.recent(id, 50);
   });
 
+  // GET /api/afs/:id/auto-opt-out-preview?level=S — sections qui seraient ecartees
+  // automatiquement si le niveau cible passe a `level`. Pas d'effet — preview seulement.
+  fastify.get('/afs/:id/auto-opt-out-preview', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const level = String(request.query?.level || '').toUpperCase();
+    if (!['E', 'S', 'P'].includes(level)) {
+      return reply.code(400).send({ detail: 'Niveau invalide (attendu E, S ou P)' });
+    }
+    const sections = db.sections.previewOptOutAboveLevel(id, level);
+    return { count: sections.length, sections };
+  });
+
+  // POST /api/afs/:id/auto-opt-out — applique l'opt-out automatique des
+  // fonctionnalites au-dessus du niveau cible. Body: { level: 'E'|'S'|'P' }.
+  fastify.post('/afs/:id/auto-opt-out', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const level = String(request.body?.level || '').toUpperCase();
+    if (!['E', 'S', 'P'].includes(level)) {
+      return reply.code(400).send({ detail: 'Niveau invalide (attendu E, S ou P)' });
+    }
+    const userId = request.authUser?.id;
+    const count = db.sections.optOutAboveLevel(id, level);
+    db.auditLog.add({
+      afId: id, userId, action: 'af.auto_opt_out',
+      payload: { level, count },
+    });
+    log.info(`Auto opt-out applied on AF #${id}: ${count} sections opted-out (level=${level})`);
+    return { ok: true, count };
+  });
+
   // GET /api/afs/:id/template-updates — sections avec une mise a jour de template disponible.
   // Couvre les TROIS sources :
   //   - kind='equipment' avec equipment_template_id (diff = points ajoutes/retires/modifies)

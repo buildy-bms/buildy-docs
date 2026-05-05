@@ -16,6 +16,7 @@ import api, {
   updateAf, exportPointsList, exportAf, exportSynthesis, downloadExportUrl,
   previewAfUrl, previewPointsListUrl,
   listSections, getAfRequiredLevel,
+  previewAfAutoOptOut, applyAfAutoOptOut,
 } from '@/api'
 import SectionPickerTree from './SectionPickerTree.vue'
 import { useNotification } from '@/composables/useNotification'
@@ -115,14 +116,53 @@ async function submitEdit() {
   if (!editForm.value.client_name.trim() || !editForm.value.project_name.trim()) return
   submitting.value = true
   try {
+    const newLevel = editForm.value.service_level
+    const oldLevel = props.af.service_level || null
+    const levelChanged = newLevel !== oldLevel
+
+    // Si le niveau cible change vers une valeur non vide, on demande s'il faut
+    // ecarter automatiquement les fonctionnalites au-dessus de ce niveau.
+    let applyAutoOptOut = false
+    if (levelChanged && newLevel) {
+      try {
+        const { data: preview } = await previewAfAutoOptOut(props.af.id, newLevel)
+        if (preview.count > 0) {
+          const sample = preview.sections.slice(0, 5).map(s => `• ${s.number || '?'} ${s.title}`).join('\n')
+          const more = preview.count > 5 ? `\n…et ${preview.count - 5} autre${preview.count - 5 > 1 ? 's' : ''}` : ''
+          const ok = await confirm({
+            title: `Écarter ${preview.count} fonctionnalité${preview.count > 1 ? 's' : ''} au-dessus du niveau ${newLevel} ?`,
+            message: `Ces sections nécessitent un niveau supérieur — la MOA ne pourra pas les activer dans son contrat.\n\n${sample}${more}\n\nClique « Écarter » pour les marquer écartées par la MOA, ou « Garder en l'état » pour ne rien changer (tu pourras toujours le faire manuellement).`,
+            confirmLabel: 'Écarter',
+            cancelLabel: 'Garder en l\'état',
+          })
+          applyAutoOptOut = ok === true
+        }
+      } catch (e) {
+        // Preview optionnel : on continue le PATCH meme en cas d'erreur preview.
+      }
+    }
+
     const { data } = await updateAf(props.af.id, {
       client_name: editForm.value.client_name.trim(),
       project_name: editForm.value.project_name.trim(),
       site_address: editForm.value.site_address.trim() || null,
-      service_level: editForm.value.service_level,
+      service_level: newLevel,
       site_id: editForm.value.site_id,
     })
-    success('AF mise à jour')
+
+    let optOutCount = 0
+    if (applyAutoOptOut) {
+      try {
+        const { data: applyResult } = await applyAfAutoOptOut(props.af.id, newLevel)
+        optOutCount = applyResult.count || 0
+      } catch (e) {
+        // Le PATCH a reussi — on signale juste l'echec du opt-out.
+        error('Niveau mis à jour, mais l\'opt-out automatique a échoué.')
+      }
+    }
+
+    const optOutMsg = optOutCount > 0 ? ` · ${optOutCount} fonctionnalité${optOutCount > 1 ? 's' : ''} écartée${optOutCount > 1 ? 's' : ''}` : ''
+    success(`AF mise à jour${optOutMsg}`)
     showEdit.value = false
     emit('updated', data)
   } catch (e) {

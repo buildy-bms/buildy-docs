@@ -27,6 +27,12 @@ export const getAfsStats = () => api.get('/afs/stats')
 export const getAf = (id) => api.get(`/afs/${id}`)
 export const createAf = (data) => api.post('/afs', data)
 export const updateAf = (id, data) => api.patch(`/afs/${id}`, data)
+// Preview des sections candidates a l'auto opt-out pour un niveau cible
+export const previewAfAutoOptOut = (id, level) =>
+  api.get(`/afs/${id}/auto-opt-out-preview`, { params: { level } })
+// Applique l'auto opt-out sur les sections au-dessus du niveau cible
+export const applyAfAutoOptOut = (id, level) =>
+  api.post(`/afs/${id}/auto-opt-out`, { level })
 export const deleteAf = (id) => api.delete(`/afs/${id}`)
 export const cloneAf = (id, data) => api.post(`/afs/${id}/clone`, data)
 export const getAfAudit = (id) => api.get(`/afs/${id}/audit`)

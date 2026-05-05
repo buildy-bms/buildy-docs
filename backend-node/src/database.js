@@ -3700,6 +3700,25 @@ const sections = {
     `).run(afId, ...above);
     return r.changes;
   },
+  // Preview : meme logique que optOutAboveLevel mais retourne la liste des
+  // sections candidates au lieu d'appliquer l'UPDATE. Utilise par l'UI pour
+  // afficher un resume avant confirmation utilisateur.
+  previewOptOutAboveLevel(afId, afLevel) {
+    const RANK = { E: 0, S: 1, P: 2 };
+    const targetRank = RANK[(afLevel || '').toUpperCase()];
+    if (targetRank == null || targetRank >= 2) return [];
+    const above = ['E', 'S', 'P'].filter(l => RANK[l] > targetRank);
+    const placeholders = above.map(() => '?').join(',');
+    return db.prepare(`
+      SELECT id, number, title, service_level
+        FROM sections
+       WHERE af_id = ?
+         AND service_level IS NOT NULL
+         AND opted_out_by_moa = 0
+         AND SUBSTR(UPPER(service_level), 1, 1) IN (${placeholders})
+       ORDER BY position, id
+    `).all(afId, ...above);
+  },
   outdatedByAf(afId) {
     return db.prepare(`
       SELECT s.id, s.number, s.title, s.equipment_template_id, s.equipment_template_version,
