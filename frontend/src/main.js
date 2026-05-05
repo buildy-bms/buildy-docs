@@ -43,11 +43,21 @@ router.onError((err) => handleChunkLoadError(err))
 
 createApp(App).use(createPinia()).use(router).mount('#app')
 
-// Service worker (PWA standalone iOS / Android).
-// On ne register qu'en prod : en dev avec Vite HMR, le SW intercepte les
-// modules et casse le hot reload.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => { /* silencieux */ })
-  })
+// Service worker : DESACTIVE temporairement.
+// On unregister proactivement tout SW existant (fix incident 2026-05-05
+// où le SW v1 cassait la chaîne de redirects OIDC sur Safari iOS). Quand
+// la PWA sera réactivée, on bumpera ce flag et on registrera un SW propre.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations()
+    .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+    .then((results) => {
+      if (results.some(Boolean)) {
+        // Caches CacheStorage : purge complète si on vient de unregister
+        if ('caches' in window) {
+          caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        }
+        console.info('[sw] désinscrit (kill-switch)')
+      }
+    })
+    .catch(() => { /* silencieux */ })
 }
