@@ -64,7 +64,12 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
   async function onDrop(e) {
     isDragOver.value = false
     dragDepth.value = 0
-    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'))
+    // Drop interne (drag d'un noeud DOM via SortableJS pour réordonner) :
+    // dataTransfer.files est vide. On return silencieusement, sinon le
+    // reorder déclenche à tort l'erreur "Glisse uniquement des fichiers".
+    const allFiles = Array.from(e.dataTransfer?.files || [])
+    if (!allFiles.length) return
+    const files = allFiles.filter(f => f.type.startsWith('image/'))
     if (!files.length) {
       notifyError('Glisse uniquement des fichiers image')
       return
