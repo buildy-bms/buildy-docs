@@ -127,40 +127,44 @@ function hasNotes(html) {
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
                                                           : 'border-gray-200 bg-gray-50/40')]">
-                <!-- Header de catégorie : grid pour aligner verticalement les
-                     « Présent / Pas de XXX » à travers les rows malgré les
-                     longueurs de label différentes (ECS vs Production
-                     photovoltaïque). -->
-                <div class="px-3 py-2 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] sm:grid-cols-[auto_auto_minmax(180px,1fr)_auto_auto_auto] items-center gap-2 sm:gap-3 bg-white">
+                <!-- Header de catégorie : grid à colonnes fixes pour aligner
+                     PARFAITEMENT verticalement « Présent / Pas de XXX » à
+                     travers les rows malgré les longueurs de label différentes.
+                     Avec `auto`, les colonnes s'adaptaient au contenu et
+                     décalaient les lignes entre elles. Largeurs fixes : icon
+                     20px, picto 28px, label 240px (truncate), Présent 90px,
+                     Pas de XXX 240px (couvre « Pas de production photovoltaïque »),
+                     puis 1fr pour pousser les actions à droite. -->
+                <div class="px-3 py-2 grid items-center gap-3 bg-white"
+                     :style="'grid-template-columns: 20px 28px 240px 90px 240px minmax(0, 1fr);'">
                   <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
                           class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
                           :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
                     <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
                     <ChevronUpIcon v-else class="w-3.5 h-3.5" />
                   </button>
-                  <span v-else class="w-4 shrink-0"></span>
+                  <span v-else></span>
                   <SystemCategoryIcon :category="s.system_category" size="md" />
                   <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate"
                         @click="s.present && emit('toggle-system-collapsed', s.id)">
                     {{ systemLabels[s.system_category] || s.system_category }}
                   </span>
-                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap shrink-0">
+                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
                     <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
                            @change="e => patchSystem(s, { present: e.target.checked })"
                            class="rounded border-gray-300" />
                     <span class="text-gray-700">Présent</span>
                   </label>
-                  <!-- Toggle "Non concerne" : largeur fixe pour alignement
-                       inter-rows. Caché (mais espace réservé) si système
-                       déjà marqué présent. -->
-                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer shrink-0 min-w-52"
+                  <!-- Toggle "Non concerne" : column 5 toujours fixée à 240px,
+                       contenu invisible mais place réservée si système présent. -->
+                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer truncate"
                          :class="s.present ? 'invisible' : ''">
                     <input type="checkbox" :checked="!!s.not_concerned"
                            @change="e => patchSystem(s, { not_concerned: e.target.checked })"
-                           class="rounded border-gray-300" />
-                    <span class="text-gray-500 italic">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
+                           class="rounded border-gray-300 shrink-0" />
+                    <span class="text-gray-500 italic truncate">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
                   </label>
-                  <div class="flex items-center gap-2 shrink-0 ml-auto">
+                  <div class="flex items-center gap-2 shrink-0 justify-self-end">
                     <button
                       type="button"
                       :disabled="!s.present"
