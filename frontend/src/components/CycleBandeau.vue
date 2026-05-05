@@ -397,8 +397,12 @@ const exportDescription = computed(() => {
           class="cursor-text hover:bg-gray-100 rounded px-1 -mx-1"
           title="Cliquer pour renommer rapidement (Entrée valide, Esc annule)"
         >{{ af.project_name }}</span>
-        <button @click="openEdit" class="text-gray-300 hover:text-indigo-600 shrink-0" title="Éditer client / projet / contrat">
+        <button
+          @click="openEdit"
+          class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 bg-white border border-gray-300 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 rounded-md shrink-0 transition-colors"
+        >
           <PencilSquareIcon class="w-3.5 h-3.5" />
+          <span class="whitespace-nowrap">Paramètres</span>
         </button>
       </h2>
       <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
