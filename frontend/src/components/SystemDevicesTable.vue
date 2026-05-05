@@ -203,176 +203,153 @@ async function removeDevice(d) {
       </button>
     </div>
 
-    <!-- Devices : carte avec 3 sections sémantiques (header / specs / GTB).
-         Hiérarchie typographique forte : nom dominant en haut, label
-         sections en uppercase pour le rythme, pills GTB regroupées dans
-         un encart distinct, footer compact pour les méta-actions. -->
-    <div v-if="devices.length" class="space-y-3">
+    <!-- Devices : layout dense 2 rangées (specs + GTB), nom mis en valeur
+         dans la 1ère ligne, HS toggle visible en permanence (status pas
+         action), actions hover pour dup/supprimer. -->
+    <div v-if="devices.length" class="space-y-2">
       <PhotoDropzone v-for="d in devices" :key="d.id"
           :site-uuid="siteUuid || ''"
           :attach-to="{ device_id: d.id }"
           :enabled="!!siteUuid"
           @changed="refreshPhotos">
-        <div :class="['group bg-white border border-gray-200 rounded-xl shadow-sm hover:border-gray-300 hover:shadow transition overflow-hidden',
-                      d.out_of_service ? 'opacity-60' : '']">
-          <!-- HEADER : nom (titre dominant) + badge HS + actions hover -->
-          <div class="flex items-start gap-3 px-4 pt-3 pb-2 border-b border-gray-100">
-            <div class="flex-1 min-w-0">
-              <input type="text" :value="d.name" placeholder="Nommer ce système (ex : Chaudière gaz principale)"
+        <div :class="['group bg-white border border-gray-200 rounded-lg px-3 py-2.5 hover:border-gray-300 transition',
+                      d.out_of_service ? 'opacity-60 bg-gray-50' : '']">
+          <!-- LIGNE 1 : Nom (font-medium) + Marque + Référence + Puissance + Énergie + Rôle + HS + actions -->
+          <div class="grid grid-cols-12 gap-2 items-end">
+            <div class="col-span-12 md:col-span-3">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Nom du système</label>
+              <input type="text" :value="d.name" placeholder="ex : Chaudière gaz principale"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                     class="w-full text-base font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
-              <p v-if="d.brand || d.model_reference" class="text-xs text-gray-500 mt-0.5 truncate">
-                {{ [d.brand, d.model_reference].filter(Boolean).join(' · ') }}
-              </p>
+                     :class="inputCls" class="font-semibold placeholder:italic placeholder:text-gray-300 placeholder:font-normal" />
             </div>
-            <button type="button"
-                    @click="patchDevice(d, { out_of_service: !d.out_of_service })"
-                    :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-full border transition shrink-0',
-                             d.out_of_service
-                               ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                               : 'bg-white text-gray-400 border-gray-200 hover:border-red-200 hover:text-red-600']"
-                    title="Marquer comme hors service (ignoré dans le plan d'action)">
-              <span :class="d.out_of_service ? '' : 'opacity-0 group-hover:opacity-100 transition'">
-                {{ d.out_of_service ? '✕ Hors service' : 'Hors service' }}
-              </span>
-              <span v-if="!d.out_of_service" class="block group-hover:hidden">●</span>
-            </button>
-            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
-              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-indigo-50" title="Dupliquer">
-                <DocumentDuplicateIcon class="w-4 h-4" />
-              </button>
-              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 p-1.5 rounded-md hover:bg-red-50" title="Supprimer">
-                <TrashIcon class="w-4 h-4" />
-              </button>
+            <div class="col-span-6 md:col-span-2">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Marque</label>
+              <input type="text" :value="d.brand" placeholder="Atlantic"
+                     @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
+            </div>
+            <div class="col-span-6 md:col-span-2">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Référence</label>
+              <input type="text" :value="d.model_reference" placeholder="Varmax 70"
+                     @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
+            </div>
+            <div class="col-span-3 md:col-span-1">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Puiss.</label>
+              <div class="relative">
+                <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
+                       @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       :class="inputCls" class="text-right pr-7 placeholder:text-gray-300" />
+                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
+              </div>
+            </div>
+            <div class="col-span-4 md:col-span-2">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Énergie</label>
+              <SearchableSelect
+                :model-value="d.energy_source"
+                @update:model-value="v => patchDevice(d, { energy_source: v || null })"
+                :options="ENERGY_OPTIONS"
+                :clearable="false"
+                placeholder="Énergie"
+              />
+            </div>
+            <div class="col-span-5 md:col-span-2">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Rôle</label>
+              <SearchableSelect
+                :model-value="d.device_role"
+                @update:model-value="v => patchDevice(d, { device_role: v || null })"
+                :options="ROLE_OPTIONS"
+                :clearable="false"
+                placeholder="Rôle"
+              />
             </div>
           </div>
 
-          <!-- BODY : grille des specs + section GTB séparée -->
-          <div class="px-4 py-3 space-y-3">
-            <!-- Section Specs : marque, ref, énergie, puissance, nature, loc -->
+          <!-- LIGNE 2 : Localisation + GTB pills + Protocoles + HS + actions -->
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div class="flex-1 min-w-44">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Localisation</label>
+              <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol, Toiture…"
+                     @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
+                     :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
+            </div>
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Caractéristiques</p>
-              <div class="grid grid-cols-12 gap-2">
-                <div class="col-span-6 md:col-span-3">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Marque</label>
-                  <input type="text" :value="d.brand" placeholder="ex : Atlantic"
-                         @blur="e => e.target.value !== (d.brand || '') && patchDevice(d, { brand: e.target.value || null })"
-                         :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
-                </div>
-                <div class="col-span-6 md:col-span-3">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Référence</label>
-                  <input type="text" :value="d.model_reference" placeholder="ex : Varmax 70"
-                         @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
-                         :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
-                </div>
-                <div class="col-span-4 md:col-span-2">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Puissance</label>
-                  <div class="relative">
-                    <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
-                           @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                           :class="inputCls" class="text-right pr-8 placeholder:text-gray-300" />
-                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 pointer-events-none">kW</span>
-                  </div>
-                </div>
-                <div class="col-span-4 md:col-span-2">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Énergie</label>
-                  <SearchableSelect
-                    :model-value="d.energy_source"
-                    @update:model-value="v => patchDevice(d, { energy_source: v || null })"
-                    :options="ENERGY_OPTIONS"
-                    :clearable="false"
-                    placeholder="Énergie"
-                  />
-                </div>
-                <div class="col-span-4 md:col-span-2">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Rôle</label>
-                  <SearchableSelect
-                    :model-value="d.device_role"
-                    @update:model-value="v => patchDevice(d, { device_role: v || null })"
-                    :options="ROLE_OPTIONS"
-                    :clearable="false"
-                    placeholder="Rôle"
-                  />
-                </div>
-                <div class="col-span-12">
-                  <label class="block text-[11px] text-gray-500 mb-0.5">Localisation</label>
-                  <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol, Toiture, Niveau 2…"
-                         @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
-                         :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
-                </div>
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Liaison GTB</label>
+              <div class="flex items-center gap-1.5">
+                <button type="button"
+                        @click="patchDevice(d, { wired: !d.wired })"
+                        :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
+                        title="Communication câblée vers la GTB">
+                  <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
+                </button>
+                <button type="button"
+                        @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
+                        :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
+                        title="R175-3 4° — Arrêt manuel possible">
+                  <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
+                </button>
+                <button type="button"
+                        @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
+                        :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
+                        title="R175-3 4° — Reprise autonome de la GTB">
+                  <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
+                </button>
               </div>
             </div>
-
-            <!-- Section Conformité R175 / GTB : encart distinct sur fond gris -->
-            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Conformité R175 &amp; supervision GTB</p>
-              <div class="flex flex-wrap items-end gap-x-4 gap-y-3">
-                <div class="flex flex-col gap-1">
-                  <span class="text-[11px] text-gray-500">Liaison GTB</span>
-                  <div class="flex items-center gap-1.5">
-                    <button type="button"
-                            @click="patchDevice(d, { wired: !d.wired })"
-                            :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
-                            title="Communication câblée vers la GTB">
-                      <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
-                    </button>
-                    <button type="button"
-                            @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
-                            :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
-                            title="R175-3 4° — Arrêt manuel possible">
-                      <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
-                    </button>
-                    <button type="button"
-                            @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
-                            :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
-                            title="R175-3 4° — Reprise autonome de la GTB">
-                      <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
-                    </button>
-                  </div>
-                </div>
-                <div class="flex flex-col gap-1 min-w-48 flex-1">
-                  <span class="text-[11px] text-gray-500">Protocole(s) de communication</span>
-                  <ProtocolMultiPicker
-                    :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
-                    :options="COMM_OPTIONS"
-                    size="xs"
-                    placeholder="Aucun protocole"
-                    @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
-                  />
-                </div>
-              </div>
+            <div class="min-w-44">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Protocole(s)</label>
+              <ProtocolMultiPicker
+                :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
+                :options="COMM_OPTIONS"
+                size="xs"
+                placeholder="Aucun"
+                @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
+              />
             </div>
-          </div>
 
-          <!-- FOOTER : annotations (notes + photos) -->
-          <div class="flex items-center justify-between gap-2 px-4 py-2 bg-gray-50 border-t border-gray-100">
-            <div class="flex items-center gap-2">
+            <!-- Méta-actions à droite : Notes / Photo / HS / Dup / Supprimer
+                 HS et notes/photo TOUJOURS visibles (status + actions
+                 fréquentes). Dup/supprimer en hover (actions rares). -->
+            <div class="flex items-center gap-1 ml-auto">
               <button type="button" @click="emit('open-device-notes', d)"
-                      :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition',
+                      :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
                         hasNotes(d.notes_html || d.notes)
                           ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                          : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300']"
-                      :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter des notes'">
+                          : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                      :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                 <PencilSquareIcon class="w-3.5 h-3.5" />
-                {{ hasNotes(d.notes_html || d.notes) ? 'Notes' : 'Ajouter une note' }}
+                <span v-if="hasNotes(d.notes_html || d.notes)">Notes</span>
               </button>
               <input type="file" accept="image/*" class="hidden"
                      :ref="el => { if (el) fileInputs[d.id] = el }"
                      @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
               <button @click="pickPhotoFor(d.id)"
-                      :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition',
+                      :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
                                (photosByDevice[d.id] || []).length
                                  ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                                 : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300']"
-                      :title="`Ajouter une photo (${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''})`">
+                                 : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                      :title="`${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`">
                 <CameraIcon class="w-3.5 h-3.5" />
-                <span v-if="(photosByDevice[d.id] || []).length">
-                  {{ (photosByDevice[d.id] || []).length }} photo{{ (photosByDevice[d.id] || []).length > 1 ? 's' : '' }}
-                </span>
-                <span v-else>Ajouter une photo</span>
+                <span v-if="(photosByDevice[d.id] || []).length">{{ (photosByDevice[d.id] || []).length }}</span>
+              </button>
+              <button type="button"
+                      @click="patchDevice(d, { out_of_service: !d.out_of_service })"
+                      :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
+                               d.out_of_service
+                                 ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100'
+                                 : 'border-gray-200 text-gray-500 bg-white hover:border-red-200 hover:text-red-600']"
+                      title="Hors service — ignoré dans le plan d'action">
+                <span v-if="d.out_of_service">✕ HS</span>
+                <span v-else>HS</span>
+              </button>
+              <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
+              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 p-1 rounded transition opacity-0 group-hover:opacity-100" title="Dupliquer">
+                <DocumentDuplicateIcon class="w-4 h-4" />
+              </button>
+              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 p-1 rounded transition opacity-0 group-hover:opacity-100" title="Supprimer">
+                <TrashIcon class="w-4 h-4" />
               </button>
             </div>
-            <span class="text-[10px] text-gray-400 italic hidden md:inline">Glisser-déposer une image sur la carte pour ajouter rapidement</span>
           </div>
         </div>
       </PhotoDropzone>
