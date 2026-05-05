@@ -131,6 +131,20 @@ const filteredSorted = computed(() => {
     let av, bv
     if (sortBy.value === 'status') { av = STATUS_ORDER[a.status] ?? 99; bv = STATUS_ORDER[b.status] ?? 99 }
     else if (sortBy.value === 'updated_at') { av = a.updated_at || ''; bv = b.updated_at || '' }
+    else if (sortBy.value === 'kind') {
+      const KIND_ORDER = { af: 0, bacs_audit: 1, site_audit: 2, brochure: 3 }
+      av = KIND_ORDER[a.kind || 'af'] ?? 99
+      bv = KIND_ORDER[b.kind || 'af'] ?? 99
+    }
+    else if (sortBy.value === 'service_level') {
+      const LEVEL_ORDER = { E: 0, S: 1, P: 2 }
+      av = LEVEL_ORDER[a.service_level] ?? 99
+      bv = LEVEL_ORDER[b.service_level] ?? 99
+    }
+    else if (sortBy.value === 'bacs_progress') {
+      av = (a.kind === 'bacs_audit' || a.kind === 'site_audit') ? bacsProgress(a).percent : -1
+      bv = (b.kind === 'bacs_audit' || b.kind === 'site_audit') ? bacsProgress(b).percent : -1
+    }
     else { av = (a[sortBy.value] || '').toString().toLowerCase(); bv = (b[sortBy.value] || '').toString().toLowerCase() }
     if (av < bv) return sortDir.value === 'asc' ? -1 : 1
     if (av > bv) return sortDir.value === 'asc' ? 1 : -1
@@ -421,31 +435,48 @@ onMounted(refresh)
       </button>
     </div>
 
-    <!-- Tableau unique (avec tri colonne + groupement optionnel) -->
-    <div v-else class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-      <table class="w-full text-sm">
+    <!-- Tableau unique (avec tri colonne + groupement optionnel).
+         Container `overflow-x-auto` pour permettre au tableau de s'elargir
+         au-dela du container si necessaire (whitespace-nowrap partout pour
+         eviter les retours a la ligne sur les lignes etroites). -->
+    <div v-else class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
+      <table class="w-full text-sm" style="min-width: max-content;">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('client_name')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('kind')">
+              Type {{ sortBy === 'kind' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('client_name')">
               Client {{ sortBy === 'client_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700" @click="toggleSort('project_name')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('project_name')">
               Projet {{ sortBy === 'project_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-44" @click="toggleSort('status')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('site_address')">
+              Adresse {{ sortBy === 'site_address' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('status')">
               Statut {{ sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-left px-4 py-2.5 w-24">Contrat</th>
-            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 w-40" @click="toggleSort('updated_at')">
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('service_level')">
+              Contrat {{ sortBy === 'service_level' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('bacs_progress')">
+              Avancement {{ sortBy === 'bacs_progress' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('updated_by_name')">
+              Modifié par {{ sortBy === 'updated_by_name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+            </th>
+            <th class="text-left px-4 py-2.5 cursor-pointer hover:text-gray-700 whitespace-nowrap" @click="toggleSort('updated_at')">
               Dernière modif {{ sortBy === 'updated_at' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
             </th>
-            <th class="text-right px-4 py-2.5 w-24">Actions</th>
+            <th class="text-right px-4 py-2.5 whitespace-nowrap">Actions</th>
           </tr>
         </thead>
         <tbody>
           <template v-for="(row, idx) in tableRows" :key="idx">
             <tr v-if="row.kind === 'header'" class="bg-gray-50/60 border-t border-gray-200">
-              <td colspan="6" class="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <td colspan="10" class="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                 {{ row.label }} <span class="text-gray-400 font-normal">· {{ row.count }}</span>
               </td>
             </tr>
@@ -454,52 +485,67 @@ onMounted(refresh)
               class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer group"
               @click="router.push(routeForDoc(row.af))"
             >
-              <td class="px-4 py-2.5 font-semibold text-gray-800">{{ row.af.client_name }}</td>
-              <td class="px-4 py-2.5 text-gray-700">
-                <div class="flex items-center gap-2">
-                  <span
-                    v-if="row.af.kind === 'bacs_audit'"
-                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
-                    title="Audit BACS — décret R175"
-                  >BACS</span>
-                  <span
-                    v-else-if="row.af.kind === 'site_audit'"
-                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-emerald-100 text-emerald-700"
-                    title="Audit GTB (Classique) — préparation devis Buildy"
-                  >GTB</span>
-                  <span
-                    v-else-if="row.af.kind === 'brochure'"
-                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
-                  >Brochure</span>
-                  <span
-                    v-else
-                    class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-green-100 text-green-800"
-                    title="Analyse fonctionnelle — livrable de chantier"
-                  >AF</span>
-                  {{ row.af.project_name }}
-                </div>
-                <p v-if="row.af.site_address" class="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
-                  <MapPinIcon class="w-3 h-3 shrink-0" />{{ row.af.site_address }}
-                </p>
-                <!-- Barre de progression stepper pour les audits BACS -->
-                <div v-if="(row.af.kind || 'af') === 'bacs_audit'" class="mt-1.5 flex items-center gap-2">
-                  <div class="flex-1 max-w-45 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <!-- Type : badge couleur par kind -->
+              <td class="px-4 py-2.5 whitespace-nowrap">
+                <span
+                  v-if="row.af.kind === 'bacs_audit'"
+                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-orange-100 text-orange-700"
+                  title="Audit BACS — décret R175"
+                >BACS</span>
+                <span
+                  v-else-if="row.af.kind === 'site_audit'"
+                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-emerald-100 text-emerald-700"
+                  title="Audit GTB (Classique) — préparation devis Buildy"
+                >GTB</span>
+                <span
+                  v-else-if="row.af.kind === 'brochure'"
+                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
+                >Brochure</span>
+                <span
+                  v-else
+                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-green-100 text-green-800"
+                  title="Analyse fonctionnelle — livrable de chantier"
+                >AF</span>
+              </td>
+              <!-- Client -->
+              <td class="px-4 py-2.5 font-semibold text-gray-800 whitespace-nowrap">{{ row.af.client_name }}</td>
+              <!-- Projet (nom seul) -->
+              <td class="px-4 py-2.5 text-gray-700 whitespace-nowrap">{{ row.af.project_name }}</td>
+              <!-- Adresse -->
+              <td class="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                <span v-if="row.af.site_address" class="inline-flex items-center gap-1">
+                  <MapPinIcon class="w-3 h-3 shrink-0 text-gray-400" />{{ row.af.site_address }}
+                </span>
+                <span v-else class="text-gray-300 italic">—</span>
+              </td>
+              <!-- Statut -->
+              <td class="px-4 py-2.5 whitespace-nowrap"><StatusBadge :status="row.af.status" /></td>
+              <!-- Contrat (niveau service E/S/P) -->
+              <td class="px-4 py-2.5 whitespace-nowrap">
+                <ServiceLevelBadge v-if="row.af.service_level" :level="row.af.service_level" />
+                <span v-else class="text-[11px] text-gray-400 italic">—</span>
+              </td>
+              <!-- Avancement (barre BACS) -->
+              <td class="px-4 py-2.5 whitespace-nowrap">
+                <div v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'" class="flex items-center gap-2">
+                  <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                     <div class="h-full bg-emerald-500 transition-all"
                          :style="{ width: bacsProgress(row.af).percent + '%' }"></div>
                   </div>
                   <span class="text-[10px] font-medium text-gray-600 whitespace-nowrap">
-                    {{ bacsProgress(row.af).count }} / 9 étapes
+                    {{ bacsProgress(row.af).count }} / 9
                   </span>
                 </div>
+                <span v-else class="text-gray-300 italic text-xs">—</span>
               </td>
-              <td class="px-4 py-2.5"><StatusBadge :status="row.af.status" /></td>
-              <td class="px-4 py-2.5">
-                <ServiceLevelBadge v-if="row.af.service_level" :level="row.af.service_level" />
-                <span v-else class="text-[11px] text-gray-400 italic">—</span>
+              <!-- Modifié par -->
+              <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                <span v-if="row.af.updated_by_name">{{ row.af.updated_by_name }}</span>
+                <span v-else class="text-gray-300 italic">—</span>
               </td>
-              <td class="px-4 py-2.5 text-xs text-gray-500">
+              <!-- Dernière modif -->
+              <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                 {{ formatDate(row.af.updated_at) }}
-                <p v-if="row.af.updated_by_name" class="text-[10px] text-gray-400 truncate">par {{ row.af.updated_by_name }}</p>
               </td>
               <td class="px-4 py-2.5 text-right">
                 <div class="inline-flex items-center gap-1">
@@ -525,7 +571,7 @@ onMounted(refresh)
             </tr>
           </template>
           <tr v-if="!filteredSorted.length">
-            <td colspan="6" class="px-4 py-10 text-center">
+            <td colspan="10" class="px-4 py-10 text-center">
               <p class="text-sm text-gray-500">
                 <template v-if="searchQuery">
                   Aucune AF ne correspond à « <strong>{{ searchQuery }}</strong> ».
@@ -540,7 +586,7 @@ onMounted(refresh)
             </td>
           </tr>
           <tr v-if="hasMore">
-            <td colspan="6" class="px-4 py-3 text-center bg-gray-50 border-t border-gray-200">
+            <td colspan="10" class="px-4 py-3 text-center bg-gray-50 border-t border-gray-200">
               <button
                 @click="loadMore"
                 class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
