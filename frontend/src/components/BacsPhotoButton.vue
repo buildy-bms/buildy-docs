@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { CameraIcon, TrashIcon, XMarkIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, TrashIcon, XMarkIcon, ArrowDownTrayIcon, MapPinIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments,
   uploadSiteDocument,
@@ -9,7 +9,7 @@ import {
   getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
-import { compressBeforeUpload } from '@/composables/usePhotoCompression'
+import { compressBeforeUpload, extractExifMeta } from '@/composables/usePhotoCompression'
 import { useViewport } from '@/composables/useViewport'
 
 /**
@@ -106,6 +106,9 @@ async function uploadFiles(files) {
   const uploaded = []
   try {
     for (const rawFile of files) {
+      // Extraire l'EXIF AVANT compression (la passe canvas re-encode et
+      // strip l'EXIF, on perdrait GPS / date / appareil sinon).
+      const exifMeta = await extractExifMeta(rawFile)
       // Compression côté client : économie réseau 4G en gardant l'orig
       // si la compression échoue ou n'apporte rien (cf. composable).
       const f = await compressBeforeUpload(rawFile)
@@ -116,6 +119,7 @@ async function uploadFiles(files) {
         title: defaultTitle,
         category: 'photo',
         ...filterParams.value,
+        ...(exifMeta || {}),
       })
       uploaded.push({
         id: data.id,
@@ -222,6 +226,37 @@ const btnCls = computed(() => {
     : 'border-gray-300 text-gray-600 hover:bg-gray-50'
   return `${base} ${size} ${tone}`
 })
+
+// Affichage des EXIF (date capture, GPS, appareil) sous chaque tile et
+// dans la modal preview. Pin = lien Google Maps.
+function fmtTakenAt(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+function fmtTakenAtShort(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+}
+function gpsMapUrl(p) {
+  if (p?.gps_latitude == null || p?.gps_longitude == null) return null
+  return `https://www.google.com/maps/search/?api=1&query=${p.gps_latitude},${p.gps_longitude}`
+}
+function exifTooltip(p) {
+  if (!p) return ''
+  const parts = []
+  if (p.taken_at) parts.push('Pris le ' + fmtTakenAt(p.taken_at))
+  if (p.camera_make || p.camera_model) {
+    parts.push([p.camera_make, p.camera_model].filter(Boolean).join(' '))
+  }
+  if (p.gps_latitude != null && p.gps_longitude != null) {
+    parts.push(`GPS ${p.gps_latitude.toFixed(5)}, ${p.gps_longitude.toFixed(5)}`)
+  }
+  return parts.join(' · ')
+}
 </script>
 
 <template>
@@ -288,12 +323,17 @@ const btnCls = computed(() => {
         Aucune photo. Glisse des images sur l'icone ou clique sur <strong>+ Ajouter</strong>.
       </div>
       <div v-else class="grid grid-cols-3 gap-1.5">
-        <div v-for="p in photos" :key="p.id" class="relative group">
+        <div v-for="p in photos" :key="p.id" class="relative group" :title="exifTooltip(p)">
           <button type="button" @click="previewPhoto = p" class="block w-full">
             <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
                  loading="lazy" decoding="async"
                  class="w-full h-16 object-cover rounded border border-gray-200 hover:border-indigo-400 transition cursor-zoom-in" />
           </button>
+          <a v-if="gpsMapUrl(p)" :href="gpsMapUrl(p)" target="_blank" rel="noopener" @click.stop
+             class="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/55 hover:bg-indigo-600 text-white flex items-center justify-center transition"
+             :title="`Voir sur Google Maps — ${exifTooltip(p)}`">
+            <MapPinIcon class="w-3 h-3" />
+          </a>
           <button
             @click="removePhoto(p)"
             class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center"
@@ -301,6 +341,11 @@ const btnCls = computed(() => {
           >
             <TrashIcon class="w-3 h-3" />
           </button>
+          <span v-if="p.taken_at"
+                class="absolute bottom-1 left-1 inline-flex items-center gap-0.5 px-1 py-px rounded bg-black/55 text-white text-[9px] font-medium">
+            <ClockIcon class="w-2.5 h-2.5" />
+            {{ fmtTakenAtShort(p.taken_at) }}
+          </span>
           <p v-if="p.title" class="text-[9px] text-gray-500 truncate mt-0.5" :title="p.title">{{ p.title }}</p>
         </div>
       </div>
@@ -459,6 +504,21 @@ const btnCls = computed(() => {
           <div class="min-w-0 flex-1">
             <h3 class="text-base font-semibold truncate">{{ previewPhoto.title || previewPhoto.original_name }}</h3>
             <p v-if="label" class="text-xs opacity-70 truncate">{{ label }}</p>
+            <div v-if="previewPhoto.taken_at || gpsMapUrl(previewPhoto) || previewPhoto.camera_make || previewPhoto.camera_model"
+                 class="mt-1 flex items-center gap-3 flex-wrap text-[11px] opacity-80">
+              <span v-if="previewPhoto.taken_at" class="inline-flex items-center gap-1">
+                <ClockIcon class="w-3 h-3" />
+                {{ fmtTakenAt(previewPhoto.taken_at) }}
+              </span>
+              <a v-if="gpsMapUrl(previewPhoto)" :href="gpsMapUrl(previewPhoto)" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1 text-indigo-200 hover:text-white">
+                <MapPinIcon class="w-3 h-3" />
+                {{ previewPhoto.gps_latitude.toFixed(5) }}, {{ previewPhoto.gps_longitude.toFixed(5) }}
+              </a>
+              <span v-if="previewPhoto.camera_make || previewPhoto.camera_model" class="text-white/60">
+                {{ [previewPhoto.camera_make, previewPhoto.camera_model].filter(Boolean).join(' ') }}
+              </span>
+            </div>
           </div>
           <a :href="getSiteDocumentDownloadUrl(previewPhoto.id)" :download="previewPhoto.original_name || previewPhoto.title"
              class="ml-4 px-3 py-1.5 text-xs font-medium text-white border border-white/40 rounded hover:bg-white/10 inline-flex items-center gap-1">

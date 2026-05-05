@@ -137,13 +137,19 @@ onBeforeUnmount(teardownSortable)
             <Tooltip text="Granularité de la régulation : zone unique, par pièce, par étage… Plus la granularité est fine, plus le confort et l'économie d'énergie sont optimisés (R175-6 II §2)."><span>Type de régulation</span></Tooltip>
           </th>
           <th class="text-center py-2 w-44">
-            <Tooltip text="Quel équipement de la liste des systèmes (chap. 3) produit le chaud/froid de cette zone ? Sélectionner l'équipement physique (chaudière, PAC, DRV, rooftop…) déjà saisi en chap. 3."><span>Générateur lié</span></Tooltip>
+            <Tooltip text="Équipement qui produit le chaud/froid : chaudière, PAC, unité extérieure DRV, rooftop… À sélectionner parmi les équipements saisis en chap. 3 sur cette zone."><span>Production</span></Tooltip>
           </th>
           <th class="text-center py-2 w-44">
-            <Tooltip text="Technologie du générateur (PAC, chaudière gaz/fioul, DRV…). Sert à apprécier le potentiel d'économie d'énergie attendu de la régulation et l'éligibilité à l'exemption R175-6 II."><span>Type générateur</span></Tooltip>
+            <Tooltip text="Équipement qui transporte l'énergie de la production aux émetteurs : pompes de circulation, AHU… Laisser vide si le système n'a pas de distribution séparée (ex : DRV, poêle)."><span>Distribution</span></Tooltip>
+          </th>
+          <th class="text-center py-2 w-44">
+            <Tooltip text="Équipement qui restitue l'énergie dans la zone : radiateurs, ventilo-convecteurs, unités intérieures DRV, plancher chauffant… Laisser vide pour un appareil indépendant (poêle bois)."><span>Émission</span></Tooltip>
+          </th>
+          <th class="text-center py-2 w-44">
+            <Tooltip text="Technologie de production (PAC, chaudière gaz/fioul, DRV…). Sert à apprécier le potentiel d'économie d'énergie attendu de la régulation et l'éligibilité à l'exemption R175-6 II."><span>Type production</span></Tooltip>
           </th>
           <th class="text-center py-2 w-24">
-            <Tooltip text="Année de mise en service du générateur. Un équipement vieillissant est candidat au remplacement plutôt qu'à un retrofit régulation."><span>Âge (ans)</span></Tooltip>
+            <Tooltip text="Année de mise en service de la production. Un équipement vieillissant est candidat au remplacement plutôt qu'à un retrofit régulation."><span>Âge (ans)</span></Tooltip>
           </th>
           <th class="text-center py-2 w-24">
             <Tooltip text="Appareil indépendant de chauffage au bois (poêle, insert, cheminée fermée…) → exempté de R175-6 (II du décret). Ne déclenche pas d'action corrective."><span>Exempté bois</span></Tooltip>
@@ -185,6 +191,26 @@ onBeforeUnmount(teardownSortable)
           <td class="py-2 px-2">
             <select :value="t.generator_device_id"
                     @change="e => patchThermal(t, { generator_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
+                    class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
+              <option :value="null">— aucun</option>
+              <option v-for="d in generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')" :key="d.id" :value="d.id">
+                {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+              </option>
+            </select>
+          </td>
+          <td class="py-2 px-2">
+            <select :value="t.distribution_device_id"
+                    @change="e => patchThermal(t, { distribution_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
+                    class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
+              <option :value="null">— aucune</option>
+              <option v-for="d in generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')" :key="d.id" :value="d.id">
+                {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+              </option>
+            </select>
+          </td>
+          <td class="py-2 px-2">
+            <select :value="t.emission_device_id"
+                    @change="e => patchThermal(t, { emission_device_id: e.target.value ? parseInt(e.target.value, 10) : null })"
                     class="w-full text-xs px-2 py-1 border border-gray-200 rounded">
               <option :value="null">— aucun</option>
               <option v-for="d in generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating')" :key="d.id" :value="d.id">
@@ -236,7 +262,7 @@ onBeforeUnmount(teardownSortable)
              en flex compact avec labels inline (vs grid 3 cols qui faisait
              des champs trop larges et illisibles). -->
         <tr v-if="t.has_automatic_regulation" class="bg-amber-50/30 text-xs">
-          <td colspan="10" class="px-5 py-2.5">
+          <td colspan="12" class="px-5 py-2.5">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span class="text-[11px] text-gray-400 italic shrink-0">
                 ↳ détail R175-6 · {{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}

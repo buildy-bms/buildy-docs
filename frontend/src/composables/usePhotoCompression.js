@@ -9,13 +9,44 @@
  *
  * Le composant appelant attend un Blob ou File en sortie, utilisable
  * directement dans un FormData.
+ *
+ * `extractExifMeta(file)` doit être appelé AVANT compressBeforeUpload :
+ * la passe canvas re-encode et strip l'EXIF, donc l'EXIF doit être
+ * extrait sur le file original puis transmis au backend en query params.
  */
+
+import exifr from 'exifr'
 
 const SKIP_THRESHOLD = 1024 * 1024 // 1 MB
 const HEIC_MIMES = new Set(['image/heic', 'image/heif'])
 
 export function usePhotoCompression() {
-  return { compressBeforeUpload }
+  return { compressBeforeUpload, extractExifMeta }
+}
+
+export async function extractExifMeta(file) {
+  if (!file || !file.type?.startsWith('image/')) return null
+  try {
+    const data = await exifr.parse(file, {
+      pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate',
+             'GPSLatitude', 'GPSLongitude', 'latitude', 'longitude',
+             'Make', 'Model'],
+      reviveValues: true,
+    })
+    if (!data) return null
+    const meta = {}
+    const dt = data.DateTimeOriginal || data.CreateDate || data.ModifyDate
+    if (dt instanceof Date && !isNaN(dt.getTime())) meta.taken_at = dt.toISOString()
+    if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+      meta.gps_latitude = data.latitude
+      meta.gps_longitude = data.longitude
+    }
+    if (typeof data.Make === 'string' && data.Make.trim())   meta.camera_make = data.Make.trim()
+    if (typeof data.Model === 'string' && data.Model.trim()) meta.camera_model = data.Model.trim()
+    return Object.keys(meta).length ? meta : null
+  } catch {
+    return null
+  }
 }
 
 export async function compressBeforeUpload(file, opts = {}) {
