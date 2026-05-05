@@ -156,8 +156,9 @@ const SERVICE_LEVELS = {
     E: 'paid', S: true, P: true,
   },
   gestion_comptes: {
-    label: 'Ajout / suppression de comptes utilisateurs (sur demande)',
+    label: 'Gestion active des comptes utilisateurs par Buildy (création, droits, accompagnement permanent)',
     E: 'paid', S: true, P: true,
+    bacs_link: 'R175-5',
   },
   support_standard: {
     label: 'Support standard (best effort) via outil de ticket',

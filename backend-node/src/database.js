@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 76;
+const TARGET_VERSION = 77;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -2909,6 +2909,79 @@ function runMigrations() {
     `);
     db.pragma('user_version = 76');
     log.info('Migration 76 appliquee : exports.kind accepte pdf-bacs-tables');
+  }
+
+  if (current < 77) {
+    // Lot — Chapitre 14 « Pourquoi Buildy » : section type de positionnement
+    // regroupant 4 angles (BACS / Cybersécurité / Cloud / Buildy Box). Bloc
+    // autonome destiné à servir de pièce de défense en inspection R175-5-1
+    // ET de matière première pour la brochure commerciale.
+    //
+    // - 14.1 (Conformité BACS) + 12 sous-sections : body_html riche figé
+    // - 14.2 (Cybersécurité) + 4 sous-sections : placeholders (rédaction Kevin)
+    // - 14.3 (Cloud) + 7 sous-sections : placeholders (rédaction Kevin)
+    // - 14.4 (Buildy Box) + 3 sous-sections : body_html depuis buildy.fr
+    //
+    // Walk récursif du sous-arbre 14 dans PLAN_AF + INSERT chaque node avec
+    // body_html depuis BODIES_BY_SLUG. Ne touche pas aux nodes existants
+    // (idempotent, INSERT OR IGNORE par slug). Le seeder boot suivant trouve
+    // tout déjà créé et le backfillNewPlanSections() ajoute les sections aux
+    // AFs vivantes.
+    const { PLAN_AF } = require('./seeds/plan-af');
+    const { BODIES_BY_SLUG } = require('./seeds/chapter-14-bodies');
+
+    const ch14 = PLAN_AF.find(n => n.number === '14');
+    if (!ch14) {
+      log.warn('Migration 77 : node 14 introuvable dans PLAN_AF — skip');
+    } else {
+      let inserted = 0;
+      const insertStmt = db.prepare(`
+        INSERT INTO section_templates
+          (slug, number, title, kind, body_html, bacs_articles,
+           parent_template_id, is_functionality, position)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+      `);
+      const getBySlug = db.prepare('SELECT id FROM section_templates WHERE slug = ?');
+      const maxPosForParent = db.prepare(
+        'SELECT COALESCE(MAX(position), 0) AS m FROM section_templates WHERE parent_template_id IS ?'
+      );
+
+      function walk(node, parentTemplateId) {
+        const slug = node.number;
+        let id = null;
+        const existing = getBySlug.get(slug);
+        if (existing) {
+          id = existing.id;
+        } else {
+          const bodyHtml = Object.prototype.hasOwnProperty.call(BODIES_BY_SLUG, slug)
+            ? BODIES_BY_SLUG[slug]
+            : null;
+          const maxRow = maxPosForParent.get(parentTemplateId || null);
+          const position = (maxRow?.m || 0) + 10;
+          const result = insertStmt.run(
+            slug,
+            node.number || null,
+            node.title,
+            node.kind || 'standard',
+            bodyHtml,
+            node.bacs_articles || null,
+            parentTemplateId || null,
+            position,
+          );
+          id = result.lastInsertRowid;
+          inserted++;
+        }
+        if (Array.isArray(node.children)) {
+          for (const c of node.children) walk(c, id);
+        }
+      }
+
+      walk(ch14, null);
+      log.info(`Migration 77 : chapitre 14 « Pourquoi Buildy » seede (${inserted} sections inserees)`);
+    }
+
+    db.pragma('user_version = 77');
+    log.info('Migration 77 appliquee : chapitre 14 Pourquoi Buildy (BACS + Cybersecurite + Cloud + Buildy Box)');
   }
 
   if (current > TARGET_VERSION) {
