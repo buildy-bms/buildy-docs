@@ -255,10 +255,10 @@ async function removeDevice(d) {
                 <span class="flag-ico">{{ d.out_of_service ? '✕' : '○' }}</span> HS
               </button>
               <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
-              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 p-1 rounded transition opacity-0 group-hover:opacity-100" title="Dupliquer">
+              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" title="Dupliquer">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
-              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 p-1 rounded transition opacity-0 group-hover:opacity-100" title="Supprimer">
+              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition" title="Supprimer">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </div>
@@ -309,8 +309,11 @@ async function removeDevice(d) {
             </div>
           </div>
 
-          <!-- LIGNE 2 : Localisation + GTB pills + Protocoles -->
-          <div class="mt-2 flex flex-wrap items-end gap-x-3 gap-y-2">
+          <!-- LIGNE 2 : Localisation + GTB pills + Protocoles. Containers
+               de hauteur uniforme (h-9) pour aligner les labels au-dessus
+               et les contenus en bas malgré les hauteurs intrinsèques
+               différentes (input 38px / pills 24px / dropdown 38px). -->
+          <div class="mt-2 flex flex-wrap items-start gap-x-3 gap-y-2">
             <div class="flex-1 min-w-44">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Localisation</label>
               <input type="text" :value="d.location" placeholder="ex : Local technique sous-sol, Toiture…"
@@ -319,7 +322,7 @@ async function removeDevice(d) {
             </div>
             <div>
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Liaison GTB</label>
-              <div class="flex items-center gap-1.5">
+              <div class="flex items-center gap-1.5 h-9">
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
                         :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
