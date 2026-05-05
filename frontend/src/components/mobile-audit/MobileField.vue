@@ -7,8 +7,8 @@ defineProps({
 </script>
 
 <template>
-  <div class="space-y-2">
-    <label v-if="label" class="block text-sm font-medium text-gray-700">
+  <div class="space-y-1.5">
+    <label v-if="label" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
       {{ label }}
       <span v-if="required" class="text-red-500">*</span>
     </label>

@@ -124,7 +124,7 @@ const totalSurface = computed(() =>
 </script>
 
 <template>
-  <div class="p-3 pb-24 space-y-3">
+  <div class="p-3 space-y-3">
     <!-- Stats résumé -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
       <div class="w-14 h-14 rounded-xl bg-indigo-50 text-indigo-600 inline-flex items-center justify-center">

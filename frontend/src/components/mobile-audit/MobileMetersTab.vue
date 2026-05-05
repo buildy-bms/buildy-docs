@@ -153,7 +153,7 @@ function toggleProtocol(p) {
 </script>
 
 <template>
-  <div class="p-3 pb-24 space-y-3">
+  <div class="p-3 space-y-3">
     <!-- Stats -->
     <div class="grid grid-cols-3 gap-2">
       <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">

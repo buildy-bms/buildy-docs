@@ -188,7 +188,7 @@ async function removeDevice(d) {
 </script>
 
 <template>
-  <div class="p-3 pb-24 space-y-3">
+  <div class="p-3 space-y-3">
     <!-- Stat puissance -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
       <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
