@@ -357,6 +357,19 @@ async function refresh() {
   try {
     await auditStore.loadAudit(docId)
     refreshSiteCounts()
+    // Auto-heal : si l'audit a des zones mais aucune ligne system / thermal
+    // (cas des audits créés pendant la régression de cascade — le require
+    // resyncBacsAuditWithSiteZones manquait dans bacs-audit.js, fix f5c1baa),
+    // on déclenche un resync silencieux pour repeupler la card 03.
+    if (zones.value.length > 0 && systems.value.length === 0) {
+      try {
+        const r = await resyncBacsAudit(docId)
+        if (r?.data?.systems_count > 0) {
+          await refreshAuditData()
+          success(`Plan d'audit synchronisé (${r.data.systems_count} système${r.data.systems_count > 1 ? 's' : ''} ajouté${r.data.systems_count > 1 ? 's' : ''})`)
+        }
+      } catch { /* ignore — le user peut declencher manuellement via le bouton */ }
+    }
   } catch (e) {
     error('Échec du chargement de l\'audit BACS')
   }
