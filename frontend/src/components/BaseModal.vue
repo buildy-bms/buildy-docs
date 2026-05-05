@@ -28,7 +28,11 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-40 bg-black/50 flex items-center justify-center px-4 py-6" @click.self="emit('close')">
+    <!-- z-[110] : doit passer au-dessus de tout (MobileSheet z-50/60,
+         lightbox z-50, popover SearchableSelect z-100). Sans ça, les
+         modales de confirmation de suppression apparaissaient sous le
+         sheet mobile en cours → l'utilisateur voyait rien se passer. -->
+    <div class="fixed inset-0 z-110 bg-black/50 flex items-center justify-center px-4 py-6" @click.self="emit('close')">
       <div ref="dialogRef"
            role="dialog" aria-modal="true" :aria-labelledby="titleId"
            tabindex="-1"
