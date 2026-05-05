@@ -1,5 +1,5 @@
 <script setup>
-import { FireIcon } from '@heroicons/vue/24/outline'
+import { FireIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -20,7 +20,12 @@ const props = defineProps({
   step: { type: Object, default: null },
   active: { type: Boolean, default: false },
 })
-const emit = defineEmits(['validate-step', 'invalidate-step'])
+const emit = defineEmits(['validate-step', 'invalidate-step', 'open-notes'])
+
+function hasNotes(html) {
+  if (!html) return false
+  return html.replace(/<[^>]*>/g, '').trim().length > 0
+}
 
 const audit = useAuditStore()
 const { error } = useNotification()
@@ -124,10 +129,23 @@ async function patchThermal(t, patch) {
                      class="rounded border-gray-300" />
             </Tooltip>
           </td>
-          <td class="px-5 py-2">
-            <input type="text" :value="t.notes" placeholder="—"
-                   @blur="e => patchThermal(t, { notes: e.target.value || null })"
-                   class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
+          <td class="px-5 py-2 text-center">
+            <button type="button"
+                    @click="emit('open-notes', {
+                      title: 'Notes régulation thermique',
+                      contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                      entityType: 'thermal',
+                      entityRef: t,
+                      currentHtml: t.notes_html || t.notes || '',
+                    })"
+                    :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
+                      hasNotes(t.notes_html || t.notes)
+                        ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                        : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                    :title="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+              <PencilSquareIcon class="w-3.5 h-3.5" />
+              {{ hasNotes(t.notes_html || t.notes) ? 'Notes' : '+ Notes' }}
+            </button>
           </td>
         </tr>
         <tr v-for="t in thermalFiltered" :key="`detail-${t.id}`"

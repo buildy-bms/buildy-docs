@@ -754,6 +754,9 @@ async function saveNotesModal(html) {
     } else if (m.entityType === 'device') {
       const { data } = await updateBacsDevice(m.entityRef.id, payload)
       Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'thermal') {
+      const { data } = await updateBacsThermal(m.entityRef.id, payload)
+      Object.assign(m.entityRef, data)
     } else if (m.entityType === 'action_item_alternatives') {
       const { data } = await updateBacsActionItem(m.entityRef.id, { alternative_solutions_html: html || null })
       Object.assign(m.entityRef, data)
@@ -1172,6 +1175,7 @@ onBeforeUnmount(() => {
         :step="stepFor('thermal')"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
+        @open-notes="openNotesModal"
       />
 
       <!-- 6. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->

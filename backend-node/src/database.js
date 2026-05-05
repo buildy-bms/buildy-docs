@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 83;
+const TARGET_VERSION = 84;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3208,6 +3208,19 @@ function runMigrations() {
     `).run();
     db.pragma('user_version = 83');
     log.info(`Migration 83 : ${upd.changes} template(s) DRV/Rooftop reassignes a la categorie thermique_mixte`);
+  }
+
+  if (current < 84) {
+    // Lot — Notes riches sur bacs_audit_thermal_regulation : ajout de la
+    // colonne notes_html pour permettre l'édition via la même modale que
+    // les autres entités (system / device / meter). La colonne notes
+    // legacy reste pour compat backward.
+    const cols = db.prepare("PRAGMA table_info(bacs_audit_thermal_regulation)").all();
+    if (!cols.some(c => c.name === 'notes_html')) {
+      db.exec('ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN notes_html TEXT');
+      log.info('Migration 84 : colonne notes_html ajoutee a bacs_audit_thermal_regulation');
+    }
+    db.pragma('user_version = 84');
   }
 
   if (current > TARGET_VERSION) {

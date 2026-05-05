@@ -93,8 +93,8 @@ function hasNotes(html) {
       <thead class="text-xs text-gray-500 font-medium bg-gray-50">
         <tr>
           <th class="text-center px-5 py-2.5 w-44">Zone</th>
+          <th class="text-center py-2.5 w-40">Énergie</th>
           <th class="text-center py-2.5 w-32">Usage</th>
-          <th class="text-center py-2.5 w-40">Type</th>
           <th class="text-left py-2.5 w-72">État compteur</th>
           <th class="text-center py-2.5 w-44">Protocole(s)</th>
           <th class="text-center py-2.5 w-24">Notes</th>
@@ -118,8 +118,8 @@ function hasNotes(html) {
                   class="text-red-600 mr-1" title="Compteur requis non présent">⚠</span>
             {{ m.zone_name || 'Compteur général' }}
           </td>
-          <td class="py-2.5 text-center"><MeterUsagePill :usage="m.usage" /></td>
           <td class="py-2.5 text-center"><MeterTypePill :type="m.meter_type" /></td>
+          <td class="py-2.5 text-center"><MeterUsagePill :usage="m.usage" /></td>
           <td class="py-2.5 px-2">
             <div class="flex flex-wrap items-center gap-1.5">
               <button type="button"
@@ -227,8 +227,8 @@ function hasNotes(html) {
               </span>
             </div>
             <div class="flex items-center gap-1.5 mt-1">
-              <MeterUsagePill :usage="m.usage" />
               <MeterTypePill :type="m.meter_type" />
+              <MeterUsagePill :usage="m.usage" />
             </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">

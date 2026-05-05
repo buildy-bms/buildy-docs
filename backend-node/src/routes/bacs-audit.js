@@ -413,6 +413,10 @@ async function routes(fastify) {
       generator_age_years: z.number().int().nullable().optional(),
       generator_exempt_wood: z.boolean().nullable().optional(),
       notes: z.string().nullable().optional(),
+      // Migration 84 : notes riches via la modale partagée (system / device /
+      // meter / thermal — même UX). `notes` legacy conservé pour les saisies
+      // historiques.
+      notes_html: z.string().nullable().optional(),
       // Migration 61 : detail R175-6
       sensor_position: z.string().nullable().optional(),
       thermostat_type: z.string().nullable().optional(),
