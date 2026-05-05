@@ -79,11 +79,11 @@ const devicesWithMeta = computed(() => {
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 
 const USAGES = [
-  { key: 'manages_heating', label: 'Chauffage' },
-  { key: 'manages_cooling', label: 'Refroidissement' },
-  { key: 'manages_ventilation', label: 'Ventilation' },
-  { key: 'manages_dhw', label: 'ECS' },
-  { key: 'manages_lighting', label: 'Éclairage' },
+  { key: 'manages_heating', label: 'Chauffage', category: 'heating' },
+  { key: 'manages_cooling', label: 'Refroidissement', category: 'cooling' },
+  { key: 'manages_ventilation', label: 'Ventilation', category: 'ventilation' },
+  { key: 'manages_dhw', label: 'ECS', category: 'dhw' },
+  { key: 'manages_lighting', label: 'Éclairage', category: 'lighting_indoor' },
 ]
 </script>
 
@@ -201,7 +201,10 @@ const USAGES = [
             :key="u.key"
             class="flex items-center justify-between gap-3 px-3 py-4 cursor-pointer rounded-xl active:bg-gray-50"
           >
-            <span class="text-base text-gray-800 font-medium">{{ u.label }}</span>
+            <div class="flex items-center gap-3 min-w-0">
+              <SystemCategoryIcon :category="u.category" size="md" />
+              <span class="text-base text-gray-800 font-medium">{{ u.label }}</span>
+            </div>
             <input
               type="checkbox"
               :checked="!!bms[u.key]"
