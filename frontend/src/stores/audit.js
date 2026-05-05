@@ -13,6 +13,7 @@ import {
   getBacsInspections, listZones,
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
+  getSite, updateSite,
 } from '@/api'
 
 export const useAuditStore = defineStore('audit', {
@@ -77,6 +78,14 @@ export const useAuditStore = defineStore('audit', {
           const z = await listZones(d.data.site_id)
           this.zones = z.data
         }
+        // Charge le site (source de vérité pour l'adresse, le nom client, etc).
+        // Évite la duplication site_address dans le document.
+        if (d.data.site_uuid) {
+          try {
+            const s = await getSite(d.data.site_uuid)
+            this.site = s.data
+          } catch { this.site = null }
+        }
         const [dev, ps, ins] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
@@ -93,6 +102,17 @@ export const useAuditStore = defineStore('audit', {
     async refreshActionItems() {
       const a = await getBacsActionItems(this.docId)
       this.actionItems = a.data
+    },
+
+    /**
+     * Met à jour un champ du site (adresse, nom client, etc) — la source
+     * de vérité est la table `sites`, propagée à FM via la sync. Les
+     * documents héritent de ces valeurs et ne stockent pas de duplicata.
+     */
+    async updateSiteFields(patch) {
+      if (!this.site?.uuid) throw new Error('Site non chargé')
+      const { data } = await updateSite(this.site.uuid, patch)
+      this.site = data
     },
 
     async refreshInspections() {
