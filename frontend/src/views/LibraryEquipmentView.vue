@@ -62,6 +62,19 @@ async function onSaved(savedTpl) {
     if (fresh) await openTemplate(fresh)
   }
 }
+// Save sans fermer : refresh la liste + synchronise la fiche detail si
+// elle est ouverte. La modale d'edition reste affichee.
+async function onSavedInline(savedTpl) {
+  await refresh()
+  if (savedTpl?.id && selected.value?.id === savedTpl.id) {
+    await openTemplate(savedTpl)
+  }
+  // editorTemplate reactive : on lui passe la fraiche version pour que
+  // le bandeau de validation et liveTemplate se synchronisent.
+  if (savedTpl?.id && editorTemplate.value?.id === savedTpl.id) {
+    editorTemplate.value = savedTpl
+  }
+}
 async function onDeleted() {
   showEditor.value = false
   selected.value = null
@@ -687,6 +700,7 @@ onMounted(async () => {
       :template="editorTemplate"
       @close="showEditor = false"
       @saved="onSaved"
+      @saved-inline="onSavedInline"
       @deleted="onDeleted"
     />
 

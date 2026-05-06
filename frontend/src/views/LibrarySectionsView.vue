@@ -175,6 +175,13 @@ async function onSaved() {
   showCreate.value = false
   await refresh()
 }
+async function onSavedInline(savedTpl) {
+  await refresh()
+  if (savedTpl?.id) {
+    const fresh = items.value.find(t => t.id === savedTpl.id)
+    if (fresh) editing.value = fresh
+  }
+}
 async function onDeleted() {
   editing.value = null
   await refresh()
@@ -626,6 +633,7 @@ onBeforeUnmount(teardownSortables)
       mode="standard"
       @close="editing = null"
       @saved="onSaved"
+      @saved-inline="onSavedInline"
       @deleted="onDeleted"
     />
 
