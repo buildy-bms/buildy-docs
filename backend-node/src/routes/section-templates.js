@@ -45,6 +45,7 @@ const createSchema = z.object({
   is_functionality: z.boolean().optional(),
   parent_template_id: z.number().int().positive().nullable().optional(),
   equipment_template_id: z.number().int().positive().nullable().optional(),
+  icon_name: z.string().nullable().optional(),
   document_kinds: documentKindsSchema.optional(),
 });
 
@@ -168,6 +169,7 @@ async function routes(fastify) {
       isFunctionality: body.is_functionality === true,
       parentTemplateId: body.parent_template_id ?? null,
       equipmentTemplateId: body.equipment_template_id ?? null,
+      iconName: body.icon_name || null,
     });
 
     // Tagging document_kinds : pris du body si fourni, sinon defaut ['af'].
