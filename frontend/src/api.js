@@ -47,6 +47,8 @@ export const getSection = (id) => api.get(`/sections/${id}`)
 export const updateSection = (id, data) => api.patch(`/sections/${id}`, data)
 export const createSection = (afId, data) => api.post(`/afs/${afId}/sections`, data)
 export const deleteSection = (id) => api.delete(`/sections/${id}`)
+// Lot — Déplace une section dans sa fratrie (up/down).
+export const moveSection = (id, direction) => api.post(`/sections/${id}/move`, { direction })
 export const getSectionPoints = (id) => api.get(`/sections/${id}/points`)
 export const addSectionOverride = (id, data) => api.post(`/sections/${id}/overrides`, data)
 export const deleteSectionOverride = (sectionId, overrideId) =>
@@ -439,11 +441,16 @@ export const deleteFaqCategory = (id, { force = false } = {}) =>
 export const pushFaqCategory = (id) => api.post(`/faq/categories/${id}/push`)
 
 export const listFaqArticles = (params) => api.get('/faq/articles', { params })
+export const searchFaqArticles = (q) => api.get('/faq/articles/searchable', { params: q ? { q } : {} })
+export const listFaqArticleVersions = (id) => api.get(`/faq/articles/${id}/versions`)
+export const restoreFaqArticleVersion = (id, versionId) =>
+  api.post(`/faq/articles/${id}/versions/${versionId}/restore`)
 export const getFaqArticle = (id) => api.get(`/faq/articles/${id}`)
 export const createFaqArticle = (data) => api.post('/faq/articles', data)
 export const updateFaqArticle = (id, data) => api.patch(`/faq/articles/${id}`, data)
 export const deleteFaqArticle = (id) => api.delete(`/faq/articles/${id}`)
 export const pushFaqArticle = (id) => api.post(`/faq/articles/${id}/push`)
+export const pullFaqArticleFromCrisp = (id) => api.post(`/faq/articles/${id}/pull`)
 
 export const faqAiRewrite = (article_id) => api.post('/faq/ai/rewrite', { article_id })
 export const faqAiGenerate = (question, category_id = null) =>

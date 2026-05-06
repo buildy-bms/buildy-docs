@@ -12,7 +12,7 @@ const props = defineProps({
   selectedId: { type: Number, default: null },
   afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'attachment-drop', 'promote-to-library'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -240,6 +240,8 @@ watch(matchedIds, (ids) => {
       @toggle-opt-out="emit('toggle-opt-out', $event)"
       @toggle-demanded="emit('toggle-demanded', $event)"
       @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
+      @move-up="emit('move-up', $event)"
+      @move-down="emit('move-down', $event)"
       @attachment-drop="emit('attachment-drop', $event)"
       @promote-to-library="emit('promote-to-library', $event)"
     />

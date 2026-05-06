@@ -312,6 +312,25 @@ async function routes(fastify) {
     return updated;
   });
 
+  // POST /api/sections/:id/move — déplace une section dans sa fratrie.
+  // Body : { direction: 'up' | 'down' }. Swap atomique avec le voisin.
+  fastify.post('/sections/:id/move', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const section = db.sections.getById(id);
+    if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
+    if (!assertWrite(request, reply, section.af_id)) return;
+    const direction = request.body?.direction;
+    if (direction !== 'up' && direction !== 'down') {
+      return reply.code(400).send({ detail: "direction doit etre 'up' ou 'down'" });
+    }
+    const moved = db.sections.moveWithinSiblings(id, direction);
+    db.auditLog.add({
+      afId: section.af_id, sectionId: id, userId: request.authUser?.id,
+      action: 'section.move', payload: { direction, moved },
+    });
+    return { ok: true, moved };
+  });
+
   // GET /api/sections/:id/points — points résolus (template + overrides)
   fastify.get('/sections/:id/points', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
