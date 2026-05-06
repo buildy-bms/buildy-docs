@@ -10,7 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon, MagnifyingGlassIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon, MagnifyingGlassIcon, CheckBadgeIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
@@ -130,6 +130,19 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
 const submitting = ref(false)
 const validating = ref(false)
+
+// Suggestion de titre proposee par Claude (description ou justification BACS).
+const suggestedTitle = ref(null)
+function onSuggestedTitle(t) {
+  if (t && t.trim() && t.trim() !== (form.value.name || '').trim()) {
+    suggestedTitle.value = t.trim()
+  }
+}
+function applySuggestedTitle() {
+  if (suggestedTitle.value) form.value.name = suggestedTitle.value
+  suggestedTitle.value = null
+}
+function dismissSuggestedTitle() { suggestedTitle.value = null }
 
 // Etat local synchronise avec props.template + mises a jour apres save
 // inline. Permet au bandeau de validation de rester a jour sans fermer.
@@ -480,6 +493,21 @@ async function destroy() {
           <input v-model="form.name" type="text" required autocomplete="off" data-1p-ignore="true"
                  placeholder="Ex : Pompe à chaleur air/eau"
                  class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <div v-if="suggestedTitle"
+               class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">
+            <SparklesIcon class="w-3.5 h-3.5 text-violet-600 shrink-0" />
+            <span class="text-violet-900 truncate flex-1">
+              Claude propose : <span class="font-medium">« {{ suggestedTitle }} »</span>
+            </span>
+            <button type="button" @click="applySuggestedTitle"
+                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0">
+              Appliquer
+            </button>
+            <button type="button" @click="dismissSuggestedTitle"
+                    class="text-violet-400 hover:text-violet-700 shrink-0" title="Ignorer">
+              <XMarkIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         <div>
           <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Catégorie</label>
@@ -622,6 +650,7 @@ async function destroy() {
           v-model="form.description_html"
           placeholder="Ce que fait l'équipement, son rapport au décret BACS, qui assure sa régulation, et comment Buildy intervient en aval…"
           min-height="120px"
+          @suggested-title="onSuggestedTitle"
           :assist-context="{
             kind: 'equipment_description',
             title: form.name || null,

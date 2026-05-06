@@ -10,7 +10,7 @@
  * de la vue arbre permet aussi de re-parenter visuellement.
  */
 import { ref, computed, watch, onMounted } from 'vue'
-import { TrashIcon, ClockIcon, ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, ClockIcon, ArrowUturnLeftIcon, SparklesIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
 import RichTextEditor from './RichTextEditor.vue'
@@ -134,6 +134,21 @@ const AVAIL_OPTIONS = [
 const submitting = ref(false)
 const deleting = ref(false)
 const validating = ref(false)
+
+// Suggestion de titre proposee par Claude (mig prompt). Affichee comme
+// bandeau "Appliquer / Ignorer" sous le champ Titre. Ignoree par defaut
+// si elle est identique au titre courant.
+const suggestedTitle = ref(null)
+function onSuggestedTitle(t) {
+  if (t && t.trim() && t.trim() !== form.value.title.trim()) {
+    suggestedTitle.value = t.trim()
+  }
+}
+function applySuggestedTitle() {
+  if (suggestedTitle.value) form.value.title = suggestedTitle.value
+  suggestedTitle.value = null
+}
+function dismissSuggestedTitle() { suggestedTitle.value = null }
 
 // Etat local du template : reflete le dernier save inline. Permet au
 // bandeau de validation, au statut, et a la matrice "dirty" de rester
@@ -478,6 +493,22 @@ async function destroy() {
           <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                  :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
                  class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <!-- Suggestion de titre Claude (apres reformulation/generation) -->
+          <div v-if="suggestedTitle"
+               class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">
+            <SparklesIcon class="w-3.5 h-3.5 text-violet-600 shrink-0" />
+            <span class="text-violet-900 truncate flex-1">
+              Claude propose : <span class="font-medium">« {{ suggestedTitle }} »</span>
+            </span>
+            <button type="button" @click="applySuggestedTitle"
+                    class="px-2 py-0.5 text-[11px] font-medium text-white bg-violet-600 hover:bg-violet-700 rounded transition shrink-0">
+              Appliquer
+            </button>
+            <button type="button" @click="dismissSuggestedTitle"
+                    class="text-violet-400 hover:text-violet-700 shrink-0" title="Ignorer">
+              <XMarkIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div v-if="mode === 'functionality'">
@@ -603,6 +634,7 @@ async function destroy() {
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
           min-height="180px"
+          @suggested-title="onSuggestedTitle"
           :assist-context="{
             kind: mode === 'functionality' ? 'functionality' : 'narrative_section',
             title: form.title || null,

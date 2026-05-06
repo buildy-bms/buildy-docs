@@ -226,6 +226,14 @@ const SYSTEM_PROMPT_LIBRARY = [
   `- Aucune classe CSS, aucun <div>, aucun <html>/<body>, aucun markdown (pas de **gras**, pas de # titres).`,
   `- Reponds UNIQUEMENT par le HTML demande. Pas de preambule "Voici...", pas de conclusion, pas d'explication.`,
   ``,
+  `=== SUGGESTION DE TITRE (optionnel) ===`,
+  `Si le titre actuel de l'entite est imprecis, redondant, mal formule ou incomplet, propose un meilleur titre.`,
+  `- Format : commence ta reponse PAR la ligne EXACTE \`<!--TITLE: Nouveau titre propose-->\` puis enchaine sur le HTML.`,
+  `- Le titre propose doit etre CONCIS (3 a 8 mots), specifique, sans guillemets francais.`,
+  `- Style coherent avec le reste de la bibliotheque : tournures nominales pour les fonctionnalites ("Cartographie multi-sites", "Detection des derives") ; descriptives pour les sections types.`,
+  `- Si le titre actuel est deja bon, N'INCLUS PAS le commentaire — saute directement au HTML.`,
+  `- Critere : ne propose un changement que s'il apporte une vraie amelioration (clarte, precision, adequation au contenu). Pas de variation cosmetique.`,
+  ``,
   `=== RYTHME VISUEL — IMPORTANT ===`,
   `Le contenu doit etre AERE et lisible, pas un pave dense.`,
   `- Plusieurs <p> COURTS valent mieux qu'un long paragraphe.`,
@@ -387,8 +395,25 @@ async function assistLibrary({
     .map(b => b.text)
     .join('')
     .trim();
+
+  // Extraction d'une suggestion de titre (optionnelle). Claude est invite a
+  // commencer par `<!--TITLE: ...-->` quand il pense que le titre courant
+  // peut etre ameliore. On separe ce commentaire du HTML retourne.
+  let suggested_title = null;
+  let html = text;
+  const titleMatch = html.match(/^\s*<!--\s*TITLE:\s*(.+?)\s*-->\s*/i);
+  if (titleMatch) {
+    const proposed = (titleMatch[1] || '').trim();
+    // On ignore une suggestion identique au titre courant (Claude verifie
+    // deja, mais defense en profondeur).
+    if (proposed && proposed.toLowerCase() !== (title || '').toLowerCase()) {
+      suggested_title = proposed;
+    }
+    html = html.slice(titleMatch[0].length);
+  }
   return {
-    html: text,
+    html,
+    suggested_title,
     usage: resp.usage,
     library_context: corpus ? {
       strategy: corpus.strategy,
