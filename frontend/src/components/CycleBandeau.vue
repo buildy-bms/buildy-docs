@@ -338,7 +338,16 @@ async function submitExport() {
     }
     lastExportId.value = data.id
     lastExportInfo.value = data
-    window.open(downloadExportUrl(data.id), '_blank')
+    // Télécharge via <a download> plutot que window.open (evite les
+    // popup-blockers Safari/Firefox apres un await — l'event utilisateur
+    // d'origine n'est plus considere comme "live" par le navigateur).
+    const a = document.createElement('a')
+    a.href = downloadExportUrl(data.id)
+    a.target = '_blank'
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
   } catch (e) {
     error(e.response?.data?.detail || 'Échec de la génération du PDF')
   } finally {

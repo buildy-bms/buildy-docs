@@ -434,6 +434,16 @@ function buildOfferingsAnnexForAf(af) {
         AND section_template_id IS NOT NULL
     `).all(af.id).map(r => r.section_template_id)
   );
+  // Lot 91 — Sections ajoutees comme option payante a la carte.
+  const optinPaidOptionTemplateIds = new Set(
+    db.db.prepare(`
+      SELECT DISTINCT section_template_id
+      FROM sections
+      WHERE af_id = ?
+        AND optin_paid_option = 1
+        AND section_template_id IS NOT NULL
+    `).all(af.id).map(r => r.section_template_id)
+  );
 
   // Recupere tous les section_templates pour construire l'arbre
   const allTemplates = db.db.prepare(`
@@ -467,8 +477,11 @@ function buildOfferingsAnnexForAf(af) {
   function emit(node, visualDepth) {
     if (!hasFeatureDescendant(node)) return;
     if (node.is_functionality) {
-      const refused = optedOutTemplateIds.has(node.id);
+      // Priorite : demanded > optin > refused (au cas ou un etat herite
+      // aurait les 2 flags actifs, on privilegie l'inclusion volontaire).
+      const optinPaid = optinPaidOptionTemplateIds.has(node.id);
       const demanded = demandedTemplateIds.has(node.id);
+      const refused = !demanded && !optinPaid && optedOutTemplateIds.has(node.id);
       if (refused) optedOutCount++;
       if (demanded) demandedCount++;
       const ae = node.avail_e || 'unavailable';
@@ -486,6 +499,7 @@ function buildOfferingsAnnexForAf(af) {
         all_option: allOption,
         refused,
         demanded,
+        optin_paid_option: optinPaid,
       });
       for (const child of node.children) emit(child, visualDepth + 1);
     } else {
