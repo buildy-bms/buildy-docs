@@ -245,8 +245,15 @@ function seedAfStructure(afId) {
   // Lot — Migration 78 : filtre sur document_kinds contient 'af'. Les sections
   // marquees brochure-only ou bacs_audit-only ne sont PAS instanciees dans
   // l'AF (ex: ch.14.4 Buildy Box reserve a la brochure commerciale).
+  // Lot — Bibliotheque source de verite : on saute les section_templates
+  // kind='equipment' dont le equipment_template_id est null (l'equipement a
+  // ete supprime de la biblio). Cela evite les sections fantomes type
+  // « Systemes DRV » sans pendant biblio. Apres l'insert canonique du plan,
+  // on enrichit en ajoutant TOUS les equipments de la biblio dont la
+  // categorie est deja representee dans une section parent (cf libraryExtendAf).
   const allTemplates = db.sectionTemplates.list({}).filter(t =>
     Array.isArray(t.document_kinds) && t.document_kinds.includes('af')
+    && !(t.kind === 'equipment' && !t.equipment_template_id)
   );
   const byParentTpl = new Map();
   for (const t of allTemplates) {
@@ -329,8 +336,72 @@ function seedAfStructure(afId) {
   });
   tx();
 
-  log.info(`Seed AF #${afId} : ${total} sections inserted (depuis section_templates)`);
-  return total;
+  // Extension biblio : ajoute les equipments du catalogue dont la categorie
+  // est deja representee dans un parent du plan (categorie deduite des enfants
+  // equipment deja inseres). Evite que la biblio soit "muette" quand un site
+  // a des equipements specifiques (ex : unite-interieure-drv en plus / a la
+  // place de l'ancien drv) qui ne sont pas codes en dur dans plan-af.
+  const extendAdded = libraryExtendAf(afId);
+
+  log.info(`Seed AF #${afId} : ${total} sections du plan + ${extendAdded} sections biblio (categorie deduite)`);
+  return total + extendAdded;
+}
+
+/**
+ * Pour une AF qui vient d'etre seedee : pour chaque section parent dont les
+ * enfants equipment couvrent une ou plusieurs categories systeme, ajoute en
+ * fratrie tous les equipment_templates de la biblio appartenant a ces
+ * categories qui ne sont pas encore representes. Idempotent dans le sens ou
+ * un eq_template deja present (par equipment_template_id) n'est jamais
+ * duplique. Numerotation continue (suit la derniere fratrie inseree).
+ */
+function libraryExtendAf(afId) {
+  const allLib = db.equipmentTemplates.list();
+  if (!allLib.length) return 0;
+  const sections = db.db.prepare(`
+    SELECT id, parent_id, number, kind, equipment_template_id, position, title
+    FROM sections WHERE af_id = ? ORDER BY parent_id NULLS FIRST, position
+  `).all(afId);
+  const byId = new Map(sections.map(s => [s.id, s]));
+  const childrenOf = new Map();
+  for (const s of sections) {
+    const p = s.parent_id || 0;
+    if (!childrenOf.has(p)) childrenOf.set(p, []);
+    childrenOf.get(p).push(s);
+  }
+  const tplById = new Map(allLib.map(t => [t.id, t]));
+  let added = 0;
+  for (const [parentId, kids] of childrenOf) {
+    if (!parentId) continue; // top-level : on n'extend pas la racine
+    const parent = byId.get(parentId);
+    if (!parent) continue;
+    const eqKids = kids.filter(k => k.kind === 'equipment' && k.equipment_template_id);
+    if (!eqKids.length) continue;
+    const existingTplIds = new Set(eqKids.map(k => k.equipment_template_id));
+    const cats = new Set();
+    for (const k of eqKids) {
+      const t = tplById.get(k.equipment_template_id);
+      if (t?.category) cats.add(t.category);
+    }
+    if (!cats.size) continue;
+    let nextIdx = kids.length;
+    let nextPos = kids.reduce((m, k) => Math.max(m, k.position || 0), 0);
+    for (const lib of allLib) {
+      if (!lib.category || !cats.has(lib.category)) continue;
+      if (existingTplIds.has(lib.id)) continue;
+      nextIdx++;
+      nextPos += 10;
+      const number = parent.number ? `${parent.number}.${nextIdx}` : null;
+      db.sections.create({
+        afId, parentId, position: nextPos, number,
+        title: lib.name, kind: 'equipment',
+        equipmentTemplateId: lib.id, equipmentTemplateVersion: lib.current_version,
+        bacsArticles: null, bodyHtml: null, genericNote: 0,
+      });
+      added++;
+    }
+  }
+  return added;
 }
 
 function escapeHtml(s) {
