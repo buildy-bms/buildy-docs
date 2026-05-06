@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import Sortable from 'sortablejs'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -27,7 +27,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'reorder-children', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library'])
 
 // Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
 // calculer la disponibilite de chaque feature au niveau choisi par le MOA.
@@ -355,6 +355,42 @@ const titleHtml = computed(() => {
             <EyeSlashIcon v-else class="w-3 h-3" />
           </button>
         </Tooltip>
+        <Tooltip text="Remonter d'un cran (↑)">
+          <button
+            type="button"
+            @click.stop="emit('move-up', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowUpIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Descendre d'un cran (↓)">
+          <button
+            type="button"
+            @click.stop="emit('move-down', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowDownIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Sortir d'un niveau (← outdent)">
+          <button
+            type="button"
+            @click.stop="emit('outdent', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowLeftIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Indenter dans le précédent (→ indent)">
+          <button
+            type="button"
+            @click.stop="emit('indent', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowRightIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
         <Tooltip text="Ajouter une sous-section">
           <button
             type="button"
@@ -439,6 +475,8 @@ const titleHtml = computed(() => {
         @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
         @move-up="emit('move-up', $event)"
         @move-down="emit('move-down', $event)"
+        @indent="emit('indent', $event)"
+        @outdent="emit('outdent', $event)"
         @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"

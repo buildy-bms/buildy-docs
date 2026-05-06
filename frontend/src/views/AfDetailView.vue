@@ -363,6 +363,8 @@ async function handleMoveSection(node, direction) {
 }
 const handleMoveUp = (node) => handleMoveSection(node, 'up')
 const handleMoveDown = (node) => handleMoveSection(node, 'down')
+const handleIndent = (node) => handleMoveSection(node, 'indent')
+const handleOutdent = (node) => handleMoveSection(node, 'outdent')
 
 // Lot — Reorder bulk d'une fratrie (drag-drop SortableJS).
 async function handleReorderChildren({ parentId, ids }) {
@@ -596,6 +598,8 @@ watch(() => route.params.id, async (newId, oldId) => {
               @toggle-optin-paid-option="handleToggleOptinPaidOption"
               @move-up="handleMoveUp"
               @move-down="handleMoveDown"
+              @indent="handleIndent"
+              @outdent="handleOutdent"
               @reorder-children="handleReorderChildren"
               @attachment-drop="handleAttachmentDrop"
               @promote-to-library="handlePromoteToLibrary"
