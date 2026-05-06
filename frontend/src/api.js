@@ -55,6 +55,9 @@ export const listSectionInstances = (id) => api.get(`/sections/${id}/instances`)
 export const getSectionTemplateUpdate = (id) => api.get(`/sections/${id}/template-update`)
 export const applySectionTemplateUpdate = (id) => api.post(`/sections/${id}/template-update/apply`)
 export const dismissSectionTemplateUpdate = (id) => api.post(`/sections/${id}/template-update/dismiss`)
+// Insere un section_template manquant dans une AF (source 'new_section' / 'new_functionality')
+export const addMissingTemplateToAf = (afId, templateId) =>
+  api.post(`/afs/${afId}/template-updates/add-missing/${templateId}`)
 export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instances`, data)
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
@@ -421,5 +424,30 @@ export const updateEquipment = (id, data) => api.patch(`/equipments/${id}`, data
 export const deleteEquipment = (id) => api.delete(`/equipments/${id}`)
 export const getBacsPowerCumul = (siteId) =>
   api.get('/equipments/bacs-power-cumul', { params: { site_id: siteId } })
+
+// ── FAQ Buildy / Crisp Knowledge Base ──
+export const getFaqSettings = () => api.get('/faq/settings')
+export const saveFaqSettings = (data) => api.put('/faq/settings', data)
+export const testFaqConnection = () => api.post('/faq/test-connection')
+export const pullFaqFromCrisp = () => api.post('/faq/sync/pull')
+
+export const listFaqCategories = () => api.get('/faq/categories')
+export const createFaqCategory = (data) => api.post('/faq/categories', data)
+export const updateFaqCategory = (id, data) => api.patch(`/faq/categories/${id}`, data)
+export const deleteFaqCategory = (id, { force = false } = {}) =>
+  api.delete(`/faq/categories/${id}`, { params: force ? { force: 1 } : {} })
+export const pushFaqCategory = (id) => api.post(`/faq/categories/${id}/push`)
+
+export const listFaqArticles = (params) => api.get('/faq/articles', { params })
+export const getFaqArticle = (id) => api.get(`/faq/articles/${id}`)
+export const createFaqArticle = (data) => api.post('/faq/articles', data)
+export const updateFaqArticle = (id, data) => api.patch(`/faq/articles/${id}`, data)
+export const deleteFaqArticle = (id) => api.delete(`/faq/articles/${id}`)
+export const pushFaqArticle = (id) => api.post(`/faq/articles/${id}/push`)
+
+export const faqAiRewrite = (article_id) => api.post('/faq/ai/rewrite', { article_id })
+export const faqAiGenerate = (question, category_id = null) =>
+  api.post('/faq/ai/generate', { question, category_id })
+export const faqAiSuggestMissing = () => api.post('/faq/ai/missing-articles')
 
 export default api

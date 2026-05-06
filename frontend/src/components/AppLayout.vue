@@ -19,6 +19,7 @@ import {
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   DocumentDuplicateIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
 import CommandPalette from './CommandPalette.vue'
 
@@ -60,6 +61,8 @@ const nav = [
   { name: 'Sections types', to: '/library/sections', icon: BookmarkIcon },
   { name: 'Systèmes techniques', to: '/library/equipments', icon: RectangleStackIcon },
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
+  { section: 'Support' },
+  { name: 'FAQ Buildy', to: '/faq', icon: ChatBubbleLeftRightIcon },
   { section: 'Système' },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
   { name: 'Textes standards PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },

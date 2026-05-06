@@ -772,6 +772,332 @@ async function assistTranscriptMapping({ skeleton, transcript }) {
   };
 }
 
+// ─── FAQ Buildy / Crisp Knowledge Base ─────────────────────────────
+// Trois modes d'assistance :
+//   1) Réécrire/améliorer un article existant (`assistFaqRewrite`)
+//   2) Générer un article complet à partir d'une question (`assistFaqGenerate`)
+//   3) Suggérer des articles manquants en s'appuyant sur le corpus (`assistFaqSuggestMissing`)
+// Le bloc corpus (sections + équipements + fonctionnalités + titres FAQ
+// existants) est mis en cache éphémère car il change rarement.
+
+const PROMPT_KEY_FAQ_REWRITE = 'faq.rewrite';
+const PROMPT_KEY_FAQ_GENERATE = 'faq.generate';
+const PROMPT_KEY_FAQ_SUGGEST_MISSING = 'faq.suggest_missing';
+
+const SYSTEM_PROMPT_FAQ_BASE = [
+  `Tu rédiges des articles de la base de connaissance Crisp Helpdesk de Buildy, publiés sur https://help.buildy.fr/. Audience : clients Buildy (exploitants de bâtiment, MOA/MOE/BE, intégrateurs).`,
+  ``,
+  `=== STYLE BUILDY ===`,
+  `- Français professionnel, clair, accessible. Tous les accents corrects.`,
+  `- Phrases courtes, structure logique. Pas de superlatifs marketing.`,
+  `- Commence par une réponse concrète (1-2 phrases qui répondent directement à la question), finis par une suggestion d'action ou un renvoi utile.`,
+  `- Vocabulaire métier compréhensible : supervision, exploitation, équipement technique, alarme, parc, énergie. Évite le jargon IT pur ("polling", "trame", "broker", "daemon" sont à reformuler).`,
+  ``,
+  `=== NOMENCLATURE PRODUIT (publique) ===`,
+  `- "Buildy" : la plateforme + la société.`,
+  `- "Hyperveez" : application web de supervision (UI desktop / tablette).`,
+  `- "Gojee" : application mobile iOS/Android.`,
+  `- "Buildy Edge" : la passerelle matérielle déployée sur site.`,
+  `- "Buildy Cloud" : le backend cloud hébergé.`,
+  `- "Buildy Connect" : l'API REST pour systèmes tiers.`,
+  `INTERDIT côté client : "Fleet Manager", "Buildy Tools", "Buildy Docs" (composants internes, jamais nommés dans les articles publiés).`,
+  ``,
+  `=== STRUCTURE D'UN ARTICLE CRISP ===`,
+  `Un article a un TITRE (champ séparé) + un CORPS. Tu produis uniquement le corps.`,
+  `Hiérarchie typique d'un article réussi :`,
+  `- 1 paragraphe d'introduction qui répond à la question (pas de titre, juste un <p>).`,
+  `- Sections principales en <h2> (ex : "Activer la fonctionnalité", "Cas d'usage", "Dépannage").`,
+  `- Sous-sections en <h3> si nécessaire (rares — éviter d'aller plus loin que H3).`,
+  `- Un paragraphe de clôture (renvoi vers une autre fonctionnalité, contact support, etc.).`,
+  `JAMAIS de <h1> dans le corps : le titre H1 est le titre de l'article (champ séparé).`,
+  ``,
+  `=== FORMAT DE SORTIE OBLIGATOIRE — HTML ===`,
+  `Tu réponds en HTML qui sera converti en markdown Crisp côté serveur. Voici le mapping autorisé :`,
+  ``,
+  `Balises courantes (utilise-les librement) :`,
+  `  <h2>Section</h2>            → "## Section" en markdown Crisp`,
+  `  <h3>Sous-section</h3>       → "### Sous-section"`,
+  `  <p>Paragraphe.</p>           → texte simple`,
+  `  <strong>gras</strong>        → **gras**`,
+  `  <em>italique</em>            → *italique*`,
+  `  <u>souligné</u>              → __souligné__   (Crisp utilise __ pour le soulignement, pas le gras)`,
+  `  <mark>surligné</mark>        → ++surligné++   (Crisp uniquement)`,
+  `  <s>barré</s>                 → ~~barré~~`,
+  `  <code>inline</code>          → \`inline\``,
+  `  <pre><code class="language-bash">cmd</code></pre>  → bloc de code avec lang`,
+  `  <a href="url">label</a>      → [label](url)`,
+  `  <ul><li>item</li></ul>       → liste à puces`,
+  `  <ol><li>étape</li></ol>      → liste numérotée`,
+  `  <blockquote>citation</blockquote>  → "> citation"`,
+  `  <hr>                          → "---" séparateur`,
+  ``,
+  `Balises spéciales Crisp (utilise-les pour mettre en valeur) :`,
+  `  <blockquote class="callout-tip">Astuce.</blockquote>     → boîte d'astuce verte ("| Astuce.")`,
+  `  <blockquote class="callout-info">Information.</blockquote>  → boîte d'info bleue ("|| Info.")`,
+  `  <blockquote class="callout-warning">Attention.</blockquote> → boîte d'avertissement orange ("||| Attention.")`,
+  ``,
+  `Images (avec largeur explicite si pertinent) :`,
+  `  <img src="https://www.buildy.fr/docs/crisp-faq/xxx.webp" alt="description" width="800">`,
+  `  → ![description](url =800xauto) en markdown Crisp.`,
+  `  N'INVENTE PAS d'URL d'image — n'inclus une <img> que si l'utilisateur l'a fournie ou s'il s'agit de remettre une image existante.`,
+  ``,
+  `Embeds vidéo (rares — uniquement si pertinent) :`,
+  `  <a href="https://www.youtube.com/watch?v=ID" data-embed="youtube">titre vidéo</a>`,
+  `  data-embed accepte aussi : "vimeo", "dailymotion", "frame".`,
+  ``,
+  `=== RÈGLES STRICTES ===`,
+  `- Réponds UNIQUEMENT par le HTML du corps de l'article. Pas de préambule "Voici…", pas de conclusion meta, pas de markdown Crisp brut (notre converter s'en charge).`,
+  `- Aucune classe CSS hors les "callout-*" listés. Aucun <div>, <span>, <html>, <body>. Aucun style inline.`,
+  `- Les listes ne s'imbriquent pas (Crisp Markdown ne supporte pas les listes imbriquées proprement).`,
+  `- Espacement : un saut de ligne entre éléments de bloc, c'est le rendu Crisp qui gère le visuel.`,
+  `- Quand tu peux mettre en valeur une astuce, une info importante ou une mise en garde : utilise les callouts <blockquote class="callout-tip|info|warning">. C'est nettement plus efficace qu'un simple <p>.`,
+  `- Quand un mot clé technique est cité pour la 1re fois, l'entourer de <code> aide la lecture (ex : <code>BACnet/IP</code>, <code>buildy.fr</code>).`,
+].join('\n');
+
+const SYSTEM_PROMPT_FAQ_REWRITE = [
+  SYSTEM_PROMPT_FAQ_BASE,
+  ``,
+  `=== MODE : RÉÉCRITURE ===`,
+  `Tu reçois un article existant. Améliore-le SANS changer son sens : clarté, concision, structure aérée, vocabulaire Buildy. Conserve la longueur générale (ne réduis pas drastiquement). Conserve les listes et titres pertinents. Si tu vois une erreur factuelle évidente par rapport au corpus fourni, corrige-la.`,
+  ``,
+  `=== TITRE ===`,
+  `Si le titre actuel est clair, RECOPIE-LE. Sinon propose un meilleur titre via le marker \`<!--TITLE: nouveau titre-->\` AVANT le HTML. Forme nominale courte, sans guillemets ni virgule.`,
+].join('\n');
+
+const SYSTEM_PROMPT_FAQ_GENERATE = [
+  SYSTEM_PROMPT_FAQ_BASE,
+  ``,
+  `=== MODE : GÉNÉRATION ===`,
+  `Tu reçois une question utilisateur. Rédige un article FAQ complet qui y répond. Structure recommandée :`,
+  `1. Un <p> d'introduction qui répond directement à la question (1-2 phrases).`,
+  `2. Le détail en 2-4 paragraphes courts ou une liste si pertinent.`,
+  `3. Une note de clôture (renvoi vers une autre fonctionnalité ou une action utilisateur).`,
+  ``,
+  `Appuie-toi sur le CORPUS BUILDY fourni : ne réinvente pas, cite les fonctionnalités/équipements existants par leur nom officiel.`,
+  ``,
+  `=== TITRE OBLIGATOIRE ===`,
+  `Commence ta réponse par le marker \`<!--TITLE: titre proposé-->\` puis enchaîne le HTML. Forme nominale courte (3-8 mots), centrée sur l'action de l'utilisateur.`,
+].join('\n');
+
+const SYSTEM_PROMPT_FAQ_SUGGEST_MISSING = [
+  `Tu es l'assistant éditorial de la base de connaissance Buildy. Tu reçois :`,
+  `- Le CORPUS Buildy (sections types, équipements, fonctionnalités).`,
+  `- La liste des TITRES d'articles FAQ existants.`,
+  ``,
+  `Mission : identifier 5 à 10 articles MANQUANTS qui devraient exister dans la FAQ pour bien couvrir le corpus. Privilégie les sujets fréquemment posés par les exploitants : démarrage, alarmes, accès, intégrations, contrats, maintenance, dépannage courant, conformité BACS.`,
+  ``,
+  `Format de sortie OBLIGATOIRE — JSON valide UNIQUEMENT, pas de texte autour :`,
+  `\`\`\`json`,
+  `{ "suggestions": [`,
+  `  { "title": "Titre nominal court (3-8 mots)",`,
+  `    "rationale": "Pourquoi cet article manque (1 phrase).",`,
+  `    "source_refs": ["nom de la fonctionnalité ou équipement Buildy lié", "..."] }`,
+  `]}`,
+  `\`\`\``,
+  ``,
+  `Règles : ne propose pas un sujet déjà couvert par un titre existant. Pas de doublon. Pas de marketing. Pas de jargon IT.`,
+].join('\n');
+
+function getActivePrompt(key, fallback) {
+  try {
+    const row = db.aiPrompts && db.aiPrompts.get(key);
+    if (row && row.body && row.body.trim()) return row.body;
+  } catch { /* fallback silencieux */ }
+  return fallback;
+}
+
+// Construit un bloc texte agrégeant le corpus Buildy (sections types,
+// équipements, fonctionnalités) + optionnellement les titres FAQ existants.
+// Volontairement compact (titre + premier paragraphe) pour rester sous le
+// budget tokens. Le résultat est cacheable (change rarement).
+function buildBuildyCorpusContext({ includeFaqTitles = false } = {}) {
+  const lines = [];
+  const truncate = (html, max = 280) => {
+    const txt = stripHtml(html || '');
+    return txt.length > max ? txt.slice(0, max) + '…' : txt;
+  };
+
+  // Sections types narratives
+  try {
+    const sections = db.sectionTemplates?.list?.({ kind: 'standard' }) || [];
+    if (sections.length) {
+      lines.push('## SECTIONS TYPES (narratives)');
+      for (const s of sections) {
+        if (!s.title) continue;
+        const summary = truncate(s.description_html || s.body_html || '');
+        lines.push(`- ${s.title}${summary ? ' — ' + summary : ''}`);
+      }
+      lines.push('');
+    }
+  } catch { /* table ou méthode absente */ }
+
+  // Équipements (templates)
+  try {
+    const eqs = db.equipmentTemplates?.list?.() || [];
+    if (eqs.length) {
+      lines.push('## ÉQUIPEMENTS BUILDY (templates)');
+      for (const e of eqs) {
+        if (!e.name) continue;
+        const summary = truncate(e.description_html || '');
+        lines.push(`- ${e.name}${e.category ? ' [' + e.category + ']' : ''}${summary ? ' — ' + summary : ''}`);
+      }
+      lines.push('');
+    }
+  } catch { /* */ }
+
+  // Fonctionnalités (sections is_functionality=1)
+  try {
+    const features = db.sectionTemplates?.list?.({ kind: 'functionality' }) || [];
+    if (features.length) {
+      lines.push('## FONCTIONNALITÉS BUILDY');
+      for (const f of features) {
+        if (!f.title) continue;
+        const summary = truncate(f.description_html || f.body_html || '');
+        const levels = [];
+        if (f.avail_e) levels.push(`E:${f.avail_e}`);
+        if (f.avail_s) levels.push(`S:${f.avail_s}`);
+        if (f.avail_p) levels.push(`P:${f.avail_p}`);
+        const lvl = levels.length ? ' (' + levels.join(' / ') + ')' : '';
+        lines.push(`- ${f.title}${lvl}${summary ? ' — ' + summary : ''}`);
+      }
+      lines.push('');
+    }
+  } catch { /* */ }
+
+  if (includeFaqTitles) {
+    try {
+      const titles = db.faqArticles?.listAllTitles?.() || [];
+      if (titles.length) {
+        lines.push('## ARTICLES FAQ EXISTANTS (titres)');
+        for (const t of titles) {
+          lines.push(`- ${t.title}`);
+        }
+        lines.push('');
+      }
+    } catch { /* */ }
+  }
+
+  return lines.join('\n');
+}
+
+function _extractTitle(text, currentTitle) {
+  let outHtml = text || '';
+  let suggested_title = null;
+  const m = outHtml.match(/<!--\s*TITLE:\s*(.+?)\s*-->/i);
+  if (m) {
+    const proposed = (m[1] || '').trim();
+    if (proposed && proposed.toLowerCase() !== (currentTitle || '').toLowerCase()) {
+      suggested_title = proposed;
+    }
+    outHtml = outHtml.replace(m[0], '').trim();
+  }
+  return { html: outHtml, suggested_title };
+}
+
+async function assistFaqRewrite({ article }) {
+  if (!article) throw new Error('Article manquant');
+  const corpus = buildBuildyCorpusContext({ includeFaqTitles: false });
+  const systemBlocks = [
+    {
+      type: 'text',
+      text: getActivePrompt(PROMPT_KEY_FAQ_REWRITE, SYSTEM_PROMPT_FAQ_REWRITE),
+      cache_control: { type: 'ephemeral' },
+    },
+    {
+      type: 'text',
+      text: `=== CORPUS BUILDY ===\n${corpus}`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  const userPrompt = [
+    `=== ARTICLE À RÉÉCRIRE ===`,
+    `Titre : ${article.title || ''}`,
+    `Catégorie : ${article.category_name || article.category || '—'}`,
+    ``,
+    `Contenu actuel (HTML) :`,
+    article.content_html || '<p></p>',
+    ``,
+    `Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`,
+  ].join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 2048,
+    system: systemBlocks,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  const { html, suggested_title } = _extractTitle(raw, article.title);
+  return { html, suggested_title, usage: resp.usage };
+}
+
+async function assistFaqGenerate({ question, categoryName = null }) {
+  if (!question || !question.trim()) throw new Error('Question manquante');
+  const corpus = buildBuildyCorpusContext({ includeFaqTitles: false });
+  const systemBlocks = [
+    {
+      type: 'text',
+      text: getActivePrompt(PROMPT_KEY_FAQ_GENERATE, SYSTEM_PROMPT_FAQ_GENERATE),
+      cache_control: { type: 'ephemeral' },
+    },
+    {
+      type: 'text',
+      text: `=== CORPUS BUILDY ===\n${corpus}`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  const userPrompt = [
+    `=== QUESTION CLIENT ===`,
+    question.trim(),
+    ``,
+    categoryName ? `Catégorie cible : ${categoryName}` : null,
+    ``,
+    `Rédige l'article FAQ complet (titre + corps HTML).`,
+  ].filter(Boolean).join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 2048,
+    system: systemBlocks,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  const { html, suggested_title } = _extractTitle(raw, '');
+  return { html, suggested_title, usage: resp.usage };
+}
+
+async function assistFaqSuggestMissing() {
+  const corpus = buildBuildyCorpusContext({ includeFaqTitles: true });
+  const systemBlocks = [
+    {
+      type: 'text',
+      text: getActivePrompt(PROMPT_KEY_FAQ_SUGGEST_MISSING, SYSTEM_PROMPT_FAQ_SUGGEST_MISSING),
+      cache_control: { type: 'ephemeral' },
+    },
+    {
+      type: 'text',
+      text: `=== CORPUS BUILDY + FAQ ===\n${corpus}`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  const userPrompt = `Identifie les articles FAQ manquants. Sortie JSON strict.`;
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 2048,
+    system: systemBlocks,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  let parsed = null;
+  try { parsed = JSON.parse(cleaned); } catch { /* tolerant */ }
+  return {
+    suggestions: Array.isArray(parsed?.suggestions) ? parsed.suggestions : [],
+    usage: resp.usage,
+  };
+}
+
 module.exports = {
   streamSection, buildPrompts, assistLibrary,
   assistAuditSynthesis, assistActionAlternatives, assistTranscriptMapping,
@@ -779,4 +1105,13 @@ module.exports = {
   PROMPT_KEY_LIBRARY,
   DEFAULT_SYSTEM_PROMPT_LIBRARY: SYSTEM_PROMPT_LIBRARY,
   getActivePromptLibrary,
+  // FAQ Buildy / Crisp
+  assistFaqRewrite, assistFaqGenerate, assistFaqSuggestMissing,
+  buildBuildyCorpusContext,
+  PROMPT_KEY_FAQ_REWRITE,
+  PROMPT_KEY_FAQ_GENERATE,
+  PROMPT_KEY_FAQ_SUGGEST_MISSING,
+  DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE: SYSTEM_PROMPT_FAQ_REWRITE,
+  DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE: SYSTEM_PROMPT_FAQ_GENERATE,
+  DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING: SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
 };

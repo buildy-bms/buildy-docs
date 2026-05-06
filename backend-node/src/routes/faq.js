@@ -1,0 +1,340 @@
+'use strict';
+
+// Routes FAQ Buildy / Crisp Knowledge Base.
+//
+// Settings : credentials chiffrés via lib/crypto + website_id + locale.
+// Catégories + articles : CRUD local + push manuel vers Crisp + pull global.
+// IA : 3 endpoints (rewrite / generate / suggest-missing).
+
+const { z } = require('zod');
+const db = require('../database');
+const log = require('../lib/logger').system;
+const { encrypt } = require('../lib/crypto');
+const {
+  loadCrispCredentials,
+  testConnection: testCrispConnection,
+} = require('../lib/crisp');
+const {
+  pullFromCrisp,
+  pushCategoryToCrisp,
+  deleteCategoryOnCrisp,
+  pushArticleToCrisp,
+  deleteArticleOnCrisp,
+} = require('../lib/faq-sync');
+const {
+  assistFaqRewrite,
+  assistFaqGenerate,
+  assistFaqSuggestMissing,
+} = require('../lib/claude');
+const { uploadImage } = require('../lib/faq-image-upload');
+
+// ── Schemas ────────────────────────────────────────────────────────
+const settingsSchema = z.object({
+  api_identifier: z.string().min(1, 'Identifiant API requis'),
+  api_key: z.string().min(1, 'Clé API requise'),
+  website_id: z.string().min(1, 'Website ID requis'),
+  default_locale: z.string().min(2).max(10).optional(),
+});
+
+const categorySchema = z.object({
+  name: z.string().min(1, 'Nom requis'),
+  description: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  order_index: z.number().int().optional(),
+  parent_id: z.number().int().positive().nullable().optional(),
+  locale: z.string().min(2).max(10).optional(),
+});
+
+const articleCreateSchema = z.object({
+  title: z.string().min(1, 'Titre requis'),
+  content_html: z.string().nullable().optional(),
+  category_id: z.number().int().positive().nullable().optional(),
+  status: z.enum(['draft', 'published']).optional(),
+  visibility: z.enum(['public', 'private']).optional(),
+  locale: z.string().min(2).max(10).optional(),
+});
+
+const articleUpdateSchema = articleCreateSchema.partial();
+
+// ── Helpers ────────────────────────────────────────────────────────
+function settingsView() {
+  const row = db.crispSettings.get();
+  return {
+    has_credentials: !!(row && row.api_identifier_encrypted && row.api_key_encrypted),
+    website_id: row?.website_id || null,
+    default_locale: row?.default_locale || 'fr',
+    last_pull_at: row?.last_pull_at || null,
+    last_pull_status: row?.last_pull_status || null,
+    last_pull_error: row?.last_pull_error || null,
+  };
+}
+
+async function routes(fastify) {
+  // ── Settings ────────────────────────────────────────────────────
+  fastify.get('/faq/settings', async () => settingsView());
+
+  fastify.put('/faq/settings', async (request, reply) => {
+    const parsed = settingsSchema.safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const { api_identifier, api_key, website_id, default_locale } = parsed.data;
+    db.crispSettings.upsert({
+      apiIdentifierEncrypted: encrypt(api_identifier),
+      apiKeyEncrypted: encrypt(api_key),
+      websiteId: website_id,
+      defaultLocale: default_locale || 'fr',
+    });
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'faq.settings.update',
+      payload: { website_id, default_locale: default_locale || 'fr' },
+    });
+    log.info(`FAQ Crisp settings mis à jour par user=${request.authUser?.id}`);
+    return settingsView();
+  });
+
+  fastify.post('/faq/test-connection', async () => {
+    const creds = loadCrispCredentials();
+    if (!creds) return { ok: false, error: 'Credentials Crisp non configurés' };
+    return testCrispConnection(creds);
+  });
+
+  fastify.post('/faq/sync/pull', async (request, reply) => {
+    const creds = loadCrispCredentials();
+    if (!creds) return reply.code(400).send({ detail: 'Credentials Crisp non configurés' });
+    try {
+      const result = await pullFromCrisp({});
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.pull',
+        payload: { ...result.pulled, conflicts: result.conflicts.length },
+      });
+      return result;
+    } catch (e) {
+      log.warn(`FAQ pull failed: ${e.message}`);
+      return reply.code(502).send({ detail: e.message });
+    }
+  });
+
+  // ── Catégories ──────────────────────────────────────────────────
+  fastify.get('/faq/categories', async () => {
+    return db.faqCategories.list();
+  });
+
+  fastify.post('/faq/categories', async (request, reply) => {
+    const parsed = categorySchema.safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const data = parsed.data;
+    const created = db.faqCategories.create({
+      name: data.name,
+      description: data.description || null,
+      color: data.color || null,
+      orderIndex: data.order_index || 0,
+      parentId: data.parent_id || null,
+      locale: data.locale || 'fr',
+      dirty: 1,
+    });
+    return created;
+  });
+
+  fastify.patch('/faq/categories/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const cat = db.faqCategories.getById(id);
+    if (!cat) return reply.code(404).send({ detail: 'Catégorie introuvable' });
+    const parsed = categorySchema.partial().safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const patch = {};
+    if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+    if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+    if (parsed.data.color !== undefined) patch.color = parsed.data.color;
+    if (parsed.data.order_index !== undefined) patch.orderIndex = parsed.data.order_index;
+    if (parsed.data.parent_id !== undefined) patch.parentId = parsed.data.parent_id;
+    if (parsed.data.locale !== undefined) patch.locale = parsed.data.locale;
+    patch.dirty = 1;
+    return db.faqCategories.update(id, patch);
+  });
+
+  fastify.delete('/faq/categories/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const force = request.query?.force === '1' || request.query?.force === 'true';
+    try {
+      await deleteCategoryOnCrisp(id, { force });
+      return { ok: true };
+    } catch (e) {
+      const code = e.status || 500;
+      return reply.code(code).send({ detail: e.message });
+    }
+  });
+
+  fastify.post('/faq/categories/:id/push', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    try {
+      const updated = await pushCategoryToCrisp(id);
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.category.push',
+        payload: { id, crisp_id: updated.crisp_id },
+      });
+      return updated;
+    } catch (e) {
+      log.warn(`FAQ push category ${id}: ${e.message}`);
+      return reply.code(502).send({ detail: e.message });
+    }
+  });
+
+  // ── Articles ────────────────────────────────────────────────────
+  fastify.get('/faq/articles', async (request) => {
+    const { category_id, status, q, locale } = request.query || {};
+    return db.faqArticles.list({
+      categoryId: category_id !== undefined ? parseInt(category_id, 10) : null,
+      status: status || null,
+      q: q || null,
+      locale: locale || null,
+    });
+  });
+
+  fastify.get('/faq/articles/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    return article;
+  });
+
+  fastify.post('/faq/articles', async (request, reply) => {
+    const parsed = articleCreateSchema.safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const data = parsed.data;
+    const created = db.faqArticles.create({
+      title: data.title,
+      contentHtml: data.content_html || '',
+      categoryId: data.category_id || null,
+      status: data.status || 'draft',
+      visibility: data.visibility || 'public',
+      locale: data.locale || 'fr',
+      dirty: 1,
+      createdBy: request.authUser?.id || null,
+    });
+    return created;
+  });
+
+  fastify.patch('/faq/articles/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    const parsed = articleUpdateSchema.safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const patch = {};
+    if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+    if (parsed.data.content_html !== undefined) patch.contentHtml = parsed.data.content_html;
+    if (parsed.data.category_id !== undefined) patch.categoryId = parsed.data.category_id;
+    if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+    if (parsed.data.visibility !== undefined) patch.visibility = parsed.data.visibility;
+    if (parsed.data.locale !== undefined) patch.locale = parsed.data.locale;
+    patch.dirty = 1;
+    return db.faqArticles.update(id, patch, request.authUser?.id || null);
+  });
+
+  fastify.delete('/faq/articles/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    try {
+      await deleteArticleOnCrisp(id);
+      return { ok: true };
+    } catch (e) {
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  fastify.post('/faq/articles/:id/push', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    try {
+      const updated = await pushArticleToCrisp(id, request.authUser?.id || null);
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.article.push',
+        payload: { id, crisp_id: updated.crisp_id, status: updated.status },
+      });
+      return updated;
+    } catch (e) {
+      log.warn(`FAQ push article ${id}: ${e.message}`);
+      return reply.code(502).send({ detail: e.message });
+    }
+  });
+
+  // ── IA ──────────────────────────────────────────────────────────
+  fastify.post('/faq/ai/rewrite', async (request, reply) => {
+    const articleId = parseInt(request.body?.article_id, 10);
+    if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
+    const article = db.faqArticles.getById(articleId);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    const cat = article.category_id ? db.faqCategories.getById(article.category_id) : null;
+    try {
+      const result = await assistFaqRewrite({
+        article: { ...article, category_name: cat?.name || null },
+      });
+      db.faqArticles.update(articleId, {
+        lastAiAssistAt: new Date().toISOString(),
+      }, request.authUser?.id || null);
+      return result;
+    } catch (e) {
+      log.warn(`FAQ AI rewrite ${articleId}: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  fastify.post('/faq/ai/generate', async (request, reply) => {
+    const question = (request.body?.question || '').trim();
+    const categoryId = request.body?.category_id ? parseInt(request.body.category_id, 10) : null;
+    if (!question) return reply.code(400).send({ detail: 'question requise' });
+    const cat = categoryId ? db.faqCategories.getById(categoryId) : null;
+    try {
+      return await assistFaqGenerate({
+        question,
+        categoryName: cat?.name || null,
+      });
+    } catch (e) {
+      log.warn(`FAQ AI generate: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  fastify.post('/faq/ai/missing-articles', async (request, reply) => {
+    try {
+      return await assistFaqSuggestMissing();
+    } catch (e) {
+      log.warn(`FAQ AI missing: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  // ── Upload image (multipart) ─────────────────────────────────────
+  // Reçoit un fichier image, l'optimise (sharp), pousse sur FTP OVH,
+  // renvoie l'URL publique pour insertion dans l'éditeur.
+  fastify.post('/faq/upload-image', async (request, reply) => {
+    const file = await request.file();
+    if (!file) return reply.code(400).send({ detail: 'Aucun fichier reçu' });
+    try {
+      const buffer = await file.toBuffer();
+      const result = await uploadImage(buffer, file.mimetype);
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.image.upload',
+        payload: { filename: file.filename, size: result.size, format: result.format },
+      });
+      return result;
+    } catch (e) {
+      log.warn(`FAQ image upload: ${e.message}`);
+      return reply.code(400).send({ detail: e.message });
+    }
+  });
+}
+
+module.exports = routes;

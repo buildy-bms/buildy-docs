@@ -782,8 +782,55 @@ async function routes(fastify) {
       };
     });
 
-    const items = [...equipmentItems, ...sectionItems];
+    // Source 3 — nouveaux templates de la bibliotheque NON encore presents
+    // dans cette AF (sections narratives + fonctionnalites). Le user peut
+    // les ajouter en un clic via POST /template-updates/add-missing.
+    const missingTpls = db.sectionTemplates.missingByAf(id);
+    const missingItems = missingTpls.map(t => ({
+      source: t.is_functionality ? 'new_functionality' : 'new_section',
+      // Pas de section_id (la section n'existe pas encore). On cle par template_id.
+      section_id: null,
+      missing_template_id: t.id,
+      section_number: null,
+      section_title: t.title, // titre proposé = titre du template
+      template_id: t.id,
+      template_name: t.title,
+      template_slug: t.slug,
+      from_version: 0,
+      to_version: t.current_version,
+      total_changes: 1,
+      // Apercu du body propose pour le panneau deplie
+      body_preview: (t.body_html || '').replace(/<[^>]*>/g, '').slice(0, 200),
+    }));
+
+    const items = [...equipmentItems, ...sectionItems, ...missingItems];
     return { count: items.length, items };
+  });
+
+  // POST /api/afs/:id/template-updates/add-missing/:templateId — insere
+  // un section_template manquant dans cette AF. Retourne le nouveau
+  // section_id ou un detail d'erreur.
+  fastify.post('/afs/:id/template-updates/add-missing/:templateId', async (request, reply) => {
+    const afId = parseInt(request.params.id, 10);
+    const templateId = parseInt(request.params.templateId, 10);
+    const af = db.afs.getById(afId);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    const result = db.sectionTemplates.addMissingTemplateToAf(afId, templateId);
+    if (!result.ok) {
+      const reasonMsg = {
+        'template-not-found': 'Template introuvable',
+        'not-af-tagged': 'Template non tagué AF',
+        'skipped-exists': 'Section déjà présente dans cette AF',
+        'skipped-no-parent': 'Le chapitre parent n\'existe pas dans cette AF',
+      }[result.reason] || 'Échec de l\'insertion';
+      return reply.code(409).send({ detail: reasonMsg, reason: result.reason });
+    }
+    db.auditLog.add({
+      afId, userId: request.authUser?.id,
+      action: 'af.add_missing_template',
+      payload: { template_id: templateId },
+    });
+    return { ok: true };
   });
 }
 
