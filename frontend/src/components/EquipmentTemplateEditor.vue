@@ -420,7 +420,12 @@ async function destroy() {
         </span>
       </div>
     </div>
-    <form @submit.prevent="submit" class="space-y-2">
+    <form @submit.prevent="submit" class="space-y-2.5">
+      <!-- Sous-bloc IDENTITÉ : sections parentes, nom, categorie, slug. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Identité
+        </legend>
 
       <!-- Sections parentes : multi-select chips + popover de recherche -->
       <div v-if="isEdit">
@@ -516,23 +521,13 @@ async function destroy() {
                placeholder="pac-air-eau"
                class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
+      </fieldset>
 
-      <!-- BACS herite de la categorie : lecture seule, edite via la page Categories -->
-      <div v-if="isEdit && (template.bacs_articles || template.bacs_inherited_from)">
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
-        <div class="flex items-start gap-2 px-3 py-2 bg-purple-50/50 border border-purple-200 rounded-lg text-xs">
-          <ScaleIcon class="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-          <div class="min-w-0">
-            <p class="text-gray-700">
-              <span class="font-medium">{{ template.bacs_articles || '— (catégorie sans BACS)' }}</span>
-            </p>
-            <p v-if="template.bacs_inherited_from" class="text-[11px] text-gray-500 mt-0.5">
-              Hérité de la catégorie « {{ template.bacs_inherited_from.label }} » — édité dans Catégories de systèmes.
-            </p>
-          </div>
-        </div>
-      </div>
-
+      <!-- Sous-bloc APPARENCE : icone + couleur. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Apparence
+        </legend>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Icône & couleur</label>
         <div class="flex items-center gap-2">
@@ -563,7 +558,27 @@ async function destroy() {
           <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" title="Couleur personnalisée" />
         </div>
       </div>
+      </fieldset>
 
+      <!-- Sous-bloc TECHNIQUE : BACS herite + protocoles exiges. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Technique
+        </legend>
+        <div v-if="isEdit && (template.bacs_articles || template.bacs_inherited_from)">
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
+          <div class="flex items-start gap-2 px-3 py-1.5 bg-purple-50/50 border border-purple-200 rounded-lg text-xs">
+            <ScaleIcon class="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+            <div class="min-w-0">
+              <p class="text-gray-700">
+                <span class="font-medium">{{ template.bacs_articles || '— (catégorie sans BACS)' }}</span>
+              </p>
+              <p v-if="template.bacs_inherited_from" class="text-[11px] text-gray-500 mt-0.5">
+                Hérité de la catégorie « {{ template.bacs_inherited_from.label }} » — édité dans Catégories de systèmes.
+              </p>
+            </div>
+          </div>
+        </div>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Protocoles exigés</label>
         <div class="flex flex-wrap gap-1.5 items-center">
@@ -592,7 +607,13 @@ async function destroy() {
           </div>
         </div>
       </div>
+      </fieldset>
 
+      <!-- Sous-bloc CONTENU : description fonctionnelle + justification BACS. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Contenu
+        </legend>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
           Description fonctionnelle
@@ -628,6 +649,7 @@ async function destroy() {
           }"
         />
       </div>
+      </fieldset>
 
       <!-- Donnees lues / ecrites + Captures : repliables (gain de hauteur).
            Auto-deplies sur des modeles deja peuples. -->

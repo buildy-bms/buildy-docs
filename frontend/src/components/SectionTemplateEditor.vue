@@ -467,103 +467,102 @@ async function destroy() {
         </span>
       </div>
     </div>
-    <form @submit.prevent="submit" class="space-y-2">
-      <!-- Ligne 1 : Titre seul (champ principal, full width) -->
-      <div>
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Titre *</label>
-        <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
-               :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
-               class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-      </div>
-
-      <!-- Ligne 2 : Icone + Section parente cote a cote (2 colonnes). En
-           mode 'standard', remplace l'icone par le selecteur Type. -->
-      <div class="grid grid-cols-2 gap-2">
-        <div v-if="mode === 'functionality'">
-          <label class="block text-[11px] font-medium text-gray-600 mb-0.5"
-                 title="Affichée dans la liste, la brochure et le tableau des offres">
-            Icône
-          </label>
-          <FaIconPicker v-model="form.icon_name" />
-        </div>
-        <div v-else>
-          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de section</label>
-          <select v-model="form.kind"
-                  class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
-            <option v-for="o in KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-        </div>
+    <form @submit.prevent="submit" class="space-y-2.5">
+      <!-- Sous-bloc IDENTITÉ : titre, icone/type, section parente. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Identité
+        </legend>
         <div>
-          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Section parente</label>
-          <SearchableSelect
-            v-model="form.parent_template_id"
-            :options="parentSelectOptions"
-            placeholder="— (top-level)"
-            search-placeholder="Rechercher une section parente…"
-          />
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Titre *</label>
+          <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
+                 :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
+                 class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
-      </div>
-
-      <!-- Picker du modele d'equipement : uniquement pour kind=equipment -->
-      <div v-if="form.kind === 'equipment'">
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Modèle d'équipement</label>
-        <button type="button" @click="showEquipmentPicker = true"
-                class="w-full text-left px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
-          <span v-if="form.equipment_template_id" class="text-gray-800">
-            {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }}
-            <span class="text-gray-400 text-xs">— cliquer pour changer</span>
-          </span>
-          <span v-else class="text-gray-400 italic">Aucun équipement choisi — cliquer pour sélectionner</span>
-        </button>
-      </div>
-
-      <!-- BACS (multi-select) : uniquement pour les fonctionnalites -->
-      <div v-if="showBacs">
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
-        <BacsArticlesPicker v-model="form.bacs_articles" />
-      </div>
-
-      <!-- Multi-tagging par type de document Buildy (Lot — migration 78).
-           Permet de definir dans quels documents la section apparait : AF
-           livree au client, brochure technico-commerciale, audit BACS, etc.
-           Heritage parent -> enfants en cascade a la sauvegarde.
-           Layout compact : label + cascade-toggle + pills sur 2 lignes max. -->
-      <div>
-        <div class="flex items-center justify-between gap-3 mb-1">
-          <label class="text-[11px] font-medium text-gray-600">
-            Documents où cette {{ labelEntity }} apparaît
-          </label>
-          <label v-if="isEdit" class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none whitespace-nowrap">
-            <input v-model="cascadeDocumentKinds" type="checkbox"
-                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0 w-3.5 h-3.5" />
-            <span>Propager aux sous-sections</span>
-          </label>
+        <div class="grid grid-cols-2 gap-2">
+          <div v-if="mode === 'functionality'">
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5"
+                   title="Affichée dans la liste, la brochure et le tableau des offres">
+              Icône
+            </label>
+            <FaIconPicker v-model="form.icon_name" />
+          </div>
+          <div v-else>
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de section</label>
+            <select v-model="form.kind"
+                    class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
+              <option v-for="o in KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Section parente</label>
+            <SearchableSelect
+              v-model="form.parent_template_id"
+              :options="parentSelectOptions"
+              placeholder="— (top-level)"
+              search-placeholder="Rechercher une section parente…"
+            />
+          </div>
         </div>
-        <div class="flex flex-wrap gap-1.5">
-          <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
-                  @click="toggleDocumentKind(dk.kind)"
-                  :title="dk.description"
-                  :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition whitespace-nowrap',
-                           isDocumentKindActive(dk.kind)
-                             ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
-                             : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
-            <span :class="['w-1.5 h-1.5 rounded-full shrink-0', isDocumentKindActive(dk.kind) ? 'bg-indigo-600' : 'bg-gray-300']" />
-            <span class="font-medium">{{ dk.label }}</span>
+        <!-- Picker du modele d'equipement : uniquement pour kind=equipment -->
+        <div v-if="form.kind === 'equipment'">
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Modèle d'équipement</label>
+          <button type="button" @click="showEquipmentPicker = true"
+                  class="w-full text-left px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
+            <span v-if="form.equipment_template_id" class="text-gray-800">
+              {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }}
+              <span class="text-gray-400 text-xs">— cliquer pour changer</span>
+            </span>
+            <span v-else class="text-gray-400 italic">Aucun équipement choisi — cliquer pour sélectionner</span>
           </button>
         </div>
-        <p v-if="!form.document_kinds?.length" class="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
-          ⚠ Sans aucun tag, cette section n'apparaîtra dans aucun document.
-        </p>
-      </div>
+      </fieldset>
 
-      <!-- Matrice de disponibilite par niveau de contrat (Lot 36).
-           Layout compact : 1 ligne, 3 colonnes E/S/P, segmented icon-only.
-           Hover sur une icone = label complet. -->
-      <div v-if="showAvailability">
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+      <!-- Sous-bloc CLASSIFICATION : BACS + types de documents.
+           Heritage parent -> enfants en cascade a la sauvegarde. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Classification
+        </legend>
+        <div v-if="showBacs">
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
+          <BacsArticlesPicker v-model="form.bacs_articles" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <label class="text-[11px] font-medium text-gray-600">
+              Documents où cette {{ labelEntity }} apparaît
+            </label>
+            <label v-if="isEdit" class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none whitespace-nowrap">
+              <input v-model="cascadeDocumentKinds" type="checkbox"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0 w-3.5 h-3.5" />
+              <span>Propager aux sous-sections</span>
+            </label>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
+                    @click="toggleDocumentKind(dk.kind)"
+                    :title="dk.description"
+                    :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition whitespace-nowrap',
+                             isDocumentKindActive(dk.kind)
+                               ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
+                               : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
+              <span :class="['w-1.5 h-1.5 rounded-full shrink-0', isDocumentKindActive(dk.kind) ? 'bg-indigo-600' : 'bg-gray-300']" />
+              <span class="font-medium">{{ dk.label }}</span>
+            </button>
+          </div>
+          <p v-if="!form.document_kinds?.length" class="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
+            ⚠ Sans aucun tag, cette section n'apparaîtra dans aucun document.
+          </p>
+        </div>
+      </fieldset>
+
+      <!-- Sous-bloc DISPONIBILITÉ : matrice E/S/P (fonctionnalites uniquement). -->
+      <fieldset v-if="showAvailability" class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
           Disponibilité par niveau
-          <span class="text-gray-400 font-normal">— ❌ non dispo · ✓ inclus · € option payante</span>
-        </label>
+          <span class="text-gray-400 font-normal normal-case tracking-normal">— ❌ non dispo · ✓ inclus · € option</span>
+        </legend>
         <div class="grid grid-cols-3 gap-2">
           <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code"
                class="flex items-center justify-between gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1">
@@ -586,21 +585,20 @@ async function destroy() {
             </div>
           </div>
         </div>
-      </div>
+      </fieldset>
 
-      <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
-      <div v-if="form.kind === 'standard'">
-        <div class="flex items-center justify-between mb-0.5">
-          <label class="block text-[11px] font-medium text-gray-600">
+      <!-- Sous-bloc CONTENU : RichText editor (kind=standard uniquement). -->
+      <fieldset v-if="form.kind === 'standard'" class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5">
+        <legend class="px-1.5 flex items-center gap-2">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
             Contenu canonique
-            <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
-          </label>
+          </span>
           <button v-if="isEdit" type="button" @click="openHistory"
-                  class="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition whitespace-nowrap"
+                  class="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition whitespace-nowrap normal-case tracking-normal"
                   title="Voir l'historique des modifications du texte et restaurer une version antérieure">
             <ClockIcon class="w-3.5 h-3.5" /> Historique
           </button>
-        </div>
+        </legend>
         <RichTextEditor
           v-model="form.body_html"
           placeholder="Ce que dit cette section dans le style Buildy : 2-4 paragraphes courts, ton sobre et technique, vocabulaire métier GTB précis…"
@@ -616,12 +614,11 @@ async function destroy() {
             parent_template_id: form.parent_template_id || null,
           }"
         />
-      </div>
-
-      <p v-if="isEdit && form.kind === 'standard'"
-         class="text-[11px] text-gray-500 italic">
-        Les AFs existantes restent figées sur la version liée. La mise à jour est proposée à l'ouverture de chaque AF.
-      </p>
+        <p v-if="isEdit"
+           class="text-[11px] text-gray-500 italic mt-1.5">
+          Les AFs existantes restent figées sur la version liée. La mise à jour est proposée à l'ouverture de chaque AF.
+        </p>
+      </fieldset>
 
       <!-- Captures du modele : repliable pour ne pas occuper la moitie de
            la modale en permanence. Auto-deplie si attachments existent. -->
