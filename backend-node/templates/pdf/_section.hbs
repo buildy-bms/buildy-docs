@@ -176,10 +176,9 @@
 
   {{#if attachments.length}}
   <div class="captures">
-    <h5 class="captures-title">Captures ({{attachments.length}})</h5>
     {{#each attachments}}
     <div class="capture">
-      <img src="{{dataUrl}}" alt="{{caption}}" />
+      <img src="{{dataUrl}}" alt="{{caption}}" {{#if width}}width="{{width}}"{{/if}} {{#if height}}height="{{height}}"{{/if}} />
       {{#if caption}}<p class="capture-caption">{{caption}}</p>{{/if}}
     </div>
     {{/each}}
