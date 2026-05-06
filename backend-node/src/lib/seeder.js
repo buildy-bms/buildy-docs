@@ -44,7 +44,15 @@ function seedLibraryOnBoot() {
   let pointsCreated = 0;
   let pointsEnriched = 0;
 
+  // Tombstones : si l'utilisateur a explicitement supprime un equipement de
+  // la bibliotheque via l'UI, on ne le recree pas au boot suivant. Symetrique
+  // de deleted_section_template_slugs (cf. lib/seeder.js section_templates).
+  const tombstonedSlugs = new Set(
+    db.db.prepare('SELECT slug FROM deleted_equipment_template_slugs').all().map(r => r.slug)
+  );
+
   for (const tpl of ALL_TEMPLATES) {
+    if (tombstonedSlugs.has(tpl.slug)) continue;
     const existing = db.equipmentTemplates.getBySlug(tpl.slug);
     if (!existing) {
       // Création complète
@@ -359,8 +367,11 @@ function libraryExtendAf(afId) {
   const allLib = db.equipmentTemplates.list();
   if (!allLib.length) return 0;
   const sections = db.db.prepare(`
-    SELECT id, parent_id, number, kind, equipment_template_id, position, title
-    FROM sections WHERE af_id = ? ORDER BY parent_id NULLS FIRST, position
+    SELECT s.id, s.parent_id, s.number, s.kind, s.equipment_template_id, s.position,
+           s.title, stt.library_categories AS tpl_library_categories
+    FROM sections s
+    LEFT JOIN section_templates stt ON stt.id = s.section_template_id
+    WHERE s.af_id = ? ORDER BY s.parent_id NULLS FIRST, s.position
   `).all(afId);
   const byId = new Map(sections.map(s => [s.id, s]));
   const childrenOf = new Map();
@@ -375,15 +386,26 @@ function libraryExtendAf(afId) {
     if (!parentId) continue; // top-level : on n'extend pas la racine
     const parent = byId.get(parentId);
     if (!parent) continue;
-    const eqKids = kids.filter(k => k.kind === 'equipment' && k.equipment_template_id);
-    if (!eqKids.length) continue;
-    const existingTplIds = new Set(eqKids.map(k => k.equipment_template_id));
+    // Categories cibles : (1) declaratif via section_templates.library_categories
+    // sur le parent (Lot mig 95), augmente par (2) detection automatique des
+    // categories des enfants equipment deja inseres. Le declaratif protege
+    // contre la perte de categorie quand un equipement de la lib est supprime
+    // (ex : drv tombstone -> la cat 'climatisation' disparaitrait sans le
+    // declaratif, et unite-interieure-drv ne serait plus injectee).
     const cats = new Set();
+    if (parent.tpl_library_categories) {
+      try {
+        const declared = JSON.parse(parent.tpl_library_categories);
+        if (Array.isArray(declared)) for (const c of declared) cats.add(c);
+      } catch { /* JSON invalide -> ignore */ }
+    }
+    const eqKids = kids.filter(k => k.kind === 'equipment' && k.equipment_template_id);
     for (const k of eqKids) {
       const t = tplById.get(k.equipment_template_id);
       if (t?.category) cats.add(t.category);
     }
     if (!cats.size) continue;
+    const existingTplIds = new Set(eqKids.map(k => k.equipment_template_id));
     let nextIdx = kids.length;
     let nextPos = kids.reduce((m, k) => Math.max(m, k.position || 0), 0);
     for (const lib of allLib) {
