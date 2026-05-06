@@ -228,29 +228,37 @@ const SYSTEM_PROMPT_LIBRARY = [
   ``,
   `=== SUGGESTION DE TITRE (OBLIGATOIRE en tete de reponse) ===`,
   `Tu DOIS commencer ta reponse par la ligne EXACTE \`<!--TITLE: titre-->\` puis enchainer sur le HTML.`,
-  `Le titre cible un INTEGRATEUR GTB / un EXPLOITANT (pro technique). Style PROFESSIONNEL et DESCRIPTIF, qui designe clairement L'OBJET METIER concerne :`,
-  `- Forme nominale (groupe nominal francais classique), 3 a 8 mots.`,
-  `- AJOUTE LA PRECISION FONCTIONNELLE quand elle manque : ne pas s'arreter au mecanisme, completer par l'objet metier.`,
-  `  Mauvais (trop generique / brut) → Bon (precise + valeur metier sobre) :`,
-  `  • "Detection des derives"           → "Detection des derives de consommation"`,
-  `  • "Notifications par email"          → "Notifications email des alarmes critiques"`,
-  `  • "Acces simplifie par QR Codes"     → "Acces aux equipements par QR Code"`,
-  `  • "API Buildy Connect"               → "Ouverture API vers les systemes tiers"`,
-  `  • "Mises a jour automatiques"        → "Mises a jour automatiques des passerelles"`,
+  `CIBLE DU TITRE : EXPLOITANTS DE BATIMENT (gestionnaires de patrimoine, facility managers) et CONSTRUCTEURS DE BATIMENT (MOA, MOE, AMO, BE thermique). PAS des integrateurs GTB ni des developpeurs.`,
+  `Ils comprennent le langage du batiment et de l'exploitation, mais PAS le jargon IT / GTB-technique pur.`,
+  `Style : forme nominale francaise, claire, accessible, axee EXPLOITATION et VALEUR pour le batiment.`,
+  ``,
+  `Reformule les jargons techniques internes en concepts d'exploitation :`,
+  `  Trop technique → Niveau exploitant/constructeur :`,
+  `  • "Acquisition temps reel des points terrain"  → "Suivi en temps reel des equipements techniques"`,
+  `  • "Detection des derives"                       → "Detection des derives de consommation"`,
+  `  • "Notifications par email"                     → "Alertes par email"`,
+  `  • "Acces simplifie par QR Codes"                → "Acces rapide aux equipements par QR Code"`,
+  `  • "API Buildy Connect"                          → "Ouverture vers vos logiciels metiers"`,
+  `  • "Mises a jour automatiques des apps"          → "Mises a jour automatiques de la passerelle"`,
+  `  • "Cartographie multi-sites"                     → "Cartographie de votre parc de batiments"`,
+  ``,
+  `Vocabulaire OK : exploitation, batiment, equipement technique, consommation, alarme, releve, suivi, parc, patrimoine, site, energie, conformite, decret BACS, maintenance.`,
+  `Vocabulaire a TRADUIRE (trop IT/GTB) : point, point terrain, polling, trame, broker MQTT, daemon, serveur, instance, provisionning, bus, automate.`,
   `INTERDIT (sloganesque, marketing creux) :`,
   `  • "Terrain toujours visible, en temps reel"   ← ton publicitaire`,
   `  • "Restez informe en temps reel"              ← injonction client, pas un titre de doc`,
+  `  • "Surveillance proactive des consommations"  ← "proactive" = jargon marketing`,
   `  • "Toujours a jour, sans intervention"        ← punchline`,
-  `  • "Surveillance proactive des consommations"  ← jargon marketing ("proactive")`,
+  ``,
   `Garde-fous :`,
-  `- Pas de phrases-slogan, pas d'injonctions au lecteur ("Restez...", "Pilotez...", "Gardez la main..."), pas de "Toujours..." en tete.`,
-  `- Pas de superlatifs ni de jargon marketing : "proactive", "intelligente", "puissante", "instantane", "revolutionnaire", "complete" -> a EVITER.`,
-  `- Pas de virgule : un titre = une formule nominale unitaire.`,
-  `- Vocabulaire metier GTB direct (supervision, alarme, regulation, point, releve, consommation, derive, etc.).`,
-  `- Si le titre courant est deja descriptif et clair (ex : "Acquisition temps reel des points terrain"), RECOPIE-LE tel quel.`,
-  `- Si le titre courant est vague ou tronque, ajoute la precision metier manquante.`,
+  `- Forme nominale (groupe nominal), 3 a 8 mots, sans virgule, sans guillemets francais.`,
+  `- Pas d'injonction au lecteur ("Restez...", "Pilotez...", "Gardez la main...").`,
+  `- Pas de superlatifs ni de jargon marketing : "proactive", "intelligente", "puissante", "instantane", "revolutionnaire" -> a EVITER.`,
+  `- Pas de jargon IT pur : voir liste ci-dessus.`,
+  `- Si le titre courant est deja accessible, descriptif et de niveau exploitant, RECOPIE-LE tel quel.`,
+  `- Si le titre courant est trop technique/IT, traduis-le en langage exploitation.`,
   `- Le marker doit TOUJOURS etre present, meme si tu recopies le titre actuel.`,
-  `Exemple : \`<!--TITLE: Acquisition temps reel des points terrain-->\` puis HTML.`,
+  `Exemple : \`<!--TITLE: Suivi en temps reel des equipements techniques-->\` puis HTML.`,
   ``,
   `=== RYTHME VISUEL — IMPORTANT ===`,
   `Le contenu doit etre AERE et lisible, pas un pave dense.`,
@@ -296,16 +304,18 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     }
     lines.push(`=== INSTRUCTION ===`);
     lines.push(`Propose un meilleur titre pour cette entite. Tiens compte du contenu fourni s'il y en a.`);
-    lines.push(`Cible : INTEGRATEUR GTB / EXPLOITANT (pro technique). Style PROFESSIONNEL DESCRIPTIF, qui designe l'OBJET METIER.`);
-    lines.push(`- Forme nominale francaise (3 a 8 mots), specifique, sans guillemets francais, sans virgule.`);
-    lines.push(`- AJOUTE LA PRECISION METIER quand elle manque :`);
-    lines.push(`  • "Detection des derives"        → "Detection des derives de consommation"`);
-    lines.push(`  • "Notifications par email"      → "Notifications email des alarmes critiques"`);
-    lines.push(`  • "Mises a jour automatiques"    → "Mises a jour automatiques des passerelles"`);
-    lines.push(`INTERDIT (sloganesque) : "Terrain toujours visible en temps reel", "Restez informe en temps reel", "Toujours a jour sans intervention".`);
-    lines.push(`Pas de jargon marketing : "proactive", "intelligente", "puissante", "instantane", "revolutionnaire" sont a EVITER.`);
-    lines.push(`Pas d'injonction au lecteur ("Restez...", "Pilotez..."). Pas de "Toujours..." en tete.`);
-    lines.push(`Si le titre courant est deja clair, RECOPIE-LE TEL QUEL.`);
+    lines.push(`CIBLE : EXPLOITANTS DE BATIMENT (FM, gestionnaires patrimoine) et CONSTRUCTEURS (MOA, MOE, BE). PAS des integrateurs GTB ni des dev.`);
+    lines.push(`Style : forme nominale francaise (3 a 8 mots), claire, accessible, axee EXPLOITATION/VALEUR batiment. Sans virgule, sans guillemets francais.`);
+    lines.push(`Traduis le jargon technique en langage exploitation :`);
+    lines.push(`  • "Acquisition temps reel des points terrain" → "Suivi en temps reel des equipements techniques"`);
+    lines.push(`  • "Detection des derives"                       → "Detection des derives de consommation"`);
+    lines.push(`  • "Notifications par email"                     → "Alertes par email"`);
+    lines.push(`  • "API Buildy Connect"                          → "Ouverture vers vos logiciels metiers"`);
+    lines.push(`Vocabulaire OK : exploitation, batiment, equipement technique, consommation, alarme, suivi, parc, patrimoine, energie, conformite, decret BACS.`);
+    lines.push(`A TRADUIRE (trop IT/GTB) : point, point terrain, polling, trame, broker, daemon, instance, automate.`);
+    lines.push(`INTERDIT (sloganesque) : "Terrain toujours visible…", "Restez informe…", "Surveillance proactive…", "Toujours a jour, sans intervention".`);
+    lines.push(`Pas de jargon marketing ("proactive", "intelligente", "puissante", "instantane"). Pas d'injonction au lecteur ("Restez...", "Pilotez...").`);
+    lines.push(`Si le titre actuel est deja accessible et clair pour un exploitant, RECOPIE-LE tel quel.`);
     lines.push(`REPONDS UNIQUEMENT PAR LA LIGNE \`<!--TITLE: titre propose-->\` ET RIEN D'AUTRE.`);
     lines.push(`Aucun HTML, aucun preambule, aucune explication. Juste le marker.`);
     return lines.join('\n');
