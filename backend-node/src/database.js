@@ -4400,7 +4400,8 @@ const sections = {
              stt.icon_name AS tpl_icon_name,
              eqt.icon_kind AS eq_icon_kind,
              eqt.icon_value AS eq_icon_value,
-             eqt.icon_color AS eq_icon_color
+             eqt.icon_color AS eq_icon_color,
+             eqt.category AS eq_category
       FROM sections s
       LEFT JOIN section_templates stt ON stt.id = s.section_template_id
       LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id

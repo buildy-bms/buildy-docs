@@ -124,6 +124,73 @@ async function buildAfExportData(af, opts = {}) {
   );
   const resolveLiveBacs = buildLiveBacsResolver();
 
+  // Catalogue des categories de systeme (cle -> {icon_value, icon_color})
+  // pour propager dans le PDF les icones colorees des sections « categorie »
+  // qui regroupent des equipements (ex : Chauffage, Ventilation, Comptage…).
+  // Une section parent est consideree comme categorie si tous ses descendants
+  // de kind='equipment' partagent la meme `eqt.category`.
+  const categoriesByKey = new Map();
+  for (const c of db.systemCategoriesDb.list()) {
+    categoriesByKey.set(c.key, c);
+    if (Array.isArray(c.slugs)) for (const slug of c.slugs) categoriesByKey.set(slug, c);
+  }
+  // Pour chaque section, agreger les categories distinctes des descendants
+  // equipment. Si UNE seule categorie -> on l'attribue a la section.
+  const sectionCategoryKey = new Map();
+  {
+    const childrenByParent = new Map();
+    for (const s of allSections) {
+      const k = s.parent_id || null;
+      if (!childrenByParent.has(k)) childrenByParent.set(k, []);
+      childrenByParent.get(k).push(s);
+    }
+    function gatherCategories(sectionId) {
+      const set = new Set();
+      const stack = [sectionId];
+      while (stack.length) {
+        const cur = stack.pop();
+        const kids = childrenByParent.get(cur) || [];
+        for (const k of kids) {
+          if (k.kind === 'equipment' && k.eq_category) set.add(k.eq_category);
+          stack.push(k.id);
+        }
+      }
+      return set;
+    }
+    for (const s of allSections) {
+      if (s.kind === 'equipment') continue; // resolu directement via eq_*
+      const cats = gatherCategories(s.id);
+      if (cats.size === 1) sectionCategoryKey.set(s.id, [...cats][0]);
+    }
+  }
+  function resolveSectionIcon(s) {
+    // 1. Equipement : icone du template equipement
+    if (s.kind === 'equipment' && s.eq_icon_value) {
+      return {
+        icon_kind: s.eq_icon_kind || 'fa',
+        icon_value: s.eq_icon_value,
+        icon_color: s.eq_icon_color || null,
+      };
+    }
+    // 2. Section categorie : icone de la system_category correspondante
+    const catKey = sectionCategoryKey.get(s.id);
+    if (catKey) {
+      const cat = categoriesByKey.get(catKey);
+      if (cat) {
+        return {
+          icon_kind: 'fa',
+          icon_value: cat.icon_value || null,
+          icon_color: cat.icon_color || null,
+        };
+      }
+    }
+    // 3. Section_template avec icon_name (sans couleur — fallback gris fonce)
+    if (s.tpl_icon_name) {
+      return { icon_kind: 'fa', icon_value: s.tpl_icon_name, icon_color: null };
+    }
+    return { icon_kind: null, icon_value: null, icon_color: null };
+  }
+
   // Numérotation live : recalculée depuis les positions courantes dans
   // l'arbre, identique à la logique frontend (`stores/af.js`). Le `number`
   // figé en DB devient stale dès qu'une section est déplacée ou exclue,
@@ -289,11 +356,14 @@ async function buildAfExportData(af, opts = {}) {
           (db.sectionTemplates.getById(s.section_template_id)?.slug === '13' ||
            s.number === '13');
         const liveBacs = resolveLiveBacs(s);
+        const ico = resolveSectionIcon(s);
         return {
           id: s.id,
           number: liveNumber,
           title: s.title,
-          icon_name: s.tpl_icon_name || null,
+          icon_name: ico.icon_value || s.tpl_icon_name || null,
+          icon_color: ico.icon_color || null,
+          icon_kind: ico.icon_kind || null,
           service_level: sl,
           service_level_label: formatLevelFull(sl),
           badgeClass: badgeClass || 'ESP',
