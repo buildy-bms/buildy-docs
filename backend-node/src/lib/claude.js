@@ -399,9 +399,10 @@ async function assistLibrary({
   // Extraction d'une suggestion de titre (optionnelle). Claude est invite a
   // commencer par `<!--TITLE: ...-->` quand il pense que le titre courant
   // peut etre ameliore. On separe ce commentaire du HTML retourne.
+  // (variable `html` deja prise par le parametre destructure -> `outHtml`)
   let suggested_title = null;
-  let html = text;
-  const titleMatch = html.match(/^\s*<!--\s*TITLE:\s*(.+?)\s*-->\s*/i);
+  let outHtml = text;
+  const titleMatch = outHtml.match(/^\s*<!--\s*TITLE:\s*(.+?)\s*-->\s*/i);
   if (titleMatch) {
     const proposed = (titleMatch[1] || '').trim();
     // On ignore une suggestion identique au titre courant (Claude verifie
@@ -409,10 +410,10 @@ async function assistLibrary({
     if (proposed && proposed.toLowerCase() !== (title || '').toLowerCase()) {
       suggested_title = proposed;
     }
-    html = html.slice(titleMatch[0].length);
+    outHtml = outHtml.slice(titleMatch[0].length);
   }
   return {
-    html,
+    html: outHtml,
     suggested_title,
     usage: resp.usage,
     library_context: corpus ? {
