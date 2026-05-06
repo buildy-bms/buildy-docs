@@ -178,19 +178,25 @@ function teardownRootSortable() {
 function setupRootSortable() {
   teardownRootSortable()
   if (!rootContainerRef.value) return
+  rootContainerRef.value.setAttribute('data-parent-id', '')
   rootSortable = Sortable.create(rootContainerRef.value, {
     animation: 150,
+    // Groupe partagé pour drag-drop entre toutes les fratries (re-parentage).
+    group: 'sections-tree',
     handle: '.section-drag-handle',
     ghostClass: 'section-tree-ghost',
     chosenClass: 'section-tree-chosen',
     dragClass: 'section-tree-dragging',
     fallbackOnBody: true,
     onEnd: (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
-      const ids = Array.from(rootContainerRef.value.children)
+      const sameContainer = evt.from === evt.to
+      if (sameContainer && evt.oldIndex === evt.newIndex) return
+      const newParentAttr = evt.to.getAttribute('data-parent-id') || ''
+      const newParentId = newParentAttr === '' ? null : parseInt(newParentAttr, 10)
+      const ids = Array.from(evt.to.children)
         .map(el => parseInt(el.getAttribute('data-id'), 10))
         .filter(Boolean)
-      emit('reorder-children', { parentId: null, ids })
+      emit('reorder-children', { parentId: newParentId, ids })
     },
   })
 }

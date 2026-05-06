@@ -131,30 +131,45 @@ function teardownSortable() {
 function setupSortable() {
   teardownSortable()
   if (!childrenContainerRef.value) return
+  // data-parent-id sur le container = parent dont les enfants sont
+  // re-arranges. Permet au onEnd de detecter le re-parentage cross-fratries.
+  childrenContainerRef.value.setAttribute('data-parent-id', String(props.node.id))
   sortable = Sortable.create(childrenContainerRef.value, {
     animation: 150,
+    // Groupe partagé = drag-drop possible entre toutes les fratries du tree
+    // (cf. SectionTree top-level). Re-parentage autorisé.
+    group: 'sections-tree',
     handle: '.section-drag-handle',
     ghostClass: 'section-tree-ghost',
     chosenClass: 'section-tree-chosen',
     dragClass: 'section-tree-dragging',
     fallbackOnBody: true,
     onEnd: (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
-      const ids = Array.from(childrenContainerRef.value.children)
+      // Le drop a-t-il vraiment bouge l'element ?
+      const sameContainer = evt.from === evt.to
+      if (sameContainer && evt.oldIndex === evt.newIndex) return
+      // evt.to est le container destination. On lit son data-parent-id pour
+      // identifier le nouveau parent (null pour root, sinon section.id).
+      const newParentAttr = evt.to.getAttribute('data-parent-id') || ''
+      const newParentId = newParentAttr === '' ? null : parseInt(newParentAttr, 10)
+      const ids = Array.from(evt.to.children)
         .map(el => parseInt(el.getAttribute('data-id'), 10))
         .filter(Boolean)
-      emit('reorder-children', { parentId: props.node.id, ids })
+      emit('reorder-children', { parentId: newParentId, ids })
     },
   })
 }
-watch([hasChildren, isCollapsed], async () => {
+// Le conteneur enfants est rendu tant que !isCollapsed (cf. v-if dans le
+// template) — même vide, pour autoriser le drop dans une section sans
+// enfants ("ranger sous cette section").
+watch(isCollapsed, async () => {
   await nextTick()
-  if (hasChildren.value && !isCollapsed.value) setupSortable()
+  if (!isCollapsed.value) setupSortable()
   else teardownSortable()
 })
 onMounted(async () => {
   await nextTick()
-  if (hasChildren.value && !isCollapsed.value) setupSortable()
+  if (!isCollapsed.value) setupSortable()
 })
 onBeforeUnmount(teardownSortable)
 
@@ -395,7 +410,13 @@ const titleHtml = computed(() => {
       </Tooltip>
     </button>
 
-    <div v-if="hasChildren && !isCollapsed" ref="childrenContainerRef">
+    <!-- Conteneur enfants : rendu meme sans enfants (tant que la section
+         n'est pas collapsed) pour permettre le drag-drop "ranger ici" dans
+         une section vide. La min-height (cf. style scoped) assure une zone
+         droppable de quelques pixels en absence d'enfants. -->
+    <div v-if="!isCollapsed"
+         ref="childrenContainerRef"
+         :class="['section-tree-children', !hasChildren && 'section-tree-empty-dropzone']">
       <SectionTreeNode
         v-for="child in node.children"
         :key="child.id"
@@ -448,5 +469,10 @@ const titleHtml = computed(() => {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   background: white;
   border-radius: 6px;
+}
+/* Zone de drop pour une section deplie sans enfants : 6px de hauteur
+   minimale pour permettre au user de relacher l'element dedans. */
+.section-tree-empty-dropzone {
+  min-height: 6px;
 }
 </style>

@@ -4392,20 +4392,48 @@ const sections = {
   delete(id) {
     db.prepare('DELETE FROM sections WHERE id = ?').run(id);
   },
-  // Lot — Reorder atomique d'une fratrie complete via ids ordonnes.
-  // Tous les ids doivent appartenir a la meme AF + meme parent_id.
-  // Filtre les ids invalides + assigne position = (i+1)*10 a chaque id.
+  // Lot — Reorder + re-parentage atomique d'une fratrie complete.
+  // Pour chaque id de orderedIds : set parent_id = parentId + position (i+1)*10.
+  // Couvre 2 cas :
+  //   1) reorder simple (tous les ids ont deja parentId comme parent)
+  //   2) re-parentage par drag (un ou plusieurs ids changent de parent)
+  // Garde-fou anti-cycle : un id ne peut pas etre droppe dans son propre
+  // sous-arbre. Filtre les ids invalides (autre AF, descendant du target).
   reorderSiblings(afId, parentId, orderedIds) {
     if (!Array.isArray(orderedIds) || !orderedIds.length) return 0;
     const placeholders = orderedIds.map(() => '?').join(',');
-    const valid = db.prepare(
-      `SELECT id FROM sections WHERE af_id = ? AND parent_id IS ? AND id IN (${placeholders})`
-    ).all(afId, parentId, ...orderedIds).map(r => r.id);
-    const validSet = new Set(valid);
-    const filtered = orderedIds.filter(id => validSet.has(id));
+    // Verifie que tous les ids appartiennent a l'AF
+    const validInAf = db.prepare(
+      `SELECT id FROM sections WHERE af_id = ? AND id IN (${placeholders})`
+    ).all(afId, ...orderedIds).map(r => r.id);
+    const validInAfSet = new Set(validInAf);
+    // Anti-cycle : si parentId est dans le sous-arbre d'un id deplace, abort.
+    // On calcule pour chaque id deplace tous ses descendants (CTE), et
+    // on rejette si parentId y figure.
+    let cycleViolation = false;
+    if (parentId != null) {
+      for (const id of orderedIds) {
+        if (!validInAfSet.has(id)) continue;
+        const descendants = db.prepare(`
+          WITH RECURSIVE descendants(id) AS (
+            SELECT id FROM sections WHERE parent_id = ?
+            UNION ALL
+            SELECT s.id FROM sections s JOIN descendants d ON s.parent_id = d.id
+          )
+          SELECT id FROM descendants
+        `).all(id).map(r => r.id);
+        if (id === parentId || descendants.includes(parentId)) {
+          cycleViolation = true; break;
+        }
+      }
+    }
+    if (cycleViolation) return 0;
+    const filtered = orderedIds.filter(id => validInAfSet.has(id));
     const tx = db.transaction(() => {
       filtered.forEach((id, i) => {
-        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run((i + 1) * 10, id);
+        db.prepare(
+          'UPDATE sections SET parent_id = ?, position = ? WHERE id = ?'
+        ).run(parentId, (i + 1) * 10, id);
       });
     });
     tx();
