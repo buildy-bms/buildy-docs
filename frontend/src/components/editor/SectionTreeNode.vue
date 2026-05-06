@@ -5,10 +5,12 @@ import Sortable from 'sortablejs'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
-import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+// Registre cure : evite d'embarquer les ~3000 icones FA Pro Solid dans le
+// chunk principal. Les section_templates.icon_name hors registre tombent
+// sur 'cube' (cf. equipment-icons.js).
+import '@/lib/equipment-icons'
+import { resolveFaIconName as _resolveFaIconName } from '@/lib/equipment-icons'
 
 // Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
 // (sections seedees avant le passage en numerotation auto).
@@ -294,7 +296,7 @@ const titleHtml = computed(() => {
       />
       <FontAwesomeIcon
         v-else-if="node.tpl_icon_name"
-        :icon="['fas', node.tpl_icon_name]"
+        :icon="['fas', _resolveFaIconName(node.tpl_icon_name)]"
         class="w-3 h-3 shrink-0 text-gray-500"
         :class="isSelected ? 'text-indigo-700' : ''"
       />

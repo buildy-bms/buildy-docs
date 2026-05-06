@@ -131,21 +131,54 @@ export const useAfStore = defineStore('af', () => {
     requiredLevelKey.value = 0
   }
 
+  // Cache localStorage de la structure d'AF (light sections + meta) pour
+  // un rendu instantane lors d'une revisite de l'AF. Les donnees fraiches
+  // sont ramenees en arriere-plan et remplacent le cache des qu'elles
+  // arrivent (stale-while-revalidate).
+  const CACHE_KEY = (id) => `af-${id}-structure-v1`
+  function readCache(id) {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = window.localStorage.getItem(CACHE_KEY(id))
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      // TTL 7 jours pour eviter d'afficher des donnees trop datees si
+      // l'utilisateur revient apres une longue absence.
+      if (!parsed?.ts || Date.now() - parsed.ts > 7 * 24 * 3600 * 1000) return null
+      return parsed
+    } catch { return null }
+  }
+  function writeCache(id, payload) {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(CACHE_KEY(id), JSON.stringify({ ...payload, ts: Date.now() }))
+    } catch { /* quota / private mode -> ignore */ }
+  }
+
   async function loadAf(id) {
     $reset()
-    loading.value = true
+    // 1) Hydrate immediat depuis le cache si disponible -> tree visible
+    //    sans attendre le reseau. La fraicheur arrive ensuite.
+    const cached = readCache(id)
+    if (cached?.af && Array.isArray(cached.sections)) {
+      af.value = cached.af
+      sections.value = cached.sections
+      loading.value = false
+      // Selectionne la 1re section pendant qu'on rafraichit (best effort)
+      if (sections.value.length) selectSection(sections.value[0].id).catch(() => {})
+    } else {
+      loading.value = true
+    }
+    // 2) Refresh reseau (toujours, meme si cache hit) — light = sans body_html
     try {
-      // Mode light : on ne charge PAS body_html / body_yjs (potentiellement
-      // plusieurs Mo sur une AF riche). Le tree n'a besoin que de la structure
-      // + flags + icones. Le body est ramene a la selection via selectSection().
       const [{ data: afData }, { data: sectionsData }] = await Promise.all([
         getAf(id),
         listSections(id, { light: true }),
       ])
       af.value = afData
       sections.value = sectionsData || []
-      // Selectionne la 1re section root par defaut
-      if (sections.value.length) {
+      writeCache(id, { af: afData, sections: sectionsData || [] })
+      if (!cached && sections.value.length) {
         await selectSection(sections.value[0].id)
       }
     } finally {
@@ -161,6 +194,7 @@ export const useAfStore = defineStore('af', () => {
   async function refreshSections() {
     if (!af.value) return
     sections.value = (await listSections(af.value.id, { light: true })).data
+    writeCache(af.value.id, { af: af.value, sections: sections.value })
     if (!selectedId.value && sections.value.length) {
       await selectSection(sections.value[0].id)
     }

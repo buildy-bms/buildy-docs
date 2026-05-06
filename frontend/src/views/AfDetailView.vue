@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, provide, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary, moveSection, reorderAfSections } from '@/api'
@@ -8,9 +8,9 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useAfStore } from '@/stores/af'
 import BaseModal from '@/components/BaseModal.vue'
 import CycleBandeau from '@/components/CycleBandeau.vue'
-import TemplatePropagationBanner from '@/components/TemplatePropagationBanner.vue'
-import ActivityPanel from '@/components/ActivityPanel.vue'
-import RequiredServiceLevelPanel from '@/components/RequiredServiceLevelPanel.vue'
+const TemplatePropagationBanner = defineAsyncComponent(() => import('@/components/TemplatePropagationBanner.vue'))
+const ActivityPanel = defineAsyncComponent(() => import('@/components/ActivityPanel.vue'))
+const RequiredServiceLevelPanel = defineAsyncComponent(() => import('@/components/RequiredServiceLevelPanel.vue'))
 import { useResizable } from '@/composables/useResizable'
 import { ChevronLeftIcon, ChevronRightIcon, PresentationChartLineIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -59,13 +59,17 @@ const projectionOpen = ref(false)
 const projectionAttachments = ref([])
 const projectionLightboxIndex = ref(null)
 import SectionTree from '@/components/editor/SectionTree.vue'
-import SectionEditor from '@/components/editor/SectionEditor.vue'
-import PointsTable from '@/components/editor/PointsTable.vue'
-import EquipmentInstancesTable from '@/components/editor/EquipmentInstancesTable.vue'
-import AttachmentsGrid from '@/components/editor/AttachmentsGrid.vue'
-import ZonesTable from '@/components/editor/ZonesTable.vue'
-import EquipmentDescriptionPanel from '@/components/editor/EquipmentDescriptionPanel.vue'
-import EquipmentTemplatePicker from '@/components/EquipmentTemplatePicker.vue'
+// Composants poids lourds (Tiptap, captures, points, instances, hyperveez…)
+// charges en async pour reduire le bundle initial (TTI). Le tree apparait
+// immediatement ; l'editeur arrive a la 1re selection (deja en place via
+// selectSection async dans le store).
+const SectionEditor = defineAsyncComponent(() => import('@/components/editor/SectionEditor.vue'))
+const PointsTable = defineAsyncComponent(() => import('@/components/editor/PointsTable.vue'))
+const EquipmentInstancesTable = defineAsyncComponent(() => import('@/components/editor/EquipmentInstancesTable.vue'))
+const AttachmentsGrid = defineAsyncComponent(() => import('@/components/editor/AttachmentsGrid.vue'))
+const ZonesTable = defineAsyncComponent(() => import('@/components/editor/ZonesTable.vue'))
+const EquipmentDescriptionPanel = defineAsyncComponent(() => import('@/components/editor/EquipmentDescriptionPanel.vue'))
+const EquipmentTemplatePicker = defineAsyncComponent(() => import('@/components/EquipmentTemplatePicker.vue'))
 import SafeHtml from '@/components/SafeHtml.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 

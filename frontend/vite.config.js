@@ -50,5 +50,21 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        // FA Pro Solid : sans ce manualChunks, Rollup hoist tout le module
+        // (qui pese ~2.5 Mo une fois minifie) dans le chunk du 1er
+        // consommateur. Resultat : equipment-icons.js gonfle a 2.5 Mo et
+        // bloque le 1er paint de l'AF. En isolant FA dans son propre chunk
+        // partage, les imports nommes (faFire, faCube, ...) sont reellement
+        // tree-shakes — chaque chunk consommateur ne reference que ses
+        // icones et fa-pro-solid n'est telecharge qu'a la demande.
+        manualChunks(id) {
+          if (id.includes('@fortawesome/pro-solid-svg-icons')) {
+            return 'fa-pro-solid'
+          }
+        },
+      },
+    },
   },
 })
