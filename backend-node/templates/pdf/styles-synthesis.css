@@ -784,7 +784,7 @@ table.systems-table tfoot td {
 .annex-demanded-pill {
   display: inline-block;
   margin-left: 1.5mm;
-  padding: 0.3mm 1.2mm;
+  padding: 0.9mm 1.8mm;
   background: #d1fae5;
   color: #065f46;
   border: 0.4pt solid #6ee7b7;
@@ -795,6 +795,7 @@ table.systems-table tfoot td {
   letter-spacing: 0.06em;
   vertical-align: middle;
   white-space: nowrap;
+  line-height: 1;
 }
 .annex-row-demanded td.annex-feature {
   background: #f0fdf4;
@@ -851,7 +852,7 @@ table.systems-table tfoot td {
 .annex-optin-pill {
   display: inline-block;
   margin-left: 1.5mm;
-  padding: 0.3mm 1.5mm;
+  padding: 0.9mm 1.8mm;
   background: #10b981;
   color: #ffffff;
   border: 0.4pt solid #059669;
@@ -862,6 +863,7 @@ table.systems-table tfoot td {
   letter-spacing: 0.06em;
   vertical-align: middle;
   white-space: nowrap;
+  line-height: 1;
 }
 .annex-row-optin td.annex-feature {
   background: #ecfdf5;
@@ -873,13 +875,14 @@ table.systems-table tfoot td {
 .annex-row-optin td.annex-cell { background: #ecfdf5; }
 .annex-avail-optin {
   display: inline-block;
-  padding: 0.3mm 1.5mm;
+  padding: 0.9mm 1.8mm;
   background: #10b981;
   color: #ffffff;
   border-radius: 2mm;
   font-size: 6pt;
   font-weight: 700;
   white-space: nowrap;
+  line-height: 1;
 }
 
 /* En A4 paysage la page-offerings n'a pas besoin de page-break-before

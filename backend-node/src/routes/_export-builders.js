@@ -63,6 +63,10 @@ const synthesisTablePath = path.resolve(__dirname, '../../templates/pdf/_synthes
 const renderSynthesisTable = Handlebars.compile(fs.readFileSync(synthesisTablePath, 'utf-8'));
 const contractualSummaryPath = path.resolve(__dirname, '../../templates/pdf/_contractual-summary.hbs');
 const renderContractualSummary = Handlebars.compile(fs.readFileSync(contractualSummaryPath, 'utf-8'));
+// Lot 91 — meme rendu offerings que la synthese pour les sections
+// kind='synthesis' du PDF AF (rendu unifié + cohérence visuelle).
+const offeringsAnnexPath = path.resolve(__dirname, '../../templates/pdf/_offerings-annex.hbs');
+const renderOfferingsAnnex = Handlebars.compile(fs.readFileSync(offeringsAnnexPath, 'utf-8'));
 
 function buildLiveBacsResolver() {
   const cats = db.systemCategoriesDb.list();
@@ -257,6 +261,12 @@ async function buildAfExportData(af, opts = {}) {
   const synthesisRows = buildSynthesisRows();
   const contractualSummary = buildContractualSummaryForAf(af);
   const contractualSummaryHtml = renderContractualSummary(contractualSummary);
+  // Lot 91 — sections kind='synthesis' affichent EXACTEMENT le meme tableau
+  // que la Synthese AF (partial _offerings-annex). Pre-render avec les memes
+  // donnees offeringsAnnex pour aligner les 2 documents.
+  const synthesisOfferingsHtml = renderOfferingsAnnex({
+    offeringsAnnex: buildOfferingsAnnexForAf(af),
+  });
 
   function buildTree(parentId, depth) {
     return allSections
@@ -267,7 +277,7 @@ async function buildAfExportData(af, opts = {}) {
         const sl = s.service_level;
         const badgeClass = sl ? sl.replace(/[^A-Z]/g, '') : '';
         const synthesisHtml = s.kind === 'synthesis'
-          ? renderSynthesisTable({ rows: synthesisRows })
+          ? synthesisOfferingsHtml
           : null;
         // Le chapitre 13 "Engagement contractuel" reçoit la synthese
         // calculee (offre recommandee + options à souscrire). On la prepend
