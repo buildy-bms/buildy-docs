@@ -37,6 +37,8 @@ export const deleteAf = (id) => api.delete(`/afs/${id}`)
 export const cloneAf = (id, data) => api.post(`/afs/${id}/clone`, data)
 export const getAfAudit = (id) => api.get(`/afs/${id}/audit`)
 export const getAfTemplateUpdates = (id) => api.get(`/afs/${id}/template-updates`)
+export const syncAfFromLibrary = (id, { overwriteBodies = false } = {}) =>
+  api.post(`/afs/${id}/sync-library`, { overwrite_bodies: overwriteBodies })
 export const listAfInstances = (afId) => api.get(`/afs/${afId}/instances`)
 export const getAfRequiredLevel = (id, excludedIds = []) =>
   api.get(`/afs/${id}/required-level`, { params: excludedIds.length ? { excluded: excludedIds.join(',') } : {} })

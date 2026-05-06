@@ -914,6 +914,7 @@ function resyncBacsAuditWithSiteZones(documentId) {
 module.exports = {
   seedLibraryOnBoot, seedSectionTemplatesOnBoot, backfillSectionTemplateLinks,
   backfillNewPlanSections, seedSystemCategoriesOnBoot, seedAfStructure,
+  libraryExtendAf,
   seedBacsRequirementsOnBoot, seedBacsMeterRequirementsOnBoot,
   seedBacsAuditStructure, resyncBacsAuditWithSiteZones,
 };

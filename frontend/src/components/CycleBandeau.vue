@@ -5,6 +5,7 @@ import {
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
   RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
   EllipsisHorizontalIcon, Cog6ToothIcon, RectangleStackIcon, EyeIcon,
+  ArrowPathIcon, BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
@@ -17,6 +18,7 @@ import api, {
   previewAfUrl, previewPointsListUrl,
   listSections, getAfRequiredLevel,
   previewAfAutoOptOut, applyAfAutoOptOut,
+  syncAfFromLibrary,
 } from '@/api'
 import SectionPickerTree from './SectionPickerTree.vue'
 import { useNotification } from '@/composables/useNotification'
@@ -50,6 +52,34 @@ const lastExportInfo = ref(null)
 // Lot 28 — partage AF
 const showShare = ref(false)
 const showInstances = ref(false)
+// Pull biblio -> AF (modale de confirmation)
+const showSyncLibrary = ref(false)
+const syncLibraryOverwriteBodies = ref(false)
+const syncLibraryRunning = ref(false)
+const syncLibraryResult = ref(null)
+function openSyncLibraryModal() {
+  syncLibraryOverwriteBodies.value = false
+  syncLibraryResult.value = null
+  showSyncLibrary.value = true
+}
+async function runSyncLibrary() {
+  syncLibraryRunning.value = true
+  try {
+    const { data } = await syncAfFromLibrary(props.af.id, {
+      overwriteBodies: syncLibraryOverwriteBodies.value,
+    })
+    syncLibraryResult.value = data
+    const total = data.titles_synced + data.bodies_synced + data.missing_added + data.equipment_added
+    success(total === 0
+      ? 'AF déjà à jour avec la bibliothèque'
+      : `Synchro biblio : ${data.titles_synced} titre(s), ${data.bodies_synced} contenu(s), ${data.missing_added} section(s) type, ${data.equipment_added} équipement(s) ajouté(s)`)
+    emit('sections-changed')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de la synchro biblio')
+  } finally {
+    syncLibraryRunning.value = false
+  }
+}
 
 // Menu deroulant du bouton Points (split button : action principale a gauche
 // = export PDF, chevron a droite ouvre les actions secondaires comme XLSX).
@@ -524,6 +554,14 @@ const exportDescription = computed(() => {
           <RectangleStackIcon class="w-4 h-4 text-gray-400 shrink-0" />
           Versions
         </button>
+        <button
+          type="button"
+          @click="openSyncLibraryModal(); showMoreMenu = false"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+        >
+          <ArrowPathIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          Synchroniser depuis la bibliothèque
+        </button>
         <div class="border-t border-gray-100 my-1"></div>
         <button
           type="button"
@@ -786,6 +824,54 @@ const exportDescription = computed(() => {
   <!-- Modale partage AF (Lot 28) -->
   <ShareAfModal v-if="showShare" :af-id="af.id" @close="showShare = false" />
   <AfInstancesModal v-if="showInstances" :af-id="af.id" @close="showInstances = false" @goto-section="(id) => emit('goto-section', id)" />
+
+  <!-- Modale Pull biblio -> AF -->
+  <BaseModal v-if="showSyncLibrary" title="Synchroniser depuis la bibliothèque" size="md" @close="showSyncLibrary = false">
+    <div class="space-y-4">
+      <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+        <p class="text-xs font-semibold text-blue-900 inline-flex items-center gap-1.5">
+          <BookOpenIcon class="w-4 h-4" />
+          Que va-t-il se passer ?
+        </p>
+        <ul class="text-[11px] text-blue-900 leading-relaxed space-y-1 list-disc pl-4">
+          <li>Les <strong>titres</strong> des sections rattachées à un système ou à une section type sont resynchronisés sur la bibliothèque.</li>
+          <li>Les <strong>nouvelles sections types</strong> et <strong>nouveaux équipements</strong> ajoutés à la bibliothèque depuis la création de l'AF sont insérés.</li>
+          <li>Les <strong>versions de référence</strong> des sections sont mises à jour (acquittement).</li>
+          <li>Les contenus que vous avez édités dans cette AF sont <strong>préservés</strong> par défaut.</li>
+        </ul>
+      </div>
+
+      <label class="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" v-model="syncLibraryOverwriteBodies"
+               class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+        <span class="text-xs text-gray-700 leading-relaxed">
+          Écraser aussi les <strong>contenus rédigés</strong> dans cette AF par les contenus canoniques de la bibliothèque
+          <span class="block text-[11px] text-amber-700 mt-0.5">⚠️ Toute édition locale sera perdue. À utiliser quand vous voulez vraiment repartir du contenu de la bibliothèque.</span>
+        </span>
+      </label>
+
+      <div v-if="syncLibraryResult" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-1">
+        <p class="text-xs font-semibold text-emerald-900">Synchronisation terminée</p>
+        <ul class="text-[11px] text-emerald-900 space-y-0.5">
+          <li>Titres resynchronisés : <strong>{{ syncLibraryResult.titles_synced }}</strong></li>
+          <li v-if="syncLibraryOverwriteBodies">Contenus réécrits : <strong>{{ syncLibraryResult.bodies_synced }}</strong></li>
+          <li>Sections types ajoutées : <strong>{{ syncLibraryResult.missing_added }}</strong></li>
+          <li>Équipements ajoutés : <strong>{{ syncLibraryResult.equipment_added }}</strong></li>
+          <li>Versions acquittées : <strong>{{ syncLibraryResult.versions_bumped }}</strong></li>
+        </ul>
+      </div>
+    </div>
+    <template #footer>
+      <button @click="showSyncLibrary = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">
+        {{ syncLibraryResult ? 'Fermer' : 'Annuler' }}
+      </button>
+      <button v-if="!syncLibraryResult" @click="runSyncLibrary" :disabled="syncLibraryRunning"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+        <ArrowPathIcon class="w-4 h-4" :class="syncLibraryRunning ? 'animate-spin' : ''" />
+        {{ syncLibraryRunning ? 'Synchro en cours…' : 'Synchroniser' }}
+      </button>
+    </template>
+  </BaseModal>
 
   <!-- Modale édition métadonnées AF (Lot 29) -->
   <BaseModal v-if="showEdit" title="Éditer les informations de l'AF" size="lg" @close="showEdit = false">

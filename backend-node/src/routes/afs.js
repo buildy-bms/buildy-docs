@@ -857,6 +857,116 @@ async function routes(fastify) {
     });
     return { ok: true };
   });
+
+  // POST /api/afs/:id/sync-library — pull biblio -> AF.
+  // Resync les titres des sections (depuis equipment_template.name ou
+  // section_template.title), bumpe les version pins, ajoute les nouvelles
+  // sections types manquantes, et re-execute libraryExtendAf pour materialiser
+  // les nouveaux equipements de la biblio.
+  // Body : { overwrite_bodies: boolean } — si true, ecrase les body_html
+  // edites par l'utilisateur avec le contenu canonique du template (sinon
+  // les corps locaux sont preserves, seules les versions sont bumpees).
+  fastify.post('/afs/:id/sync-library', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, id)) return;
+
+    const overwriteBodies = request.body?.overwrite_bodies === true;
+    const userId = request.authUser?.id;
+
+    // 1) Resync titres + version pins (et optionnellement bodies) pour toutes
+    //    les sections de l'AF rattachees a un template biblio.
+    const sectionsToSync = db.db.prepare(`
+      SELECT s.id, s.title, s.body_html, s.kind,
+             s.section_template_id, s.section_template_version,
+             s.equipment_template_id, s.equipment_template_version,
+             stt.title AS tpl_title, stt.body_html AS tpl_body_html, stt.current_version AS tpl_version,
+             eqt.name AS eq_name, eqt.current_version AS eq_version
+      FROM sections s
+      LEFT JOIN section_templates stt ON stt.id = s.section_template_id
+      LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+      WHERE s.af_id = ?
+    `).all(id);
+
+    let titlesSynced = 0;
+    let bodiesSynced = 0;
+    let versionsBumped = 0;
+
+    for (const s of sectionsToSync) {
+      const fields = {};
+      // Titre : equipment_template.name prioritaire (source de verite biblio
+      // pour les equipements), sinon section_template.title.
+      const targetTitle = s.eq_name || s.tpl_title;
+      if (targetTitle && s.title !== targetTitle) {
+        fields.title = targetTitle;
+        titlesSynced++;
+      }
+      // Body : seulement si overwrite explicite (les corps locaux sont sacres
+      // par defaut). N'applicable que pour les sections rattachees a un
+      // section_template (les equipment_templates n'ont pas de body partage).
+      if (overwriteBodies && s.section_template_id && s.tpl_body_html != null
+          && (s.body_html || '') !== (s.tpl_body_html || '')) {
+        fields.bodyHtml = s.tpl_body_html;
+        bodiesSynced++;
+      }
+      // Version pins : bumpe vers current_version pour acquitter (memes
+      // semantiques que template-update/dismiss au niveau section).
+      if (s.section_template_id && s.tpl_version != null
+          && s.section_template_version !== s.tpl_version) {
+        fields.sectionTemplateVersion = s.tpl_version;
+        versionsBumped++;
+      }
+      if (s.equipment_template_id && s.eq_version != null
+          && s.equipment_template_version !== s.eq_version) {
+        fields.equipmentTemplateVersion = s.eq_version;
+        versionsBumped++;
+      }
+      if (Object.keys(fields).length) {
+        fields.updatedBy = userId;
+        db.sections.update(s.id, fields);
+        if (fields.bodyHtml !== undefined) {
+          // Re-index FTS (le body change)
+          const bodyText = (fields.bodyHtml || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+          db.sections.reindexFts(s.id, id, fields.title || s.title, bodyText);
+        }
+      }
+    }
+
+    // 2) Ajout des section_templates manquants (sections types + fonctionnalites
+    //    nouvelles ajoutees a la biblio depuis la creation de l'AF).
+    const missingTpls = db.sectionTemplates.missingByAf(id);
+    let missingAdded = 0;
+    for (const tpl of missingTpls) {
+      const r = db.sectionTemplates.addMissingTemplateToAf(id, tpl.id);
+      if (r.ok) missingAdded++;
+    }
+
+    // 3) Extension biblio equipement : ajoute les equipment_templates de la
+    //    biblio qui matchent les library_categories des parents et qui ne
+    //    sont pas encore presents.
+    const { libraryExtendAf } = require('../lib/seeder');
+    const equipmentAdded = libraryExtendAf(id);
+
+    db.auditLog.add({
+      afId: id, userId,
+      action: 'af.sync.library',
+      payload: {
+        titles_synced: titlesSynced, bodies_synced: bodiesSynced,
+        versions_bumped: versionsBumped, missing_added: missingAdded,
+        equipment_added: equipmentAdded, overwrite_bodies: overwriteBodies,
+      },
+    });
+    log.info(`AF #${id} sync biblio : ${titlesSynced} titres, ${bodiesSynced} bodies, ${versionsBumped} versions, ${missingAdded} sections type, ${equipmentAdded} equipements`);
+
+    return {
+      titles_synced: titlesSynced,
+      bodies_synced: bodiesSynced,
+      versions_bumped: versionsBumped,
+      missing_added: missingAdded,
+      equipment_added: equipmentAdded,
+    };
+  });
 }
 
 module.exports = routes;
