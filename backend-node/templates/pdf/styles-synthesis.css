@@ -794,6 +794,7 @@ table.systems-table tfoot td {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+  white-space: nowrap;
 }
 .annex-row-demanded td.annex-feature {
   background: #f0fdf4;
@@ -818,6 +819,7 @@ table.systems-table tfoot td {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+  white-space: nowrap;
 }
 .annex-row-refused td.annex-feature {
   background: #fef2f2;
@@ -859,6 +861,7 @@ table.systems-table tfoot td {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+  white-space: nowrap;
 }
 .annex-row-optin td.annex-feature {
   background: #ecfdf5;
@@ -876,6 +879,7 @@ table.systems-table tfoot td {
   border-radius: 2mm;
   font-size: 6pt;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* En A4 paysage la page-offerings n'a pas besoin de page-break-before

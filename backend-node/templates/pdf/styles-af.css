@@ -795,15 +795,18 @@ table.points-mini .badge-type {
   margin-bottom: 2mm;
 }
 .capture { page-break-inside: avoid; margin-bottom: 4mm; }
-/* Lot — captures jamais agrandies au-dela de leur taille naturelle.
-   Les attributs width/height intrinseques (en px) viennent de la DB ;
-   width:auto + max-* permet de scale DOWN si l'image deborde, jamais UP. */
+/* Captures : taille naturelle de l'image. CSS contraint UNIQUEMENT par
+   le haut (max-*) pour rentrer dans la zone, JAMAIS par le bas — donc
+   une image plus petite que les bornes garde sa taille intrinseque,
+   pas d'upscale qui pixelise. Important : ne pas declarer width/height
+   en HTML (Puppeteer rend en pixels CSS, attribut HTML = px CSS, donc
+   1px source = 0.265mm imprime → image 1600px = 423mm = grotesque). */
 .capture img {
   display: block;
-  width: auto;
-  height: auto;
   max-width: 100%;
   max-height: 90mm;
+  width: auto;
+  height: auto;
   border: 1px solid #e8ebf0;
   border-radius: 2mm;
 }
