@@ -375,7 +375,7 @@ async function destroy() {
   <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" @close="emit('close')">
     <!-- Bandeau statut de validation de la description (mig 89). -->
     <div v-if="isEdit"
-         :class="['flex items-center gap-3 px-3 py-2 mb-3 rounded-lg border text-sm',
+         :class="['flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md border text-sm',
                   currentStatus === 'validated' ? 'bg-emerald-50 border-emerald-200' :
                   currentStatus === 'draft' ? 'bg-amber-50 border-amber-200' :
                   'bg-gray-50 border-gray-200']">
@@ -400,11 +400,11 @@ async function destroy() {
         </span>
       </div>
     </div>
-    <form @submit.prevent="submit" class="space-y-3">
+    <form @submit.prevent="submit" class="space-y-2">
 
       <!-- Sections parentes : multi-select chips + popover de recherche -->
       <div v-if="isEdit">
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
           Sections parentes dans l'arbre AF
           <span class="text-gray-400 font-normal">— où ce modèle apparaît dans les AFs</span>
         </label>
@@ -451,13 +451,13 @@ async function destroy() {
       <!-- Identite -->
       <div class="grid grid-cols-3 gap-3">
         <div class="col-span-2">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Nom *</label>
           <input v-model="form.name" type="text" required autocomplete="off" data-1p-ignore="true"
                  placeholder="Ex : Pompe à chaleur air/eau"
-                 class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+                 class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Catégorie</label>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Catégorie</label>
           <div ref="categoryRef" class="relative">
             <button type="button" @click="toggleCategory"
                     class="w-full flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
@@ -491,15 +491,15 @@ async function destroy() {
       </div>
 
       <div v-if="!isEdit">
-        <label class="block text-xs font-medium text-gray-600 mb-1">Slug <span class="text-gray-400 font-normal">— auto si vide</span></label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Slug <span class="text-gray-400 font-normal">— auto si vide</span></label>
         <input v-model="form.slug" type="text" autocomplete="off" data-1p-ignore="true"
                placeholder="pac-air-eau"
-               class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+               class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
 
       <!-- BACS herite de la categorie : lecture seule, edite via la page Categories -->
       <div v-if="isEdit && (template.bacs_articles || template.bacs_inherited_from)">
-        <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
         <div class="flex items-start gap-2 px-3 py-2 bg-purple-50/50 border border-purple-200 rounded-lg text-xs">
           <ScaleIcon class="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
           <div class="min-w-0">
@@ -514,14 +514,14 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Icône & couleur</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Icône & couleur</label>
         <div class="flex items-center gap-2">
           <span class="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-200 rounded-lg shrink-0">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: form.icon_value, icon_color: form.icon_color }" size="md" />
           </span>
           <input v-model="iconSearch" type="text" autocomplete="off" data-1p-ignore="true"
                  placeholder="Rechercher (fire, water…)"
-                 class="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+                 class="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
         </div>
 
         <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
@@ -545,7 +545,7 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1.5">Protocoles exigés</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Protocoles exigés</label>
         <div class="flex flex-wrap gap-1.5 items-center">
           <button v-for="p in allProtocols" :key="p" type="button" @click="toggleProtocol(p)"
                   :class="['px-2.5 py-0.5 text-xs rounded-full border transition', form.preferred_protocols.includes(p) ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50']">
@@ -574,7 +574,7 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
           Description fonctionnelle
         </label>
         <RichTextEditor
@@ -593,7 +593,7 @@ async function destroy() {
       </div>
 
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Justification BACS</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Justification BACS</label>
         <RichTextEditor
           v-model="form.bacs_justification"
           placeholder="L'article R175-X définit… Le décret impose… La solution Buildy permet…"
