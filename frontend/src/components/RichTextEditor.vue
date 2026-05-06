@@ -35,7 +35,7 @@ const props = defineProps({
   // au backend qui construit un prompt structure.
   assistContext: { type: Object, default: null },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'suggested-title'])
 const { success, error: notifyError } = useNotification()
 const { usage: claudeUsage, refresh: refreshClaudeUsage } = useClaudeUsage()
 const assisting = ref(false)
@@ -93,6 +93,11 @@ async function callClaude() {
       editor.value.commands.setContent(data.html, false)
       emit('update:modelValue', data.html)
       recomputeEmpty()
+      // Claude peut renvoyer un titre alternatif (mig prompt "SUGGESTION DE
+      // TITRE"). Le parent affiche un bandeau "Appliquer / Ignorer".
+      if (data.suggested_title) {
+        emit('suggested-title', data.suggested_title)
+      }
       const cost = typeof data.cost_eur === 'number' ? data.cost_eur : null
       lastRequestCostEur.value = cost
       const costLabel = cost != null ? ` · ≈ ${cost.toFixed(4)} €` : ''

@@ -104,18 +104,19 @@ async function routes(fastify) {
     }
 
     try {
-      const { html: out, usage, library_context } = await assistLibrary(body);
+      const { html: out, suggested_title, usage, library_context } = await assistLibrary(body);
       const requestCostEur = Math.round(costEurFromUsage(usage) * 10000) / 10000;
       db.auditLog.add({
         userId: request.authUser?.id,
         action: 'claude.library-assist',
         payload: {
           mode: body.mode, kind: body.kind, title: body.title,
+          suggested_title: suggested_title || null,
           length_in: (body.html || '').length, length_out: out.length, usage,
           library_context, cost_eur: requestCostEur,
         },
       });
-      return { html: out, usage, library_context, cost_eur: requestCostEur };
+      return { html: out, suggested_title, usage, library_context, cost_eur: requestCostEur };
     } catch (err) {
       log.error(`Claude library-assist error: ${err.message}`);
       return reply.code(500).send({ detail: err.message || 'Échec de la requête Claude' });
