@@ -193,6 +193,28 @@ async function routes(fastify) {
     }
   });
 
+  // POST /api/equipment-templates/:id/validate-content — marque la
+  // description comme valide. Toute modif ulterieure du description_html
+  // re-clear ce statut automatiquement (equipmentTemplates.update).
+  fastify.post('/equipment-templates/:id/validate-content', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tpl = db.equipmentTemplates.getById(id);
+    if (!tpl) return reply.code(404).send({ detail: 'Template non trouvé' });
+    const userId = request.authUser?.id;
+    const updated = db.equipmentTemplates.validateContent(id, userId);
+    db.auditLog.add({ templateId: id, userId, action: 'template.validate_content', payload: { id } });
+    return updated;
+  });
+
+  fastify.delete('/equipment-templates/:id/validate-content', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tpl = db.equipmentTemplates.getById(id);
+    if (!tpl) return reply.code(404).send({ detail: 'Template non trouvé' });
+    const updated = db.equipmentTemplates.unvalidateContent(id);
+    db.auditLog.add({ templateId: id, userId: request.authUser?.id, action: 'template.unvalidate_content', payload: { id } });
+    return updated;
+  });
+
   // DELETE /api/equipment-templates/:id — suppression
   fastify.delete('/equipment-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);

@@ -216,6 +216,29 @@ async function routes(fastify) {
     }
   });
 
+  // POST /api/section-templates/:id/validate-content — marque le contenu
+  // comme valide (date + auteur). Toute modif ulterieure du body_html
+  // re-clear ce statut automatiquement (sectionTemplates.update).
+  fastify.post('/section-templates/:id/validate-content', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tpl = db.sectionTemplates.getById(id);
+    if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
+    const userId = request.authUser?.id;
+    const updated = db.sectionTemplates.validateContent(id, userId);
+    db.auditLog.add({ userId, action: 'section_template.validate_content', payload: { id } });
+    return updated;
+  });
+
+  // DELETE /api/section-templates/:id/validate-content — repasse en brouillon.
+  fastify.delete('/section-templates/:id/validate-content', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tpl = db.sectionTemplates.getById(id);
+    if (!tpl) return reply.code(404).send({ detail: 'Section type non trouvée' });
+    const updated = db.sectionTemplates.unvalidateContent(id);
+    db.auditLog.add({ userId: request.authUser?.id, action: 'section_template.unvalidate_content', payload: { id } });
+    return updated;
+  });
+
   fastify.delete('/section-templates/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const tpl = db.sectionTemplates.getById(id);

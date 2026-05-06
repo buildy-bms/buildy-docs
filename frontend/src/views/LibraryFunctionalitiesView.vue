@@ -10,6 +10,8 @@ import {
   uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
   cloneSectionTemplate,
 } from '@/api'
+import ContentValidationDot from '@/components/ContentValidationDot.vue'
+import { getValidationStatus } from '@/lib/content-validation'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
 import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
@@ -70,6 +72,9 @@ function availCell(value) {
 const items = ref([])
 const allTemplates = ref([])
 const search = ref('')
+// Filtre statut de validation : 'all' | 'pending' (vide+brouillon) |
+// 'empty' | 'draft' | 'validated'.
+const validationFilter = ref('all')
 const editing = ref(null)
 const showCreate = ref(false)
 const showBulk = ref(false)
@@ -217,6 +222,7 @@ const enrichedItems = computed(() => {
       parent_title: p?.title || null,
       parent_path: p?.path || null,
       feature_depth: featureDepth(t),
+      validation_status: getValidationStatus(t, 'body_html'),
     }
   })
 })
@@ -241,13 +247,20 @@ function rootSectionOf(t, byId) {
 const groupedItems = computed(() => {
   const q = search.value.trim().toLowerCase()
   const byIdAll = new Map(allTemplates.value.map(t => [t.id, t]))
-  const filtered = q
+  const matchesValidation = (t) => {
+    const f = validationFilter.value
+    if (f === 'all') return true
+    if (f === 'pending') return t.validation_status !== 'validated'
+    return t.validation_status === f
+  }
+  const filtered = (q
     ? enrichedItems.value.filter(t =>
         (t.title || '').toLowerCase().includes(q) ||
         (t.bacs_articles || '').toLowerCase().includes(q) ||
         (t.parent_title || '').toLowerCase().includes(q)
       )
     : enrichedItems.value
+  ).filter(matchesValidation)
 
   // Bucket par section racine
   const buckets = new Map() // rootId|'__none__' -> { root, all: [...] }
@@ -312,6 +325,14 @@ const groupedItems = computed(() => {
 
 // Compteur total pour l'etat vide
 const totalFiltered = computed(() => groupedItems.value.reduce((n, g) => n + g.items.length, 0))
+
+// Compteurs globaux par statut de validation (sur tous les items, pas
+// filtres). Sert de KPI dans le bandeau du haut.
+const validationCounts = computed(() => {
+  const counts = { empty: 0, draft: 0, validated: 0 }
+  for (const t of enrichedItems.value) counts[t.validation_status]++
+  return counts
+})
 
 // Drag-drop : un seul Sortable sur le tbody plat. onMove valide que
 // le drop reste au sein de la meme fratrie (meme parent_template_id),
@@ -420,15 +441,49 @@ onBeforeUnmount(teardownSortables)
       </div>
     </div>
 
-    <div class="relative max-w-md mb-4">
-      <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-      <input v-model="search" type="text" placeholder="Rechercher (titre, BACS)…"
-             autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-             class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <button v-if="search" @click="search = ''"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
-        <XMarkIcon class="w-4 h-4" />
-      </button>
+    <div class="flex items-center gap-3 mb-4 flex-wrap">
+      <div class="relative max-w-md flex-1 min-w-65">
+        <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+        <input v-model="search" type="text" placeholder="Rechercher (titre, BACS)…"
+               autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
+               class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        <button v-if="search" @click="search = ''"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+          <XMarkIcon class="w-4 h-4" />
+        </button>
+      </div>
+      <!-- Filtre statut de validation : pills inline. Compteurs dynamiques. -->
+      <div class="inline-flex items-center bg-gray-50 border border-gray-200 rounded-lg p-1 text-xs whitespace-nowrap">
+        <button @click="validationFilter = 'all'"
+                :class="['px-2.5 py-1 rounded-md transition font-medium',
+                         validationFilter === 'all' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+          Tous
+        </button>
+        <button @click="validationFilter = 'validated'"
+                :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                         validationFilter === 'validated' ? 'bg-white shadow-sm text-emerald-700' : 'text-gray-500 hover:text-gray-700']">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+          Validés <span class="text-gray-400 font-normal">{{ validationCounts.validated }}</span>
+        </button>
+        <button @click="validationFilter = 'draft'"
+                :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                         validationFilter === 'draft' ? 'bg-white shadow-sm text-amber-700' : 'text-gray-500 hover:text-gray-700']">
+          <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+          Brouillons <span class="text-gray-400 font-normal">{{ validationCounts.draft }}</span>
+        </button>
+        <button @click="validationFilter = 'empty'"
+                :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                         validationFilter === 'empty' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+          <span class="inline-block w-2 h-2 rounded-full bg-gray-300"></span>
+          Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
+        </button>
+        <button @click="validationFilter = 'pending'"
+                :title="'Vide + brouillon (tout ce qui n\'est pas encore validé)'"
+                :class="['px-2.5 py-1 rounded-md transition font-medium',
+                         validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+          À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
+        </button>
+      </div>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-x-auto">
@@ -475,6 +530,10 @@ onBeforeUnmount(teardownSortables)
               <td class="px-4 py-2 font-medium text-gray-800 whitespace-nowrap"
                   :style="t.feature_depth ? `padding-left: ${16 + t.feature_depth * 18}px` : ''">
                 <span v-if="t.feature_depth" class="text-gray-400 mr-1.5">↳</span>
+                <ContentValidationDot :status="t.validation_status"
+                                      :validated-at="t.content_validated_at"
+                                      :validated-by="t.content_validated_by_name"
+                                      class="mr-2 align-middle" />
                 <FontAwesomeIcon v-if="t.icon_name" :icon="['fas', t.icon_name]" class="w-4 h-4 text-gray-500 mr-2 inline-block align-[-2px]" />
                 {{ t.title }}
               </td>

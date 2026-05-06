@@ -6,6 +6,8 @@ defineProps({ embedded: { type: Boolean, default: false } })
 
 import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate } from '@/api'
+import ContentValidationDot from '@/components/ContentValidationDot.vue'
+import { getValidationStatus } from '@/lib/content-validation'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faCamera } from '@fortawesome/pro-solid-svg-icons'
@@ -120,12 +122,20 @@ const viewMode = ref(localStorage.getItem('library-view-mode') || 'table')
 const searchQuery = ref('')
 const sortBy = ref('name')
 const sortDir = ref('asc')
+const validationFilter = ref('all') // 'all'|'pending'|'empty'|'draft'|'validated'
 function setViewMode(m) { viewMode.value = m; localStorage.setItem('library-view-mode', m) }
 function toggleSort(c) {
   if (sortBy.value === c) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   else { sortBy.value = c; sortDir.value = 'asc' }
 }
 function normalize(s) { return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') }
+
+// Compteurs de validation, sur la liste brute (avant filtre) — KPI haut.
+const validationCounts = computed(() => {
+  const counts = { empty: 0, draft: 0, validated: 0 }
+  for (const t of templates.value) counts[getValidationStatus(t, 'description_html')]++
+  return counts
+})
 
 const filteredSorted = computed(() => {
   const q = normalize(searchQuery.value)
@@ -137,6 +147,14 @@ const filteredSorted = computed(() => {
       normalize(t.category).includes(q) ||
       normalize(t.preferred_protocols).includes(q)
     )
+  }
+  // Filtre statut de validation (sur description_html)
+  if (validationFilter.value !== 'all') {
+    list = list.filter(t => {
+      const s = getValidationStatus(t, 'description_html')
+      if (validationFilter.value === 'pending') return s !== 'validated'
+      return s === validationFilter.value
+    })
   }
   list = [...list].sort((a, b) => {
     let av, bv
@@ -239,7 +257,9 @@ const NATURE_COLORS = {
 
 const grouped = computed(() => {
   const groups = {}
-  for (const t of templates.value) {
+  // Utilise filteredSorted pour que les filtres recherche / validation
+  // s'appliquent aussi a la vue grille (cohérent avec la vue tableau).
+  for (const t of filteredSorted.value) {
     const cat = t.category || 'autres'
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(t)
@@ -319,17 +339,48 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="templates.length" class="flex items-center justify-between gap-3 mb-4">
-        <div class="relative flex-1 max-w-md">
+      <div v-if="templates.length" class="flex items-center gap-3 mb-4 flex-wrap">
+        <div class="relative flex-1 max-w-md min-w-65">
           <MagnifyingGlassIcon class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
           <input v-model="searchQuery" type="text" placeholder="Rechercher (nom, slug, catégorie, protocole)…"
                  autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
-                 class="w-full pl-9 pr-9 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                 class="w-full pl-9 pr-9 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
           <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
-        <div class="inline-flex items-center border border-gray-200 rounded overflow-hidden text-xs">
+        <div class="inline-flex items-center bg-gray-50 border border-gray-200 rounded-lg p-1 text-xs whitespace-nowrap">
+          <button @click="validationFilter = 'all'"
+                  :class="['px-2.5 py-1 rounded-md transition font-medium',
+                           validationFilter === 'all' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+            Tous
+          </button>
+          <button @click="validationFilter = 'validated'"
+                  :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                           validationFilter === 'validated' ? 'bg-white shadow-sm text-emerald-700' : 'text-gray-500 hover:text-gray-700']">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            Validés <span class="text-gray-400 font-normal">{{ validationCounts.validated }}</span>
+          </button>
+          <button @click="validationFilter = 'draft'"
+                  :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                           validationFilter === 'draft' ? 'bg-white shadow-sm text-amber-700' : 'text-gray-500 hover:text-gray-700']">
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+            Brouillons <span class="text-gray-400 font-normal">{{ validationCounts.draft }}</span>
+          </button>
+          <button @click="validationFilter = 'empty'"
+                  :class="['px-2.5 py-1 rounded-md transition font-medium inline-flex items-center gap-1.5',
+                           validationFilter === 'empty' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+            <span class="inline-block w-2 h-2 rounded-full bg-gray-300"></span>
+            Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
+          </button>
+          <button @click="validationFilter = 'pending'"
+                  title="Vide + brouillon (tout ce qui n'est pas encore validé)"
+                  :class="['px-2.5 py-1 rounded-md transition font-medium',
+                           validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
+            À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
+          </button>
+        </div>
+        <div class="inline-flex items-center border border-gray-200 rounded overflow-hidden text-xs ml-auto">
           <button @click="setViewMode('table')" :class="['px-3 py-1.5 inline-flex items-center gap-1', viewMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">
             <TableCellsIcon class="w-3.5 h-3.5" /> Tableau
           </button>
@@ -388,6 +439,10 @@ onMounted(async () => {
                 <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap"
                     :style="it.visual_depth ? `padding-left: ${16 + it.visual_depth * 18}px` : ''">
                   <span v-if="it.visual_depth" class="text-gray-400 mr-1.5">↳</span>
+                  <ContentValidationDot :status="getValidationStatus(it.t, 'description_html')"
+                                        :validated-at="it.t.content_validated_at"
+                                        :validated-by="it.t.content_validated_by_name"
+                                        class="mr-2 align-middle" />
                   {{ it.t.name }}
                 </td>
                 <td class="px-2 py-2 text-center align-middle" @click.stop>
@@ -445,7 +500,11 @@ onMounted(async () => {
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button v-for="t in items" :key="t.id" @click="openTemplate(t)"
-                  class="text-left bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group">
+                  class="text-left bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md hover:border-indigo-300 transition group relative">
+            <ContentValidationDot :status="getValidationStatus(t, 'description_html')"
+                                  :validated-at="t.content_validated_at"
+                                  :validated-by="t.content_validated_by_name"
+                                  class="absolute top-2 right-2" />
             <div class="flex items-center justify-between mb-2">
               <EquipmentIcon :template="t" size="lg" />
               <span class="text-[10px] text-gray-400">v{{ t.current_version }}</span>
