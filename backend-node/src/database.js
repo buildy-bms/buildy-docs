@@ -4392,6 +4392,45 @@ const sections = {
   delete(id) {
     db.prepare('DELETE FROM sections WHERE id = ?').run(id);
   },
+  // Lot — Deplace une section au sein de sa fratrie (meme af_id + parent_id).
+  // direction = 'up' / 'down'. Idempotent : noop si deja en bord.
+  // Retourne true si la section a bouge, false sinon.
+  moveWithinSiblings(id, direction) {
+    const sec = this.getById(id);
+    if (!sec) return false;
+    const siblings = db.prepare(`
+      SELECT id, position FROM sections
+      WHERE af_id = ? AND parent_id IS ?
+      ORDER BY position, id
+    `).all(sec.af_id, sec.parent_id);
+    const idx = siblings.findIndex(s => s.id === id);
+    if (idx < 0) return false;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= siblings.length) return false;
+    const a = siblings[idx];
+    const b = siblings[targetIdx];
+    // Swap des positions. Si elles sont egales (collision), on reorder
+    // l'ensemble de la fratrie en increments de 10 et on swap.
+    const tx = db.transaction(() => {
+      if (a.position === b.position) {
+        siblings.forEach((s, i) => {
+          db.prepare('UPDATE sections SET position = ? WHERE id = ?').run((i + 1) * 10, s.id);
+        });
+        const nextSiblings = db.prepare(
+          'SELECT id, position FROM sections WHERE af_id = ? AND parent_id IS ? ORDER BY position, id'
+        ).all(sec.af_id, sec.parent_id);
+        const na = nextSiblings.find(s => s.id === a.id);
+        const nb = nextSiblings.find(s => s.id === b.id);
+        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run(nb.position, na.id);
+        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run(na.position, nb.id);
+      } else {
+        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run(b.position, a.id);
+        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run(a.position, b.id);
+      }
+    });
+    tx();
+    return true;
+  },
   // Sections d'une AF qui referencent un template a une version anterieure
   // a la version courante du template (= une mise a jour est disponible).
   // Marque opted_out_by_moa = 1 sur les sections de l'AF dont le niveau de
@@ -5571,6 +5610,7 @@ const faqArticles = {
       contentHtml: 'content_html', status: 'status', visibility: 'visibility',
       locale: 'locale', crispId: 'crisp_id', dirty: 'dirty',
       pulledAt: 'pulled_at', pushedAt: 'pushed_at', crispUpdatedAt: 'crisp_updated_at',
+      crispUrl: 'crisp_url',
       lastAiAssistAt: 'last_ai_assist_at',
     };
     for (const [k, col] of Object.entries(map)) {

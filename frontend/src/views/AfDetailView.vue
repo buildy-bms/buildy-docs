@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary } from '@/api'
+import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary, moveSection } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAfStore } from '@/stores/af'
@@ -348,6 +348,18 @@ async function selectSection(id) {
   if (isCompact.value) treeDrawerOpen.value = false
 }
 
+// Lot — Réordonner une section dans sa fratrie (boutons ↑/↓ du tree).
+async function handleMoveSection(node, direction) {
+  try {
+    const { data } = await moveSection(node.id, direction)
+    if (data?.moved) await afStore.refreshSections()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du déplacement')
+  }
+}
+const handleMoveUp = (node) => handleMoveSection(node, 'up')
+const handleMoveDown = (node) => handleMoveSection(node, 'down')
+
 // Eligibilite des actions opt-out / demanded sur la section selectionnee
 // (memes regles que SectionTreeNode : feature avec au moins un paid_option,
 // OU service_level dans S/P/S/P).
@@ -566,6 +578,8 @@ watch(() => route.params.id, async (newId, oldId) => {
               @toggle-opt-out="handleToggleOptOut"
               @toggle-demanded="handleToggleDemanded"
               @toggle-optin-paid-option="handleToggleOptinPaidOption"
+              @move-up="handleMoveUp"
+              @move-down="handleMoveDown"
               @attachment-drop="handleAttachmentDrop"
               @promote-to-library="handlePromoteToLibrary"
             />

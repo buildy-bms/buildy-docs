@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch, nextTick, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
@@ -24,7 +24,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'attachment-drop', 'promote-to-library'])
 
 // Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
 // calculer la disponibilite de chaque feature au niveau choisi par le MOA.
@@ -313,6 +313,24 @@ const titleHtml = computed(() => {
             <ArrowUpOnSquareIcon class="w-3 h-3" />
           </button>
         </Tooltip>
+        <Tooltip text="Monter cette section dans la fratrie">
+          <button
+            type="button"
+            @click.stop="emit('move-up', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowUpIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Descendre cette section dans la fratrie">
+          <button
+            type="button"
+            @click.stop="emit('move-down', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowDownIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
         <Tooltip text="Supprimer cette section (et ses enfants)">
           <button
             type="button"
@@ -368,6 +386,8 @@ const titleHtml = computed(() => {
         @toggle-opt-out="emit('toggle-opt-out', $event)"
         @toggle-demanded="emit('toggle-demanded', $event)"
         @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
+        @move-up="emit('move-up', $event)"
+        @move-down="emit('move-down', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"
       />
