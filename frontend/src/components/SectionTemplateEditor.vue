@@ -529,33 +529,35 @@ async function destroy() {
         </p>
       </div>
 
-      <!-- Matrice de disponibilite par niveau de contrat (Lot 36) -->
+      <!-- Matrice de disponibilite par niveau de contrat (Lot 36).
+           Layout compact : 1 ligne, 3 colonnes E/S/P, segmented icon-only.
+           Hover sur une icone = label complet. -->
       <div v-if="showAvailability">
         <label class="block text-xs font-medium text-gray-600 mb-1.5">
           Disponibilité par niveau de contrat
-          <span class="text-gray-400 font-normal">— pour chaque niveau, choisir le statut</span>
+          <span class="text-gray-400 font-normal">— ❌ non dispo · ✓ inclus · € option payante</span>
         </label>
-        <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
-          <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code" class="flex items-center gap-3 px-3 py-2">
-            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-sm shrink-0">
+        <div class="grid grid-cols-3 gap-2">
+          <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code"
+               class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-indigo-50 text-indigo-700 font-mono text-xs shrink-0"
+                  :title="lvl.label">
               {{ lvl.code }}
             </span>
-            <span class="text-sm text-gray-700 w-24 shrink-0">{{ lvl.label }}</span>
-            <div class="flex flex-wrap gap-1.5 ml-auto">
+            <span class="text-xs text-gray-600 truncate flex-1">{{ lvl.label }}</span>
+            <div class="inline-flex items-center bg-gray-50 rounded-md p-0.5 shrink-0">
               <button v-for="o in AVAIL_OPTIONS" :key="String(o.value)" type="button"
                       @click="form[lvl.field] = o.value"
-                      :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition',
+                      :title="o.label"
+                      :class="['inline-flex items-center justify-center w-7 h-6 text-xs rounded transition',
                                form[lvl.field] === o.value
-                                 ? o.color + ' shadow-sm'
-                                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
-                <span class="font-medium">{{ o.icon }}</span> {{ o.label }}
+                                 ? o.color + ' shadow-sm font-medium'
+                                 : 'text-gray-400 hover:text-gray-600 hover:bg-white']">
+                {{ o.icon }}
               </button>
             </div>
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 mt-1.5">
-          ✓ inclus = couvert par le contrat · € option payante = facturé en sus · ❌ non disponible
-        </p>
       </div>
 
       <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
