@@ -4,19 +4,24 @@
  * Champs : key (immuable en edit), label, bacs (texte libre), slugs (multi-select
  * des templates equipement), icone FA Pro + couleur.
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 import { createSystemCategory, updateSystemCategory, deleteSystemCategory, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
-const ALL_FA_NAMES = [...new Set(
-  Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon).map(i => i.iconName)
-)].sort()
+// Lazy-load la full lib FA Pro Solid (~1 Mo) UNIQUEMENT a l'ouverture
+// de la modale d'edition (admin only).
+const ALL_FA_NAMES = ref([])
+onMounted(async () => {
+  const allSolidIcons = await import('@fortawesome/pro-solid-svg-icons')
+  ALL_FA_NAMES.value = [...new Set(
+    Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon).map(i => i.iconName)
+  )].sort()
+})
 
 const props = defineProps({
   category: { type: Object, default: null }, // null = creation
@@ -61,7 +66,7 @@ const iconSearch = ref('')
 const filteredIcons = computed(() => {
   const q = iconSearch.value.trim().toLowerCase()
   if (!q) return [] // grille masquee tant qu'on ne tape rien (gain de place)
-  return ALL_FA_NAMES.filter(n => n.includes(q)).slice(0, 60)
+  return ALL_FA_NAMES.value.filter(n => n.includes(q)).slice(0, 60)
 })
 
 function selectIconName(name) { form.value.icon_value = 'fa-' + name }

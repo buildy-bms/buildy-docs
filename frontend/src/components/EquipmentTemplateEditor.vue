@@ -16,14 +16,9 @@ import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import EquipmentPointsEditor from './EquipmentPointsEditor.vue'
 import TemplateAttachmentsGrid from './TemplateAttachmentsGrid.vue'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-
-// Liste exhaustive des noms d'icones FA Solid Pro, déduplique les alias.
-const ALL_FA_NAMES = [...new Set(
-  Object.values(allSolidIcons)
-    .filter(i => i && i.iconName && i.icon)
-    .map(i => i.iconName)
-)].sort()
+// Lazy-load la full lib FA Pro Solid (~1 Mo) UNIQUEMENT dans cet editeur
+// admin pour eviter le bundle main.
+const ALL_FA_NAMES = ref([])
 import {
   createEquipmentTemplate,
   updateEquipmentTemplate,
@@ -262,9 +257,16 @@ async function loadAllSectionTemplates() {
     allSectionTemplates.value = data || []
   } catch { allSectionTemplates.value = [] }
 }
-onMounted(() => {
+onMounted(async () => {
   reloadLinks()
   loadAllSectionTemplates()
+  // Lazy load FA full library (~1 Mo) seulement quand l'editeur est ouvert
+  const allSolidIcons = await import('@fortawesome/pro-solid-svg-icons')
+  ALL_FA_NAMES.value = [...new Set(
+    Object.values(allSolidIcons)
+      .filter(i => i && i.iconName && i.icon)
+      .map(i => i.iconName)
+  )].sort()
 })
 
 // Tous les parents possibles (section_templates non-equipment) — avec chemin
@@ -367,7 +369,7 @@ const iconSearch = ref('')
 const filteredIcons = computed(() => {
   const q = iconSearch.value.trim().toLowerCase()
   if (!q) return [] // pas d'affichage par defaut : la grille n'apparait qu'a la recherche
-  return ALL_FA_NAMES.filter(n => n.includes(q)).slice(0, 60)
+  return ALL_FA_NAMES.value.filter(n => n.includes(q)).slice(0, 60)
 })
 
 function selectIconName(name) {

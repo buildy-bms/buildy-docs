@@ -336,23 +336,85 @@ async function routes(fastify) {
     return { ok: true, count };
   });
 
-  // POST /api/sections/:id/move — déplace une section dans sa fratrie.
-  // Body : { direction: 'up' | 'down' }. Swap atomique avec le voisin.
+  // POST /api/sections/:id/move — déplace une section dans sa fratrie ou
+  // change son niveau d'indentation.
+  // Body : { direction: 'up' | 'down' | 'indent' | 'outdent' }
+  //   - 'up' / 'down' : swap atomique avec le voisin de la fratrie.
+  //   - 'indent'      : devient enfant du sibling precedent (place en derniere position).
+  //   - 'outdent'     : remonte d'un niveau (devient frere de son parent, juste apres).
   fastify.post('/sections/:id/move', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
     if (!assertWrite(request, reply, section.af_id)) return;
     const direction = request.body?.direction;
-    if (direction !== 'up' && direction !== 'down') {
-      return reply.code(400).send({ detail: "direction doit etre 'up' ou 'down'" });
+    if (!['up', 'down', 'indent', 'outdent'].includes(direction)) {
+      return reply.code(400).send({ detail: "direction doit etre 'up', 'down', 'indent' ou 'outdent'" });
     }
-    const moved = db.sections.moveWithinSiblings(id, direction);
+
+    if (direction === 'up' || direction === 'down') {
+      const moved = db.sections.moveWithinSiblings(id, direction);
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, userId: request.authUser?.id,
+        action: 'section.move', payload: { direction, moved },
+      });
+      return { ok: true, moved };
+    }
+
+    // Changement de niveau d'indentation. On utilise reorderSiblings qui
+    // gere le re-parentage atomique + le check anti-cycle.
+    if (direction === 'indent') {
+      // Trouve le sibling precedent (= nouveau parent)
+      const prev = db.db.prepare(`
+        SELECT id FROM sections
+         WHERE af_id = ? AND parent_id IS ?
+           AND position < ?
+         ORDER BY position DESC LIMIT 1
+      `).get(section.af_id, section.parent_id || null, section.position);
+      if (!prev) {
+        return reply.code(400).send({ detail: 'Impossible d\'indenter : pas de section precedente comme parent' });
+      }
+      // Insere comme dernier enfant du prev
+      const existingChildren = db.db.prepare(`
+        SELECT id FROM sections WHERE af_id = ? AND parent_id = ? ORDER BY position
+      `).all(section.af_id, prev.id).map(r => r.id);
+      const newOrder = [...existingChildren, id];
+      db.sections.reorderSiblings(section.af_id, prev.id, newOrder);
+      db.auditLog.add({
+        afId: section.af_id, sectionId: id, userId: request.authUser?.id,
+        action: 'section.move', payload: { direction, new_parent_id: prev.id },
+      });
+      return { ok: true, moved: true };
+    }
+
+    // outdent : remonte d'un niveau (parent -> grand-parent)
+    if (!section.parent_id) {
+      return reply.code(400).send({ detail: 'Impossible de remonter : section deja a la racine' });
+    }
+    const parent = db.sections.getById(section.parent_id);
+    const grandParentId = parent?.parent_id || null;
+    // Insere juste apres le parent dans la fratrie du grand-parent
+    const grandSiblings = db.db.prepare(`
+      SELECT id, position FROM sections
+       WHERE af_id = ? AND parent_id IS ?
+       ORDER BY position
+    `).all(section.af_id, grandParentId);
+    const idsBefore = [];
+    const idsAfter = [];
+    let seenParent = false;
+    for (const s of grandSiblings) {
+      if (s.id === id) continue; // si deja la pour quelque raison, on ignore
+      if (!seenParent) idsBefore.push(s.id);
+      else idsAfter.push(s.id);
+      if (s.id === parent.id) seenParent = true;
+    }
+    const newOrder = [...idsBefore, id, ...idsAfter];
+    db.sections.reorderSiblings(section.af_id, grandParentId, newOrder);
     db.auditLog.add({
       afId: section.af_id, sectionId: id, userId: request.authUser?.id,
-      action: 'section.move', payload: { direction, moved },
+      action: 'section.move', payload: { direction, new_parent_id: grandParentId },
     });
-    return { ok: true, moved };
+    return { ok: true, moved: true };
   });
 
   // GET /api/sections/:id/points — points résolus (template + overrides)

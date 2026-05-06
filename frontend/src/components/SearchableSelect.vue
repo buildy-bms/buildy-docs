@@ -17,14 +17,15 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
-import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+// Registre cure (~40 icones) pour eviter d'embarquer les ~3000 FA Pro
+// Solid dans le bundle principal. Les options qui referencent une icone
+// hors registre tombent sur 'cube' (cf. equipment-icons.js).
+import { resolveFaIconName } from '@/lib/equipment-icons'
 
 function faName(icon) {
   if (!icon) return null
-  return icon.replace(/^fa-/, '')
+  return resolveFaIconName(icon)
 }
 
 const props = defineProps({

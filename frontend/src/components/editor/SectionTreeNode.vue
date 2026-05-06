@@ -1,14 +1,16 @@
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import Sortable from 'sortablejs'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
-import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+// Registre cure : evite d'embarquer les ~3000 icones FA Pro Solid dans le
+// chunk principal. Les section_templates.icon_name hors registre tombent
+// sur 'cube' (cf. equipment-icons.js).
+import '@/lib/equipment-icons'
+import { resolveFaIconName as _resolveFaIconName } from '@/lib/equipment-icons'
 
 // Numerotation calculee live depuis l'AfDetailView. Fallback sur node.number
 // (sections seedees avant le passage en numerotation auto).
@@ -25,7 +27,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'reorder-children', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library'])
 
 // Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
 // calculer la disponibilite de chaque feature au niveau choisi par le MOA.
@@ -294,7 +296,7 @@ const titleHtml = computed(() => {
       />
       <FontAwesomeIcon
         v-else-if="node.tpl_icon_name"
-        :icon="['fas', node.tpl_icon_name]"
+        :icon="['fas', _resolveFaIconName(node.tpl_icon_name)]"
         class="w-3 h-3 shrink-0 text-gray-500"
         :class="isSelected ? 'text-indigo-700' : ''"
       />
@@ -351,6 +353,42 @@ const titleHtml = computed(() => {
           >
             <EyeIcon v-if="excluded" class="w-3 h-3" />
             <EyeSlashIcon v-else class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Remonter d'un cran (↑)">
+          <button
+            type="button"
+            @click.stop="emit('move-up', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowUpIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Descendre d'un cran (↓)">
+          <button
+            type="button"
+            @click.stop="emit('move-down', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowDownIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Sortir d'un niveau (← outdent)">
+          <button
+            type="button"
+            @click.stop="emit('outdent', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowLeftIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <Tooltip text="Indenter dans le précédent (→ indent)">
+          <button
+            type="button"
+            @click.stop="emit('indent', node)"
+            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
+          >
+            <ArrowRightIcon class="w-3 h-3" />
           </button>
         </Tooltip>
         <Tooltip text="Ajouter une sous-section">
@@ -437,6 +475,8 @@ const titleHtml = computed(() => {
         @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
         @move-up="emit('move-up', $event)"
         @move-down="emit('move-down', $event)"
+        @indent="emit('indent', $event)"
+        @outdent="emit('outdent', $event)"
         @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"

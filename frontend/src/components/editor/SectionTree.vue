@@ -13,7 +13,7 @@ const props = defineProps({
   selectedId: { type: Number, default: null },
   afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'reorder-children', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -286,6 +286,8 @@ onBeforeUnmount(teardownRootSortable)
         @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
         @move-up="emit('move-up', $event)"
         @move-down="emit('move-down', $event)"
+        @indent="emit('indent', $event)"
+        @outdent="emit('outdent', $event)"
         @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"

@@ -462,8 +462,35 @@ export const pushFaqArticle = (id) => api.post(`/faq/articles/${id}/push`)
 export const pullFaqArticleFromCrisp = (id) => api.post(`/faq/articles/${id}/pull`)
 
 export const faqAiRewrite = (article_id) => api.post('/faq/ai/rewrite', { article_id })
-export const faqAiGenerate = (question, category_id = null) =>
-  api.post('/faq/ai/generate', { question, category_id })
+// Génération article FAQ — accepte un objet riche.
+// Si `images` est fourni (Array<File>), on envoie en multipart/form-data
+// (Claude Vision). Sinon JSON simple.
+export const faqAiGenerate = (payload = {}) => {
+  const {
+    question, category_id, article_type = 'howto',
+    include_images_in_content = false, images = [], annotations = [],
+  } = payload
+  if (!images.length) {
+    return api.post('/faq/ai/generate', {
+      question, category_id, article_type,
+    })
+  }
+  const fd = new FormData()
+  fd.append('question', question)
+  if (category_id) fd.append('category_id', String(category_id))
+  fd.append('article_type', article_type)
+  fd.append('include_images_in_content', include_images_in_content ? '1' : '0')
+  if (annotations?.length) fd.append('annotations', JSON.stringify(annotations))
+  for (const img of images) fd.append('images', img, img.name)
+  return api.post('/faq/ai/generate', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000, // vision peut être lente, on relâche le timeout par défaut axios
+  })
+}
+
+// Régénération partielle d'un passage sélectionné dans l'éditeur.
+export const faqAiRewriteSelection = ({ article_id, selection_html, instruction = '' }) =>
+  api.post('/faq/ai/rewrite-selection', { article_id, selection_html, instruction })
 export const faqAiSuggestMissing = () => api.post('/faq/ai/missing-articles')
 
 export default api

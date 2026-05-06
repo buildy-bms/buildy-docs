@@ -1,13 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-
-// Enregistre TOUTES les icones FA Pro Solid (~3000 icones)
-// pour permettre au picker de proposer une recherche dans toute la base.
-const iconObjs = Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon)
-library.add(...iconObjs)
+import { resolveFaIconName } from '@/lib/equipment-icons'
 
 const props = defineProps({
   template: { type: Object, required: true },
@@ -21,13 +15,7 @@ const sizeClass = computed(() => ({
 const iconKind = computed(() => props.template?.icon_kind || 'fa')
 const iconValue = computed(() => props.template?.icon_value || 'fa-cube')
 const iconColor = computed(() => props.template?.icon_color || '#6b7280')
-
-// Pour FontAwesome, on enleve le prefixe 'fa-'. Si l'icone n'existe pas, fallback 'cube'.
-const knownNames = new Set(iconObjs.map(i => i.iconName))
-const faName = computed(() => {
-  const v = (iconValue.value || 'fa-cube').replace(/^fa-/, '')
-  return knownNames.has(v) ? v : 'cube'
-})
+const faName = computed(() => resolveFaIconName(iconValue.value))
 </script>
 
 <template>

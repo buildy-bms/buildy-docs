@@ -20,8 +20,12 @@ import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
-library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+// Lazy-load la full lib FA Pro Solid : la grille des fonctionnalites peut
+// afficher n'importe quelle icone choisie en bibliotheque, mais ce n'est
+// pas critique au 1er paint. import() dynamique = chunk separe.
+import('@fortawesome/pro-solid-svg-icons').then((allSolidIcons) => {
+  library.add(...Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon))
+})
 import { useNotification } from '@/composables/useNotification'
 
 const { error: notifyError, success: notifySuccess } = useNotification()

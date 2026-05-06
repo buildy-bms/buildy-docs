@@ -8,16 +8,23 @@
  * v-model = nom FA en kebab-case (ex: "camera", "chart-line", "building").
  * Pas de prefixe 'fa-'. null/'' = pas d'icone.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'
 import { XMarkIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 
-const iconObjs = Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon)
-library.add(...iconObjs)
-const allNames = iconObjs.map(i => i.iconName).sort()
-const knownNames = new Set(allNames)
+// Lazy load de la full lib FA Pro Solid (~1 Mo gzipped) UNIQUEMENT quand
+// le picker est instancie (admin only). Evite de polluer le bundle main.
+const allNames = ref([])
+const knownNames = ref(new Set())
+onMounted(async () => {
+  const allSolidIcons = await import('@fortawesome/pro-solid-svg-icons')
+  const iconObjs = Object.values(allSolidIcons).filter(i => i && i.iconName && i.icon)
+  library.add(...iconObjs)
+  const names = iconObjs.map(i => i.iconName).sort()
+  allNames.value = names
+  knownNames.value = new Set(names)
+})
 
 const props = defineProps({
   modelValue: { type: String, default: null },
@@ -29,16 +36,16 @@ const showSuggestions = ref(false)
 
 const validIcon = computed(() => {
   const v = (query.value || '').trim().toLowerCase()
-  return v && knownNames.has(v) ? v : null
+  return v && knownNames.value.has(v) ? v : null
 })
 
 // Suggestions filtrees : prefixe d'abord, puis substring
 const suggestions = computed(() => {
   const q = (query.value || '').trim().toLowerCase()
-  if (!q) return allNames.slice(0, 30)
+  if (!q) return allNames.value.slice(0, 30)
   const prefix = []
   const sub = []
-  for (const n of allNames) {
+  for (const n of allNames.value) {
     if (n === q) continue
     if (n.startsWith(q)) prefix.push(n)
     else if (n.includes(q)) sub.push(n)
@@ -60,7 +67,7 @@ function onInput() {
   // Si l'user tape un nom valide, on emit immediatement. Sinon on attend.
   const v = (query.value || '').trim().toLowerCase()
   if (!v) emit('update:modelValue', null)
-  else if (knownNames.has(v)) emit('update:modelValue', v)
+  else if (knownNames.value.has(v)) emit('update:modelValue', v)
 }
 function onBlur() { setTimeout(() => { showSuggestions.value = false }, 150) }
 </script>
