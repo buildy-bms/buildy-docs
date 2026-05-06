@@ -284,12 +284,14 @@ function seedAfStructure(afId) {
     let equipmentTemplateId = null;
     let equipmentTemplateVersion = null;
     let equipmentTemplateBacs = null;
+    let equipmentTemplateName = null;
     if (tpl.kind === 'equipment' && tpl.equipment_template_id) {
       const eq = db.equipmentTemplates.getById(tpl.equipment_template_id);
       if (eq) {
         equipmentTemplateId = eq.id;
         equipmentTemplateVersion = eq.current_version;
         equipmentTemplateBacs = eq.bacs_articles;
+        equipmentTemplateName = eq.name;
       }
     }
 
@@ -298,7 +300,11 @@ function seedAfStructure(afId) {
       parentId: parentSectionId,
       position: total * 10,
       number: computedNumber,
-      title: tpl.title,
+      // Pour les sections kind='equipment' rattachees a un template biblio,
+      // le titre suit le nom du template (source de verite). Le titre fige
+      // dans section_templates.title etait celui du seed plan-af initial,
+      // qui peut differer du nom actuel si l'utilisateur a renomme depuis.
+      title: equipmentTemplateName || tpl.title,
       serviceLevel: tpl.service_level || null,
       serviceLevelSource: tpl.service_level_source || null,
       bacsArticles: tpl.bacs_articles || equipmentTemplateBacs || null,
