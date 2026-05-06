@@ -10,7 +10,7 @@
  *   saved (template) → fermer et rafraîchir le parent
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, ChevronDownIcon, XMarkIcon, PlusIcon, ScaleIcon, MagnifyingGlassIcon, CheckBadgeIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import RichTextEditor from './RichTextEditor.vue'
@@ -33,7 +33,11 @@ import {
   createSectionTemplate,
   updateSectionTemplate,
   deleteSectionTemplate,
+  validateEquipmentTemplateContent,
+  unvalidateEquipmentTemplateContent,
 } from '@/api'
+import ContentValidationDot from './ContentValidationDot.vue'
+import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useConfirm } from '@/composables/useConfirm'
@@ -125,6 +129,41 @@ onMounted(() => document.addEventListener('mousedown', onDocClick))
 onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
 const submitting = ref(false)
+const validating = ref(false)
+
+// Statut de validation derive du template courant (mig 89). Cf. doc dans
+// SectionTemplateEditor.vue — meme logique avec description_html.
+const currentStatus = computed(() => getValidationStatus(props.template || {}, 'description_html'))
+const isDirty = computed(() => {
+  if (!isEdit.value) return false
+  const cur = props.template?.description_html || ''
+  return (form.value.description_html || '') !== cur
+})
+const canValidate = computed(() => {
+  if (!isEdit.value) return false
+  const html = (props.template?.description_html || '').trim()
+  return !!html && !isDirty.value
+})
+
+async function toggleValidation() {
+  if (!canValidate.value || !props.template?.id) return
+  validating.value = true
+  try {
+    if (currentStatus.value === 'validated') {
+      const { data } = await unvalidateEquipmentTemplateContent(props.template.id)
+      success('Description repassée en brouillon')
+      emit('saved', data)
+    } else {
+      const { data } = await validateEquipmentTemplateContent(props.template.id)
+      success('Description validée')
+      emit('saved', data)
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec')
+  } finally {
+    validating.value = false
+  }
+}
 
 watch(() => props.template, (t) => {
   if (t) {
@@ -334,6 +373,33 @@ async function destroy() {
 
 <template>
   <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" @close="emit('close')">
+    <!-- Bandeau statut de validation de la description (mig 89). -->
+    <div v-if="isEdit"
+         :class="['flex items-center gap-3 px-3 py-2 mb-3 rounded-lg border text-sm',
+                  currentStatus === 'validated' ? 'bg-emerald-50 border-emerald-200' :
+                  currentStatus === 'draft' ? 'bg-amber-50 border-amber-200' :
+                  'bg-gray-50 border-gray-200']">
+      <ContentValidationDot :status="currentStatus"
+                            :validated-at="props.template?.content_validated_at"
+                            :validated-by="props.template?.content_validated_by_name" />
+      <div class="flex-1 text-xs">
+        <template v-if="currentStatus === 'validated'">
+          <span class="font-medium text-emerald-800">Description validée</span>
+          <span v-if="props.template?.content_validated_by_name" class="text-emerald-700">
+            · par {{ props.template.content_validated_by_name }}
+          </span>
+          <span v-if="props.template?.content_validated_at" class="text-emerald-600">
+            · le {{ new Date(props.template.content_validated_at).toLocaleDateString('fr-FR') }}
+          </span>
+        </template>
+        <span v-else-if="currentStatus === 'draft'" class="font-medium text-amber-800">
+          Brouillon — description rédigée mais pas encore validée
+        </span>
+        <span v-else class="font-medium text-gray-600">
+          Vide — aucune description rédigée pour le moment
+        </span>
+      </div>
+    </div>
     <form @submit.prevent="submit" class="space-y-3">
 
       <!-- Sections parentes : multi-select chips + popover de recherche -->
@@ -562,6 +628,18 @@ async function destroy() {
       <button v-if="isEdit" @click="destroy"
               class="mr-auto px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition inline-flex items-center gap-1.5">
         <TrashIcon class="w-4 h-4" /> Supprimer
+      </button>
+      <button v-if="isEdit && currentStatus === 'validated'"
+              @click="toggleValidation" :disabled="!canValidate || validating"
+              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : ''"
+              class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+        Repasser en brouillon
+      </button>
+      <button v-else-if="isEdit"
+              @click="toggleValidation" :disabled="!canValidate || validating"
+              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : (canValidate ? '' : 'Aucune description à valider')"
+              class="px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+        <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider la description' }}
       </button>
       <button @click="emit('close')"
               class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 88;
+const TARGET_VERSION = 89;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3301,6 +3301,35 @@ function runMigrations() {
     db.pragma('user_version = 88');
   }
 
+  if (current < 89) {
+    // Lot — Statut de validation du contenu de la bibliothèque (sections
+    // types, fonctionnalités, équipements). 3 états dérivés en lecture :
+    //   - vide       : body_html / description_html null ou blanc
+    //   - brouillon  : contenu présent, content_validated_at NULL
+    //   - validé     : content_validated_at non NULL (date + auteur)
+    // Action utilisateur explicite "Valider le contenu" depuis l'éditeur.
+    // Toute modification ultérieure du contenu repasse en brouillon
+    // (auto-clear côté DB methods sectionTemplates.update / equipmentTemplates.update).
+    const stCols = db.prepare('PRAGMA table_info(section_templates)').all();
+    const stHas = (n) => stCols.some(c => c.name === n);
+    if (!stHas('content_validated_at')) {
+      db.exec('ALTER TABLE section_templates ADD COLUMN content_validated_at TEXT');
+    }
+    if (!stHas('content_validated_by')) {
+      db.exec('ALTER TABLE section_templates ADD COLUMN content_validated_by INTEGER REFERENCES users(id)');
+    }
+    const etCols = db.prepare('PRAGMA table_info(equipment_templates)').all();
+    const etHas = (n) => etCols.some(c => c.name === n);
+    if (!etHas('content_validated_at')) {
+      db.exec('ALTER TABLE equipment_templates ADD COLUMN content_validated_at TEXT');
+    }
+    if (!etHas('content_validated_by')) {
+      db.exec('ALTER TABLE equipment_templates ADD COLUMN content_validated_by INTEGER REFERENCES users(id)');
+    }
+    log.info('Migration 89 appliquée : content_validated_at/by sur section_templates et equipment_templates');
+    db.pragma('user_version = 89');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3390,13 +3419,22 @@ const sessions = {
 // ── Equipment templates (bibliotheque) ───────────────────────────────
 const equipmentTemplates = {
   list({ category } = {}) {
-    if (category) {
-      return db.prepare('SELECT * FROM equipment_templates WHERE category = ? ORDER BY name').all(category);
-    }
-    return db.prepare('SELECT * FROM equipment_templates ORDER BY category, name').all();
+    const sql = `
+      SELECT et.*, u.display_name AS content_validated_by_name
+      FROM equipment_templates et
+      LEFT JOIN users u ON u.id = et.content_validated_by
+      ${category ? 'WHERE et.category = ?' : ''}
+      ORDER BY ${category ? 'et.name' : 'et.category, et.name'}
+    `;
+    return category ? db.prepare(sql).all(category) : db.prepare(sql).all();
   },
   getById(id) {
-    return db.prepare('SELECT * FROM equipment_templates WHERE id = ?').get(id);
+    return db.prepare(`
+      SELECT et.*, u.display_name AS content_validated_by_name
+      FROM equipment_templates et
+      LEFT JOIN users u ON u.id = et.content_validated_by
+      WHERE et.id = ?
+    `).get(id);
   },
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
@@ -3413,6 +3451,15 @@ const equipmentTemplates = {
     return this.getById(result.lastInsertRowid);
   },
   update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
+    // Auto-clear de la validation si description_html change effectivement
+    // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
+    let clearValidation = false;
+    if (descriptionHtml !== undefined && descriptionHtml !== null) {
+      const cur = this.getById(id);
+      if (cur && (cur.description_html || '') !== (descriptionHtml || '')) {
+        clearValidation = true;
+      }
+    }
     db.prepare(`
       UPDATE equipment_templates
       SET name = COALESCE(?, name),
@@ -3426,6 +3473,7 @@ const equipmentTemplates = {
           preferred_protocols = COALESCE(?, preferred_protocols),
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
+          ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
     `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
     return this.getById(id);
@@ -3485,6 +3533,26 @@ const equipmentTemplates = {
       return { newId, pointsCount: points.length, attachmentsCount: atts.length };
     });
     return tx();
+  },
+
+  // Statut de validation du contenu (mig 89). Symétrique de sectionTemplates.
+  validateContent(id, userId) {
+    db.prepare(`
+      UPDATE equipment_templates
+         SET content_validated_at = CURRENT_TIMESTAMP,
+             content_validated_by = ?
+       WHERE id = ?
+    `).run(userId || null, id);
+    return this.getById(id);
+  },
+  unvalidateContent(id) {
+    db.prepare(`
+      UPDATE equipment_templates
+         SET content_validated_at = NULL,
+             content_validated_by = NULL
+       WHERE id = ?
+    `).run(id);
+    return this.getById(id);
   },
 };
 
@@ -3575,6 +3643,7 @@ const sectionTemplates = {
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const rows = db.prepare(`
       SELECT st.*,
+             u.display_name AS content_validated_by_name,
              (SELECT COUNT(*) FROM sections s
                 JOIN afs a ON a.id = s.af_id
                 WHERE s.section_template_id = st.id AND a.deleted_at IS NULL) AS affected_afs_count,
@@ -3587,6 +3656,7 @@ const sectionTemplates = {
              (SELECT GROUP_CONCAT(document_kind) FROM section_template_documents
                 WHERE section_template_id = st.id) AS document_kinds_csv
       FROM section_templates st
+      LEFT JOIN users u ON u.id = st.content_validated_by
       ${whereClause}
       ORDER BY st.position, st.id
     `).all(...params);
@@ -3597,7 +3667,12 @@ const sectionTemplates = {
     }));
   },
   getById(id) {
-    const row = db.prepare('SELECT * FROM section_templates WHERE id = ?').get(id);
+    const row = db.prepare(`
+      SELECT st.*, u.display_name AS content_validated_by_name
+      FROM section_templates st
+      LEFT JOIN users u ON u.id = st.content_validated_by
+      WHERE st.id = ?
+    `).get(id);
     if (!row) return null;
     return { ...row, document_kinds: this.getDocumentKinds(id) };
   },
@@ -3689,6 +3764,15 @@ const sectionTemplates = {
     if (availP !== undefined) { fields.push('avail_p = ?'); params.push(availP); }
     if (iconName !== undefined) { fields.push('icon_name = ?'); params.push(iconName); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
+    // Auto-clear validation : si le contenu change, on repasse en brouillon.
+    // Le snapshot ci-dessus a deja teste le diff effectif.
+    if (bodyHtml !== undefined) {
+      const cur = this.getById(id);
+      if (cur && (cur.body_html || '') !== (bodyHtml || '')) {
+        fields.push('content_validated_at = NULL');
+        fields.push('content_validated_by = NULL');
+      }
+    }
     if (!fields.length) return this.getById(id);
     fields.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
@@ -3910,6 +3994,28 @@ const sectionTemplates = {
       newRootId: idMap.get(rootId),
       clonedCount: idMap.size,
     };
+  },
+
+  // Statut de validation du contenu (mig 89). Action utilisateur explicite
+  // depuis l'éditeur. Toute modif ultérieure du body_html re-clear la
+  // validation (cf. update() ci-dessus).
+  validateContent(id, userId) {
+    db.prepare(`
+      UPDATE section_templates
+         SET content_validated_at = CURRENT_TIMESTAMP,
+             content_validated_by = ?
+       WHERE id = ?
+    `).run(userId || null, id);
+    return this.getById(id);
+  },
+  unvalidateContent(id) {
+    db.prepare(`
+      UPDATE section_templates
+         SET content_validated_at = NULL,
+             content_validated_by = NULL
+       WHERE id = ?
+    `).run(id);
+    return this.getById(id);
   },
 };
 

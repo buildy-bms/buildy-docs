@@ -27,7 +27,12 @@ import {
   listSectionTemplateVersions,
   getSectionTemplateVersion,
   listDocumentKinds,
+  validateSectionTemplateContent,
+  unvalidateSectionTemplateContent,
 } from '@/api'
+import ContentValidationDot from './ContentValidationDot.vue'
+import { CheckBadgeIcon } from '@heroicons/vue/24/outline'
+import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -128,6 +133,25 @@ const AVAIL_OPTIONS = [
 
 const submitting = ref(false)
 const deleting = ref(false)
+const validating = ref(false)
+
+// Statut de validation derive du template courant (mis a jour apres save).
+// On ne lit pas la form pour le statut : le statut suit l'etat persiste.
+const currentStatus = computed(() => getValidationStatus(props.template || {}, 'body_html'))
+// Le bouton Valider/Repasser ne s'active que sur un contenu sauvegarde et
+// non vide. Si la form est dirty (HTML modifie depuis le dernier save), on
+// force a enregistrer d'abord — autrement la validation porterait sur un
+// contenu deja obsolete (auto-clear cote backend des l'enregistrement).
+const isDirty = computed(() => {
+  if (!isEdit.value) return false
+  const cur = props.template?.body_html || ''
+  return (form.value.body_html || '') !== cur
+})
+const canValidate = computed(() => {
+  if (!isEdit.value) return false
+  const html = (props.template?.body_html || '').trim()
+  return !!html && !isDirty.value
+})
 const showEquipmentPicker = ref(false)
 
 // Liste des parents possibles (toutes les sections types non-feuilles + le
@@ -328,6 +352,26 @@ async function submit() {
   }
 }
 
+async function toggleValidation() {
+  if (!isEdit.value || !canValidate.value) return
+  validating.value = true
+  try {
+    if (currentStatus.value === 'validated') {
+      const { data } = await unvalidateSectionTemplateContent(props.template.id)
+      success('Contenu repassé en brouillon')
+      emit('saved', data)
+    } else {
+      const { data } = await validateSectionTemplateContent(props.template.id)
+      success('Contenu validé')
+      emit('saved', data)
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec')
+  } finally {
+    validating.value = false
+  }
+}
+
 async function destroy() {
   if (!isEdit.value) return
   const ok = await confirm({ title: 'Supprimer ?', message: `« ${props.template.title} »`, confirmLabel: 'Supprimer', danger: true })
@@ -368,6 +412,34 @@ async function destroy() {
 
 <template>
   <BaseModal :title="modalTitle" size="lg" @close="emit('close')">
+    <!-- Bandeau statut de validation du contenu (mig 89). Affiche
+         pastille + libelle + auteur/date si valide. Cache en creation. -->
+    <div v-if="isEdit"
+         :class="['flex items-center gap-3 px-3 py-2 mb-3 rounded-lg border text-sm',
+                  currentStatus === 'validated' ? 'bg-emerald-50 border-emerald-200' :
+                  currentStatus === 'draft' ? 'bg-amber-50 border-amber-200' :
+                  'bg-gray-50 border-gray-200']">
+      <ContentValidationDot :status="currentStatus"
+                            :validated-at="props.template.content_validated_at"
+                            :validated-by="props.template.content_validated_by_name" />
+      <div class="flex-1 text-xs">
+        <template v-if="currentStatus === 'validated'">
+          <span class="font-medium text-emerald-800">Contenu validé</span>
+          <span v-if="props.template.content_validated_by_name" class="text-emerald-700">
+            · par {{ props.template.content_validated_by_name }}
+          </span>
+          <span v-if="props.template.content_validated_at" class="text-emerald-600">
+            · le {{ new Date(props.template.content_validated_at).toLocaleDateString('fr-FR') }}
+          </span>
+        </template>
+        <span v-else-if="currentStatus === 'draft'" class="font-medium text-amber-800">
+          Brouillon — contenu rédigé mais pas encore validé
+        </span>
+        <span v-else class="font-medium text-gray-600">
+          Vide — aucun contenu rédigé pour le moment
+        </span>
+      </div>
+    </div>
     <form @submit.prevent="submit" class="space-y-3">
       <div>
         <label class="block text-xs font-medium text-gray-600 mb-1">Titre *</label>
@@ -533,6 +605,21 @@ async function destroy() {
       <button v-if="isEdit" @click="destroy" :disabled="deleting"
               class="mr-auto px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50">
         <TrashIcon class="w-4 h-4" /> {{ deleting ? 'Suppression…' : 'Supprimer' }}
+      </button>
+      <!-- Toggle validation du contenu (mig 89). Desactive tant que
+           la form n'est pas enregistree (sinon le bouton porterait sur
+           un contenu obsolete : auto-clear backend des le save suivant). -->
+      <button v-if="isEdit && currentStatus === 'validated'"
+              @click="toggleValidation" :disabled="!canValidate || validating"
+              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : ''"
+              class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+        Repasser en brouillon
+      </button>
+      <button v-else-if="isEdit"
+              @click="toggleValidation" :disabled="!canValidate || validating"
+              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : (canValidate ? '' : 'Aucun contenu à valider')"
+              class="px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+        <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider le contenu' }}
       </button>
       <button @click="emit('close')"
               class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">

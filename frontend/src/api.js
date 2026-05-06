@@ -200,6 +200,12 @@ export const createEquipmentTemplate = (data) => api.post('/equipment-templates'
 export const updateEquipmentTemplate = (id, data) => api.patch(`/equipment-templates/${id}`, data)
 export const deleteEquipmentTemplate = (id) => api.delete(`/equipment-templates/${id}`)
 export const cloneEquipmentTemplate = (id, data) => api.post(`/equipment-templates/${id}/clone`, data)
+
+// Statut de validation du contenu (mig 89). Pareil que pour les sections.
+export const validateEquipmentTemplateContent = (id) =>
+  api.post(`/equipment-templates/${id}/validate-content`)
+export const unvalidateEquipmentTemplateContent = (id) =>
+  api.delete(`/equipment-templates/${id}/validate-content`)
 export const addTemplatePoint = (templateId, data) =>
   api.post(`/equipment-templates/${templateId}/points`, data)
 export const updateTemplatePoint = (templateId, pointId, data) =>
@@ -234,6 +240,13 @@ export const bulkUpdateSectionTemplateDocumentKinds = (payload) =>
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
 export const cloneSectionTemplate = (id, data) => api.post(`/section-templates/${id}/clone`, data)
+
+// Statut de validation du contenu (mig 89). validate marque la section/feature
+// comme "validée" (date + auteur). unvalidate repasse en brouillon.
+export const validateSectionTemplateContent = (id) =>
+  api.post(`/section-templates/${id}/validate-content`)
+export const unvalidateSectionTemplateContent = (id) =>
+  api.delete(`/section-templates/${id}/validate-content`)
 
 // Promotion d'une section AF ad-hoc (sans template) vers la bibliothèque.
 // Crée un section_template depuis la section + lie l'AF au nouveau template.
