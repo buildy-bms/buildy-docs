@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 94;
+const TARGET_VERSION = 95;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3525,6 +3525,60 @@ function runMigrations() {
       log.info(`Migration 94 appliquee : section type 13.x « Engagement de commande du contrat de services » (id=${newId}, propagee dans ${inserted} AF(s)).`);
     }
     db.pragma('user_version = 94');
+  }
+
+  if (current < 95) {
+    // Lot — Library-driven equipment sections (renforcement de fbc9b2f).
+    //
+    // Probleme initial : libraryExtendAf derive les categories d'equipement
+    // a injecter dans une section parent depuis les categories des enfants
+    // equipment deja inseres. Mais si un equipement a ete supprime de la
+    // bibliotheque (ex : drv tombstoned), la categorie correspondante
+    // disparait du parent, et les autres equipements de la lib avec cette
+    // categorie (ex : unite-interieure-drv) ne sont jamais ajoutes.
+    //
+    // Resolution :
+    // (a) Nouvelle colonne library_categories sur section_templates pour
+    //     declarer explicitement les categories d'equipement qu'un parent
+    //     accueille. libraryExtendAf prend cette declaration en compte en
+    //     plus (et en fallback) des categories detectees dans eqKids.
+    try { db.exec('ALTER TABLE section_templates ADD COLUMN library_categories TEXT'); }
+    catch { /* deja la */ }
+
+    // (b) Set library_categories sur les parents narratifs canoniques.
+    //     Idempotent : ne touche pas si l'utilisateur a deja edite la valeur.
+    const PARENT_TO_CATS = {
+      '2.1': ['chauffage', 'climatisation'],
+      '2.2': ['ventilation'],
+      '2.3': ['ecs'],
+      '2.4': ['eclairage'],
+      '2.5': ['electricite'],
+      '2.6': ['comptage'],
+      '2.7': ['qai'],
+      '2.8': ['occultation'],
+      '2.9': ['process'],
+      '2.10': ['autres'],
+    };
+    const setCats = db.prepare(`
+      UPDATE section_templates
+         SET library_categories = ?
+       WHERE slug = ? AND (library_categories IS NULL OR library_categories = '')
+    `);
+    for (const [slug, cats] of Object.entries(PARENT_TO_CATS)) {
+      setCats.run(JSON.stringify(cats), slug);
+    }
+
+    // (c) Tombstone equipment_templates : protege contre la recreation au
+    //     boot apres une suppression UI (parite avec deleted_section_template_slugs).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS deleted_equipment_template_slugs (
+        slug TEXT PRIMARY KEY,
+        deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    log.info('Migration 95 appliquee : section_templates.library_categories + tombstones equipment_templates');
+    db.pragma('user_version = 95');
   }
 
   if (current > TARGET_VERSION) {

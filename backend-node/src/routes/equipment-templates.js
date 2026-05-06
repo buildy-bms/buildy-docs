@@ -107,6 +107,10 @@ async function routes(fastify) {
     if (db.equipmentTemplates.getBySlug(slug)) {
       return reply.code(409).send({ detail: 'Un template avec ce slug existe déjà' });
     }
+    // Recreation explicite : si l'utilisateur ressuscite un slug tombstoned,
+    // on retire la marque pour que le seed boot puisse re-enrichir la lib
+    // (idempotent — pas d'effet si pas tombstoned).
+    db.db.prepare('DELETE FROM deleted_equipment_template_slugs WHERE slug = ?').run(slug);
 
     const userId = request.authUser?.id;
     const tpl = db.equipmentTemplates.create({
@@ -232,6 +236,10 @@ async function routes(fastify) {
     }
 
     db.equipmentTemplates.delete(id);
+    // Tombstone : empeche la recreation au prochain boot via seedLibraryOnBoot
+    // (parite avec deleted_section_template_slugs). Toujours pose, meme si le
+    // slug n'est pas dans le seed (idempotent via INSERT OR IGNORE).
+    db.db.prepare('INSERT OR IGNORE INTO deleted_equipment_template_slugs (slug) VALUES (?)').run(tpl.slug);
     db.auditLog.add({ templateId: id, userId: request.authUser?.id, action: 'template.delete' });
     return { ok: true };
   });
