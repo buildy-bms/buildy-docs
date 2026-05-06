@@ -189,13 +189,21 @@ async function suggestTitleOnly() {
 const liveTemplate = ref(props.template || {})
 watch(() => props.template, (t) => { liveTemplate.value = t || {} })
 
-const currentStatus = computed(() => getValidationStatus(liveTemplate.value || {}, 'body_html'))
 // Pour le bouton Valider : le contenu doit etre sauvegarde ET non vide.
 // Si dirty, le bouton fait save+validate en cascade (cf. toggleValidation).
 const isDirty = computed(() => {
   if (!isEdit.value) return false
   const cur = liveTemplate.value?.body_html || ''
   return (form.value.body_html || '') !== cur
+})
+// Statut affiche : si le contenu sauvegarde etait valide MAIS la form a
+// ete modifiee depuis (isDirty), on degrade visuellement en 'draft' pour
+// que l'utilisateur voie immediatement que la validation ne porte plus
+// sur le contenu courant. Le bouton "Valider le contenu" reapparait.
+const currentStatus = computed(() => {
+  const persisted = getValidationStatus(liveTemplate.value || {}, 'body_html')
+  if (persisted === 'validated' && isDirty.value) return 'draft'
+  return persisted
 })
 // Le contenu peut etre valide soit s'il est deja sauvegarde non-vide,
 // soit s'il y a du contenu dans la form (dans ce cas on save d'abord).
@@ -402,7 +410,11 @@ async function save({ close = true } = {}) {
         is_functionality: props.mode === 'functionality',
       })
       liveTemplate.value = data
-      success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} créée`)
+      const propagated = data?.propagated_to_afs || 0
+      const propagatedMsg = propagated > 0
+        ? ` (ajoutée à ${propagated} AF${propagated > 1 ? 's' : ''} existante${propagated > 1 ? 's' : ''})`
+        : ''
+      success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} créée${propagatedMsg}`)
       emit('saved', data)
       return data
     }

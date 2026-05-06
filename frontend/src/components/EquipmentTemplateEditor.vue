@@ -177,11 +177,17 @@ async function suggestTitleOnly() {
 const liveTemplate = ref(props.template || {})
 watch(() => props.template, (t) => { liveTemplate.value = t || {} })
 
-const currentStatus = computed(() => getValidationStatus(liveTemplate.value || {}, 'description_html'))
 const isDirty = computed(() => {
   if (!isEdit.value) return false
   const cur = liveTemplate.value?.description_html || ''
   return (form.value.description_html || '') !== cur
+})
+// Cf. SectionTemplateEditor : degrade en 'draft' quand isDirty pour que
+// le bouton "Valider la description" reapparaisse pendant l'edition.
+const currentStatus = computed(() => {
+  const persisted = getValidationStatus(liveTemplate.value || {}, 'description_html')
+  if (persisted === 'validated' && isDirty.value) return 'draft'
+  return persisted
 })
 const canValidate = computed(() => {
   if (!isEdit.value) return false

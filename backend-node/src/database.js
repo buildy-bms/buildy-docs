@@ -4017,6 +4017,57 @@ const sectionTemplates = {
     `).run(id);
     return this.getById(id);
   },
+
+  // Propagation d'un NOUVEAU template aux AFs existantes. Quand un
+  // section_template est cree dans la bibliotheque (avec document_kinds
+  // contenant 'af'), on l'insere dans toutes les AFs existantes — IF le
+  // parent existe dans l'AF. Idempotent : skip si deja present.
+  // Pas pour les fonctionnalites (is_functionality=1).
+  propagateNewToAfs(templateId) {
+    const tpl = this.getById(templateId);
+    if (!tpl) return { inserted: 0, skipped: 0 };
+    if (tpl.is_functionality) return { inserted: 0, skipped: 0, reason: 'functionality' };
+    if (!Array.isArray(tpl.document_kinds) || !tpl.document_kinds.includes('af')) {
+      return { inserted: 0, skipped: 0, reason: 'not-af-tagged' };
+    }
+    const allAfs = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+    let inserted = 0, skipped = 0;
+    for (const af of allAfs) {
+      const exists = db.prepare(
+        'SELECT 1 FROM sections WHERE af_id = ? AND section_template_id = ?'
+      ).get(af.id, templateId);
+      if (exists) { skipped++; continue; }
+      let parentSectionId = null;
+      if (tpl.parent_template_id) {
+        const parent = db.prepare(
+          'SELECT id FROM sections WHERE af_id = ? AND section_template_id = ? LIMIT 1'
+        ).get(af.id, tpl.parent_template_id);
+        if (!parent) { skipped++; continue; }
+        parentSectionId = parent.id;
+      }
+      const maxPos = db.prepare(
+        'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id IS ?'
+      ).get(af.id, parentSectionId);
+      const position = (maxPos?.m || 0) + 10;
+      const created = sections.create({
+        afId: af.id,
+        parentId: parentSectionId,
+        position,
+        number: null,
+        title: tpl.title,
+        serviceLevel: tpl.service_level || null,
+        serviceLevelSource: tpl.service_level ? 'manual' : null,
+        bacsArticles: tpl.bacs_articles || null,
+        bodyHtml: tpl.body_html || null,
+        kind: tpl.kind || 'standard',
+        equipmentTemplateId: tpl.equipment_template_id || null,
+      });
+      db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+        .run(templateId, tpl.current_version, created.id);
+      inserted++;
+    }
+    return { inserted, skipped };
+  },
 };
 
 // ── AFs ──────────────────────────────────────────────────────────────
