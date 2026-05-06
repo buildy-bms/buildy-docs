@@ -4,7 +4,7 @@
 <div class="section depth-{{depth}}" data-toc-anchor="sec-{{id}}" id="sec-{{id}}">
   {{#if (eq depth 0)}}
     <h1>
-      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name "currentColor" "16"}}}</span>{{/if}}{{title}}
+      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name (or icon_color "currentColor") "16"}}}</span>{{/if}}{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
         {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
@@ -12,7 +12,7 @@
     </h1>
   {{else if (eq depth 1)}}
     <h2>
-      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name "currentColor" "16"}}}</span>{{/if}}{{title}}
+      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name (or icon_color "currentColor") "16"}}}</span>{{/if}}{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
         {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
@@ -20,7 +20,7 @@
     </h2>
   {{else if (eq depth 2)}}
     <h3>
-      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name "currentColor" "16"}}}</span>{{/if}}{{title}}
+      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name (or icon_color "currentColor") "16"}}}</span>{{/if}}{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
         {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
@@ -28,7 +28,7 @@
     </h3>
   {{else}}
     <h4>
-      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name "currentColor" "16"}}}</span>{{/if}}{{title}}
+      <span class="section-num">{{number}}</span>{{#if icon_name}}<span class="section-icon">{{{faIcon icon_name (or icon_color "currentColor") "16"}}}</span>{{/if}}{{title}}
       <span class="section-badges">
         {{#if service_level_label}}<span class="badge-level {{badgeClass}}">{{service_level_label}}</span>{{/if}}
         {{!-- Badge BACS retiré du header — désormais dans l'encart .bacs-context juste sous le titre --}}
