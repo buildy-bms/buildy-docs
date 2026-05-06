@@ -4463,6 +4463,42 @@ const sections = {
       ORDER BY s.parent_id NULLS FIRST, s.position, s.id
     `).all(afId);
   },
+  // Variante "lite" : meme structure que listByAf mais SANS body_html ni
+  // body_yjs (les BLOB Yjs peuvent peser plusieurs centaines de Ko sur des
+  // AFs riches). Sert au chargement initial de l'arborescence ou` seuls les
+  // titres + flags + icones sont necessaires. Le body est ensuite recupere a
+  // la selection via getById().
+  // Ajoute un champ derive `is_empty` (1/0) pour preserver l'indicateur
+  // visuel "section vide" dans le tree sans avoir a renvoyer le body_html.
+  listByAfLight(afId) {
+    return db.prepare(`
+      SELECT s.id, s.af_id, s.parent_id, s.position, s.number, s.title,
+             s.service_level, s.service_level_source, s.bacs_articles,
+             s.kind, s.included_in_export, s.generic_note, s.fact_check_status,
+             s.opted_out_by_moa, s.demanded_by_moa, s.optin_paid_option,
+             s.equipment_template_id, s.equipment_template_version,
+             s.section_template_id, s.section_template_version,
+             s.hyperveez_page_slug, s.created_at, s.updated_at, s.updated_by,
+             CASE
+               WHEN s.body_html IS NULL OR s.body_html = '' THEN 1
+               WHEN s.body_html LIKE '%class="text-gray-400"%' THEN 1
+               ELSE 0
+             END AS is_empty,
+             stt.avail_e AS tpl_avail_e,
+             stt.avail_s AS tpl_avail_s,
+             stt.avail_p AS tpl_avail_p,
+             stt.icon_name AS tpl_icon_name,
+             eqt.icon_kind AS eq_icon_kind,
+             eqt.icon_value AS eq_icon_value,
+             eqt.icon_color AS eq_icon_color,
+             eqt.category AS eq_category
+      FROM sections s
+      LEFT JOIN section_templates stt ON stt.id = s.section_template_id
+      LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+      WHERE s.af_id = ?
+      ORDER BY s.parent_id NULLS FIRST, s.position, s.id
+    `).all(afId);
+  },
   getById(id) {
     return db.prepare(`
       SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email,

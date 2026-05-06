@@ -132,6 +132,12 @@ const KIND_ICON = {
 }
 
 function isEmpty(node) {
+  // En mode light (init load), `is_empty` est calcule cote backend pour
+  // eviter de transferer body_html. Fallback sur body_html quand present
+  // (selection courante / refresh post-edit).
+  if (typeof node.is_empty === 'number' || typeof node.is_empty === 'boolean') {
+    return !!node.is_empty
+  }
   if (!node.body_html) return true
   if (node.body_html.includes('class="text-gray-400"')) return true
   return false

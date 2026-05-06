@@ -222,7 +222,8 @@ const LEVEL_LABEL = { E: 'Essentials', S: 'Smart', P: 'Premium' }
 
 async function loadSectionsForPicker() {
   try {
-    const { data } = await listSections(props.af.id)
+    // Picker = uniquement metadata (titres, kind, parent_id) -> light suffit.
+    const { data } = await listSections(props.af.id, { light: true })
     exportSections.value = data
   } catch { exportSections.value = [] }
 }

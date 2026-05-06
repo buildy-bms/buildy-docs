@@ -66,10 +66,14 @@ const createSectionSchema = z.object({
 });
 
 async function routes(fastify) {
-  // GET /api/afs/:afId/sections — liste plate des sections d'une AF
+  // GET /api/afs/:afId/sections — liste plate des sections d'une AF.
+  // Query : ?light=1 pour omettre body_html et body_yjs (gain reseau /
+  // initial load — le body est recupere a la selection via GET /sections/:id).
+  // Champs derives en mode light : `is_empty` (1 si body absent/placeholder).
   fastify.get('/afs/:afId/sections', async (request) => {
     const afId = parseInt(request.params.afId, 10);
-    return db.sections.listByAf(afId);
+    const light = request.query?.light === '1' || request.query?.light === 'true';
+    return light ? db.sections.listByAfLight(afId) : db.sections.listByAf(afId);
   });
 
   // POST /api/afs/:afId/sections — création d'une section

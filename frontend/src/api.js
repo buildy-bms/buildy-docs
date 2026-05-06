@@ -44,7 +44,10 @@ export const getAfRequiredLevel = (id, excludedIds = []) =>
   api.get(`/afs/${id}/required-level`, { params: excludedIds.length ? { excluded: excludedIds.join(',') } : {} })
 
 // ── Sections ──
-export const listSections = (afId) => api.get(`/afs/${afId}/sections`)
+// listSections : `light=1` omet body_html / body_yjs pour accelerer l'init
+// load de l'AF (le body est rapatrie a la selection via getSection).
+export const listSections = (afId, { light = false } = {}) =>
+  api.get(`/afs/${afId}/sections`, { params: light ? { light: 1 } : {} })
 export const getSection = (id) => api.get(`/sections/${id}`)
 export const updateSection = (id, data) => api.patch(`/sections/${id}`, data)
 export const createSection = (afId, data) => api.post(`/afs/${afId}/sections`, data)
