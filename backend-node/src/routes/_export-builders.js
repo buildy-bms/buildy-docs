@@ -716,14 +716,15 @@ function buildPointsListExportData(af, opts = {}) {
 
   // KPIs niveau requis vs niveau visé — pour piloter la couleur de la
   // barre à gauche de l'encart cover (cohérence avec Synthèse + AF).
-  // Lot 92 : af.service_level fait foi quand renseigne.
-  let requiredLevel;
+  // Lot 91 : af.service_level fait foi quand renseigne (input MOA).
+  let serviceLevel;
   if (af.service_level) {
-    requiredLevel = af.service_level.toUpperCase();
+    const slug = af.service_level.toUpperCase();
+    serviceLevel = { level: slug, label: formatLevelFull(slug), justifications: [] };
   } else {
-    const requiredAfLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
-    requiredLevel = requiredAfLevel?.level || null;
+    serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
   }
+  const requiredLevel = serviceLevel?.level || null;
   const contractLevel = af.service_level || null;
   const kpis = {
     requiredLevel,
@@ -732,6 +733,7 @@ function buildPointsListExportData(af, opts = {}) {
     contractLevelLabel: contractLevel ? SERVICE_LEVEL_LABELS[contractLevel] : null,
     verdict: buildLevelVerdict({ requiredLevel, contractLevel }),
   };
+  const optinPaidOptionCount = allSections.filter(s => !!s.optin_paid_option).length;
 
   const data = {
     af,
@@ -742,7 +744,8 @@ function buildPointsListExportData(af, opts = {}) {
     serviceLevelLabel: SERVICE_LEVEL_LABELS[af.service_level] || af.service_level || '—',
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
     kpis,
-    serviceLevel: requiredAfLevel,    // .justifications consomme par _cover-level-band.hbs
+    optinPaidOptionCount,
+    serviceLevel,    // .justifications consomme par _cover-level-band.hbs
     categories,
     rows,
     totals,
@@ -755,6 +758,8 @@ module.exports = {
   buildAfExportData,
   buildPointsListExportData,
   buildOfferingsAnnexForAf,
+  buildContractualSummaryForAf,
+  renderContractualSummary,
   buildLevelVerdict,
   // Re-exporte pour que export.js puisse les utiliser sans dupliquer
   buildLiveBacsResolver,

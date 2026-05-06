@@ -81,6 +81,25 @@
 </section>
 {{/if}}
 
+{{!-- ═══════════════════ Engagement contractuel — niveau MOA + options payantes (Lot 91) ═══════════════════ --}}
+{{#if contractualSummary.hasDemands}}
+<section class="page">
+  <h1 class="page-title">Engagement contractuel — niveau d'offre et options payantes</h1>
+
+  <p class="section-intro">
+    Le maître d'ouvrage a souscrit l'offre <strong>{{contractualSummary.currentLevelName}}</strong>.
+    {{#if contractualSummary.requiredOptions.length}}
+    {{contractualSummary.requiredOptions.length}} option{{#if (gt contractualSummary.requiredOptions.length 1)}}s{{/if}} payante{{#if (gt contractualSummary.requiredOptions.length 1)}}s{{/if}} ont été ajoutées au contrat à la carte, sans changement de niveau.
+    {{/if}}
+    {{#if contractualSummary.unavailableFeatures.length}}
+    Attention : certaines fonctionnalités exigées ne sont pas disponibles à ce niveau (voir liste ci-dessous).
+    {{/if}}
+  </p>
+
+  {{> _contractual-summary contractualSummary}}
+</section>
+{{/if}}
+
 {{!-- ═══════════════════ PAGE 2 — Zones fonctionnelles × catégories ═══════════════════ --}}
 <section class="page">
   <h1 class="page-title">2. Zones fonctionnelles du bâtiment</h1>
