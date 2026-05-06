@@ -228,21 +228,29 @@ const SYSTEM_PROMPT_LIBRARY = [
   ``,
   `=== SUGGESTION DE TITRE (OBLIGATOIRE en tete de reponse) ===`,
   `Tu DOIS commencer ta reponse par la ligne EXACTE \`<!--TITLE: titre-->\` puis enchainer sur le HTML.`,
-  `Le titre cible un INTEGRATEUR GTB / un EXPLOITANT — pas un developpeur. Style ORIENTE UTILISATEUR / VALEUR, presque marketing :`,
-  `- Mets en avant le BENEFICE METIER ou la VALEUR percue par le client, pas le mecanisme technique sous-jacent.`,
-  `  Mauvais (technique brut)  → Bon (oriente valeur) :`,
-  `  • "Detection des derives et des fuites"   → "Surveillance proactive des consommations"`,
-  `  • "Mises a jour automatiques des apps"     → "Toujours a jour, sans intervention"`,
-  `  • "Notifications par email"                → "Restez informe en temps reel"`,
-  `  • "Acces simplifie par QR Codes"           → "Acces immediat aux equipements en un scan"`,
-  `  • "API Buildy Connect"                     → "Ouverture vers vos systemes tiers"`,
-  `- Style nominal court (3 a 8 mots), specifique, sans guillemets francais.`,
-  `- Reste sobre et precis : pas de superlatifs creux ("revolutionnaire", "incroyable", "puissant"), pas d'enthousiasme excessif.`,
-  `- Vocabulaire metier (GTB, supervision, exploitation, conformite, energie...) mais ACCESSIBLE.`,
-  `- Si le titre courant est deja oriente utilisateur et concret, RECOPIE-LE TEL QUEL dans le marker (le backend filtrera).`,
-  `- Si le titre courant est trop technique / interne / fade, propose une amelioration concrete et orientee benefice.`,
+  `Le titre cible un INTEGRATEUR GTB / un EXPLOITANT (pro technique). Style PROFESSIONNEL et DESCRIPTIF, qui designe clairement L'OBJET METIER concerne :`,
+  `- Forme nominale (groupe nominal francais classique), 3 a 8 mots.`,
+  `- AJOUTE LA PRECISION FONCTIONNELLE quand elle manque : ne pas s'arreter au mecanisme, completer par l'objet metier.`,
+  `  Mauvais (trop generique / brut) → Bon (precise + valeur metier sobre) :`,
+  `  • "Detection des derives"           → "Detection des derives de consommation"`,
+  `  • "Notifications par email"          → "Notifications email des alarmes critiques"`,
+  `  • "Acces simplifie par QR Codes"     → "Acces aux equipements par QR Code"`,
+  `  • "API Buildy Connect"               → "Ouverture API vers les systemes tiers"`,
+  `  • "Mises a jour automatiques"        → "Mises a jour automatiques des passerelles"`,
+  `INTERDIT (sloganesque, marketing creux) :`,
+  `  • "Terrain toujours visible, en temps reel"   ← ton publicitaire`,
+  `  • "Restez informe en temps reel"              ← injonction client, pas un titre de doc`,
+  `  • "Toujours a jour, sans intervention"        ← punchline`,
+  `  • "Surveillance proactive des consommations"  ← jargon marketing ("proactive")`,
+  `Garde-fous :`,
+  `- Pas de phrases-slogan, pas d'injonctions au lecteur ("Restez...", "Pilotez...", "Gardez la main..."), pas de "Toujours..." en tete.`,
+  `- Pas de superlatifs ni de jargon marketing : "proactive", "intelligente", "puissante", "instantane", "revolutionnaire", "complete" -> a EVITER.`,
+  `- Pas de virgule : un titre = une formule nominale unitaire.`,
+  `- Vocabulaire metier GTB direct (supervision, alarme, regulation, point, releve, consommation, derive, etc.).`,
+  `- Si le titre courant est deja descriptif et clair (ex : "Acquisition temps reel des points terrain"), RECOPIE-LE tel quel.`,
+  `- Si le titre courant est vague ou tronque, ajoute la precision metier manquante.`,
   `- Le marker doit TOUJOURS etre present, meme si tu recopies le titre actuel.`,
-  `Exemple : \`<!--TITLE: Surveillance proactive des consommations-->\` puis HTML.`,
+  `Exemple : \`<!--TITLE: Acquisition temps reel des points terrain-->\` puis HTML.`,
   ``,
   `=== RYTHME VISUEL — IMPORTANT ===`,
   `Le contenu doit etre AERE et lisible, pas un pave dense.`,
@@ -288,14 +296,16 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     }
     lines.push(`=== INSTRUCTION ===`);
     lines.push(`Propose un meilleur titre pour cette entite. Tiens compte du contenu fourni s'il y en a.`);
-    lines.push(`Le titre cible un INTEGRATEUR GTB / un EXPLOITANT. Style ORIENTE UTILISATEUR / VALEUR, presque marketing :`);
-    lines.push(`- Mets en avant le BENEFICE METIER ou la VALEUR client, PAS le mecanisme technique brut.`);
-    lines.push(`  Exemples : "Surveillance proactive des consommations" plutot que "Detection des derives" ;`);
-    lines.push(`  "Toujours a jour, sans intervention" plutot que "Mises a jour automatiques des apps" ;`);
-    lines.push(`  "Acces immediat aux equipements en un scan" plutot que "Acces simplifie par QR Codes".`);
-    lines.push(`- Style nominal court (3 a 8 mots), specifique, sans guillemets francais.`);
-    lines.push(`- Sobre et concret : pas de superlatifs creux ("revolutionnaire", "puissant", "incroyable").`);
-    lines.push(`- Vocabulaire metier accessible (GTB, supervision, exploitation, conformite, energie...).`);
+    lines.push(`Cible : INTEGRATEUR GTB / EXPLOITANT (pro technique). Style PROFESSIONNEL DESCRIPTIF, qui designe l'OBJET METIER.`);
+    lines.push(`- Forme nominale francaise (3 a 8 mots), specifique, sans guillemets francais, sans virgule.`);
+    lines.push(`- AJOUTE LA PRECISION METIER quand elle manque :`);
+    lines.push(`  • "Detection des derives"        → "Detection des derives de consommation"`);
+    lines.push(`  • "Notifications par email"      → "Notifications email des alarmes critiques"`);
+    lines.push(`  • "Mises a jour automatiques"    → "Mises a jour automatiques des passerelles"`);
+    lines.push(`INTERDIT (sloganesque) : "Terrain toujours visible en temps reel", "Restez informe en temps reel", "Toujours a jour sans intervention".`);
+    lines.push(`Pas de jargon marketing : "proactive", "intelligente", "puissante", "instantane", "revolutionnaire" sont a EVITER.`);
+    lines.push(`Pas d'injonction au lecteur ("Restez...", "Pilotez..."). Pas de "Toujours..." en tete.`);
+    lines.push(`Si le titre courant est deja clair, RECOPIE-LE TEL QUEL.`);
     lines.push(`REPONDS UNIQUEMENT PAR LA LIGNE \`<!--TITLE: titre propose-->\` ET RIEN D'AUTRE.`);
     lines.push(`Aucun HTML, aucun preambule, aucune explication. Juste le marker.`);
     return lines.join('\n');
