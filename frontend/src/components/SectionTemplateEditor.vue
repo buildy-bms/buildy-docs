@@ -566,17 +566,18 @@ async function destroy() {
         </label>
         <div class="grid grid-cols-3 gap-2">
           <div v-for="lvl in CONTRACT_LEVELS" :key="lvl.code"
-               class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1.5">
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-indigo-50 text-indigo-700 font-mono text-xs shrink-0"
-                  :title="lvl.label">
-              {{ lvl.code }}
+               class="flex items-center justify-between gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1">
+            <span class="inline-flex items-center gap-1.5 text-xs text-gray-700 truncate">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-indigo-50 text-indigo-700 font-mono text-[11px] shrink-0">
+                {{ lvl.code }}
+              </span>
+              <span class="truncate">{{ lvl.label }}</span>
             </span>
-            <span class="text-xs text-gray-600 truncate flex-1">{{ lvl.label }}</span>
             <div class="inline-flex items-center bg-gray-50 rounded-md p-0.5 shrink-0">
               <button v-for="o in AVAIL_OPTIONS" :key="String(o.value)" type="button"
                       @click="form[lvl.field] = o.value"
                       :title="o.label"
-                      :class="['inline-flex items-center justify-center w-7 h-6 text-xs rounded transition',
+                      :class="['inline-flex items-center justify-center w-6 h-5 text-xs rounded transition',
                                form[lvl.field] === o.value
                                  ? o.color + ' shadow-sm font-medium'
                                  : 'text-gray-400 hover:text-gray-600 hover:bg-white']">
@@ -618,16 +619,22 @@ async function destroy() {
       </div>
 
       <p v-if="isEdit && form.kind === 'standard'"
-         class="text-xs text-gray-500 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg p-3">
-        Les AFs existantes restent figées sur la version actuellement liée. Pour qu'une AF
-        prenne en compte cette modification, ouvre la section concernée — un bandeau
-        « nouvelle version » te proposera de la mettre à jour.
+         class="text-[11px] text-gray-500 italic">
+        Les AFs existantes restent figées sur la version liée. La mise à jour est proposée à l'ouverture de chaque AF.
       </p>
 
-      <!-- Captures du modele : automatiquement heritees par les AFs -->
-      <div v-if="isEdit">
-        <TemplateAttachmentsGrid template-kind="section" :template-id="props.template.id" />
-      </div>
+      <!-- Captures du modele : repliable pour ne pas occuper la moitie de
+           la modale en permanence. Auto-deplie si attachments existent. -->
+      <details v-if="isEdit" class="group" :open="(props.template?.attachments_count || 0) > 0">
+        <summary class="text-[11px] font-medium text-gray-600 cursor-pointer hover:text-gray-800 inline-flex items-center gap-1.5 select-none list-none">
+          <span class="inline-block w-3 h-3 transition-transform group-open:rotate-90">▸</span>
+          Captures du modèle
+          <span v-if="props.template?.attachments_count" class="text-gray-400">· {{ props.template.attachments_count }}</span>
+        </summary>
+        <div class="mt-2">
+          <TemplateAttachmentsGrid template-kind="section" :template-id="props.template.id" />
+        </div>
+      </details>
     </form>
 
     <template #footer>

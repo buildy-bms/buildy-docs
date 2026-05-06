@@ -629,19 +629,32 @@ async function destroy() {
         />
       </div>
 
-      <!-- Donnees lues / ecrites — disponible uniquement en mode edition -->
-      <div v-if="isEdit" class="pt-3 border-t border-gray-100">
-        <h3 class="text-sm font-medium text-gray-800 mb-1">Données typiques</h3>
-        <p class="text-xs text-gray-500 mb-3">
-          Liste des informations remontées par cet équipement (lectures) et des actions pilotables (écritures). Cliquer une ligne pour la modifier, glisser-déposer pour réordonner.
+      <!-- Donnees lues / ecrites + Captures : repliables (gain de hauteur).
+           Auto-deplies sur des modeles deja peuples. -->
+      <details v-if="isEdit" class="group pt-2 border-t border-gray-100"
+               :open="(template?.points_count || 0) > 0">
+        <summary class="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-gray-900 inline-flex items-center gap-1.5 select-none list-none">
+          <span class="inline-block w-3 h-3 transition-transform group-open:rotate-90">▸</span>
+          Données typiques
+          <span v-if="template?.points_count" class="text-gray-400">· {{ template.points_count }}</span>
+        </summary>
+        <p class="text-[11px] text-gray-500 mt-1 mb-2">
+          Lectures (mesures, états) et écritures (commandes, consignes). Cliquer pour éditer, glisser pour réordonner.
         </p>
         <EquipmentPointsEditor :template-id="template.id" @updated="$emit('saved', template)" />
-      </div>
+      </details>
 
-      <!-- Captures du modele : automatiquement heritees par les AFs -->
-      <div v-if="isEdit" class="pt-3 border-t border-gray-100">
-        <TemplateAttachmentsGrid template-kind="equipment" :template-id="template.id" />
-      </div>
+      <details v-if="isEdit" class="group pt-2 border-t border-gray-100"
+               :open="(template?.attachments_count || 0) > 0">
+        <summary class="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-gray-900 inline-flex items-center gap-1.5 select-none list-none">
+          <span class="inline-block w-3 h-3 transition-transform group-open:rotate-90">▸</span>
+          Captures du modèle
+          <span v-if="template?.attachments_count" class="text-gray-400">· {{ template.attachments_count }}</span>
+        </summary>
+        <div class="mt-2">
+          <TemplateAttachmentsGrid template-kind="equipment" :template-id="template.id" />
+        </div>
+      </details>
     </form>
 
     <template #footer>
