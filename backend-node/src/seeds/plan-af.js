@@ -357,8 +357,18 @@ const PLAN_AF = [
   // Contenu détaillé seedé depuis migration 69 (cf. database.js).
   // L'export PDF y greffe automatiquement la synthèse "offre cible
   // recommandée" calculée à partir des fonctionnalités demandées par le MOA.
+  // Sous-chapitre 13.x ajouté en migration 94 :
+  //   "Engagement de commande du contrat de services" (texte d'engagement
+  //   formel du MOA, validé par checkbox bloquante à la transition AF).
   {
     number: '13', title: 'Engagement contractuel', kind: 'standard',
+    children: [
+      {
+        slug: 'engagement-commande-contrat-services',
+        title: 'Engagement de commande du contrat de services',
+        kind: 'standard',
+      },
+    ],
   },
 
   // ═══════════ Chapitre 14 — Pourquoi Buildy ═══════════

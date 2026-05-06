@@ -228,6 +228,7 @@ const transitionTo = ref(null)
 const transitionMotif = ref('')
 const transitionNotes = ref('')
 const transitionWarnings = ref([])
+const agreedToContractualCommitment = ref(false)
 
 function openPhaseMenu() { showPhaseMenu.value = !showPhaseMenu.value }
 
@@ -237,6 +238,7 @@ async function startTransition(target) {
   transitionMotif.value = ''
   transitionNotes.value = ''
   transitionWarnings.value = []
+  agreedToContractualCommitment.value = false
   // Validee + livree : modale obligatoire (snapshot figé)
   if (target === 'validee' || target === 'livree') {
     // Pre-check : remonte les avertissements (sections vides, equipements
@@ -255,12 +257,14 @@ async function confirmTransition() {
   const target = transitionTo.value
   const isSnapshot = target === 'validee' || target === 'livree'
   if (isSnapshot && !transitionMotif.value.trim()) return
+  if (target === 'validee' && !agreedToContractualCommitment.value) return
   submitting.value = true
   try {
     const { data } = await api.post(`/afs/${props.af.id}/transition`, {
       to: target,
       motif: transitionMotif.value.trim() || null,
       notes: transitionNotes.value.trim() || null,
+      ...(target === 'validee' ? { agreement_accepted: true } : {}),
     })
     success(isSnapshot
       ? `${PHASE_LABELS[target]} — snapshot figé (PDF + tag Git)`
@@ -733,6 +737,30 @@ const exportDescription = computed(() => {
         </ul>
         <p class="text-[11px] text-amber-800 italic">Vous pouvez confirmer malgré ces avertissements ; ils sont consignés dans l'audit.</p>
       </div>
+      <!-- Engagement contractuel — bloquant pour la validation -->
+      <div v-if="transitionTo === 'validee'" class="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+        <p class="text-xs font-semibold text-blue-900 inline-flex items-center gap-1.5">
+          <span class="text-base leading-none">📋</span>
+          Engagement de commande du contrat de services
+        </p>
+        <p class="text-[11px] leading-relaxed text-blue-900">
+          En validant cette AF, le maître d'ouvrage <strong>s'engage à passer commande du contrat de services Buildy</strong>
+          (Smart ou Premium, ainsi que les options payantes souscrites)
+          <strong>au plus tard la veille de la date de livraison prévue</strong>.
+        </p>
+        <p class="text-[11px] leading-relaxed text-blue-900">
+          À défaut, Buildy se réserve le droit de <strong>repousser la livraison</strong> ou de
+          <strong>livrer sans activer les fonctionnalités payantes</strong>.
+          Détail dans le chapitre <em>13 — Engagement contractuel</em> de l'AF.
+        </p>
+        <label class="flex items-start gap-2 cursor-pointer pt-1">
+          <input type="checkbox" v-model="agreedToContractualCommitment"
+                 class="mt-0.5 h-4 w-4 rounded border-blue-300 text-indigo-600 focus:ring-indigo-500" />
+          <span class="text-[11px] text-blue-900 leading-relaxed">
+            Je confirme avoir pris connaissance et accepté l'engagement de commande du contrat de services au nom du MOA.
+          </span>
+        </label>
+      </div>
       <div>
         <label class="block text-xs font-semibold text-gray-700 mb-1">Motif (obligatoire) *</label>
         <input v-model="transitionMotif" type="text" required autocomplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true"
@@ -747,7 +775,8 @@ const exportDescription = computed(() => {
     </form>
     <template #footer>
       <button @click="showTransitionModal = false" class="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Annuler</button>
-      <button @click="confirmTransition" :disabled="submitting || !transitionMotif.trim()"
+      <button @click="confirmTransition"
+              :disabled="submitting || !transitionMotif.trim() || (transitionTo === 'validee' && !agreedToContractualCommitment)"
               :class="['px-3 py-1.5 text-xs text-white disabled:opacity-50', transitionTo === 'livree' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700']">
         {{ submitting ? 'En cours…' : (transitionTo === 'livree' ? 'Livrer le DOE' : 'Valider l\'AF') }}
       </button>
