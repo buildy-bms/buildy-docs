@@ -24,7 +24,7 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal title="Ajouter une zone fonctionnelle" size="md" @close="emit('close')">
+  <BaseModal title="Ajouter une zone fonctionnelle" size="md" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Nom de la zone *</label>
