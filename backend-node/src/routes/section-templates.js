@@ -335,13 +335,19 @@ async function routes(fastify) {
       }
     }
 
-    const propagate = String(request.query.propagate_unchanged || '') === '1';
+    // Lot — Propagation par défaut activée. Avant : opt-in via query param
+    // `propagate_unchanged=1`, ce qui était jamais transmis par le front →
+    // aucune sync biblio→AF en pratique. Maintenant : opt-out explicite via
+    // `propagate_unchanged=0` pour les cas avancés.
+    const propagate = String(request.query.propagate_unchanged || '1') !== '0';
     const userId = request.authUser?.id;
 
     // Snapshots avant update pour propagation
+    const oldTitle = tpl.title;
     const oldBody = tpl.body_html;
     const oldBacs = tpl.bacs_articles;
     const oldLevel = tpl.service_level;
+    const newTitle = body.title === undefined ? oldTitle : body.title;
     const newBody = body.body_html === undefined ? oldBody : body.body_html;
     const newBacs = body.bacs_articles === undefined ? oldBacs : body.bacs_articles;
 
@@ -355,6 +361,7 @@ async function routes(fastify) {
       ? deriveServiceLevel({ avail_e: newAvailE, avail_s: newAvailS, avail_p: newAvailP })
       : (body.service_level !== undefined ? body.service_level : oldLevel);
     const newLevel = derivedLevel;
+    const titleChanged = body.title !== undefined && newTitle !== oldTitle;
     const bodyChanged = body.body_html !== undefined && newBody !== oldBody;
     const bacsChanged = body.bacs_articles !== undefined && newBacs !== oldBacs;
     const levelChanged = newLevel !== oldLevel;
@@ -387,12 +394,18 @@ async function routes(fastify) {
     }
 
     let propagatedCount = 0;
+    let titleSynced = 0;
     let levelSynced = 0;
     let bacsSynced = 0;
-    if (bodyChanged || bacsChanged || levelChanged) {
+    if (titleChanged || bodyChanged || bacsChanged || levelChanged) {
       db.sectionTemplates.bumpVersion(id);
       const newVersion = db.sectionTemplates.getById(id).current_version;
       if (propagate) {
+        if (titleChanged) {
+          // Lot — Le titre est une meta toujours synchronisée (analogue au
+          // service_level). Pas de version personnalisable côté section AF.
+          titleSynced = db.sectionTemplates.syncTitle(id, newTitle, newVersion);
+        }
         if (bodyChanged) {
           propagatedCount = db.sectionTemplates.propagateUnchanged(id, oldBody, newBody, newVersion);
         }
@@ -400,10 +413,9 @@ async function routes(fastify) {
           bacsSynced = db.sectionTemplates.propagateBacsUnchanged(id, oldBacs, newBacs, newVersion);
         }
         if (levelChanged) {
-          // Le niveau est une meta, jamais editee par section : toujours synchroniser.
           levelSynced = db.sectionTemplates.syncServiceLevel(id, newLevel, newVersion);
         }
-        log.info(`Section template #${id} : ${propagatedCount} body, ${bacsSynced} BACS, ${levelSynced} niveau(x) propages (user #${userId})`);
+        log.info(`Section template #${id} : ${titleSynced} titre(s), ${propagatedCount} body, ${bacsSynced} BACS, ${levelSynced} niveau(x) propages (user #${userId})`);
       }
     }
 
@@ -412,6 +424,7 @@ async function routes(fastify) {
       action: 'section_template.update',
       payload: {
         id, fields: Object.keys(body),
+        title_synced: titleSynced,
         body_propagated: propagatedCount, bacs_propagated: bacsSynced, level_synced: levelSynced,
         document_kinds_cascaded: documentKindsCascaded,
       },

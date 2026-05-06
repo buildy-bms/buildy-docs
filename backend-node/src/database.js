@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 91;
+const TARGET_VERSION = 93;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3412,6 +3412,46 @@ function runMigrations() {
     db.pragma('user_version = 91');
   }
 
+  if (current < 92) {
+    // FAQ Buildy : historique des versions d'article. Snapshot du
+    // content_html + title + status pris AVANT chaque push vers Crisp,
+    // pour permettre une restauration en cas de regression.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS faq_article_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id INTEGER NOT NULL REFERENCES faq_articles(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        content_html TEXT,
+        status TEXT,
+        reason TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_faq_article_versions_article
+        ON faq_article_versions(article_id, created_at DESC);
+    `);
+    log.info('Migration 92 appliquée : faq_article_versions (snapshot pré-push)');
+    db.pragma('user_version = 92');
+  }
+
+  if (current < 93) {
+    // Lot — Resync one-shot des titres de sections AF avec leur template.
+    // Avant ce lot, les titres ne se propageaient pas de la biblio aux AFs
+    // (la propagation backend etait conditionnelle a un query param jamais
+    // transmis). Resultat : certaines AFs avaient des titres obsoletes.
+    // Cette migration force l'alignement au boot. Les titres etaient deja
+    // censes etre des metas non-customisables, donc pas de perte de travail
+    // utilisateur.
+    const result = db.prepare(`
+      UPDATE sections
+         SET title = (SELECT title FROM section_templates WHERE id = sections.section_template_id)
+       WHERE section_template_id IS NOT NULL
+         AND title != (SELECT title FROM section_templates WHERE id = sections.section_template_id)
+    `).run();
+    log.info(`Migration 93 appliquée : ${result.changes} titre(s) de sections AF resynchronises avec leur template biblio.`);
+    db.pragma('user_version = 93');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3892,6 +3932,16 @@ const sectionTemplates = {
          SET service_level = ?, section_template_version = ?
        WHERE section_template_id = ?
     `).run(newLevel, newVersion, templateId);
+    return r.changes;
+  },
+  // Lot — Le titre est aussi une meta non editable par section AF (le titre
+  // canonique est dans la biblio). Toujours propagé aux sections rattachees.
+  syncTitle(templateId, newTitle, newVersion) {
+    const r = db.prepare(`
+      UPDATE sections
+         SET title = ?, section_template_version = ?
+       WHERE section_template_id = ?
+    `).run(newTitle, newVersion, templateId);
     return r.changes;
   },
 
@@ -5448,6 +5498,59 @@ const faqArticles = {
   },
   listAllTitles() {
     return db.prepare('SELECT id, title, category_id FROM faq_articles ORDER BY title').all();
+  },
+  // Corpus IA : articles publiés avec URL Crisp (pour permettre les liens internes).
+  listForCorpus() {
+    return db.prepare(`
+      SELECT a.id, a.title, a.crisp_url, a.status, a.content_html,
+             c.name AS category_name
+      FROM faq_articles a
+      LEFT JOIN faq_categories c ON c.id = a.category_id
+      WHERE a.status = 'published' AND a.crisp_url IS NOT NULL
+      ORDER BY a.title
+    `).all();
+  },
+  // Snapshot des versions article (avant push, ou avant une réécriture IA).
+  snapshot(articleId, { reason = null, userId = null } = {}) {
+    const a = this.getById(articleId);
+    if (!a) return null;
+    const r = db.prepare(`
+      INSERT INTO faq_article_versions (article_id, title, content_html, status, reason, created_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(articleId, a.title, a.content_html || '', a.status || 'draft', reason, userId);
+    return r.lastInsertRowid;
+  },
+  listVersions(articleId, { limit = 30 } = {}) {
+    return db.prepare(`
+      SELECT v.id, v.article_id, v.title, v.status, v.reason, v.created_at,
+             v.created_by, u.display_name AS created_by_name,
+             length(v.content_html) AS content_size
+      FROM faq_article_versions v
+      LEFT JOIN users u ON u.id = v.created_by
+      WHERE v.article_id = ?
+      ORDER BY v.created_at DESC
+      LIMIT ?
+    `).all(articleId, limit);
+  },
+  getVersion(versionId) {
+    return db.prepare('SELECT * FROM faq_article_versions WHERE id = ?').get(versionId);
+  },
+  // Modale "Insérer un lien vers un article" : recherche par titre, articles publiés.
+  listForLinkPicker(q = null) {
+    const where = ["a.crisp_url IS NOT NULL", "a.status = 'published'"];
+    const args = [];
+    if (q && q.trim()) {
+      where.push('a.title LIKE ?');
+      args.push(`%${q.trim()}%`);
+    }
+    return db.prepare(`
+      SELECT a.id, a.title, a.crisp_url, c.name AS category_name
+      FROM faq_articles a
+      LEFT JOIN faq_categories c ON c.id = a.category_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY a.title
+      LIMIT 200
+    `).all(...args);
   },
   create({ crispId = null, categoryId = null, title, slug = null, contentHtml = null,
            status = 'draft', visibility = 'public', locale = 'fr', dirty = 1,

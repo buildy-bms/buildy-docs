@@ -1163,7 +1163,7 @@ table.points-mini .badge-type {
 .annex-demanded-pill {
   display: inline-block;
   margin-left: 1.5mm;
-  padding: 0.3mm 1.2mm;
+  padding: 0.9mm 1.8mm;
   background: #d1fae5;
   color: #065f46;
   border: 0.4pt solid #6ee7b7;
@@ -1173,6 +1173,8 @@ table.points-mini .badge-type {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+  white-space: nowrap;
+  line-height: 1;
 }
 .annex-row-demanded td.annex-feature {
   background: #f0fdf4;
@@ -1187,7 +1189,7 @@ table.points-mini .badge-type {
 .annex-refused-pill {
   display: inline-block;
   margin-left: 1.5mm;
-  padding: 0.3mm 1.2mm;
+  padding: 0.9mm 1.8mm;
   background: #fee2e2;
   color: #991b1b;
   border: 0.4pt solid #fca5a5;
@@ -1197,6 +1199,45 @@ table.points-mini .badge-type {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   vertical-align: middle;
+  white-space: nowrap;
+  line-height: 1;
+}
+/* Lot 91 — Option payante a la carte (optin_paid_option=1).
+   Aligne sur styles-synthesis.css pour cohérence visuelle entre AF et Synthèse. */
+.annex-optin-pill {
+  display: inline-block;
+  margin-left: 1.5mm;
+  padding: 0.9mm 1.8mm;
+  background: #10b981;
+  color: #ffffff;
+  border: 0.4pt solid #059669;
+  border-radius: 2.5mm;
+  font-size: 5.4pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  white-space: nowrap;
+  line-height: 1;
+}
+.annex-row-optin td.annex-feature {
+  background: #ecfdf5;
+  font-weight: 600;
+  color: #065f46;
+  border-left: 1.2mm solid #10b981;
+  padding-left: 2mm !important;
+}
+.annex-row-optin td.annex-cell { background: #ecfdf5; }
+.annex-avail-optin {
+  display: inline-block;
+  padding: 0.9mm 1.8mm;
+  background: #10b981;
+  color: #ffffff;
+  border-radius: 2mm;
+  font-size: 6pt;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1;
 }
 .annex-row-refused td.annex-feature {
   background: #fef2f2;
