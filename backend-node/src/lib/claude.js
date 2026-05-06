@@ -271,6 +271,21 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
   }
   lines.push('');
 
+  // Mode title : on ne genere ni ne reformule le contenu, juste un titre.
+  if (mode === 'title') {
+    if (html?.trim()) {
+      lines.push(`=== CONTENU ACTUEL (pour t'aider a proposer un titre adapte) ===`);
+      lines.push(html.trim());
+      lines.push('');
+    }
+    lines.push(`=== INSTRUCTION ===`);
+    lines.push(`Propose un meilleur titre pour cette entite. Tiens compte du contenu fourni s'il y en a.`);
+    lines.push(`Style : nominal court (3 a 8 mots), specifique, vocabulaire metier GTB, sans guillemets francais.`);
+    lines.push(`REPONDS UNIQUEMENT PAR LA LIGNE \`<!--TITLE: titre propose-->\` ET RIEN D'AUTRE.`);
+    lines.push(`Aucun HTML, aucun preambule, aucune explication. Juste le marker.`);
+    return lines.join('\n');
+  }
+
   // Texte source (mode reformulate) ou rien (mode generate)
   if (mode === 'reformulate' && html?.trim()) {
     lines.push(`=== TEXTE ACTUEL A REFORMULER ===`);

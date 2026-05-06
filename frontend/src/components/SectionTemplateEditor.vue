@@ -29,6 +29,7 @@ import {
   listDocumentKinds,
   validateSectionTemplateContent,
   unvalidateSectionTemplateContent,
+  claudeLibraryAssist,
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
 import { CheckBadgeIcon } from '@heroicons/vue/24/outline'
@@ -139,6 +140,7 @@ const validating = ref(false)
 // bandeau "Appliquer / Ignorer" sous le champ Titre. Ignoree par defaut
 // si elle est identique au titre courant.
 const suggestedTitle = ref(null)
+const suggestingTitle = ref(false)
 function onSuggestedTitle(t) {
   if (t && t.trim() && t.trim() !== form.value.title.trim()) {
     suggestedTitle.value = t.trim()
@@ -149,6 +151,37 @@ function applySuggestedTitle() {
   suggestedTitle.value = null
 }
 function dismissSuggestedTitle() { suggestedTitle.value = null }
+
+// Bouton ✨ dans le champ titre : appelle Claude en mode 'title' (renvoie
+// uniquement un titre via marker, pas de body). Le contenu courant est
+// envoye comme contexte pour que la suggestion soit coherente.
+async function suggestTitleOnly() {
+  if (!form.value.title.trim() || suggestingTitle.value) return
+  suggestingTitle.value = true
+  try {
+    const { data } = await claudeLibraryAssist({
+      mode: 'title',
+      kind: mode === 'functionality' ? 'functionality' : 'narrative_section',
+      title: form.value.title.trim(),
+      html: form.value.body_html || undefined,
+      bacs_articles: form.value.bacs_articles || null,
+      avail_e: form.value.avail_e,
+      avail_s: form.value.avail_s,
+      avail_p: form.value.avail_p,
+      current_template_id: props.template?.id || null,
+      parent_template_id: form.value.parent_template_id || null,
+    })
+    if (data?.suggested_title) {
+      onSuggestedTitle(data.suggested_title)
+    } else {
+      success('Titre actuel jugé déjà bon par Claude')
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la requête Claude')
+  } finally {
+    suggestingTitle.value = false
+  }
+}
 
 // Etat local du template : reflete le dernier save inline. Permet au
 // bandeau de validation, au statut, et a la matrice "dirty" de rester
@@ -490,9 +523,16 @@ async function destroy() {
         </legend>
         <div>
           <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Titre *</label>
-          <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
-                 :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
-                 class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <div class="relative">
+            <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
+                   :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
+                   class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+            <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.title.trim()"
+                    :title="form.title.trim() ? 'Proposer un meilleur titre avec Claude' : 'Saisir d\'abord un titre'"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
+              <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
+            </button>
+          </div>
           <!-- Suggestion de titre Claude (apres reformulation/generation) -->
           <div v-if="suggestedTitle"
                class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">

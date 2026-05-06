@@ -90,11 +90,14 @@ async function routes(fastify) {
       return reply.code(503).send({ detail: 'Assistant Claude non configuré (ANTHROPIC_API_KEY manquant)' });
     }
     const body = request.body || {};
-    if (!['generate', 'reformulate'].includes(body.mode)) {
-      return reply.code(400).send({ detail: 'mode requis : generate ou reformulate' });
+    if (!['generate', 'reformulate', 'title'].includes(body.mode)) {
+      return reply.code(400).send({ detail: 'mode requis : generate, reformulate ou title' });
     }
     if (body.mode === 'reformulate' && !(body.html || '').trim()) {
       return reply.code(400).send({ detail: 'Aucun texte à reformuler' });
+    }
+    if (body.mode === 'title' && !(body.title || '').trim() && !(body.html || '').trim()) {
+      return reply.code(400).send({ detail: 'Titre ou contenu requis pour proposer un titre' });
     }
     if (body.library_context && body.library_context.enabled) {
       const s = body.library_context.strategy;

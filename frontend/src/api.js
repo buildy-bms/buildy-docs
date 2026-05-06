@@ -265,6 +265,8 @@ export const listAuditActions = () => api.get('/audit-log/actions')
 //             bacs_articles?, avail_e?, avail_s?, avail_p?,
 //             current_template_id?, parent_template_id?, category?,
 //             library_context?: { enabled, strategy } }
+// mode 'title' : Claude propose UNIQUEMENT un titre (pas de body), via le
+// marker `<!--TITLE: ...-->`. Backend retourne suggested_title + html=''.
 export const getClaudeUsage = () => api.get('/claude/usage')
 // ── Prompts IA editables ──
 export const listAiPrompts = () => api.get('/ai-prompts')
