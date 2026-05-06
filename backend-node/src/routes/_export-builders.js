@@ -297,6 +297,7 @@ async function buildAfExportData(af, opts = {}) {
           body_html: s.body_html,
           generic_note: s.generic_note,
           opted_out_by_moa: s.opted_out_by_moa === 1,
+          optin_paid_option: s.optin_paid_option === 1,
           kind: s.kind,
           depth,
           attachments: data.attachments,
@@ -325,7 +326,24 @@ async function buildAfExportData(af, opts = {}) {
   }
   const tocFlat = flattenForToc(tree);
 
-  const serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+  // Niveau de service AF : priorise le choix MOA (af.service_level renseigne).
+  // Le calcul auto resolveAfLevel ne sert que de fallback pour les anciennes
+  // AFs sans niveau choisi — sinon il ecrasait le choix MOA en remontant le
+  // niveau a chaque feature avail_p-only meme non demandee.
+  let serviceLevel;
+  if (af.service_level) {
+    const slug = af.service_level.toUpperCase();
+    serviceLevel = {
+      level: slug,
+      label: formatLevelFull(slug),
+      justifications: [],
+    };
+  } else {
+    serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+  }
+  // Compteur d'options payantes a la carte (mig 92) pour affichage cover :
+  // "Niveau cible : Essentials + 3 options payantes".
+  const optinPaidOptionCount = allSections.filter(s => !!s.optin_paid_option).length;
 
   let version;
   if (previewMode) {
@@ -374,6 +392,7 @@ async function buildAfExportData(af, opts = {}) {
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
     serviceLevel,
     kpis,
+    optinPaidOptionCount,
     tree,
     tocFlat,
     includeBacsAnnex,
@@ -477,23 +496,22 @@ function buildOfferingsAnnexForAf(af) {
   for (const r of roots) emit(r, 0);
 
   // Niveaux d'offre :
-  //  - is_target  → niveau cible AF (engagement contractuel actuel)
-  //  - is_required → niveau Buildy requis pour le perimetre AF.
-  //                  Calcule via resolveAfLevel() sur TOUTES les sections
-  //                  actives (non opt-out), pour rester aligne avec le calcul
-  //                  utilise par la cover (kpis.requiredLevelLabel) et eviter
-  //                  qu'un meme AF affiche 2 niveaux requis differents (bug
-  //                  isole 2026-05-04 : cover disait Premium, page 3 disait
-  //                  Essentiel parce qu'elle ne regardait que les sections
-  //                  demanded par la MOA via buildContractualSummaryForAf).
-  //  Le template gere le cas where target == required en n'affichant que
-  //  le badge or (Niveau cible) pour eviter les doublons visuels.
+  //  - is_target  → niveau cible AF (engagement contractuel choisi par MOA)
+  //  - is_required → niveau Buildy requis :
+  //      Lot 92 : af.service_level fait foi quand renseigne (input MOA).
+  //      Fallback resolveAfLevel pour anciennes AFs sans niveau choisi.
+  //  Le template masque le badge required quand target == required.
   const allLevels = db.offeringLevels.list();
   const targetSlug = (af.service_level || '').toUpperCase();
   const summary = buildContractualSummaryForAf(af);
   const sectionsForLevel = db.sections.listByAf(af.id);
-  const requiredAfLevel = resolveAfLevel(sectionsForLevel.filter(s => !s.opted_out_by_moa));
-  const requiredSlug = requiredAfLevel?.level || null;
+  let requiredSlug;
+  if (af.service_level) {
+    requiredSlug = af.service_level.toUpperCase();
+  } else {
+    const requiredAfLevel = resolveAfLevel(sectionsForLevel.filter(s => !s.opted_out_by_moa));
+    requiredSlug = requiredAfLevel?.level || null;
+  }
   const levels = allLevels.map(l => ({
     ...l,
     is_target: l.slug === targetSlug,
@@ -531,33 +549,41 @@ function buildOfferingsAnnexForAf(af) {
 const LEVEL_RANK = { E: 0, S: 1, P: 2 };
 const LEVEL_NAMES = { E: 'Essentiel', S: 'Smart', P: 'Premium' };
 function buildContractualSummaryForAf(af) {
-  // Recupere toutes les sections demandees + refusees pour l'AF.
-  const demandedSections = db.db.prepare(`
-    SELECT s.id, s.title, s.section_template_id
+  // Lot — Options payantes a la carte (mig 92).
+  // af.service_level est un INPUT (le niveau choisi par le MOA), pas un
+  // calcul. On classifie chaque feature {demanded OR optin_paid_option}
+  // selon avail_<niveau choisi> :
+  //   - 'included'    -> coveredFeatures   (deja couvertes par le contrat)
+  //   - 'paid_option' -> requiredOptions   (a inclure dans l'avenant)
+  //   - NULL          -> unavailableFeatures (warning : indisponible a ce niveau)
+  // upgradeNeeded n'est leve QUE par les sections demanded indisponibles
+  // au niveau choisi (pas par les optin_paid_option indisponibles).
+  const flagged = db.db.prepare(`
+    SELECT s.id, s.title, s.section_template_id, s.demanded_by_moa, s.optin_paid_option
     FROM sections s
     WHERE s.af_id = ?
-      AND s.demanded_by_moa = 1
+      AND (s.demanded_by_moa = 1 OR s.optin_paid_option = 1)
       AND s.section_template_id IS NOT NULL
   `).all(af.id);
 
   const targetSlug = (af.service_level || 'E').toUpperCase();
-  const targetRank = LEVEL_RANK[targetSlug] ?? 0;
+  const targetName = LEVEL_NAMES[targetSlug] || targetSlug;
 
-  if (demandedSections.length === 0) {
+  if (flagged.length === 0) {
     return {
       hasDemands: false,
       currentLevel: targetSlug,
-      currentLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
-      recommendedLevel: targetSlug,
-      recommendedLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
+      currentLevelName: targetName,
+      recommendedLevel: targetSlug,        // conserve pour compat hbs
+      recommendedLevelName: targetName,
       upgradeNeeded: false,
       requiredOptions: [],
       coveredFeatures: [],
+      unavailableFeatures: [],
     };
   }
 
-  // Lookup des template_id demandes pour chercher leurs availabilities.
-  const tplIds = demandedSections.map(s => s.section_template_id);
+  const tplIds = flagged.map(s => s.section_template_id);
   const placeholders = tplIds.map(() => '?').join(',');
   const tpls = db.db.prepare(`
     SELECT id, title, avail_e, avail_s, avail_p
@@ -565,51 +591,39 @@ function buildContractualSummaryForAf(af) {
   `).all(...tplIds);
   const byTplId = new Map(tpls.map(t => [t.id, t]));
 
-  // Pour chaque demande : trouve le niveau min ou la feature est dispo.
-  const features = []; // { title, avails, minLevel, unavailable }
-  let maxRank = targetRank;
-  for (const s of demandedSections) {
-    const tpl = byTplId.get(s.section_template_id);
-    if (!tpl) continue;
-    const avails = { E: tpl.avail_e, S: tpl.avail_s, P: tpl.avail_p };
-    let minLevel = null;
-    for (const lvl of ['E', 'S', 'P']) {
-      const v = avails[lvl];
-      if (v === 'included' || v === 'paid_option') { minLevel = lvl; break; }
-    }
-    if (!minLevel) {
-      features.push({ title: tpl.title, avails, minLevel: null, unavailable: true });
-      continue;
-    }
-    const rank = LEVEL_RANK[minLevel];
-    if (rank > maxRank) maxRank = rank;
-    features.push({ title: tpl.title, avails, minLevel, unavailable: false });
-  }
-
-  // Resolve le niveau recommande
-  const recommendedSlug = Object.entries(LEVEL_RANK).find(([, r]) => r === maxRank)?.[0] || 'E';
-  const upgradeNeeded = maxRank > targetRank;
-
-  // A ce niveau recommande, distingue les features 'included' des 'paid_option'
   const requiredOptions = [];
   const coveredFeatures = [];
-  for (const f of features) {
-    if (f.unavailable) continue;
-    const availAtRec = f.avails[recommendedSlug];
-    if (availAtRec === 'paid_option') requiredOptions.push({ title: f.title });
-    else if (availAtRec === 'included') coveredFeatures.push({ title: f.title });
+  const unavailableFeatures = [];
+  let upgradeNeeded = false;
+
+  for (const s of flagged) {
+    const tpl = byTplId.get(s.section_template_id);
+    if (!tpl) continue;
+    const availAtTarget = tpl[`avail_${targetSlug.toLowerCase()}`];
+    const isDemanded = !!s.demanded_by_moa;
+    const isOptin = !!s.optin_paid_option;
+    if (availAtTarget === 'included') {
+      coveredFeatures.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+    } else if (availAtTarget === 'paid_option') {
+      requiredOptions.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+    } else {
+      unavailableFeatures.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+      // Seules les sections demanded (= socle exige) imposent un upgrade.
+      // Les optin sur indispo sont juste affichees comme "non eligibles a ce niveau".
+      if (isDemanded) upgradeNeeded = true;
+    }
   }
 
   return {
     hasDemands: true,
     currentLevel: targetSlug,
-    currentLevelName: LEVEL_NAMES[targetSlug] || targetSlug,
-    recommendedLevel: recommendedSlug,
-    recommendedLevelName: LEVEL_NAMES[recommendedSlug] || recommendedSlug,
+    currentLevelName: targetName,
+    recommendedLevel: targetSlug,        // = currentLevel (plus de calcul auto)
+    recommendedLevelName: targetName,
     upgradeNeeded,
     requiredOptions,
     coveredFeatures,
-    unavailableFeatures: features.filter(f => f.unavailable).map(f => ({ title: f.title })),
+    unavailableFeatures,
   };
 }
 
@@ -702,8 +716,14 @@ function buildPointsListExportData(af, opts = {}) {
 
   // KPIs niveau requis vs niveau visé — pour piloter la couleur de la
   // barre à gauche de l'encart cover (cohérence avec Synthèse + AF).
-  const requiredAfLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
-  const requiredLevel = requiredAfLevel?.level || null;
+  // Lot 92 : af.service_level fait foi quand renseigne.
+  let requiredLevel;
+  if (af.service_level) {
+    requiredLevel = af.service_level.toUpperCase();
+  } else {
+    const requiredAfLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+    requiredLevel = requiredAfLevel?.level || null;
+  }
   const contractLevel = af.service_level || null;
   const kpis = {
     requiredLevel,

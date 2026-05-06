@@ -188,7 +188,7 @@ export const useAfStore = defineStore('af', () => {
   // restent coherents apres l'update optimiste (sinon UI non reactive).
   function normalizePatch(patch) {
     const norm = { ...patch }
-    for (const key of ['opted_out_by_moa', 'demanded_by_moa', 'included_in_export']) {
+    for (const key of ['opted_out_by_moa', 'demanded_by_moa', 'optin_paid_option', 'included_in_export']) {
       if (typeof norm[key] === 'boolean') norm[key] = norm[key] ? 1 : 0
     }
     return norm
@@ -204,7 +204,7 @@ export const useAfStore = defineStore('af', () => {
     // Si le patch touche un flag qui se cascade aux descendants cote
     // backend (opted_out / demanded / included_in_export), on refresh
     // toute la liste pour propager visuellement la cascade au tree.
-    const cascadeKeys = ['opted_out_by_moa', 'demanded_by_moa', 'included_in_export']
+    const cascadeKeys = ['opted_out_by_moa', 'demanded_by_moa', 'optin_paid_option', 'included_in_export']
     const triggersCascade = cascadeKeys.some(k => k in patch)
     try {
       await updateSection(sectionId, patch)

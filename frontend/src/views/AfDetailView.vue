@@ -80,6 +80,11 @@ const {
   verificationProgress,
 } = storeToRefs(afStore)
 provide('liveSectionNumbering', liveSectionNumbering)
+// Niveau de contrat de l'AF (E/S/P) injecte dans le tree pour calculer
+// dynamiquement la disponibilite de chaque feature (avail_<level>) et
+// afficher les badges Inclus / Option / Non dispo (mig 92).
+const afServiceLevel = computed(() => (af.value?.service_level || '').toUpperCase() || null)
+provide('afServiceLevel', afServiceLevel)
 
 // Helpers projection (utilisent selectedId / orderedSections / af du store)
 async function loadProjectionAttachments(sectionId) {
@@ -317,6 +322,20 @@ async function handleToggleDemanded(node) {
   }
 }
 
+// Lot 92 — Ajouter une fonctionnalite comme option payante au contrat
+// MOA, sans changer de niveau d'offre. Toggle du flag optin_paid_option.
+// Exclusivite : optin XOR opted_out (gere cote backend + ici en optimiste).
+async function handleToggleOptinPaidOption(node) {
+  const newVal = node.optin_paid_option === 1 ? 0 : 1
+  try {
+    const patch = { optin_paid_option: !!newVal }
+    if (newVal && node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+    await afStore.patchSection(node.id, patch)
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec mise à jour')
+  }
+}
+
 async function selectSection(id) {
   await afStore.selectSection(id)
   // En mode compact, fermer automatiquement le drawer apres selection
@@ -338,8 +357,21 @@ const selectedFlags = computed(() => {
   return {
     optedOut: s?.opted_out_by_moa === 1,
     demanded: s?.demanded_by_moa === 1,
+    optinPaid: s?.optin_paid_option === 1,
     excluded: s?.included_in_export === 0,
   }
+})
+
+// Lot 92 — Eligibilite "ajouter en option payante" sur la section selectionnee :
+// la feature doit etre disponible en paid_option AU NIVEAU choisi par le MOA
+// (af.service_level). Si af.service_level est null, on n'affiche pas le bouton.
+const selectedCanOptinPaidOption = computed(() => {
+  const s = selectedSection.value
+  if (!s) return false
+  const lvl = afServiceLevel.value
+  if (!lvl) return false
+  const avail = lvl === 'E' ? s.tpl_avail_e : lvl === 'S' ? s.tpl_avail_s : lvl === 'P' ? s.tpl_avail_p : null
+  return avail === 'paid_option'
 })
 
 function onSectionUpdated(updated) {
@@ -527,6 +559,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               @toggle-include="handleToggleInclude"
               @toggle-opt-out="handleToggleOptOut"
               @toggle-demanded="handleToggleDemanded"
+              @toggle-optin-paid-option="handleToggleOptinPaidOption"
               @attachment-drop="handleAttachmentDrop"
               @promote-to-library="handlePromoteToLibrary"
             />
@@ -626,6 +659,24 @@ watch(() => route.params.id, async (newId, oldId) => {
               >
                 <FontAwesomeIcon :icon="['fas', 'ban']" class="w-3.5 h-3.5 shrink-0" />
                 <span>{{ selectedFlags.optedOut ? 'Écartée par la MOA' : 'Marquer écartée' }}</span>
+              </button>
+            </Tooltip>
+            <!-- Lot 92 — Bouton "Ajouter en option payante" (visible si la
+                 feature est avail_paid_option au niveau choisi par le MOA) -->
+            <Tooltip
+              v-if="selectedCanOptinPaidOption"
+              :text="selectedFlags.optinPaid ? 'Retirer du contrat (cette option payante ne sera plus comptée dans l\'avenant)' : 'Ajouter cette fonctionnalité au contrat comme option payante — sans changer de niveau d\'offre'"
+            >
+              <button
+                type="button"
+                @click="handleToggleOptinPaidOption(selectedSection)"
+                :class="['inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap',
+                         selectedFlags.optinPaid
+                           ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700'
+                           : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50']"
+              >
+                <span class="font-bold">€</span>
+                <span>{{ selectedFlags.optinPaid ? 'Option payante au contrat' : 'Ajouter en option payante' }}</span>
               </button>
             </Tooltip>
             <Tooltip

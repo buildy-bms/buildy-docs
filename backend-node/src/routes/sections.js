@@ -18,6 +18,7 @@ const updateSectionSchema = z.object({
   section_template_version: z.number().int().optional(),
   opted_out_by_moa: z.boolean().optional(),
   demanded_by_moa: z.boolean().optional(),
+  optin_paid_option: z.boolean().optional(),
 }).strict();
 
 const overrideSchema = z.object({
@@ -223,14 +224,24 @@ async function routes(fastify) {
     try { body = updateSectionSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
-    // Exclusivite logique : refusee et demandee ne peuvent pas etre actives
-    // simultanement. Si on toggle l'une, on force l'autre a 0.
+    // Exclusivite logique : refusee / demandee / option-payante.
+    // - opted_out XOR demanded (deja en place)
+    // - opted_out XOR optin_paid_option (toggle l'un eteint l'autre)
+    // demanded et optin peuvent coexister (semantique : "exigee ET payee
+    // a part") mais en pratique l'UI bascule de l'un a l'autre.
     let optedOutByMoa = body.opted_out_by_moa == null ? undefined : (body.opted_out_by_moa ? 1 : 0);
     let demandedByMoa = body.demanded_by_moa == null ? undefined : (body.demanded_by_moa ? 1 : 0);
+    let optinPaidOption = body.optin_paid_option == null ? undefined : (body.optin_paid_option ? 1 : 0);
     if (optedOutByMoa === 1 && demandedByMoa === undefined && section.demanded_by_moa) {
       demandedByMoa = 0;
     }
     if (demandedByMoa === 1 && optedOutByMoa === undefined && section.opted_out_by_moa) {
+      optedOutByMoa = 0;
+    }
+    if (optedOutByMoa === 1 && optinPaidOption === undefined && section.optin_paid_option) {
+      optinPaidOption = 0;
+    }
+    if (optinPaidOption === 1 && optedOutByMoa === undefined && section.opted_out_by_moa) {
       optedOutByMoa = 0;
     }
 
@@ -245,6 +256,7 @@ async function routes(fastify) {
       includedInExport,
       optedOutByMoa,
       demandedByMoa,
+      optinPaidOption,
       sectionTemplateVersion: body.section_template_version,
       factCheckStatus: body.fact_check_status,
       updatedBy: userId,
@@ -259,11 +271,16 @@ async function routes(fastify) {
     const cascadeFields = {};
     if (optedOutByMoa !== undefined) cascadeFields.optedOutByMoa = optedOutByMoa;
     if (demandedByMoa !== undefined) cascadeFields.demandedByMoa = demandedByMoa;
+    if (optinPaidOption !== undefined) cascadeFields.optinPaidOption = optinPaidOption;
     if (includedInExport !== undefined) cascadeFields.includedInExport = includedInExport;
-    // Exclusivite : si on cascade opt-out=1, force aussi demanded=0 sur les
-    // descendants (et inversement). Aligne sur la logique du parent.
-    if (cascadeFields.optedOutByMoa === 1) cascadeFields.demandedByMoa = 0;
+    // Exclusivite cascadee : opt-out=1 -> force demanded=0 ET optin=0 sur
+    // les descendants. Inversement, demanded=1 ou optin=1 -> opt-out=0.
+    if (cascadeFields.optedOutByMoa === 1) {
+      cascadeFields.demandedByMoa = 0;
+      cascadeFields.optinPaidOption = 0;
+    }
     if (cascadeFields.demandedByMoa === 1) cascadeFields.optedOutByMoa = 0;
+    if (cascadeFields.optinPaidOption === 1) cascadeFields.optedOutByMoa = 0;
     if (Object.keys(cascadeFields).length > 0) {
       const descendants = db.db.prepare(`
         WITH RECURSIVE descendants(id) AS (

@@ -4,16 +4,15 @@
 <div class="contractual-summary">
   {{#if hasDemands}}
     <div class="contractual-recommended">
-      <div class="contractual-recommended-label">Offre recommandée</div>
-      <div class="contractual-recommended-name">{{recommendedLevelName}}</div>
+      <div class="contractual-recommended-label">Offre choisie par le MOA</div>
+      <div class="contractual-recommended-name">{{currentLevelName}}</div>
       {{#if upgradeNeeded}}
       <div class="contractual-upgrade-note">
-        ⚠ Le niveau actuellement renseigné dans l'AF est <strong>{{currentLevelName}}</strong>.
-        Les fonctionnalités demandées par le MOA imposent de monter à <strong>{{recommendedLevelName}}</strong>.
+        ⚠ Certaines fonctionnalités exigées par le MOA ne sont pas disponibles au niveau <strong>{{currentLevelName}}</strong> — voir liste ci-dessous (un changement de niveau d'offre est nécessaire pour les couvrir).
       </div>
       {{else}}
       <div class="contractual-upgrade-note contractual-upgrade-ok">
-        Niveau cohérent avec l'AF (<strong>{{currentLevelName}}</strong>).
+        Toutes les fonctionnalités exigées sont couvertes par l'offre <strong>{{currentLevelName}}</strong> (incluses ou activables en option).
       </div>
       {{/if}}
     </div>
@@ -31,7 +30,7 @@
 
     {{#if coveredFeatures.length}}
     <div class="contractual-block">
-      <h4 class="contractual-block-title">Fonctionnalités demandées déjà incluses dans l'offre {{recommendedLevelName}}</h4>
+      <h4 class="contractual-block-title">Fonctionnalités déjà incluses dans l'offre {{currentLevelName}}</h4>
       <ul class="contractual-list">
         {{#each coveredFeatures}}
         <li><span class="contractual-pill contractual-pill-included">✓ Incluse</span> {{title}}</li>
@@ -42,7 +41,7 @@
 
     {{#if unavailableFeatures.length}}
     <div class="contractual-block contractual-block-warn">
-      <h4 class="contractual-block-title">⚠ Fonctionnalités demandées non disponibles dans le catalogue actuel</h4>
+      <h4 class="contractual-block-title">⚠ Fonctionnalités non disponibles au niveau {{currentLevelName}}</h4>
       <ul class="contractual-list">
         {{#each unavailableFeatures}}
         <li>{{title}}</li>
@@ -52,7 +51,7 @@
     {{/if}}
   {{else}}
     <div class="contractual-noinput">
-      <p>Aucune option payante n'a été explicitement demandée par le maître d'ouvrage à ce stade. L'offre <strong>{{currentLevelName}}</strong> renseignée dans l'analyse fonctionnelle reste l'engagement contractuel applicable.</p>
+      <p>Aucune fonctionnalité n'a été marquée comme exigée ni activée en option payante par le MOA à ce stade. L'offre <strong>{{currentLevelName}}</strong> reste l'engagement contractuel applicable, dans son périmètre standard.</p>
     </div>
   {{/if}}
 </div>
