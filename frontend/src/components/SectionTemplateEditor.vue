@@ -498,7 +498,7 @@ async function destroy() {
 </script>
 
 <template>
-  <BaseModal :title="modalTitle" size="lg" @close="emit('close')">
+  <BaseModal :title="modalTitle" size="lg" :dismiss-on-backdrop="false" @close="emit('close')">
     <!-- Bandeau statut de validation du contenu (mig 89). Affiche
          pastille + libelle + auteur/date si valide. Cache en creation. -->
     <div v-if="isEdit"

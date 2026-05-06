@@ -120,7 +120,7 @@ async function destroy() {
 </script>
 
 <template>
-  <BaseModal :title="isEdit ? `Éditer la catégorie « ${category.label} »` : 'Nouvelle catégorie de système'" size="lg" @close="emit('close')">
+  <BaseModal :title="isEdit ? `Éditer la catégorie « ${category.label} »` : 'Nouvelle catégorie de système'" size="lg" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div class="grid grid-cols-3 gap-3">
         <div class="col-span-2">

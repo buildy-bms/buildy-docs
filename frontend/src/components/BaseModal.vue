@@ -6,6 +6,11 @@ import { useFocusTrap } from '@/composables/useFocusTrap'
 const props = defineProps({
   title: { type: String, required: true },
   size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg' | 'xl'
+  // Par defaut un clic sur le backdrop ferme. Pour les modales d'edition
+  // avec saisie utilisateur (formulaires longs), passer `:dismiss-on-backdrop="false"`
+  // pour eviter une perte accidentelle (clic a cote = pas de fermeture).
+  // L'ESC reste actif et le bouton X aussi.
+  dismissOnBackdrop: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['close'])
@@ -36,7 +41,8 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
          lightbox z-50, popover SearchableSelect z-100). Sans ça, les
          modales de confirmation de suppression apparaissaient sous le
          sheet mobile en cours → l'utilisateur voyait rien se passer. -->
-    <div class="fixed inset-0 z-110 bg-black/50 flex items-center justify-center px-4 py-6" @click.self="emit('close')">
+    <div class="fixed inset-0 z-110 bg-black/50 flex items-center justify-center px-4 py-6"
+         @click.self="dismissOnBackdrop && emit('close')">
       <div ref="dialogRef"
            role="dialog" aria-modal="true" :aria-labelledby="titleId"
            tabindex="-1"

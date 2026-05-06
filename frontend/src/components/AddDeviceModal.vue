@@ -34,7 +34,7 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" @close="emit('close')">
+  <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div class="grid grid-cols-2 gap-3">
         <div>
