@@ -142,7 +142,16 @@ async function applyAll() {
   showModal.value = false
 }
 
-watch(() => props.afId, refresh, { immediate: true })
+// Differe le 1er fetch apres le paint initial pour ne pas competition avec
+// le chargement du tree (TTI). requestIdleCallback fallback setTimeout.
+function scheduleRefresh() {
+  const ric = typeof window !== 'undefined' && window.requestIdleCallback
+  if (ric) ric(() => refresh(), { timeout: 1500 })
+  else setTimeout(refresh, 200)
+}
+watch(() => props.afId, (newId) => {
+  if (newId) scheduleRefresh()
+}, { immediate: true })
 defineExpose({ refresh })
 </script>
 

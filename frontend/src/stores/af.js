@@ -135,9 +135,12 @@ export const useAfStore = defineStore('af', () => {
     $reset()
     loading.value = true
     try {
+      // Mode light : on ne charge PAS body_html / body_yjs (potentiellement
+      // plusieurs Mo sur une AF riche). Le tree n'a besoin que de la structure
+      // + flags + icones. Le body est ramene a la selection via selectSection().
       const [{ data: afData }, { data: sectionsData }] = await Promise.all([
         getAf(id),
-        listSections(id),
+        listSections(id, { light: true }),
       ])
       af.value = afData
       sections.value = sectionsData || []
@@ -157,7 +160,7 @@ export const useAfStore = defineStore('af', () => {
 
   async function refreshSections() {
     if (!af.value) return
-    sections.value = (await listSections(af.value.id)).data
+    sections.value = (await listSections(af.value.id, { light: true })).data
     if (!selectedId.value && sections.value.length) {
       await selectSection(sections.value[0].id)
     }
