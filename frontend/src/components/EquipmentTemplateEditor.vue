@@ -35,6 +35,7 @@ import {
   deleteSectionTemplate,
   validateEquipmentTemplateContent,
   unvalidateEquipmentTemplateContent,
+  claudeLibraryAssist,
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
@@ -133,6 +134,7 @@ const validating = ref(false)
 
 // Suggestion de titre proposee par Claude (description ou justification BACS).
 const suggestedTitle = ref(null)
+const suggestingTitle = ref(false)
 function onSuggestedTitle(t) {
   if (t && t.trim() && t.trim() !== (form.value.name || '').trim()) {
     suggestedTitle.value = t.trim()
@@ -143,6 +145,32 @@ function applySuggestedTitle() {
   suggestedTitle.value = null
 }
 function dismissSuggestedTitle() { suggestedTitle.value = null }
+
+async function suggestTitleOnly() {
+  if (!form.value.name.trim() || suggestingTitle.value) return
+  suggestingTitle.value = true
+  try {
+    const { data } = await claudeLibraryAssist({
+      mode: 'title',
+      kind: 'equipment_description',
+      title: form.value.name.trim(),
+      html: form.value.description_html || undefined,
+      category_label: selectedCategory.value?.label || null,
+      bacs_articles: props.template?.bacs_articles || null,
+      current_template_id: props.template?.id || null,
+      category: form.value.category || null,
+    })
+    if (data?.suggested_title) {
+      onSuggestedTitle(data.suggested_title)
+    } else {
+      success('Nom actuel jugé déjà bon par Claude')
+    }
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la requête Claude')
+  } finally {
+    suggestingTitle.value = false
+  }
+}
 
 // Etat local synchronise avec props.template + mises a jour apres save
 // inline. Permet au bandeau de validation de rester a jour sans fermer.
@@ -490,9 +518,16 @@ async function destroy() {
       <div class="grid grid-cols-3 gap-3">
         <div class="col-span-2">
           <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Nom *</label>
-          <input v-model="form.name" type="text" required autocomplete="off" data-1p-ignore="true"
-                 placeholder="Ex : Pompe à chaleur air/eau"
-                 class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <div class="relative">
+            <input v-model="form.name" type="text" required autocomplete="off" data-1p-ignore="true"
+                   placeholder="Ex : Pompe à chaleur air/eau"
+                   class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+            <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.name.trim()"
+                    :title="form.name.trim() ? 'Proposer un meilleur nom avec Claude' : 'Saisir d\'abord un nom'"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
+              <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
+            </button>
+          </div>
           <div v-if="suggestedTitle"
                class="mt-1 flex items-center gap-2 px-2 py-1 bg-violet-50 border border-violet-200 rounded-md text-[11px]">
             <SparklesIcon class="w-3.5 h-3.5 text-violet-600 shrink-0" />
