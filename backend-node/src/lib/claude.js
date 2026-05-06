@@ -228,13 +228,21 @@ const SYSTEM_PROMPT_LIBRARY = [
   ``,
   `=== SUGGESTION DE TITRE (OBLIGATOIRE en tete de reponse) ===`,
   `Tu DOIS commencer ta reponse par la ligne EXACTE \`<!--TITLE: titre-->\` puis enchainer sur le HTML.`,
-  `Reflechis au titre approprie pour cette entite :`,
+  `Le titre cible un INTEGRATEUR GTB / un EXPLOITANT — pas un developpeur. Style ORIENTE UTILISATEUR / VALEUR, presque marketing :`,
+  `- Mets en avant le BENEFICE METIER ou la VALEUR percue par le client, pas le mecanisme technique sous-jacent.`,
+  `  Mauvais (technique brut)  → Bon (oriente valeur) :`,
+  `  • "Detection des derives et des fuites"   → "Surveillance proactive des consommations"`,
+  `  • "Mises a jour automatiques des apps"     → "Toujours a jour, sans intervention"`,
+  `  • "Notifications par email"                → "Restez informe en temps reel"`,
+  `  • "Acces simplifie par QR Codes"           → "Acces immediat aux equipements en un scan"`,
+  `  • "API Buildy Connect"                     → "Ouverture vers vos systemes tiers"`,
   `- Style nominal court (3 a 8 mots), specifique, sans guillemets francais.`,
-  `- Tournures nominales pour les fonctionnalites ("Cartographie multi-sites", "Detection des derives").`,
-  `- Si le titre courant fourni est deja bon, RECOPIE-LE TEL QUEL dans le marker (le backend filtrera).`,
-  `- Si le titre courant est imprecis, redondant, mal formule ou incomplet, propose une amelioration concrete.`,
+  `- Reste sobre et precis : pas de superlatifs creux ("revolutionnaire", "incroyable", "puissant"), pas d'enthousiasme excessif.`,
+  `- Vocabulaire metier (GTB, supervision, exploitation, conformite, energie...) mais ACCESSIBLE.`,
+  `- Si le titre courant est deja oriente utilisateur et concret, RECOPIE-LE TEL QUEL dans le marker (le backend filtrera).`,
+  `- Si le titre courant est trop technique / interne / fade, propose une amelioration concrete et orientee benefice.`,
   `- Le marker doit TOUJOURS etre present, meme si tu recopies le titre actuel.`,
-  `Exemple : \`<!--TITLE: Detection des derives et des fuites-->\` puis HTML.`,
+  `Exemple : \`<!--TITLE: Surveillance proactive des consommations-->\` puis HTML.`,
   ``,
   `=== RYTHME VISUEL — IMPORTANT ===`,
   `Le contenu doit etre AERE et lisible, pas un pave dense.`,
@@ -280,7 +288,14 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     }
     lines.push(`=== INSTRUCTION ===`);
     lines.push(`Propose un meilleur titre pour cette entite. Tiens compte du contenu fourni s'il y en a.`);
-    lines.push(`Style : nominal court (3 a 8 mots), specifique, vocabulaire metier GTB, sans guillemets francais.`);
+    lines.push(`Le titre cible un INTEGRATEUR GTB / un EXPLOITANT. Style ORIENTE UTILISATEUR / VALEUR, presque marketing :`);
+    lines.push(`- Mets en avant le BENEFICE METIER ou la VALEUR client, PAS le mecanisme technique brut.`);
+    lines.push(`  Exemples : "Surveillance proactive des consommations" plutot que "Detection des derives" ;`);
+    lines.push(`  "Toujours a jour, sans intervention" plutot que "Mises a jour automatiques des apps" ;`);
+    lines.push(`  "Acces immediat aux equipements en un scan" plutot que "Acces simplifie par QR Codes".`);
+    lines.push(`- Style nominal court (3 a 8 mots), specifique, sans guillemets francais.`);
+    lines.push(`- Sobre et concret : pas de superlatifs creux ("revolutionnaire", "puissant", "incroyable").`);
+    lines.push(`- Vocabulaire metier accessible (GTB, supervision, exploitation, conformite, energie...).`);
     lines.push(`REPONDS UNIQUEMENT PAR LA LIGNE \`<!--TITLE: titre propose-->\` ET RIEN D'AUTRE.`);
     lines.push(`Aucun HTML, aucun preambule, aucune explication. Juste le marker.`);
     return lines.join('\n');
