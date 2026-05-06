@@ -115,10 +115,84 @@ Statuts brochure : `'draft' | 'published'`
   - `/library/functionalities` -> `LibraryFunctionalitiesView.vue` (matrice E/S/P, PDF offres)
 - **`section_templates` = source de verite du plan AF** (Lot 33). La structure du plan vit dans cette table. `seeds/plan-af.js` ne fait que bootstrap via migration 26 — modifier `plan-af.js` ne suffit PAS, il faut aussi une migration de bootstrap si on ajoute des nodes.
 - **Seeder idempotent** (`lib/seeder.js:77-82`) : n'ecrase JAMAIS les `description_html`, `bacs_articles`, `preferred_protocols` editees manuellement. Pour reseed un champ, le vider explicitement en DB d'abord. Ne jamais "corriger" le seeder pour overwrite.
-- **Tombstones de slugs** : table `deleted_section_template_slugs`. Empeche le re-seed apres suppression d'une section type. Sans tombstone, suppression UI = recreation au prochain boot ("bug fantome").
+- **Tombstones de slugs** : 2 tables symetriques pour empecher le re-seed apres suppression UI :
+  - `deleted_section_template_slugs` (sections types narratives + fonctionnalites)
+  - `deleted_equipment_template_slugs` (equipements de la biblio, mig 95) — `seedLibraryOnBoot` skip si le slug y figure ; routes DELETE/POST `/equipment-templates` posent / effacent le tombstone (resurrection explicite).
+  Sans tombstone, suppression UI = recreation au prochain boot ("bug fantome").
 - **Cascade manuelle DELETE section_templates** : la FK `sections.section_template_id` n'a pas `ON DELETE CASCADE`. Routes DELETE (`routes/section-templates.js:169-185`) doivent : (1) compter AFs affectees via `countAffectedAfs()`, (2) renvoyer 409 si > 0 et `!force`, (3) `DELETE FROM sections WHERE section_template_id = ?` AVANT, (4) ajouter le tombstone.
 - **Niveaux d'offre** : `section_templates.avail_e | avail_s | avail_p` accepte `'included' | 'paid_option' | NULL` (Zod enum strict, `routes/section-templates.js:16`). **La valeur exacte est `'paid_option'`, jamais `'option'`** — bug recurrent. Le `service_level` est *derive* (niveau minimum d'inclusion), pas saisi.
 - **PDF tableau offres** = parcours d'arbre (`routes/offerings.js`). DFS sur `parent_template_id`, tri par profondeur, indentation cumulee. Une feature peut avoir des features enfants (nested).
+
+### Sections equipement = biblio uniquement (mig 95)
+
+A la creation d'une AF, **les sections kind='equipment' sont generees exclusivement depuis `equipment_templates`** (= biblio), jamais depuis du hardcode `plan-af.js`. Mecanismes :
+
+- **`section_templates.library_categories`** (TEXT JSON array) sur les parents narratifs `2.1` -> `2.10`. Ex : `2.1 Chauffage & Climatisation` -> `["chauffage", "climatisation"]`. Declare quelles categories d'equipement ce parent accueille.
+- **`libraryExtendAf(afId)`** (`lib/seeder.js`) : pour chaque parent du plan, agrege les categories cibles depuis (1) `section_templates.library_categories` + (2) les categories des equipements deja inseres dans cette AF, puis materialise tous les `equipment_templates` de la biblio matchant l'une de ces categories qui ne sont pas deja presents. Idempotent (dedup par `equipment_template_id`).
+- **Filet de securite `seedAfStructure`** : skip les section_templates `kind='equipment'` avec `equipment_template_id IS NULL` (l'equipement a ete supprime de la biblio -> FK SET NULL -> on n'instancie pas une section orpheline).
+- **Migration 95 (a)** : retire `'af'` du `document_kinds` de tous les section_templates legacy `kind='equipment'`. Effet : ils restent visibles en bibliotheque mais ne sont plus injectes dans les nouvelles AFs.
+- **Titre de section** = `equipment_templates.name` quand l'eq_template est rattache (`seedAfStructure.insertNode`, fallback sur `tpl.title`). La biblio est la source de verite des noms d'equipements ; un renommage en biblio est donc reflete sur les nouvelles AFs.
+
+Pour ajouter un nouvel equipement dans la biblio et qu'il apparaisse dans les AFs futures : creer le row dans `equipment_templates` avec un `category` qui matche les `library_categories` d'un parent du plan (ex : `category='climatisation'` -> apparaitra sous `2.1`). Aucun toucher a `plan-af.js` n'est necessaire.
+
+### Pull biblio -> AF (sync manuelle)
+
+`POST /api/afs/:id/sync-library` (body `{ overwrite_bodies?: bool }`) — bouton **Synchroniser depuis la bibliothèque** dans le menu Plus du `CycleBandeau`. Actions cumulees, idempotentes :
+1. Resync des titres : `equipment_template.name` (priorite) ou `section_template.title` -> `sections.title`.
+2. Insertion des `section_templates` manquants tagges `'af'` (via `missingByAf` + `addMissingTemplateToAf`).
+3. `libraryExtendAf` pour materialiser les nouveaux equipements de la biblio.
+4. Bump des `section_template_version` / `equipment_template_version` (acquittement, pas de pop-up restant).
+5. Optionnel via `overwrite_bodies=true` : ecrasement des `body_html` locaux par le contenu canonique du `section_template`. **Off par defaut** pour preserver les edits utilisateur. La case a cocher dans la modale UI le rend explicite.
+
+Trace dans `audit_log` (action `af.sync.library` + payload des compteurs).
+
+### Engagement de commande du contrat de services (mig 94)
+
+Section type `13.x` sous le chapitre 13 (`slug='engagement-commande-contrat-services'`). Lors de la transition d'AF vers `validee` :
+- Modale `CycleBandeau` affiche un bloc d'engagement + checkbox bloquante.
+- Bouton « Valider l'AF » `:disabled` tant que la case n'est pas cochee.
+- Backend `POST /api/afs/:id/transition` rejette `400` si `to='validee'` sans `agreement_accepted=true` ; trace dans `audit_log` (`payload.agreement_accepted=true`).
+
+## AF detail — performance & UX
+
+### Chargement initial light (perf PR #51)
+`GET /api/afs/:afId/sections?light=1` renvoie la structure SANS `body_html` ni `body_yjs` (les BLOB Yjs peuvent peser plusieurs Mo sur des AFs riches), avec un champ derive `is_empty` (1/0 calcule en SQL) pour preserver l'indicateur "section vide" du tree. Le body est rapatrie a la selection via `getSection(id)`.
+
+- `db.sections.listByAfLight(afId)` : variante SQL.
+- `frontend/src/stores/af.js` `loadAf` / `refreshSections` -> `light: true`.
+- `CycleBandeau.loadSectionsForPicker` aussi en light (titres + parent_id suffisent).
+- `SectionTree.isEmpty(node)` lit `node.is_empty` quand fourni, fallback sur `body_html`.
+
+### Cache localStorage de la structure (perf PR #52)
+Pattern stale-while-revalidate dans `stores/af.js`. Cle `af-<id>-structure-v1`, TTL 7 jours. `loadAf` hydrate immediatement depuis le cache (tree visible en 0 ms sur revisite), puis lance le refresh reseau en arriere-plan qui ecrase le cache. Helpers `readCache` / `writeCache` privates au store.
+
+### Tree-shake FA Pro Solid (perf PR #52)
+Sans precaution, `import * as allSolidIcons from '@fortawesome/pro-solid-svg-icons'` + `Object.values(...)` defait le tree-shaking — Vite hoist les ~3000 icones (~2.5 Mo) dans le chunk du 1er consommateur. Strategie en 3 couches :
+
+1. **`frontend/src/lib/equipment-icons.js`** : registre cure (~37 icones) avec named imports + `library.add(...ICONS)` + `resolveFaIconName(iconValue)` -> nom valide ou `'cube'` fallback. Couvre les icon_value seedees dans `equipment-templates/*.js` + system_categories_db.
+2. **Composants au runtime** (EquipmentIcon, SearchableSelect, SectionTreeNode, MeterTypePill, MeterUsagePill, SystemCategoryIcon) : importent UNIQUEMENT depuis `lib/equipment-icons.js` ou en named explicit. **Jamais `import *`**.
+3. **Pickers admin** (FaIconPicker, EquipmentTemplateEditor, SystemCategoryEditor, LibraryFunctionalitiesView) : `await import('@fortawesome/pro-solid-svg-icons')` au mount — la full lib charge a l'ouverture du picker, pas avant.
+4. **`vite.config.js` `manualChunks`** : force `@fortawesome/pro-solid-svg-icons` dans son propre chunk `fa-pro-solid` (charge a la demande). Sans ce split, Vite hoist le module dans le chunk du 1er consommateur, gonflant `equipment-icons.js` a 2.5 Mo.
+
+Mesure : chunk sur le chemin AF passe de **2.5 Mo a 80 Ko**. Le chunk `fa-pro-solid` (2.5 Mo) ne se charge QUE sur les routes admin avec un picker.
+
+**Regle** : ne jamais reintroduire `import * as allSolidIcons` sur le chemin AF detail. Si une nouvelle icone est requise au runtime, l'ajouter au registre cure de `lib/equipment-icons.js`.
+
+### Async components AfDetailView (perf PR #52)
+`defineAsyncComponent(() => import('...'))` sur les composants poids lourds (Tiptap, captures, instances, etc.) :
+SectionEditor, PointsTable, EquipmentInstancesTable, AttachmentsGrid, ZonesTable, EquipmentDescriptionPanel, EquipmentTemplatePicker, TemplatePropagationBanner, ActivityPanel, RequiredServiceLevelPanel.
+Resultat : chunk AfDetailView 179 Ko -> 102 Ko ; le tree est paint avant que Tiptap charge. Le `TemplatePropagationBanner` retarde son 1er fetch via `requestIdleCallback` (fallback `setTimeout 200ms`) pour ne pas concurrencer le paint initial.
+
+### Tree actions au survol (PR #52)
+`SectionTreeNode` rend au hover :
+- **↑ / ↓** : reordonner dans la fratrie (events `move-up` / `move-down`)
+- **← / →** : indenter / outdenter (events `outdent` / `indent`)
+- **Œil**, **+**, **Suppr**, etc.
+
+Backend : `POST /api/sections/:id/move` accepte `direction ∈ ('up'|'down'|'indent'|'outdent')`.
+- `indent` : la section devient enfant de son sibling precedent (placee en derniere position dans ce nouveau parent).
+- `outdent` : remonte d'un niveau (devient frere de son parent, juste apres lui dans la fratrie du grand-parent).
+Le drag-drop SortableJS reste disponible en parallele pour les deplacements rapides cross-fratries.
 
 ## Architecture Audit BACS
 - **Routes decoupees par domaine** : `backend-node/src/routes/bacs-audit.js` (point d'entree, CRUD systems/meters/bms/thermal/devices/action-items) enregistre 4 sous-plugins :
