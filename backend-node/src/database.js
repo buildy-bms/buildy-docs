@@ -4392,6 +4392,26 @@ const sections = {
   delete(id) {
     db.prepare('DELETE FROM sections WHERE id = ?').run(id);
   },
+  // Lot — Reorder atomique d'une fratrie complete via ids ordonnes.
+  // Tous les ids doivent appartenir a la meme AF + meme parent_id.
+  // Filtre les ids invalides + assigne position = (i+1)*10 a chaque id.
+  reorderSiblings(afId, parentId, orderedIds) {
+    if (!Array.isArray(orderedIds) || !orderedIds.length) return 0;
+    const placeholders = orderedIds.map(() => '?').join(',');
+    const valid = db.prepare(
+      `SELECT id FROM sections WHERE af_id = ? AND parent_id IS ? AND id IN (${placeholders})`
+    ).all(afId, parentId, ...orderedIds).map(r => r.id);
+    const validSet = new Set(valid);
+    const filtered = orderedIds.filter(id => validSet.has(id));
+    const tx = db.transaction(() => {
+      filtered.forEach((id, i) => {
+        db.prepare('UPDATE sections SET position = ? WHERE id = ?').run((i + 1) * 10, id);
+      });
+    });
+    tx();
+    return filtered.length;
+  },
+
   // Lot — Deplace une section au sein de sa fratrie (meme af_id + parent_id).
   // direction = 'up' / 'down'. Idempotent : noop si deja en bord.
   // Retourne true si la section a bouge, false sinon.

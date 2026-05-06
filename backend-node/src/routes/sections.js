@@ -312,6 +312,26 @@ async function routes(fastify) {
     return updated;
   });
 
+  // POST /api/afs/:afId/sections/reorder — reorder atomique d'une fratrie.
+  // Body : { parent_id: number|null, ids: [...] }. Reseed les positions
+  // selon l'ordre des ids. Tous doivent appartenir a la meme fratrie.
+  fastify.post('/afs/:afId/sections/reorder', async (request, reply) => {
+    const afId = parseInt(request.params.afId, 10);
+    const af = db.afs.getById(afId);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertWrite(request, reply, afId)) return;
+    const { parent_id = null, ids = [] } = request.body || {};
+    if (!Array.isArray(ids) || !ids.length) {
+      return reply.code(400).send({ detail: 'ids[] requis' });
+    }
+    const count = db.sections.reorderSiblings(afId, parent_id, ids);
+    db.auditLog.add({
+      afId, userId: request.authUser?.id, action: 'sections.reorder',
+      payload: { parent_id, count, ids },
+    });
+    return { ok: true, count };
+  });
+
   // POST /api/sections/:id/move — déplace une section dans sa fratrie.
   // Body : { direction: 'up' | 'down' }. Swap atomique avec le voisin.
   fastify.post('/sections/:id/move', async (request, reply) => {
