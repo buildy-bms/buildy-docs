@@ -54,6 +54,21 @@
   </div>
   {{/if}}
 
+  {{!-- Lot 92 — Option payante a la carte. Le MOA reste sur son niveau
+       de base mais ajoute cette fonctionnalite via un avenant. Encart
+       symetrique de l'opt-out, avec ton positif (€ vert). --}}
+  {{#if optin_paid_option}}
+  <div class="section-badge-optin">
+    <span class="section-badge-optin-icon">€</span>
+    <span class="section-badge-optin-text">
+      Option payante ajoutée au contrat
+      <span class="section-badge-optin-detail">
+        — incluse dans l'avenant à l'offre de base, sans changement de niveau
+      </span>
+    </span>
+  </div>
+  {{/if}}
+
   {{!-- Encart contextualisé "lien avec le décret BACS" (Lot 17b) --}}
   {{#if bacs_articles_label}}
   <div class="bacs-context">

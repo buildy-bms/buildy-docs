@@ -24,7 +24,11 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'attachment-drop', 'promote-to-library'])
+
+// Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
+// calculer la disponibilite de chaque feature au niveau choisi par le MOA.
+const afServiceLevel = inject('afServiceLevel', ref(null))
 
 // Drag-drop accueille les captures depuis l'editeur. On reagit uniquement
 // si le payload contient 'application/x-buildy-attachment' (l'id de la
@@ -66,6 +70,18 @@ const isAdHoc = computed(() =>
 )
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
 const demanded = computed(() => props.node.demanded_by_moa === 1)
+const optinPaid = computed(() => props.node.optin_paid_option === 1)
+// Disponibilite de la feature au niveau de contrat choisi par le MOA.
+// Renvoie 'included' | 'paid_option' | null. Sert au badge live et a la
+// visibilite du bouton "Ajouter en option payante".
+const availAtAfLevel = computed(() => {
+  const lvl = afServiceLevel.value
+  if (!lvl) return null
+  if (lvl === 'E') return props.node.tpl_avail_e || null
+  if (lvl === 'S') return props.node.tpl_avail_s || null
+  if (lvl === 'P') return props.node.tpl_avail_p || null
+  return null
+})
 // Disponibilites par niveau (depuis le section_template). Permet de
 // distinguer les features "incluses" des "options payantes" (paid_option).
 const availE = computed(() => props.node.tpl_avail_e || null)
@@ -221,7 +237,7 @@ const titleHtml = computed(() => {
         class="w-3 h-3 shrink-0 text-gray-500"
         :class="isSelected ? 'text-indigo-700' : ''"
       />
-      <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', demanded ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
+      <span :class="['flex-1 min-w-0 truncate text-[12px]', isSelected ? 'font-semibold text-indigo-900' : levelClasses, excluded ? 'line-through text-gray-400 italic' : '', optedOut ? 'line-through text-amber-700 italic' : '', (demanded || optinPaid) ? 'text-emerald-700 font-semibold' : '']" v-html="titleHtml"></span>
 
       <!-- Actions au survol : demande/refuse MOA + inclure/exclure + ajouter enfant + supprimer.
            hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre.
@@ -250,6 +266,20 @@ const titleHtml = computed(() => {
             :class="['p-0.5 rounded', optedOut ? 'hover:bg-emerald-200 text-emerald-600' : 'hover:bg-amber-200 text-amber-600']"
           >
             <NoSymbolIcon class="w-3 h-3" />
+          </button>
+        </Tooltip>
+        <!-- Lot 92 — Bouton "Ajouter en option payante au contrat".
+             Visible uniquement quand la feature est en avail_<af.service_level>='paid_option'. -->
+        <Tooltip
+          v-if="availAtAfLevel === 'paid_option'"
+          :text="optinPaid ? 'Retirer du contrat (ne plus inclure comme option payante)' : 'Ajouter au contrat comme option payante (sans changer de niveau d\'offre)'"
+        >
+          <button
+            type="button"
+            @click.stop="emit('toggle-optin-paid-option', node)"
+            :class="['p-0.5 rounded font-bold text-[10px] leading-none w-3.5 h-3.5 flex items-center justify-center', optinPaid ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-200 text-emerald-700']"
+          >
+            €
           </button>
         </Tooltip>
         <Tooltip :text="excluded ? 'Inclure cette section dans les exports' : 'Exclure cette section des exports'">
@@ -297,8 +327,12 @@ const titleHtml = computed(() => {
       <Tooltip v-if="isAdHoc" text="Spécifique à cette AF — sans pendant dans la bibliothèque">
         <span class="shrink-0 px-1 py-0 text-[9px] font-medium bg-violet-100 text-violet-700 rounded uppercase tracking-wide">AF</span>
       </Tooltip>
-      <!-- Indicateur permanent si section demandee, ecartee, ou exclue -->
-      <Tooltip v-if="demanded" text="Fonction exigée par la MOA — à inclure dans l'avenant contractuel">
+      <!-- Indicateur permanent si section demandee, en option payante,
+           ecartee, ou exclue. Lot 92 : pastille € verte pour optin_paid_option. -->
+      <Tooltip v-if="optinPaid" text="Option payante ajoutée au contrat (sans changement de niveau d'offre)">
+        <span class="shrink-0 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold leading-none">€</span>
+      </Tooltip>
+      <Tooltip v-else-if="demanded" text="Fonction exigée par la MOA — à inclure dans l'avenant contractuel">
         <span class="shrink-0 text-emerald-700">
           <CheckBadgeIcon class="w-3 h-3" />
         </span>
@@ -333,6 +367,7 @@ const titleHtml = computed(() => {
         @toggle-include="emit('toggle-include', $event)"
         @toggle-opt-out="emit('toggle-opt-out', $event)"
         @toggle-demanded="emit('toggle-demanded', $event)"
+        @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"
       />

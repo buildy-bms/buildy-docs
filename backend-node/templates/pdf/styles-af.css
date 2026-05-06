@@ -424,6 +424,46 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
   font-style: normal;
 }
 
+/* Lot 92 — Badge "Option payante ajoutee au contrat". Symetrique de
+   l'opt-out, ton positif (vert/emeraude, € en pastille). */
+.section-badge-optin {
+  display: flex;
+  align-items: center;
+  gap: 2.5mm;
+  background: #ecfdf5;
+  border: 0.4pt solid #6ee7b7;
+  border-left: 1.2mm solid #10b981;
+  padding: 2mm 3.5mm;
+  margin: 2mm 0 3mm;
+  border-radius: 1.8mm;
+  font-size: 8.5pt;
+  page-break-inside: avoid;
+}
+.section-badge-optin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 5mm;
+  height: 5mm;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 9pt;
+  line-height: 1;
+}
+.section-badge-optin-text {
+  font-family: 'Inter', sans-serif;
+  color: #065f46;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.section-badge-optin-detail {
+  font-weight: 400;
+  color: #047857;
+  font-style: normal;
+}
+
 /* Encart contextualisé "lien avec le décret BACS" — charte PDF Buildy :
    filet navy a gauche, fond gris tres leger, label navy. Pas de violet. */
 .bacs-context {
