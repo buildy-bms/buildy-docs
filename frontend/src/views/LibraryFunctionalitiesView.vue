@@ -221,15 +221,26 @@ const enrichedItems = computed(() => {
   })
 })
 
-// Liste plate ordonnee en DFS de l'arbre des fonctionnalites :
-// chaque feature parente est immediatement suivie de ses enfants
-// (transitif), puis on passe au sibling suivant. Les indentations
-// (feature_depth) rendent la hierarchie lisible.
+// Calcule la section "racine" (premier ancetre non-functionality) d'une
+// feature. C'est la categorie de regroupement affichee en en-tete de
+// table (ex: "Application Hyperveez", "Fonctionnalites transverses").
+function rootSectionOf(t, byId) {
+  let cur = t
+  while (cur && cur.is_functionality) {
+    cur = cur.parent_template_id ? byId.get(cur.parent_template_id) : null
+  }
+  return cur || null
+}
+
+// Items regroupes par section parente racine. Chaque groupe contient
+// ses features en ordre DFS (parent suivi de ses enfants) avec
+// indentation via feature_depth.
 //
-// En mode recherche, on garde l'ordre plat brut (la hierarchie n'a
-// plus de sens quand on filtre).
-const flatItems = computed(() => {
+// En mode recherche : meme regroupement, items filtres, groupes vides
+// masques. La hierarchie reste lisible.
+const groupedItems = computed(() => {
   const q = search.value.trim().toLowerCase()
+  const byIdAll = new Map(allTemplates.value.map(t => [t.id, t]))
   const filtered = q
     ? enrichedItems.value.filter(t =>
         (t.title || '').toLowerCase().includes(q) ||
@@ -237,47 +248,70 @@ const flatItems = computed(() => {
         (t.parent_title || '').toLowerCase().includes(q)
       )
     : enrichedItems.value
-  if (q) return filtered
 
-  // Index par parent_template_id, trie par position ascendante
-  const byParent = new Map()
+  // Bucket par section racine
+  const buckets = new Map() // rootId|'__none__' -> { root, all: [...] }
   for (const t of filtered) {
-    const k = t.parent_template_id || 'orphans'
-    if (!byParent.has(k)) byParent.set(k, [])
-    byParent.get(k).push(t)
+    const root = rootSectionOf(t, byIdAll)
+    const key = root ? root.id : '__none__'
+    if (!buckets.has(key)) buckets.set(key, { root, all: [] })
+    buckets.get(key).all.push(t)
   }
-  for (const arr of byParent.values()) arr.sort((a, b) => (a.position || 0) - (b.position || 0))
 
-  const featureIds = new Set(filtered.map(t => t.id))
-  const out = []
-  const seen = new Set()
-  function emit(parentKey) {
-    const arr = byParent.get(parentKey)
-    if (!arr) return
-    for (const t of arr) {
-      if (seen.has(t.id)) continue
-      seen.add(t.id)
-      out.push(t)
-      if (byParent.has(t.id)) emit(t.id)
+  // Pour chaque bucket, ordonne en DFS sur l'arbre des features
+  function dfsOrder(bucketItems) {
+    if (q) return bucketItems // pas de DFS en recherche, ordre plat
+    const byParent = new Map()
+    for (const t of bucketItems) {
+      const k = t.parent_template_id || 'orphans'
+      if (!byParent.has(k)) byParent.set(k, [])
+      byParent.get(k).push(t)
     }
+    for (const arr of byParent.values()) arr.sort((a, b) => (a.position || 0) - (b.position || 0))
+    const featureIds = new Set(bucketItems.map(t => t.id))
+    const out = []
+    const seen = new Set()
+    function emit(parentKey) {
+      const arr = byParent.get(parentKey)
+      if (!arr) return
+      for (const t of arr) {
+        if (seen.has(t.id)) continue
+        seen.add(t.id)
+        out.push(t)
+        if (byParent.has(t.id)) emit(t.id)
+      }
+    }
+    const rootKeys = []
+    for (const k of byParent.keys()) {
+      if (k === 'orphans' || !featureIds.has(k)) rootKeys.push(k)
+    }
+    rootKeys.sort((a, b) => {
+      if (a === 'orphans') return 1
+      if (b === 'orphans') return -1
+      return 0
+    })
+    for (const k of rootKeys) emit(k)
+    return out
   }
-  // Racines : groupes dont la cle n'est PAS un id de feature affiche
-  // (donc 'orphans' ou bien un parent_template_id qui pointe vers une
-  // section non-functionality — categorie de regroupement).
-  const rootKeys = []
-  for (const k of byParent.keys()) {
-    if (k === 'orphans' || !featureIds.has(k)) rootKeys.push(k)
+
+  // Construit la liste finale ordonnee par position de la section racine
+  const groups = []
+  for (const [, b] of buckets) {
+    groups.push({
+      root: b.root,
+      items: dfsOrder(b.all),
+    })
   }
-  rootKeys.sort((a, b) => {
-    if (a === 'orphans') return 1
-    if (b === 'orphans') return -1
-    const pa = byParent.get(a)?.[0]?.parent_path || ''
-    const pb = byParent.get(b)?.[0]?.parent_path || ''
-    return pa.localeCompare(pb, 'fr')
+  groups.sort((a, b) => {
+    if (!a.root) return 1
+    if (!b.root) return -1
+    return (a.root.position || 0) - (b.root.position || 0)
   })
-  for (const k of rootKeys) emit(k)
-  return out
+  return groups
 })
+
+// Compteur total pour l'etat vide
+const totalFiltered = computed(() => groupedItems.value.reduce((n, g) => n + g.items.length, 0))
 
 // Drag-drop : un seul Sortable sur le tbody plat. onMove valide que
 // le drop reste au sein de la meme fratrie (meme parent_template_id),
@@ -298,13 +332,16 @@ function setupSortables() {
   sortableInstance = Sortable.create(el, {
     animation: 150,
     handle: '.drag-handle',
+    draggable: 'tr[data-id]', // exclut les lignes d'en-tete de groupe
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     onMove(evt) {
-      // Refuse tout drop sur une ligne d'un autre parent
-      const a = evt.dragged?.getAttribute('data-parent-id') || ''
-      const b = evt.related?.getAttribute('data-parent-id') || ''
+      // Refuse tout drop sur une ligne d'un autre parent OU sur une
+      // ligne d'en-tete (pas de data-parent-id)
+      const a = evt.dragged?.getAttribute('data-parent-id')
+      const b = evt.related?.getAttribute('data-parent-id')
+      if (a === null || b === null) return false
       return a === b
     },
     onEnd: async (evt) => {
@@ -312,7 +349,8 @@ function setupSortables() {
       const draggedParent = evt.item.getAttribute('data-parent-id') || ''
       // Recolte les ids de la fratrie dans le nouvel ordre DOM
       const ids = Array.from(el.children)
-        .filter(li => (li.getAttribute('data-parent-id') || '') === draggedParent)
+        .filter(li => li.hasAttribute('data-id')
+          && (li.getAttribute('data-parent-id') || '') === draggedParent)
         .map(li => parseInt(li.getAttribute('data-id'), 10))
         .filter(Boolean)
       const parentId = draggedParent === '' ? null : parseInt(draggedParent, 10)
@@ -327,7 +365,7 @@ function setupSortables() {
   })
 }
 
-watch([flatItems, search], async () => {
+watch([groupedItems, search], async () => {
   await nextTick()
   setupSortables()
 }, { deep: false })
@@ -408,10 +446,21 @@ onBeforeUnmount(teardownSortables)
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
         </thead>
-        <!-- Un seul tbody : items en ordre DFS (parent suivi de ses enfants).
-             Drag-drop scopage par data-parent-id (cf. setupSortables.onMove). -->
+        <!-- Un seul tbody : en-tete de section racine puis features en
+             ordre DFS (parent suivi de ses enfants). Drag-drop scope par
+             data-parent-id (cf. setupSortables.onMove) ; les en-tetes ne
+             sont pas draggable (filtrees par draggable: 'tr[data-id]'). -->
         <tbody ref="tbodyRef">
-            <tr v-for="t in flatItems" :key="t.id" :data-id="t.id"
+          <template v-for="g in groupedItems" :key="g.root ? `g-${g.root.id}` : 'g-none'">
+            <tr class="group-header bg-gray-50 border-t-2 border-gray-200">
+              <td colspan="9" class="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-gray-600">
+                {{ g.root ? g.root.title : 'Sans section parente' }}
+                <span class="ml-2 text-gray-400 normal-case font-normal tracking-normal">
+                  · {{ g.items.length }} fonctionnalité{{ g.items.length > 1 ? 's' : '' }}
+                </span>
+              </td>
+            </tr>
+            <tr v-for="t in g.items" :key="t.id" :data-id="t.id"
                 :data-parent-id="t.parent_template_id || ''"
                 :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
                          dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
@@ -477,8 +526,9 @@ onBeforeUnmount(teardownSortables)
                 </button>
               </td>
             </tr>
+          </template>
         </tbody>
-        <tbody v-if="!flatItems.length">
+        <tbody v-if="!totalFiltered">
           <tr>
             <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-400 italic">
               {{ search ? `Aucune fonctionnalité ne correspond à « ${search} ».` : 'Aucune fonctionnalité.' }}
