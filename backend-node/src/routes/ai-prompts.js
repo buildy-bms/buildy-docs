@@ -12,6 +12,12 @@ const log = require('../lib/logger').system;
 const {
   PROMPT_KEY_LIBRARY,
   DEFAULT_SYSTEM_PROMPT_LIBRARY,
+  PROMPT_KEY_FAQ_REWRITE,
+  PROMPT_KEY_FAQ_GENERATE,
+  PROMPT_KEY_FAQ_SUGGEST_MISSING,
+  DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE,
+  DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
+  DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
 } = require('../lib/claude');
 
 // Catalogue des prompts exposes a l'admin (cle -> meta)
@@ -20,6 +26,21 @@ const PROMPT_CATALOG = {
     label: 'Bibliothèque (sections, fonctionnalités, équipements)',
     description: 'Prompt système utilisé par le bouton "Reformuler avec Claude" sur toutes les fiches de la bibliothèque (sections types, fonctionnalités, descriptions et justifications BACS d\'équipements).',
     default_body: DEFAULT_SYSTEM_PROMPT_LIBRARY,
+  },
+  [PROMPT_KEY_FAQ_REWRITE]: {
+    label: 'FAQ Buildy — Réécrire un article',
+    description: 'Prompt système utilisé par le bouton "Réécrire avec IA" dans l\'éditeur d\'article FAQ. Améliore clarté et structure sans changer le sens.',
+    default_body: DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE,
+  },
+  [PROMPT_KEY_FAQ_GENERATE]: {
+    label: 'FAQ Buildy — Générer un article depuis une question',
+    description: 'Prompt système utilisé par le bouton "Générer depuis une question" dans la page FAQ. Produit titre + corps complet en s\'appuyant sur le corpus Buildy.',
+    default_body: DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
+  },
+  [PROMPT_KEY_FAQ_SUGGEST_MISSING]: {
+    label: 'FAQ Buildy — Suggérer des articles manquants',
+    description: 'Prompt système utilisé par le bouton "Suggestions IA d\'articles manquants". Compare le corpus Buildy aux articles FAQ existants et propose les sujets non couverts.',
+    default_body: DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
   },
 };
 

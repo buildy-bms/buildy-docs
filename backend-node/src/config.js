@@ -75,6 +75,14 @@ const config = Object.freeze({
   httpsEnabled: process.env.HTTPS_ENABLED === 'true',
   httpsCertPath: process.env.HTTPS_CERT_PATH || path.resolve(__dirname, '../../certs/server.crt'),
   httpsKeyPath: process.env.HTTPS_KEY_PATH || path.resolve(__dirname, '../../certs/server.key'),
+
+  // FAQ Buildy : upload images vers FTP OVH (mêmes credentials que docs/.env.ftp)
+  faqFtpHost: process.env.FAQ_FTP_HOST || process.env.FTP_HOST || '',
+  faqFtpPort: parseInt(process.env.FAQ_FTP_PORT || process.env.FTP_PORT || '21', 10),
+  faqFtpUser: process.env.FAQ_FTP_USER || process.env.FTP_USER || '',
+  faqFtpPassword: process.env.FAQ_FTP_PASSWORD || process.env.FTP_PASSWORD || '',
+  faqFtpRemoteDir: (process.env.FAQ_FTP_REMOTE_DIR || 'www/docs/crisp-faq').replace(/\/$/, ''),
+  faqFtpPublicBase: (process.env.FAQ_FTP_PUBLIC_BASE || 'https://www.buildy.fr/docs/crisp-faq').replace(/\/$/, ''),
 });
 
 // Validations securite

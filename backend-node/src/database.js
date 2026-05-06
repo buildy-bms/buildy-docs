@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 89;
+const TARGET_VERSION = 90;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3330,6 +3330,74 @@ function runMigrations() {
     db.pragma('user_version = 89');
   }
 
+  if (current < 90) {
+    // Lot — FAQ Buildy : synchronisation Knowledge Base Crisp.
+    //   - crisp_settings : singleton (id=1) avec credentials chiffrés (lib/crypto)
+    //     + website_id + locale par défaut + statut du dernier pull.
+    //   - faq_categories / faq_articles : calque Crisp 1:1 avec champs `crisp_id`,
+    //     `dirty` (modif locale non poussée), `pulled_at` / `pushed_at`.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS crisp_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        api_identifier_encrypted TEXT,
+        api_key_encrypted TEXT,
+        website_id TEXT,
+        default_locale TEXT NOT NULL DEFAULT 'fr',
+        last_pull_at TEXT,
+        last_pull_status TEXT,
+        last_pull_error TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS faq_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crisp_id TEXT UNIQUE,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        parent_id INTEGER REFERENCES faq_categories(id) ON DELETE SET NULL,
+        locale TEXT NOT NULL DEFAULT 'fr',
+        pulled_at TEXT,
+        pushed_at TEXT,
+        dirty INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_faq_categories_parent ON faq_categories(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_faq_categories_crisp ON faq_categories(crisp_id);
+
+      CREATE TABLE IF NOT EXISTS faq_articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crisp_id TEXT UNIQUE,
+        category_id INTEGER REFERENCES faq_categories(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        slug TEXT,
+        content_html TEXT,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+        visibility TEXT NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','private')),
+        locale TEXT NOT NULL DEFAULT 'fr',
+        views_count INTEGER DEFAULT 0,
+        pulled_at TEXT,
+        pushed_at TEXT,
+        crisp_updated_at TEXT,
+        dirty INTEGER NOT NULL DEFAULT 0,
+        last_ai_assist_at TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_category ON faq_articles(category_id);
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_status ON faq_articles(status);
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_dirty ON faq_articles(dirty);
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_crisp ON faq_articles(crisp_id);
+    `);
+    log.info('Migration 90 appliquée : crisp_settings + faq_categories + faq_articles (FAQ Buildy / Crisp KB)');
+    db.pragma('user_version = 90');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -4018,55 +4086,98 @@ const sectionTemplates = {
     return this.getById(id);
   },
 
-  // Propagation d'un NOUVEAU template aux AFs existantes. Quand un
-  // section_template est cree dans la bibliotheque (avec document_kinds
-  // contenant 'af'), on l'insere dans toutes les AFs existantes — IF le
-  // parent existe dans l'AF. Idempotent : skip si deja present.
-  // Pas pour les fonctionnalites (is_functionality=1).
+  // Liste les section_templates qui POURRAIENT etre ajoutes a une AF
+  // donnee : tagges 'af', avec un parent_template_id present dans l'AF
+  // (ou top-level), et qui ne sont pas DEJA dans l'AF. Sert a alimenter
+  // la "detection d'elements modifies" avec une source supplementaire :
+  // les nouveaux templates de la bibliotheque non encore presents.
+  missingByAf(afId) {
+    return db.prepare(`
+      SELECT st.*
+      FROM section_templates st
+      INNER JOIN section_template_documents stdocs
+        ON stdocs.section_template_id = st.id AND stdocs.document_kind = 'af'
+      WHERE NOT EXISTS (
+          SELECT 1 FROM sections s
+          WHERE s.af_id = ? AND s.section_template_id = st.id
+        )
+        AND (
+          st.parent_template_id IS NULL
+          OR EXISTS (
+            SELECT 1 FROM sections s2
+            WHERE s2.af_id = ? AND s2.section_template_id = st.parent_template_id
+          )
+        )
+      ORDER BY st.position, st.id
+    `).all(afId, afId);
+  },
+
+  // Helper interne : insere le section_template dans une AF si le parent
+  // est present (ou top-level). Retourne 'inserted' | 'skipped-exists' |
+  // 'skipped-no-parent'. Idempotent.
+  _insertTemplateIntoAf(afId, tpl) {
+    const exists = db.prepare(
+      'SELECT 1 FROM sections WHERE af_id = ? AND section_template_id = ?'
+    ).get(afId, tpl.id);
+    if (exists) return 'skipped-exists';
+    let parentSectionId = null;
+    if (tpl.parent_template_id) {
+      const parent = db.prepare(
+        'SELECT id FROM sections WHERE af_id = ? AND section_template_id = ? LIMIT 1'
+      ).get(afId, tpl.parent_template_id);
+      if (!parent) return 'skipped-no-parent';
+      parentSectionId = parent.id;
+    }
+    const maxPos = db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id IS ?'
+    ).get(afId, parentSectionId);
+    const position = (maxPos?.m || 0) + 10;
+    const created = sections.create({
+      afId,
+      parentId: parentSectionId,
+      position,
+      number: null,
+      title: tpl.title,
+      serviceLevel: tpl.service_level || null,
+      serviceLevelSource: tpl.service_level ? 'manual' : null,
+      bacsArticles: tpl.bacs_articles || null,
+      bodyHtml: tpl.body_html || null,
+      kind: tpl.kind || 'standard',
+      equipmentTemplateId: tpl.equipment_template_id || null,
+    });
+    db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
+      .run(tpl.id, tpl.current_version, created.id);
+    return 'inserted';
+  },
+
+  // Propagation d'un NOUVEAU template aux AFs existantes (au moment de
+  // sa creation dans la bibliotheque). Insere dans toutes les AFs ouvertes
+  // ou le parent existe. Idempotent.
   propagateNewToAfs(templateId) {
     const tpl = this.getById(templateId);
     if (!tpl) return { inserted: 0, skipped: 0 };
-    if (tpl.is_functionality) return { inserted: 0, skipped: 0, reason: 'functionality' };
     if (!Array.isArray(tpl.document_kinds) || !tpl.document_kinds.includes('af')) {
       return { inserted: 0, skipped: 0, reason: 'not-af-tagged' };
     }
     const allAfs = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
     let inserted = 0, skipped = 0;
     for (const af of allAfs) {
-      const exists = db.prepare(
-        'SELECT 1 FROM sections WHERE af_id = ? AND section_template_id = ?'
-      ).get(af.id, templateId);
-      if (exists) { skipped++; continue; }
-      let parentSectionId = null;
-      if (tpl.parent_template_id) {
-        const parent = db.prepare(
-          'SELECT id FROM sections WHERE af_id = ? AND section_template_id = ? LIMIT 1'
-        ).get(af.id, tpl.parent_template_id);
-        if (!parent) { skipped++; continue; }
-        parentSectionId = parent.id;
-      }
-      const maxPos = db.prepare(
-        'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id IS ?'
-      ).get(af.id, parentSectionId);
-      const position = (maxPos?.m || 0) + 10;
-      const created = sections.create({
-        afId: af.id,
-        parentId: parentSectionId,
-        position,
-        number: null,
-        title: tpl.title,
-        serviceLevel: tpl.service_level || null,
-        serviceLevelSource: tpl.service_level ? 'manual' : null,
-        bacsArticles: tpl.bacs_articles || null,
-        bodyHtml: tpl.body_html || null,
-        kind: tpl.kind || 'standard',
-        equipmentTemplateId: tpl.equipment_template_id || null,
-      });
-      db.prepare('UPDATE sections SET section_template_id = ?, section_template_version = ? WHERE id = ?')
-        .run(templateId, tpl.current_version, created.id);
-      inserted++;
+      const r = this._insertTemplateIntoAf(af.id, tpl);
+      if (r === 'inserted') inserted++; else skipped++;
     }
     return { inserted, skipped };
+  },
+
+  // Ajoute un template manquant dans une AF specifique (action utilisateur
+  // depuis le bandeau "Mises a jour de la bibliotheque" -> source new_*).
+  addMissingTemplateToAf(afId, templateId) {
+    const tpl = this.getById(templateId);
+    if (!tpl) return { ok: false, reason: 'template-not-found' };
+    if (!Array.isArray(tpl.document_kinds) || !tpl.document_kinds.includes('af')) {
+      return { ok: false, reason: 'not-af-tagged' };
+    }
+    const r = this._insertTemplateIntoAf(afId, tpl);
+    return { ok: r === 'inserted', reason: r };
   },
 };
 
@@ -5213,6 +5324,156 @@ const pdfBoilerplate = {
   },
 };
 
+// ── FAQ Buildy / Crisp Knowledge Base (lot 90) ──────────────────────
+// crisp_settings = singleton (id=1) avec credentials chiffrés via lib/crypto.
+const crispSettings = {
+  get() {
+    return db.prepare('SELECT * FROM crisp_settings WHERE id = 1').get() || null;
+  },
+  upsert({ apiIdentifierEncrypted, apiKeyEncrypted, websiteId, defaultLocale }) {
+    db.prepare(`
+      INSERT INTO crisp_settings (id, api_identifier_encrypted, api_key_encrypted, website_id, default_locale, updated_at)
+      VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(id) DO UPDATE SET
+        api_identifier_encrypted = excluded.api_identifier_encrypted,
+        api_key_encrypted = excluded.api_key_encrypted,
+        website_id = excluded.website_id,
+        default_locale = excluded.default_locale,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(apiIdentifierEncrypted, apiKeyEncrypted, websiteId, defaultLocale || 'fr');
+    return this.get();
+  },
+  setLastPull({ status, error }) {
+    db.prepare(`
+      UPDATE crisp_settings
+      SET last_pull_at = CURRENT_TIMESTAMP, last_pull_status = ?, last_pull_error = ?
+      WHERE id = 1
+    `).run(status || null, error || null);
+  },
+};
+
+const faqCategories = {
+  list({ locale } = {}) {
+    if (locale) {
+      return db.prepare('SELECT * FROM faq_categories WHERE locale = ? ORDER BY order_index, name').all(locale);
+    }
+    return db.prepare('SELECT * FROM faq_categories ORDER BY order_index, name').all();
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM faq_categories WHERE id = ?').get(id);
+  },
+  getByCrispId(crispId) {
+    return db.prepare('SELECT * FROM faq_categories WHERE crisp_id = ?').get(crispId);
+  },
+  create({ crispId = null, name, description = null, color = null, orderIndex = 0,
+           parentId = null, locale = 'fr', dirty = 1, pulledAt = null }) {
+    const r = db.prepare(`
+      INSERT INTO faq_categories (crisp_id, name, description, color, order_index, parent_id, locale, dirty, pulled_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(crispId, name, description, color, orderIndex, parentId, locale, dirty ? 1 : 0, pulledAt);
+    return this.getById(r.lastInsertRowid);
+  },
+  update(id, patch) {
+    const sets = [];
+    const args = [];
+    const map = {
+      name: 'name', description: 'description', color: 'color',
+      orderIndex: 'order_index', parentId: 'parent_id', locale: 'locale',
+      crispId: 'crisp_id', dirty: 'dirty', pulledAt: 'pulled_at', pushedAt: 'pushed_at',
+    };
+    for (const [k, col] of Object.entries(map)) {
+      if (patch[k] !== undefined) {
+        sets.push(`${col} = ?`);
+        args.push(k === 'dirty' ? (patch[k] ? 1 : 0) : patch[k]);
+      }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    args.push(id);
+    db.prepare(`UPDATE faq_categories SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    return this.getById(id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM faq_categories WHERE id = ?').run(id);
+  },
+  countArticles(id) {
+    return db.prepare('SELECT COUNT(*) as n FROM faq_articles WHERE category_id = ?').get(id).n;
+  },
+};
+
+const faqArticles = {
+  list({ categoryId = null, status = null, q = null, locale = null, limit = 500 } = {}) {
+    const where = [];
+    const args = [];
+    if (categoryId !== null && categoryId !== undefined) { where.push('a.category_id = ?'); args.push(categoryId); }
+    if (status) { where.push('a.status = ?'); args.push(status); }
+    if (locale) { where.push('a.locale = ?'); args.push(locale); }
+    if (q) {
+      where.push('(a.title LIKE ? OR a.content_html LIKE ?)');
+      args.push(`%${q}%`, `%${q}%`);
+    }
+    const sql = `
+      SELECT a.id, a.crisp_id, a.category_id, a.title, a.slug, a.status, a.visibility,
+             a.locale, a.dirty, a.pulled_at, a.pushed_at, a.crisp_updated_at,
+             a.last_ai_assist_at, a.created_at, a.updated_at,
+             c.name AS category_name
+      FROM faq_articles a
+      LEFT JOIN faq_categories c ON c.id = a.category_id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY a.updated_at DESC
+      LIMIT ?
+    `;
+    args.push(limit);
+    return db.prepare(sql).all(...args);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM faq_articles WHERE id = ?').get(id);
+  },
+  getByCrispId(crispId) {
+    return db.prepare('SELECT * FROM faq_articles WHERE crisp_id = ?').get(crispId);
+  },
+  listAllTitles() {
+    return db.prepare('SELECT id, title, category_id FROM faq_articles ORDER BY title').all();
+  },
+  create({ crispId = null, categoryId = null, title, slug = null, contentHtml = null,
+           status = 'draft', visibility = 'public', locale = 'fr', dirty = 1,
+           pulledAt = null, crispUpdatedAt = null, createdBy = null }) {
+    const r = db.prepare(`
+      INSERT INTO faq_articles (crisp_id, category_id, title, slug, content_html, status, visibility,
+                                locale, dirty, pulled_at, crisp_updated_at, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(crispId, categoryId, title, slug, contentHtml, status, visibility,
+           locale, dirty ? 1 : 0, pulledAt, crispUpdatedAt, createdBy, createdBy);
+    return this.getById(r.lastInsertRowid);
+  },
+  update(id, patch, userId = null) {
+    const sets = [];
+    const args = [];
+    const map = {
+      categoryId: 'category_id', title: 'title', slug: 'slug',
+      contentHtml: 'content_html', status: 'status', visibility: 'visibility',
+      locale: 'locale', crispId: 'crisp_id', dirty: 'dirty',
+      pulledAt: 'pulled_at', pushedAt: 'pushed_at', crispUpdatedAt: 'crisp_updated_at',
+      lastAiAssistAt: 'last_ai_assist_at',
+    };
+    for (const [k, col] of Object.entries(map)) {
+      if (patch[k] !== undefined) {
+        sets.push(`${col} = ?`);
+        args.push(k === 'dirty' ? (patch[k] ? 1 : 0) : patch[k]);
+      }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    if (userId) { sets.push('updated_by = ?'); args.push(userId); }
+    args.push(id);
+    db.prepare(`UPDATE faq_articles SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    return this.getById(id);
+  },
+  remove(id) {
+    db.prepare('DELETE FROM faq_articles WHERE id = ?').run(id);
+  },
+};
+
 module.exports = {
   init,
   pdfBoilerplate,
@@ -5244,5 +5505,8 @@ module.exports = {
   equipments,
   sitesSyncQueue,
   aiPrompts,
+  crispSettings,
+  faqCategories,
+  faqArticles,
   get db() { return db; },
 };

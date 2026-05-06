@@ -134,6 +134,19 @@ const routes = [
     meta: { title: 'Brochure' },
     component: () => import('@/views/BrochureDetailView.vue'),
   },
+  {
+    path: '/faq',
+    name: 'faq-buildy',
+    meta: { title: 'FAQ Buildy' },
+    component: () => import('@/views/FaqBuildyView.vue'),
+  },
+  {
+    path: '/faq/articles/:id',
+    name: 'faq-article-editor',
+    meta: { title: 'Article FAQ' },
+    component: () => import('@/views/FaqArticleEditorView.vue'),
+    props: true,
+  },
 ]
 
 const router = createRouter({

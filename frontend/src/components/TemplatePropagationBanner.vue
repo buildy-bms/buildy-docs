@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { ArrowPathIcon, XMarkIcon, CheckIcon, ChevronRightIcon, ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
-import { getAfTemplateUpdates, applySectionTemplateUpdate, dismissSectionTemplateUpdate } from '@/api'
+import { getAfTemplateUpdates, applySectionTemplateUpdate, dismissSectionTemplateUpdate, addMissingTemplateToAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
@@ -22,9 +22,9 @@ const busy = ref(new Set())
 
 const totalChanges = computed(() => updates.value.reduce((acc, u) => acc + (u.total_changes || 0), 0))
 
-// Resume des sources : "2 équipements · 3 sections · 1 fonctionnalité"
+// Resume des sources : "2 équipements · 3 sections · 1 fonctionnalité · 2 nouveautés"
 const sourcesSummary = computed(() => {
-  const counts = { equipment: 0, section_template: 0, functionality: 0 }
+  const counts = { equipment: 0, section_template: 0, functionality: 0, new_section: 0, new_functionality: 0 }
   for (const u of updates.value) {
     const s = u.source || 'equipment'
     if (counts[s] != null) counts[s]++
@@ -33,6 +33,8 @@ const sourcesSummary = computed(() => {
   if (counts.equipment) parts.push(`${counts.equipment} équipement${counts.equipment > 1 ? 's' : ''}`)
   if (counts.section_template) parts.push(`${counts.section_template} section${counts.section_template > 1 ? 's' : ''}`)
   if (counts.functionality) parts.push(`${counts.functionality} fonctionnalité${counts.functionality > 1 ? 's' : ''}`)
+  const newCount = counts.new_section + counts.new_functionality
+  if (newCount) parts.push(`${newCount} nouveau${newCount > 1 ? 'x' : ''} dans la biblio`)
   return parts.join(' · ')
 })
 
@@ -40,7 +42,10 @@ const SOURCE_LABELS = {
   equipment: { label: 'Équipement', class: 'bg-blue-100 text-blue-800' },
   section_template: { label: 'Section', class: 'bg-green-100 text-green-800' },
   functionality: { label: 'Fonctionnalité', class: 'bg-purple-100 text-purple-800' },
+  new_section: { label: 'Nouvelle section', class: 'bg-emerald-100 text-emerald-800' },
+  new_functionality: { label: 'Nouvelle fonctionnalité', class: 'bg-emerald-100 text-emerald-800' },
 }
+const isNewItem = (s) => s === 'new_section' || s === 'new_functionality'
 function sourceLabel(s) { return SOURCE_LABELS[s || 'equipment']?.label || s }
 function sourceClass(s) { return SOURCE_LABELS[s || 'equipment']?.class || 'bg-gray-100 text-gray-700' }
 
@@ -63,33 +68,65 @@ function toggle(id) {
   expanded.value = new Set(expanded.value)
 }
 
+// Cle stable d'un item (section_id si existant, sinon templateId pour les "new_*")
+function itemKey(item) {
+  return item.section_id ?? `new-${item.missing_template_id}`
+}
+
 async function apply(item) {
-  busy.value.add(item.section_id)
+  // Branche selon le type : ajout pour new_*, sync pour les autres.
+  if (isNewItem(item.source)) return addNew(item)
+  busy.value.add(itemKey(item))
   busy.value = new Set(busy.value)
   try {
     await applySectionTemplateUpdate(item.section_id)
     notifySuccess(`§ ${item.section_number || '?'} synchronisée sur v${item.to_version}`)
-    updates.value = updates.value.filter(u => u.section_id !== item.section_id)
+    updates.value = updates.value.filter(u => itemKey(u) !== itemKey(item))
     emit('updated')
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de la synchronisation')
   } finally {
-    busy.value.delete(item.section_id)
+    busy.value.delete(itemKey(item))
     busy.value = new Set(busy.value)
   }
 }
 
+async function addNew(item) {
+  busy.value.add(itemKey(item))
+  busy.value = new Set(busy.value)
+  try {
+    await addMissingTemplateToAf(props.afId, item.missing_template_id)
+    notifySuccess(`« ${item.template_name} » ajoutée à l'AF`)
+    updates.value = updates.value.filter(u => itemKey(u) !== itemKey(item))
+    emit('updated')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de l\'ajout')
+  } finally {
+    busy.value.delete(itemKey(item))
+    busy.value = new Set(busy.value)
+  }
+}
+
+function dismissNew(item) {
+  // Le "ignorer" pour un new_* n'a pas de persistance backend — il disparait
+  // de la liste cote UI mais reapparaitra au prochain refresh. Acceptable
+  // car un user qui veut definitivement le filtrer peut supprimer le
+  // template ou modifier ses document_kinds.
+  updates.value = updates.value.filter(u => itemKey(u) !== itemKey(item))
+}
+
 async function dismiss(item) {
-  busy.value.add(item.section_id)
+  if (isNewItem(item.source)) return dismissNew(item)
+  busy.value.add(itemKey(item))
   busy.value = new Set(busy.value)
   try {
     await dismissSectionTemplateUpdate(item.section_id)
-    updates.value = updates.value.filter(u => u.section_id !== item.section_id)
+    updates.value = updates.value.filter(u => itemKey(u) !== itemKey(item))
     emit('updated')
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec')
   } finally {
-    busy.value.delete(item.section_id)
+    busy.value.delete(itemKey(item))
     busy.value = new Set(busy.value)
   }
 }
@@ -97,8 +134,8 @@ async function dismiss(item) {
 async function applyAll() {
   const ok = await confirm({
     title: `Appliquer ${updates.value.length} mise(s) à jour ?`,
-    message: 'Le contenu actuel des sections n\'est pas modifié — seul le pointeur de version est synchronisé.',
-    confirmLabel: 'Appliquer',
+    message: 'Les nouveautés de la bibliothèque sont ajoutées à l\'AF, et les sections déjà liées sont synchronisées sur la dernière version du template.',
+    confirmLabel: 'Tout appliquer',
   })
   if (!ok) return
   for (const u of [...updates.value]) await apply(u)
@@ -115,7 +152,7 @@ defineExpose({ refresh })
       <ArrowPathIcon class="w-4 h-4 text-amber-700 shrink-0" />
       <p class="text-xs text-amber-900 truncate">
         <span class="font-semibold">{{ updates.length }} {{ updates.length > 1 ? 'éléments' : 'élément' }}</span>
-        de la bibliothèque {{ updates.length > 1 ? 'ont évolué' : 'a évolué' }}
+        à revoir
         <span v-if="sourcesSummary" class="text-amber-700">· {{ sourcesSummary }}</span>
       </p>
     </div>
@@ -130,55 +167,73 @@ defineExpose({ refresh })
   <BaseModal v-if="showModal" title="Mises à jour de la bibliothèque" size="lg" @close="showModal = false">
     <div class="space-y-3 max-h-[65vh] overflow-y-auto">
       <p class="text-xs text-gray-500">
-        La bibliothèque a évolué depuis que ces sections ont été créées ou synchronisées la dernière fois.
-        <strong>Pour les équipements</strong>, appliquer sert à acquitter — le contenu est résolu dynamiquement.
-        <strong>Pour les sections narratives et les fonctionnalités</strong>, appliquer remplace le contenu
-        local de la section par le nouveau texte canonique du template.
+        <strong>Nouveautés</strong> : sections / fonctionnalités ajoutées à la bibliothèque, pas encore dans cette AF — clic <em>Ajouter</em> pour les insérer.
+        <br>
+        <strong>Mises à jour</strong> : sections / fonctionnalités déjà liées dont le template a évolué — clic <em>Appliquer</em> remplace le contenu local par le nouveau texte canonique. Pour les équipements, appliquer sert à acquitter (le contenu est résolu dynamiquement).
       </p>
 
-      <div v-for="item in updates" :key="item.section_id" class="border border-gray-200 rounded-lg">
+      <div v-for="item in updates" :key="itemKey(item)" class="border border-gray-200 rounded-lg">
         <div class="px-4 py-3 flex items-center justify-between gap-3 bg-gray-50">
-          <button @click="toggle(item.section_id)" class="flex items-center gap-2 min-w-0 text-left">
-            <ChevronRightIcon :class="['w-4 h-4 text-gray-400 transition-transform', expanded.has(item.section_id) && 'rotate-90']" />
+          <button @click="toggle(itemKey(item))" class="flex items-center gap-2 min-w-0 text-left">
+            <ChevronRightIcon :class="['w-4 h-4 text-gray-400 transition-transform', expanded.has(itemKey(item)) && 'rotate-90']" />
             <div class="min-w-0">
               <p class="text-sm font-semibold text-gray-800 truncate">
                 <span :class="['inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider mr-1.5 align-middle', sourceClass(item.source)]">
                   {{ sourceLabel(item.source) }}
                 </span>
-                <span class="text-gray-400 font-mono mr-1">{{ item.section_number || '?' }}</span>
+                <span v-if="item.section_number" class="text-gray-400 font-mono mr-1">{{ item.section_number }}</span>
                 {{ item.section_title }}
               </p>
               <p class="text-[11px] text-gray-500 mt-0.5">
-                Template <span class="font-medium">{{ item.template_name }}</span>
-                <span class="ml-2 inline-flex items-center gap-1">
-                  v{{ item.from_version || 0 }}
-                  <ArrowsRightLeftIcon class="w-3 h-3" />
-                  v{{ item.to_version }}
-                </span>
-                <span v-if="item.total_changes" class="ml-2 text-amber-700">· {{ item.total_changes }} changement{{ item.total_changes > 1 ? 's' : '' }}</span>
+                <template v-if="isNewItem(item.source)">
+                  À ajouter — sous <span class="font-medium">{{ item.template_name }}</span> (v{{ item.to_version }})
+                </template>
+                <template v-else>
+                  Template <span class="font-medium">{{ item.template_name }}</span>
+                  <span class="ml-2 inline-flex items-center gap-1">
+                    v{{ item.from_version || 0 }}
+                    <ArrowsRightLeftIcon class="w-3 h-3" />
+                    v{{ item.to_version }}
+                  </span>
+                  <span v-if="item.total_changes" class="ml-2 text-amber-700">· {{ item.total_changes }} changement{{ item.total_changes > 1 ? 's' : '' }}</span>
+                </template>
               </p>
             </div>
           </button>
           <div class="flex items-center gap-2 shrink-0">
             <button
               @click="dismiss(item)"
-              :disabled="busy.has(item.section_id)"
+              :disabled="busy.has(itemKey(item))"
               class="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-800 disabled:opacity-50"
-              title="Acquitter sans changer le contenu local"
+              :title="isNewItem(item.source) ? 'Ne pas ajouter cet élément' : 'Acquitter sans changer le contenu local'"
             >
-              <XMarkIcon class="w-3.5 h-3.5 inline" /> Garder ma version
+              <XMarkIcon class="w-3.5 h-3.5 inline" />
+              {{ isNewItem(item.source) ? 'Ignorer' : 'Garder ma version' }}
             </button>
             <button
               @click="apply(item)"
-              :disabled="busy.has(item.section_id)"
+              :disabled="busy.has(itemKey(item))"
               class="px-3 py-1 text-[11px] bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1"
             >
-              <CheckIcon class="w-3.5 h-3.5" /> Appliquer
+              <CheckIcon class="w-3.5 h-3.5" />
+              {{ isNewItem(item.source) ? 'Ajouter à l\'AF' : 'Appliquer' }}
             </button>
           </div>
         </div>
 
-        <div v-if="expanded.has(item.section_id)" class="px-4 py-3 text-xs space-y-2">
+        <div v-if="expanded.has(itemKey(item))" class="px-4 py-3 text-xs space-y-2">
+          <!-- Aperçu pour les nouveaux templates de la bibliothèque -->
+          <template v-if="isNewItem(item.source)">
+            <div class="text-gray-700">
+              <p class="font-semibold text-emerald-700 mb-1">+ Nouveau dans la bibliothèque</p>
+              <p v-if="item.body_preview" class="text-gray-600 text-[11px] leading-relaxed line-clamp-4">
+                {{ item.body_preview }}{{ (item.body_preview || '').length >= 200 ? '…' : '' }}
+              </p>
+              <p v-else class="text-gray-400 italic text-[11px]">
+                Pas encore de contenu rédigé. La section sera ajoutée vide et tu pourras la compléter.
+              </p>
+            </div>
+          </template>
           <!-- Diff equipement (points read/write) -->
           <template v-if="item.source === 'equipment' || !item.source">
             <div v-if="item.added?.length">
@@ -215,8 +270,8 @@ defineExpose({ refresh })
             </div>
           </template>
 
-          <!-- Diff section narrative / fonctionnalite -->
-          <template v-else>
+          <!-- Diff section narrative / fonctionnalite (PAS pour les new_*) -->
+          <template v-else-if="!isNewItem(item.source)">
             <div v-if="item.body_changed" class="text-gray-700">
               <p class="font-semibold text-amber-700 mb-1">~ Texte canonique modifié</p>
               <p class="text-gray-500 text-[11px] leading-relaxed">
