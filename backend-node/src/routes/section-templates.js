@@ -179,13 +179,29 @@ async function routes(fastify) {
       : ['af'];
     db.sectionTemplates.setDocumentKinds(created.id, kinds, { cascade: false });
 
+    // Propagation auto aux AFs existantes (Lot Auto-Propagation).
+    // Si le template est tagge 'af' et n'est pas une fonctionnalite, on
+    // l'insere dans toutes les AFs ouvertes ou le parent existe.
+    const propagation = db.sectionTemplates.propagateNewToAfs(created.id);
+
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.create',
-      payload: { id: created.id, slug: created.slug, is_functionality: created.is_functionality, document_kinds: kinds },
+      payload: {
+        id: created.id, slug: created.slug,
+        is_functionality: created.is_functionality, document_kinds: kinds,
+        propagated_to_afs: propagation.inserted,
+      },
     });
 
-    return reply.code(201).send(db.sectionTemplates.getById(created.id));
+    if (propagation.inserted > 0) {
+      log.info(`Section template #${created.id} propage a ${propagation.inserted} AF(s) (skipped ${propagation.skipped})`);
+    }
+
+    return reply.code(201).send({
+      ...db.sectionTemplates.getById(created.id),
+      propagated_to_afs: propagation.inserted,
+    });
   });
 
   // POST /api/section-templates/:id/clone — duplique la section type + tout
