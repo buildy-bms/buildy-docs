@@ -161,7 +161,7 @@ async function suggestTitleOnly() {
   try {
     const { data } = await claudeLibraryAssist({
       mode: 'title',
-      kind: mode === 'functionality' ? 'functionality' : 'narrative_section',
+      kind: props.mode === 'functionality' ? 'functionality' : 'narrative_section',
       title: form.value.title.trim(),
       html: form.value.body_html || undefined,
       bacs_articles: form.value.bacs_articles || null,
