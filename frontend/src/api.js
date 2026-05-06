@@ -49,6 +49,10 @@ export const createSection = (afId, data) => api.post(`/afs/${afId}/sections`, d
 export const deleteSection = (id) => api.delete(`/sections/${id}`)
 // Lot — Déplace une section dans sa fratrie (up/down).
 export const moveSection = (id, direction) => api.post(`/sections/${id}/move`, { direction })
+// Lot — Reorder atomique d'une fratrie de sections AF via drag-drop.
+// payload : { parent_id: number|null, ids: [...] }
+export const reorderAfSections = (afId, payload) =>
+  api.post(`/afs/${afId}/sections/reorder`, payload)
 export const getSectionPoints = (id) => api.get(`/sections/${id}/points`)
 export const addSectionOverride = (id, data) => api.post(`/sections/${id}/overrides`, data)
 export const deleteSectionOverride = (sectionId, overrideId) =>

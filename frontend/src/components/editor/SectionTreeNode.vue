@@ -1,6 +1,7 @@
 <script setup>
-import { computed, ref, watch, nextTick, inject } from 'vue'
-import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ChevronRightIcon, ChevronDownIcon, PlusIcon, TrashIcon, EyeIcon, EyeSlashIcon, NoSymbolIcon, CheckCircleIcon, CheckBadgeIcon, ArrowUpOnSquareIcon, ArrowUpIcon, ArrowDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import Sortable from 'sortablejs'
 import ServiceLevelBadge from '@/components/ServiceLevelBadge.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
@@ -24,7 +25,7 @@ const props = defineProps({
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'reorder-children', 'attachment-drop', 'promote-to-library'])
 
 // Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
 // calculer la disponibilite de chaque feature au niveau choisi par le MOA.
@@ -117,6 +118,46 @@ const hasChildren = computed(() => Array.isArray(props.node.children) && props.n
 const isCollapsed = computed(() => props.collapsed.has(props.node.id))
 const isSelected = computed(() => props.selectedId === props.node.id)
 
+// Drag-drop reorder : Sortable sur le conteneur des enfants directs.
+// Chaque enfant porte data-id pour qu'on recupere les ids dans le nouvel
+// ordre au onEnd. handle: '.drag-handle' (icone Bars3 sur chaque ligne).
+// La fratrie ne peut etre droppee qu'au sein du meme parent (group local
+// par defaut, pas de re-parentage).
+const childrenContainerRef = ref(null)
+let sortable = null
+function teardownSortable() {
+  if (sortable) { try { sortable.destroy() } catch { /* ignore */ } sortable = null }
+}
+function setupSortable() {
+  teardownSortable()
+  if (!childrenContainerRef.value) return
+  sortable = Sortable.create(childrenContainerRef.value, {
+    animation: 150,
+    handle: '.section-drag-handle',
+    ghostClass: 'section-tree-ghost',
+    chosenClass: 'section-tree-chosen',
+    dragClass: 'section-tree-dragging',
+    fallbackOnBody: true,
+    onEnd: (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(childrenContainerRef.value.children)
+        .map(el => parseInt(el.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      emit('reorder-children', { parentId: props.node.id, ids })
+    },
+  })
+}
+watch([hasChildren, isCollapsed], async () => {
+  await nextTick()
+  if (hasChildren.value && !isCollapsed.value) setupSortable()
+  else teardownSortable()
+})
+onMounted(async () => {
+  await nextTick()
+  if (hasChildren.value && !isCollapsed.value) setupSortable()
+})
+onBeforeUnmount(teardownSortable)
+
 // Scroll-into-view automatique quand cette ligne devient selectionnee
 const btnRef = ref(null)
 watch(isSelected, async (sel) => {
@@ -165,7 +206,7 @@ const titleHtml = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div :data-id="node.id" :data-parent-id="node.parent_id || ''">
     <button
       ref="btnRef"
       :style="indentStyle"
@@ -179,6 +220,11 @@ const titleHtml = computed(() => {
       @dragleave="onDragLeave"
       @drop="onDrop"
     >
+      <!-- Drag handle : visible au hover, declenche le drag SortableJS. -->
+      <span class="section-drag-handle shrink-0 opacity-0 group-hover:opacity-100 cursor-grab text-gray-400 hover:text-gray-700 -ml-0.5"
+            @click.stop @mousedown.stop>
+        <Bars3Icon class="w-3 h-3" />
+      </span>
       <!-- Slot statut "verifie" : toujours rendu (place fixe la plus a gauche)
            pour aligner verticalement les ✓ d'une ligne a l'autre. -->
       <Tooltip :text="node.fact_check_status === 'verified' ? 'Section vérifiée' : 'À vérifier'">
@@ -313,24 +359,6 @@ const titleHtml = computed(() => {
             <ArrowUpOnSquareIcon class="w-3 h-3" />
           </button>
         </Tooltip>
-        <Tooltip text="Monter cette section dans la fratrie">
-          <button
-            type="button"
-            @click.stop="emit('move-up', node)"
-            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
-          >
-            <ArrowUpIcon class="w-3 h-3" />
-          </button>
-        </Tooltip>
-        <Tooltip text="Descendre cette section dans la fratrie">
-          <button
-            type="button"
-            @click.stop="emit('move-down', node)"
-            class="p-0.5 rounded hover:bg-gray-200 text-gray-500"
-          >
-            <ArrowDownIcon class="w-3 h-3" />
-          </button>
-        </Tooltip>
         <Tooltip text="Supprimer cette section (et ses enfants)">
           <button
             type="button"
@@ -367,7 +395,7 @@ const titleHtml = computed(() => {
       </Tooltip>
     </button>
 
-    <div v-if="hasChildren && !isCollapsed">
+    <div v-if="hasChildren && !isCollapsed" ref="childrenContainerRef">
       <SectionTreeNode
         v-for="child in node.children"
         :key="child.id"
@@ -388,9 +416,37 @@ const titleHtml = computed(() => {
         @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
         @move-up="emit('move-up', $event)"
         @move-down="emit('move-down', $event)"
+        @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"
       />
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Drag-drop : ghost = barre horizontale verte indiquant la position de
+   drop. Element dragge legerement transparent avec ombre. */
+:deep(.section-tree-ghost) {
+  position: relative;
+  opacity: 0.4;
+}
+:deep(.section-tree-ghost) > button {
+  background: #d1fae5;
+  outline: 2px dashed #10b981;
+  outline-offset: -2px;
+  height: 4px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+:deep(.section-tree-ghost) > button > * { display: none !important; }
+:deep(.section-tree-chosen) {
+  background: rgba(16, 185, 129, 0.05);
+}
+:deep(.section-tree-dragging) {
+  opacity: 0.95;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  background: white;
+  border-radius: 6px;
+}
+</style>

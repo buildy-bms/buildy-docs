@@ -1,18 +1,19 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   RectangleStackIcon, GlobeAltIcon, ChartBarSquareIcon, DocumentTextIcon,
   MagnifyingGlassIcon, PlusIcon, XMarkIcon, CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import SectionTreeNode from './SectionTreeNode.vue'
 import Tooltip from '@/components/Tooltip.vue'
+import Sortable from 'sortablejs'
 
 const props = defineProps({
   sections: { type: Array, required: true }, // liste plate (parent_id pour hierarchie)
   selectedId: { type: Number, default: null },
   afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'reorder-children', 'attachment-drop', 'promote-to-library'])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -166,6 +167,36 @@ watch(matchedIds, (ids) => {
     preSearchCollapsed = null
   }
 })
+
+// Drag-drop reorder au top-level (sections roots de l'AF). Les enfants
+// sont gérés par SortableJS interne aux SectionTreeNode (récursif).
+const rootContainerRef = ref(null)
+let rootSortable = null
+function teardownRootSortable() {
+  if (rootSortable) { try { rootSortable.destroy() } catch { /* ignore */ } rootSortable = null }
+}
+function setupRootSortable() {
+  teardownRootSortable()
+  if (!rootContainerRef.value) return
+  rootSortable = Sortable.create(rootContainerRef.value, {
+    animation: 150,
+    handle: '.section-drag-handle',
+    ghostClass: 'section-tree-ghost',
+    chosenClass: 'section-tree-chosen',
+    dragClass: 'section-tree-dragging',
+    fallbackOnBody: true,
+    onEnd: (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(rootContainerRef.value.children)
+        .map(el => parseInt(el.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      emit('reorder-children', { parentId: null, ids })
+    },
+  })
+}
+watch(tree, async () => { await nextTick(); setupRootSortable() })
+onMounted(async () => { await nextTick(); setupRootSortable() })
+onBeforeUnmount(teardownRootSortable)
 </script>
 
 <template>
@@ -222,28 +253,31 @@ watch(matchedIds, (ids) => {
       Toutes les sections sont vérifiées. ✓
     </p>
 
-    <SectionTreeNode
-      v-for="node in tree"
-      :key="node.id"
-      :node="node"
-      :level="0"
-      :selected-id="selectedId"
-      :collapsed="collapsed"
-      :kind-icon="KIND_ICON"
-      :is-empty="isEmpty"
-      :search="search"
-      @select="emit('select', $event)"
-      @toggle="toggle"
-      @add-child="emit('add-child', $event)"
-      @delete="emit('delete', $event)"
-      @toggle-include="emit('toggle-include', $event)"
-      @toggle-opt-out="emit('toggle-opt-out', $event)"
-      @toggle-demanded="emit('toggle-demanded', $event)"
-      @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
-      @move-up="emit('move-up', $event)"
-      @move-down="emit('move-down', $event)"
-      @attachment-drop="emit('attachment-drop', $event)"
-      @promote-to-library="emit('promote-to-library', $event)"
-    />
+    <div ref="rootContainerRef">
+      <SectionTreeNode
+        v-for="node in tree"
+        :key="node.id"
+        :node="node"
+        :level="0"
+        :selected-id="selectedId"
+        :collapsed="collapsed"
+        :kind-icon="KIND_ICON"
+        :is-empty="isEmpty"
+        :search="search"
+        @select="emit('select', $event)"
+        @toggle="toggle"
+        @add-child="emit('add-child', $event)"
+        @delete="emit('delete', $event)"
+        @toggle-include="emit('toggle-include', $event)"
+        @toggle-opt-out="emit('toggle-opt-out', $event)"
+        @toggle-demanded="emit('toggle-demanded', $event)"
+        @toggle-optin-paid-option="emit('toggle-optin-paid-option', $event)"
+        @move-up="emit('move-up', $event)"
+        @move-down="emit('move-down', $event)"
+        @reorder-children="emit('reorder-children', $event)"
+        @attachment-drop="emit('attachment-drop', $event)"
+        @promote-to-library="emit('promote-to-library', $event)"
+      />
+    </div>
   </div>
 </template>

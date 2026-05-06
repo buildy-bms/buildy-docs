@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary, moveSection } from '@/api'
+import { getSection, listEquipmentTemplates, moveAttachment, listSectionAttachments, promoteSectionToLibrary, moveSection, reorderAfSections } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAfStore } from '@/stores/af'
@@ -360,6 +360,18 @@ async function handleMoveSection(node, direction) {
 const handleMoveUp = (node) => handleMoveSection(node, 'up')
 const handleMoveDown = (node) => handleMoveSection(node, 'down')
 
+// Lot — Reorder bulk d'une fratrie (drag-drop SortableJS).
+async function handleReorderChildren({ parentId, ids }) {
+  if (!Array.isArray(ids) || !ids.length) return
+  try {
+    await reorderAfSections(af.value.id, { parent_id: parentId, ids })
+    await afStore.refreshSections()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du réordonnancement')
+    await afStore.refreshSections()
+  }
+}
+
 // Eligibilite des actions opt-out / demanded sur la section selectionnee
 // (memes regles que SectionTreeNode : feature avec au moins un paid_option,
 // OU service_level dans S/P/S/P).
@@ -580,6 +592,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               @toggle-optin-paid-option="handleToggleOptinPaidOption"
               @move-up="handleMoveUp"
               @move-down="handleMoveDown"
+              @reorder-children="handleReorderChildren"
               @attachment-drop="handleAttachmentDrop"
               @promote-to-library="handlePromoteToLibrary"
             />
