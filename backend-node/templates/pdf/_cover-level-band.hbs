@@ -18,7 +18,12 @@
     <div class="cover-level-band-arrow">vs</div>
     <div class="cover-level-band-item">
       <p class="cover-level-band-label">Niveau actuellement visé</p>
-      <p class="cover-level-band-value">{{#if kpis.contractLevelLabel}}{{kpis.contractLevelLabel}}{{else}}<em>à définir</em>{{/if}}</p>
+      <p class="cover-level-band-value">
+        {{#if kpis.contractLevelLabel}}{{kpis.contractLevelLabel}}{{else}}<em>à définir</em>{{/if}}
+        {{#if (gt optinPaidOptionCount 0)}}
+        <span class="cover-level-band-options">+ {{optinPaidOptionCount}} option{{#if (gt optinPaidOptionCount 1)}}s{{/if}} payante{{#if (gt optinPaidOptionCount 1)}}s{{/if}}</span>
+        {{/if}}
+      </p>
     </div>
   </div>
 

@@ -15,6 +15,7 @@ const {
   buildAfExportData,
   buildPointsListExportData,
   buildOfferingsAnnexForAf,
+  buildContractualSummaryForAf,
   buildLevelVerdict,
 } = require('./_export-builders');
 
@@ -391,13 +392,27 @@ async function routes(fastify) {
     }
 
     const { resolveAfLevel } = require('../lib/service-level-resolver');
-    const required = resolveAfLevel(liveSections);
     const RANK = { E: 0, S: 1, P: 2 };
     const LEVEL_LABELS = { E: 'Essentials', S: 'Smart', P: 'Premium' };
 
     const contractLevel = af.service_level || null;
-    const requiredLevel = required.level || null;
-    const levelVerdict = buildLevelVerdict({ requiredLevel, contractLevel });
+    // Lot 91 — Niveau requis : on respecte d'abord le choix MOA (af.service_level).
+    // Une section dispo en paid_option au niveau choisi (ou deja optin_paid_option=1)
+    // n'impose pas d'upgrade — c'est une option payante a ajouter en sus.
+    function _availAtTarget(s) {
+      const t = (contractLevel || '').toUpperCase();
+      if (!t) return null;
+      return t === 'E' ? s.tpl_avail_e : t === 'S' ? s.tpl_avail_s : t === 'P' ? s.tpl_avail_p : null;
+    }
+    const liveSectionsForLevelCalc = liveSections.filter(s =>
+      !s.optin_paid_option && _availAtTarget(s) !== 'paid_option'
+    );
+    const required = resolveAfLevel(liveSectionsForLevelCalc);
+    const requiredLevel = contractLevel || required.level || null;
+    const levelVerdict = buildLevelVerdict({ requiredLevel: required.level || null, contractLevel });
+
+    // Compteur d'options payantes a la carte choisies par le MOA (mig 91).
+    const optinPaidOptionCount = liveSections.filter(s => !!s.optin_paid_option).length;
 
     const kpis = {
       systemsCovered: equipmentLive.filter(s => {
@@ -412,6 +427,7 @@ async function routes(fastify) {
       requiredLevel,
       requiredLevelLabel: requiredLevel ? LEVEL_LABELS[requiredLevel] : null,
       verdict: levelVerdict,
+      optinPaidOptionCount,
     };
 
     const optedOutList = equipmentOptedOut.map(s => ({
@@ -926,6 +942,7 @@ async function routes(fastify) {
       kpis, optedOutList,
       // serviceLevel.justifications consomme par _cover-level-band.hbs
       serviceLevel: required,
+      optinPaidOptionCount,
       // Nouveau modele tabulaire :
       systemCategories: SYSTEM_CATEGORIES,
       zonesMatrix, zonesColTotals, zonesGrandTotal, unzonedInstances: unzoned, hasZones: zones.length > 0,
@@ -935,6 +952,8 @@ async function routes(fastify) {
       // Tableau des offres avec badges Offre cible / Offre requise (charte
       // alignee sur l'annexe AF, consomme le partial _offerings-annex.hbs).
       offeringsAnnex: buildOfferingsAnnexForAf(af),
+      // Lot 91 — Synthese contractuelle (incluses / options payantes / non dispo)
+      contractualSummary: buildContractualSummaryForAf(af),
     };
 
     const exportsDir = path.resolve(config.exportsDir);

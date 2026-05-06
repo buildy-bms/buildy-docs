@@ -96,6 +96,17 @@ h1, h2, h3, h4, h5 {
   font-size: 14pt; color: white; margin: 0; font-weight: 600; font-family: 'Poppins', sans-serif;
   line-height: 1.1;
 }
+.cover-level-band-options {
+  display: inline-block;
+  margin-left: 2mm;
+  padding: 0.5mm 2mm;
+  font-size: 8.5pt;
+  font-weight: 500;
+  color: #064e3b;
+  background: #6ee7b7;
+  border-radius: 2mm;
+  vertical-align: 1pt;
+}
 .cover-level-band-arrow {
   font-size: 10pt; color: rgba(255,255,255,0.4); padding: 0 3mm; font-style: italic;
 }
