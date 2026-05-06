@@ -3679,7 +3679,7 @@ const sectionTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM section_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality, parentTemplateId, equipmentTemplateId, availE, availS, availP }) {
+  create({ slug, number, title, kind, bodyHtml, bacsArticles, serviceLevel, serviceLevelSource, features, isFunctionality, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName }) {
     // Position : derniere de la fratrie (parent_template_id donne).
     const maxRow = db.prepare(
       'SELECT COALESCE(MAX(position), 0) AS m FROM section_templates WHERE parent_template_id IS ?'
@@ -3689,13 +3689,13 @@ const sectionTemplates = {
       INSERT INTO section_templates
         (slug, number, title, kind, body_html, bacs_articles, service_level, service_level_source,
          features, is_functionality, position, parent_template_id, equipment_template_id,
-         avail_e, avail_s, avail_p)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         avail_e, avail_s, avail_p, icon_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, number || null, title, kind || 'standard', bodyHtml || null,
             bacsArticles || null, serviceLevel || null, serviceLevelSource || null,
             features ? JSON.stringify(features) : null, isFunctionality ? 1 : 0, position,
             parentTemplateId || null, equipmentTemplateId || null,
-            availE || null, availS || null, availP || null);
+            availE || null, availS || null, availP || null, iconName || null);
     return this.getById(result.lastInsertRowid);
   },
   delete(id) {

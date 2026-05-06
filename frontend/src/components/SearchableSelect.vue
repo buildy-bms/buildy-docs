@@ -233,7 +233,7 @@ function clear() {
       <div v-if="open"
            data-searchable-popover="true"
            :style="popoverStyle"
-           class="fixed z-100 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+           class="fixed z-115 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
            @keydown="onKeydown">
         <div v-if="showSearch" class="relative border-b border-gray-100">
           <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
