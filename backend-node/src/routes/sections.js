@@ -224,25 +224,23 @@ async function routes(fastify) {
     try { body = updateSectionSchema.parse(request.body); }
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
-    // Exclusivite logique : refusee / demandee / option-payante.
-    // - opted_out XOR demanded (deja en place)
-    // - opted_out XOR optin_paid_option (toggle l'un eteint l'autre)
-    // demanded et optin peuvent coexister (semantique : "exigee ET payee
-    // a part") mais en pratique l'UI bascule de l'un a l'autre.
+    // Exclusivite stricte entre les 3 flags MOA : opted_out, demanded,
+    // optin_paid_option. Au plus UN actif a la fois. Si l'utilisateur active
+    // l'un, on force les 2 autres a 0 quand le PATCH ne les precise pas.
     let optedOutByMoa = body.opted_out_by_moa == null ? undefined : (body.opted_out_by_moa ? 1 : 0);
     let demandedByMoa = body.demanded_by_moa == null ? undefined : (body.demanded_by_moa ? 1 : 0);
     let optinPaidOption = body.optin_paid_option == null ? undefined : (body.optin_paid_option ? 1 : 0);
-    if (optedOutByMoa === 1 && demandedByMoa === undefined && section.demanded_by_moa) {
-      demandedByMoa = 0;
+    if (optedOutByMoa === 1) {
+      if (demandedByMoa === undefined && section.demanded_by_moa) demandedByMoa = 0;
+      if (optinPaidOption === undefined && section.optin_paid_option) optinPaidOption = 0;
     }
-    if (demandedByMoa === 1 && optedOutByMoa === undefined && section.opted_out_by_moa) {
-      optedOutByMoa = 0;
+    if (demandedByMoa === 1) {
+      if (optedOutByMoa === undefined && section.opted_out_by_moa) optedOutByMoa = 0;
+      if (optinPaidOption === undefined && section.optin_paid_option) optinPaidOption = 0;
     }
-    if (optedOutByMoa === 1 && optinPaidOption === undefined && section.optin_paid_option) {
-      optinPaidOption = 0;
-    }
-    if (optinPaidOption === 1 && optedOutByMoa === undefined && section.opted_out_by_moa) {
-      optedOutByMoa = 0;
+    if (optinPaidOption === 1) {
+      if (optedOutByMoa === undefined && section.opted_out_by_moa) optedOutByMoa = 0;
+      if (demandedByMoa === undefined && section.demanded_by_moa) demandedByMoa = 0;
     }
 
     const userId = request.authUser?.id;
@@ -273,14 +271,20 @@ async function routes(fastify) {
     if (demandedByMoa !== undefined) cascadeFields.demandedByMoa = demandedByMoa;
     if (optinPaidOption !== undefined) cascadeFields.optinPaidOption = optinPaidOption;
     if (includedInExport !== undefined) cascadeFields.includedInExport = includedInExport;
-    // Exclusivite cascadee : opt-out=1 -> force demanded=0 ET optin=0 sur
-    // les descendants. Inversement, demanded=1 ou optin=1 -> opt-out=0.
+    // Exclusivite cascadee stricte (au plus UN flag MOA actif).
+    // Activer l'un eteint les 2 autres sur tous les descendants.
     if (cascadeFields.optedOutByMoa === 1) {
       cascadeFields.demandedByMoa = 0;
       cascadeFields.optinPaidOption = 0;
     }
-    if (cascadeFields.demandedByMoa === 1) cascadeFields.optedOutByMoa = 0;
-    if (cascadeFields.optinPaidOption === 1) cascadeFields.optedOutByMoa = 0;
+    if (cascadeFields.demandedByMoa === 1) {
+      cascadeFields.optedOutByMoa = 0;
+      cascadeFields.optinPaidOption = 0;
+    }
+    if (cascadeFields.optinPaidOption === 1) {
+      cascadeFields.optedOutByMoa = 0;
+      cascadeFields.demandedByMoa = 0;
+    }
     if (Object.keys(cascadeFields).length > 0) {
       const descendants = db.db.prepare(`
         WITH RECURSIVE descendants(id) AS (

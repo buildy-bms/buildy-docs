@@ -312,24 +312,30 @@ async function handlePromoteToLibrary(node) {
 async function handleToggleDemanded(node) {
   const newVal = node.demanded_by_moa === 1 ? 0 : 1
   try {
-    // L'exclusivite refusee/demandee est garantie cote backend, mais on
-    // anticipe l'effet local pour eviter un flash visuel.
+    // Exclusivite stricte des 3 flags MOA. Anticipe le reset des autres
+    // pour eviter un flash visuel (backend force aussi l'exclusivite).
     const patch = { demanded_by_moa: !!newVal }
-    if (newVal && node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+    if (newVal) {
+      if (node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+      if (node.optin_paid_option === 1) patch.optin_paid_option = false
+    }
     await afStore.patchSection(node.id, patch)
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec mise à jour')
   }
 }
 
-// Lot 92 — Ajouter une fonctionnalite comme option payante au contrat
+// Lot 91 — Ajouter une fonctionnalite comme option payante au contrat
 // MOA, sans changer de niveau d'offre. Toggle du flag optin_paid_option.
-// Exclusivite : optin XOR opted_out (gere cote backend + ici en optimiste).
+// Exclusivite stricte avec opted_out ET demanded.
 async function handleToggleOptinPaidOption(node) {
   const newVal = node.optin_paid_option === 1 ? 0 : 1
   try {
     const patch = { optin_paid_option: !!newVal }
-    if (newVal && node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+    if (newVal) {
+      if (node.opted_out_by_moa === 1) patch.opted_out_by_moa = false
+      if (node.demanded_by_moa === 1) patch.demanded_by_moa = false
+    }
     await afStore.patchSection(node.id, patch)
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec mise à jour')
