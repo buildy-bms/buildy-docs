@@ -795,7 +795,18 @@ table.points-mini .badge-type {
   margin-bottom: 2mm;
 }
 .capture { page-break-inside: avoid; margin-bottom: 4mm; }
-.capture img { max-width: 100%; max-height: 90mm; border: 1px solid #e8ebf0; border-radius: 2mm; }
+/* Lot — captures jamais agrandies au-dela de leur taille naturelle.
+   Les attributs width/height intrinseques (en px) viennent de la DB ;
+   width:auto + max-* permet de scale DOWN si l'image deborde, jamais UP. */
+.capture img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 90mm;
+  border: 1px solid #e8ebf0;
+  border-radius: 2mm;
+}
 .capture-caption {
   font-size: 8.5pt;
   color: #6b7280;

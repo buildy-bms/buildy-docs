@@ -10,7 +10,7 @@
   size: A4 landscape;
   margin: 14mm 14mm 12mm 14mm;
 }
-@page :first { margin: 0; }
+@page :first { margin: 0; background: #1b2842; }
 
 html, body {
   margin: 0;
