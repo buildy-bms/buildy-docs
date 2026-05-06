@@ -453,12 +453,19 @@ async function routes(fastify) {
     if (!assertWrite(request, reply, id)) return;
 
     const validTargets = ['redaction', 'validee', 'commissioning', 'commissioned', 'livree'];
-    const { to, motif, notes } = request.body || {};
+    const { to, motif, notes, agreement_accepted } = request.body || {};
     if (!validTargets.includes(to)) {
       return reply.code(400).send({ detail: 'Statut cible invalide' });
     }
     if (to === af.status) {
       return reply.code(400).send({ detail: 'L\'AF est déjà dans cet état' });
+    }
+    // Validation : la transition vers 'validee' exige l'acceptation explicite
+    // de l'engagement de commande du contrat de services (chapitre 13.x).
+    if (to === 'validee' && agreement_accepted !== true) {
+      return reply.code(400).send({
+        detail: "Acceptation de l'engagement de commande du contrat de services requise pour valider cette AF.",
+      });
     }
 
     // Snapshot + tag pour validee / livree
@@ -509,7 +516,10 @@ async function routes(fastify) {
     db.auditLog.add({
       afId: id, userId,
       action: to === 'livree' ? 'af.delivered' : `af.status.${to}`,
-      payload: { from: af.status, to, motif, milestone_id: milestone?.id },
+      payload: {
+        from: af.status, to, motif, milestone_id: milestone?.id,
+        ...(to === 'validee' ? { agreement_accepted: true } : {}),
+      },
     });
     log.info(`AF #${id} : transition ${af.status} → ${to} par user #${userId}`);
 

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 93;
+const TARGET_VERSION = 94;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3450,6 +3450,81 @@ function runMigrations() {
     `).run();
     log.info(`Migration 93 appliquée : ${result.changes} titre(s) de sections AF resynchronises avec leur template biblio.`);
     db.pragma('user_version = 93');
+  }
+
+  if (current < 94) {
+    // Lot — Engagement de commande du contrat de services (section type 13.x).
+    // Ajoute un sous-chapitre sous le chapitre 13 « Engagement contractuel »
+    // qui formalise l'engagement du MOA a passer commande du contrat de
+    // services (Smart/Premium) au plus tard la veille de la livraison, et
+    // les consequences a defaut (report de livraison ou non-activation des
+    // fonctionnalites payantes).
+    const parent = db.prepare(`SELECT id FROM section_templates WHERE slug = '13'`).get();
+    if (!parent) {
+      log.warn('Migration 94 : chapitre 13 introuvable (slug=13) — skip');
+    } else {
+      const slug = 'engagement-commande-contrat-services';
+      const existing = db.prepare('SELECT id FROM section_templates WHERE slug = ?').get(slug);
+      const bodyHtml = `<p>Le maître d'ouvrage <strong>s'engage à passer commande du contrat de services Buildy</strong> (Smart ou Premium, selon le niveau choisi dans la présente AF) <strong>au plus tard la veille de la date de livraison prévue du projet</strong>.</p>
+
+<p>Cet engagement couvre également la souscription des éventuelles options payantes ajoutées à la carte au contrat (cf. chapitre <em>Options payantes à inclure dans l'avenant</em>).</p>
+
+<h3>Pourquoi cet engagement ?</h3>
+<p>Le contrat de services est facturé au palier (nombre de points de données effectivement supervisés), connu uniquement en fin de chantier. Le devis correspondant est donc émis au dernier moment, et le commanditaire (exploitant, mainteneur, property manager ou client final) peut être identifié tardivement. Il revient au MOA d'orchestrer ce processus en amont de la livraison.</p>
+
+<h3>Conséquences à défaut de commande</h3>
+<p>Si la commande du contrat de services n'a pas été reçue par Buildy à la date prévue de livraison, Buildy se réserve le droit de&nbsp;:</p>
+<ul>
+  <li><strong>Repousser la date de livraison</strong> du projet jusqu'à réception et validation de la commande&nbsp;;</li>
+  <li><strong>Ou livrer le projet sans activer les fonctionnalités</strong> nécessitant un contrat Smart, Premium ou une option payante souscrite. Ces fonctionnalités resteront documentées dans l'AF mais désactivées techniquement jusqu'à la commande effective.</li>
+  </ul>
+
+<p>La validation de la présente AF par le MOA acte la prise de connaissance et l'acceptation de cet engagement.</p>`;
+      let newId;
+      if (existing) {
+        newId = existing.id;
+        log.info(`Migration 94 : section_template '${slug}' existe deja (id=${newId}) — skip insert`);
+      } else {
+        const result = db.prepare(`
+          INSERT INTO section_templates
+            (slug, number, title, kind, body_html, parent_template_id, is_functionality, position)
+          VALUES (?, NULL, ?, 'standard', ?, ?, 0, 100)
+        `).run(slug, 'Engagement de commande du contrat de services', bodyHtml, parent.id);
+        newId = result.lastInsertRowid;
+        db.prepare(`
+          INSERT OR IGNORE INTO section_template_documents (section_template_id, document_kind)
+          VALUES (?, 'af')
+        `).run(newId);
+      }
+      // Propagation aux AFs vivantes (idempotente). On ne peut pas appeler
+      // db.sectionTemplates ici (sectionTemplates n'est pas encore expose au
+      // boot des migrations) — on reproduit la logique inline.
+      const tpl = db.prepare('SELECT * FROM section_templates WHERE id = ?').get(newId);
+      const afsAlive = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+      let inserted = 0;
+      for (const af of afsAlive) {
+        const exists = db.prepare(
+          'SELECT 1 FROM sections WHERE af_id = ? AND section_template_id = ?'
+        ).get(af.id, tpl.id);
+        if (exists) continue;
+        const parentSection = db.prepare(
+          'SELECT id FROM sections WHERE af_id = ? AND section_template_id = ? LIMIT 1'
+        ).get(af.id, tpl.parent_template_id);
+        if (!parentSection) continue;
+        const maxPos = db.prepare(
+          'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id = ?'
+        ).get(af.id, parentSection.id);
+        const position = (maxPos?.m || 0) + 10;
+        const ins = db.prepare(`
+          INSERT INTO sections
+            (af_id, parent_id, position, number, title, kind, body_html, section_template_id, section_template_version)
+          VALUES (?, ?, ?, NULL, ?, 'standard', ?, ?, ?)
+        `).run(af.id, parentSection.id, position, tpl.title, tpl.body_html, tpl.id, tpl.current_version || 1);
+        if (ins.changes > 0) inserted++;
+      }
+      log.info(`Migration 94 appliquee : section type 13.x « Engagement de commande du contrat de services » (id=${newId}, propagee dans ${inserted} AF(s)).`);
+    }
+    db.pragma('user_version = 94');
   }
 
   if (current > TARGET_VERSION) {
