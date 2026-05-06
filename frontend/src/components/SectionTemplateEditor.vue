@@ -135,22 +135,27 @@ const submitting = ref(false)
 const deleting = ref(false)
 const validating = ref(false)
 
-// Statut de validation derive du template courant (mis a jour apres save).
-// On ne lit pas la form pour le statut : le statut suit l'etat persiste.
-const currentStatus = computed(() => getValidationStatus(props.template || {}, 'body_html'))
-// Le bouton Valider/Repasser ne s'active que sur un contenu sauvegarde et
-// non vide. Si la form est dirty (HTML modifie depuis le dernier save), on
-// force a enregistrer d'abord — autrement la validation porterait sur un
-// contenu deja obsolete (auto-clear cote backend des l'enregistrement).
+// Etat local du template : reflete le dernier save inline. Permet au
+// bandeau de validation, au statut, et a la matrice "dirty" de rester
+// a jour sans fermer la modale.
+const liveTemplate = ref(props.template || {})
+watch(() => props.template, (t) => { liveTemplate.value = t || {} })
+
+const currentStatus = computed(() => getValidationStatus(liveTemplate.value || {}, 'body_html'))
+// Pour le bouton Valider : le contenu doit etre sauvegarde ET non vide.
+// Si dirty, le bouton fait save+validate en cascade (cf. toggleValidation).
 const isDirty = computed(() => {
   if (!isEdit.value) return false
-  const cur = props.template?.body_html || ''
+  const cur = liveTemplate.value?.body_html || ''
   return (form.value.body_html || '') !== cur
 })
+// Le contenu peut etre valide soit s'il est deja sauvegarde non-vide,
+// soit s'il y a du contenu dans la form (dans ce cas on save d'abord).
 const canValidate = computed(() => {
   if (!isEdit.value) return false
-  const html = (props.template?.body_html || '').trim()
-  return !!html && !isDirty.value
+  const persistedHtml = (liveTemplate.value?.body_html || '').trim()
+  const formHtml = (form.value.body_html || '').trim()
+  return !!(persistedHtml || formHtml)
 })
 const showEquipmentPicker = ref(false)
 
@@ -302,11 +307,15 @@ const modalTitle = computed(() => {
   return `Éditer « ${props.template.title} »`
 })
 
-async function submit() {
-  if (!form.value.title.trim()) return
+// save({ close }) : enregistre le template. Si close=true (defaut), emit
+// 'saved' qui ferme la modale (comportement "Enregistrer et fermer"). Si
+// close=false, emit 'saved-inline' : le parent rafraichit sa liste mais
+// la modale reste ouverte (bouton "Enregistrer" simple).
+async function save({ close = true } = {}) {
+  if (!form.value.title.trim()) return null
   if (!form.value.document_kinds?.length) {
     notifyError('Sélectionne au moins un type de document.')
-    return
+    return null
   }
   submitting.value = true
   try {
@@ -333,37 +342,55 @@ async function submit() {
       const { data } = await updateSectionTemplate(props.template.id, payload, {
         cascadeDocumentKinds: cascadeDocumentKinds.value,
       })
+      liveTemplate.value = data
       const cascaded = data?.document_kinds_cascaded || 0
       const cascadeMsg = cascaded > 0 ? ` (tags propagés à ${cascaded} sous-section${cascaded > 1 ? 's' : ''})` : ''
       success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} enregistrée${cascadeMsg}`)
-      emit('saved', data)
+      emit(close ? 'saved' : 'saved-inline', data)
+      return data
     } else {
       const { data } = await createSectionTemplate({
         ...payload,
         is_functionality: props.mode === 'functionality',
       })
+      liveTemplate.value = data
       success(`${labelEntity.value[0].toUpperCase()}${labelEntity.value.slice(1)} créée`)
       emit('saved', data)
+      return data
     }
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de l\'enregistrement')
+    return null
   } finally {
     submitting.value = false
   }
 }
 
+// Aliases : "Enregistrer" sans fermer / avec fermer (double bouton du footer).
+const submit = () => save({ close: true })
+const submitKeepOpen = () => save({ close: false })
+
+// Validation/devalidation. Si la form a des changements non sauvegardes,
+// on enregistre d'abord (sinon le backend re-clear la validation immediate).
 async function toggleValidation() {
   if (!isEdit.value || !canValidate.value) return
   validating.value = true
   try {
+    if (isDirty.value) {
+      const saved = await save({ close: false })
+      if (!saved) { validating.value = false; return }
+    }
+    const tplId = liveTemplate.value?.id || props.template.id
     if (currentStatus.value === 'validated') {
-      const { data } = await unvalidateSectionTemplateContent(props.template.id)
+      const { data } = await unvalidateSectionTemplateContent(tplId)
+      liveTemplate.value = data
       success('Contenu repassé en brouillon')
-      emit('saved', data)
+      emit('saved-inline', data)
     } else {
-      const { data } = await validateSectionTemplateContent(props.template.id)
+      const { data } = await validateSectionTemplateContent(tplId)
+      liveTemplate.value = data
       success('Contenu validé')
-      emit('saved', data)
+      emit('saved-inline', data)
     }
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec')
@@ -420,16 +447,16 @@ async function destroy() {
                   currentStatus === 'draft' ? 'bg-amber-50 border-amber-200' :
                   'bg-gray-50 border-gray-200']">
       <ContentValidationDot :status="currentStatus"
-                            :validated-at="props.template.content_validated_at"
-                            :validated-by="props.template.content_validated_by_name" />
+                            :validated-at="liveTemplate.content_validated_at"
+                            :validated-by="liveTemplate.content_validated_by_name" />
       <div class="flex-1 text-xs">
         <template v-if="currentStatus === 'validated'">
           <span class="font-medium text-emerald-800">Contenu validé</span>
-          <span v-if="props.template.content_validated_by_name" class="text-emerald-700">
-            · par {{ props.template.content_validated_by_name }}
+          <span v-if="liveTemplate.content_validated_by_name" class="text-emerald-700">
+            · par {{ liveTemplate.content_validated_by_name }}
           </span>
-          <span v-if="props.template.content_validated_at" class="text-emerald-600">
-            · le {{ new Date(props.template.content_validated_at).toLocaleDateString('fr-FR') }}
+          <span v-if="liveTemplate.content_validated_at" class="text-emerald-600">
+            · le {{ new Date(liveTemplate.content_validated_at).toLocaleDateString('fr-FR') }}
           </span>
         </template>
         <span v-else-if="currentStatus === 'draft'" class="font-medium text-amber-800">
@@ -608,28 +635,34 @@ async function destroy() {
               class="mr-auto px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50">
         <TrashIcon class="w-4 h-4" /> {{ deleting ? 'Suppression…' : 'Supprimer' }}
       </button>
-      <!-- Toggle validation du contenu (mig 89). Desactive tant que
-           la form n'est pas enregistree (sinon le bouton porterait sur
-           un contenu obsolete : auto-clear backend des le save suivant). -->
+      <!-- Toggle validation du contenu (mig 89). Si la form est dirty,
+           le clic enregistre d'abord puis valide (cf. toggleValidation). -->
       <button v-if="isEdit && currentStatus === 'validated'"
-              @click="toggleValidation" :disabled="!canValidate || validating"
-              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : ''"
-              class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+              class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
         Repasser en brouillon
       </button>
       <button v-else-if="isEdit"
-              @click="toggleValidation" :disabled="!canValidate || validating"
-              :title="isDirty ? 'Enregistrez d\'abord vos modifications' : (canValidate ? '' : 'Aucun contenu à valider')"
-              class="px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
+              @click="toggleValidation" :disabled="!canValidate || validating || submitting"
+              :title="canValidate ? '' : 'Aucun contenu à valider'"
+              class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
         <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider le contenu' }}
       </button>
       <button @click="emit('close')"
-              class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
+              class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
         Annuler
       </button>
+      <!-- Double bouton Enregistrer : sans fermer (defaut quand on continue
+           a editer) / avec fermer (validation finale). En creation, un seul. -->
+      <button v-if="isEdit"
+              @click="submitKeepOpen" :disabled="submitting || !form.title.trim()"
+              title="Enregistrer sans fermer"
+              class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
+        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+      </button>
       <button @click="submit" :disabled="submitting || !form.title.trim()"
-              class="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
-        {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer' : 'Créer') }}
+              class="px-4 py-1.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm">
+        {{ submitting ? 'Enregistrement…' : (isEdit ? 'Enregistrer et fermer' : 'Créer') }}
       </button>
     </template>
   </BaseModal>

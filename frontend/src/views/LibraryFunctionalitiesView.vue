@@ -164,6 +164,16 @@ async function onSaved() {
   showCreate.value = false
   await refresh()
 }
+// Save sans fermer : la modale reste ouverte, on rafraichit la liste
+// derriere et on synchronise le template ouvert avec la fraiche version
+// (pour le compteur AFs, badge de validation, etc.).
+async function onSavedInline(savedTpl) {
+  await refresh()
+  if (savedTpl?.id) {
+    const fresh = items.value.find(t => t.id === savedTpl.id)
+    if (fresh) editing.value = fresh
+  }
+}
 async function onDeleted() {
   editing.value = null
   await refresh()
@@ -603,6 +613,7 @@ onBeforeUnmount(teardownSortables)
       mode="functionality"
       @close="editing = null"
       @saved="onSaved"
+      @saved-inline="onSavedInline"
       @deleted="onDeleted"
     />
 
