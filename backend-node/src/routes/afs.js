@@ -631,9 +631,24 @@ async function routes(fastify) {
     );
 
     const allSections = db.sections.listByAf(id);
-    // Exclure du calcul : sections desactivees a l'export, ecartees par la MOA, ou marquees excluded en query
+    // Lot 91 — Une section dispo en `paid_option` au niveau choisi par le MOA
+    // n'impose PAS d'upgrade : c'est une option payante qu'on ajoute en sus.
+    // On l'exclut du calcul "niveau requis" pour eviter un faux shortfall.
+    // Idem pour les sections deja optin_paid_option=1 (acceptees en option).
+    const targetSlug = (af.service_level || '').toUpperCase();
+    function availableAsPaidOptionAtTarget(s) {
+      if (!targetSlug) return false;
+      const a = targetSlug === 'E' ? s.tpl_avail_e
+              : targetSlug === 'S' ? s.tpl_avail_s
+              : targetSlug === 'P' ? s.tpl_avail_p : null;
+      return a === 'paid_option';
+    }
     const includedSections = allSections.filter(s =>
-      s.included_in_export && !s.opted_out_by_moa && !excluded.has(s.id)
+      s.included_in_export &&
+      !s.opted_out_by_moa &&
+      !excluded.has(s.id) &&
+      !s.optin_paid_option &&            // deja prise en option payante
+      !availableAsPaidOptionAtTarget(s)  // activable en option au niveau choisi
     );
 
     const { resolveAfLevel } = require('../lib/service-level-resolver');
