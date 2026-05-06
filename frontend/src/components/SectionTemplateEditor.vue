@@ -415,7 +415,7 @@ async function destroy() {
     <!-- Bandeau statut de validation du contenu (mig 89). Affiche
          pastille + libelle + auteur/date si valide. Cache en creation. -->
     <div v-if="isEdit"
-         :class="['flex items-center gap-3 px-3 py-2 mb-3 rounded-lg border text-sm',
+         :class="['flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md border text-sm',
                   currentStatus === 'validated' ? 'bg-emerald-50 border-emerald-200' :
                   currentStatus === 'draft' ? 'bg-amber-50 border-amber-200' :
                   'bg-gray-50 border-gray-200']">
@@ -440,36 +440,34 @@ async function destroy() {
         </span>
       </div>
     </div>
-    <form @submit.prevent="submit" class="space-y-3">
+    <form @submit.prevent="submit" class="space-y-2">
+      <!-- Ligne 1 : Titre seul (champ principal, full width) -->
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1">Titre *</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Titre *</label>
         <input v-model="form.title" type="text" required autocomplete="off" data-1p-ignore="true"
                :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
-               class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+               class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
       </div>
 
-      <!-- Icone FontAwesome (uniquement pour les fonctionnalites — pas pour
-           les sections types narratives). Visible dans la liste de la
-           bibliotheque et dans la brochure PDF. -->
-      <div v-if="mode === 'functionality'">
-        <label class="block text-xs font-medium text-gray-600 mb-1">
-          Icône
-          <span class="text-gray-400 font-normal">— affichée dans la liste, la brochure et le tableau des offres</span>
-        </label>
-        <FaIconPicker v-model="form.icon_name" />
-      </div>
-
-      <!-- Pour les fonctionnalites, kind est toujours 'standard' (texte) : on cache le picker -->
-      <div :class="['grid gap-3', mode === 'functionality' ? 'grid-cols-1' : 'grid-cols-2']">
-        <div v-if="mode !== 'functionality'">
-          <label class="block text-xs font-medium text-gray-600 mb-1">Type de section</label>
+      <!-- Ligne 2 : Icone + Section parente cote a cote (2 colonnes). En
+           mode 'standard', remplace l'icone par le selecteur Type. -->
+      <div class="grid grid-cols-2 gap-2">
+        <div v-if="mode === 'functionality'">
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5"
+                 title="Affichée dans la liste, la brochure et le tableau des offres">
+            Icône
+          </label>
+          <FaIconPicker v-model="form.icon_name" />
+        </div>
+        <div v-else>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de section</label>
           <select v-model="form.kind"
-                  class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
+                  class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
             <option v-for="o in KIND_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Section parente</label>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Section parente</label>
           <SearchableSelect
             v-model="form.parent_template_id"
             :options="parentSelectOptions"
@@ -481,9 +479,9 @@ async function destroy() {
 
       <!-- Picker du modele d'equipement : uniquement pour kind=equipment -->
       <div v-if="form.kind === 'equipment'">
-        <label class="block text-xs font-medium text-gray-600 mb-1">Modèle d'équipement</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Modèle d'équipement</label>
         <button type="button" @click="showEquipmentPicker = true"
-                class="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
+                class="w-full text-left px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition">
           <span v-if="form.equipment_template_id" class="text-gray-800">
             {{ selectedEquipmentName || `Équipement #${form.equipment_template_id}` }}
             <span class="text-gray-400 text-xs">— cliquer pour changer</span>
@@ -494,24 +492,31 @@ async function destroy() {
 
       <!-- BACS (multi-select) : uniquement pour les fonctionnalites -->
       <div v-if="showBacs">
-        <label class="block text-xs font-medium text-gray-600 mb-1.5">Articles BACS applicables</label>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Articles BACS applicables</label>
         <BacsArticlesPicker v-model="form.bacs_articles" />
       </div>
 
       <!-- Multi-tagging par type de document Buildy (Lot — migration 78).
            Permet de definir dans quels documents la section apparait : AF
            livree au client, brochure technico-commerciale, audit BACS, etc.
-           Heritage parent -> enfants en cascade a la sauvegarde. -->
+           Heritage parent -> enfants en cascade a la sauvegarde.
+           Layout compact : label + cascade-toggle + pills sur 2 lignes max. -->
       <div>
-        <label class="block text-xs font-medium text-gray-600 mb-1.5">
-          Documents où cette {{ labelEntity }} apparaît
-          <span class="text-gray-400 font-normal">— sélectionner un ou plusieurs types</span>
-        </label>
+        <div class="flex items-center justify-between gap-3 mb-1">
+          <label class="text-[11px] font-medium text-gray-600">
+            Documents où cette {{ labelEntity }} apparaît
+          </label>
+          <label v-if="isEdit" class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none whitespace-nowrap">
+            <input v-model="cascadeDocumentKinds" type="checkbox"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0 w-3.5 h-3.5" />
+            <span>Propager aux sous-sections</span>
+          </label>
+        </div>
         <div class="flex flex-wrap gap-1.5">
           <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
                   @click="toggleDocumentKind(dk.kind)"
                   :title="dk.description"
-                  :class="['inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition whitespace-nowrap',
+                  :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition whitespace-nowrap',
                            isDocumentKindActive(dk.kind)
                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
@@ -519,11 +524,6 @@ async function destroy() {
             <span class="font-medium">{{ dk.label }}</span>
           </button>
         </div>
-        <label v-if="isEdit" class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
-          <input v-model="cascadeDocumentKinds" type="checkbox"
-                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30 shrink-0" />
-          <span>Propager ces tags aux sous-sections (recommandé)</span>
-        </label>
         <p v-if="!form.document_kinds?.length" class="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
           ⚠ Sans aucun tag, cette section n'apparaîtra dans aucun document.
         </p>
@@ -533,8 +533,8 @@ async function destroy() {
            Layout compact : 1 ligne, 3 colonnes E/S/P, segmented icon-only.
            Hover sur une icone = label complet. -->
       <div v-if="showAvailability">
-        <label class="block text-xs font-medium text-gray-600 mb-1.5">
-          Disponibilité par niveau de contrat
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+          Disponibilité par niveau
           <span class="text-gray-400 font-normal">— ❌ non dispo · ✓ inclus · € option payante</span>
         </label>
         <div class="grid grid-cols-3 gap-2">
@@ -562,13 +562,13 @@ async function destroy() {
 
       <!-- Contenu canonique : kind=standard uniquement (zones/synth/hyperveez/equipment l'ignorent) -->
       <div v-if="form.kind === 'standard'">
-        <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-medium text-gray-600">
+        <div class="flex items-center justify-between mb-0.5">
+          <label class="block text-[11px] font-medium text-gray-600">
             Contenu canonique
             <span class="text-gray-400 font-normal">— HTML, paragraphes courts</span>
           </label>
           <button v-if="isEdit" type="button" @click="openHistory"
-                  class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1 rounded transition whitespace-nowrap"
+                  class="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition whitespace-nowrap"
                   title="Voir l'historique des modifications du texte et restaurer une version antérieure">
             <ClockIcon class="w-3.5 h-3.5" /> Historique
           </button>
