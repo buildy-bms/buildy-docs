@@ -413,21 +413,30 @@ async function assistLibrary({
     .join('')
     .trim();
 
-  // Extraction d'une suggestion de titre (optionnelle). Claude est invite a
-  // commencer par `<!--TITLE: ...-->` quand il pense que le titre courant
-  // peut etre ameliore. On separe ce commentaire du HTML retourne.
+  // Extraction d'une suggestion de titre. Le marker `<!--TITLE: ...-->`
+  // est en principe en tete (mode=title) ou avant le HTML (autres modes),
+  // mais on cherche sur l'ensemble de la reponse pour etre robuste a une
+  // variante de Claude (saut de ligne, espace, position).
   // (variable `html` deja prise par le parametre destructure -> `outHtml`)
   let suggested_title = null;
   let outHtml = text;
-  const titleMatch = outHtml.match(/^\s*<!--\s*TITLE:\s*(.+?)\s*-->\s*/i);
+  const titleMatch = outHtml.match(/<!--\s*TITLE:\s*(.+?)\s*-->/i);
   if (titleMatch) {
     const proposed = (titleMatch[1] || '').trim();
-    // On ignore une suggestion identique au titre courant (Claude verifie
-    // deja, mais defense en profondeur).
     if (proposed && proposed.toLowerCase() !== (title || '').toLowerCase()) {
       suggested_title = proposed;
     }
-    outHtml = outHtml.slice(titleMatch[0].length);
+    // Strip le marker du HTML retourne (peu importe ou il etait).
+    outHtml = outHtml.replace(titleMatch[0], '').trim();
+  }
+  // En mode 'title', si on n'a rien trouve mais que la reponse est courte
+  // (< 120 chars), on suppose que c'est le titre brut sans marker.
+  if (mode === 'title' && !suggested_title) {
+    const stripped = text.replace(/<[^>]*>/g, '').trim();
+    if (stripped && stripped.length < 120 && stripped.toLowerCase() !== (title || '').toLowerCase()) {
+      suggested_title = stripped;
+    }
+    outHtml = '';
   }
   return {
     html: outHtml,
