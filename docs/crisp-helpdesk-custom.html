@@ -1,0 +1,804 @@
+<!--
+  Crisp Helpdesk — Custom HTML Buildy
+  À coller dans : Crisp → Helpdesk → Settings → Custom Code → Custom HTML
+  Palette : navy #1b2842 · accent #00CD92 · light #f4f5f7
+  Typo   : Poppins (titres) + Inter (corps) — cohérent PDF design system Buildy
+-->
+
+<!-- ============================================================================
+     Hide empty paragraphs (CSS ne peut matcher ni &nbsp; ni textContent)
+     Crisp insère <p><br></p> ET <p><span>&nbsp;</span></p> entre chaque bloc
+     selon l'origine du contenu (export Word vs Tiptap natif).
+     ============================================================================ -->
+<script>
+(function() {
+  function cleanEmptyParagraphs() {
+    var paragraphs = document.querySelectorAll('.csh-article article p, .csh-article-content-text p');
+    paragraphs.forEach(function(p) {
+      // Strip toutes formes d'espaces (regular, non-breaking U+00A0, narrow nbsp U+202F, zero-width)
+      var text = (p.textContent || '').replace(/[\s  ​]/g, '');
+      if (!text) p.style.display = 'none';
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cleanEmptyParagraphs);
+  } else {
+    cleanEmptyParagraphs();
+  }
+  // Au cas où Crisp re-render dynamiquement (SPA-style), on observe le DOM
+  if (typeof MutationObserver !== 'undefined') {
+    var debounce;
+    new MutationObserver(function() {
+      clearTimeout(debounce);
+      debounce = setTimeout(cleanEmptyParagraphs, 150);
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+<style>
+/* ── Polices : Poppins pour les titres, Inter pour le corps ── */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Corps en Inter, titres en Poppins */
+*, *::before, *::after {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.csh-header-title,
+.csh-home-title,
+.csh-article .csh-article-content article .csh-markdown-title,
+.csh-article .csh-article-content article .csh-markdown-title-h1,
+.csh-article .csh-article-content article .csh-markdown-title-h2,
+.csh-article .csh-article-content article .csh-markdown-title-h3,
+.csh-article .csh-article-content article .csh-markdown-title-h4,
+.csh-footer-ask-text-title {
+  font-family: 'Poppins', sans-serif !important;
+  letter-spacing: -0.02em !important;
+}
+
+*::selection { background: rgba(0, 205, 146, 0.18) !important; }
+
+/* Hiérarchie de poids allégée (comme sur la page de statut) */
+.csh-font-sans-bold { font-weight: 600 !important; }
+.csh-font-sans-semibold { font-weight: 500 !important; }
+.csh-font-sans-medium { font-weight: 400 !important; }
+.csh-font-sans-regular { font-weight: 400 !important; }
+
+/* ── Fix alignement universel des boutons (textes + icônes parfaitement centrés) ── */
+.csh-button,
+a.csh-button,
+button.csh-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+}
+.csh-button > * {
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* ── Reset spacing pour coller le bandeau vert au header ── */
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+header[role="banner"] {
+  margin-bottom: 0 !important;
+}
+
+/* ── Background page ── */
+#body {
+  background: #f4f5f7 !important;
+  padding: 0 0 32px 0 !important;
+  margin: 0 !important;
+  position: relative !important;
+}
+/* Spacing entre bandeau et contenu (resserré) */
+#body > .csh-wrapper {
+  padding-top: 20px !important;
+}
+
+/* ============================================================================
+   HERO STRIP VERT (équivalent "All systems operational" de la page de statut)
+   Bandeau plein-largeur collé immédiatement sous le header navy
+   ============================================================================ */
+#body::before {
+  content: '\2713  Documentation et support actifs \00B7 Mise à jour quotidienne' !important;
+  display: block !important;
+  background: linear-gradient(135deg, #00CD92 0%, #00b87f 100%) !important;
+  color: #fff !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.86rem !important;
+  letter-spacing: 0.01em !important;
+  text-align: center !important;
+  padding: 14px 24px !important;
+  margin: 0 !important;
+  box-shadow: 0 4px 14px rgba(0, 205, 146, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.08) !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* ============================================================================
+   FUSION BREADCRUMB CATÉGORIE/ARTICLE avec le fond gris de page
+   (élimine la bande blanche "Retour | Articles sur :" entre header et bandeau)
+   ============================================================================ */
+.csh-category-aside,
+.csh-article-aside {
+  background: #f4f5f7 !important;
+}
+/* Pilule "Retour" plus discrète et intégrée */
+.csh-category-aside-back .csh-button,
+.csh-article-aside-back .csh-button {
+  background: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 100px !important;
+  color: #1b2842 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.15s ease !important;
+}
+.csh-category-aside-back .csh-button:hover,
+.csh-article-aside-back .csh-button:hover {
+  background: #f9fafb !important;
+  border-color: #d1d5db !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ============================================================================
+   HEADER (bandeau navy + logo + bouton + titre + recherche)
+   ============================================================================ */
+
+/* Header au-dessus du bandeau vert (sinon le dropdown de recherche est masqué) */
+header[role="banner"] {
+  position: relative !important;
+  z-index: 20 !important;
+}
+.csh-header-background.csh-theme-background-color-default {
+  background: linear-gradient(160deg, #101828 0%, #1b2842 50%, #233354 100%) !important;
+}
+/* Dropdown des résultats de recherche — assurer qu'il passe au-dessus de tout */
+.csh-header-search-results {
+  z-index: 30 !important;
+}
+
+/* Logo */
+.csh-header-main-logo img {
+  height: 42px !important;
+  max-height: 42px !important;
+  width: auto !important;
+}
+
+/* Bouton "Aller au site" — pilule verte (alignement 100% flex, pas de line-height) */
+a.csh-header-main-actions-website {
+  background: #00CD92 !important;
+  border: none !important;
+  border-radius: 100px !important;
+  padding: 0 22px !important;
+  height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-decoration: none !important;
+  box-shadow: 0 2px 10px rgba(0, 205, 146, 0.3) !important;
+  transition: all 0.2s ease !important;
+  line-height: 1 !important;
+}
+a.csh-header-main-actions-website:hover {
+  background: #00e0a0 !important;
+  box-shadow: 0 4px 16px rgba(0, 205, 146, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+span.csh-header-main-actions-website-itself {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  height: auto !important;
+}
+
+/* Titre principal "Comment pouvons-nous vous aider ?" */
+.csh-header-title {
+  color: #fff !important;
+  font-weight: 600 !important;
+  margin-top: 24px !important;
+  margin-bottom: 8px !important;
+  font-size: 2rem !important;
+}
+
+/* Champ de recherche — pilule blanche avec ombre, halo vert au focus */
+.csh-header-search {
+  margin-top: 24px !important;
+  margin-bottom: 36px !important;
+}
+.csh-header-search-field {
+  border-radius: 100px !important;
+  background: #fff !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.04) !important;
+  border: none !important;
+  overflow: hidden !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease !important;
+}
+.csh-header-search[data-has-focus="true"] .csh-header-search-field {
+  box-shadow: 0 12px 32px rgba(0, 205, 146, 0.22), 0 0 0 3px rgba(0, 205, 146, 0.18) !important;
+}
+.csh-header-search-field input {
+  height: 56px !important;
+  padding: 0 24px !important;
+  font-size: 0.95rem !important;
+  border-radius: 100px !important;
+  color: #1b2842 !important;
+  font-weight: 400 !important;
+}
+.csh-header-search-field input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+/* ============================================================================
+   ZONE PRINCIPALE
+   ============================================================================ */
+
+/* Titres de section ("Articles en vedette…", "Toutes les catégories") */
+.csh-home-title {
+  color: #1b2842 !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  margin-bottom: 14px !important;
+  position: relative !important;
+  padding-left: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+.csh-home-title::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 4px !important;
+  height: 16px !important;
+  background: #00CD92 !important;
+  border-radius: 4px !important;
+}
+
+/* Séparateur entre les deux sections — fin et discret */
+.csh-home-separator {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, #e5e7eb 30%, #e5e7eb 70%, transparent) !important;
+  margin: 36px 0 !important;
+}
+
+/* ============================================================================
+   ARTICLES EN VEDETTE — cartes blanches, soft shadow, hover lift
+   (style aligné avec les service-group cards de la page de statut)
+   ============================================================================ */
+
+.csh-home-list {
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+}
+
+.csh-home-list li .csh-box.csh-box-link {
+  background: #fff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-height: 68px !important;
+}
+
+/* Pastille checkmark verte avec halo — exact pattern page de statut */
+.csh-home-list li .csh-box.csh-box-link::before {
+  content: '\2713' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  background: #00CD92 !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-shadow: 0 0 0 3px rgba(0, 205, 146, 0.15) !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Flèche → qui apparaît à droite au hover */
+.csh-home-list li .csh-box.csh-box-link::after {
+  content: '\2192' !important;
+  position: absolute !important;
+  right: 18px !important;
+  top: 50% !important;
+  transform: translateY(-50%) translateX(-4px) !important;
+  color: #00CD92 !important;
+  font-size: 1.1rem !important;
+  font-weight: 500 !important;
+  opacity: 0 !important;
+  transition: all 0.2s ease !important;
+}
+.csh-home-list li .csh-box.csh-box-link:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06) !important;
+  transform: translateY(-1px) !important;
+  padding-right: 38px !important;
+}
+.csh-home-list li .csh-box.csh-box-link:hover::before {
+  box-shadow: 0 0 0 4px rgba(0, 205, 146, 0.2) !important;
+  transform: scale(1.05) !important;
+}
+.csh-home-list li .csh-box.csh-box-link:hover::after {
+  opacity: 1 !important;
+  transform: translateY(-50%) translateX(0) !important;
+}
+
+.csh-home-list-label {
+  color: #1b2842 !important;
+  font-weight: 500 !important;
+  font-size: 0.92rem !important;
+  line-height: 1.45 !important;
+}
+
+/* ============================================================================
+   TOUTES LES CATÉGORIES — cartes avec image, badge intégral
+   ============================================================================ */
+
+.csh-home-list.csh-home-list-large {
+  display: grid !important;
+  gap: 14px !important;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+}
+
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link {
+  background: #fff !important;
+  border: none !important;
+  border-radius: 16px !important;
+  padding: 18px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.25s ease !important;
+  min-height: 88px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Pastille checkmark dans le coin haut-droit (signal "catégorie active") */
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link::after {
+  content: '\2713' !important;
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  background: rgba(0, 205, 146, 0.12) !important;
+  color: #00b87f !important;
+  border-radius: 50% !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Hover = remplissage vert plein, comme un status banner healthy */
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover {
+  background: linear-gradient(135deg, #00CD92 0%, #00b87f 100%) !important;
+  box-shadow: 0 8px 24px rgba(0, 205, 146, 0.3), 0 4px 8px rgba(0, 205, 146, 0.18) !important;
+  transform: translateY(-2px) !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover::after {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* En hover, badge + label passent en blanc */
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-category-badge {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-label-none {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+/* Image avec fond doux pour ressortir sur le vert */
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+}
+/* Placeholder image-none : icône livre devient blanche */
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none::before {
+  background-color: #fff !important;
+}
+
+/* Image de catégorie — taille uniforme, fond léger pour les logos */
+.csh-home-list.csh-home-list-large .csh-home-list-image {
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  border-radius: 12px !important;
+  background-size: contain !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-color: transparent !important;
+}
+
+/* Image absente — placeholder neutre élégant avec icône livre */
+.csh-home-list.csh-home-list-large .csh-home-list-image-none {
+  background: linear-gradient(135deg, #f4f5f7, #e9ecef) !important;
+  color: #94a3b8 !important;
+  font-size: 0 !important;
+  position: relative !important;
+}
+.csh-home-list.csh-home-list-large .csh-home-list-image-none::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 22px !important;
+  height: 22px !important;
+  transform: translate(-50%, -50%) !important;
+  background-color: #94a3b8 !important;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'><path d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20V5a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 5.5v14zM6.5 19a.5.5 0 0 0 0 1H20v-1H6.5z'/></svg>") center/contain no-repeat !important;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'><path d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20V5a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 5.5v14zM6.5 19a.5.5 0 0 0 0 1H20v-1H6.5z'/></svg>") center/contain no-repeat !important;
+}
+
+/* Bloc texte à droite de l'image */
+.csh-home-list-aside {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Badge de catégorie — pilule, tronquage retiré pour libellés longs */
+.csh-home-list-category {
+  display: block !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+.csh-category-badge {
+  background: rgba(27, 40, 66, 0.06) !important;
+  color: #1b2842 !important;
+  border-radius: 100px !important;
+  padding: 6px 14px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: 100% !important;
+  letter-spacing: 0 !important;
+  line-height: 1.3 !important;
+}
+
+/* "Pas de description" — discret */
+.csh-home-list-label.csh-home-list-label-none {
+  color: #94a3b8 !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  font-size: 0.82rem !important;
+}
+
+/* ============================================================================
+   FOOTER — CTA contact (aligné page de statut)
+   ============================================================================ */
+
+.csh-footer-ask {
+  background: linear-gradient(160deg, #101828 0%, #1b2842 100%) !important;
+  padding: 36px 0 !important;
+  border-radius: 20px !important;
+  margin: 0 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+.csh-footer-ask::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -50% !important;
+  right: -10% !important;
+  width: 400px !important;
+  height: 400px !important;
+  background: radial-gradient(circle, rgba(0, 205, 146, 0.08), transparent 70%) !important;
+  pointer-events: none !important;
+}
+
+.csh-footer-ask-text-title {
+  color: #fff !important;
+  font-weight: 600 !important;
+  font-size: 1.05rem !important;
+  letter-spacing: -0.01em !important;
+}
+.csh-footer-ask-text-label {
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 0.86rem !important;
+  font-weight: 400 !important;
+  margin-top: 4px !important;
+}
+
+/* Boutons footer — alignement 100% flex pour que texte + icône soient parfaitement centrés */
+.csh-footer-ask-buttons .csh-button.csh-button-accent {
+  background: #00CD92 !important;
+  border: none !important;
+  border-radius: 100px !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  height: 40px !important;
+  line-height: 1 !important;
+  padding: 0 22px !important;
+  box-shadow: 0 2px 10px rgba(0, 205, 146, 0.25) !important;
+  transition: all 0.2s ease !important;
+  overflow: visible !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+.csh-footer-ask-buttons .csh-button.csh-button-accent:hover {
+  background: #00e0a0 !important;
+  box-shadow: 0 4px 16px rgba(0, 205, 146, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* "Discuter avec nous" en outline blanc pour différencier */
+.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+}
+.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Copyright — discret */
+.csh-footer-copyright {
+  background: transparent !important;
+  margin-top: 24px !important;
+}
+.csh-footer-copyright-brand {
+  opacity: 0.35 !important;
+}
+.csh-footer-copyright-brand img {
+  height: 18px !important;
+}
+
+/* ============================================================================
+   PAGE ARTICLE (vue détail) — typographie soignée
+   ============================================================================ */
+
+/* Bouton retour catégorie */
+.csh-article .csh-article-aside-back .csh-button {
+  border-radius: 100px !important;
+  background: rgba(27, 40, 66, 0.06) !important;
+  color: #1b2842 !important;
+  font-weight: 500 !important;
+  font-size: 0.82rem !important;
+  border: none !important;
+  transition: background 0.2s ease !important;
+}
+.csh-article .csh-article-aside-back .csh-button:hover {
+  background: rgba(27, 40, 66, 0.1) !important;
+}
+
+/* Liens dans l'article */
+.csh-article .csh-article-content article a {
+  color: #00b87f !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  text-decoration-thickness: 1px !important;
+  font-weight: 500 !important;
+  transition: color 0.15s ease !important;
+}
+.csh-article .csh-article-content article a:hover {
+  color: #009166 !important;
+  text-decoration-thickness: 2px !important;
+}
+
+/* Titres article — Poppins, hiérarchie visuelle franche entre H1 → H4 */
+
+/* ============================================================================
+   FIX MAJEUR : Crisp injecte <p><br></p> entre CHAQUE bloc
+   = origine principale des "grands espaces vides" — on les masque tous
+   ============================================================================ */
+.csh-article article p:has(> br:only-child) {
+  display: none !important;
+}
+/* Fallback pour navigateurs sans :has() — paragraphes vides */
+.csh-article article p:empty {
+  display: none !important;
+}
+
+/* H1 — Titre principal (Crisp utilise <h1 class="csh-font-sans-bold">, sans csh-markdown-*) */
+.csh-article .csh-article-content-header h1 {
+  font-size: 1.85rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1b2842 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
+}
+/* Le séparateur sous H1 : on le passe en vert Buildy */
+.csh-article .csh-article-content-header {
+  border-bottom: 2px solid #00CD92 !important;
+  padding-bottom: 12px !important;
+  margin-bottom: 16px !important;
+}
+
+/* H2 — Sections principales (1.4rem, barre verte verticale à gauche) */
+.csh-article article h2,
+.csh-article .csh-markdown-title-h2 {
+  font-size: 1.4rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1b2842 !important;
+  font-weight: 700 !important;
+  margin: 28px 0 12px 0 !important;
+  letter-spacing: -0.02em !important;
+  padding-left: 14px !important;
+  border-left: 4px solid #00CD92 !important;
+  line-height: 1.3 !important;
+}
+
+/* H3 — Sous-sections */
+.csh-article article h3,
+.csh-article .csh-markdown-title-h3 {
+  font-size: 1.15rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1b2842 !important;
+  font-weight: 600 !important;
+  margin: 22px 0 8px 0 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.35 !important;
+}
+
+/* H4 — Labels (Inter uppercase letterspaced) */
+.csh-article article h4,
+.csh-article .csh-markdown-title-h4 {
+  font-size: 0.82rem !important;
+  color: #00876b !important;
+  font-weight: 700 !important;
+  margin: 18px 0 8px 0 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  line-height: 1.4 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+/* Paragraphes article — espacement homogène resserré */
+.csh-article article p {
+  margin: 0 0 12px 0 !important;
+}
+
+/* Listes — moins d'espace au-dessus */
+.csh-article article ol,
+.csh-article article ul,
+.csh-article .csh-markdown-list {
+  margin: 4px 0 14px 0 !important;
+}
+
+/* Breadcrumb "Articles sur :" Catégorie — moins de marge en bas */
+.csh-article-content-header-metas-category {
+  margin-bottom: 6px !important;
+  font-size: 0.85rem !important;
+}
+
+/* Dernier élément : pas de margin-bottom inutile */
+.csh-article article > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Corps de texte article */
+.csh-article .csh-article-content article p {
+  line-height: 1.7 !important;
+  color: #334155 !important;
+}
+
+/* Code inline — vert Buildy */
+.csh-article .csh-article-content article .csh-markdown-code-inline {
+  background: rgba(0, 205, 146, 0.08) !important;
+  border-color: rgba(0, 205, 146, 0.2) !important;
+  color: #00876b !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+  font-size: 0.88em !important;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
+}
+
+/* Puces de listes (non numérotées) */
+.csh-article .csh-article-content article .csh-markdown-list .csh-markdown-list-item:before {
+  background: #00CD92 !important;
+}
+
+/* Date "Mis à jour le" — discrète */
+.csh-article-content-date {
+  color: #94a3b8 !important;
+  font-size: 0.82rem !important;
+  font-weight: 400 !important;
+}
+
+/* ============================================================================
+   PAGE CATÉGORIE — liste d'articles
+   ============================================================================ */
+
+.csh-category-articles-list .csh-box {
+  background: #fff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s ease !important;
+}
+.csh-category-articles-list .csh-box:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ============================================================================
+   RESPONSIVE — mobile (≤ 640 px)
+   ============================================================================ */
+
+@media (max-width: 640px) {
+  .csh-header-title {
+    font-size: 1.5rem !important;
+    margin-top: 16px !important;
+  }
+  .csh-header-search-field input {
+    height: 48px !important;
+    font-size: 0.9rem !important;
+  }
+  .csh-home-list,
+  .csh-home-list.csh-home-list-large {
+    grid-template-columns: 1fr !important;
+  }
+  .csh-footer-ask {
+    margin: 0 8px !important;
+    padding: 28px 0 !important;
+  }
+  .csh-footer-ask-buttons {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .csh-footer-ask-buttons .csh-button.csh-button-accent {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+</style>
