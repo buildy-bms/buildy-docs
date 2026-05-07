@@ -16,7 +16,8 @@
  */
 
 const path = require('path');
-const Database = require('better-sqlite3');
+// better-sqlite3 vit dans backend-node/node_modules (pas à la racine du repo)
+const Database = require(path.join(__dirname, '..', 'backend-node', 'node_modules', 'better-sqlite3'));
 
 const args = process.argv.slice(2).reduce((acc, a) => {
   const [k, v] = a.replace(/^--/, '').split('=');
