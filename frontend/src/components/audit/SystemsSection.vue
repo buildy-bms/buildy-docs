@@ -43,7 +43,7 @@ const showNotConcernedSystems = defineModel('showNotConcernedSystems', { type: B
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step',
   'toggle-zone-collapsed', 'toggle-system-collapsed',
-  'add-device',
+  'add-device', 'add-device-from-library',
 ])
 
 const audit = useAuditStore()
@@ -255,7 +255,8 @@ onBeforeUnmount(teardownSortables)
                     entityType: 'device', entityRef: d,
                     currentHtml: d.notes_html || d.notes || ''
                   })"
-                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })" />
+                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })"
+                  @add-device-from-library="sys => emit('add-device-from-library', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })" />
               </div>
             </template>
           </div>

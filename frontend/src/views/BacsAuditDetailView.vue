@@ -95,6 +95,7 @@ async function deleteAudit() {
   }
 }
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
+import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
@@ -135,6 +136,7 @@ const site = ref(null)
 const showAddZoneModal = ref(false)
 const showAddMeterModal = ref(false)
 const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
+const libraryDevicePickerSystem = ref(null) // { id, system_category, zone_name }
 
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
@@ -1200,6 +1202,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @toggle-zone-collapsed="toggleZoneCollapsed"
         @toggle-system-collapsed="toggleSystemCollapsed"
         @add-device="sys => addDeviceModalSystem = sys"
+        @add-device-from-library="sys => libraryDevicePickerSystem = sys"
       />
 
       <!-- 4. Compteurs et mesurage (R175-3 1°) -->
@@ -1362,6 +1365,14 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       :comm-options="COMM_OPTIONS"
       @close="addDeviceModalSystem = null"
       @submit="submitAddDevice"
+    />
+    <LibraryDevicePicker
+      v-if="libraryDevicePickerSystem"
+      :system="libraryDevicePickerSystem"
+      :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :zone-name="libraryDevicePickerSystem.zone_name || ''"
+      @close="libraryDevicePickerSystem = null"
+      @added="refreshAuditData"
     />
 
     <BulkPhotoUploadModal

@@ -7,6 +7,7 @@ import {
   ChevronDownIcon,
   TrashIcon,
   PlusIcon,
+  BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -14,6 +15,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { updateBacsSystem, createBacsDevice, updateBacsDevice, deleteBacsDevice, updateBacsThermal } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
+import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
@@ -156,6 +158,27 @@ async function patchSystem(s, patch) {
 const editingDevice = ref(null)
 const deviceForm = ref({})
 const savingDevice = ref(false)
+
+// Libellés de catégories de systèmes (alignés sur SYSTEM_LABEL desktop).
+const systemLabels = {
+  heating: 'Chauffage',
+  cooling: 'Refroidissement',
+  ventilation: 'Ventilation',
+  dhw: 'ECS',
+  lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur',
+  electricity_production: 'Production photovoltaïque',
+}
+
+// Bibliothèque de modèles (préfiltrée par catégorie)
+const libraryDevicePickerSystem = ref(null)
+function openLibraryDevicePicker(system) {
+  libraryDevicePickerSystem.value = {
+    id: system.id,
+    system_category: system.system_category,
+    zone_name: zones.value.find(z => z.zone_id === system.zone_id)?.name || '',
+  }
+}
 
 function openCreateDevice(system) {
   deviceForm.value = {
@@ -322,12 +345,20 @@ async function removeDevice(d) {
                 </div>
                 <ChevronRightIcon class="w-5 h-5 text-gray-300" />
               </button>
-              <button
-                @click="openCreateDevice(s)"
-                class="w-full inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium"
-              >
-                <PlusIcon class="w-5 h-5" /> Ajouter un équipement
-              </button>
+              <div class="flex items-stretch gap-1.5">
+                <button
+                  @click="openCreateDevice(s)"
+                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
+                >
+                  <PlusIcon class="w-5 h-5 shrink-0" /> Ajouter
+                </button>
+                <button
+                  @click="openLibraryDevicePicker(s)"
+                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
+                >
+                  <BookOpenIcon class="w-5 h-5 shrink-0" /> Bibliothèque
+                </button>
+              </div>
             </div>
 
             <!-- Régulation thermique R175-6 (heating + cooling présents en mode BACS) -->
@@ -577,5 +608,15 @@ async function removeDevice(d) {
         </template>
       </div>
     </MobileSheet>
+
+    <!-- Modale bibliothèque (BaseModal s'adapte mobile via max-w-[92vw]) -->
+    <LibraryDevicePicker
+      v-if="libraryDevicePickerSystem"
+      :system="libraryDevicePickerSystem"
+      :system-label="systemLabels[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :zone-name="libraryDevicePickerSystem.zone_name || ''"
+      @close="libraryDevicePickerSystem = null"
+      @added="audit.refreshAuditCore()"
+    />
   </div>
 </template>

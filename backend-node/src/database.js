@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 95;
+const TARGET_VERSION = 96;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3581,6 +3581,22 @@ function runMigrations() {
     db.pragma('user_version = 95');
   }
 
+  if (current < 96) {
+    // Lot — Bouton « Bibliothèque » dans les cartes systèmes BACS.
+    //
+    // Sur la fiche d'un equipment_template (admin), on peut renseigner une
+    // énergie et un niveau (production/distribution/émission) "par défaut"
+    // qui pré-remplissent le device créé depuis ce template via la modale
+    // bibliothèque. Champs nullables — un template peut rester générique.
+    try { db.exec('ALTER TABLE equipment_templates ADD COLUMN default_energy_source TEXT'); }
+    catch { /* deja la */ }
+    try { db.exec('ALTER TABLE equipment_templates ADD COLUMN default_device_role TEXT'); }
+    catch { /* deja la */ }
+
+    log.info('Migration 96 appliquee : equipment_templates.default_energy_source + default_device_role');
+    db.pragma('user_version = 96');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3690,18 +3706,19 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
             descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
+            defaultEnergySource || null, defaultDeviceRole || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
+  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -3711,6 +3728,14 @@ const equipmentTemplates = {
         clearValidation = true;
       }
     }
+    // default_energy_source / default_device_role : explicitement settable a
+    // NULL pour permettre de vider le pré-remplissage depuis l'editeur admin.
+    // Sentinel '__clear__' demande l'unset ; absent (undefined) = inchange.
+    const energySql = defaultEnergySource === '__clear__' ? 'NULL' : 'COALESCE(?, default_energy_source)';
+    const roleSql   = defaultDeviceRole   === '__clear__' ? 'NULL' : 'COALESCE(?, default_device_role)';
+    const energyArg = defaultEnergySource === '__clear__' ? [] : [defaultEnergySource ?? null];
+    const roleArg   = defaultDeviceRole   === '__clear__' ? [] : [defaultDeviceRole ?? null];
+
     db.prepare(`
       UPDATE equipment_templates
       SET name = COALESCE(?, name),
@@ -3722,11 +3747,13 @@ const equipmentTemplates = {
           icon_value = COALESCE(?, icon_value),
           icon_color = COALESCE(?, icon_color),
           preferred_protocols = COALESCE(?, preferred_protocols),
+          default_energy_source = ${energySql},
+          default_device_role = ${roleSql},
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
+    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -3751,12 +3778,14 @@ const equipmentTemplates = {
       const r = db.prepare(`
         INSERT INTO equipment_templates
           (slug, name, category, bacs_articles, bacs_justification, description_html,
-           icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           icon_kind, icon_value, icon_color, preferred_protocols,
+           default_energy_source, default_device_role, created_by, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         candidate, newName, src.category, src.bacs_articles, src.bacs_justification,
         src.description_html, src.icon_kind, src.icon_value, src.icon_color,
-        src.preferred_protocols, userId || null, userId || null,
+        src.preferred_protocols, src.default_energy_source, src.default_device_role,
+        userId || null, userId || null,
       );
       const newId = r.lastInsertRowid;
       // Points

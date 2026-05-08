@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon, BookOpenIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice, duplicateBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -27,7 +27,7 @@ const props = defineProps({
   systemLabel: { type: String, required: true },
   siteUuid: { type: String, default: null },
 })
-const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device'])
+const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device', 'add-device-from-library'])
 
 function hasNotes(htmlOrText) {
   if (!htmlOrText) return false
@@ -168,6 +168,25 @@ async function dupDevice(d) {
   }
 }
 
+// Menu déroulant du split button « Ajouter un système »
+const addMenuOpen = ref(false)
+const addMenuRef = ref(null)
+function toggleAddMenu() { addMenuOpen.value = !addMenuOpen.value }
+function closeAddMenu() { addMenuOpen.value = false }
+function onClickAddManual() {
+  closeAddMenu()
+  emit('add-device', props.system)
+}
+function onClickAddFromLibrary() {
+  closeAddMenu()
+  emit('add-device-from-library', props.system)
+}
+function onAddMenuDocClick(e) {
+  if (addMenuRef.value && !addMenuRef.value.contains(e.target)) closeAddMenu()
+}
+onMounted(() => document.addEventListener('mousedown', onAddMenuDocClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onAddMenuDocClick))
+
 async function removeDevice(d) {
   const ok = await confirm({
     title: 'Supprimer cet équipement ?',
@@ -195,13 +214,47 @@ async function removeDevice(d) {
         </span>
         <span v-else class="text-gray-400 italic whitespace-nowrap">aucun système saisi</span>
       </div>
-      <button
-        type="button"
-        @click="emit('add-device', system)"
-        class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm whitespace-nowrap shrink-0"
-      >
-        <PlusIcon class="w-3.5 h-3.5" /> Ajouter un système
-      </button>
+      <!-- Split button : action principale = formulaire manuel,
+           déroulante = bibliothèque pré-filtrée sur la catégorie. -->
+      <div ref="addMenuRef" class="relative inline-flex shrink-0 whitespace-nowrap">
+        <button
+          type="button"
+          @click="onClickAddManual"
+          class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-l-lg shadow-sm whitespace-nowrap"
+        >
+          <PlusIcon class="w-3.5 h-3.5 shrink-0" /> Ajouter un système
+        </button>
+        <button
+          type="button"
+          @click="toggleAddMenu"
+          :aria-expanded="addMenuOpen"
+          aria-label="Plus d'options pour ajouter"
+          class="inline-flex items-center justify-center px-1.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-r-lg shadow-sm border-l border-emerald-700 shrink-0"
+        >
+          <ChevronDownIcon class="w-3.5 h-3.5 shrink-0" />
+        </button>
+        <div
+          v-if="addMenuOpen"
+          class="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg w-60 py-1 text-sm"
+        >
+          <button
+            type="button"
+            @click="onClickAddManual"
+            class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 whitespace-nowrap"
+          >
+            <PlusIcon class="w-4 h-4 text-gray-500 shrink-0" />
+            <span>Saisir manuellement</span>
+          </button>
+          <button
+            type="button"
+            @click="onClickAddFromLibrary"
+            class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 whitespace-nowrap"
+          >
+            <BookOpenIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Depuis la bibliothèque</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Devices : layout dense 2 rangées (specs + GTB) avec header

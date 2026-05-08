@@ -67,6 +67,8 @@ function seedLibraryOnBoot() {
         iconValue: tpl.icon_value,
         iconColor: tpl.icon_color,
         preferredProtocols: tpl.preferred_protocols,
+        defaultEnergySource: tpl.default_energy_source,
+        defaultDeviceRole: tpl.default_device_role,
       });
       for (const p of (tpl.points || [])) {
         db.equipmentTemplatePoints.create(created.id, {
@@ -86,6 +88,10 @@ function seedLibraryOnBoot() {
       if (!existing.bacs_articles && tpl.bacs_articles) updates.bacsArticles = tpl.bacs_articles;
       if (!existing.bacs_justification && tpl.bacs_justification) updates.bacsJustification = tpl.bacs_justification;
       if (!existing.preferred_protocols && tpl.preferred_protocols) updates.preferredProtocols = tpl.preferred_protocols;
+      // Enrichissement non destructif : ne touche pas si l'admin a déjà saisi
+      // une valeur (idempotent même après edit manuel — cf. memoire seeder).
+      if (!existing.default_energy_source && tpl.default_energy_source) updates.defaultEnergySource = tpl.default_energy_source;
+      if (!existing.default_device_role && tpl.default_device_role) updates.defaultDeviceRole = tpl.default_device_role;
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
 
