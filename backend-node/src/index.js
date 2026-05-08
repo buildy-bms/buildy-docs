@@ -110,6 +110,7 @@ async function main() {
   await fastify.register(require('./routes/zones'), { prefix: '/api' });
   await fastify.register(require('./routes/equipments'), { prefix: '/api' });
   await fastify.register(require('./routes/bacs-audit'), { prefix: '/api' });
+  await fastify.register(require('./routes/bacs-checklist-catalog'), { prefix: '/api' });
   await fastify.register(require('./routes/site-documents'), { prefix: '/api' });
   await fastify.register(require('./routes/site-credentials'), { prefix: '/api' });
   await fastify.register(require('./routes/pdf-boilerplate'), { prefix: '/api' });

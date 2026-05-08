@@ -44,6 +44,7 @@ import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
 import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
+import ChecklistSection from '@/components/audit/ChecklistSection.vue'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import InspectionsSection from '@/components/audit/InspectionsSection.vue'
@@ -582,6 +583,10 @@ const STEP_DEFINITIONS = [
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
     isComplete: () => !!bms.value?.existing_solution },
+  { key: 'docs-checklist',
+    label: 'Documents collectés',
+    description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
+    isComplete: () => checklistAllHandled.value && photoCoverageComplete.value },
   { key: 'inspections',
     label: 'Inspections',
     description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
@@ -606,6 +611,46 @@ const STEP_DEFINITIONS = [
 
 function stepFor(key) {
   return stepperSteps.value.find(s => s.key === key)
+}
+
+// État de complétion de la check-list (mig 100). Recharge à chaque mount
+// + à la demande depuis ChecklistSection (event @refreshed).
+const checklistAllHandled = ref(false)
+const photoCoverageComplete = ref(false)
+const checklistSectionRef = ref(null)
+async function refreshChecklistStatus() {
+  try {
+    const { getBacsChecklist, getBacsPhotoCoverage } = await import('@/api')
+    const [c, cov] = await Promise.all([
+      getBacsChecklist(docId),
+      getBacsPhotoCoverage(docId),
+    ])
+    checklistAllHandled.value = c.data.length > 0 && c.data.every(i => i.status !== 'pending')
+    const total = cov.data.zones.total + cov.data.systems.total + cov.data.meters.total + cov.data.bms.total
+    const covered = cov.data.zones.covered + cov.data.systems.covered + cov.data.meters.covered + cov.data.bms.covered
+    photoCoverageComplete.value = total > 0 && covered === total
+  } catch { /* silencieux */ }
+}
+onMounted(refreshChecklistStatus)
+
+// Navigation depuis le bloc « Couverture photo » : scroller vers la zone
+// concernée (les autres entités sont enfouies dans la card systèmes,
+// donc on scroll juste vers la card racine pour l'instant).
+function gotoChecklistZone(zoneId) {
+  const el = document.querySelector(`[data-zone-id="${zoneId}"]`) || document.getElementById('zones')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+function gotoChecklistSystem(systemId) {
+  const el = document.querySelector(`[data-system-id="${systemId}"]`) || document.getElementById('systems')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+function gotoChecklistMeter(meterId) {
+  const el = document.querySelector(`[data-meter-id="${meterId}"]`) || document.getElementById('meters')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+function gotoChecklistBms() {
+  const el = document.getElementById('bms')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 // Steps cachés en mode site_audit (purement R175) : régulation thermique
@@ -1268,6 +1313,19 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @invalidate-step="invalidateStep"
         @save-doc="saveDocDebounced"
         @refresh-audit-data="refreshAuditData"
+      />
+
+      <!-- Documents collectés & couverture photo (mig 100) -->
+      <ChecklistSection
+        :doc-id="docId"
+        :active="activeStepKey === 'docs-checklist'"
+        :step="stepFor('docs-checklist')"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @goto-zone="gotoChecklistZone"
+        @goto-system="gotoChecklistSystem"
+        @goto-meter="gotoChecklistMeter"
+        @goto-bms="gotoChecklistBms"
       />
 
       <!-- 7. Inspection périodique par un tiers (R175-5-1) -->

@@ -310,6 +310,19 @@ export const createBacsMeter = (docId, data) => api.post(`/bacs-audit/${docId}/m
 export const updateBacsMeter = (id, data) => api.patch(`/bacs-audit/meters/${id}`, data)
 export const deleteBacsMeter = (id) => api.delete(`/bacs-audit/meters/${id}`)
 export const getBacsBms = (docId) => api.get(`/bacs-audit/${docId}/bms`)
+// Check-list audit (mig 100) — pièces jointes du dossier + couverture photo
+export const getBacsChecklist = (docId) => api.get(`/bacs-audit/${docId}/checklist`)
+export const updateBacsChecklistItem = (docId, key, data) =>
+  api.patch(`/bacs-audit/${docId}/checklist/${encodeURIComponent(key)}`, data)
+export const getBacsPhotoCoverage = (docId) => api.get(`/bacs-audit/${docId}/photo-coverage`)
+export const listChecklistCatalog = (params) => api.get('/bacs-checklist-catalog', { params })
+export const createChecklistCatalogItem = (data) => api.post('/bacs-checklist-catalog', data)
+export const updateChecklistCatalogItem = (key, data) =>
+  api.patch(`/bacs-checklist-catalog/${encodeURIComponent(key)}`, data)
+export const deleteChecklistCatalogItem = (key) =>
+  api.delete(`/bacs-checklist-catalog/${encodeURIComponent(key)}`)
+export const reorderChecklistCatalog = (keys) =>
+  api.patch('/bacs-checklist-catalog/reorder', { keys })
 export const updateBacsBms = (docId, data) => api.put(`/bacs-audit/${docId}/bms`, data)
 export const getBacsBmsComponents = (docId) => api.get(`/bacs-audit/${docId}/bms-components`)
 export const createBacsBmsComponent = (docId, data) => api.post(`/bacs-audit/${docId}/bms-components`, data)
