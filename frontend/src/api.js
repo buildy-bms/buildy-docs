@@ -303,8 +303,8 @@ export const ensureUserFromPocketId = (pocketid_id) => api.post('/users/ensure-b
 // ── Audit BACS — donnees structurees ──
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
 export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
-export const updateBacsSystemZones = (id, extraZoneIds) =>
-  api.patch(`/bacs-audit/systems/${id}/zones`, { extra_zone_ids: extraZoneIds })
+export const updateBacsDeviceZones = (deviceId, extraZoneIds) =>
+  api.patch(`/bacs-audit/devices/${deviceId}/zones`, { extra_zone_ids: extraZoneIds })
 export const getBacsMeters = (docId) => api.get(`/bacs-audit/${docId}/meters`)
 export const createBacsMeter = (docId, data) => api.post(`/bacs-audit/${docId}/meters`, data)
 export const updateBacsMeter = (id, data) => api.patch(`/bacs-audit/meters/${id}`, data)

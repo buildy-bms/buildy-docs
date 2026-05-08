@@ -1,29 +1,30 @@
 <script setup>
 /**
- * Sélecteur multi-zones pour partager un système BACS entre plusieurs
- * zones fonctionnelles (ex. chaufferie commune Logistique + Ateliers).
+ * Sélecteur multi-zones pour partager un équipement physique entre plusieurs
+ * zones fonctionnelles (chaufferie commune Logistique + Ateliers, CTA mutualisée,
+ * luminaire qui éclaire 2 plateaux…).
  *
  * Affiche :
- * - Un badge « Partagé · +N » si le système couvre plus d'une zone
- * - Un dropdown avec checkboxes pour ajouter/retirer des zones supplémentaires
- *   (la zone d'origine est marquée et non décochable)
+ * - Un badge « Partagé · +N » si l'équipement dessert plus d'une zone
+ * - Un dropdown checkboxes pour ajouter / retirer des zones supplémentaires
+ *   (la zone d'origine du système parent est marquée et non décochable)
  *
  * Émet `updated` après un patch réussi (le parent rafraîchit son state).
  *
  * Props :
- *   system : { id, zone_id, system_category, extra_zone_ids }
+ *   device : { id, extra_zone_ids }
+ *   originZoneId : id de la zone d'origine (du système parent)
  *   zones : [{ zone_id, name, ... }]   liste de zones du document
- *   systemLabel : libellé humain de la catégorie (« Chauffage », ...)
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ShareIcon, CheckIcon } from '@heroicons/vue/24/outline'
-import { updateBacsSystemZones } from '@/api'
+import { updateBacsDeviceZones } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
-  system: { type: Object, required: true },
+  device: { type: Object, required: true },
+  originZoneId: { type: Number, required: true },
   zones: { type: Array, required: true },
-  systemLabel: { type: String, default: '' },
 })
 const emit = defineEmits(['updated'])
 const { error: notifyError, success } = useNotification()
@@ -32,15 +33,14 @@ const open = ref(false)
 const saving = ref(false)
 const rootRef = ref(null)
 
-const extraIds = computed(() => props.system.extra_zone_ids || [])
+const extraIds = computed(() => props.device.extra_zone_ids || [])
 const sharedCount = computed(() => extraIds.value.length)
 
-// Liste des zones autres que la zone d'origine — les seules toggleables.
 const candidateZones = computed(() =>
-  props.zones.filter(z => z.zone_id !== props.system.zone_id),
+  props.zones.filter(z => z.zone_id !== props.originZoneId),
 )
 const originZone = computed(() =>
-  props.zones.find(z => z.zone_id === props.system.zone_id),
+  props.zones.find(z => z.zone_id === props.originZoneId),
 )
 
 function toggleOpen() { open.value = !open.value }
@@ -52,18 +52,11 @@ async function toggleZone(zoneId, checked) {
   const next = new Set(extraIds.value)
   if (checked) next.add(zoneId); else next.delete(zoneId)
   try {
-    await updateBacsSystemZones(props.system.id, [...next])
+    await updateBacsDeviceZones(props.device.id, [...next])
     success(checked ? 'Zone ajoutée au partage' : 'Zone retirée du partage')
     emit('updated')
   } catch (e) {
-    if (e.response?.status === 409) {
-      const zoneName = candidateZones.value.find(z => z.zone_id === zoneId)?.name
-      notifyError(
-        `« ${zoneName || zoneId} » a déjà un système ${props.systemLabel}. Retire-le ou fusionne d'abord.`,
-      )
-    } else {
-      notifyError(e.response?.data?.detail || 'Mise à jour des zones impossible')
-    }
+    notifyError(e.response?.data?.detail || 'Mise à jour des zones impossible')
   } finally {
     saving.value = false
   }
@@ -82,18 +75,18 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
       type="button"
       @click="toggleOpen"
       :class="[
-        'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
+        'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
         sharedCount > 0
           ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-          : 'border-gray-300 text-gray-600 hover:bg-gray-50',
+          : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700',
       ]"
       :title="sharedCount > 0
-        ? `Système partagé avec ${sharedCount} autre zone${sharedCount > 1 ? 's' : ''}`
-        : 'Partager ce système avec d\'autres zones'"
+        ? `Équipement partagé avec ${sharedCount} autre zone${sharedCount > 1 ? 's' : ''}`
+        : 'Partager cet équipement avec d\'autres zones'"
     >
-      <ShareIcon class="w-4 h-4 shrink-0" />
+      <ShareIcon class="w-3.5 h-3.5 shrink-0" />
       <span v-if="sharedCount > 0">Partagé · +{{ sharedCount }}</span>
-      <span v-else>Zones</span>
+      <span v-else>+ Partager</span>
     </button>
 
     <div
@@ -103,7 +96,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
       <div class="px-3 py-2 border-b border-gray-100">
         <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Zones desservies</p>
         <p class="text-[11px] text-gray-400 mt-0.5">
-          La même chaufferie / CTA / luminaire alimente plusieurs zones ?
+          Cet équipement alimente / éclaire / ventile plusieurs zones ?
         </p>
       </div>
       <!-- Zone d'origine, marquée en lecture seule -->
@@ -112,7 +105,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
         <span class="text-gray-700 truncate">{{ originZone?.name || 'Zone d\'origine' }}</span>
         <span class="ml-auto text-[10px] text-gray-400 italic">Origine</span>
       </div>
-      <!-- Zones candidates (toggleables) -->
+      <!-- Zones candidates -->
       <div v-if="!candidateZones.length" class="px-3 py-2 text-xs text-gray-400 italic">
         Aucune autre zone à partager.
       </div>

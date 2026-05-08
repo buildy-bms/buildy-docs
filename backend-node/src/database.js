@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 97;
+const TARGET_VERSION = 98;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3626,6 +3626,33 @@ function runMigrations() {
     db.pragma('user_version = 97');
   }
 
+  if (current < 98) {
+    // Lot — Partage multi-zones AU NIVEAU DEVICE (et non plus système).
+    //
+    // Correction de scope mig 97 : un « système » dans le langage utilisateur
+    // = un équipement physique (chaudière, VMC, luminaire), pas l'enveloppe
+    // zone × catégorie. C'est le device qui dessert physiquement plusieurs
+    // zones (la chaufferie commune = 1 chaudière), pas la « catégorie
+    // chauffage de Logistique » qui est une abstraction matrice.
+    //
+    // On supprime donc l'extras-zones niveau système (table vide en prod
+    // après le déploiement initial) et on la ré-attache au device.
+    db.exec('DROP TABLE IF EXISTS bacs_audit_system_extra_zones');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_device_extra_zones (
+        device_id INTEGER NOT NULL REFERENCES bacs_audit_system_devices(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (device_id, zone_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_dev_extra_zones_zone
+        ON bacs_audit_device_extra_zones(zone_id);
+    `);
+
+    log.info('Migration 98 appliquee : partage multi-zones rebasculé au niveau device');
+    db.pragma('user_version = 98');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -5903,58 +5930,40 @@ const faqArticles = {
   },
 };
 
-// ── Bacs Audit — partage multi-zones d'un système (mig 97) ───────────
-const bacsAuditSystemZones = {
-  // Zones supplémentaires desservies par un système (en plus de sa zone
-  // d'origine system.zone_id). Renvoie [zoneId, ...].
-  listExtraForSystem(systemId) {
+// ── Bacs Audit — partage multi-zones d'un device (mig 98) ────────────
+// Un même équipement physique (chaudière, VMC, luminaire) peut desservir
+// plusieurs zones fonctionnelles. La zone d'origine est implicite (celle
+// du système parent) ; les zones supplémentaires vivent dans cette table.
+const bacsAuditDeviceZones = {
+  // Zones supplémentaires desservies par un device. Renvoie [zoneId, ...].
+  listExtraForDevice(deviceId) {
     return db.prepare(
-      'SELECT zone_id FROM bacs_audit_system_extra_zones WHERE system_id = ? ORDER BY zone_id'
-    ).all(systemId).map(r => r.zone_id);
+      'SELECT zone_id FROM bacs_audit_device_extra_zones WHERE device_id = ? ORDER BY zone_id'
+    ).all(deviceId).map(r => r.zone_id);
   },
 
-  // Liste plate des { system_id, zone_id } pour tous les systèmes d'un
-  // document : utile pour préfixer la résolution des extras en GET systems
-  // sans faire un N+1.
+  // Liste plate des { device_id, zone_id } pour tous les devices d'un
+  // document : préfix de résolution sans N+1 pour le GET devices.
   listExtrasForDocument(documentId) {
     return db.prepare(`
-      SELECT ez.system_id, ez.zone_id
-      FROM bacs_audit_system_extra_zones ez
-      JOIN bacs_audit_systems s ON s.id = ez.system_id
+      SELECT ez.device_id, ez.zone_id
+      FROM bacs_audit_device_extra_zones ez
+      JOIN bacs_audit_system_devices d ON d.id = ez.device_id
+      JOIN bacs_audit_systems s ON s.id = d.system_id
       WHERE s.document_id = ?
     `).all(documentId);
   },
 
-  // Remplace l'ensemble des zones supplémentaires d'un système. Transaction
-  // pour atomicité (pas d'état intermédiaire visible).
-  setExtraForSystem(systemId, zoneIds) {
+  // Remplace l'ensemble des zones supplémentaires d'un device.
+  setExtraForDevice(deviceId, zoneIds) {
     const tx = db.transaction(() => {
-      db.prepare('DELETE FROM bacs_audit_system_extra_zones WHERE system_id = ?').run(systemId);
+      db.prepare('DELETE FROM bacs_audit_device_extra_zones WHERE device_id = ?').run(deviceId);
       const stmt = db.prepare(
-        'INSERT INTO bacs_audit_system_extra_zones (system_id, zone_id) VALUES (?, ?)'
+        'INSERT INTO bacs_audit_device_extra_zones (device_id, zone_id) VALUES (?, ?)'
       );
-      for (const zid of zoneIds) stmt.run(systemId, zid);
+      for (const zid of zoneIds) stmt.run(deviceId, zid);
     });
     tx();
-  },
-
-  // Vérifie si une zone est déjà couverte par un autre système de la même
-  // catégorie pour un document donné. Renvoie l'id du système conflictuel
-  // si trouvé, null sinon. Utilisé pour empêcher d'ajouter une zone qui a
-  // déjà un système même catégorie (à la place : fusionner).
-  findConflictingSystem({ documentId, zoneId, systemCategory, excludeSystemId }) {
-    // Conflit possible : zone d'origine d'un autre système OR zone extra.
-    const direct = db.prepare(`
-      SELECT id FROM bacs_audit_systems
-      WHERE document_id = ? AND zone_id = ? AND system_category = ? AND id != ?
-    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
-    if (direct) return direct.id;
-    const extra = db.prepare(`
-      SELECT s.id FROM bacs_audit_system_extra_zones ez
-      JOIN bacs_audit_systems s ON s.id = ez.system_id
-      WHERE s.document_id = ? AND ez.zone_id = ? AND s.system_category = ? AND s.id != ?
-    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
-    return extra?.id || null;
   },
 };
 
@@ -5992,6 +6001,6 @@ module.exports = {
   crispSettings,
   faqCategories,
   faqArticles,
-  bacsAuditSystemZones,
+  bacsAuditDeviceZones,
   get db() { return db; },
 };

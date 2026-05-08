@@ -11,6 +11,9 @@ import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropzone from './PhotoDropzone.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import DeviceZoneSharing from './DeviceZoneSharing.vue'
+import { storeToRefs } from 'pinia'
+import { useAuditStore } from '@/stores/audit'
 
 /**
  * Sous-table éditable des équipements (devices) d'un système BACS donné.
@@ -36,6 +39,11 @@ function hasNotes(htmlOrText) {
 
 const { error } = useNotification()
 const { confirm } = useConfirm()
+
+// Liste des zones du document, alimentée par le store : nécessaire au
+// sélecteur DeviceZoneSharing par équipement.
+const auditStore = useAuditStore()
+const { zones: storeZones } = storeToRefs(auditStore)
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
@@ -300,14 +308,13 @@ async function removeDevice(d) {
                 <span v-if="(photosByDevice[d.id] || []).length">{{ (photosByDevice[d.id] || []).length }}</span>
                 <span v-else>+ Photo</span>
               </button>
-              <!-- HS = pill cohérente avec Câblé/Arrêt manuel/Autonome,
-                   mais semantique destructive (rouge si actif) -->
-              <button type="button"
-                      @click="patchDevice(d, { out_of_service: !d.out_of_service })"
-                      :class="['flag-pill', d.out_of_service ? 'flag-danger-on' : 'flag-off']"
-                      title="Hors service — ignoré dans le plan d'action">
-                <span class="flag-ico">{{ d.out_of_service ? '✕' : '○' }}</span> HS
-              </button>
+              <!-- Partage multi-zones : un même équipement physique peut
+                   alimenter plusieurs zones (chaufferie commune, etc.) -->
+              <DeviceZoneSharing
+                :device="d"
+                :origin-zone-id="system.zone_id"
+                :zones="storeZones"
+                @updated="emit('changed')" />
               <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
               <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" title="Dupliquer">
                 <DocumentDuplicateIcon class="w-4 h-4" />
@@ -376,8 +383,8 @@ async function removeDevice(d) {
                      :class="inputCls" class="placeholder:italic placeholder:text-gray-300" />
             </div>
             <div class="col-span-12 md:col-span-4">
-              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Liaison GTB</label>
-              <div class="flex items-center gap-1.5 h-7">
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">État</label>
+              <div class="flex items-center gap-1.5 h-7 flex-wrap">
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
                         :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
@@ -395,6 +402,14 @@ async function removeDevice(d) {
                         :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
                         title="R175-3 4° — Reprise autonome de la GTB">
                   <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
+                </button>
+                <!-- HS = pill destructive (rouge si actif), regroupée avec
+                     les autres états du device pour cohérence visuelle. -->
+                <button type="button"
+                        @click="patchDevice(d, { out_of_service: !d.out_of_service })"
+                        :class="['flag-pill', d.out_of_service ? 'flag-danger-on' : 'flag-off']"
+                        title="Hors service — ignoré dans le plan d'action">
+                  <span class="flag-ico">{{ d.out_of_service ? '✕' : '○' }}</span> HS
                 </button>
               </div>
             </div>
