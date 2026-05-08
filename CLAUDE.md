@@ -304,3 +304,65 @@ Pattern unifié : actions d'export visibles + menu « Plus » :
 - Backend `POST /api/users/ensure-by-pocketid-id` : crée un placeholder local (oidc_sub = pocketid id) pour pouvoir grant à un collègue qui ne s'est pas encore loggé sur Docs. Au prochain login OIDC, `getByOidcSub` retrouve l'enregistrement et complète le profil via `updateProfile`.
 - Frontend (ShareAfModal + MobileShareSheet) : si l'user sélectionné est PocketID (id préfixé `pocketid:`), appelle d'abord `ensureUserFromPocketId(pocketid_id)` pour obtenir l'id local, puis `grantAfPermission`.
 - Env var requise prod : `POCKETID_API_KEY=...` dans `/opt/buildy-docs/.env`. Token créé dans PocketID admin (Paramètres → API Keys) avec scope minimum `users:read`.
+## FAQ Buildy / Crisp Knowledge Base
+
+Gestion centralisée de la base de connaissance Crisp Helpdesk (`https://help.buildy.fr/`) depuis Buildy Docs, avec assistance IA et synchronisation manuelle. Sidebar : *Support → FAQ Buildy* (`/faq`).
+
+### Architecture (Lot 90-91)
+- **DB** : `crisp_settings` (singleton, credentials chiffrés via `lib/crypto.js`), `faq_categories`, `faq_articles` (avec `crisp_id`, `dirty`, `crisp_url`, `crisp_updated_at`).
+- **SDK officiel** : `crisp-api` v10.9.x. Auth tier `website` obligatoire (token généré dans Crisp → *Settings → Workspace Settings → Advanced configuration → API Token*, **pas** un plugin Marketplace ; quota 10 000 req/jour). Wrapper minimal dans `lib/crisp.js`.
+- **Service sync** : `lib/faq-sync.js` — `pullFromCrisp()`, `pushArticleToCrisp()`, `pushCategoryToCrisp()`, `deleteCategoryOnCrisp()`. Pull = endpoint flat `/helpdesk/locale/{locale}/articles` (PAS `/category/{id}/articles` qui retourne 404), puis `getArticle()` pour le content. Le mapping `category_id` Crisp ↔ local se fait via la map `crisp_id → faqCategories.id`.
+- **Routes Fastify** : `routes/faq.js` (`/api/faq/{settings,test-connection,sync/pull,categories,articles,upload-image,ai/{rewrite,generate,missing-articles}}`).
+- **Frontend** : `views/FaqBuildyView.vue` (arbre catégories + tableau articles + modales settings/IA), `views/FaqArticleEditorView.vue` (éditeur), `components/FaqRichTextEditor.vue` (Tiptap dédié), `components/FaqCategoryNode.vue`, `stores/faq.js`.
+
+### Conversion Markdown Crisp ↔ HTML — `lib/crisp-markdown.js`
+Crisp stocke ses articles en **Markdown Crisp-flavored** (non-standard). Bidirectionnel obligatoire :
+- **Pull** : `crispMarkdownToHtml(md)` → HTML pour Tiptap.
+- **Push** : `htmlToCrispMarkdown(html)` → Markdown pour Crisp.
+
+Spécificités Crisp à respecter (différentes du Markdown standard) :
+- `__texte__` = **soulignement** (PAS gras, le gras c'est `**`).
+- `++texte++` = **surlignage** (custom Crisp).
+- `~~texte~~` = barré.
+- Callouts inline sur 1 ligne : `| ...` (tip vert) / `|| ...` (info jaune) / `||| ...` (warning orange). **Le texte DOIT être sur la même ligne que le préfixe**, sinon Crisp affiche un encart vide. → cf. pièges ci-dessous.
+- Embeds : `${youtube}[label](id)`, idem `vimeo`, `dailymotion`, `frame`.
+- Image avec dimension : `![alt](url =800xauto)`.
+- Listes : Crisp insère systématiquement une ligne vide entre items, et **renumérote `1.` partout** au stockage. Notre converter MD→HTML doit fusionner les `1.\n\n1.\n\n1.` en une `<ol>` unique avec numérotation correcte côté HTML.
+
+### Pièges connus à NE PAS oublier
+1. **Tiptap enveloppe systématiquement en `<p>` à l'intérieur des `<blockquote>` et des `<li>`**. Le converter HTML→MD doit aplatir (`_flattenForCallout` / `_flattenListItem`) AVANT la conversion inline, sinon les callouts produisent `||\nTexte` (encart vide + paragraphe orphelin) et les listes produisent `1.\nÉtape` (chiffre seul + texte séparé).
+2. **Crisp réécrit la numérotation `1.`, `2.`, `3.` en `1.`, `1.`, `1.`** lors du stockage (chaque item devient un paragraphe-liste isolé). Notre converter MD→HTML doit donc absorber les lignes vides entre items numérotés et regrouper en une `<ol>` unique.
+3. **Auth tier `website`** uniquement. `plugin` exige une installation marketplace. `user` n'existe pas pour les endpoints helpdesk. La doc principale mentionne `plugin` partout — le tier `website` est documenté à part : https://docs.crisp.chat/guides/rest-api/authentication/website-token/.
+4. **`saveHelpdeskLocaleArticle` exige `description: null`** explicite dans le payload, sinon Crisp répond `invalid_data` (HTTP 502 côté backend).
+5. **Le pull ne récupère pas les articles dont `dirty=1` localement** (conflit). Ça inclut le champ `crisp_url` qui n'est populé qu'au prochain pull non-conflictuel après un push.
+
+### Éditeur FAQ — features spécifiques
+- **Headings H1–H4** (le RichTextEditor partagé limite à H3-H4 ; ne PAS utiliser le partagé pour la FAQ).
+- **Underline + Highlight + Image + Link** + StarterKit (Blockquote désactivé pour utiliser notre `FaqBlockquote`).
+- **Callouts éditables** via `FaqBlockquote` qui ajoute un attribut `variant: 'tip'|'info'|'warning'` mappé en classe `callout-{variant}`. 3 boutons toolbar dédiés (vert/jaune/orange + icônes ampoule/info/triangle).
+- **Image upload** : drag-drop ou bouton, push vers FTP OVH `crisp-faq/<uuid>.<ext>` via `lib/faq-image-upload.js` (sharp resize ≤1600px, conversion WebP sauf PNG transparent). Config via `FAQ_FTP_*` (fallback sur `FTP_*`).
+- **Image placeholders** : `<img data-placeholder="true" alt="...">` rendu en zone grise rayée cliquable, ignoré au push Crisp. L'IA en insère aux emplacements pertinents pour suggestion.
+- **Bouton "Réécrire avec IA"** intégré à droite de la toolbar (visible si `articleId` fourni).
+- **Bouton "Voir en ligne"** dans le top-bar de l'éditeur (visible si `crisp_url && status='published'`), ouvre l'article publié sur help.buildy.fr.
+
+### Prompts IA (éditables via `/ai-prompts`)
+- `faq.rewrite` — réécrit un article existant en améliorant clarté/structure.
+- `faq.generate` — produit titre + corps depuis une question utilisateur.
+- `faq.suggest_missing` — propose une liste d'articles manquants (JSON).
+
+Tous les 3 héritent du même `SYSTEM_PROMPT_FAQ_BASE` (`lib/claude.js`) qui :
+- Cible une audience non technique (utilisateurs Hyperveez/Gojee, exploitants de bâtiment, MOA/MOE/BE) et impose un ton pédagogue (définir chaque acronyme, POURQUOI avant COMMENT, exemples concrets, pas de jargon IT pur).
+- Documente exhaustivement la correspondance HTML ↔ Markdown Crisp à respecter.
+- Impose la hiérarchie titres : H1 = champ titre séparé, corps commence en H2, jamais de H1 dans le contenu.
+- Encourage les callouts (1-3 par article max) avec cas d'usage explicites.
+- Encourage les `<img data-placeholder="true">` aux emplacements visuels pertinents.
+- Le corpus Buildy (sections, équipements, fonctionnalités) est mis en cache éphémère (Anthropic prompt caching) pour minimiser les tokens.
+
+### Workflow utilisateur
+1. *Settings → Paramètres Crisp* (token + website_id chiffrés en DB).
+2. *Pull depuis Crisp* — récupère catégories + articles, conversion MD→HTML, marqués `dirty=0`.
+3. Édition dans Buildy Docs (toolbar avec callouts, image upload, IA).
+4. *Publier vers Crisp* sur chaque article (jamais d'auto-push). Conversion HTML→MD, push via SDK, `dirty=0`.
+5. *Voir en ligne* pour vérifier le rendu sur help.buildy.fr.
+6. Re-pull périodique pour récupérer les éditions faites côté Crisp directement (les conflits avec `dirty=1` local sont signalés sans écraser).
+

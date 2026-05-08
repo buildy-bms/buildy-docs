@@ -157,8 +157,20 @@ function crispMarkdownToHtml(md) {
     }
     if (callout) {
       flushParagraph(para); para = [];
-      out.push(`<blockquote class="${callout.cls}">${_inline(callout.content)}</blockquote>`);
       i++;
+      // Tolérance legacy : si le préfixe est sur une ligne seule, on absorbe
+      // le 1er paragraphe qui suit (qui formait un paragraphe orphelin à cause
+      // du bug pré-correction du converter HTML->MD). Skip les lignes vides.
+      if (!callout.content) {
+        while (i < lines.length && !lines[i].trim()) i++; // skip blanks
+        const absorbed = [];
+        while (i < lines.length && lines[i].trim() && !/^[#>|]|^[*\-+]\s|^\d+\.\s|^```/.test(lines[i].trim())) {
+          absorbed.push(lines[i].trim());
+          i++;
+        }
+        callout.content = absorbed.join(' ').trim();
+      }
+      out.push(`<blockquote class="${callout.cls}">${_inline(callout.content || '')}</blockquote>`);
       continue;
     }
 
@@ -174,26 +186,53 @@ function crispMarkdownToHtml(md) {
       continue;
     }
 
-    // Unordered list
+    // Unordered list — tolère les lignes vides entre items (legacy Crisp)
     if (/^[*\-+]\s+/.test(trimmed)) {
       flushParagraph(para); para = [];
       const items = [];
-      while (i < lines.length && /^\s*[*\-+]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*[*\-+]\s+/, ''));
-        i++;
+      let j = i;
+      while (j < lines.length) {
+        const l = lines[j];
+        if (/^\s*[*\-+]\s+/.test(l)) {
+          items.push(l.replace(/^\s*[*\-+]\s+/, ''));
+          j++;
+        } else if (!l.trim()) {
+          // ligne vide : continue la liste si l'item suivant est encore une puce
+          let k = j + 1;
+          while (k < lines.length && !lines[k].trim()) k++;
+          if (k < lines.length && /^\s*[*\-+]\s+/.test(lines[k])) j = k;
+          else break;
+        } else {
+          break;
+        }
       }
+      i = j;
       out.push('<ul>' + items.map((t) => `<li>${_inline(t)}</li>`).join('') + '</ul>');
       continue;
     }
 
-    // Ordered list
+    // Ordered list — tolère "1. \n\n 1. \n\n 1." que Crisp produit quand
+    // chaque item est isolé par une ligne vide. On fusionne en une <ol> unique
+    // et on renumérote correctement côté HTML.
     if (/^\d+\.\s+/.test(trimmed)) {
       flushParagraph(para); para = [];
       const items = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
-        i++;
+      let j = i;
+      while (j < lines.length) {
+        const l = lines[j];
+        if (/^\s*\d+\.\s+/.test(l)) {
+          items.push(l.replace(/^\s*\d+\.\s+/, ''));
+          j++;
+        } else if (!l.trim()) {
+          let k = j + 1;
+          while (k < lines.length && !lines[k].trim()) k++;
+          if (k < lines.length && /^\s*\d+\.\s+/.test(lines[k])) j = k;
+          else break;
+        } else {
+          break;
+        }
       }
+      i = j;
       out.push('<ol>' + items.map((t) => `<li>${_inline(t)}</li>`).join('') + '</ol>');
       continue;
     }
@@ -266,8 +305,11 @@ function _htmlInline(html) {
     return `[${cleanLabel || href}](${href})`;
   });
 
-  // Images
+  // Images — on ignore les placeholders (data-placeholder="true") qui sont
+  // des suggestions d'emplacement de l'IA, jamais publiées vers Crisp.
   s = s.replace(/<img\s+[^>]*>/gi, (m) => {
+    if (/\bdata-placeholder="true"/i.test(m)) return '';
+    if (/\bsrc="placeholder:/i.test(m)) return '';
     const src = (m.match(/\bsrc="([^"]+)"/i) || [])[1] || '';
     const alt = (m.match(/\balt="([^"]*)"/i) || [])[1] || '';
     const w = (m.match(/\bwidth="(\d+)"/i) || [])[1];
@@ -301,21 +343,45 @@ function htmlToCrispMarkdown(html) {
   // hr
   s = s.replace(/<hr\s*\/?>/gi, '\n\n---\n\n');
 
-  // Listes (non imbriquées au lot 1 — Tiptap StarterKit gère le plat)
+  // Listes (non imbriquées au lot 1 — Tiptap StarterKit gère le plat).
+  // Tiptap enveloppe le contenu de chaque <li> dans <p>...</p> -> on aplatit
+  // pour produire `1. Item` sur une seule ligne (sinon Crisp casse la liste).
+  function _flattenListItem(html) {
+    const flat = html
+      .replace(/<\/p>\s*<p[^>]*>/gi, ' ')
+      .replace(/<\/?p[^>]*>/gi, '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return _htmlInline(flat).replace(/\s+/g, ' ').trim();
+  }
   s = s.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, inner) => {
-    const items = [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) => `* ${_htmlInline(m[1]).trim()}`);
+    const items = [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) => `* ${_flattenListItem(m[1])}`);
     return '\n' + items.join('\n') + '\n';
   });
   s = s.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_, inner) => {
-    const items = [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m, idx) => `${idx + 1}. ${_htmlInline(m[1]).trim()}`);
+    const items = [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m, idx) => `${idx + 1}. ${_flattenListItem(m[1])}`);
     return '\n' + items.join('\n') + '\n';
   });
 
-  // Blockquote callouts (classes spécifiques)
-  s = s.replace(/<blockquote\s+class="callout-warning"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n||| ${_htmlInline(c).trim()}\n`);
-  s = s.replace(/<blockquote\s+class="callout-info"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n|| ${_htmlInline(c).trim()}\n`);
-  s = s.replace(/<blockquote\s+class="callout-tip"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n| ${_htmlInline(c).trim()}\n`);
-  s = s.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n> ${_htmlInline(c).trim()}\n`);
+  // Blockquote callouts (classes spécifiques).
+  // Crisp exige que le texte soit sur la MÊME ligne que le préfixe `|`/`||`/`|||`.
+  // Tiptap enveloppe systématiquement le contenu d'un blockquote dans un ou
+  // plusieurs <p>...</p> -> on aplatit en remplaçant les balises <p> par des
+  // espaces avant la conversion inline.
+  function _flattenForCallout(html) {
+    const flat = html
+      .replace(/<\/p>\s*<p[^>]*>/gi, ' ') // joint les <p> consécutifs
+      .replace(/<\/?p[^>]*>/gi, '')        // strip <p> isolés
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return _htmlInline(flat).replace(/\s+/g, ' ').trim();
+  }
+  s = s.replace(/<blockquote\s+class="callout-warning"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n||| ${_flattenForCallout(c)}\n`);
+  s = s.replace(/<blockquote\s+class="callout-info"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n|| ${_flattenForCallout(c)}\n`);
+  s = s.replace(/<blockquote\s+class="callout-tip"[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n| ${_flattenForCallout(c)}\n`);
+  s = s.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => `\n> ${_flattenForCallout(c)}\n`);
 
   // Tables : peu utilisé en Tiptap StarterKit, on ignore au lot 1 (passe-plat HTML brut).
 

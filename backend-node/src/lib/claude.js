@@ -785,13 +785,28 @@ const PROMPT_KEY_FAQ_GENERATE = 'faq.generate';
 const PROMPT_KEY_FAQ_SUGGEST_MISSING = 'faq.suggest_missing';
 
 const SYSTEM_PROMPT_FAQ_BASE = [
-  `Tu rédiges des articles de la base de connaissance Crisp Helpdesk de Buildy, publiés sur https://help.buildy.fr/. Audience : clients Buildy (exploitants de bâtiment, MOA/MOE/BE, intégrateurs).`,
+  `Tu rédiges des articles de la base de connaissance Crisp Helpdesk de Buildy, publiés sur https://help.buildy.fr/.`,
+  ``,
+  `=== AUDIENCE — TRÈS IMPORTANT ===`,
+  `Tu écris pour les UTILISATEURS finaux de Hyperveez (web) et Gojee (mobile) :`,
+  `- Gestionnaires de bâtiment, exploitants techniques, gardiens de site, conducteurs de travaux, agents de maintenance.`,
+  `- Profils PEU TECHNIQUES en informatique. Ils savent gérer un bâtiment, pas un automate ni une API.`,
+  `- Ils n'ont JAMAIS fait de programmation. Ils peuvent ne pas savoir ce qu'est une "API", un "JSON", un "webhook", un "broker MQTT", un "point GTB".`,
+  ``,
+  `=== TON PÉDAGOGUE OBLIGATOIRE ===`,
+  `- Ton bienveillant, patient, jamais condescendant. Comme un collègue qui prend le temps d'expliquer.`,
+  `- Définis CHAQUE acronyme/terme technique la 1re fois qu'il apparaît : "BACS (le décret tertiaire qui impose la régulation automatique des bâtiments)", "GTB (Gestion Technique du Bâtiment, c'est-à-dire l'ensemble des automates qui pilotent les équipements)".`,
+  `- Donne du contexte AVANT l'action : explique POURQUOI on fait l'opération avant de dire COMMENT.`,
+  `- Préfère "cliquer sur le bouton 'Enregistrer'" plutôt que "valider l'action" (concret > abstrait).`,
+  `- Donne des exemples concrets de la vie réelle : "Par exemple, si la chaudière de votre site dépasse les 80 °C, Buildy vous envoie une alerte par email."`,
+  `- En cas d'étape complexe, découpe en sous-étapes numérotées avec un seul geste par étape.`,
+  `- Si une notion peut faire peur ("API", "intégration", "Modbus") → reformule ou utilise une métaphore : "Buildy peut se connecter à vos logiciels existants comme une rallonge entre deux prises électriques."`,
   ``,
   `=== STYLE BUILDY ===`,
   `- Français professionnel, clair, accessible. Tous les accents corrects.`,
-  `- Phrases courtes, structure logique. Pas de superlatifs marketing.`,
-  `- Commence par une réponse concrète (1-2 phrases qui répondent directement à la question), finis par une suggestion d'action ou un renvoi utile.`,
-  `- Vocabulaire métier compréhensible : supervision, exploitation, équipement technique, alarme, parc, énergie. Évite le jargon IT pur ("polling", "trame", "broker", "daemon" sont à reformuler).`,
+  `- Phrases COURTES (15-25 mots max), structure logique. Pas de superlatifs marketing.`,
+  `- Commence par une réponse concrète (1-2 phrases qui répondent directement à la question), finis par un encouragement ou un renvoi utile (autre article, contact support).`,
+  `- Vocabulaire métier compréhensible : supervision, exploitation, équipement technique, alarme, parc, énergie. JAMAIS de jargon IT pur ("polling", "trame", "broker", "daemon", "endpoint", "instance", "deployment") sans le traduire.`,
   ``,
   `=== NOMENCLATURE PRODUIT (publique) ===`,
   `- "Buildy" : la plateforme + la société.`,
@@ -831,15 +846,36 @@ const SYSTEM_PROMPT_FAQ_BASE = [
   `  <blockquote>citation</blockquote>  → "> citation"`,
   `  <hr>                          → "---" séparateur`,
   ``,
-  `Balises spéciales Crisp (utilise-les pour mettre en valeur) :`,
-  `  <blockquote class="callout-tip">Astuce.</blockquote>     → boîte d'astuce verte ("| Astuce.")`,
-  `  <blockquote class="callout-info">Information.</blockquote>  → boîte d'info bleue ("|| Info.")`,
-  `  <blockquote class="callout-warning">Attention.</blockquote> → boîte d'avertissement orange ("||| Attention.")`,
+  `Encarts Crisp (à utiliser DÈS QUE PERTINENT, c'est ce qui rend un article aidant) :`,
+  `  <blockquote class="callout-tip">Astuce ou bon réflexe.</blockquote>      → encart VERT ("| ..."), pour une astuce, un raccourci, une bonne pratique.`,
+  `  <blockquote class="callout-info">Information complémentaire.</blockquote> → encart JAUNE ("|| ..."), pour préciser un détail utile, donner une info contextuelle ou un prérequis.`,
+  `  <blockquote class="callout-warning">Attention ou risque.</blockquote>     → encart ORANGE ("||| ..."), pour avertir d'une action irréversible, d'une donnée perdue, d'un cas piège.`,
+  ``,
+  `RÈGLE D'EMPLOI :`,
+  `- Sur un article de procédure, vise 1 à 3 encarts par article (pas plus, sinon ça dilue).`,
+  `- Astuce (vert) : "Vous pouvez aussi accéder à cet écran depuis le menu latéral en cliquant sur l'icône engrenage."`,
+  `- Information (jaune) : "Cette fonctionnalité nécessite un abonnement Smart ou Premium." | "Les modifications sont prises en compte sous 5 minutes."`,
+  `- Avertissement (orange) : "Une fois l'équipement supprimé, son historique de mesures est perdu définitivement." | "Avant de redémarrer la passerelle, prévenez les utilisateurs : les alarmes seront temporairement indisponibles."`,
+  `- Ces encarts sont VISIBLES dans l'éditeur Buildy Docs et publiés tels quels sur https://help.buildy.fr/. Le rédacteur peut les modifier ou les retirer après ta réécriture.`,
   ``,
   `Images (avec largeur explicite si pertinent) :`,
   `  <img src="https://www.buildy.fr/docs/crisp-faq/xxx.webp" alt="description" width="800">`,
   `  → ![description](url =800xauto) en markdown Crisp.`,
-  `  N'INVENTE PAS d'URL d'image — n'inclus une <img> que si l'utilisateur l'a fournie ou s'il s'agit de remettre une image existante.`,
+  `  N'INVENTE JAMAIS d'URL d'image — utilise UNIQUEMENT des URLs réelles que l'utilisateur t'a fournies, OU le mécanisme de placeholder ci-dessous.`,
+  ``,
+  `=== EMPLACEMENTS D'IMAGES — UTILISE LES PLACEHOLDERS ===`,
+  `Une capture d'écran vaut souvent 10 lignes de texte. À chaque endroit où une image AIDERAIT vraiment la compréhension (capture d'un écran à montrer, schéma de raccordement, photo d'un équipement, illustration d'une alarme à l'écran...), tu DOIS insérer un placeholder :`,
+  ``,
+  `  <img data-placeholder="true" alt="Description précise de l'image attendue. Soit explicite : nom de l'écran, élément à mettre en évidence, action visible.">`,
+  ``,
+  `Le placeholder s'affiche dans l'éditeur comme une zone grise « image à uploader », et le rédacteur peut cliquer dessus pour téléverser la vraie image. Les placeholders ne sont JAMAIS publiés vers Crisp (notre converter les ignore au push).`,
+  ``,
+  `Bonne pratique : 1 placeholder par section visuelle critique. Trop d'images dilue la pédagogie. Pas de placeholder pour les sujets purement textuels (ex. tarifs, mentions légales).`,
+  ``,
+  `Exemples de bons alt :`,
+  `  alt="Capture de l'écran « Alertes » d'Hyperveez, avec le bouton « Nouvelle alerte » entouré en haut à droite."`,
+  `  alt="Schéma : passerelle Buildy Edge raccordée au routeur 4G d'un côté et à la GTB Schneider de l'autre."`,
+  `  alt="Photo : QR code collé sur la porte d'une armoire électrique, scannable depuis l'application Gojee."`,
   ``,
   `Embeds vidéo (rares — uniquement si pertinent) :`,
   `  <a href="https://www.youtube.com/watch?v=ID" data-embed="youtube">titre vidéo</a>`,
@@ -932,76 +968,112 @@ function getActivePrompt(key, fallback) {
   return fallback;
 }
 
-// Construit un bloc texte agrégeant le corpus Buildy (sections types,
-// équipements, fonctionnalités) + optionnellement les titres FAQ existants.
-// Volontairement compact (titre + premier paragraphe) pour rester sous le
-// budget tokens. Le résultat est cacheable (change rarement).
-function buildBuildyCorpusContext({ includeFaqTitles = false } = {}) {
+// Construit un bloc texte agrégeant le corpus Buildy COMPLET pour l'IA :
+// sections types, équipements (avec listes de points), fonctionnalités, plus
+// les articles FAQ déjà publiés (titre + URL Crisp + résumé) pour permettre
+// les liens internes. Cacheable (change rarement) -> cache_control ephemeral
+// côté appelant pour économiser les tokens entre appels successifs.
+//
+// Options :
+//   - mode 'full' (défaut) : corpus le plus complet possible (1500 chars/entité)
+//                            pour les modes rewrite / generate.
+//   - mode 'titles'         : corpus minimal pour suggest_missing (titres+résumé court).
+function buildBuildyCorpusContext({ mode = 'full' } = {}) {
   const lines = [];
-  const truncate = (html, max = 280) => {
+  const isFull = mode === 'full';
+  const MAX = isFull ? 1500 : 240;
+  const truncate = (html, max = MAX) => {
     const txt = stripHtml(html || '');
     return txt.length > max ? txt.slice(0, max) + '…' : txt;
   };
 
-  // Sections types narratives
+  lines.push('# CORPUS BUILDY — SOURCE DE VÉRITÉ POUR LA RÉDACTION');
+  lines.push('');
+  lines.push('Ce corpus est la SEULE source que tu peux utiliser pour rédiger les articles. Toute affirmation factuelle (nom d\'écran, fonctionnalité, capacité, valeur, comportement) doit être traçable à un élément de ce corpus. Si une info n\'est pas ici, ne l\'invente pas.');
+  lines.push('');
+
+  // ── Sections types narratives ──────────────────────────────────
   try {
     const sections = db.sectionTemplates?.list?.({ kind: 'standard' }) || [];
     if (sections.length) {
-      lines.push('## SECTIONS TYPES (narratives)');
+      lines.push('## SECTIONS TYPES NARRATIVES (chapitres documentaires Buildy)');
       for (const s of sections) {
         if (!s.title) continue;
         const summary = truncate(s.description_html || s.body_html || '');
-        lines.push(`- ${s.title}${summary ? ' — ' + summary : ''}`);
+        lines.push(`### ${s.title}`);
+        if (summary) lines.push(summary);
+        if (s.bacs_articles) lines.push(`(BACS : ${s.bacs_articles})`);
+        lines.push('');
       }
-      lines.push('');
-    }
-  } catch { /* table ou méthode absente */ }
-
-  // Équipements (templates)
-  try {
-    const eqs = db.equipmentTemplates?.list?.() || [];
-    if (eqs.length) {
-      lines.push('## ÉQUIPEMENTS BUILDY (templates)');
-      for (const e of eqs) {
-        if (!e.name) continue;
-        const summary = truncate(e.description_html || '');
-        lines.push(`- ${e.name}${e.category ? ' [' + e.category + ']' : ''}${summary ? ' — ' + summary : ''}`);
-      }
-      lines.push('');
     }
   } catch { /* */ }
 
-  // Fonctionnalités (sections is_functionality=1)
+  // ── Équipements (templates + points si dispo) ─────────────────
+  try {
+    const eqs = db.equipmentTemplates?.list?.() || [];
+    if (eqs.length) {
+      lines.push('## ÉQUIPEMENTS / SYSTÈMES TECHNIQUES BUILDY');
+      for (const e of eqs) {
+        if (!e.name) continue;
+        const summary = truncate(e.description_html || '');
+        lines.push(`### ${e.name}${e.category ? ' [' + e.category + ']' : ''}`);
+        if (summary) lines.push(summary);
+        if (isFull && e.bacs_justification) {
+          const j = truncate(e.bacs_justification, 600);
+          if (j) lines.push(`*Justification BACS :* ${j}`);
+        }
+        // Liste de points (si la méthode existe)
+        if (isFull) {
+          try {
+            const points = db.equipmentTemplatePoints?.listByTemplate?.(e.id) || [];
+            if (points.length) {
+              const sample = points.slice(0, 12).map((p) => p.label || p.slug).filter(Boolean);
+              if (sample.length) lines.push(`*Points :* ${sample.join(', ')}${points.length > 12 ? `, … (+${points.length - 12})` : ''}`);
+            }
+          } catch { /* */ }
+        }
+        lines.push('');
+      }
+    }
+  } catch { /* */ }
+
+  // ── Fonctionnalités (is_functionality=1) ──────────────────────
   try {
     const features = db.sectionTemplates?.list?.({ kind: 'functionality' }) || [];
     if (features.length) {
-      lines.push('## FONCTIONNALITÉS BUILDY');
+      lines.push('## FONCTIONNALITÉS BUILDY (matrice E/S/P)');
       for (const f of features) {
         if (!f.title) continue;
         const summary = truncate(f.description_html || f.body_html || '');
         const levels = [];
-        if (f.avail_e) levels.push(`E:${f.avail_e}`);
-        if (f.avail_s) levels.push(`S:${f.avail_s}`);
-        if (f.avail_p) levels.push(`P:${f.avail_p}`);
+        if (f.avail_e) levels.push(`Essentials:${f.avail_e}`);
+        if (f.avail_s) levels.push(`Smart:${f.avail_s}`);
+        if (f.avail_p) levels.push(`Premium:${f.avail_p}`);
         const lvl = levels.length ? ' (' + levels.join(' / ') + ')' : '';
-        lines.push(`- ${f.title}${lvl}${summary ? ' — ' + summary : ''}`);
+        lines.push(`### ${f.title}${lvl}`);
+        if (summary) lines.push(summary);
+        if (f.bacs_articles) lines.push(`(BACS : ${f.bacs_articles})`);
+        lines.push('');
       }
-      lines.push('');
     }
   } catch { /* */ }
 
-  if (includeFaqTitles) {
-    try {
-      const titles = db.faqArticles?.listAllTitles?.() || [];
-      if (titles.length) {
-        lines.push('## ARTICLES FAQ EXISTANTS (titres)');
-        for (const t of titles) {
-          lines.push(`- ${t.title}`);
-        }
+  // ── Articles FAQ déjà publiés sur help.buildy.fr (avec URL) ──
+  // Permet à l'IA de proposer des liens internes au lieu de re-rédiger
+  // un sujet déjà couvert.
+  try {
+    const articles = db.faqArticles?.listForCorpus?.() || [];
+    if (articles.length) {
+      lines.push('## ARTICLES FAQ DÉJÀ PUBLIÉS (utilise leur URL pour les liens internes)');
+      for (const a of articles) {
+        if (!a.title || !a.crisp_url) continue;
+        const summary = truncate(a.content_html, isFull ? 600 : 180);
+        lines.push(`### [${a.title}](${a.crisp_url})${a.category_name ? ' — *' + a.category_name + '*' : ''}`);
+        if (summary) lines.push(summary);
         lines.push('');
       }
-    } catch { /* */ }
-  }
+    }
+  } catch { /* */ }
 
   return lines.join('\n');
 }
@@ -1022,7 +1094,7 @@ function _extractTitle(text, currentTitle) {
 
 async function assistFaqRewrite({ article }) {
   if (!article) throw new Error('Article manquant');
-  const corpus = buildBuildyCorpusContext({ includeFaqTitles: false });
+  const corpus = buildBuildyCorpusContext({ mode: 'full' });
   const systemBlocks = [
     {
       type: 'text',
@@ -1059,7 +1131,7 @@ async function assistFaqRewrite({ article }) {
 
 async function assistFaqGenerate({ question, categoryName = null }) {
   if (!question || !question.trim()) throw new Error('Question manquante');
-  const corpus = buildBuildyCorpusContext({ includeFaqTitles: false });
+  const corpus = buildBuildyCorpusContext({ mode: 'full' });
   const systemBlocks = [
     {
       type: 'text',
