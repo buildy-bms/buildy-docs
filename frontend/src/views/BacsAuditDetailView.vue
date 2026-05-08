@@ -1050,7 +1050,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
           <span class="text-gray-400">{{ isBacs ? 'Audit BACS' : 'Audit GTB (Classique)' }}</span>
           <span v-if="document?.updated_by_name" class="text-gray-400">
             · édité par <strong class="font-medium text-gray-600">{{ document.updated_by_name }}</strong>
-            <span v-if="document.updated_at" :title="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
+            <span v-if="document.updated_at" v-tooltip="document.updated_at"> il y a {{ relativeTime(document.updated_at) }}</span>
           </span>
           <span v-if="document?.delivered_at" class="ml-2 inline-flex items-center gap-1 text-emerald-700">
             ✓ Livré le {{ formatDate(document.delivered_at) }}
@@ -1082,7 +1082,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       <div class="flex items-center gap-2 flex-wrap shrink-0">
         <!-- Aperçu HTML (avant export PDF) -->
         <button @click="openPreview"
-          title="Aperçu HTML rapide du rapport (sans génération PDF)"
+          v-tooltip="'Aperçu HTML rapide du rapport (sans génération PDF)'"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap">
           <EyeIcon class="w-4 h-4 shrink-0" />
           Aperçu
@@ -1104,7 +1104,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
         <!-- Livrer (CTA principal vert) -->
         <button @click="deliver" :disabled="delivering"
-          title="Génère le PDF final + fige le snapshot Git"
+          v-tooltip="'Génère le PDF final + fige le snapshot Git'"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
           <CheckCircleIcon class="w-4 h-4 shrink-0" />
           {{ delivering ? 'Livraison…' : 'Livrer' }}
@@ -1356,7 +1356,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
     <!-- Modale d'edition de notes (zones, systemes, compteurs, GTB, devices) -->
     <NotesEditorModal
       :open="notesModal.open"
-      :title="notesModal.title"
+      v-tooltip="notesModal.title"
       :context-label="notesModal.contextLabel"
       v-model="notesModal.html"
       :assist-context="notesModal.assistContext"
@@ -1418,7 +1418,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
     <PdfPreviewModal
       v-if="previewOpen"
-      :title="`Aperçu — ${isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
+      v-tooltip="`Aperçu — ${isBacs ? 'rapport BACS' : 'audit GTB'} ${document?.client_name || ''}`"
       :preview-url="previewUrl"
       :downloading="exporting"
       download-label="Télécharger le PDF"

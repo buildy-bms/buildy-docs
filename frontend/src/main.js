@@ -15,6 +15,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import { tooltipDirective } from './lib/tooltip-directive'
 
 // Apres un deploy, l'index.html charge en cache pointe vers des chunks
 // dont les hashs ont change cote serveur. L'import dynamique echoue
@@ -41,7 +42,11 @@ function handleChunkLoadError(reason) {
 window.addEventListener('vite:preloadError', (ev) => handleChunkLoadError(ev?.payload))
 router.onError((err) => handleChunkLoadError(err))
 
-createApp(App).use(createPinia()).use(router).mount('#app')
+const app = createApp(App)
+app.use(createPinia())
+app.use(router)
+app.directive('tooltip', tooltipDirective)
+app.mount('#app')
 
 // Service worker : PWA install standalone iOS / Android.
 // SW minimal (cache assets statiques uniquement, pas d'interception

@@ -506,10 +506,10 @@ onMounted(async () => {
                   <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ it.t.points_count }}</span>
                 </td>
                 <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <span v-if="it.t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" :title="`Utilisé dans ${it.t.sections_using_count} section(s) AF`">
+                  <span v-if="it.t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${it.t.sections_using_count} section(s) AF`">
                     <BookmarkIcon class="w-3 h-3" /> {{ it.t.sections_using_count }}
                   </span>
-                  <span v-else class="text-[11px] text-gray-300 italic" title="Jamais utilisé — candidat au nettoyage">∅ inutilisé</span>
+                  <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé — candidat au nettoyage'">∅ inutilisé</span>
                 </td>
                 <td class="px-4 py-2 whitespace-nowrap">
                   <ProtocolPills v-if="it.t.preferred_protocols" :protocols="it.t.preferred_protocols" :show-label="false" :max="2" />
@@ -519,7 +519,7 @@ onMounted(async () => {
                 <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
                   <button type="button" @click="openClone(it.t)"
                           class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                          title="Dupliquer ce système technique (avec ses points et captures)">
+                          v-tooltip="'Dupliquer ce système technique (avec ses points et captures)'">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -733,7 +733,7 @@ onMounted(async () => {
 
     <BulkRegenerateModal
       v-if="showBulk"
-      title="Régénérer les systèmes techniques avec Claude"
+      v-tooltip="'Régénérer les systèmes techniques avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -745,7 +745,7 @@ onMounted(async () => {
          sections AF qui referencent ce modele d'equipement). -->
     <BaseModal
       v-if="photosModalTemplate"
-      :title="`Captures d'écran — ${photosModalTemplate.name}`"
+      v-tooltip="`Captures d'écran — ${photosModalTemplate.name}`"
       size="lg"
       @close="closePhotos"
     >
@@ -763,7 +763,7 @@ onMounted(async () => {
 
     <BaseModal
       v-if="cloning"
-      title="Dupliquer le système technique"
+      v-tooltip="'Dupliquer le système technique'"
       size="md"
       @close="cloning = null"
     >

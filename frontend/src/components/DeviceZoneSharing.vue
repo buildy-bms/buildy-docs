@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
           ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
           : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700',
       ]"
-      :title="sharedCount > 0
+      v-tooltip="sharedCount > 0
         ? `Équipement partagé avec ${sharedCount} autre zone${sharedCount > 1 ? 's' : ''}`
         : 'Partager cet équipement avec d\'autres zones'"
     >
