@@ -16,7 +16,7 @@
  *   originZoneId : id de la zone d'origine (du système parent)
  *   zones : [{ zone_id, name, ... }]   liste de zones du document
  */
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ShareIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { updateBacsDeviceZones } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -82,11 +82,48 @@ async function toggleAll() {
   }
 }
 
-function onDocClick(e) {
-  if (rootRef.value && !rootRef.value.contains(e.target)) close()
+// Le dropdown est téléporté au <body> pour échapper aux conteneurs en
+// overflow:hidden des cartes système (qui clippaient la liste après 1-2 zones).
+// Position fixed calculée depuis getBoundingClientRect du bouton.
+const popupRef = ref(null)
+const pos = ref({ top: 0, left: 0 })
+const DROPDOWN_W = 256 // w-64 en px (Tailwind)
+
+function updatePos() {
+  const r = rootRef.value?.getBoundingClientRect()
+  if (!r) return
+  // Aligné à droite du bouton, sous le bouton, avec 4px d'espace.
+  pos.value = {
+    top: r.bottom + 4,
+    left: Math.max(8, r.right - DROPDOWN_W),
+  }
 }
+
+function onDocClick(e) {
+  // Click en dehors du bouton ET en dehors du popup téléporté = fermer.
+  if (rootRef.value && rootRef.value.contains(e.target)) return
+  if (popupRef.value && popupRef.value.contains(e.target)) return
+  close()
+}
+
+watch(open, async (v) => {
+  if (v) {
+    await nextTick()
+    updatePos()
+    window.addEventListener('scroll', updatePos, true)
+    window.addEventListener('resize', updatePos)
+  } else {
+    window.removeEventListener('scroll', updatePos, true)
+    window.removeEventListener('resize', updatePos)
+  }
+})
+
 onMounted(() => document.addEventListener('mousedown', onDocClick))
-onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocClick)
+  window.removeEventListener('scroll', updatePos, true)
+  window.removeEventListener('resize', updatePos)
+})
 </script>
 
 <template>
@@ -109,9 +146,16 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
       <span v-else>+ Partager</span>
     </button>
 
+  </div>
+
+  <!-- Téléporté au <body> pour échapper au overflow:hidden des cartes parentes
+       (qui clippait la liste après 1-2 zones visibles). -->
+  <Teleport to="body">
     <div
       v-if="open"
-      class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg w-64 text-sm flex flex-col max-h-112"
+      ref="popupRef"
+      :style="{ position: 'fixed', top: pos.top + 'px', left: pos.left + 'px', width: DROPDOWN_W + 'px' }"
+      class="z-60 bg-white border border-gray-200 rounded-lg shadow-lg text-sm flex flex-col max-h-112"
     >
       <!-- Header sticky -->
       <div class="px-3 py-2 border-b border-gray-100 shrink-0">
@@ -159,5 +203,5 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
         </label>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
