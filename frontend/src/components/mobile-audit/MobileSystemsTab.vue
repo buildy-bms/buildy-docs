@@ -14,18 +14,14 @@ import {
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsSystem, updateBacsDeviceZones, createBacsDevice, updateBacsDevice, deleteBacsDevice, updateBacsThermal } from '@/api'
+import { updateBacsSystem, updateBacsDeviceZones, createBacsDevice, updateBacsDevice, deleteBacsDevice } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
+import MobileThermalRegulationSheet from './MobileThermalRegulationSheet.vue'
 import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
-import {
-  PRODUCTION_REGULATION_OPTIONS,
-  DISTRIBUTION_REGULATION_OPTIONS,
-  EMISSION_REGULATION_OPTIONS,
-} from '@/composables/thermalRegulationOptions'
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -34,54 +30,36 @@ const { confirm } = useConfirm()
 
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
-const REGULATION_OPTIONS = [
-  { value: null, label: '— Sélectionner —' },
-  { value: 'per_room', label: 'Par pièce' },
-  { value: 'per_zone', label: 'Par zone' },
-  { value: 'central_only', label: 'Centrale uniquement' },
-  { value: 'none', label: 'Aucune' },
-]
-const GENERATOR_OPTIONS = [
-  { value: null, label: '— Sélectionner —' },
-  { value: 'gas', label: 'Gaz' },
-  { value: 'electric', label: 'Effet Joule' },
-  { value: 'heat_pump', label: 'Pompe à chaleur' },
-  { value: 'wood_appliance', label: 'Appareil bois (exempté R175-6)' },
-  { value: 'district_heating', label: 'Réseau de chaleur' },
-  { value: 'other', label: 'Autre' },
-]
-
-let thermalSaveTimer = null
-async function patchThermal(t, patch) {
-  Object.assign(t, patch)
-  clearTimeout(thermalSaveTimer)
-  thermalSaveTimer = setTimeout(async () => {
-    try {
-      await updateBacsThermal(t.id, patch)
-      await audit.refreshActionItems()
-    } catch { error('Sauvegarde régulation impossible') }
-  }, 400)
-}
-
-// Régulation thermique pour un (zone, catégorie) donné
+// ── Régulation thermique : ouverture du drill-down ──────────────────
+// Le panneau inline a été déplacé dans MobileThermalRegulationSheet
+// (sous-page tactile) pour alléger la liste des systèmes. Ici on calcule
+// juste le résumé compact affiché sur le bouton qui ouvre le sheet.
 function thermalFor(zoneId, category) {
   return thermal.value.find(t => t.zone_id === zoneId && (t.category || 'heating') === category)
 }
 
-// Options de devices (chaud/froid) d'une zone, formatées pour
-// SearchableSelect. Sert aux 3 niveaux Production / Distribution / Émission.
-function deviceOptions(zoneId, category) {
-  const sysIds = systems.value
-    .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
-    .map(s => s.id)
-  return devices.value
-    .filter(d => sysIds.includes(d.system_id))
-    .map(d => ({
-      value: d.id,
-      label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,
-      hint: d.brand && d.model_reference ? `${d.brand} ${d.model_reference}` : (d.brand || d.model_reference || ''),
-    }))
+const REGULATION_LABEL = {
+  per_room: 'par pièce',
+  per_zone: 'par zone',
+  central_only: 'centrale',
+  none: 'aucune',
 }
+
+function thermalStatus(zoneId, category) {
+  const t = thermalFor(zoneId, category)
+  if (!t) return { label: 'Non concernée', tone: 'neutral' }
+  if (t.generator_exempt_wood) return { label: 'Exempté — appareil bois', tone: 'neutral' }
+  if (!t.has_automatic_regulation) return { label: 'À renseigner', tone: 'warn' }
+  const granularity = REGULATION_LABEL[t.regulation_type]
+  if (granularity) return { label: `Automatique · ${granularity}`, tone: 'ok' }
+  return { label: 'Automatique · à compléter', tone: 'warn' }
+}
+
+const thermalSheetTarget = ref(null)
+function openThermalSheet(zoneId, category) {
+  thermalSheetTarget.value = { zoneId, category }
+}
+function closeThermalSheet() { thermalSheetTarget.value = null }
 
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
@@ -433,135 +411,26 @@ async function removeDevice(d) {
               </div>
             </div>
 
-            <!-- Régulation thermique R175-6 (heating + cooling présents en mode BACS) -->
-            <div
+            <!-- Régulation thermique R175-6 : déclencheur compact qui ouvre la sous-page -->
+            <button
               v-if="isBacs && s.present && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
-              class="mt-4 p-4 bg-amber-50/60 border border-amber-200 rounded-xl space-y-4"
+              type="button"
+              @click="openThermalSheet(s.zone_id, s.system_category)"
+              class="mt-3 w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
             >
-              <p class="text-sm font-semibold text-amber-800 uppercase tracking-wider">
-                Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
-              </p>
-
-              <!-- Régulation auto avec explication -->
-              <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl cursor-pointer border border-gray-100">
-                <div class="flex-1 min-w-0">
-                  <p class="text-base text-gray-900 font-medium">Régulation automatique présente ?</p>
-                  <p class="text-sm text-gray-500 mt-1 leading-relaxed">
-                    Système qui ajuste seul la température (thermostat connecté, sonde + vanne motorisée, GTB…).
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  :checked="!!thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation"
-                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { has_automatic_regulation: e.target.checked })"
-                  class="mt-1 shrink-0"
-                />
-              </label>
-
-              <template v-if="thermalFor(s.zone_id, s.system_category)?.has_automatic_regulation">
-                <div class="px-4 py-4 bg-white rounded-xl border border-gray-100 space-y-2">
-                  <p class="text-sm font-semibold text-gray-700">Granularité</p>
-                  <SearchableSelect
-                    :model-value="thermalFor(s.zone_id, s.system_category)?.regulation_type"
-                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { regulation_type: v || null })"
-                    :options="REGULATION_OPTIONS.filter(x => x.value)"
-                    placeholder="— Sélectionner —" />
-                </div>
-
-                <!-- Production : équipement + (si rempli) Type, Âge, Régulation -->
-                <div class="px-4 py-4 bg-white rounded-xl border border-gray-100 space-y-3">
-                  <p class="text-sm font-semibold text-gray-700">🔧 Production</p>
-                  <SearchableSelect
-                    :model-value="thermalFor(s.zone_id, s.system_category)?.generator_device_id"
-                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_device_id: v != null ? parseInt(v, 10) : null })"
-                    :options="deviceOptions(s.zone_id, s.system_category)"
-                    placeholder="— aucun équipement"
-                    search-placeholder="Rechercher un équipement…" />
-                  <div v-if="thermalFor(s.zone_id, s.system_category)?.generator_device_id" class="space-y-3 pl-4 border-l-4 border-amber-300">
-                    <div class="space-y-1.5">
-                      <p class="text-xs font-medium text-gray-500">Type de production</p>
-                      <SearchableSelect
-                        :model-value="thermalFor(s.zone_id, s.system_category)?.generator_type"
-                        @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_type: v || null })"
-                        :options="GENERATOR_OPTIONS.filter(x => x.value)"
-                        creatable placeholder="ex : pompe à chaleur, chaudière…" />
-                    </div>
-                    <div class="space-y-1.5">
-                      <p class="text-xs font-medium text-gray-500">Âge de l'équipement (ans)</p>
-                      <input
-                        type="number" inputmode="numeric" pattern="[0-9]*" min="0"
-                        :value="thermalFor(s.zone_id, s.system_category)?.generator_age_years"
-                        @blur="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                        placeholder="ex : 8"
-                        class="w-full px-4 py-3 text-base border border-gray-200 rounded-lg bg-white" />
-                    </div>
-                    <div class="space-y-1.5">
-                      <p class="text-xs font-medium text-gray-500">Régulation côté production</p>
-                      <SearchableSelect
-                        :model-value="thermalFor(s.zone_id, s.system_category)?.production_regulation"
-                        @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { production_regulation: v || null })"
-                        :options="PRODUCTION_REGULATION_OPTIONS"
-                        creatable placeholder="ex : sonde extérieure…" />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Distribution : équipement + (si rempli) Régulation -->
-                <div class="px-4 py-4 bg-white rounded-xl border border-gray-100 space-y-3">
-                  <p class="text-sm font-semibold text-gray-700">🚰 Distribution</p>
-                  <SearchableSelect
-                    :model-value="thermalFor(s.zone_id, s.system_category)?.distribution_device_id"
-                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { distribution_device_id: v != null ? parseInt(v, 10) : null })"
-                    :options="deviceOptions(s.zone_id, s.system_category)"
-                    placeholder="— aucune (DRV, poêle…)"
-                    search-placeholder="Rechercher un équipement…" />
-                  <div v-if="thermalFor(s.zone_id, s.system_category)?.distribution_device_id" class="space-y-1.5 pl-4 border-l-4 border-amber-300">
-                    <p class="text-xs font-medium text-gray-500">Régulation côté distribution</p>
-                    <SearchableSelect
-                      :model-value="thermalFor(s.zone_id, s.system_category)?.distribution_regulation"
-                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { distribution_regulation: v || null })"
-                      :options="DISTRIBUTION_REGULATION_OPTIONS"
-                      creatable placeholder="ex : pompe ΔP variable…" />
-                  </div>
-                </div>
-
-                <!-- Émission : équipement + (si rempli) Régulation -->
-                <div class="px-4 py-4 bg-white rounded-xl border border-gray-100 space-y-3">
-                  <p class="text-sm font-semibold text-gray-700">♨️ Émission</p>
-                  <SearchableSelect
-                    :model-value="thermalFor(s.zone_id, s.system_category)?.emission_device_id"
-                    @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { emission_device_id: v != null ? parseInt(v, 10) : null })"
-                    :options="deviceOptions(s.zone_id, s.system_category)"
-                    placeholder="— aucun"
-                    search-placeholder="Rechercher un équipement…" />
-                  <div v-if="thermalFor(s.zone_id, s.system_category)?.emission_device_id" class="space-y-1.5 pl-4 border-l-4 border-amber-300">
-                    <p class="text-xs font-medium text-gray-500">Régulation côté émission</p>
-                    <SearchableSelect
-                      :model-value="thermalFor(s.zone_id, s.system_category)?.emission_regulation"
-                      @update:modelValue="v => patchThermal(thermalFor(s.zone_id, s.system_category), { emission_regulation: v || null })"
-                      :options="EMISSION_REGULATION_OPTIONS"
-                      creatable placeholder="ex : robinets thermostatiques…" />
-                  </div>
-                </div>
-              </template>
-
-              <!-- Exempté bois — uniquement pour le chauffage (R175-6 II ne traite que les appareils de chauffage au bois) -->
-              <label v-if="s.system_category === 'heating'"
-                     class="flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl cursor-pointer border border-gray-100">
-                <div class="flex-1 min-w-0">
-                  <p class="text-base text-gray-900 font-medium">Exempté — appareil bois</p>
-                  <p class="text-sm text-gray-500 mt-1 leading-relaxed">
-                    Cocher si la production est un appareil <strong>indépendant</strong> de chauffage au bois (poêle, insert). Exempté de R175-6 (II du décret).
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  :checked="!!thermalFor(s.zone_id, s.system_category)?.generator_exempt_wood"
-                  @change="e => patchThermal(thermalFor(s.zone_id, s.system_category), { generator_exempt_wood: e.target.checked })"
-                  class="mt-1 shrink-0"
-                />
-              </label>
-            </div>
+              <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-amber-900 truncate">
+                  Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
+                </p>
+                <p :class="['text-xs mt-0.5 truncate',
+                            thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
+                            thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
+                  {{ thermalStatus(s.zone_id, s.system_category).label }}
+                </p>
+              </div>
+              <ChevronRightIcon class="w-5 h-5 text-amber-400 shrink-0" />
+            </button>
           </div>
         </div>
       </div>
@@ -738,6 +607,14 @@ async function removeDevice(d) {
       :zone-name="libraryDevicePickerSystem.zone_name || ''"
       @close="libraryDevicePickerSystem = null"
       @added="audit.refreshAuditCore()"
+    />
+
+    <!-- Sous-page régulation thermique R175-6 -->
+    <MobileThermalRegulationSheet
+      :open="!!thermalSheetTarget"
+      :zone-id="thermalSheetTarget?.zoneId"
+      :category="thermalSheetTarget?.category || 'heating'"
+      @close="closeThermalSheet"
     />
 
   </div>
