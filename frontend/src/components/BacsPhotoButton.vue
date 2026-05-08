@@ -229,18 +229,20 @@ async function saveCaptions() {
 }
 
 const btnCls = computed(() => {
-  const base = 'inline-flex items-center justify-center gap-2 rounded-xl border transition-all font-medium'
-  // Mobile : gros bouton tactile bleu plein-largeur. Desktop : compact ghost.
+  // Aligné sur le style des autres boutons d'action (Notes, HS, Câblé,
+  // Arrêt manuel) : rounded-md, px-2 py-1, text-[11px], icône w-3.5 h-3.5,
+  // tons border-200/text-700/bg-50 cohérents.
+  const base = 'inline-flex items-center justify-center gap-1 rounded-md border transition font-medium whitespace-nowrap'
   if (isMobile.value) {
     return `${base} px-4 py-3.5 text-base w-full bg-indigo-600 border-indigo-600 text-white active:bg-indigo-700`
   }
   const size = props.size === 'md'
     ? 'px-2.5 py-1 text-xs'
-    : 'px-2 py-0.5 text-[11px]'
-  if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300 scale-105`
+    : 'px-2 py-1 text-[11px]'
+  if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300/50`
   const tone = photos.value.length
-    ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+    ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+    : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700'
   return `${base} ${size} ${tone}`
 })
 
@@ -288,12 +290,15 @@ function exifTooltip(p) {
       @dragleave.prevent="onDragLeave"
       @drop.prevent="onDrop"
     >
-      <CameraIcon :class="['transition-all shrink-0', isMobile ? 'w-5 h-5' : (isDragOver ? 'w-5 h-5' : 'w-4 h-4')]" />
-      <span v-if="isMobile" class="font-medium">
-        Photos<span v-if="photos.length"> ({{ photos.length }})</span>
-      </span>
-      <span v-else-if="photos.length && !isDragOver" class="font-medium">{{ photos.length }}</span>
-      <span v-if="isDragOver && !isMobile" class="font-semibold text-[11px] whitespace-nowrap">Deposer ici</span>
+      <CameraIcon :class="['shrink-0', isMobile ? 'w-5 h-5' : 'w-3.5 h-3.5']" />
+      <template v-if="isMobile">
+        <span class="font-medium">Photos<span v-if="photos.length"> ({{ photos.length }})</span></span>
+      </template>
+      <template v-else>
+        <span v-if="isDragOver">Déposer ici</span>
+        <span v-else-if="photos.length">{{ photos.length }} photo<span v-if="photos.length > 1">s</span></span>
+        <span v-else>+ Photo</span>
+      </template>
     </button>
 
     <input
