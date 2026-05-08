@@ -6,10 +6,11 @@ const log = require('../lib/logger').system;
 const { slugify } = require('../lib/slug');
 const { snapshotAndBump } = require('../lib/template-propagation');
 
-// Énumérations alignées sur bacs_audit_system_devices (cf routes/bacs-audit.js).
-// Servent au pré-remplissage du device créé depuis la modale Bibliothèque.
+// Énergies = enum fermé (aligné sur bacs_audit_system_devices.energy_source).
+// Niveau (default_device_role) = TEXT libre depuis la mig 99 : l'admin
+// peut ajouter ses propres niveaux (au-delà de Production / Distribution /
+// Émission / Régulation) via le SearchableSelect creatable de la modale.
 const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
-const DEVICE_ROLES = ['production','distribution','emission','regulation','autre'];
 
 const createTemplateSchema = z.object({
   slug: z.string().optional(),
@@ -23,7 +24,7 @@ const createTemplateSchema = z.object({
   icon_color: z.string().nullable().optional(),
   preferred_protocols: z.string().nullable().optional(),
   default_energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
-  default_device_role: z.enum(DEVICE_ROLES).nullable().optional(),
+  default_device_role: z.string().nullable().optional(),
 });
 
 const updateTemplateSchema = createTemplateSchema.partial().omit({ slug: true });

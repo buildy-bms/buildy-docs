@@ -602,6 +602,43 @@ async function destroy() {
       </div>
       </fieldset>
 
+      <!-- Sous-bloc PRÉ-REMPLISSAGE : valeurs par défaut servant à pré-remplir
+           l'équipement créé depuis ce modèle via le bouton « Bibliothèque »
+           d'un système BACS. Le niveau accepte des valeurs libres (creatable). -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5 space-y-2">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Pré-remplissage
+        </legend>
+        <p class="text-[11px] text-gray-500">
+          Énergie et niveau pré-remplis sur l'équipement créé depuis ce modèle. Tape un nouveau niveau pour l'ajouter à la liste.
+        </p>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+              Énergie par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <SearchableSelect
+              v-model="form.default_energy_source"
+              :options="ENERGY_OPTIONS"
+              placeholder="—"
+              :clearable="true"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+              Niveau par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <SearchableSelect
+              v-model="form.default_device_role"
+              :options="ROLE_OPTIONS"
+              placeholder="—"
+              :clearable="true"
+              :creatable="true"
+            />
+          </div>
+        </div>
+      </fieldset>
+
       <!-- Sous-bloc APPARENCE : icone + couleur. -->
       <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5">
         <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
@@ -658,36 +695,6 @@ async function destroy() {
             </div>
           </div>
         </div>
-      <!-- Pré-remplissage du device créé depuis ce modèle via le bouton
-           « Bibliothèque » d'un système BACS. Champs facultatifs : si vides,
-           le device démarre avec le champ correspondant non renseigné. -->
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
-            Énergie par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
-          </label>
-          <SearchableSelect
-            v-model="form.default_energy_source"
-            :options="ENERGY_OPTIONS"
-            placeholder="—"
-            :clearable="true"
-          />
-        </div>
-        <div>
-          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
-            Niveau par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
-          </label>
-          <SearchableSelect
-            v-model="form.default_device_role"
-            :options="ROLE_OPTIONS"
-            placeholder="—"
-            :clearable="true"
-          />
-        </div>
-        <p class="col-span-2 text-[11px] text-gray-500 -mt-1">
-          Pré-remplit l'équipement créé depuis ce modèle via le bouton « Bibliothèque » d'un système BACS.
-        </p>
-      </div>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Protocoles exigés</label>
         <div class="flex flex-wrap gap-1.5 items-center">

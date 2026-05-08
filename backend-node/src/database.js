@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 98;
+const TARGET_VERSION = 99;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3651,6 +3651,62 @@ function runMigrations() {
 
     log.info('Migration 98 appliquee : partage multi-zones rebasculé au niveau device');
     db.pragma('user_version = 98');
+  }
+
+  if (current < 99) {
+    // Lot — Niveaux libres (Production / Distribution / Émission / Régulation +
+    // valeurs custom). On retire la contrainte CHECK sur device_role pour
+    // permettre à l'admin d'ajouter ses propres niveaux depuis la modale
+    // de modèle d'équipement (SearchableSelect creatable).
+    //
+    // SQLite ne permet pas de DROP CHECK directement → recréation de la
+    // table en conservant les données.
+    db.exec(`
+      BEGIN;
+      CREATE TABLE bacs_audit_system_devices_new99 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        name TEXT,
+        brand TEXT,
+        model_reference TEXT,
+        power_kw REAL,
+        energy_source TEXT
+          CHECK (energy_source IS NULL OR energy_source IN
+            ('gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre')),
+        device_role TEXT,
+        communication_protocol TEXT
+          CHECK (communication_protocol IS NULL OR communication_protocol IN
+            ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+             'knx','mbus','mqtt','lorawan','autre','non_communicant','absent')),
+        location TEXT,
+        notes TEXT,
+        notes_html TEXT,
+        wired INTEGER,
+        meets_r175_3_p4 INTEGER,
+        meets_r175_3_p4_autonomous INTEGER,
+        managed_by_bms INTEGER,
+        out_of_service INTEGER DEFAULT 0,
+        bms_integration_out_of_service INTEGER DEFAULT 0,
+        communication_protocols TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO bacs_audit_system_devices_new99
+        SELECT id, system_id, position, name, brand, model_reference, power_kw,
+               energy_source, device_role, communication_protocol, location, notes,
+               notes_html, wired, meets_r175_3_p4, meets_r175_3_p4_autonomous,
+               managed_by_bms, out_of_service, bms_integration_out_of_service,
+               communication_protocols, created_at, updated_at
+        FROM bacs_audit_system_devices;
+      DROP TABLE bacs_audit_system_devices;
+      ALTER TABLE bacs_audit_system_devices_new99 RENAME TO bacs_audit_system_devices;
+      CREATE INDEX idx_bacs_devices_system ON bacs_audit_system_devices(system_id, position);
+      COMMIT;
+    `);
+
+    log.info('Migration 99 appliquee : device_role devient TEXT libre (niveaux custom)');
+    db.pragma('user_version = 99');
   }
 
   if (current > TARGET_VERSION) {
