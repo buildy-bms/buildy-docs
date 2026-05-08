@@ -1,75 +1,137 @@
 <!--
   Crisp Helpdesk — Custom HTML Buildy
-  À coller dans : Crisp → Helpdesk → Settings → Custom Code → Custom HTML
+  Push automatique via : node scripts/push-crisp-custom-html.js
   Palette : navy #1b2842 · accent #00CD92 · light #f4f5f7
   Typo   : Poppins (titres) + Inter (corps) — cohérent PDF design system Buildy
+
+  IMPORTANT — fichier versionné en git. Toute modif doit être commitée.
+  Incident 2026-05-09 : ~50 itérations CSS perdues parce que jamais commitées.
 -->
 
 <!-- ============================================================================
-     Hide empty paragraphs (CSS ne peut matcher ni &nbsp; ni textContent)
-     Crisp insère <p><br></p> ET <p><span>&nbsp;</span></p> entre chaque bloc
-     selon l'origine du contenu (export Word vs Tiptap natif).
+     JS : nettoyage empty paragraphs (Crisp insère <p><br></p> et <p>&nbsp;</p>)
+        + raccourci "/" pour focus search bar
+        + injection des compteurs d'articles par catégorie sur la home
      ============================================================================ -->
 <script>
 (function() {
+  // ── Hide empty paragraphs (artefacts Crisp + Word imports) ─────────
   function cleanEmptyParagraphs() {
     var paragraphs = document.querySelectorAll('.csh-article article p, .csh-article-content-text p');
     paragraphs.forEach(function(p) {
-      // Strip toutes formes d'espaces (regular, non-breaking U+00A0, narrow nbsp U+202F, zero-width)
-      var text = (p.textContent || '').replace(/[\s  ​]/g, '');
+      var text = (p.textContent || '').replace(/[\s  ​]/g, ''); // espaces, U+00A0, U+202F, U+200B
       if (!text) p.style.display = 'none';
     });
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', cleanEmptyParagraphs);
-  } else {
-    cleanEmptyParagraphs();
-  }
-  // Au cas où Crisp re-render dynamiquement (SPA-style), on observe le DOM
-  if (typeof MutationObserver !== 'undefined') {
+  function startObserver() {
+    if (typeof MutationObserver === 'undefined' || !document.body) return;
     var debounce;
     new MutationObserver(function() {
       clearTimeout(debounce);
       debounce = setTimeout(cleanEmptyParagraphs, 150);
     }).observe(document.body, { childList: true, subtree: true });
   }
+
+  // ── Raccourci clavier "/" pour focus la search bar (style GitHub / Linear) ──
+  function bindSearchShortcut() {
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== '/') return;
+      var t = e.target;
+      var tag = (t.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || t.isContentEditable) return;
+      var search = document.querySelector('.csh-header-search input[type="search"]');
+      if (search) {
+        e.preventDefault();
+        search.focus();
+      }
+    });
+  }
+
+  // ── Compteur d'articles par catégorie sur la home ────────────────
+  function injectCategoryCounts() {
+    var cards = document.querySelectorAll('.csh-home-list.csh-home-list-large li a, .csh-home-list-large li a.csh-box-link');
+    if (!cards.length) return;
+    cards.forEach(function(card) {
+      if (card.dataset.countInjected) return;
+      card.dataset.countInjected = '1';
+      var href = card.getAttribute('href');
+      if (!href || !/\/category\//.test(href)) return;
+      fetch(href, { credentials: 'same-origin' })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var items = doc.querySelectorAll('li.csh-category-item');
+          var count = items.length;
+          var label = count === 0 ? 'Aucun article'
+                    : count === 1 ? '1 article'
+                    : count + ' articles';
+          var aside = card.querySelector('[class*="csh-home-list-aside"]');
+          if (!aside) return;
+          var badge = document.createElement('span');
+          badge.className = 'buildy-cat-count';
+          badge.textContent = label;
+          aside.appendChild(badge);
+        })
+        .catch(function() { /* silently fail */ });
+    });
+  }
+
+  function init() {
+    cleanEmptyParagraphs();
+    startObserver();
+    bindSearchShortcut();
+    injectCategoryCounts();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 <style>
-/* ── Polices : Poppins pour les titres, Inter pour le corps ── */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+/* ============================================================================
+   POLICES — Inter sur le corps (héritage naturel), Poppins sur les titres
+   Note : pas de `*` selector pour ne pas écraser les spans dans les Hn.
+   ============================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
-/* Corps en Inter, titres en Poppins */
-*, *::before, *::after {
+html, body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
 }
 
+/* Poppins sur les titres ET tous leurs descendants (spans wrappés par Crisp) */
 .csh-header-title,
 .csh-home-title,
-.csh-article .csh-article-content article .csh-markdown-title,
-.csh-article .csh-article-content article .csh-markdown-title-h1,
-.csh-article .csh-article-content article .csh-markdown-title-h2,
-.csh-article .csh-article-content article .csh-markdown-title-h3,
-.csh-article .csh-article-content article .csh-markdown-title-h4,
-.csh-footer-ask-text-title {
+.csh-footer-ask-text-title,
+.csh-article-content-header h1,
+.csh-article-content-header h1 *,
+.csh-article article h1, .csh-article article h1 *,
+.csh-article article h2, .csh-article article h2 *,
+.csh-article article h3, .csh-article article h3 *,
+.csh-article article h4, .csh-article article h4 *,
+.csh-markdown-title, .csh-markdown-title * {
   font-family: 'Poppins', sans-serif !important;
   letter-spacing: -0.02em !important;
 }
 
 *::selection { background: rgba(0, 205, 146, 0.18) !important; }
 
-/* Hiérarchie de poids allégée (comme sur la page de statut) */
-.csh-font-sans-bold { font-weight: 600 !important; }
-.csh-font-sans-semibold { font-weight: 500 !important; }
-.csh-font-sans-medium { font-weight: 400 !important; }
-.csh-font-sans-regular { font-weight: 400 !important; }
+/* ============================================================================
+   CAP FONT-WEIGHT 600 — Crisp défaut va jusqu'à 900 (csh-font-sans-bold).
+   Spécificité html prefix pour battre les CSS Crisp chargés après le Custom HTML.
+   ============================================================================ */
+html .csh-font-sans-bold,    body .csh-font-sans-bold    { font-weight: 600 !important; }
+html .csh-font-sans-semibold,body .csh-font-sans-semibold{ font-weight: 500 !important; }
+html .csh-font-sans-medium,  body .csh-font-sans-medium  { font-weight: 500 !important; }
+html .csh-font-sans-regular, body .csh-font-sans-regular { font-weight: 400 !important; }
 
-/* ── Fix alignement universel des boutons (textes + icônes parfaitement centrés) ── */
-.csh-button,
-a.csh-button,
-button.csh-button {
+/* ============================================================================
+   ALIGNEMENT BOUTONS UNIVERSEL
+   ============================================================================ */
+.csh-button, a.csh-button, button.csh-button {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -83,33 +145,50 @@ button.csh-button {
   align-items: center !important;
 }
 
-/* ── Reset spacing pour coller le bandeau vert au header ── */
-body {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-header[role="banner"] {
-  margin-bottom: 0 !important;
-}
+/* ============================================================================
+   RESET SPACING — bandeau vert collé au header navy
+   ============================================================================ */
+body { margin: 0 !important; padding: 0 !important; }
+header[role="banner"] { margin-bottom: 0 !important; }
 
-/* ── Background page ── */
 #body {
   background: #f4f5f7 !important;
   padding: 0 0 32px 0 !important;
   margin: 0 !important;
   position: relative !important;
 }
-/* Spacing entre bandeau et contenu (resserré) */
-#body > .csh-wrapper {
-  padding-top: 20px !important;
+#body > .csh-wrapper { padding-top: 20px !important; }
+
+/* ============================================================================
+   ANIMATIONS — fade-up staggered sur les cards de la home
+   ============================================================================ */
+@keyframes buildy-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.csh-home-list li {
+  animation: buildy-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+}
+.csh-home-list li:nth-child(1) { animation-delay: 0ms !important; }
+.csh-home-list li:nth-child(2) { animation-delay: 50ms !important; }
+.csh-home-list li:nth-child(3) { animation-delay: 100ms !important; }
+.csh-home-list li:nth-child(4) { animation-delay: 150ms !important; }
+.csh-home-list li:nth-child(5) { animation-delay: 200ms !important; }
+.csh-home-list li:nth-child(6) { animation-delay: 250ms !important; }
+.csh-home-list li:nth-child(7) { animation-delay: 300ms !important; }
+.csh-home-list li:nth-child(n+8) { animation-delay: 350ms !important; }
+.csh-home-title {
+  animation: buildy-fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .csh-home-list li, .csh-home-title { animation: none !important; }
 }
 
 /* ============================================================================
-   HERO STRIP VERT (équivalent "All systems operational" de la page de statut)
-   Bandeau plein-largeur collé immédiatement sous le header navy
+   HERO STRIP VERT — uniquement sur la home. Pages internes : fin trait.
    ============================================================================ */
-#body::before {
-  content: '\2713  Documentation et support actifs \00B7 Mise à jour quotidienne' !important;
+body:has(.csh-home) #body::before {
+  content: '\2713  Documentation Buildy \00B7 Une équipe humaine à votre écoute par chat ou email' !important;
   display: block !important;
   background: linear-gradient(135deg, #00CD92 0%, #00b87f 100%) !important;
   color: #fff !important;
@@ -124,16 +203,38 @@ header[role="banner"] {
   position: relative !important;
   z-index: 2 !important;
 }
+body:has(.csh-article) #body::before,
+body:has(.csh-category) #body::before {
+  content: '' !important;
+  display: block !important;
+  height: 3px !important;
+  background: linear-gradient(90deg, #00CD92 0%, #00b87f 100%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-shadow: 0 1px 4px rgba(0, 205, 146, 0.2) !important;
+}
 
 /* ============================================================================
    FUSION BREADCRUMB CATÉGORIE/ARTICLE avec le fond gris de page
-   (élimine la bande blanche "Retour | Articles sur :" entre header et bandeau)
    ============================================================================ */
+nav.csh-navigation,
 .csh-category-aside,
-.csh-article-aside {
-  background: #f4f5f7 !important;
+.csh-article-aside { background: #f4f5f7 !important; }
+
+.csh-navigation-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  min-height: 48px !important;
 }
-/* Pilule "Retour" plus discrète et intégrée */
+.csh-navigation-title-list,
+.csh-navigation-title-list-wrap {
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Lien "Retour" pilule blanche compacte */
+a.csh-navigation-back, .csh-navigation-back,
 .csh-category-aside-back .csh-button,
 .csh-article-aside-back .csh-button {
   background: #fff !important;
@@ -141,41 +242,77 @@ header[role="banner"] {
   border-radius: 100px !important;
   color: #1b2842 !important;
   font-weight: 500 !important;
+  font-size: 0.82rem !important;
+  padding: 0 14px 0 12px !important;
+  height: 32px !important;
+  min-height: 0 !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
   transition: all 0.15s ease !important;
 }
+a.csh-navigation-back:hover, .csh-navigation-back:hover,
 .csh-category-aside-back .csh-button:hover,
 .csh-article-aside-back .csh-button:hover {
   background: #f9fafb !important;
   border-color: #d1d5db !important;
   transform: translateY(-1px) !important;
+  text-decoration: none !important;
+}
+.csh-navigation-back::before {
+  font-size: 0.85rem !important;
+  margin-right: 2px !important;
+}
+
+.csh-navigation-title-list-subject-label {
+  color: #64748b !important;
+  font-size: 0.88rem !important;
+}
+.csh-navigation-title-list .csh-category-badge {
+  background: rgba(0, 205, 146, 0.12) !important;
+  color: #00876b !important;
+  border-radius: 100px !important;
+  padding: 6px 14px !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+.csh-navigation-title-list-description {
+  font-style: italic !important;
+  color: #94a3b8 !important;
+  font-size: 0.85rem !important;
 }
 
 /* ============================================================================
-   HEADER (bandeau navy + logo + bouton + titre + recherche)
+   HEADER NAVY — gradient + orbes décoratifs verts subtils intégrés
    ============================================================================ */
-
-/* Header au-dessus du bandeau vert (sinon le dropdown de recherche est masqué) */
 header[role="banner"] {
   position: relative !important;
   z-index: 20 !important;
 }
 .csh-header-background.csh-theme-background-color-default {
-  background: linear-gradient(160deg, #101828 0%, #1b2842 50%, #233354 100%) !important;
+  background:
+    radial-gradient(ellipse 600px 400px at 90% -10%, rgba(0, 205, 146, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 400px at -5% 110%, rgba(0, 205, 146, 0.1)  0%, transparent 60%),
+    linear-gradient(160deg, #101828 0%, #1b2842 50%, #233354 100%) !important;
 }
-/* Dropdown des résultats de recherche — assurer qu'il passe au-dessus de tout */
-.csh-header-search-results {
-  z-index: 30 !important;
-}
+.csh-header-search-results { z-index: 30 !important; }
 
-/* Logo */
 .csh-header-main-logo img {
   height: 42px !important;
   max-height: 42px !important;
   width: auto !important;
 }
 
-/* Bouton "Aller au site" — pilule verte (alignement 100% flex, pas de line-height) */
+/* Bouton "Aller au site" — pilule verte */
 a.csh-header-main-actions-website {
   background: #00CD92 !important;
   border: none !important;
@@ -198,8 +335,7 @@ a.csh-header-main-actions-website:hover {
 span.csh-header-main-actions-website-itself {
   background: transparent !important;
   border: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
+  padding: 0 !important; margin: 0 !important;
   box-shadow: none !important;
   color: #fff !important;
   font-weight: 600 !important;
@@ -210,7 +346,6 @@ span.csh-header-main-actions-website-itself {
   height: auto !important;
 }
 
-/* Titre principal "Comment pouvons-nous vous aider ?" */
 .csh-header-title {
   color: #fff !important;
   font-weight: 600 !important;
@@ -219,7 +354,19 @@ span.csh-header-main-actions-website-itself {
   font-size: 2rem !important;
 }
 
-/* Champ de recherche — pilule blanche avec ombre, halo vert au focus */
+/* Pages internes : header compact */
+body:has(.csh-article) .csh-header-title,
+body:has(.csh-category) .csh-header-title { display: none !important; }
+body:has(.csh-article) .csh-header-search,
+body:has(.csh-category) .csh-header-search {
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+}
+body:has(.csh-article) .csh-header-search-field input,
+body:has(.csh-category) .csh-header-search-field input {
+  height: 44px !important;
+}
+
 .csh-header-search {
   margin-top: 24px !important;
   margin-bottom: 36px !important;
@@ -229,8 +376,30 @@ span.csh-header-main-actions-website-itself {
   background: #fff !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.04) !important;
   border: none !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   transition: box-shadow 0.2s ease, transform 0.2s ease !important;
+  position: relative !important;
+}
+/* Hint clavier "/" à droite du champ (disparaît au focus) */
+.csh-header-search:not([data-has-focus="true"]) .csh-header-search-field::after {
+  content: '/' !important;
+  position: absolute !important;
+  right: 12px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  color: #64748b !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  pointer-events: none !important;
 }
 .csh-header-search[data-has-focus="true"] .csh-header-search-field {
   box-shadow: 0 12px 32px rgba(0, 205, 146, 0.22), 0 0 0 3px rgba(0, 205, 146, 0.18) !important;
@@ -249,167 +418,274 @@ span.csh-header-main-actions-website-itself {
 }
 
 /* ============================================================================
-   ZONE PRINCIPALE
+   ZONE PRINCIPALE — sections "01 Articles en vedette" / "02 Toutes les catégories"
    ============================================================================ */
-
-/* Titres de section ("Articles en vedette…", "Toutes les catégories") */
 .csh-home-title {
   color: #1b2842 !important;
+  font-family: 'Poppins', sans-serif !important;
   font-weight: 600 !important;
-  font-size: 0.95rem !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
-  margin-bottom: 14px !important;
+  font-size: 1.4rem !important;
+  text-transform: none !important;
+  letter-spacing: -0.02em !important;
+  margin-bottom: 6px !important;
   position: relative !important;
-  padding-left: 14px !important;
-  display: flex !important;
-  align-items: center !important;
+  padding-left: 56px !important;
+  display: block !important;
+  min-height: 40px !important;
+  line-height: 40px !important;
 }
 .csh-home-title::before {
-  content: '' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   position: absolute !important;
   left: 0 !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 4px !important;
-  height: 16px !important;
-  background: #00CD92 !important;
-  border-radius: 4px !important;
+  top: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+  background: linear-gradient(135deg, rgba(0, 205, 146, 0.12) 0%, rgba(0, 205, 146, 0.04) 100%) !important;
+  border: 1px solid rgba(0, 205, 146, 0.2) !important;
+  border-radius: 10px !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: #00876b !important;
+  letter-spacing: 0.04em !important;
+  line-height: 1 !important;
+}
+section[data-type="frequently_read"] .csh-home-title::before { content: '01' !important; }
+section[data-type="categories"]      .csh-home-title::before { content: '02' !important; }
+
+section[data-type="frequently_read"] .csh-home-title::after {
+  content: 'Les réponses les plus consultées par notre communauté' !important;
+  display: block !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: 0.92rem !important;
+  color: #64748b !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin-top: 4px !important;
+  margin-bottom: 22px !important;
+}
+section[data-type="categories"] .csh-home-title::after {
+  content: 'Toute la documentation Buildy organisée par produit' !important;
+  display: block !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 400 !important;
+  font-size: 0.92rem !important;
+  color: #64748b !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  margin-top: 4px !important;
+  margin-bottom: 22px !important;
 }
 
-/* Séparateur entre les deux sections — fin et discret */
 .csh-home-separator {
   border: none !important;
   height: 1px !important;
   background: linear-gradient(90deg, transparent, #e5e7eb 30%, #e5e7eb 70%, transparent) !important;
-  margin: 36px 0 !important;
+  margin: 28px 0 !important;
 }
 
 /* ============================================================================
-   ARTICLES EN VEDETTE — cartes blanches, soft shadow, hover lift
-   (style aligné avec les service-group cards de la page de statut)
+   ARTICLES EN VEDETTE — liste 1 colonne, numérotés #1-6
    ============================================================================ */
-
 .csh-home-list {
-  display: grid !important;
-  gap: 12px !important;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
+}
+.csh-home-list li {
+  padding: 0 !important;
+  margin: 0 !important;
+  list-style: none !important;
 }
 
 .csh-home-list li .csh-box.csh-box-link {
   background: #fff !important;
   border: none !important;
   border-radius: 14px !important;
-  padding: 16px 20px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
-  transition: all 0.2s ease !important;
+  padding: 0 38px 0 16px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
   position: relative !important;
   display: flex !important;
   align-items: center !important;
-  gap: 14px !important;
-  min-height: 68px !important;
+  gap: 12px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  text-decoration: none !important;
 }
+.csh-home-list li .csh-box.csh-box-link > * { align-self: center !important; }
 
-/* Pastille checkmark verte avec halo — exact pattern page de statut */
-.csh-home-list li .csh-box.csh-box-link::before {
-  content: '\2713' !important;
+/* Numérotation #1-6 via CSS counter */
+.csh-home-list:not(.csh-home-list-large) { counter-reset: featured-rank !important; }
+.csh-home-list:not(.csh-home-list-large) li { counter-increment: featured-rank !important; }
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link::before {
+  content: counter(featured-rank) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 26px !important;
-  height: 26px !important;
-  min-width: 26px !important;
-  background: #00CD92 !important;
-  color: #fff !important;
-  border-radius: 50% !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  background: rgba(0, 205, 146, 0.1) !important;
+  color: #00876b !important;
+  border-radius: 8px !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
   line-height: 1 !important;
-  box-shadow: 0 0 0 3px rgba(0, 205, 146, 0.15) !important;
   flex-shrink: 0 !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
+  letter-spacing: -0.02em !important;
 }
 
-/* Flèche → qui apparaît à droite au hover */
+/* Chevron › visible au repos, vert + déplacé au hover */
 .csh-home-list li .csh-box.csh-box-link::after {
-  content: '\2192' !important;
+  content: '\203A' !important;
   position: absolute !important;
   right: 18px !important;
   top: 50% !important;
-  transform: translateY(-50%) translateX(-4px) !important;
-  color: #00CD92 !important;
-  font-size: 1.1rem !important;
-  font-weight: 500 !important;
-  opacity: 0 !important;
+  transform: translateY(-50%) !important;
+  color: #cbd5e1 !important;
+  font-size: 1.4rem !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
   transition: all 0.2s ease !important;
+  line-height: 1 !important;
 }
 .csh-home-list li .csh-box.csh-box-link:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06) !important;
   transform: translateY(-1px) !important;
-  padding-right: 38px !important;
 }
-.csh-home-list li .csh-box.csh-box-link:hover::before {
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link:hover::before {
   box-shadow: 0 0 0 4px rgba(0, 205, 146, 0.2) !important;
   transform: scale(1.05) !important;
 }
 .csh-home-list li .csh-box.csh-box-link:hover::after {
-  opacity: 1 !important;
-  transform: translateY(-50%) translateX(0) !important;
+  color: #00CD92 !important;
+  transform: translateY(-50%) translateX(4px) !important;
+}
+
+/* PREMIER article = mis en valeur */
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-box.csh-box-link {
+  background: linear-gradient(135deg, #fff 0%, #f0fdf6 100%) !important;
+  border: 1px solid rgba(0, 205, 146, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(0, 205, 146, 0.08), 0 1px 3px rgba(0, 205, 146, 0.06) !important;
+  height: 64px !important;
+}
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-box.csh-box-link::before {
+  background: linear-gradient(135deg, #00CD92, #00b87f) !important;
+  color: #fff !important;
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 0.9rem !important;
+  box-shadow: 0 2px 8px rgba(0, 205, 146, 0.3) !important;
+}
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-home-list-label {
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+}
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-box.csh-box-link .csh-home-list-wrap::after {
+  content: 'Le plus consulté' !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  background: rgba(0, 205, 146, 0.1) !important;
+  color: #00876b !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  padding: 3px 8px !important;
+  border-radius: 100px !important;
+  margin-left: 10px !important;
+  letter-spacing: 0.01em !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-home-list-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
 }
 
 .csh-home-list-label {
+  font-family: 'Poppins', sans-serif !important;
   color: #1b2842 !important;
   font-weight: 500 !important;
   font-size: 0.92rem !important;
   line-height: 1.45 !important;
+  letter-spacing: -0.01em !important;
 }
 
 /* ============================================================================
-   TOUTES LES CATÉGORIES — cartes avec image, badge intégral
+   TOUTES LES CATÉGORIES — liste 1 colonne avec image + nom + description + count
    ============================================================================ */
-
 .csh-home-list.csh-home-list-large {
-  display: grid !important;
-  gap: 14px !important;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
 }
 
 .csh-home-list.csh-home-list-large li .csh-box.csh-box-link {
   background: #fff !important;
   border: none !important;
-  border-radius: 16px !important;
-  padding: 18px 20px !important;
+  border-radius: 14px !important;
+  padding: 10px 42px 10px 16px !important;
   display: flex !important;
+  flex-direction: row !important;
   align-items: center !important;
-  gap: 16px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
-  transition: all 0.25s ease !important;
-  min-height: 88px !important;
+  gap: 14px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+  min-height: 48px !important;
+  height: auto !important;
   position: relative !important;
   overflow: hidden !important;
+  text-decoration: none !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link > * {
+  margin: 0 !important;
+  align-self: center !important;
+  flex-shrink: 0 !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link > .csh-home-list-aside {
+  flex: 1 1 auto !important;
+  flex-shrink: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  min-width: 0 !important;
 }
 
-/* Pastille checkmark dans le coin haut-droit (signal "catégorie active") */
+/* Pastille checkmark à droite */
 .csh-home-list.csh-home-list-large li .csh-box.csh-box-link::after {
   content: '\2713' !important;
   position: absolute !important;
-  top: 12px !important;
-  right: 12px !important;
+  top: 50% !important;
+  right: 14px !important;
+  transform: translateY(-50%) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 22px !important;
-  height: 22px !important;
+  width: 18px !important;
+  height: 18px !important;
   background: rgba(0, 205, 146, 0.12) !important;
   color: #00b87f !important;
   border-radius: 50% !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
   line-height: 1 !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.15s ease !important;
 }
 
-/* Hover = remplissage vert plein, comme un status banner healthy */
+/* Hover = remplissage vert */
 .csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover {
   background: linear-gradient(135deg, #00CD92 0%, #00b87f 100%) !important;
   box-shadow: 0 8px 24px rgba(0, 205, 146, 0.3), 0 4px 8px rgba(0, 205, 146, 0.18) !important;
@@ -420,41 +696,23 @@ span.csh-header-main-actions-website-itself {
   color: #fff !important;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15) !important;
 }
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-category-badge { color: #fff !important; }
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-label-none { color: rgba(255, 255, 255, 0.75) !important; }
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none { background: transparent !important; }
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none::before { background-color: rgba(255, 255, 255, 0.85) !important; }
 
-/* En hover, badge + label passent en blanc */
-.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-category-badge {
-  background: rgba(255, 255, 255, 0.2) !important;
-  color: #fff !important;
-}
-.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-label-none {
-  color: rgba(255, 255, 255, 0.75) !important;
-}
-/* Image avec fond doux pour ressortir sur le vert */
-.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border-radius: 12px !important;
-}
-/* Placeholder image-none : icône livre devient blanche */
-.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none {
-  background: rgba(255, 255, 255, 0.18) !important;
-}
-.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .csh-home-list-image-none::before {
-  background-color: #fff !important;
-}
-
-/* Image de catégorie — taille uniforme, fond léger pour les logos */
 .csh-home-list.csh-home-list-large .csh-home-list-image {
-  width: 52px !important;
-  height: 52px !important;
-  min-width: 52px !important;
-  border-radius: 12px !important;
+  display: block !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-radius: 8px !important;
   background-size: contain !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
   background-color: transparent !important;
+  flex-shrink: 0 !important;
 }
-
-/* Image absente — placeholder neutre élégant avec icône livre */
 .csh-home-list.csh-home-list-large .csh-home-list-image-none {
   background: linear-gradient(135deg, #f4f5f7, #e9ecef) !important;
   color: #94a3b8 !important;
@@ -466,59 +724,105 @@ span.csh-header-main-actions-website-itself {
   position: absolute !important;
   top: 50% !important;
   left: 50% !important;
-  width: 22px !important;
-  height: 22px !important;
+  width: 16px !important;
+  height: 16px !important;
   transform: translate(-50%, -50%) !important;
   background-color: #94a3b8 !important;
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'><path d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20V5a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 5.5v14zM6.5 19a.5.5 0 0 0 0 1H20v-1H6.5z'/></svg>") center/contain no-repeat !important;
           mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'><path d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20V5a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 5.5v14zM6.5 19a.5.5 0 0 0 0 1H20v-1H6.5z'/></svg>") center/contain no-repeat !important;
 }
 
-/* Bloc texte à droite de l'image */
-.csh-home-list-aside {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 6px !important;
-  flex: 1 !important;
-  min-width: 0 !important;
+/* Reset des hauteurs/marges Crisp internes */
+html body .csh-home-list.csh-home-list-large li a.csh-box .csh-home-list-category {
+  margin: 0 !important;
+  line-height: inherit !important;
+  display: inline-flex !important;
+}
+html body .csh-home-list.csh-home-list-large li a.csh-box .csh-home-list-wrap {
+  height: auto !important;
 }
 
-/* Badge de catégorie — pilule, tronquage retiré pour libellés longs */
-.csh-home-list-category {
+/* Description sous le nom : SI set, sinon masqué */
+html body .csh-home-list.csh-home-list-large .csh-home-list-wrap {
   display: block !important;
+  flex: 0 0 auto !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow: visible !important;
+  text-align: left !important;
+  height: auto !important;
+}
+html body .csh-home-list.csh-home-list-large .csh-home-list-wrap:has(> .csh-home-list-label-none) {
+  display: none !important;
+}
+html body .csh-home-list.csh-home-list-large .csh-home-list-wrap .csh-home-list-label:not(.csh-home-list-label-none) {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.84rem !important;
+  font-weight: 400 !important;
+  color: #64748b !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0 !important;
+  display: block !important;
+  max-height: none !important;
+  overflow: visible !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  text-align: left !important;
+}
+
+.csh-home-list-category {
+  display: inline-flex !important;
+  align-items: center !important;
   white-space: normal !important;
   overflow: visible !important;
 }
 .csh-category-badge {
-  background: rgba(27, 40, 66, 0.06) !important;
+  background: transparent !important;
   color: #1b2842 !important;
-  border-radius: 100px !important;
-  padding: 6px 14px !important;
-  font-size: 0.78rem !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 0.95rem !important;
   font-weight: 600 !important;
   display: inline-flex !important;
   align-items: center !important;
-  justify-content: flex-start !important;
   white-space: normal !important;
   overflow: visible !important;
-  text-overflow: clip !important;
   max-width: 100% !important;
-  letter-spacing: 0 !important;
-  line-height: 1.3 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.5 !important;
 }
 
-/* "Pas de description" — discret */
-.csh-home-list-label.csh-home-list-label-none {
-  color: #94a3b8 !important;
-  font-style: italic !important;
-  font-weight: 400 !important;
-  font-size: 0.82rem !important;
+.csh-home-list-label.csh-home-list-label-none { display: none !important; }
+
+/* Badge "X articles" injecté par JS */
+.buildy-cat-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  background: rgba(100, 116, 139, 0.08) !important;
+  padding: 4px 10px !important;
+  border-radius: 100px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  align-self: flex-start !important;
+  margin-top: 4px !important;
+  transition: all 0.15s ease !important;
+}
+.csh-home-list.csh-home-list-large li .csh-box.csh-box-link:hover .buildy-cat-count {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* ============================================================================
-   FOOTER — CTA contact (aligné page de statut)
+   FOOTER — CTA contact (single button, on masque "Discuter")
    ============================================================================ */
-
 .csh-footer-ask {
   background: linear-gradient(160deg, #101828 0%, #1b2842 100%) !important;
   padding: 36px 0 !important;
@@ -537,7 +841,6 @@ span.csh-header-main-actions-website-itself {
   background: radial-gradient(circle, rgba(0, 205, 146, 0.08), transparent 70%) !important;
   pointer-events: none !important;
 }
-
 .csh-footer-ask-text-title {
   color: #fff !important;
   font-weight: 600 !important;
@@ -550,8 +853,6 @@ span.csh-header-main-actions-website-itself {
   font-weight: 400 !important;
   margin-top: 4px !important;
 }
-
-/* Boutons footer — alignement 100% flex pour que texte + icône soient parfaitement centrés */
 .csh-footer-ask-buttons .csh-button.csh-button-accent {
   background: #00CD92 !important;
   border: none !important;
@@ -575,51 +876,18 @@ span.csh-header-main-actions-website-itself {
   box-shadow: 0 4px 16px rgba(0, 205, 146, 0.4) !important;
   transform: translateY(-1px) !important;
 }
+.csh-footer-ask-buttons li:first-child { display: none !important; }
 
-/* "Discuter avec nous" en outline blanc pour différencier */
-.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  box-shadow: none !important;
-}
-.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent:hover {
-  background: rgba(255, 255, 255, 0.14) !important;
-  border-color: rgba(255, 255, 255, 0.28) !important;
-  box-shadow: none !important;
-  transform: translateY(-1px) !important;
-}
-
-/* Copyright — discret */
 .csh-footer-copyright {
   background: transparent !important;
   margin-top: 24px !important;
 }
-.csh-footer-copyright-brand {
-  opacity: 0.35 !important;
-}
-.csh-footer-copyright-brand img {
-  height: 18px !important;
-}
+.csh-footer-copyright-brand { opacity: 0.35 !important; }
+.csh-footer-copyright-brand img { height: 18px !important; }
 
 /* ============================================================================
-   PAGE ARTICLE (vue détail) — typographie soignée
+   PAGE ARTICLE — typographie soignée, max-width 920px centré
    ============================================================================ */
-
-/* Bouton retour catégorie */
-.csh-article .csh-article-aside-back .csh-button {
-  border-radius: 100px !important;
-  background: rgba(27, 40, 66, 0.06) !important;
-  color: #1b2842 !important;
-  font-weight: 500 !important;
-  font-size: 0.82rem !important;
-  border: none !important;
-  transition: background 0.2s ease !important;
-}
-.csh-article .csh-article-aside-back .csh-button:hover {
-  background: rgba(27, 40, 66, 0.1) !important;
-}
-
-/* Liens dans l'article */
 .csh-article .csh-article-content article a {
   color: #00b87f !important;
   text-decoration: underline !important;
@@ -633,106 +901,139 @@ span.csh-header-main-actions-website-itself {
   text-decoration-thickness: 2px !important;
 }
 
-/* Titres article — Poppins, hiérarchie visuelle franche entre H1 → H4 */
+/* Crisp insère <p><br></p> entre chaque bloc — masquer */
+.csh-article article p:has(> br:only-child) { display: none !important; }
+.csh-article article p:empty { display: none !important; }
 
-/* ============================================================================
-   FIX MAJEUR : Crisp injecte <p><br></p> entre CHAQUE bloc
-   = origine principale des "grands espaces vides" — on les masque tous
-   ============================================================================ */
-.csh-article article p:has(> br:only-child) {
-  display: none !important;
+/* Reset top spacing AGGRESSIF */
+.csh-article article,
+.csh-article .csh-article-content,
+.csh-article .csh-article-content-wrap,
+.csh-article-content-text {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
-/* Fallback pour navigateurs sans :has() — paragraphes vides */
-.csh-article article p:empty {
-  display: none !important;
+.csh-article-content-text > *:first-child,
+.csh-article article > *:first-child,
+article.csh-text-wrap > *:first-child {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
+.csh-article-content-separate,
+.csh-article-content-separate-top { display: none !important; }
 
-/* H1 — Titre principal (Crisp utilise <h1 class="csh-font-sans-bold">, sans csh-markdown-*) */
-.csh-article .csh-article-content-header h1 {
-  font-size: 1.85rem !important;
-  font-family: 'Poppins', sans-serif !important;
-  color: #1b2842 !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.025em !important;
-  margin: 0 !important;
-  line-height: 1.2 !important;
+/* Largeur lecture 920px CENTRÉE */
+.csh-article-content-text,
+.csh-article .csh-article-content-text {
+  max-width: 920px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
-/* Le séparateur sous H1 : on le passe en vert Buildy */
 .csh-article .csh-article-content-header {
-  border-bottom: 2px solid #00CD92 !important;
-  padding-bottom: 12px !important;
-  margin-bottom: 16px !important;
+  max-width: 920px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+.csh-article-content-wrap {
+  max-width: 920px !important;
+  margin: 0 auto !important;
 }
 
-/* H2 — Sections principales (1.4rem, barre verte verticale à gauche) */
-.csh-article article h2,
-.csh-article .csh-markdown-title-h2 {
-  font-size: 1.4rem !important;
+/* Sidebar gauche élargie */
+.csh-article aside,
+.csh-article > aside {
+  width: 240px !important;
+  min-width: 240px !important;
+  flex-shrink: 0 !important;
+}
+.csh-article .csh-aside { width: 100% !important; }
+
+/* H1 — 2.25rem, weight 600, sans séparateur visuel, 28px d'espace au contenu */
+.csh-article .csh-article-content-header h1 {
+  font-size: 2.25rem !important;
   font-family: 'Poppins', sans-serif !important;
   color: #1b2842 !important;
-  font-weight: 700 !important;
-  margin: 28px 0 12px 0 !important;
-  letter-spacing: -0.02em !important;
-  padding-left: 14px !important;
-  border-left: 4px solid #00CD92 !important;
-  line-height: 1.3 !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.035em !important;
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+.csh-article .csh-article-content-header {
+  border-bottom: none !important;
+  padding: 0 !important;
+  margin: 0 0 28px 0 !important;
 }
 
-/* H3 — Sous-sections */
+/* H2 — 1.6rem, weight 600 */
+.csh-article article h2,
+.csh-article .csh-markdown-title-h2,
+.csh-article .csh-article-content article .csh-markdown.csh-markdown-title.csh-markdown-title-h2 {
+  font-size: 1.6rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1b2842 !important;
+  font-weight: 600 !important;
+  margin: 36px 0 12px 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-bottom: none !important;
+  border-top: none !important;
+  text-decoration: none !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.2 !important;
+  background: transparent !important;
+}
+.csh-article article h2 *,
+.csh-article .csh-markdown-title-h2 *,
+.csh-article article h2:hover {
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+/* H3 — 1.2rem, weight 600 */
 .csh-article article h3,
 .csh-article .csh-markdown-title-h3 {
-  font-size: 1.15rem !important;
+  font-size: 1.2rem !important;
+  font-family: 'Poppins', sans-serif !important;
+  color: #1b2842 !important;
+  font-weight: 600 !important;
+  margin: 24px 0 8px 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  letter-spacing: -0.015em !important;
+  line-height: 1.3 !important;
+}
+/* H4 — 1.05rem, weight 600 */
+.csh-article article h4,
+.csh-article .csh-markdown-title-h4 {
+  font-size: 1.05rem !important;
   font-family: 'Poppins', sans-serif !important;
   color: #1b2842 !important;
   font-weight: 600 !important;
   margin: 22px 0 8px 0 !important;
-  letter-spacing: -0.01em !important;
+  padding: 0 !important;
+  border: none !important;
+  text-transform: none !important;
+  letter-spacing: -0.015em !important;
   line-height: 1.35 !important;
 }
 
-/* H4 — Labels (Inter uppercase letterspaced) */
-.csh-article article h4,
-.csh-article .csh-markdown-title-h4 {
-  font-size: 0.82rem !important;
-  color: #00876b !important;
-  font-weight: 700 !important;
-  margin: 18px 0 8px 0 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
-  line-height: 1.4 !important;
-  font-family: 'Inter', sans-serif !important;
-}
-
-/* Paragraphes article — espacement homogène resserré */
-.csh-article article p {
-  margin: 0 0 12px 0 !important;
-}
-
-/* Listes — moins d'espace au-dessus */
+.csh-article article p { margin: 0 0 12px 0 !important; }
 .csh-article article ol,
 .csh-article article ul,
-.csh-article .csh-markdown-list {
-  margin: 4px 0 14px 0 !important;
-}
+.csh-article .csh-markdown-list { margin: 4px 0 14px 0 !important; }
 
-/* Breadcrumb "Articles sur :" Catégorie — moins de marge en bas */
 .csh-article-content-header-metas-category {
   margin-bottom: 6px !important;
   font-size: 0.85rem !important;
 }
 
-/* Dernier élément : pas de margin-bottom inutile */
-.csh-article article > *:last-child {
-  margin-bottom: 0 !important;
-}
+.csh-article article > *:last-child { margin-bottom: 0 !important; }
 
-/* Corps de texte article */
-.csh-article .csh-article-content article p {
+.csh-article .csh-article-content article p,
+.csh-article .csh-article-content article li {
   line-height: 1.7 !important;
-  color: #334155 !important;
+  color: #1e293b !important;
 }
 
-/* Code inline — vert Buildy */
 .csh-article .csh-article-content article .csh-markdown-code-inline {
   background: rgba(0, 205, 146, 0.08) !important;
   border-color: rgba(0, 205, 146, 0.2) !important;
@@ -742,13 +1043,9 @@ span.csh-header-main-actions-website-itself {
   font-size: 0.88em !important;
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace !important;
 }
-
-/* Puces de listes (non numérotées) */
 .csh-article .csh-article-content article .csh-markdown-list .csh-markdown-list-item:before {
   background: #00CD92 !important;
 }
-
-/* Date "Mis à jour le" — discrète */
 .csh-article-content-date {
   color: #94a3b8 !important;
   font-size: 0.82rem !important;
@@ -758,23 +1055,109 @@ span.csh-header-main-actions-website-itself {
 /* ============================================================================
    PAGE CATÉGORIE — liste d'articles
    ============================================================================ */
-
-.csh-category-articles-list .csh-box {
+.csh-category-section-title {
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  color: #1b2842 !important;
+  letter-spacing: -0.02em !important;
+}
+.csh-category-section-list .csh-box,
+.csh-category-item .csh-box {
   background: #fff !important;
   border: none !important;
   border-radius: 14px !important;
+  padding: 16px 20px !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
   transition: all 0.2s ease !important;
 }
-.csh-category-articles-list .csh-box:hover {
+.csh-category-section-list .csh-box:hover,
+.csh-category-item .csh-box:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06) !important;
   transform: translateY(-1px) !important;
 }
+.csh-category-item-title,
+.csh-category-item-title * {
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  color: #1b2842 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Sidebar "Catégories" / "Articles en rapport" */
+.csh-aside-title {
+  font-family: 'Poppins', sans-serif !important;
+  font-weight: 600 !important;
+  color: #1b2842 !important;
+  font-size: 0.78rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 12px !important;
+}
+.csh-aside ul {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.csh-aside ul li {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.csh-aside-single-line,
+.csh-article-related-list a,
+.csh-aside ul li a {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  color: #475569 !important;
+  text-decoration: none !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  transition: all 0.15s ease !important;
+  position: relative !important;
+}
+.csh-aside-single-line:hover,
+.csh-article-related-list a:hover,
+.csh-aside ul li a:hover {
+  background: rgba(0, 205, 146, 0.06) !important;
+  color: #1b2842 !important;
+  transform: translateX(2px) !important;
+}
+.csh-aside-single-line::after,
+.csh-article-related-list a::after {
+  content: '\2192' !important;
+  position: absolute !important;
+  right: 12px !important;
+  color: #00CD92 !important;
+  opacity: 0 !important;
+  transform: translateX(-4px) !important;
+  transition: all 0.15s ease !important;
+}
+.csh-aside-single-line:hover::after,
+.csh-article-related-list a:hover::after {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+.csh-aside-single-line[data-active="true"] {
+  background: rgba(0, 205, 146, 0.1) !important;
+  color: #00876b !important;
+  font-weight: 600 !important;
+  border-left: 3px solid #00CD92 !important;
+  padding-left: 9px !important;
+}
+.csh-aside-single-line[data-active="true"]::after { display: none !important; }
 
 /* ============================================================================
    RESPONSIVE — mobile (≤ 640 px)
    ============================================================================ */
-
 @media (max-width: 640px) {
   .csh-header-title {
     font-size: 1.5rem !important;
@@ -783,10 +1166,6 @@ span.csh-header-main-actions-website-itself {
   .csh-header-search-field input {
     height: 48px !important;
     font-size: 0.9rem !important;
-  }
-  .csh-home-list,
-  .csh-home-list.csh-home-list-large {
-    grid-template-columns: 1fr !important;
   }
   .csh-footer-ask {
     margin: 0 8px !important;
