@@ -62,6 +62,26 @@ async function toggleZone(zoneId, checked) {
   }
 }
 
+const allChecked = computed(() =>
+  candidateZones.value.length > 0 &&
+  candidateZones.value.every(z => extraIds.value.includes(z.zone_id)),
+)
+
+async function toggleAll() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    const next = allChecked.value ? [] : candidateZones.value.map(z => z.zone_id)
+    await updateBacsDeviceZones(props.device.id, next)
+    success(allChecked.value ? 'Toutes les zones retirées' : 'Toutes les zones ajoutées')
+    emit('updated')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Mise à jour des zones impossible')
+  } finally {
+    saving.value = false
+  }
+}
+
 function onDocClick(e) {
   if (rootRef.value && !rootRef.value.contains(e.target)) close()
 }
@@ -91,38 +111,53 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
     <div
       v-if="open"
-      class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg w-64 py-1 text-sm"
+      class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg w-64 text-sm flex flex-col max-h-112"
     >
-      <div class="px-3 py-2 border-b border-gray-100">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Zones desservies</p>
+      <!-- Header sticky -->
+      <div class="px-3 py-2 border-b border-gray-100 shrink-0">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Zones desservies</p>
+          <button
+            v-if="candidateZones.length"
+            type="button"
+            @click="toggleAll"
+            :disabled="saving"
+            class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 whitespace-nowrap"
+          >
+            {{ allChecked ? 'Tout décocher' : 'Tout cocher' }}
+          </button>
+        </div>
         <p class="text-[11px] text-gray-400 mt-0.5">
           Cet équipement alimente / éclaire / ventile plusieurs zones ?
         </p>
       </div>
-      <!-- Zone d'origine, marquée en lecture seule -->
-      <div class="px-3 py-2 flex items-center gap-2 bg-gray-50 cursor-default">
-        <CheckIcon class="w-4 h-4 text-gray-400 shrink-0" />
-        <span class="text-gray-700 truncate">{{ originZone?.name || 'Zone d\'origine' }}</span>
-        <span class="ml-auto text-[10px] text-gray-400 italic">Origine</span>
+      <!-- Liste scrollable (zone d'origine + candidates) -->
+      <div class="overflow-y-auto flex-1 py-1">
+        <!-- Zone d'origine, marquée en lecture seule -->
+        <div class="px-3 py-2 flex items-center gap-2 bg-gray-50 cursor-default">
+          <CheckIcon class="w-4 h-4 text-gray-400 shrink-0" />
+          <span class="text-gray-700 truncate">{{ originZone?.name || 'Zone d\'origine' }}</span>
+          <span class="ml-auto text-[10px] text-gray-400 italic">Origine</span>
+        </div>
+        <!-- Zones candidates -->
+        <div v-if="!candidateZones.length" class="px-3 py-2 text-xs text-gray-400 italic">
+          Aucune autre zone à partager.
+        </div>
+        <label
+          v-for="z in candidateZones"
+          :key="z.zone_id"
+          class="px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer"
+        >
+          <input
+            type="checkbox"
+            :checked="extraIds.includes(z.zone_id)"
+            :disabled="saving"
+            @change="e => toggleZone(z.zone_id, e.target.checked)"
+            class="rounded border-gray-300 shrink-0"
+          />
+          <span class="text-gray-700 truncate">{{ z.name }}</span>
+        </label>
       </div>
-      <!-- Zones candidates -->
-      <div v-if="!candidateZones.length" class="px-3 py-2 text-xs text-gray-400 italic">
-        Aucune autre zone à partager.
-      </div>
-      <label
-        v-for="z in candidateZones"
-        :key="z.zone_id"
-        class="px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer"
-      >
-        <input
-          type="checkbox"
-          :checked="extraIds.includes(z.zone_id)"
-          :disabled="saving"
-          @change="e => toggleZone(z.zone_id, e.target.checked)"
-          class="rounded border-gray-300 shrink-0"
-        />
-        <span class="text-gray-700 truncate">{{ z.name }}</span>
-      </label>
     </div>
   </div>
 </template>

@@ -590,7 +590,7 @@ async function routes(fastify) {
   fastify.patch('/bacs-audit/devices/:id/zones', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const dev = db.db.prepare(`
-      SELECT d.*, s.zone_id AS origin_zone_id, s.document_id
+      SELECT d.*, s.zone_id AS origin_zone_id, s.document_id, s.system_category
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
       WHERE d.id = ?
@@ -614,6 +614,20 @@ async function routes(fastify) {
     }
 
     db.bacsAuditDeviceZones.setExtraForDevice(id, requested);
+
+    // Auto « Présent » : pour chaque zone supplémentaire désormais desservie,
+    // s'assurer qu'il y a un système de la même catégorie marqué present=1.
+    // Si la matrice BACS l'avait pré-généré on bascule juste le flag, sinon
+    // on crée la ligne hors-matrice (cas cogénération, GTC dédiée, etc.).
+    const upsertPresent = db.db.prepare(`
+      INSERT INTO bacs_audit_systems (document_id, zone_id, system_category, present)
+      VALUES (?, ?, ?, 1)
+      ON CONFLICT(document_id, zone_id, system_category) DO UPDATE SET present = 1, not_concerned = 0
+    `);
+    for (const zid of requested) {
+      upsertPresent.run(dev.document_id, zid, dev.system_category);
+    }
+
     regenerateActionItems(dev.document_id);
 
     return {

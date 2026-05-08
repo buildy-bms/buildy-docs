@@ -68,6 +68,16 @@ function onFocus() {
   if (!props.disabled) open.value = true
 }
 
+// Cliquer sur le site sélectionné = passer en mode recherche pour
+// remplacer (focus l'input + ouvre le dropdown).
+function openForChange() {
+  open.value = true
+  query.value = ''
+  // L'input est rendu dynamiquement (v-else), on attend le tick suivant
+  // pour le focus.
+  setTimeout(() => inputRef.value?.focus?.(), 0)
+}
+
 // Permet de fermer en cliquant ailleurs
 function onBlur() {
   setTimeout(() => { open.value = false }, 150)
@@ -89,7 +99,7 @@ onMounted(loadSites)
       v-if="selected && !open"
       class="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-indigo-300 transition"
       :class="disabled ? 'opacity-60 cursor-not-allowed' : ''"
-      @click="!disabled && (open = true)"
+      @click="!disabled && openForChange()"
     >
       <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
       <div class="flex-1 min-w-0">
@@ -128,9 +138,11 @@ onMounted(loadSites)
       />
     </div>
 
-    <!-- Dropdown de suggestions -->
+    <!-- Dropdown de suggestions : ouvert dès que open=true (le clic sur le
+         site sélectionné force open=true via openForChange, ce qui permet
+         de remplacer le site sans avoir à le clear d'abord). -->
     <div
-      v-if="open && !selected"
+      v-if="open"
       class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"
     >
       <div v-if="loading" class="px-3 py-2 text-xs text-gray-400">Chargement…</div>

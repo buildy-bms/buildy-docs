@@ -180,6 +180,37 @@ async function toggleShareDeviceZone(zoneId, checked) {
   }
 }
 
+function shareCandidateZones() {
+  if (!editingDevice.value?.system) return []
+  const originId = editingDevice.value.system.zone_id
+  return zones.value.filter(z => z.zone_id !== originId)
+}
+function shareAllChecked() {
+  const dev = editingDevice.value?.device
+  if (!dev) return false
+  const cands = shareCandidateZones()
+  if (!cands.length) return false
+  const set = new Set(dev.extra_zone_ids || [])
+  return cands.every(z => set.has(z.zone_id))
+}
+async function toggleAllShareDeviceZones() {
+  if (savingShare.value || !editingDevice.value?.device) return
+  savingShare.value = true
+  const dev = editingDevice.value.device
+  const cands = shareCandidateZones()
+  const next = shareAllChecked() ? [] : cands.map(z => z.zone_id)
+  try {
+    const { data } = await updateBacsDeviceZones(dev.id, next)
+    Object.assign(dev, data)
+    success(next.length ? 'Toutes les zones ajoutées' : 'Toutes les zones retirées')
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Mise à jour des zones impossible')
+  } finally {
+    savingShare.value = false
+  }
+}
+
 // Bibliothèque de modèles (préfiltrée par catégorie)
 const libraryDevicePickerSystem = ref(null)
 function openLibraryDevicePicker(system) {
@@ -599,10 +630,21 @@ async function removeDevice(d) {
           <!-- Partage multi-zones (mig 98) : un même équipement physique
                peut alimenter plusieurs zones (chaufferie commune, etc.). -->
           <div class="pt-2">
-            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">
-              <ShareIcon class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
-              Zones desservies
-            </p>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">
+                <ShareIcon class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+                Zones desservies
+              </p>
+              <button
+                v-if="shareCandidateZones().length"
+                type="button"
+                @click="toggleAllShareDeviceZones"
+                :disabled="savingShare"
+                class="text-xs font-medium text-indigo-600 active:text-indigo-800 disabled:opacity-50 whitespace-nowrap"
+              >
+                {{ shareAllChecked() ? 'Tout décocher' : 'Tout cocher' }}
+              </button>
+            </div>
             <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
               <div class="px-4 py-3 flex items-center gap-2 bg-gray-50">
                 <CheckIcon class="w-5 h-5 text-gray-400 shrink-0" />
