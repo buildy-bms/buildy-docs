@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Garde-fou : empêche un push si du code source local n'est pas commité.
+# Cause de l'incident 2026-05-09 : ~600 lignes FAQ restées en stash + untracked
+# pendant des semaines, prod servait une version stripped sans que personne
+# ne s'en aperçoive.
+
+ORPHAN_FILES=$(git ls-files --others --exclude-standard backend-node/src frontend/src scripts 2>/dev/null)
+
+if [ -n "$ORPHAN_FILES" ]; then
+    echo ""
+    echo "⚠️  Tu pousses, mais ces fichiers source NE SONT PAS commités :"
+    echo ""
+    echo "$ORPHAN_FILES" | sed 's/^/    • /'
+    echo ""
+    echo "  La prod fera un git pull → ces fichiers seront ABSENTS du déploiement."
+    echo "  → git add + git commit avant de push, sinon tu pousses incomplet."
+    echo ""
+
+    # Tester si on est dans un terminal interactif pour pouvoir demander confirmation
+    if [ -t 1 ]; then
+        exec < /dev/tty
+        read -p "  Pousser quand même ? (y/N) " -n 1 -r REPLY
+        echo ""
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Push annulé."
+            exit 1
+        fi
+    else
+        # Mode non-interactif (CI, gh CLI, etc.) → on bloque par défaut
+        echo "Mode non-interactif détecté → push bloqué."
+        echo "Pour bypass : git push --no-verify"
+        exit 1
+    fi
+fi
+
+exit 0

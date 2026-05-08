@@ -4,11 +4,14 @@ import { useRouter } from 'vue-router'
 import {
   ChevronLeftIcon, ArrowUpOnSquareIcon, SparklesIcon, TrashIcon,
   CheckCircleIcon, ArrowTopRightOnSquareIcon,
+  ArrowDownTrayIcon, ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { useFaqStore } from '@/stores/faq'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import FaqRichTextEditor from '@/components/FaqRichTextEditor.vue'
+import FaqArticleHistoryModal from '@/components/FaqArticleHistoryModal.vue'
+import { pullFaqArticleFromCrisp } from '@/api'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const router = useRouter()
@@ -40,6 +43,75 @@ const dirty = computed(() => {
 })
 
 const credentialsConfigured = computed(() => store.settings?.has_credentials || false)
+
+// ── Historique des versions ──
+const historyModalOpen = ref(false)
+
+// ── Réécriture IA (article entier) ──
+const aiRewriting = ref(false)
+async function rewriteWithAI() {
+  if (!await confirm({
+    title: 'Réécrire l\'article avec l\'IA ?',
+    message: 'L\'article actuel sera remplacé par une version réécrite par Claude. Un snapshot est créé avant pour pouvoir revenir en arrière.',
+    confirmText: 'Réécrire',
+  })) return
+  aiRewriting.value = true
+  try {
+    const data = await store.aiRewrite(parseInt(props.id, 10))
+    if (data.html) draft.value.content_html = data.html
+    if (data.suggested_title) suggestedTitle.value = data.suggested_title
+    success('Article réécrit par l\'IA. Vérifie et enregistre si ça te convient.')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la réécriture IA')
+  } finally {
+    aiRewriting.value = false
+  }
+}
+
+// ── Recharger depuis Crisp ──
+const pulling = ref(false)
+async function pullFromCrisp() {
+  if (dirty.value) {
+    if (!await confirm({
+      title: 'Recharger depuis Crisp ?',
+      message: 'Tu as des modifications non enregistrées qui seront perdues. Continuer ?',
+      confirmText: 'Recharger',
+      danger: true,
+    })) return
+  }
+  pulling.value = true
+  try {
+    const { data } = await pullFaqArticleFromCrisp(parseInt(props.id, 10))
+    original.value = data
+    draft.value = {
+      title: data.title || '',
+      content_html: data.content_html || '',
+      category_id: data.category_id || null,
+      status: data.status || 'draft',
+      visibility: data.visibility || 'public',
+    }
+    success('Article rechargé depuis Crisp.')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec du rechargement')
+  } finally {
+    pulling.value = false
+  }
+}
+
+// Quand une version est restaurée depuis l'historique : recharge l'article
+async function onVersionRestored() {
+  historyModalOpen.value = false
+  const article = await store.loadArticle(parseInt(props.id, 10))
+  original.value = article
+  draft.value = {
+    title: article.title || '',
+    content_html: article.content_html || '',
+    category_id: article.category_id || null,
+    status: article.status || 'draft',
+    visibility: article.visibility || 'public',
+  }
+  success('Version restaurée.')
+}
 
 onMounted(async () => {
   loading.value = true
@@ -185,6 +257,24 @@ function back() {
             <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" />
             Voir en ligne
           </a>
+          <button @click="rewriteWithAI" :disabled="aiRewriting || !draft.content_html"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition whitespace-nowrap disabled:opacity-50"
+                  title="Réécrire l'article entier avec l'IA (snapshot avant)">
+            <SparklesIcon class="w-4 h-4 shrink-0" />
+            {{ aiRewriting ? 'Réécriture…' : 'Réécrire avec IA' }}
+          </button>
+          <button v-if="original?.crisp_id" @click="pullFromCrisp" :disabled="pulling"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700 disabled:opacity-50"
+                  title="Recharger l'article depuis Crisp (écrase la version locale)">
+            <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
+            {{ pulling ? 'Rechargement…' : 'Recharger' }}
+          </button>
+          <button @click="historyModalOpen = true"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700"
+                  title="Voir l'historique des versions">
+            <ClockIcon class="w-4 h-4 shrink-0" />
+            Historique
+          </button>
           <button @click="save" :disabled="!dirty || saving"
                   class="px-4 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
             {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
@@ -263,5 +353,11 @@ function back() {
         </div>
       </div>
     </div>
+
+    <!-- Modale historique des versions -->
+    <FaqArticleHistoryModal v-if="historyModalOpen"
+                            :article-id="parseInt(props.id, 10)"
+                            @close="historyModalOpen = false"
+                            @restored="onVersionRestored" />
   </div>
 </template>
