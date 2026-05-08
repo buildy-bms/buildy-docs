@@ -250,7 +250,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           v-else
           class="w-full aspect-video bg-gray-100 flex flex-col items-center justify-center gap-2 text-center px-3 cursor-pointer hover:bg-gray-200"
           @click="retryImage(att)"
-          title="Cliquer pour réessayer"
+          v-tooltip="'Cliquer pour réessayer'"
         >
           <ExclamationCircleIcon class="w-8 h-8 text-amber-500" />
           <p class="text-[11px] text-gray-600 leading-tight">
@@ -266,7 +266,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
                    att.full_width === 1
                      ? 'bg-indigo-500 text-white hover:bg-indigo-600'
                      : 'bg-white/90 hover:bg-indigo-500 hover:text-white text-gray-600']"
-          :title="att.full_width === 1 ? 'Capture en pleine largeur (PDF brochure) — cliquer pour repasser en auto' : 'Verrouiller en pleine largeur dans le PDF brochure (au lieu de auto-fit 1-2 colonnes)'"
+          v-tooltip="att.full_width === 1 ? 'Capture en pleine largeur (PDF brochure) — cliquer pour repasser en auto' : 'Verrouiller en pleine largeur dans le PDF brochure (au lieu de auto-fit 1-2 colonnes)'"
         >
           <FontAwesomeIcon :icon="['fas', 'arrows-left-right-to-line']" class="w-3.5 h-3.5" />
         </button>
@@ -274,7 +274,7 @@ onBeforeUnmount(() => { if (sortable) sortable.destroy() })
           type="button"
           @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
-          title="Supprimer (impacte toutes les AFs)"
+          v-tooltip="'Supprimer (impacte toutes les AFs)'"
         >
           <TrashIcon class="w-3.5 h-3.5" />
         </button>

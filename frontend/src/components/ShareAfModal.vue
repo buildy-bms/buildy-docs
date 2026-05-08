@@ -81,7 +81,7 @@ onMounted(refresh)
 </script>
 
 <template>
-  <BaseModal title="Partager cette AF" size="lg" @close="emit('close')">
+  <BaseModal :title="'Partager cette AF'" size="lg" @close="emit('close')">
     <div class="space-y-5">
       <p class="text-xs text-gray-500 leading-relaxed">
         Donnez accès à d'autres utilisateurs en lecture ou écriture.
@@ -111,12 +111,12 @@ onMounted(refresh)
               <p class="text-sm font-medium text-gray-800 truncate">{{ g.user_display_name || g.user_email }}</p>
               <p class="text-[11px] text-gray-500">{{ g.user_email }} · ajouté le {{ new Date(g.granted_at + 'Z').toLocaleDateString('fr-FR') }}</p>
             </div>
-            <button @click="changeRole(g)" :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded', g.role === 'write' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800']" :title="`Cliquer pour passer en ${g.role === 'write' ? 'lecture' : 'écriture'}`">
+            <button @click="changeRole(g)" :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded', g.role === 'write' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800']" v-tooltip="`Cliquer pour passer en ${g.role === 'write' ? 'lecture' : 'écriture'}`">
               <PencilIcon v-if="g.role === 'write'" class="w-3 h-3" />
               <EyeIcon v-else class="w-3 h-3" />
               {{ g.role === 'write' ? 'Écriture' : 'Lecture' }}
             </button>
-            <button @click="revoke(g)" class="text-gray-400 hover:text-red-600 p-1" :title="`Retirer l'accès`">
+            <button @click="revoke(g)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="`Retirer l'accès`">
               <TrashIcon class="w-3.5 h-3.5" />
             </button>
           </div>

@@ -102,7 +102,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
           {{ r.code }}<span v-if="r.paragraphs" class="text-purple-500/80">&nbsp;{{ r.paragraphs }}</span>
           <span @click="removeRef(r.code, $event)"
                 class="inline-flex items-center justify-center w-4 h-4 text-purple-400 hover:text-white hover:bg-purple-500 rounded-full transition cursor-pointer"
-                title="Retirer">
+                v-tooltip="'Retirer'">
             <XMarkIcon class="w-3 h-3" />
           </span>
         </span>

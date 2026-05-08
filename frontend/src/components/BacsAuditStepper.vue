@@ -71,7 +71,7 @@ function connectorClass(s) {
           @click="$emit('step-click', s.key)"
           :class="['relative z-10 shrink-0 w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition shadow-sm',
                    circleClass(s)]"
-          :title="s.description"
+          v-tooltip="s.description"
         >
           <CheckCircleIcon v-if="s.validated" class="w-3.5 h-3.5" />
           <span v-else>{{ idx + 1 }}</span>

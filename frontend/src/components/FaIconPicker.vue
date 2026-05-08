@@ -107,7 +107,7 @@ function onBlur() { setTimeout(() => { showSuggestions.value = false }, 150) }
           @mousedown.prevent="pick(name)"
           :class="['flex flex-col items-center gap-1 p-2 rounded-md hover:bg-indigo-50 transition',
                    validIcon === name ? 'bg-indigo-100 ring-1 ring-indigo-300' : '']"
-          :title="name"
+          v-tooltip="name"
         >
           <FontAwesomeIcon :icon="['fas', name]" class="w-5 h-5 text-gray-700" />
           <span class="text-[9px] text-gray-500 truncate max-w-full">{{ name }}</span>

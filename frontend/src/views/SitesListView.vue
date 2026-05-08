@@ -132,7 +132,7 @@ onMounted(refresh)
         <button
           @click="refresh"
           class="p-2 text-gray-500 hover:text-gray-700"
-          title="Rafraîchir"
+          v-tooltip="'Rafraîchir'"
         >
           <ArrowPathIcon class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
         </button>
@@ -220,10 +220,10 @@ onMounted(refresh)
             <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(s.updated_at) }}</td>
             <td class="px-4 py-2.5 text-right">
               <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button @click="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" title="Éditer">
+                <button @click="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" v-tooltip="'Éditer'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
-                <button @click="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" title="Supprimer">
+                <button @click="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="'Supprimer'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

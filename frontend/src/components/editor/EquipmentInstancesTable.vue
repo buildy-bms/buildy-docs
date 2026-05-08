@@ -223,17 +223,17 @@ onMounted(refresh)
                 {{ allCategories.find(c => c.key === key)?.label || key }}
               </span>
             </span>
-            <span v-else-if="candidateCategories.length" class="text-amber-600 italic text-[11px]" title="Aucune catégorie choisie — toutes celles du template seront utilisées par défaut">
+            <span v-else-if="candidateCategories.length" class="text-amber-600 italic text-[11px]" v-tooltip="'Aucune catégorie choisie — toutes celles du template seront utilisées par défaut'">
               tous candidats du template
             </span>
             <span v-else class="text-gray-400 italic">—</span>
           </td>
           <td class="px-2 py-2 text-gray-600">{{ inst.qty }}</td>
           <td class="px-5 py-2 text-right">
-            <button @click="openEdit(inst)" class="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-800 mr-2" title="Éditer">
+            <button @click="openEdit(inst)" class="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-800 mr-2" v-tooltip="'Éditer'">
               <PencilSquareIcon class="w-3.5 h-3.5 inline" />
             </button>
-            <button @click="removeInstance(inst)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" title="Supprimer">
+            <button @click="removeInstance(inst)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Supprimer'">
               <TrashIcon class="w-3.5 h-3.5 inline" />
             </button>
           </td>
@@ -274,7 +274,7 @@ onMounted(refresh)
               <input type="checkbox" :checked="editForm.category_keys.includes(c.key)" @change="toggleCategory(c.key)" class="shrink-0" />
               <TagIcon class="w-3 h-3 shrink-0" />
               <span class="truncate">{{ c.label }}</span>
-              <span v-if="c.bacs" class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded ml-auto" :title="c.bacs">⚖️</span>
+              <span v-if="c.bacs" class="text-[9px] bg-violet-100 text-violet-700 px-1 rounded ml-auto" v-tooltip="c.bacs">⚖️</span>
             </label>
           </div>
         </div>

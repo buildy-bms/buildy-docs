@@ -117,7 +117,7 @@ async function submit() {
         <div class="flex flex-wrap gap-1.5">
           <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
                   @click="toggleKind(dk.kind)"
-                  :title="dk.description"
+                  v-tooltip="dk.description"
                   :class="['inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition whitespace-nowrap',
                            isKindActive(dk.kind)
                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'

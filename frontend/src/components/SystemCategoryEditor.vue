@@ -163,7 +163,7 @@ async function destroy() {
         <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
                   :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
-                  :title="name">
+                  v-tooltip="name">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
           </button>
           <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
@@ -174,7 +174,7 @@ async function destroy() {
           <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
           <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
                   :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
-                  :style="{ background: c }" :title="c"></button>
+                  :style="{ background: c }" v-tooltip="c"></button>
           <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" />
         </div>
       </div>

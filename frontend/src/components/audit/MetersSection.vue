@@ -108,7 +108,7 @@ onBeforeUnmount(teardownMetersSortable)
 <template>
   <CollapsibleSection storage-key="meters" section-id="section-meters" :active="active">
     <template #header>
-      <SectionHeader number="4" v-tooltip="'Compteurs et mesurage'"
+      <SectionHeader number="4" :title="'Compteurs et mesurage'"
                      :subtitle="audit.isBacs ? 'R175-3 1° — suivi continu, pas horaire, conservation 5 ans' : 'Compteurs présents et raccordés'"
                      :icon="BoltIcon" icon-color="text-emerald-600"
                      :step="step"

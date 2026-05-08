@@ -66,20 +66,20 @@ const isFunctionality = computed(() => props.node.is_functionality === 1)
       <span class="flex-1 min-w-0 truncate text-sm text-gray-800">{{ node.title }}</span>
 
       <SparklesIcon v-if="isFunctionality" class="w-3.5 h-3.5 text-violet-400 shrink-0"
-                    title="Marquée comme fonctionnalité" />
+                    v-tooltip="'Marquée comme fonctionnalité'" />
       <ServiceLevelBadge v-if="node.service_level" :level="node.service_level" />
       <BacsBadge v-if="node.bacs_articles" :reference="node.bacs_articles" />
 
       <span
         v-if="node.affected_afs_count > 0"
         class="text-[11px] text-gray-500 tabular-nums shrink-0 inline-flex items-center gap-0.5"
-        :title="`Utilisée dans ${node.affected_afs_count} AF${node.affected_afs_count > 1 ? 's' : ''}` + (node.outdated_count > 0 ? ` — ${node.outdated_count} avec maj en attente` : '')"
+        v-tooltip="`Utilisée dans ${node.affected_afs_count} AF${node.affected_afs_count > 1 ? 's' : ''}` + (node.outdated_count > 0 ? ` — ${node.outdated_count} avec maj en attente` : '')"
       >
         <BookmarkIcon class="w-3 h-3" />
         {{ node.affected_afs_count }}
         <span v-if="node.outdated_count > 0" class="text-amber-600">↻{{ node.outdated_count }}</span>
       </span>
-      <span v-else class="text-[11px] text-gray-300 italic shrink-0" title="Jamais utilisée — candidate au nettoyage">
+      <span v-else class="text-[11px] text-gray-300 italic shrink-0" v-tooltip="'Jamais utilisée — candidate au nettoyage'">
         ∅ inutilisée
       </span>
 

@@ -216,6 +216,51 @@ async function quickToggleNotAvailable(item) {
   } catch { error('Mise à jour impossible') }
 }
 
+// ─── Drag-drop direct sur une ligne d'item (sans ouvrir la modale) ──
+const dragOverItem = ref(null)
+
+async function onDropFiles(e, item) {
+  e.preventDefault()
+  dragOverItem.value = null
+  const files = Array.from(e.dataTransfer?.files || [])
+  if (!files.length) return
+  if (!document.value?.site_uuid) {
+    error('Audit non rattaché à un site, impossible d\'uploader.')
+    return
+  }
+  // Lazy create de la ligne d'état si besoin (1er upload)
+  let target = item
+  if (!target.id) {
+    try {
+      const { data } = await updateBacsChecklistItem(props.docId, item.catalog_key, {
+        status: 'available',
+      })
+      // Recharge pour avoir le nouveau id
+      await load()
+      target = items.value.find(i => i.catalog_key === item.catalog_key) || target
+    } catch { error('Création de la ligne impossible'); return }
+  }
+  for (const file of files) {
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      await uploadSiteDocument(document.value.site_uuid, fd, {
+        title: file.name,
+        category: 'autre',
+        bacs_audit_checklist_id: target.id,
+      })
+    } catch { error(`Upload « ${file.name} » impossible`) }
+  }
+  // Bascule auto en « Collecté » si on était en pending
+  if (target.status === 'pending') {
+    try {
+      await updateBacsChecklistItem(props.docId, target.catalog_key, { status: 'available' })
+    } catch { /* silencieux */ }
+  }
+  await load()
+  success(`${files.length} fichier${files.length > 1 ? 's' : ''} ajouté${files.length > 1 ? 's' : ''}`)
+}
+
 // ─── Status helpers ────────────────────────────────────────────────
 function statusLabel(s) {
   return { pending: 'À collecter', available: 'Collecté', not_available: 'Non disponible' }[s] || s
@@ -305,36 +350,56 @@ defineExpose({ refresh: load })
         <div v-if="!items.length" class="text-sm text-gray-400 italic px-3 py-4 border border-dashed border-gray-200 rounded-lg text-center">
           Aucun item dans le catalogue. Ajoutez-en depuis l'admin (« Catalogue check-list »).
         </div>
-        <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          <button v-for="item in items" :key="item.catalog_key"
-                  type="button"
-                  @click="openItem(item)"
-                  :class="['relative text-left border rounded-lg p-3 transition hover:border-indigo-300', statusClass(item.status)]">
-            <div class="flex items-start gap-2 mb-1">
-              <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: item.icon_value || 'fa-file', icon_color: item.icon_color || '#6b7280' }"
-                             size="md" class="shrink-0 mt-0.5" />
-              <div class="flex-1 min-w-0">
-                <p :class="['text-sm font-medium leading-tight',
-                            item.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-800']">
-                  {{ item.label }}
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center justify-between gap-2 mt-2">
-              <div class="flex items-center gap-1.5 text-[11px]">
+        <ul v-else class="space-y-2">
+          <li v-for="item in items" :key="item.catalog_key"
+              @dragover.prevent="dragOverItem = item.catalog_key"
+              @dragleave="dragOverItem === item.catalog_key && (dragOverItem = null)"
+              @drop="onDropFiles($event, item)"
+              :class="['relative border rounded-lg transition flex items-center gap-3 p-3',
+                       statusClass(item.status),
+                       dragOverItem === item.catalog_key ? 'border-indigo-500 ring-2 ring-indigo-500/30 bg-indigo-50/40' : '']">
+            <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: item.icon_value || 'fa-file', icon_color: item.icon_color || '#6b7280' }"
+                           size="md" class="shrink-0" />
+
+            <div class="flex-1 min-w-0">
+              <p :class="['text-sm font-medium leading-tight',
+                          item.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-800']">
+                {{ item.label }}
+              </p>
+              <div class="flex items-center gap-2 mt-1 text-[11px]">
                 <span v-if="item.status === 'available'" class="inline-flex items-center gap-1 text-emerald-700">
                   <CheckIcon class="w-3 h-3" /> {{ item.files_count }} fichier{{ item.files_count > 1 ? 's' : '' }}
                 </span>
                 <span v-else-if="item.status === 'not_available'" class="inline-flex items-center gap-1 text-gray-500">
-                  <NoSymbolIcon class="w-3 h-3" /> Non disponible
+                  <NoSymbolIcon class="w-3 h-3" />
+                  <span class="truncate">{{ item.not_available_reason || 'Non disponible' }}</span>
                 </span>
                 <span v-else class="inline-flex items-center gap-1 text-amber-700">
-                  <ExclamationCircleIcon class="w-3 h-3" /> À collecter
+                  <ExclamationCircleIcon class="w-3 h-3" />
+                  Glisse un fichier ici ou clique pour ouvrir
                 </span>
               </div>
             </div>
-          </button>
-        </div>
+
+            <!-- Actions inline -->
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" @click.stop="openItem(item)"
+                      v-tooltip="'Détails / notes / fichiers'"
+                      class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
+                <PencilSquareIcon class="w-3.5 h-3.5" /> Détails
+              </button>
+              <button type="button" @click.stop="quickToggleNotAvailable(item)"
+                      v-tooltip="item.status === 'not_available' ? 'Réactiver (= À collecter)' : 'Marquer non disponible'"
+                      :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border',
+                               item.status === 'not_available'
+                                 ? 'text-gray-700 bg-gray-100 border-gray-300 hover:bg-gray-200'
+                                 : 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50 hover:text-gray-700']">
+                <NoSymbolIcon class="w-3.5 h-3.5" />
+                {{ item.status === 'not_available' ? 'Réactiver' : 'Non dispo' }}
+              </button>
+            </div>
+          </li>
+        </ul>
       </section>
     </div>
   </CollapsibleSection>

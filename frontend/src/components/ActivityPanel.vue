@@ -109,10 +109,10 @@ defineExpose({ refresh })
         <ClockIcon class="w-3.5 h-3.5" /> Activité récente
       </h3>
       <div class="inline-flex items-center gap-2">
-        <button @click="refresh" class="text-gray-400 hover:text-gray-700" title="Rafraîchir">
+        <button @click="refresh" class="text-gray-400 hover:text-gray-700" v-tooltip="'Rafraîchir'">
           <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
         </button>
-        <button v-if="closable" @click="emit('close')" class="text-gray-400 hover:text-gray-700" title="Fermer">
+        <button v-if="closable" @click="emit('close')" class="text-gray-400 hover:text-gray-700" v-tooltip="'Fermer'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>

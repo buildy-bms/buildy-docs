@@ -24,7 +24,7 @@ const emit = defineEmits([
 <template>
   <CollapsibleSection storage-key="synthesis" section-id="section-synthesis" :active="active">
     <template #header>
-      <SectionHeader number="12" title="Note de synthèse"
+      <SectionHeader number="12" :title="'Note de synthèse'"
                      subtitle="Affichée en tête du PDF d'audit livré au client."
                      :icon="SparklesIcon" icon-color="text-violet-500"
                      :step="step"
@@ -48,7 +48,7 @@ const emit = defineEmits([
         <button
           @click="emit('generate')"
           :disabled="synthesisGenerating"
-          :title="usageTooltip"
+          v-tooltip="usageTooltip"
           class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition shadow-sm">
           <SparklesIcon class="w-4 h-4" :class="synthesisGenerating ? 'animate-pulse' : ''" />
           {{ synthesisGenerating

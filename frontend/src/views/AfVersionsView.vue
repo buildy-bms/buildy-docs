@@ -173,7 +173,7 @@ onMounted(refresh)
                 v-if="i !== 0"
                 @click="restore(c.sha)"
                 class="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                title="Restaurer cette version"
+                v-tooltip="'Restaurer cette version'"
               >
                 <ArrowUturnLeftIcon class="w-3 h-3" /> Restaurer
               </button>
@@ -183,7 +183,7 @@ onMounted(refresh)
       </li>
     </ol>
 
-    <BaseModal v-if="showDiff" title="Différences entre versions" size="lg" @close="showDiff = false">
+    <BaseModal v-if="showDiff" :title="'Différences entre versions'" size="lg" @close="showDiff = false">
       <div v-if="diff" class="text-xs space-y-3 max-h-[65vh] overflow-y-auto">
         <p class="text-gray-500">
           <code class="bg-gray-100 px-1">{{ diff.from_sha?.slice(0, 7) }}</code>
@@ -260,7 +260,7 @@ onMounted(refresh)
       </template>
     </BaseModal>
 
-    <BaseModal v-if="showCheckpoint" title="Marquer comme version" size="md" @close="showCheckpoint = false">
+    <BaseModal v-if="showCheckpoint" :title="'Marquer comme version'" size="md" @close="showCheckpoint = false">
       <form @submit.prevent="submitCheckpoint" class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-gray-700 mb-1">Message du commit *</label>

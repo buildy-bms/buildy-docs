@@ -179,10 +179,10 @@ onMounted(refresh)
             <span v-else>— site</span>
           </td>
           <td class="px-3 py-2 text-center">
-            <button @click="openEdit(c)" class="text-gray-400 hover:text-indigo-600 mx-1" title="Modifier">
+            <button @click="openEdit(c)" class="text-gray-400 hover:text-indigo-600 mx-1" v-tooltip="'Modifier'">
               <PencilSquareIcon class="w-4 h-4" />
             </button>
-            <button @click="removeCred(c)" class="text-gray-400 hover:text-red-600 mx-1" title="Supprimer">
+            <button @click="removeCred(c)" class="text-gray-400 hover:text-red-600 mx-1" v-tooltip="'Supprimer'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>

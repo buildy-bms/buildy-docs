@@ -39,5 +39,5 @@ const tooltip = computed(() => {
 
 <template>
   <span :class="['inline-block w-2.5 h-2.5 rounded-full shrink-0', config.cls]"
-        :title="tooltip" :aria-label="config.label" />
+        v-tooltip="tooltip" :aria-label="config.label" />
 </template>

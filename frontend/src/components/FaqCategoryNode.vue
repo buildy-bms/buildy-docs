@@ -31,7 +31,7 @@ function onClickAway(e) {
               :class="['flex-1 text-left px-2 py-1 text-sm transition rounded truncate',
                        selected === category.id ? 'text-indigo-700 font-medium' : 'text-gray-700']">
         {{ category.name }}
-        <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block ml-1 align-middle" title="Modifiée localement" />
+        <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block ml-1 align-middle" v-tooltip="'Modifiée localement'" />
       </button>
       <div class="relative opacity-0 group-hover:opacity-100 transition" data-faq-cat-menu>
         <button @click.stop="menuOpen = !menuOpen" class="p-1 hover:bg-gray-100 rounded shrink-0">

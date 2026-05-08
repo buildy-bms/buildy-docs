@@ -359,7 +359,7 @@ onBeforeUnmount(teardownSortables)
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" title="Supprimer">
+                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -400,10 +400,10 @@ onBeforeUnmount(teardownSortables)
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" title="Enregistrer">
+                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" title="Annuler">
+                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -445,10 +445,10 @@ onBeforeUnmount(teardownSortables)
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" title="Ajouter">
+                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" title="Annuler">
+                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -539,7 +539,7 @@ onBeforeUnmount(teardownSortables)
                   <CheckIcon v-if="p.is_optional" class="w-4 h-4 text-gray-400 inline-block" />
                 </td>
                 <td class="px-3 py-1.5 text-right whitespace-nowrap" @click.stop>
-                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" title="Supprimer">
+                  <button @click="removePoint(p)" class="text-gray-300 hover:text-red-600 p-0.5" v-tooltip="'Supprimer'">
                     <TrashIcon class="w-3.5 h-3.5" />
                   </button>
                 </td>
@@ -579,10 +579,10 @@ onBeforeUnmount(teardownSortables)
                          class="rounded text-indigo-600 focus:ring-indigo-500/30" />
                 </td>
                 <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" title="Enregistrer">
+                  <button @click="saveEdit(p.id)" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Enregistrer'">
                     <CheckIcon class="w-4 h-4" />
                   </button>
-                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" title="Annuler">
+                  <button @click="cancelEdit(p.id)" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                     <XMarkIcon class="w-4 h-4" />
                   </button>
                 </td>
@@ -619,10 +619,10 @@ onBeforeUnmount(teardownSortables)
                        class="rounded text-indigo-600 focus:ring-indigo-500/30" />
               </td>
               <td class="px-2 py-1.5 text-right whitespace-nowrap">
-                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" title="Ajouter">
+                <button @click="submitAdd" class="text-emerald-600 hover:text-emerald-700 p-0.5 mr-1" v-tooltip="'Ajouter'">
                   <CheckIcon class="w-4 h-4" />
                 </button>
-                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" title="Annuler">
+                <button @click="cancelAdd" class="text-gray-400 hover:text-gray-700 p-0.5" v-tooltip="'Annuler'">
                   <XMarkIcon class="w-4 h-4" />
                 </button>
               </td>

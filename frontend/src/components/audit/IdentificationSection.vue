@@ -65,7 +65,7 @@ const r175_6_applicable = computed(() => {
   <CollapsibleSection storage-key="identification" section-id="section-identification" :active="active">
     <template #header>
       <SectionHeader number="1"
-                     v-tooltip="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
+                     :title="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
                      :icon="BuildingOffice2Icon" icon-color="text-indigo-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"

@@ -410,14 +410,14 @@ const TOOLS = [
 </script>
 
 <template>
-  <BaseModal size="xl" :dismiss-on-backdrop="false" title="Annoter la capture" @close="emit('close')">
+  <BaseModal size="xl" :dismiss-on-backdrop="false" :title="'Annoter la capture'" @close="emit('close')">
     <div class="flex gap-4" style="min-height: 500px;">
       <!-- Toolbar gauche -->
       <div class="flex flex-col gap-1 border-r border-gray-100 pr-3">
         <button v-for="t in TOOLS" :key="t.key" type="button" @click="tool = t.key"
                 :class="['p-2 rounded-lg transition flex items-center justify-center w-10 h-10',
                          tool === t.key ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100']"
-                :title="t.label">
+                v-tooltip="t.label">
           <component :is="t.icon" class="w-5 h-5" />
         </button>
         <div class="my-1 h-px bg-gray-200" />
@@ -431,18 +431,18 @@ const TOOLS = [
         <div class="my-1 h-px bg-gray-200" />
         <button type="button" @click="undo" :disabled="!canUndo"
                 class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center"
-                title="Annuler">
+                v-tooltip="'Annuler'">
           <ArrowUturnLeftIcon class="w-5 h-5" />
         </button>
         <button type="button" @click="redo" :disabled="!canRedo"
                 class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-40 w-10 h-10 flex items-center justify-center"
-                title="Rétablir">
+                v-tooltip="'Rétablir'">
           <ArrowUturnRightIcon class="w-5 h-5" />
         </button>
         <div class="my-1 h-px bg-gray-200" />
         <button type="button" @click="detectPiiAuto" :disabled="piiRunning"
                 class="p-2 rounded-lg text-violet-600 hover:bg-violet-50 disabled:opacity-50 w-10 h-10 flex items-center justify-center"
-                title="Détection PII auto (OCR + flou)">
+                v-tooltip="'Détection PII auto (OCR + flou)'">
           <ArrowPathIcon v-if="piiRunning" class="w-5 h-5 animate-spin" />
           <ShieldCheckIcon v-else class="w-5 h-5" />
         </button>

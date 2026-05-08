@@ -149,7 +149,7 @@ const initials = computed(() => {
         <div
           v-if="!isOnline"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
-          title="Hors-ligne"
+          v-tooltip="'Hors-ligne'"
           aria-label="Hors-ligne"
         >
           <ClockIcon class="w-5 h-5" />
@@ -157,7 +157,7 @@ const initials = computed(() => {
         <div
           v-if="initials"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/15 text-white text-sm font-medium"
-          :title="currentUser?.display_name || currentUser?.email"
+          v-tooltip="currentUser?.display_name || currentUser?.email"
         >
           {{ initials }}
         </div>
@@ -268,7 +268,7 @@ const initials = computed(() => {
     <!-- Sheet Création -->
     <MobileSheet
       :open="showCreate"
-      title="Nouvel audit"
+      :title="'Nouvel audit'"
       save-label="Créer"
       :saving="creating"
       @close="showCreate = false"

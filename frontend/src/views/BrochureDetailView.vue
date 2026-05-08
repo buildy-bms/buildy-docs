@@ -355,7 +355,7 @@ function isInBrochure(libItem) {
                 </button>
                 <button @click="expandedItem = expandedItem === item.id ? null : item.id"
                         class="p-1 text-gray-400 hover:text-indigo-600"
-                        title="Modifier le titre / le contenu pour ce client">
+                        v-tooltip="'Modifier le titre / le contenu pour ce client'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
                 <button @click="removeItem(item)" class="p-1 text-gray-400 hover:text-red-600">

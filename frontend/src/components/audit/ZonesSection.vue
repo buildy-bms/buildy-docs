@@ -115,7 +115,7 @@ onBeforeUnmount(teardownZonesSortable)
 <template>
   <CollapsibleSection storage-key="zones" section-id="section-zones" :active="active">
     <template #header>
-      <SectionHeader number="2" v-tooltip="'Zones fonctionnelles'"
+      <SectionHeader number="2" :title="'Zones fonctionnelles'"
                      :subtitle="audit.isBacs ? 'R175-1 6° — usages homogènes' : 'Découpage du site'"
                      :icon="MapPinIcon" icon-color="text-indigo-600"
                      :step="step"

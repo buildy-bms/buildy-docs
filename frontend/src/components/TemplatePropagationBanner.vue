@@ -173,7 +173,7 @@ defineExpose({ refresh })
     </button>
   </div>
 
-  <BaseModal v-if="showModal" title="Mises à jour de la bibliothèque" size="lg" @close="showModal = false">
+  <BaseModal v-if="showModal" :title="'Mises à jour de la bibliothèque'" size="lg" @close="showModal = false">
     <div class="space-y-3 max-h-[65vh] overflow-y-auto">
       <p class="text-xs text-gray-500">
         <strong>Nouveautés</strong> : sections / fonctionnalités ajoutées à la bibliothèque, pas encore dans cette AF — clic <em>Ajouter</em> pour les insérer.
@@ -214,7 +214,7 @@ defineExpose({ refresh })
               @click="dismiss(item)"
               :disabled="busy.has(itemKey(item))"
               class="px-2 py-1 text-[11px] text-gray-500 hover:text-gray-800 disabled:opacity-50"
-              :title="isNewItem(item.source) ? 'Ne pas ajouter cet élément' : 'Acquitter sans changer le contenu local'"
+              v-tooltip="isNewItem(item.source) ? 'Ne pas ajouter cet élément' : 'Acquitter sans changer le contenu local'"
             >
               <XMarkIcon class="w-3.5 h-3.5 inline" />
               {{ isNewItem(item.source) ? 'Ignorer' : 'Garder ma version' }}

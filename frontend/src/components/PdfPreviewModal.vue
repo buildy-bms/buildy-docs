@@ -11,7 +11,7 @@
  * Usage :
  *   <PdfPreviewModal
  *     v-if="previewOpen"
- *     title="Aperçu rapport audit BACS"
+ *     v-tooltip="'Aperçu rapport audit BACS'"
  *     :preview-url="`/api/bacs-audit/${docId}/preview`"
  *     :downloading="exporting"
  *     @download="exportPdf"
@@ -53,7 +53,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
           </div>
         </header>
         <iframe :src="previewUrl"
-                title="Aperçu PDF"
+                v-tooltip="'Aperçu PDF'"
                 class="flex-1 w-full bg-white border-0"
                 sandbox="allow-same-origin" />
       </div>

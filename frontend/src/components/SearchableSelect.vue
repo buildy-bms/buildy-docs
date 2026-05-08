@@ -224,7 +224,7 @@ function clear() {
       <button v-if="clearable && (selectedOption || customLabel) && !disabled" type="button"
               @click.stop="clear"
               class="text-gray-400 hover:text-gray-600 -my-1 p-0.5 rounded"
-              title="Effacer la sélection">
+              v-tooltip="'Effacer la sélection'">
         <XMarkIcon class="w-3.5 h-3.5" />
       </button>
       <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform"

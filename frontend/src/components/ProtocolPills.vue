@@ -52,7 +52,7 @@ function colorFor(p) {
     </span>
     <span
       v-if="overflow > 0"
-      :title="allList.slice(max).join(', ')"
+      v-tooltip="allList.slice(max).join(', ')"
       class="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-full border bg-gray-100 text-gray-600 border-gray-200 whitespace-nowrap"
     >
       +{{ overflow }}
