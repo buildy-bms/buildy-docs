@@ -160,25 +160,25 @@ header[role="banner"] { margin-bottom: 0 !important; }
 #body > .csh-wrapper { padding-top: 20px !important; }
 
 /* ============================================================================
-   ANIMATIONS — fade-up staggered sur les cards de la home
+   ANIMATIONS — fade-in only (opacity), pas de transform pour ne pas bloquer
+   les hover transforms des cards. Stagger raccourci pour finir en < 350ms.
    ============================================================================ */
-@keyframes buildy-fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes buildy-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .csh-home-list li {
-  animation: buildy-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+  animation: buildy-fade-in 0.25s ease-out backwards !important;
 }
 .csh-home-list li:nth-child(1) { animation-delay: 0ms !important; }
-.csh-home-list li:nth-child(2) { animation-delay: 50ms !important; }
-.csh-home-list li:nth-child(3) { animation-delay: 100ms !important; }
-.csh-home-list li:nth-child(4) { animation-delay: 150ms !important; }
-.csh-home-list li:nth-child(5) { animation-delay: 200ms !important; }
-.csh-home-list li:nth-child(6) { animation-delay: 250ms !important; }
-.csh-home-list li:nth-child(7) { animation-delay: 300ms !important; }
-.csh-home-list li:nth-child(n+8) { animation-delay: 350ms !important; }
+.csh-home-list li:nth-child(2) { animation-delay: 30ms !important; }
+.csh-home-list li:nth-child(3) { animation-delay: 60ms !important; }
+.csh-home-list li:nth-child(4) { animation-delay: 90ms !important; }
+.csh-home-list li:nth-child(5) { animation-delay: 120ms !important; }
+.csh-home-list li:nth-child(6) { animation-delay: 150ms !important; }
+.csh-home-list li:nth-child(n+7) { animation-delay: 180ms !important; }
 .csh-home-title {
-  animation: buildy-fade-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+  animation: buildy-fade-in 0.2s ease-out backwards !important;
 }
 @media (prefers-reduced-motion: reduce) {
   .csh-home-list li, .csh-home-title { animation: none !important; }
