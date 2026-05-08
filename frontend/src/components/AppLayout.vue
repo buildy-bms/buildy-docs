@@ -20,6 +20,7 @@ import {
   ChevronDoubleRightIcon,
   DocumentDuplicateIcon,
   ChatBubbleLeftRightIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 import CommandPalette from './CommandPalette.vue'
 
@@ -64,6 +65,7 @@ const nav = [
   { section: 'Support' },
   { name: 'FAQ Buildy', to: '/faq', icon: ChatBubbleLeftRightIcon },
   { section: 'Système' },
+  { name: 'Paramètres BACS', to: '/admin/bacs-parameters', icon: Cog6ToothIcon },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
   { name: 'Textes standards PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },
   { name: 'Tableau des offres', to: '/admin/offerings-config', icon: DocumentDuplicateIcon },

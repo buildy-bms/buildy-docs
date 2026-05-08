@@ -18,6 +18,12 @@ const {
   DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE,
   DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
   DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
+  PROMPT_KEY_BACS_SYNTHESIS,
+  PROMPT_KEY_SITE_AUDIT_SYNTHESIS,
+  PROMPT_KEY_BACS_TRANSCRIPT,
+  DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
+  DEFAULT_SYSTEM_PROMPT_SITE_AUDIT_SYNTHESIS,
+  DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT,
 } = require('../lib/claude');
 
 // Catalogue des prompts exposes a l'admin (cle -> meta)
@@ -42,6 +48,21 @@ const PROMPT_CATALOG = {
     description: 'Prompt système utilisé par le bouton "Suggestions IA d\'articles manquants". Compare le corpus Buildy aux articles FAQ existants et propose les sujets non couverts.',
     default_body: DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
   },
+  [PROMPT_KEY_BACS_SYNTHESIS]: {
+    label: 'Audit BACS — Synthèse R175',
+    description: 'Prompt système utilisé par le bouton "Générer la synthèse" sur les audits BACS (kind = bacs_audit). Construit la note de synthèse réglementaire transmise au client à partir du dump complet de l\'audit.',
+    default_body: DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
+  },
+  [PROMPT_KEY_SITE_AUDIT_SYNTHESIS]: {
+    label: 'Audit Site (devis Buildy) — Synthèse commerciale',
+    description: 'Prompt système utilisé par le bouton "Générer la synthèse" sur les audits Site (kind = site_audit, hors décret BACS). Note commerciale orientée besoins du site et fonctionnalités Buildy.',
+    default_body: DEFAULT_SYSTEM_PROMPT_SITE_AUDIT_SYNTHESIS,
+  },
+  [PROMPT_KEY_BACS_TRANSCRIPT]: {
+    label: 'Audit BACS — Pré-remplissage depuis transcript Plaud Pro',
+    description: 'Prompt système utilisé par l\'import de transcript de dictée (Plaud Pro). Extrait des suggestions structurées (zone/système/équipement/compteur/régulation) à partir du verbatim de la visite terrain.',
+    default_body: DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT,
+  },
 };
 
 function expand(key) {
@@ -61,9 +82,15 @@ function expand(key) {
 }
 
 async function routes(fastify) {
-  // GET /api/ai-prompts — liste tous les prompts du catalogue
-  fastify.get('/ai-prompts', async () => {
-    return Object.keys(PROMPT_CATALOG).map(expand);
+  // GET /api/ai-prompts — liste tous les prompts du catalogue.
+  // Filtre optionnel ?prefix=bacs. pour ne ramener que les clés
+  // commençant par un préfixe (ex. utilisé par l'onglet « Prompts IA
+  // BACS » de la page Paramètres BACS).
+  fastify.get('/ai-prompts', async (request) => {
+    const prefix = (request.query?.prefix || '').trim();
+    const keys = Object.keys(PROMPT_CATALOG)
+      .filter(k => !prefix || k.startsWith(prefix));
+    return keys.map(expand);
   });
 
   // GET /api/ai-prompts/:key — detail + historique

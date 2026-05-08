@@ -507,6 +507,9 @@ async function assistLibrary({
 //  - Liste les actions correctives prioritaires (sans inventer)
 //  - Rappelle le role de Buildy en accompagnement
 //  - Invite le client a passer a l'action sans pression
+const PROMPT_KEY_BACS_SYNTHESIS = 'bacs.synthesis';
+const PROMPT_KEY_SITE_AUDIT_SYNTHESIS = 'bacs.synthesis_site';
+const PROMPT_KEY_BACS_TRANSCRIPT = 'bacs.transcript_mapping';
 const SYSTEM_PROMPT_SYNTHESIS = [
   `Tu es l'auditeur BACS senior de Buildy qui redige la note de synthese`,
   `transmise au client a la fin d'un audit de conformite au decret R175.`,
@@ -621,7 +624,9 @@ const SYSTEM_PROMPT_SYNTHESIS_SITE = [
 
 async function assistAuditSynthesis(auditDump, kind = 'bacs_audit') {
   const isSiteAudit = kind === 'site_audit';
-  const systemPrompt = isSiteAudit ? SYSTEM_PROMPT_SYNTHESIS_SITE : SYSTEM_PROMPT_SYNTHESIS;
+  const systemPrompt = isSiteAudit
+    ? getActivePrompt(PROMPT_KEY_SITE_AUDIT_SYNTHESIS, SYSTEM_PROMPT_SYNTHESIS_SITE)
+    : getActivePrompt(PROMPT_KEY_BACS_SYNTHESIS, SYSTEM_PROMPT_SYNTHESIS);
   const dumpHeader = isSiteAudit
     ? `=== AUDIT SITE (devis Buildy) — DUMP COMPLET ===`
     : `=== AUDIT BACS — DUMP COMPLET ===`;
@@ -755,7 +760,11 @@ async function assistTranscriptMapping({ skeleton, transcript }) {
     max_tokens: 4096,
     system: [
       // System prompt cacheable (stable entre runs sur le meme audit)
-      { type: 'text', text: SYSTEM_PROMPT_TRANSCRIPT, cache_control: { type: 'ephemeral' } },
+      {
+        type: 'text',
+        text: getActivePrompt(PROMPT_KEY_BACS_TRANSCRIPT, SYSTEM_PROMPT_TRANSCRIPT),
+        cache_control: { type: 'ephemeral' },
+      },
     ],
     messages: [{ role: 'user', content: userPrompt }],
   });
@@ -1212,4 +1221,11 @@ module.exports = {
   DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE: SYSTEM_PROMPT_FAQ_REWRITE,
   DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE: SYSTEM_PROMPT_FAQ_GENERATE,
   DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING: SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
+  // Audit BACS / Site
+  PROMPT_KEY_BACS_SYNTHESIS,
+  PROMPT_KEY_SITE_AUDIT_SYNTHESIS,
+  PROMPT_KEY_BACS_TRANSCRIPT,
+  DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS: SYSTEM_PROMPT_SYNTHESIS,
+  DEFAULT_SYSTEM_PROMPT_SITE_AUDIT_SYNTHESIS: SYSTEM_PROMPT_SYNTHESIS_SITE,
+  DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT: SYSTEM_PROMPT_TRANSCRIPT,
 };

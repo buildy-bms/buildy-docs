@@ -283,11 +283,15 @@ export const listAuditActions = () => api.get('/audit-log/actions')
 // marker `<!--TITLE: ...-->`. Backend retourne suggested_title + html=''.
 export const getClaudeUsage = () => api.get('/claude/usage')
 // ── Prompts IA editables ──
-export const listAiPrompts = () => api.get('/ai-prompts')
+// Le `prefix` filtre les clés (ex. 'bacs.' pour ne retourner que les
+// prompts d'audit BACS dans la page Paramètres BACS).
+export const listAiPrompts = (params = {}) => api.get('/ai-prompts', { params })
 export const getAiPrompt = (key) => api.get(`/ai-prompts/${key}`)
 export const updateAiPrompt = (key, body, label = null) => api.patch(`/ai-prompts/${key}`, { body, label })
 export const resetAiPrompt = (key) => api.post(`/ai-prompts/${key}/reset`)
 export const restoreAiPromptVersion = (key, versionId) => api.post(`/ai-prompts/${key}/restore/${versionId}`)
+// ── Articles R175 BACS (read-only) ──
+export const listBacsArticles = () => api.get('/bacs-articles')
 export const searchAfs = (q) => api.get('/afs/search', { params: { q } })
 export const claudeLibraryAssist = (payload) =>
   api.post('/claude/library-assist', payload)

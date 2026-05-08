@@ -123,6 +123,12 @@ const routes = [
     component: () => import('@/views/BoilerplateAdminView.vue'),
   },
   {
+    path: '/admin/bacs-parameters',
+    name: 'bacs-parameters',
+    meta: { title: 'Paramètres BACS' },
+    component: () => import('@/views/BacsSettingsView.vue'),
+  },
+  {
     path: '/admin/offerings-config',
     name: 'offerings-config',
     meta: { title: 'Configuration Offres PDF' },
