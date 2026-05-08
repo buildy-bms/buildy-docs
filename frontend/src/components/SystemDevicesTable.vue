@@ -12,7 +12,6 @@ import PhotoDropzone from './PhotoDropzone.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import DeviceZoneSharing from './DeviceZoneSharing.vue'
-import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 
 /**
@@ -41,9 +40,11 @@ const { error } = useNotification()
 const { confirm } = useConfirm()
 
 // Liste des zones du document, alimentée par le store : nécessaire au
-// sélecteur DeviceZoneSharing par équipement.
+// sélecteur DeviceZoneSharing par équipement. On lit auditStore.zones
+// directement plutôt que via storeToRefs — l'unwrap auto Vue + Pinia
+// state est déjà réactif, et la version storeToRefs causait une liste
+// vide côté DeviceZoneSharing dans certains contextes.
 const auditStore = useAuditStore()
-const { zones: storeZones } = storeToRefs(auditStore)
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
@@ -313,7 +314,7 @@ async function removeDevice(d) {
               <DeviceZoneSharing
                 :device="d"
                 :origin-zone-id="system.zone_id"
-                :zones="storeZones"
+                :zones="auditStore.zones"
                 @updated="emit('changed')" />
               <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
               <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" title="Dupliquer">
