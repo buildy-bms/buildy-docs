@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ChevronLeftIcon, ArrowUpOnSquareIcon, SparklesIcon, TrashIcon,
-  CheckCircleIcon, ExclamationTriangleIcon,
+  CheckCircleIcon, ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
 import { useFaqStore } from '@/stores/faq'
 import { useNotification } from '@/composables/useNotification'
@@ -26,7 +26,6 @@ const draft = ref({
 const original = ref(null)
 const loading = ref(true)
 const saving = ref(false)
-const aiRunning = ref(false)
 const suggestedTitle = ref(null)
 
 const dirty = computed(() => {
@@ -120,24 +119,12 @@ async function pushToCrisp() {
   }
 }
 
-async function rewriteWithAi() {
-  // Sauvegarder d'abord pour que l'IA voit la version courante
-  if (dirty.value) await save()
-  aiRunning.value = true
-  try {
-    const r = await store.aiRewrite(parseInt(props.id, 10))
-    if (r.html) {
-      draft.value.content_html = r.html
-    }
-    if (r.suggested_title) {
-      suggestedTitle.value = r.suggested_title
-    }
-    success('Article réécrit par l\'IA')
-  } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec')
-  } finally {
-    aiRunning.value = false
-  }
+function onRewritten(payload) {
+  // Émis par FaqRichTextEditor après /api/faq/ai/rewrite
+  if (payload?.html) draft.value.content_html = payload.html
+}
+function onSuggestedTitle(title) {
+  suggestedTitle.value = title
 }
 
 function applySuggestedTitle() {
@@ -191,11 +178,13 @@ function back() {
           Local uniquement
         </span>
         <div class="ml-auto flex items-center gap-2">
-          <button @click="rewriteWithAi" :disabled="aiRunning"
-                  class="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap disabled:opacity-50">
-            <SparklesIcon class="w-4 h-4 shrink-0" />
-            {{ aiRunning ? 'Réécriture…' : 'Réécrire avec IA' }}
-          </button>
+          <a v-if="original?.crisp_url && original?.status === 'published'"
+             :href="original.crisp_url" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap text-gray-700"
+             title="Voir l'article publié sur help.buildy.fr">
+            <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" />
+            Voir en ligne
+          </a>
           <button @click="save" :disabled="!dirty || saving"
                   class="px-4 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
             {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
@@ -259,7 +248,11 @@ function back() {
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Contenu</label>
-          <FaqRichTextEditor v-model="draft.content_html" placeholder="Rédigez l'article…" min-height="320px" />
+          <FaqRichTextEditor v-model="draft.content_html"
+                             :article-id="parseInt(props.id, 10)"
+                             placeholder="Rédigez l'article…" min-height="320px"
+                             @suggested-title="onSuggestedTitle"
+                             @rewritten="onRewritten" />
         </div>
 
         <div v-if="original" class="text-xs text-gray-400 pt-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">

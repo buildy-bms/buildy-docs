@@ -109,6 +109,7 @@ async function pullFromCrisp({ locale } = {}) {
         dirty: 0,
         pulledAt: new Date().toISOString(),
         crispUpdatedAt,
+        crispUrl: full.url || null,
       };
       if (existing) {
         if (existing.dirty) {
@@ -216,9 +217,10 @@ async function pushArticleToCrisp(articleId, userId = null) {
     const created = await client.createArticle(locale, article.title);
     const crispId = created?.article_id || created?.id;
     if (!crispId) throw new Error('Crisp createArticle : id manquant dans la réponse');
-    // Save complet : title + content (markdown) + featured + order
+    // Save complet : Crisp exige title, description, content, featured, order
     await client.updateArticle(locale, crispId, {
       title: payload.title,
+      description: null,
       content: payload.content,
       featured: false,
       order: 0,
@@ -237,6 +239,7 @@ async function pushArticleToCrisp(articleId, userId = null) {
   } else {
     await client.updateArticle(locale, article.crisp_id, {
       title: payload.title,
+      description: null,
       content: payload.content,
       featured: false,
       order: 0,
