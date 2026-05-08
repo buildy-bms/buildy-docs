@@ -5,6 +5,21 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR"
 
+# ── Garde-fou anti-perte de code (incident 2026-05-09) ────────
+# Liste les fichiers source non commités. Ils ne partent JAMAIS en prod
+# tant qu'ils ne sont pas en git (update-vps.sh fait un git pull).
+ORPHAN_FILES=$(git ls-files --others --exclude-standard backend-node/src frontend/src scripts 2>/dev/null || true)
+if [ -n "$ORPHAN_FILES" ]; then
+    echo ""
+    echo "⚠️  ATTENTION — Fichiers source NON commités (untracked) :"
+    echo "$ORPHAN_FILES" | sed 's/^/    • /'
+    echo ""
+    echo "    Ces fichiers existent en local mais PAS en git."
+    echo "    → ils ne partiront en prod qu'après git add + commit + push."
+    echo ""
+fi
+unset ORPHAN_FILES
+
 cleanup() {
     echo ""
     echo "Arret du frontend..."

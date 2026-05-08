@@ -27,6 +27,25 @@ pm2 restart buildy-docs          # restart manuel (PM2 watch est actif sur backe
 pm2 stop buildy-docs             # arret backend
 ```
 
+## Garde-fou git (anti-incident 2026-05-09)
+
+Suite a un incident ou ~600 lignes de code FAQ sont restees en stash + untracked
+pendant plusieurs semaines (prod servait une version stripped) :
+
+- **`./dev.sh`** affiche au demarrage la liste des fichiers source non commites
+  dans `backend-node/src`, `frontend/src`, `scripts`. Si tu vois ce warning,
+  ces fichiers ne partiront pas en prod tant que tu ne fais pas `git add` +
+  commit + push.
+- **`.githooks/pre-push`** demande confirmation avant un push qui laisse des
+  fichiers source orphelins. Activer une seule fois apres clone :
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+  Pour bypass ponctuel : `git push --no-verify`.
+
+**Reflexe Claude / dev** : `git status` au debut de chaque session pour spotter
+les untracked files orphelins. Toujours.
+
 ## PM2
 - Dev : `pm2 start ecosystem.config.cjs` (watch actif sur `backend-node/src`)
 - Prod : `pm2 start ecosystem.config.cjs --env production` (NODE_ENV=production, PORT=3443, TZ=Europe/Paris, watch desactive)
