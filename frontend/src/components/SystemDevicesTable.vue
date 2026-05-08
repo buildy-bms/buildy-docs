@@ -63,6 +63,30 @@ const documentZones = computed(() => {
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
 
+// Devices partagés depuis une autre zone du document (mig 98) : un device
+// dont le système parent est dans une autre zone, mais dont les extra_zone_ids
+// contiennent zone_id du système courant ET dont la catégorie matche.
+// Affichés en plus des devices propres avec un badge « Partagé depuis ».
+const sharedDevices = computed(() => {
+  const all = auditStore.devices || []
+  return all.filter(d => {
+    if (d.system_id === props.system.id) return false
+    if (!(d.extra_zone_ids || []).includes(props.system.zone_id)) return false
+    const originSys = (auditStore.systems || []).find(s => s.id === d.system_id)
+    return originSys?.system_category === props.system.system_category
+  })
+})
+
+const displayDevices = computed(() => [...props.devices, ...sharedDevices.value])
+
+function isSharedFromOtherZone(d) {
+  return d.system_id !== props.system.id
+}
+function originZoneNameFor(d) {
+  const sys = (auditStore.systems || []).find(s => s.id === d.system_id)
+  return sys?.zone_name || 'autre zone'
+}
+
 const newDevice = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
   energy_source: null, device_role: null, communication_protocol: null,
@@ -284,17 +308,21 @@ async function removeDevice(d) {
          dédié à droite pour les méta-actions (Notes / Photo / HS) afin
          de ne plus mélanger ces actions au flux d'édition.
          PhotoDropzone wrap chaque card → drops scoped au système. -->
-    <div v-if="devices.length" class="space-y-2">
-      <PhotoDropzone v-for="d in devices" :key="d.id"
+    <div v-if="displayDevices.length" class="space-y-2">
+      <PhotoDropzone v-for="d in displayDevices" :key="d.id"
           :site-uuid="siteUuid || ''"
           :attach-to="{ device_id: d.id }"
           :enabled="!!siteUuid"
           @changed="refreshPhotos">
-        <div :class="['group bg-white border border-gray-200 rounded-lg px-3 py-2.5 hover:border-gray-300 transition',
-                      d.out_of_service ? 'opacity-60 bg-gray-50' : '']">
+        <div :class="['group bg-white border rounded-lg px-3 py-2.5 hover:border-gray-300 transition',
+                      d.out_of_service ? 'opacity-60 bg-gray-50' : '',
+                      isSharedFromOtherZone(d) ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200']">
           <!-- HEADER : nom dominant + méta-actions alignées à droite -->
           <div class="flex items-center gap-2 mb-2">
             <div class="flex-1 min-w-0">
+              <div v-if="isSharedFromOtherZone(d)" class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5">
+                Partagé depuis « {{ originZoneNameFor(d) }} »
+              </div>
               <input type="text" :value="d.name" placeholder="Nommer ce système (ex : Chaudière gaz principale)"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                      class="w-full text-[15px] font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
