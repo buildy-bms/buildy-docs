@@ -27,24 +27,52 @@ pm2 restart buildy-docs          # restart manuel (PM2 watch est actif sur backe
 pm2 stop buildy-docs             # arret backend
 ```
 
-## Garde-fou git (anti-incident 2026-05-09)
+## ⚠️ Reflexes obligatoires Claude (incidents 2026-05-08 et 2026-05-09)
 
-Suite a un incident ou ~600 lignes de code FAQ sont restees en stash + untracked
-pendant plusieurs semaines (prod servait une version stripped) :
+### Au demarrage de chaque session
+1. `git status` + `git stash list` AVANT toute modification de code. Si untracked files dans `backend-node/src`, `frontend/src`, `scripts` → flag a l'utilisateur "tu veux que je commit ces fichiers d'abord ?". Si stash non vide → idem.
+2. **`./dev.sh`** affiche au demarrage la liste des fichiers source non commites. Le hook `.githooks/pre-push` bloque les push qui laissent des orphelins (activation : `git config core.hooksPath .githooks`).
 
-- **`./dev.sh`** affiche au demarrage la liste des fichiers source non commites
-  dans `backend-node/src`, `frontend/src`, `scripts`. Si tu vois ce warning,
-  ces fichiers ne partiront pas en prod tant que tu ne fais pas `git add` +
-  commit + push.
-- **`.githooks/pre-push`** demande confirmation avant un push qui laisse des
-  fichiers source orphelins. Activer une seule fois apres clone :
-  ```bash
-  git config core.hooksPath .githooks
-  ```
-  Pour bypass ponctuel : `git push --no-verify`.
+### JAMAIS de `Write` sur un fichier Vue/JS existant — TOUJOURS `Edit`
+Tu utilises EXCLUSIVEMENT l'outil `Edit` avec `old_string` cible sur les composants existants. Si tu penses devoir reecrire un fichier entier, **STOP** et demande confirmation explicite. Reecrire from scratch = boutons / imports / features perdus.
 
-**Reflexe Claude / dev** : `git status` au debut de chaque session pour spotter
-les untracked files orphelins. Toujours.
+### Composants FAQ ULTRA-SENSIBLES (a ne JAMAIS reecrire)
+
+**`frontend/src/views/FaqArticleEditorView.vue`** — top-bar avec **9 boutons obligatoires** :
+- `Retour FAQ` (back)
+- Badge etat (Modifications non publiees / Synchronise / Local uniquement)
+- `Voir en ligne` (visible si `crisp_url && status='published'`)
+- `Reecrire avec IA` (`SparklesIcon`, calls `store.aiRewrite`)
+- `Recharger` (visible si `crisp_id`, calls `pullFaqArticleFromCrisp`)
+- `Historique` (`ClockIcon`, ouvre `FaqArticleHistoryModal`)
+- `Enregistrer` (save)
+- `Publier vers Crisp` (`pushToCrisp`, indigo)
+- `Supprimer` (trash rouge)
+
+Imports requis : `FaqArticleHistoryModal`, `pullFaqArticleFromCrisp`, icones `ArrowDownTrayIcon`, `ClockIcon` + 5 autres heroicons.
+
+**`frontend/src/components/FaqRichTextEditor.vue`** — toolbar avec **callouts (tip/info/warning) via FaqBlockquote**, image upload + placeholder, **lien interne via `FaqArticleLinkModal`**, **BubbleMenu Tiptap** sur selection (bouton "Reecrire avec IA"), bouton "Generer depuis captures" (ouvre `FaqGenerateModal` mode insert). Imports : `FaqArticleLinkModal`, `FaqGenerateModal`, `FaqRewriteSelectionModal`, `BubbleMenu` de `@tiptap/vue-3/menus`.
+
+### Avant de modifier l'un de ces 2 fichiers
+```bash
+git log --oneline -5 -- frontend/src/views/FaqArticleEditorView.vue
+wc -l frontend/src/views/FaqArticleEditorView.vue
+grep -E "<button|<a " frontend/src/views/FaqArticleEditorView.vue | wc -l
+```
+- Si `FaqArticleEditorView.vue` < 300 lignes ou < 7 boutons : **NE PAS MODIFIER**, demander confirmation.
+- Si `FaqRichTextEditor.vue` < 400 lignes ou pas d'import `FaqArticleLinkModal` : **NE PAS MODIFIER**, demander confirmation.
+
+### Apres chaque modif
+- `git diff --stat` : si > 30% de lignes supprimees, **STOP** et demande validation.
+- `grep -E "<button|<a " <fichier>` : verifier que le compte de boutons n'a pas baisse.
+
+### Restauration en cas d'ecrasement
+```bash
+git fetch origin
+git checkout origin/main -- frontend/src/views/FaqArticleEditorView.vue
+git checkout origin/main -- frontend/src/components/FaqRichTextEditor.vue
+```
+Puis re-appliquer UNIQUEMENT les changements explicitement demandes par l'utilisateur dans la session courante, par-dessus cette base.
 
 ## PM2
 - Dev : `pm2 start ecosystem.config.cjs` (watch actif sur `backend-node/src`)
