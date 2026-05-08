@@ -246,9 +246,13 @@ function openCreateDevice(system) {
   }
   editingDevice.value = { mode: 'create', system }
 }
-function openEditDevice(d, system) {
+function openEditDevice(d, currentSystem) {
+  // Si le device est partagé (system_id !== currentSystem.id), on utilise
+  // son système d'origine pour le sheet d'édition : c'est sa zone d'origine
+  // qui doit s'afficher comme « Origine » dans le sélecteur de partage.
+  const originSystem = systems.value.find(s => s.id === d.system_id) || currentSystem
   deviceForm.value = { ...d }
-  editingDevice.value = { mode: 'edit', system, device: d }
+  editingDevice.value = { mode: 'edit', system: originSystem, device: d }
 }
 function closeDevice() { editingDevice.value = null }
 

@@ -86,6 +86,14 @@ function originZoneNameFor(d) {
   const sys = (auditStore.systems || []).find(s => s.id === d.system_id)
   return sys?.zone_name || 'autre zone'
 }
+// Pour le sélecteur DeviceZoneSharing : l'« origine » est la zone du
+// système parent du device (pas du système courant). Sur la vue miroir
+// dans une zone extra, le système courant n'est PAS l'origine.
+function originZoneIdOf(d) {
+  if (d.system_id === props.system.id) return props.system.zone_id
+  const sys = (auditStore.systems || []).find(s => s.id === d.system_id)
+  return sys?.zone_id ?? props.system.zone_id
+}
 
 const newDevice = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
@@ -355,7 +363,7 @@ async function removeDevice(d) {
                    alimenter plusieurs zones (chaufferie commune, etc.) -->
               <DeviceZoneSharing
                 :device="d"
-                :origin-zone-id="system.zone_id"
+                :origin-zone-id="originZoneIdOf(d)"
                 :zones="documentZones"
                 @updated="emit('changed')" />
               <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
