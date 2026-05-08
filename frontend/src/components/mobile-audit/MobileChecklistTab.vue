@@ -161,13 +161,19 @@ function statusClass(s) {
   }[s] || 'bg-white border-gray-200'
 }
 
-// Quick toggle « Non disponible » depuis la liste (sans ouvrir le sheet).
+// Quick toggle « Non disponible » avec optimistic update (anti-clignotement).
 async function quickToggleNotAvailable(it) {
   const newStatus = it.status === 'not_available' ? 'pending' : 'not_available'
+  const prev = it.status
+  it.status = newStatus
   try {
-    await updateBacsChecklistItem(audit.docId, it.catalog_key, { status: newStatus })
-    await load()
-  } catch { error('Mise à jour impossible') }
+    const { data } = await updateBacsChecklistItem(audit.docId, it.catalog_key, { status: newStatus })
+    it.id = data.id
+    it.status = data.status
+  } catch {
+    it.status = prev
+    error('Mise à jour impossible')
+  }
 }
 </script>
 

@@ -583,14 +583,14 @@ const STEP_DEFINITIONS = [
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
     isComplete: () => !!bms.value?.existing_solution },
-  { key: 'docs-checklist',
-    label: 'Documents collectés',
-    description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
-    isComplete: () => checklistAllHandled.value && photoCoverageComplete.value },
   { key: 'inspections',
     label: 'Inspections',
     description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
     isComplete: () => inspections.value.length > 0 && !!inspections.value[0].last_inspection_date },
+  { key: 'docs-checklist',
+    label: 'Check-list documentaire',
+    description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
+    isComplete: () => checklistAllHandled.value && photoCoverageComplete.value },
   { key: 'documents',
     label: 'Documents',
     description: 'Plans, schemas, datasheets et manuels deposes.',
@@ -1315,7 +1315,14 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @refresh-audit-data="refreshAuditData"
       />
 
-      <!-- Documents collectés & couverture photo (mig 100) -->
+      <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
+      <InspectionsSection v-if="isBacs"
+                          :active="activeStepKey === 'inspections'"
+                          :step="stepFor('inspections')"
+                          @validate-step="validateStep"
+                          @invalidate-step="invalidateStep" />
+
+      <!-- 8. Check-list documentaire (mig 100) -->
       <ChecklistSection
         :doc-id="docId"
         :active="activeStepKey === 'docs-checklist'"
@@ -1327,13 +1334,6 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @goto-meter="gotoChecklistMeter"
         @goto-bms="gotoChecklistBms"
       />
-
-      <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
-      <InspectionsSection v-if="isBacs"
-                          :active="activeStepKey === 'inspections'"
-                          :step="stepFor('inspections')"
-                          @validate-step="validateStep"
-                          @invalidate-step="invalidateStep" />
 
       <!-- 9. Documents du site (DOE) -->
       <DocumentsSection
