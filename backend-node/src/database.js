@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 99;
+const TARGET_VERSION = 100;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3709,6 +3709,76 @@ function runMigrations() {
     db.pragma('user_version = 99');
   }
 
+  if (current < 100) {
+    // Lot — Check-list de collecte des pièces jointes du dossier d'audit
+    // (plans étages, schémas électriques, synoptique GTB, plan IP, AF GTB,
+    // coordonnées locataires, etc.) + couverture photo des entités.
+    //
+    // Modèle :
+    //  - bacs_checklist_catalog (clé / label / icône / position / actif) :
+    //    catalogue éditable côté admin. Items partagés à tous les audits.
+    //  - bacs_audit_checklist : état par audit (pending / available /
+    //    not_available + raison + notes_html). Une ligne par (document, key).
+    //  - site_documents.bacs_audit_checklist_id : nouvelle FK pour rattacher
+    //    les fichiers à un item de check-list (vs zone/system/meter/device/bms).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_checklist_catalog (
+        key TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        description TEXT,
+        icon_value TEXT,
+        icon_color TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bacs_audit_checklist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        catalog_key TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','available','not_available')),
+        notes_html TEXT,
+        not_available_reason TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, catalog_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_audit_checklist_doc
+        ON bacs_audit_checklist(document_id);
+    `);
+    try { db.exec('ALTER TABLE site_documents ADD COLUMN bacs_audit_checklist_id INTEGER'); }
+    catch { /* déjà là */ }
+
+    // Seed initial du catalogue (les ~10 items les plus courants).
+    // L'admin peut ensuite l'éditer (ajouter/retirer/réordonner).
+    const seedItems = [
+      { key: 'floor_plans',           label: 'Plans d\'étages / niveaux',                   icon: 'fa-layer-group',          color: '#3b82f6', position: 10 },
+      { key: 'electrical_schemas',    label: 'Schémas électriques (TGBT, divisionnaires)',  icon: 'fa-bolt',                 color: '#facc15', position: 20 },
+      { key: 'gtb_synoptic',          label: 'Synoptique d\'architecture GTB',              icon: 'fa-sitemap',              color: '#06b6d4', position: 30 },
+      { key: 'ip_addressing',         label: 'Plan d\'adressage IP',                         icon: 'fa-network-wired',        color: '#22c55e', position: 40 },
+      { key: 'gtb_functional',        label: 'Analyse fonctionnelle GTB existante',         icon: 'fa-file-lines',           color: '#a855f7', position: 50 },
+      { key: 'tenants_contacts',      label: 'Coordonnées locataires / occupants',          icon: 'fa-address-book',         color: '#f97316', position: 60 },
+      { key: 'hydraulic_schemas',     label: 'Schémas hydrauliques / fluides',              icon: 'fa-droplet',              color: '#0ea5e9', position: 70 },
+      { key: 'maintenance_contracts', label: 'Carnet d\'entretien / contrats',              icon: 'fa-screwdriver-wrench',   color: '#475569', position: 80 },
+      { key: 'tech_room_access',      label: 'Accès locaux techniques (badges, codes)',     icon: 'fa-key',                  color: '#eab308', position: 90 },
+      { key: 'site_overview_photos',  label: 'Photos générales du site (façades, toiture)', icon: 'fa-camera',               color: '#10b981', position: 100 },
+    ];
+    const insertItem = db.prepare(`
+      INSERT INTO bacs_checklist_catalog (key, label, icon_value, icon_color, position)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const it of seedItems) {
+      try { insertItem.run(it.key, it.label, it.icon, it.color, it.position); }
+      catch { /* ignore conflict si déjà présent */ }
+    }
+
+    log.info('Migration 100 appliquee : check-list audit (catalog + état + FK site_documents)');
+    db.pragma('user_version = 100');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6023,6 +6093,189 @@ const bacsAuditDeviceZones = {
   },
 };
 
+// ── Bacs Audit — check-list de collecte (mig 100) ────────────────────
+const bacsChecklistCatalog = {
+  list({ active = true } = {}) {
+    const where = active === null ? '' : 'WHERE active = ?';
+    const args = active === null ? [] : [active ? 1 : 0];
+    return db.prepare(`
+      SELECT * FROM bacs_checklist_catalog ${where}
+      ORDER BY position, key
+    `).all(...args);
+  },
+  getByKey(key) {
+    return db.prepare('SELECT * FROM bacs_checklist_catalog WHERE key = ?').get(key);
+  },
+  create({ key, label, description, iconValue, iconColor, position, active = 1 }) {
+    db.prepare(`
+      INSERT INTO bacs_checklist_catalog (key, label, description, icon_value, icon_color, position, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(key, label, description || null, iconValue || null, iconColor || null, position || 0, active ? 1 : 0);
+    return this.getByKey(key);
+  },
+  update(key, { label, description, iconValue, iconColor, position, active }) {
+    db.prepare(`
+      UPDATE bacs_checklist_catalog
+      SET label = COALESCE(?, label),
+          description = COALESCE(?, description),
+          icon_value = COALESCE(?, icon_value),
+          icon_color = COALESCE(?, icon_color),
+          position = COALESCE(?, position),
+          active = COALESCE(?, active),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE key = ?
+    `).run(label, description, iconValue, iconColor, position, active === undefined ? null : (active ? 1 : 0), key);
+    return this.getByKey(key);
+  },
+  remove(key) {
+    db.prepare('DELETE FROM bacs_checklist_catalog WHERE key = ?').run(key);
+  },
+};
+
+const bacsAuditChecklist = {
+  // Liste pour un audit : merge catalog (actifs) + état si existant + nb fichiers.
+  // Si l'audit n'a pas de ligne pour un item, on retourne un placeholder
+  // status='pending' sans créer de ligne (lazy create au 1er upsert).
+  listForDocument(documentId) {
+    const items = bacsChecklistCatalog.list({ active: true });
+    const states = db.prepare(
+      'SELECT * FROM bacs_audit_checklist WHERE document_id = ?'
+    ).all(documentId);
+    const stateByKey = new Map(states.map(s => [s.catalog_key, s]));
+    const fileCounts = db.prepare(`
+      SELECT bacs_audit_checklist_id AS id, COUNT(*) AS n
+      FROM site_documents
+      WHERE bacs_audit_checklist_id IS NOT NULL
+      GROUP BY bacs_audit_checklist_id
+    `).all();
+    const filesByStateId = new Map(fileCounts.map(r => [r.id, r.n]));
+    return items.map(it => {
+      const state = stateByKey.get(it.key);
+      return {
+        catalog_key: it.key,
+        label: it.label,
+        description: it.description,
+        icon_value: it.icon_value,
+        icon_color: it.icon_color,
+        position: it.position,
+        id: state?.id || null,
+        status: state?.status || 'pending',
+        notes_html: state?.notes_html || null,
+        not_available_reason: state?.not_available_reason || null,
+        files_count: state?.id ? (filesByStateId.get(state.id) || 0) : 0,
+        updated_at: state?.updated_at || null,
+      };
+    });
+  },
+  upsert(documentId, catalogKey, patch = {}) {
+    const existing = db.prepare(
+      'SELECT id FROM bacs_audit_checklist WHERE document_id = ? AND catalog_key = ?'
+    ).get(documentId, catalogKey);
+    if (!existing) {
+      const r = db.prepare(`
+        INSERT INTO bacs_audit_checklist (document_id, catalog_key, status, notes_html, not_available_reason)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(documentId, catalogKey,
+        patch.status || 'pending',
+        patch.notes_html ?? null,
+        patch.not_available_reason ?? null);
+      return db.prepare('SELECT * FROM bacs_audit_checklist WHERE id = ?').get(r.lastInsertRowid);
+    }
+    db.prepare(`
+      UPDATE bacs_audit_checklist
+      SET status = COALESCE(?, status),
+          notes_html = COALESCE(?, notes_html),
+          not_available_reason = COALESCE(?, not_available_reason),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(patch.status, patch.notes_html, patch.not_available_reason, existing.id);
+    return db.prepare('SELECT * FROM bacs_audit_checklist WHERE id = ?').get(existing.id);
+  },
+  // Couverture photo : compte combien d'entités (zones / systems présents
+  // / meters / bms) ont au moins 1 site_document attaché.
+  photoCoverage(documentId) {
+    // Zones : on liste celles qui apparaissent dans les systèmes de l'audit
+    // (un audit peut avoir des zones-fantômes du site rattaché qu'il
+    // n'utilise pas — on ne les compte que si elles ont au moins 1 système).
+    const sysRows = db.prepare(`
+      SELECT DISTINCT s.zone_id, z.name
+      FROM bacs_audit_systems s
+      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      WHERE s.document_id = ?
+    `).all(documentId);
+    const zoneIds = sysRows.map(r => r.zone_id).filter(Boolean);
+    const zonesWithPhotos = zoneIds.length === 0 ? [] :
+      db.prepare(`
+        SELECT DISTINCT bacs_audit_zone_id AS zone_id
+        FROM site_documents
+        WHERE bacs_audit_zone_id IN (${zoneIds.map(() => '?').join(',')})
+      `).all(...zoneIds).map(r => r.zone_id);
+    const zonesCovered = new Set(zonesWithPhotos);
+    const zonesMissing = sysRows.filter(r => !zonesCovered.has(r.zone_id))
+      .map(r => ({ id: r.zone_id, name: r.name || `Zone #${r.zone_id}` }));
+
+    // Systèmes : on compte ceux marqués present=1. Une photo sur un device
+    // du système compte aussi (le device est physique, l'instance compte).
+    const sysAll = db.prepare(
+      'SELECT id, system_category, zone_id FROM bacs_audit_systems WHERE document_id = ? AND present = 1'
+    ).all(documentId);
+    const sysIds = sysAll.map(s => s.id);
+    const sysWithPhotos = sysIds.length === 0 ? [] :
+      db.prepare(`
+        SELECT DISTINCT bacs_audit_system_id AS id
+        FROM site_documents
+        WHERE bacs_audit_system_id IN (${sysIds.map(() => '?').join(',')})
+      `).all(...sysIds).map(r => r.id);
+    const sysWithDevicePhotos = sysIds.length === 0 ? [] :
+      db.prepare(`
+        SELECT DISTINCT d.system_id AS id
+        FROM site_documents sd
+        JOIN bacs_audit_system_devices d ON d.id = sd.bacs_audit_device_id
+        WHERE d.system_id IN (${sysIds.map(() => '?').join(',')})
+      `).all(...sysIds).map(r => r.id);
+    const sysCovered = new Set([...sysWithPhotos, ...sysWithDevicePhotos]);
+    const zoneNameById = new Map(sysRows.map(r => [r.zone_id, r.name]));
+    const sysMissing = sysAll.filter(s => !sysCovered.has(s.id))
+      .map(s => ({
+        id: s.id,
+        name: `${s.system_category} — ${zoneNameById.get(s.zone_id) || `Zone #${s.zone_id}`}`,
+      }));
+
+    // Compteurs
+    const metersAll = db.prepare(
+      'SELECT id, usage, meter_type FROM bacs_audit_meters WHERE document_id = ?'
+    ).all(documentId);
+    const meterIds = metersAll.map(m => m.id);
+    const metersWithPhotos = meterIds.length === 0 ? [] :
+      db.prepare(`
+        SELECT DISTINCT bacs_audit_meter_id AS id
+        FROM site_documents
+        WHERE bacs_audit_meter_id IN (${meterIds.map(() => '?').join(',')})
+      `).all(...meterIds).map(r => r.id);
+    const metersCovered = new Set(metersWithPhotos);
+    const metersMissing = metersAll.filter(m => !metersCovered.has(m.id))
+      .map(m => ({ id: m.id, name: `${m.usage} / ${m.meter_type}` }));
+
+    // BMS / GTB : table bacs_audit_bms a document_id comme PK (1 ligne par
+    // audit). La FK site_documents.bacs_audit_bms_document_id pointe vers
+    // ce document_id.
+    const bmsRow = db.prepare('SELECT document_id FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
+    let bmsFiles = 0;
+    if (bmsRow) {
+      bmsFiles = db.prepare(
+        'SELECT COUNT(*) AS n FROM site_documents WHERE bacs_audit_bms_document_id = ?'
+      ).get(documentId).n;
+    }
+
+    return {
+      zones: { total: zoneIds.length, covered: zonesCovered.size, missing: zonesMissing },
+      systems: { total: sysAll.length, covered: sysCovered.size, missing: sysMissing },
+      meters: { total: metersAll.length, covered: metersCovered.size, missing: metersMissing },
+      bms: { total: bmsRow ? 1 : 0, covered: bmsFiles > 0 ? 1 : 0, files_count: bmsFiles },
+    };
+  },
+};
+
 module.exports = {
   init,
   pdfBoilerplate,
@@ -6058,5 +6311,7 @@ module.exports = {
   faqCategories,
   faqArticles,
   bacsAuditDeviceZones,
+  bacsChecklistCatalog,
+  bacsAuditChecklist,
   get db() { return db; },
 };

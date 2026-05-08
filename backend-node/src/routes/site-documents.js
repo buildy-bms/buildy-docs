@@ -47,7 +47,8 @@ async function routes(fastify) {
     const site = db.sites.getByUuid(request.params.uuid);
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
     const { category, bacs_audit_system_id, bacs_audit_device_id,
-      bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_bms_document_id } = request.query;
+      bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_bms_document_id,
+      bacs_audit_checklist_id } = request.query;
     let sql = `
       SELECT d.*, u.display_name AS uploaded_by_name
       FROM site_documents d
@@ -76,6 +77,10 @@ async function routes(fastify) {
       sql += ' AND d.bacs_audit_bms_document_id = ?';
       args.push(parseInt(bacs_audit_bms_document_id, 10));
     }
+    if (bacs_audit_checklist_id) {
+      sql += ' AND d.bacs_audit_checklist_id = ?';
+      args.push(parseInt(bacs_audit_checklist_id, 10));
+    }
     sql += ' ORDER BY d.uploaded_at DESC';
     return db.db.prepare(sql).all(...args);
   });
@@ -89,6 +94,7 @@ async function routes(fastify) {
 
     const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id,
       bacs_audit_device_id, bacs_audit_zone_id, bacs_audit_meter_id,
+      bacs_audit_checklist_id,
       // EXIF optionnel envoyé en query par le client (extrait avant la
       // compression côté navigateur qui strip l'EXIF). Prioritaire sur
       // ce que le serveur peut extraire du buffer reçu.
@@ -176,9 +182,9 @@ async function routes(fastify) {
       INSERT INTO site_documents
         (site_id, title, category, filename, original_name, size_bytes, mime_type,
          bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
-         bacs_audit_zone_id, bacs_audit_meter_id, uploaded_by,
+         bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_checklist_id, uploaded_by,
          taken_at, gps_latitude, gps_longitude, camera_make, camera_model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       site.site_id, title, category, filename, file.filename, sizeBytes, storedMime,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
@@ -186,6 +192,7 @@ async function routes(fastify) {
       bacs_audit_device_id ? parseInt(bacs_audit_device_id, 10) : null,
       bacs_audit_zone_id ? parseInt(bacs_audit_zone_id, 10) : null,
       bacs_audit_meter_id ? parseInt(bacs_audit_meter_id, 10) : null,
+      bacs_audit_checklist_id ? parseInt(bacs_audit_checklist_id, 10) : null,
       userId || null,
       finalTakenAt, finalGpsLat, finalGpsLng, finalCameraMake, finalCameraModel,
     );

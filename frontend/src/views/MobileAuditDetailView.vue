@@ -9,6 +9,7 @@ import {
   BoltIcon,
   WrenchScrewdriverIcon,
   ClipboardDocumentListIcon,
+  ClipboardDocumentCheckIcon,
   EllipsisHorizontalIcon,
   SignalSlashIcon,
   Cog6ToothIcon,
@@ -33,6 +34,7 @@ import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
 import MobileMetersTab from '@/components/mobile-audit/MobileMetersTab.vue'
 import MobileSystemsTab from '@/components/mobile-audit/MobileSystemsTab.vue'
 import MobileBmsTab from '@/components/mobile-audit/MobileBmsTab.vue'
+import MobileChecklistTab from '@/components/mobile-audit/MobileChecklistTab.vue'
 
 /**
  * Vue mobile native de l'audit BACS / GTB.
@@ -63,6 +65,7 @@ const TABS = [
   { key: 'systems',  label: 'Systèmes', icon: WrenchScrewdriverIcon },
   { key: 'meters',   label: 'Compteurs',icon: BoltIcon },
   { key: 'bms',      label: 'GTB',      icon: ClipboardDocumentListIcon },
+  { key: 'docs',     label: 'Docs',     icon: ClipboardDocumentCheckIcon },
 ]
 
 const STORAGE_KEY = `mobile-audit-tab:${docId}`
@@ -264,6 +267,7 @@ async function removeAudit() {
         <MobileMetersTab  v-show="activeTab === 'meters'" />
         <MobileSystemsTab v-show="activeTab === 'systems'" />
         <MobileBmsTab     v-show="activeTab === 'bms'" />
+        <MobileChecklistTab v-show="activeTab === 'docs'" />
       </template>
     </main>
 

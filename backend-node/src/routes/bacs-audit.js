@@ -552,6 +552,40 @@ async function routes(fastify) {
   });
 
 
+  // ─── Check-list de collecte (mig 100) ─────────────────────────────
+  // Pièces jointes du dossier (plans, schémas, GTB, IP, AF GTB, locataires…)
+  // + couverture photo des entités existantes (zones / systèmes / compteurs / GTB).
+
+  fastify.get('/bacs-audit/:documentId/checklist', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.bacsAuditChecklist.listForDocument(id);
+  });
+
+  fastify.patch('/bacs-audit/:documentId/checklist/:catalogKey', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const key = request.params.catalogKey;
+    if (!assertBacsAuditExists(id, reply)) return;
+    if (!db.bacsChecklistCatalog.getByKey(key)) {
+      return reply.code(404).send({ detail: 'Item de catalogue introuvable' });
+    }
+    const schema = z.object({
+      status: z.enum(['pending', 'available', 'not_available']).optional(),
+      notes_html: z.string().nullable().optional(),
+      not_available_reason: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    return db.bacsAuditChecklist.upsert(id, key, body);
+  });
+
+  fastify.get('/bacs-audit/:documentId/photo-coverage', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, reply)) return;
+    return db.bacsAuditChecklist.photoCoverage(id);
+  });
+
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
   const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
   const DEVICE_ROLES = ['production','distribution','emission','regulation','autre'];
