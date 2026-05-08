@@ -27,19 +27,6 @@ const {
   assistFaqSuggestMissing,
 } = require('../lib/claude');
 const { uploadImage } = require('../lib/faq-image-upload');
-const { scoreArticle } = require('../lib/seo-scorer');
-
-// Recalcule et persiste le score SEO d'un article. Idempotent, lazy : à appeler
-// après save/pull/generate pour garder la colonne seo_score à jour.
-function recomputeSeoScore(article) {
-  if (!article || !article.id) return null;
-  const result = scoreArticle({
-    title: article.title || '',
-    contentHtml: article.content_html || '',
-  });
-  db.faqArticles.setSeoScore(article.id, { score: result.score, checks: result.checks });
-  return result;
-}
 
 // ── Schemas ────────────────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -253,27 +240,7 @@ async function routes(fastify) {
     if (parsed.data.visibility !== undefined) patch.visibility = parsed.data.visibility;
     if (parsed.data.locale !== undefined) patch.locale = parsed.data.locale;
     patch.dirty = 1;
-    const updated = db.faqArticles.update(id, patch, request.authUser?.id || null);
-    // Recalcul SEO si le contenu ou le titre a changé
-    if (parsed.data.title !== undefined || parsed.data.content_html !== undefined) {
-      recomputeSeoScore(updated);
-    }
-    return db.faqArticles.getById(id);
-  });
-
-  // Endpoint dédié : retourne le score SEO + checks détaillés (pour le badge éditeur)
-  fastify.get('/faq/articles/:id/seo-score', async (request, reply) => {
-    const id = parseInt(request.params.id, 10);
-    const article = db.faqArticles.getById(id);
-    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
-    // Recalcul live à chaque appel (pas de cache, c'est rapide)
-    const result = scoreArticle({
-      title: article.title || '',
-      contentHtml: article.content_html || '',
-    });
-    // Persiste pour les requêtes futures (few-shot examples picker)
-    db.faqArticles.setSeoScore(id, { score: result.score, checks: result.checks });
-    return result;
+    return db.faqArticles.update(id, patch, request.authUser?.id || null);
   });
 
   fastify.delete('/faq/articles/:id', async (request, reply) => {
