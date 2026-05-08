@@ -6008,8 +6008,8 @@ const faqArticles = {
       args.push(`%${q}%`, `%${q}%`);
     }
     const sql = `
-      SELECT a.id, a.crisp_id, a.category_id, a.title, a.slug, a.status, a.visibility,
-             a.locale, a.dirty, a.pulled_at, a.pushed_at, a.crisp_updated_at,
+      SELECT a.id, a.crisp_id, a.category_id, a.title, a.slug, a.description, a.status, a.visibility,
+             a.locale, a.dirty, a.pulled_at, a.pushed_at, a.crisp_updated_at, a.crisp_url,
              a.last_ai_assist_at, a.created_at, a.updated_at,
              c.name AS category_name
       FROM faq_articles a
@@ -6083,15 +6083,18 @@ const faqArticles = {
       LIMIT 200
     `).all(...args);
   },
-  create({ crispId = null, categoryId = null, title, slug = null, contentHtml = null,
-           status = 'draft', visibility = 'public', locale = 'fr', dirty = 1,
-           pulledAt = null, crispUpdatedAt = null, createdBy = null }) {
+  create({ crispId = null, categoryId = null, title, slug = null, description = null,
+           contentHtml = null, status = 'draft', visibility = 'public', locale = 'fr',
+           dirty = 1, pulledAt = null, crispUpdatedAt = null, crispUrl = null,
+           createdBy = null }) {
     const r = db.prepare(`
-      INSERT INTO faq_articles (crisp_id, category_id, title, slug, content_html, status, visibility,
-                                locale, dirty, pulled_at, crisp_updated_at, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(crispId, categoryId, title, slug, contentHtml, status, visibility,
-           locale, dirty ? 1 : 0, pulledAt, crispUpdatedAt, createdBy, createdBy);
+      INSERT INTO faq_articles (crisp_id, category_id, title, slug, description, content_html,
+                                status, visibility, locale, dirty, pulled_at, crisp_updated_at,
+                                crisp_url, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(crispId, categoryId, title, slug, description, contentHtml,
+           status, visibility, locale, dirty ? 1 : 0, pulledAt, crispUpdatedAt,
+           crispUrl, createdBy, createdBy);
     return this.getById(r.lastInsertRowid);
   },
   update(id, patch, userId = null) {
