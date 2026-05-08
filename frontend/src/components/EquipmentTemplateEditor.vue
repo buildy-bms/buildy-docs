@@ -33,6 +33,8 @@ import {
   claudeLibraryAssist,
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
+import SearchableSelect from './SearchableSelect.vue'
+import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
 import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
@@ -91,6 +93,8 @@ const form = ref({
   icon_kind: 'fa',
   icon_value: 'fa-cube',
   icon_color: '#6b7280',
+  default_energy_source: null,
+  default_device_role: null,
 })
 
 const selectedCategory = computed(() =>
@@ -230,6 +234,8 @@ watch(() => props.template, (t) => {
       icon_kind: t.icon_kind || 'fa',
       icon_value: t.icon_value || 'fa-cube',
       icon_color: t.icon_color || '#6b7280',
+      default_energy_source: t.default_energy_source || null,
+      default_device_role: t.default_device_role || null,
     }
   }
 }, { immediate: true })
@@ -396,6 +402,8 @@ async function save({ close = true } = {}) {
       icon_kind: form.value.icon_kind,
       icon_value: form.value.icon_value,
       icon_color: form.value.icon_color,
+      default_energy_source: form.value.default_energy_source || null,
+      default_device_role: form.value.default_device_role || null,
     }
     let res
     if (isEdit.value) {
@@ -650,6 +658,36 @@ async function destroy() {
             </div>
           </div>
         </div>
+      <!-- Pré-remplissage du device créé depuis ce modèle via le bouton
+           « Bibliothèque » d'un système BACS. Champs facultatifs : si vides,
+           le device démarre avec le champ correspondant non renseigné. -->
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+            Énergie par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
+          </label>
+          <SearchableSelect
+            v-model="form.default_energy_source"
+            :options="ENERGY_OPTIONS"
+            placeholder="—"
+            :clearable="true"
+          />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+            Niveau par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
+          </label>
+          <SearchableSelect
+            v-model="form.default_device_role"
+            :options="ROLE_OPTIONS"
+            placeholder="—"
+            :clearable="true"
+          />
+        </div>
+        <p class="col-span-2 text-[11px] text-gray-500 -mt-1">
+          Pré-remplit l'équipement créé depuis ce modèle via le bouton « Bibliothèque » d'un système BACS.
+        </p>
+      </div>
       <div>
         <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Protocoles exigés</label>
         <div class="flex flex-wrap gap-1.5 items-center">

@@ -6,6 +6,11 @@ const log = require('../lib/logger').system;
 const { slugify } = require('../lib/slug');
 const { snapshotAndBump } = require('../lib/template-propagation');
 
+// Énumérations alignées sur bacs_audit_system_devices (cf routes/bacs-audit.js).
+// Servent au pré-remplissage du device créé depuis la modale Bibliothèque.
+const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
+const DEVICE_ROLES = ['production','distribution','emission','regulation','autre'];
+
 const createTemplateSchema = z.object({
   slug: z.string().optional(),
   name: z.string().min(1),
@@ -17,6 +22,8 @@ const createTemplateSchema = z.object({
   icon_value: z.string().nullable().optional(),
   icon_color: z.string().nullable().optional(),
   preferred_protocols: z.string().nullable().optional(),
+  default_energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
+  default_device_role: z.enum(DEVICE_ROLES).nullable().optional(),
 });
 
 const updateTemplateSchema = createTemplateSchema.partial().omit({ slug: true });
@@ -124,6 +131,8 @@ async function routes(fastify) {
       iconValue: body.icon_value,
       iconColor: body.icon_color,
       preferredProtocols: body.preferred_protocols,
+      defaultEnergySource: body.default_energy_source,
+      defaultDeviceRole: body.default_device_role,
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -142,6 +151,14 @@ async function routes(fastify) {
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
     const userId = request.authUser?.id;
+    // Sentinel '__clear__' : vide explicitement un défaut depuis l'editeur admin
+    // (le SearchableSelect efface en envoyant null, on traduit ici).
+    const defaultEnergySource = ('default_energy_source' in body)
+      ? (body.default_energy_source ?? '__clear__')
+      : undefined;
+    const defaultDeviceRole = ('default_device_role' in body)
+      ? (body.default_device_role ?? '__clear__')
+      : undefined;
     const updated = db.equipmentTemplates.update(id, {
       name: body.name,
       category: body.category,
@@ -152,6 +169,8 @@ async function routes(fastify) {
       iconValue: body.icon_value,
       iconColor: body.icon_color,
       preferredProtocols: body.preferred_protocols,
+      defaultEnergySource,
+      defaultDeviceRole,
       updatedBy: userId,
     });
     // Si la description ou les protocoles changent, on cree une nouvelle version

@@ -95,6 +95,7 @@ async function deleteAudit() {
   }
 }
 import AddDeviceModal from '@/components/AddDeviceModal.vue'
+import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
@@ -135,6 +136,7 @@ const site = ref(null)
 const showAddZoneModal = ref(false)
 const showAddMeterModal = ref(false)
 const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
+const libraryDevicePickerSystem = ref(null) // { id, system_category, zone_name }
 
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
@@ -254,13 +256,43 @@ const STATUS_LABEL = {
 }
 
 const systemsByZone = computed(() => {
-  const groups = new Map()
-  for (const s of systems.value) {
-    const k = s.zone_id
-    if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, zone_nature: s.zone_nature, items: [] })
-    groups.get(k).items.push(s)
+  // Mig 97 : un système peut desservir plusieurs zones (sa zone d'origine
+  // s.zone_id + ses zones supplémentaires s.extra_zone_ids). On le matérialise
+  // dans chaque zone qu'il dessert, en marquant les "vues partagées" pour
+  // que la carte affiche un badge et masque le sélecteur (l'édition se fait
+  // depuis la zone d'origine pour éviter des sources de vérité divergentes).
+  const groupsByZoneId = new Map()
+  function getOrCreate(zoneId, fallbackName, fallbackNature) {
+    if (!groupsByZoneId.has(zoneId)) {
+      groupsByZoneId.set(zoneId, {
+        zone_id: zoneId,
+        zone_name: fallbackName,
+        zone_nature: fallbackNature,
+        items: [],
+      })
+    }
+    return groupsByZoneId.get(zoneId)
   }
-  return [...groups.values()]
+  for (const s of systems.value) {
+    // Carte d'origine
+    const g = getOrCreate(s.zone_id, s.zone_name, s.zone_nature)
+    g.items.push({ ...s, is_shared_view: false })
+    // Cartes miroirs dans les zones supplémentaires
+    for (const zid of (s.extra_zone_ids || [])) {
+      const targetZone = zones.value.find(z => z.zone_id === zid)
+      if (!targetZone) continue
+      const mg = getOrCreate(zid, targetZone.name, targetZone.nature)
+      mg.items.push({ ...s, is_shared_view: true })
+    }
+  }
+  // Conserve l'ordre d'origine des zones (par position si dispo, sinon ordre d'apparition)
+  const ordered = [...groupsByZoneId.values()]
+  ordered.sort((a, b) => {
+    const za = zones.value.find(z => z.zone_id === a.zone_id)
+    const zb = zones.value.find(z => z.zone_id === b.zone_id)
+    return (za?.position ?? 1e9) - (zb?.position ?? 1e9)
+  })
+  return ordered
 })
 
 // Replier/déplier manuellement les zones et catégories de la card 3.
@@ -1200,6 +1232,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @toggle-zone-collapsed="toggleZoneCollapsed"
         @toggle-system-collapsed="toggleSystemCollapsed"
         @add-device="sys => addDeviceModalSystem = sys"
+        @add-device-from-library="sys => libraryDevicePickerSystem = sys"
       />
 
       <!-- 4. Compteurs et mesurage (R175-3 1°) -->
@@ -1362,6 +1395,14 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       :comm-options="COMM_OPTIONS"
       @close="addDeviceModalSystem = null"
       @submit="submitAddDevice"
+    />
+    <LibraryDevicePicker
+      v-if="libraryDevicePickerSystem"
+      :system="libraryDevicePickerSystem"
+      :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :zone-name="libraryDevicePickerSystem.zone_name || ''"
+      @close="libraryDevicePickerSystem = null"
+      @added="refreshAuditData"
     />
 
     <BulkPhotoUploadModal

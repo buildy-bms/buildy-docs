@@ -67,6 +67,8 @@ function seedLibraryOnBoot() {
         iconValue: tpl.icon_value,
         iconColor: tpl.icon_color,
         preferredProtocols: tpl.preferred_protocols,
+        defaultEnergySource: tpl.default_energy_source,
+        defaultDeviceRole: tpl.default_device_role,
       });
       for (const p of (tpl.points || [])) {
         db.equipmentTemplatePoints.create(created.id, {
@@ -86,6 +88,10 @@ function seedLibraryOnBoot() {
       if (!existing.bacs_articles && tpl.bacs_articles) updates.bacsArticles = tpl.bacs_articles;
       if (!existing.bacs_justification && tpl.bacs_justification) updates.bacsJustification = tpl.bacs_justification;
       if (!existing.preferred_protocols && tpl.preferred_protocols) updates.preferredProtocols = tpl.preferred_protocols;
+      // Enrichissement non destructif : ne touche pas si l'admin a déjà saisi
+      // une valeur (idempotent même après edit manuel — cf. memoire seeder).
+      if (!existing.default_energy_source && tpl.default_energy_source) updates.defaultEnergySource = tpl.default_energy_source;
+      if (!existing.default_device_role && tpl.default_device_role) updates.defaultDeviceRole = tpl.default_device_role;
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
 
@@ -715,10 +721,23 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     INSERT OR IGNORE INTO bacs_audit_systems (document_id, zone_id, system_category, present)
     VALUES (?, ?, ?, 0)
   `);
+  // Mig 97 : zones déjà couvertes par un système partagé (extra_zones) — on
+  // ne re-crée pas un système doublon dans ces zones, le partage suffit.
+  // Map<zone_id, Set<system_category>>.
+  const coveredByExtras = new Map();
+  for (const r of db.db.prepare(`
+    SELECT ez.zone_id, s.system_category FROM bacs_audit_system_extra_zones ez
+    JOIN bacs_audit_systems s ON s.id = ez.system_id
+    WHERE s.document_id = ?
+  `).all(documentId)) {
+    if (!coveredByExtras.has(r.zone_id)) coveredByExtras.set(r.zone_id, new Set());
+    coveredByExtras.get(r.zone_id).add(r.system_category);
+  }
   let systemsCount = 0;
   for (const z of zones) {
     const cats = z.nature ? (reqByNature[z.nature] || []) : [];
     for (const cat of cats) {
+      if (coveredByExtras.get(z.zone_id)?.has(cat)) continue;
       const r = insertSystem.run(documentId, z.zone_id, cat);
       if (r.changes) systemsCount++;
     }

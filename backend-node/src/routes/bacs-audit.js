@@ -28,13 +28,25 @@ async function routes(fastify) {
   fastify.get('/bacs-audit/:documentId/systems', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(id, reply)) return;
-    return db.db.prepare(`
+    const rows = db.db.prepare(`
       SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
       FROM bacs_audit_systems s
       LEFT JOIN zones z ON z.zone_id = s.zone_id
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.position, s.system_category
     `).all(id);
+    // Enrichit chaque système avec ses zones supplémentaires (mig 97).
+    // Une seule requête groupée pour éviter le N+1.
+    const extras = db.bacsAuditSystemZones.listExtrasForDocument(id);
+    const extrasBySystem = new Map();
+    for (const e of extras) {
+      if (!extrasBySystem.has(e.system_id)) extrasBySystem.set(e.system_id, []);
+      extrasBySystem.get(e.system_id).push(e.zone_id);
+    }
+    return rows.map(s => ({
+      ...s,
+      extra_zone_ids: extrasBySystem.get(s.id) || [],
+    }));
   });
 
   fastify.patch('/bacs-audit/systems/:id', async (request, reply) => {
@@ -88,6 +100,58 @@ async function routes(fastify) {
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
+  });
+
+  // PATCH /bacs-audit/systems/:id/zones — partage du système avec d'autres
+  // zones fonctionnelles (mig 97). Body : { extra_zone_ids: [int] } liste
+  // les zones supplémentaires desservies (en plus de zone_id d'origine).
+  // Refuse 409 si une des zones a déjà un autre système de la même
+  // catégorie (l'utilisateur doit alors retirer ou fusionner cet autre
+  // système avant de partager).
+  fastify.patch('/bacs-audit/systems/:id/zones', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const sys = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
+    if (!sys) return reply.code(404).send({ detail: 'Système non trouvé' });
+
+    const schema = z.object({
+      extra_zone_ids: z.array(z.number().int().positive()).default([]),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    // Dédup et exclut la zone d'origine si l'utilisateur l'a incluse par erreur.
+    const requested = [...new Set(body.extra_zone_ids)].filter(z => z !== sys.zone_id);
+
+    // Validation conflits : aucune des zones demandées ne doit déjà avoir
+    // un autre système de la même catégorie pour ce document.
+    for (const zid of requested) {
+      const conflictId = db.bacsAuditSystemZones.findConflictingSystem({
+        documentId: sys.document_id,
+        zoneId: zid,
+        systemCategory: sys.system_category,
+        excludeSystemId: id,
+      });
+      if (conflictId) {
+        const zone = db.db.prepare('SELECT name FROM zones WHERE zone_id = ?').get(zid);
+        return reply.code(409).send({
+          detail: `La zone « ${zone?.name || zid} » a déjà un système ${sys.system_category}. Retire-le ou fusionne d'abord.`,
+          conflicting_system_id: conflictId,
+          zone_id: zid,
+        });
+      }
+      // Vérifier aussi que la zone existe (sécurité)
+      const zoneExists = db.db.prepare('SELECT 1 FROM zones WHERE zone_id = ?').get(zid);
+      if (!zoneExists) return reply.code(400).send({ detail: `Zone #${zid} introuvable.` });
+    }
+
+    db.bacsAuditSystemZones.setExtraForSystem(id, requested);
+    regenerateActionItems(sys.document_id);
+
+    return {
+      ...db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id),
+      extra_zone_ids: db.bacsAuditSystemZones.listExtraForSystem(id),
+    };
   });
 
   // ─── Meters (R175-3 §1) ────────────────────────────────────────────
@@ -572,6 +636,11 @@ async function routes(fastify) {
   });
 
   // POST /bacs-audit/systems/:id/devices — ajout d'un device au système
+  // Si `equipment_template_id` est fourni, le device est pré-rempli depuis
+  // ce modèle de la bibliothèque (nom + énergie + niveau par défaut). On
+  // refuse alors la création si la catégorie du modèle n'est pas compatible
+  // avec la system_category du système cible (cohérence forte : pas de VMC
+  // dans un système Chauffage).
   fastify.post('/bacs-audit/systems/:id/devices', async (request, reply) => {
     const sysId = parseInt(request.params.id, 10);
     const sys = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(sysId);
@@ -586,10 +655,32 @@ async function routes(fastify) {
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
+      equipment_template_id: z.number().int().positive().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    // Pré-remplissage depuis un modèle bibliothèque (optionnel).
+    let prefName = body.name || null;
+    let prefEnergy = body.energy_source || null;
+    let prefRole = body.device_role || null;
+    if (body.equipment_template_id) {
+      const tpl = db.equipmentTemplates.getById(body.equipment_template_id);
+      if (!tpl) return reply.code(404).send({ detail: 'Modèle bibliothèque introuvable' });
+      const { libraryCategoriesForBacsCategory } = require('../lib/system-categories');
+      const allowedCats = libraryCategoriesForBacsCategory(sys.system_category);
+      if (allowedCats.length && tpl.category && !allowedCats.includes(tpl.category)) {
+        return reply.code(400).send({
+          detail: `Modèle « ${tpl.name} » (catégorie ${tpl.category}) incompatible avec la catégorie du système (${sys.system_category}).`,
+        });
+      }
+      // Le payload explicite a priorité sur les défauts du template (l'utilisateur
+      // peut customiser dans la modale avant de valider).
+      if (!prefName) prefName = tpl.name;
+      if (!prefEnergy) prefEnergy = tpl.default_energy_source || null;
+      if (!prefRole) prefRole = tpl.default_device_role || null;
+    }
 
     // Position : derniere + 10
     const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM bacs_audit_system_devices WHERE system_id = ?').get(sysId).p;
@@ -600,8 +691,8 @@ async function routes(fastify) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sysId, maxPos + 10,
-      body.name || null, body.brand || null, body.model_reference || null, body.power_kw ?? null,
-      body.energy_source || null, body.device_role || null,
+      prefName, body.brand || null, body.model_reference || null, body.power_kw ?? null,
+      prefEnergy, prefRole,
       body.communication_protocol || null,
       body.location || null, body.notes || null,
     );

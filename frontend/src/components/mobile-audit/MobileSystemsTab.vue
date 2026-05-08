@@ -7,13 +7,17 @@ import {
   ChevronDownIcon,
   TrashIcon,
   PlusIcon,
+  BookOpenIcon,
+  ShareIcon,
+  CheckIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsSystem, createBacsDevice, updateBacsDevice, deleteBacsDevice, updateBacsThermal } from '@/api'
+import { updateBacsSystem, updateBacsSystemZones, createBacsDevice, updateBacsDevice, deleteBacsDevice, updateBacsThermal } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
+import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
@@ -128,17 +132,38 @@ function toggleZone(zoneId) {
 }
 
 const systemsByZone = computed(() => {
-  const groups = new Map()
-  for (const s of systems.value) {
-    // Garder les usages "non concerné" (= Absent dans le toggle mobile) :
-    // ils sont rendus grisés / atténués dans le template au lieu d'être
-    // cachés, pour que l'auditeur puisse les réactiver d'un clic.
-    const k = s.zone_id
-    if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, items: [] })
-    groups.get(k).items.push(s)
+  // Mig 97 : un système peut desservir plusieurs zones. Cartes miroirs dans
+  // les zones extras avec is_shared_view=true (édition partagée, badge
+  // affiché à la place du sélecteur).
+  const groupsByZoneId = new Map()
+  function getOrCreate(zoneId, fallbackName) {
+    if (!groupsByZoneId.has(zoneId)) {
+      groupsByZoneId.set(zoneId, { zone_id: zoneId, zone_name: fallbackName, items: [] })
+    }
+    return groupsByZoneId.get(zoneId)
   }
-  return [...groups.values()]
+  for (const s of systems.value) {
+    // Carte d'origine. Garder les usages "non concerné" (= Absent dans le
+    // toggle mobile) : grisés au rendu pour permettre la réactivation.
+    getOrCreate(s.zone_id, s.zone_name).items.push({ ...s, is_shared_view: false })
+    for (const zid of (s.extra_zone_ids || [])) {
+      const z = zones.value.find(zz => zz.zone_id === zid)
+      if (!z) continue
+      getOrCreate(zid, z.name).items.push({ ...s, is_shared_view: true })
+    }
+  }
+  const ordered = [...groupsByZoneId.values()]
+  ordered.sort((a, b) => {
+    const za = zones.value.find(z => z.zone_id === a.zone_id)
+    const zb = zones.value.find(z => z.zone_id === b.zone_id)
+    return (za?.position ?? 1e9) - (zb?.position ?? 1e9)
+  })
+  return ordered
 })
+
+function originZoneName(s) {
+  return zones.value.find(z => z.zone_id === s.zone_id)?.name || 'autre zone'
+}
 
 function devicesOf(systemId) {
   return devices.value.filter(d => d.system_id === systemId)
@@ -156,6 +181,44 @@ async function patchSystem(s, patch) {
 const editingDevice = ref(null)
 const deviceForm = ref({})
 const savingDevice = ref(false)
+
+// Sheet de partage multi-zones (mig 97)
+const sharingSystem = ref(null)
+const savingShare = ref(false)
+function openSharingSheet(s) { sharingSystem.value = s }
+function closeSharingSheet() { sharingSystem.value = null }
+async function toggleShareZone(zoneId, checked) {
+  if (savingShare.value || !sharingSystem.value) return
+  savingShare.value = true
+  const next = new Set(sharingSystem.value.extra_zone_ids || [])
+  if (checked) next.add(zoneId); else next.delete(zoneId)
+  try {
+    await updateBacsSystemZones(sharingSystem.value.id, [...next])
+    success(checked ? 'Zone ajoutée au partage' : 'Zone retirée du partage')
+    await audit.refreshAuditCore()
+    // Recharge l'objet courant pour refléter le nouveau extra_zone_ids
+    sharingSystem.value = systems.value.find(s => s.id === sharingSystem.value.id) || null
+  } catch (e) {
+    if (e.response?.status === 409) {
+      const zone = zones.value.find(z => z.zone_id === zoneId)
+      error(`« ${zone?.name || zoneId} » a déjà un système de cette catégorie. Retire-le d'abord.`)
+    } else {
+      error(e.response?.data?.detail || 'Mise à jour des zones impossible')
+    }
+  } finally {
+    savingShare.value = false
+  }
+}
+
+// Bibliothèque de modèles (préfiltrée par catégorie)
+const libraryDevicePickerSystem = ref(null)
+function openLibraryDevicePicker(system) {
+  libraryDevicePickerSystem.value = {
+    id: system.id,
+    system_category: system.system_category,
+    zone_name: zones.value.find(z => z.zone_id === system.zone_id)?.name || '',
+  }
+}
 
 function openCreateDevice(system) {
   deviceForm.value = {
@@ -303,6 +366,35 @@ async function removeDevice(d) {
               </button>
             </div>
 
+            <!-- Partage multi-zones (mig 97) -->
+            <div v-if="s.present" class="mt-3">
+              <button
+                v-if="!s.is_shared_view"
+                type="button"
+                @click="openSharingSheet(s)"
+                :class="[
+                  'w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium rounded-xl border whitespace-nowrap',
+                  (s.extra_zone_ids || []).length > 0
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-gray-200 bg-white text-gray-600',
+                ]"
+              >
+                <ShareIcon class="w-4 h-4 shrink-0" />
+                <span v-if="(s.extra_zone_ids || []).length > 0">
+                  Partagé · +{{ (s.extra_zone_ids || []).length }} zone{{ (s.extra_zone_ids || []).length > 1 ? 's' : '' }}
+                </span>
+                <span v-else>Partager avec d'autres zones</span>
+              </button>
+              <div
+                v-else
+                class="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
+                :title="`Mêmes équipements que ${SYSTEM_LABEL[s.system_category] || s.system_category} de « ${originZoneName(s)} »`"
+              >
+                <CheckIcon class="w-4 h-4 shrink-0" />
+                Partagé depuis « {{ originZoneName(s) }} »
+              </div>
+            </div>
+
             <!-- Devices nested -->
             <div v-if="s.present" class="mt-3 pl-2 border-l-2 border-gray-100 space-y-1.5">
               <button
@@ -322,12 +414,20 @@ async function removeDevice(d) {
                 </div>
                 <ChevronRightIcon class="w-5 h-5 text-gray-300" />
               </button>
-              <button
-                @click="openCreateDevice(s)"
-                class="w-full inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium"
-              >
-                <PlusIcon class="w-5 h-5" /> Ajouter un équipement
-              </button>
+              <div class="flex items-stretch gap-1.5">
+                <button
+                  @click="openCreateDevice(s)"
+                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
+                >
+                  <PlusIcon class="w-5 h-5 shrink-0" /> Ajouter
+                </button>
+                <button
+                  @click="openLibraryDevicePicker(s)"
+                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
+                >
+                  <BookOpenIcon class="w-5 h-5 shrink-0" /> Bibliothèque
+                </button>
+              </div>
             </div>
 
             <!-- Régulation thermique R175-6 (heating + cooling présents en mode BACS) -->
@@ -575,6 +675,64 @@ async function removeDevice(d) {
             </button>
           </div>
         </template>
+      </div>
+    </MobileSheet>
+
+    <!-- Modale bibliothèque (BaseModal s'adapte mobile via max-w-[92vw]) -->
+    <LibraryDevicePicker
+      v-if="libraryDevicePickerSystem"
+      :system="libraryDevicePickerSystem"
+      :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :zone-name="libraryDevicePickerSystem.zone_name || ''"
+      @close="libraryDevicePickerSystem = null"
+      @added="audit.refreshAuditCore()"
+    />
+
+    <!-- Sheet de partage multi-zones (mig 97) -->
+    <MobileSheet
+      :open="!!sharingSystem"
+      :title="sharingSystem ? `Partage — ${SYSTEM_LABEL[sharingSystem.system_category] || sharingSystem.system_category}` : ''"
+      hide-save
+      @close="closeSharingSheet"
+    >
+      <div v-if="sharingSystem" class="p-3 space-y-3">
+        <p class="text-sm text-gray-600">
+          Coche les zones desservies par ce système (chaufferie commune, CTA mutualisée…). Les équipements sont les mêmes pour toutes les zones cochées.
+        </p>
+
+        <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+          <!-- Zone d'origine, marquée -->
+          <div class="px-4 py-3 flex items-center gap-2 bg-gray-50">
+            <CheckIcon class="w-5 h-5 text-gray-400 shrink-0" />
+            <span class="flex-1 text-base text-gray-700 truncate">
+              {{ zones.find(z => z.zone_id === sharingSystem.zone_id)?.name || 'Zone d\'origine' }}
+            </span>
+            <span class="text-[11px] text-gray-400 italic shrink-0">Origine</span>
+          </div>
+
+          <!-- Autres zones, toggleables -->
+          <label
+            v-for="z in zones.filter(z => z.zone_id !== sharingSystem.zone_id)"
+            :key="z.zone_id"
+            class="px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-gray-50"
+          >
+            <input
+              type="checkbox"
+              :checked="(sharingSystem.extra_zone_ids || []).includes(z.zone_id)"
+              :disabled="savingShare"
+              @change="e => toggleShareZone(z.zone_id, e.target.checked)"
+              class="w-5 h-5 rounded border-gray-300 shrink-0"
+            />
+            <span class="text-base text-gray-700 truncate">{{ z.name }}</span>
+          </label>
+
+          <p
+            v-if="zones.filter(z => z.zone_id !== sharingSystem.zone_id).length === 0"
+            class="px-4 py-6 text-sm text-gray-400 italic text-center"
+          >
+            Aucune autre zone disponible pour le partage.
+          </p>
+        </div>
       </div>
     </MobileSheet>
   </div>

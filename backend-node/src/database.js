@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 95;
+const TARGET_VERSION = 97;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3581,6 +3581,51 @@ function runMigrations() {
     db.pragma('user_version = 95');
   }
 
+  if (current < 96) {
+    // Lot — Bouton « Bibliothèque » dans les cartes systèmes BACS.
+    //
+    // Sur la fiche d'un equipment_template (admin), on peut renseigner une
+    // énergie et un niveau (production/distribution/émission) "par défaut"
+    // qui pré-remplissent le device créé depuis ce template via la modale
+    // bibliothèque. Champs nullables — un template peut rester générique.
+    try { db.exec('ALTER TABLE equipment_templates ADD COLUMN default_energy_source TEXT'); }
+    catch { /* deja la */ }
+    try { db.exec('ALTER TABLE equipment_templates ADD COLUMN default_device_role TEXT'); }
+    catch { /* deja la */ }
+
+    log.info('Migration 96 appliquee : equipment_templates.default_energy_source + default_device_role');
+    db.pragma('user_version = 96');
+  }
+
+  if (current < 97) {
+    // Lot — Partage d'un système BACS entre plusieurs zones fonctionnelles.
+    //
+    // Cas d'usage : une chaufferie commune alimente plusieurs cellules
+    // logistiques + ateliers. Aujourd'hui le modèle bacs_audit_systems
+    // (zone_id FK + UNIQUE(document_id, zone_id, system_category)) oblige
+    // à dupliquer le système une fois par zone, ce qui est faux.
+    //
+    // Approche conservative : on garde zone_id (zone "d'origine") et on
+    // ajoute une table d'extras pour les zones supplémentaires desservies.
+    // Les call sites existants (resync, exports, indicateurs R175) continuent
+    // de fonctionner sans modification — ils traitent toujours la zone
+    // d'origine. La nouvelle UI matérialise les extras comme des cartes
+    // miroir dans les autres zones, avec un badge « Partagé ».
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_system_extra_zones (
+        system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (system_id, zone_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_sys_extra_zones_zone
+        ON bacs_audit_system_extra_zones(zone_id);
+    `);
+
+    log.info('Migration 97 appliquee : bacs_audit_system_extra_zones (partage multi-zones)');
+    db.pragma('user_version = 97');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3690,18 +3735,19 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
             descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
+            defaultEnergySource || null, defaultDeviceRole || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy }) {
+  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -3711,6 +3757,14 @@ const equipmentTemplates = {
         clearValidation = true;
       }
     }
+    // default_energy_source / default_device_role : explicitement settable a
+    // NULL pour permettre de vider le pré-remplissage depuis l'editeur admin.
+    // Sentinel '__clear__' demande l'unset ; absent (undefined) = inchange.
+    const energySql = defaultEnergySource === '__clear__' ? 'NULL' : 'COALESCE(?, default_energy_source)';
+    const roleSql   = defaultDeviceRole   === '__clear__' ? 'NULL' : 'COALESCE(?, default_device_role)';
+    const energyArg = defaultEnergySource === '__clear__' ? [] : [defaultEnergySource ?? null];
+    const roleArg   = defaultDeviceRole   === '__clear__' ? [] : [defaultDeviceRole ?? null];
+
     db.prepare(`
       UPDATE equipment_templates
       SET name = COALESCE(?, name),
@@ -3722,11 +3776,13 @@ const equipmentTemplates = {
           icon_value = COALESCE(?, icon_value),
           icon_color = COALESCE(?, icon_color),
           preferred_protocols = COALESCE(?, preferred_protocols),
+          default_energy_source = ${energySql},
+          default_device_role = ${roleSql},
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, updatedBy || null, id);
+    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -3751,12 +3807,14 @@ const equipmentTemplates = {
       const r = db.prepare(`
         INSERT INTO equipment_templates
           (slug, name, category, bacs_articles, bacs_justification, description_html,
-           icon_kind, icon_value, icon_color, preferred_protocols, created_by, updated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           icon_kind, icon_value, icon_color, preferred_protocols,
+           default_energy_source, default_device_role, created_by, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         candidate, newName, src.category, src.bacs_articles, src.bacs_justification,
         src.description_html, src.icon_kind, src.icon_value, src.icon_color,
-        src.preferred_protocols, userId || null, userId || null,
+        src.preferred_protocols, src.default_energy_source, src.default_device_role,
+        userId || null, userId || null,
       );
       const newId = r.lastInsertRowid;
       // Points
@@ -5845,6 +5903,61 @@ const faqArticles = {
   },
 };
 
+// ── Bacs Audit — partage multi-zones d'un système (mig 97) ───────────
+const bacsAuditSystemZones = {
+  // Zones supplémentaires desservies par un système (en plus de sa zone
+  // d'origine system.zone_id). Renvoie [zoneId, ...].
+  listExtraForSystem(systemId) {
+    return db.prepare(
+      'SELECT zone_id FROM bacs_audit_system_extra_zones WHERE system_id = ? ORDER BY zone_id'
+    ).all(systemId).map(r => r.zone_id);
+  },
+
+  // Liste plate des { system_id, zone_id } pour tous les systèmes d'un
+  // document : utile pour préfixer la résolution des extras en GET systems
+  // sans faire un N+1.
+  listExtrasForDocument(documentId) {
+    return db.prepare(`
+      SELECT ez.system_id, ez.zone_id
+      FROM bacs_audit_system_extra_zones ez
+      JOIN bacs_audit_systems s ON s.id = ez.system_id
+      WHERE s.document_id = ?
+    `).all(documentId);
+  },
+
+  // Remplace l'ensemble des zones supplémentaires d'un système. Transaction
+  // pour atomicité (pas d'état intermédiaire visible).
+  setExtraForSystem(systemId, zoneIds) {
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM bacs_audit_system_extra_zones WHERE system_id = ?').run(systemId);
+      const stmt = db.prepare(
+        'INSERT INTO bacs_audit_system_extra_zones (system_id, zone_id) VALUES (?, ?)'
+      );
+      for (const zid of zoneIds) stmt.run(systemId, zid);
+    });
+    tx();
+  },
+
+  // Vérifie si une zone est déjà couverte par un autre système de la même
+  // catégorie pour un document donné. Renvoie l'id du système conflictuel
+  // si trouvé, null sinon. Utilisé pour empêcher d'ajouter une zone qui a
+  // déjà un système même catégorie (à la place : fusionner).
+  findConflictingSystem({ documentId, zoneId, systemCategory, excludeSystemId }) {
+    // Conflit possible : zone d'origine d'un autre système OR zone extra.
+    const direct = db.prepare(`
+      SELECT id FROM bacs_audit_systems
+      WHERE document_id = ? AND zone_id = ? AND system_category = ? AND id != ?
+    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
+    if (direct) return direct.id;
+    const extra = db.prepare(`
+      SELECT s.id FROM bacs_audit_system_extra_zones ez
+      JOIN bacs_audit_systems s ON s.id = ez.system_id
+      WHERE s.document_id = ? AND ez.zone_id = ? AND s.system_category = ? AND s.id != ?
+    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
+    return extra?.id || null;
+  },
+};
+
 module.exports = {
   init,
   pdfBoilerplate,
@@ -5879,5 +5992,6 @@ module.exports = {
   crispSettings,
   faqCategories,
   faqArticles,
+  bacsAuditSystemZones,
   get db() { return db; },
 };

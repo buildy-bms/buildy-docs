@@ -7,6 +7,8 @@ module.exports = {
   bacs_articles: 'R175-1 §1',
   bacs_justification: '<p>L\'article R175-1 définit un <strong>système de chauffage</strong> comme la combinaison des composantes nécessaires pour assurer l\'augmentation contrôlée de la température de l\'air intérieur. Un aérotherme, en tant qu\'émetteur de chaleur soufflée, entre dans cette définition.</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres équipements du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et que leur fonctionnement soit <strong>géré de manière autonome</strong> (programmation, supervision, alarmes).</p><p>L\'intégration de l\'aérotherme dans la solution Buildy permet de superviser sa marche, sa consigne effective et ses défauts, et de transmettre les commandes nécessaires.</p>',
   preferred_protocols: 'Modbus TCP,KNX/IP',
+  default_energy_source: 'electric',
+  default_device_role: 'emission',
   icon_kind: 'fa',
   icon_value: 'fa-temperature-arrow-up',
   icon_color: '#f97316',

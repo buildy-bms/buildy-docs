@@ -52,4 +52,35 @@ function loadCategoriesFromDb() {
   }
 }
 
-module.exports = { SYSTEM_CATEGORIES, normalizeText, candidateCategoriesForSlug, loadCategoriesFromDb };
+// Mapping `bacs_audit_systems.system_category` (BACS R175, anglais) → liste
+// de `equipment_templates.category` (biblio, français) compatibles. Sert au
+// pré-filtrage de la modale « Bibliothèque » dans une carte de système :
+// quand on est dans un système Chauffage, on ne montre que les modèles
+// chauffage / mixte (DRV, CTA…). Inclut volontairement la catégorie mixte
+// `thermique_mixte` côté heating ET cooling : un DRV chauffe ET refroidit.
+const LIBRARY_CATS_FOR_BACS_CATEGORY = {
+  heating:               ['chauffage', 'thermique_mixte'],
+  cooling:               ['climatisation', 'thermique_mixte'],
+  ventilation:           ['ventilation', 'thermique_mixte'],
+  dhw:                   ['ecs'],
+  // 'eclairage' est l'ancienne valeur unique (templates seedés). 'eclairage_int'
+  // et 'eclairage_ext' sont la nouvelle dichotomie BACS — on accepte les deux
+  // pour ne pas masquer les modèles legacy.
+  lighting_indoor:       ['eclairage_int', 'eclairage'],
+  lighting_outdoor:      ['eclairage_ext', 'eclairage'],
+  // 'pv' = nouveau slug ; 'electricite' = ancien slug du seed production-electricite.
+  electricity_production: ['pv', 'electricite'],
+};
+
+function libraryCategoriesForBacsCategory(bacsCategory) {
+  return LIBRARY_CATS_FOR_BACS_CATEGORY[bacsCategory] || [];
+}
+
+module.exports = {
+  SYSTEM_CATEGORIES,
+  normalizeText,
+  candidateCategoriesForSlug,
+  loadCategoriesFromDb,
+  LIBRARY_CATS_FOR_BACS_CATEGORY,
+  libraryCategoriesForBacsCategory,
+};
