@@ -876,7 +876,18 @@ html body .csh-home-list.csh-home-list-large .csh-home-list-wrap .csh-home-list-
   box-shadow: 0 4px 16px rgba(0, 205, 146, 0.4) !important;
   transform: translateY(-1px) !important;
 }
-.csh-footer-ask-buttons li:first-child { display: none !important; }
+/* "Discuter avec nous" en outline blanc pour différencier du CTA email */
+.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+}
+.csh-footer-ask-buttons li:first-child .csh-button.csh-button-accent:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+  transform: translateY(-1px) !important;
+}
 
 .csh-footer-copyright {
   background: transparent !important;
@@ -925,17 +936,17 @@ article.csh-text-wrap > *:first-child {
 /* Largeur lecture 920px CENTRÉE */
 .csh-article-content-text,
 .csh-article .csh-article-content-text {
-  max-width: 920px !important;
+  max-width: 1100px !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }
 .csh-article .csh-article-content-header {
-  max-width: 920px !important;
+  max-width: 1100px !important;
   margin-left: auto !important;
   margin-right: auto !important;
 }
 .csh-article-content-wrap {
-  max-width: 920px !important;
+  max-width: 1100px !important;
   margin: 0 auto !important;
 }
 
