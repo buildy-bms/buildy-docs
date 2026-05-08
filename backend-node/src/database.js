@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 103;
+const TARGET_VERSION = 104;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3815,6 +3815,22 @@ function runMigrations() {
     `);
     log.info('Migration 103 appliquee : faq_settings (whitelist mots-cles SEO)');
     db.pragma('user_version = 103');
+  }
+
+  if (current < 104) {
+    // crisp_url : URL publique de l'article cote help.buildy.fr (renvoyee par
+    // Crisp au pull non-conflictuel). La colonne avait ete ajoutee a la main
+    // en dev sans migration -> manquait en prod (incident 2026-05-08).
+    // ALTER IF NOT EXISTS via try/catch : sqlite ne supporte pas
+    // 'ADD COLUMN IF NOT EXISTS', et la dev DB a deja la colonne.
+    try {
+      db.exec(`ALTER TABLE faq_articles ADD COLUMN crisp_url TEXT;`);
+      log.info('Migration 104 appliquee : faq_articles.crisp_url');
+    } catch (e) {
+      if (!String(e.message).includes('duplicate column')) throw e;
+      log.info('Migration 104 : faq_articles.crisp_url existait deja (ajoute manuellement avant)');
+    }
+    db.pragma('user_version = 104');
   }
 
   if (current > TARGET_VERSION) {
