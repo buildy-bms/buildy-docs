@@ -53,11 +53,14 @@ const { confirm } = useConfirm()
 
 const docId = parseInt(route.params.id, 10)
 
+// Ordre aligné sur le stepper desktop (BacsAuditDetailView STEP_DEFINITIONS) :
+// Site → Zones → Systèmes → Compteurs → GTB. La régulation thermique R175-6
+// est nichée dans l'onglet Systèmes côté mobile.
 const TABS = [
   { key: 'site',     label: 'Site',     icon: IdentificationIcon },
   { key: 'zones',    label: 'Zones',    icon: Squares2X2Icon },
-  { key: 'meters',   label: 'Compteurs',icon: BoltIcon },
   { key: 'systems',  label: 'Systèmes', icon: WrenchScrewdriverIcon },
+  { key: 'meters',   label: 'Compteurs',icon: BoltIcon },
   { key: 'bms',      label: 'GTB',      icon: ClipboardDocumentListIcon },
 ]
 
