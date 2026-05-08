@@ -43,6 +43,7 @@ import AddZoneModal from '@/components/AddZoneModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
+import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import InspectionsSection from '@/components/audit/InspectionsSection.vue'
@@ -66,6 +67,23 @@ import { UserPlusIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 const auditStore = useAuditStore()
 const { isNarrow } = useViewport()
 const showShare = ref(false)
+const showEditMetadata = ref(false)
+
+async function onMetadataSaved(updated) {
+  showEditMetadata.value = false
+  // Si le kind a changé, rediriger vers la bonne URL canonique pour rester
+  // cohérent avec le router (BacsAuditDetailView est branché sur les 2 kinds
+  // mais l'URL doit refléter le type courant pour les liens directs).
+  const oldKind = document.value?.kind
+  const newKind = updated.kind
+  document.value = updated
+  if (oldKind && oldKind !== newKind) {
+    const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
+    if (router.currentRoute.value.path !== target) router.replace(target)
+  }
+  // Le client_name / project_name peuvent influencer l'audit (en-tête),
+  // pas besoin de full reload — document.value mis à jour suffit.
+}
 const showSettingsMenu = ref(false)
 const settingsMenuRef = ref(null)
 
@@ -1103,6 +1121,11 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
           <div v-if="showSettingsMenu"
                class="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-56 py-1 whitespace-nowrap"
                @click.stop>
+            <button @click="showSettingsMenu = false; showEditMetadata = true"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <PencilSquareIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              Modifier les paramètres
+            </button>
             <button @click="showSettingsMenu = false; showShare = true"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
               <UserPlusIcon class="w-4 h-4 text-gray-400 shrink-0" />
@@ -1405,6 +1428,14 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
     <!-- Partage audit (mêmes APIs que ShareAfModal AF — table documents unifiée) -->
     <ShareAfModal v-if="showShare" :af-id="docId" @close="showShare = false" />
+
+    <!-- Modifier les paramètres de l'audit (parité AF) -->
+    <EditAuditMetadataModal
+      v-if="showEditMetadata && document"
+      :audit="document"
+      @close="showEditMetadata = false"
+      @saved="onMetadataSaved"
+    />
 
     <!-- Bottom navigation mobile/tablette portrait : raccourcis vers les sections principales -->
     <MobileAuditNav

@@ -25,7 +25,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { updateAf, deleteAf, deliverBacsAudit } from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
-import { UserPlusIcon } from '@heroicons/vue/24/outline'
+import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
+import { UserPlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -92,6 +93,21 @@ function goBack() {
 
 // Sheet paramètres audit (kind, livrer, supprimer)
 const showSettings = ref(false)
+const showEditMetadata = ref(false)
+function openEditMetadata() {
+  showSettings.value = false
+  showEditMetadata.value = true
+}
+async function onMetadataSaved(updated) {
+  showEditMetadata.value = false
+  const oldKind = document.value?.kind
+  const newKind = updated.kind
+  await refresh()
+  if (oldKind && oldKind !== newKind) {
+    const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
+    if (route.path !== target) router.replace(target)
+  }
+}
 const showShare = ref(false)
 const switching = ref(false)
 const delivering = ref(false)
@@ -286,6 +302,15 @@ async function removeAudit() {
       @close="showSettings = false"
     >
       <div class="p-4 space-y-4">
+        <!-- Modifier les paramètres (parité AF) -->
+        <button
+          @click="openEditMetadata"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl"
+        >
+          <PencilSquareIcon class="w-5 h-5" />
+          Modifier les paramètres
+        </button>
+
         <!-- Type d'audit (kind) -->
         <div>
           <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Type d'audit</p>
@@ -387,6 +412,14 @@ async function removeAudit() {
       :open="showShare"
       :doc-id="docId"
       @close="showShare = false"
+    />
+
+    <!-- Modifier les paramètres de l'audit (parité AF) -->
+    <EditAuditMetadataModal
+      v-if="showEditMetadata && document"
+      :audit="document"
+      @close="showEditMetadata = false"
+      @saved="onMetadataSaved"
     />
   </div>
 </template>
