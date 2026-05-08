@@ -366,6 +366,7 @@ async function removeDevice(d) {
                 @update:model-value="v => patchDevice(d, { device_role: v || null })"
                 :options="ROLE_OPTIONS"
                 :clearable="false"
+                :creatable="true"
                 size="sm"
                 placeholder="Rôle"
               />

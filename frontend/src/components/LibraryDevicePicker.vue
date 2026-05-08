@@ -175,6 +175,7 @@ async function pickTemplate(t) {
             :options="ROLE_FILTER_OPTIONS"
             placeholder="Tous niveaux"
             :clearable="false"
+            :creatable="true"
           />
         </div>
       </div>

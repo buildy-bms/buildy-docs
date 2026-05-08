@@ -23,6 +23,15 @@ import BaseModal from '@/components/BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useRouter, useRoute } from 'vue-router'
+import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
+
+// Helpers libellés FR pour les défauts énergie/niveau dans la table.
+function energyLabel(value) {
+  return ENERGY_OPTIONS.find(o => o.value === value)?.label || value
+}
+function roleLabel(value) {
+  return ROLE_OPTIONS.find(o => o.value === value)?.label || value
+}
 
 const { error: notifyError, success: notifySuccess } = useNotification()
 
@@ -415,6 +424,12 @@ onMounted(async () => {
               </th>
               <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap">Slug</th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_energy_source')">
+                Énergie {{ sortBy === 'default_energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
+              <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_device_role')">
+                Niveau {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+              </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
@@ -435,7 +450,7 @@ onMounted(async () => {
               <tr v-if="it.kind === 'category'"
                   class="border-t border-gray-100 bg-gray-50/40">
                 <td class="px-4 py-1.5"></td>
-                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="8">
+                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
                   {{ it.label }}
                   <span class="text-gray-400 normal-case font-normal ml-2">· {{ it.count }}</span>
                 </td>
@@ -476,6 +491,18 @@ onMounted(async () => {
                 </td>
                 <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ it.t.slug }}</code></td>
                 <td class="px-4 py-2 text-center whitespace-nowrap">
+                  <span v-if="it.t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    {{ energyLabel(it.t.default_energy_source) }}
+                  </span>
+                  <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                </td>
+                <td class="px-4 py-2 text-center whitespace-nowrap">
+                  <span v-if="it.t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+                    {{ roleLabel(it.t.default_device_role) }}
+                  </span>
+                  <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                </td>
+                <td class="px-4 py-2 text-center whitespace-nowrap">
                   <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ it.t.points_count }}</span>
                 </td>
                 <td class="px-4 py-2 text-center whitespace-nowrap">
@@ -499,7 +526,7 @@ onMounted(async () => {
               </tr>
             </template>
             <tr v-if="!flatEquipmentItems.length">
-              <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
             </tr>
