@@ -75,8 +75,28 @@ export const useAuditStore = defineStore('audit', {
         catch { this.auditProgress = {} }
         this.synthesisHtml = d.data.audit_synthesis_html || ''
         if (d.data.site_id) {
-          const z = await listZones(d.data.site_id)
-          this.zones = z.data
+          try {
+            const z = await listZones(d.data.site_id)
+            this.zones = z.data
+          } catch { this.zones = [] }
+        }
+        // Fallback : si l'audit n'a pas de site rattaché OU si listZones a
+        // échoué, on reconstitue les zones depuis les systèmes de l'audit
+        // (chaque système porte zone_id + zone_name via JOIN backend). Sans
+        // ça, toute la card 02 « usages homogènes » et tout composant qui
+        // lit audit.zones reste vide alors que les zones existent en DB.
+        if (!this.zones?.length && sys.data?.length) {
+          const map = new Map()
+          for (const s of sys.data) {
+            if (s.zone_id != null && !map.has(s.zone_id)) {
+              map.set(s.zone_id, {
+                zone_id: s.zone_id,
+                name: s.zone_name || `Zone #${s.zone_id}`,
+                nature: s.zone_nature || null,
+              })
+            }
+          }
+          this.zones = [...map.values()]
         }
         // Charge le site (source de vérité pour l'adresse, le nom client, etc).
         // Évite la duplication site_address dans le document.

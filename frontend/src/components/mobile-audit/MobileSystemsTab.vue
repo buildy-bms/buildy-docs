@@ -144,7 +144,25 @@ const systemsByZone = computed(() => {
 })
 
 function devicesOf(systemId) {
-  return devices.value.filter(d => d.system_id === systemId)
+  const sys = systems.value.find(s => s.id === systemId)
+  if (!sys) return []
+  const own = devices.value.filter(d => d.system_id === systemId)
+  // Mig 98 : inclut aussi les devices d'autres systèmes partagés vers la
+  // zone courante avec la même catégorie (chaufferie commune, etc.).
+  const shared = devices.value.filter(d => {
+    if (d.system_id === systemId) return false
+    if (!(d.extra_zone_ids || []).includes(sys.zone_id)) return false
+    const origin = systems.value.find(s => s.id === d.system_id)
+    return origin?.system_category === sys.system_category
+  })
+  return [...own, ...shared]
+}
+function isSharedDevice(d, systemId) {
+  return d.system_id !== systemId
+}
+function deviceOriginZoneName(d) {
+  const sys = systems.value.find(s => s.id === d.system_id)
+  return sys?.zone_name || 'autre zone'
 }
 
 async function patchSystem(s, patch) {
@@ -373,9 +391,18 @@ async function removeDevice(d) {
                 v-for="d in devicesOf(s.id)"
                 :key="d.id"
                 @click="openEditDevice(d, s)"
-                class="w-full flex items-center gap-2 px-3 py-3.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-left"
+                :class="[
+                  'w-full flex items-center gap-2 px-3 py-3.5 hover:bg-gray-100 rounded-xl text-left',
+                  isSharedDevice(d, s.id) ? 'bg-emerald-50/60 border border-emerald-200' : 'bg-gray-50',
+                ]"
               >
                 <div class="flex-1 min-w-0">
+                  <p
+                    v-if="isSharedDevice(d, s.id)"
+                    class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5"
+                  >
+                    Partagé depuis « {{ deviceOriginZoneName(d) }} »
+                  </p>
                   <p class="text-base font-medium text-gray-800 truncate leading-tight">
                     {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
                   </p>
