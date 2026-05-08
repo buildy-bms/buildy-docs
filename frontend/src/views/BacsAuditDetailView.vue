@@ -700,6 +700,7 @@ const STEP_TO_SECTION_ID = {
   thermal: 'section-thermal',
   bms: 'section-bms',
   inspections: 'section-inspections',
+  'docs-checklist': 'section-docs-checklist',
   documents: 'section-documents',
   credentials: 'section-credentials',
   review: 'section-review',

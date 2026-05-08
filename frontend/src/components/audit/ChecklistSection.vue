@@ -50,19 +50,37 @@ const items = ref([])
 const coverage = ref({ zones: { total: 0, covered: 0, missing: [] }, systems: { total: 0, covered: 0, missing: [] }, meters: { total: 0, covered: 0, missing: [] }, bms: { total: 0, covered: 0, files_count: 0 } })
 const loading = ref(true)
 
-async function load() {
-  loading.value = true
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
     const [c, cov] = await Promise.all([
       getBacsChecklist(props.docId),
       getBacsPhotoCoverage(props.docId),
     ])
-    items.value = c.data
+    // MAJ ciblée sur les items existants (par catalog_key) pour ne pas
+    // déranger le rendu Vue avec un nouveau tableau (cause de clignotement) ;
+    // sinon, premier mount, on assigne l'array.
+    if (items.value.length && c.data.length === items.value.length) {
+      const byKey = new Map(c.data.map(x => [x.catalog_key, x]))
+      for (const it of items.value) {
+        const fresh = byKey.get(it.catalog_key)
+        if (!fresh) continue
+        // On préserve l'objet pour ne pas re-render la ligne si rien n'a
+        // changé visuellement (status, files_count, raison, id).
+        if (it.id !== fresh.id) it.id = fresh.id
+        if (it.files_count !== fresh.files_count) it.files_count = fresh.files_count
+        if (it.status !== fresh.status) it.status = fresh.status
+        if (it.notes_html !== fresh.notes_html) it.notes_html = fresh.notes_html
+        if (it.not_available_reason !== fresh.not_available_reason) it.not_available_reason = fresh.not_available_reason
+      }
+    } else {
+      items.value = c.data
+    }
     coverage.value = cov.data
   } catch (e) {
-    error('Chargement de la check-list impossible')
+    if (!silent) error('Chargement de la check-list impossible')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 onMounted(load)
@@ -283,39 +301,31 @@ defineExpose({ refresh: load })
     :step="step" :active="active" :anchor-id="'docs-checklist'"
     @validate-step="emit('validate-step')" @invalidate-step="emit('invalidate-step')">
 
-    <div v-if="loading" class="px-5 py-8 text-center text-sm text-gray-400">Chargement…</div>
+    <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-400">Chargement…</div>
 
-    <div v-else class="px-5 py-4 space-y-6">
-      <!-- ── BLOC 1 : Couverture photo ─────────────────────────────────── -->
-      <section ref="popoverRef" class="space-y-3">
-        <div class="flex items-center gap-2">
-          <CameraIcon class="w-4 h-4 text-emerald-600" />
-          <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-            Couverture photo des entités ({{ totalCovered }}/{{ totalEntities }})
-          </h3>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div v-else class="px-4 py-3 space-y-3">
+      <!-- ── BLOC 1 : Couverture photo (KPI pleines) ───────────────────── -->
+      <section ref="popoverRef">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5">
           <button v-for="kind in ['zones', 'systems', 'meters', 'bms']" :key="kind"
                   type="button"
                   @click="kind !== 'bms' ? togglePopover(kind) : emit('goto-bms')"
-                  :class="['relative bg-white border rounded-md px-2.5 py-1.5 text-left transition hover:border-emerald-300 flex items-center gap-2',
-                           coverage[kind].covered === coverage[kind].total && coverage[kind].total > 0
-                             ? 'border-emerald-200'
-                             : coverage[kind].total === 0
-                               ? 'border-gray-200 opacity-60'
-                               : 'border-amber-200 bg-amber-50/40']">
-            <MapPinIcon v-if="kind === 'zones'" class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-            <WrenchScrewdriverIcon v-if="kind === 'systems'" class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-            <BoltIcon v-if="kind === 'meters'" class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-            <CpuChipIcon v-if="kind === 'bms'" class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  :class="['relative rounded-md px-2.5 py-1.5 text-left transition-colors duration-200 flex items-center gap-2 border',
+                           coverage[kind].total === 0
+                             ? 'bg-gray-50 border-gray-200 text-gray-400'
+                             : coverage[kind].covered === coverage[kind].total
+                               ? 'bg-emerald-100 border-emerald-300 text-emerald-900 hover:bg-emerald-200'
+                               : 'bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-200']">
+            <MapPinIcon v-if="kind === 'zones'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
+            <WrenchScrewdriverIcon v-if="kind === 'systems'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
+            <BoltIcon v-if="kind === 'meters'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
+            <CpuChipIcon v-if="kind === 'bms'" class="w-3.5 h-3.5 shrink-0 opacity-70" />
             <div class="flex-1 min-w-0">
-              <p class="text-[11px] text-gray-600 leading-tight">
+              <p class="text-[10px] uppercase tracking-wider opacity-70 leading-tight">
                 {{ { zones: 'Zones', systems: 'Systèmes', meters: 'Compteurs', bms: 'GTB' }[kind] }}
               </p>
-              <p class="text-sm font-semibold text-gray-900 leading-tight">
-                {{ coverage[kind].covered }}<span class="text-gray-400 font-normal">/{{ coverage[kind].total }}</span>
-                <span v-if="coverage[kind].total > coverage[kind].covered" class="ml-1 text-[10px] text-amber-700">⚠</span>
-                <span v-else-if="coverage[kind].total > 0" class="ml-1 text-[10px] text-emerald-700">✓</span>
+              <p class="text-sm font-semibold leading-tight">
+                {{ coverage[kind].covered }}<span class="opacity-50 font-normal">/{{ coverage[kind].total }}</span>
               </p>
             </div>
             <!-- Popover liste des entités sans photo -->
@@ -332,63 +342,56 @@ defineExpose({ refresh: load })
         </div>
       </section>
 
-      <!-- ── BLOC 2 : Pièces jointes du dossier ─────────────────────────── -->
-      <section class="space-y-3">
-        <div class="flex items-center gap-2">
-          <PencilSquareIcon class="w-4 h-4 text-indigo-600" />
-          <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-            Pièces jointes du dossier ({{ itemsHandled }}/{{ totalItems }})
-          </h3>
+      <!-- ── BLOC 2 : Pièces jointes du dossier (1 ligne par item) ──────── -->
+      <section>
+        <div v-if="!items.length" class="text-sm text-gray-400 italic px-3 py-3 border border-dashed border-gray-200 rounded-md text-center">
+          Aucun item dans le catalogue.
         </div>
-        <div v-if="!items.length" class="text-sm text-gray-400 italic px-3 py-4 border border-dashed border-gray-200 rounded-lg text-center">
-          Aucun item dans le catalogue. Ajoutez-en depuis l'admin (« Catalogue check-list »).
-        </div>
-        <ul v-else class="space-y-2">
+        <ul v-else class="space-y-1">
           <li v-for="item in items" :key="item.catalog_key"
               @dragover.prevent="dragOverItem = item.catalog_key"
               @dragleave="dragOverItem === item.catalog_key && (dragOverItem = null)"
               @drop="onDropFiles($event, item)"
-              :class="['relative border rounded-lg transition flex items-center gap-3 p-3',
+              :class="['relative border rounded-md flex items-center gap-2 px-2.5 py-1.5 transition-colors duration-200',
                        statusClass(item.status),
-                       dragOverItem === item.catalog_key ? 'border-indigo-500 ring-2 ring-indigo-500/30 bg-indigo-50/40' : '']">
+                       dragOverItem === item.catalog_key ? 'border-indigo-500! ring-2 ring-indigo-500/30 bg-indigo-50!' : '']">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: item.icon_value || 'fa-file', icon_color: item.icon_color || '#6b7280' }"
-                           size="md" class="shrink-0" />
+                           size="sm" class="shrink-0" />
 
-            <div class="flex-1 min-w-0">
-              <p :class="['text-sm font-medium leading-tight',
+            <div class="flex-1 min-w-0 leading-tight">
+              <p :class="['text-sm font-medium truncate',
                           item.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-800']">
                 {{ item.label }}
               </p>
-              <p v-if="item.status === 'available'" class="mt-0.5 text-[11px] text-emerald-700 inline-flex items-center gap-1">
+              <p v-if="item.status === 'available'" class="text-[11px] text-emerald-700 inline-flex items-center gap-1 mt-0.5">
                 <CheckIcon class="w-3 h-3" /> {{ item.files_count }} fichier{{ item.files_count > 1 ? 's' : '' }}
               </p>
-              <p v-else-if="item.status === 'not_available'" class="mt-0.5 text-[11px] text-gray-500 inline-flex items-center gap-1 truncate">
+              <p v-else-if="item.status === 'not_available'" class="text-[11px] text-gray-500 inline-flex items-center gap-1 mt-0.5 truncate">
                 <NoSymbolIcon class="w-3 h-3 shrink-0" /> {{ item.not_available_reason || 'Non disponible' }}
               </p>
             </div>
 
             <!-- Actions inline -->
-            <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex items-center gap-1 shrink-0">
               <BacsPhotoButton
                 v-if="document?.site_uuid && item.id"
                 :site-uuid="document.site_uuid"
                 :attach-to="{ checklist_id: item.id }"
                 :label="item.label"
                 size="sm"
-                @changed="load" />
+                @changed="load({ silent: true })" />
               <button type="button" @click.stop="openItem(item)"
                       v-tooltip="'Notes & fichiers'"
-                      class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
-                <PencilSquareIcon class="w-3.5 h-3.5" /> Notes
+                      class="inline-flex items-center justify-center w-7 h-7 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
+                <PencilSquareIcon class="w-3.5 h-3.5" />
               </button>
               <button type="button" @click.stop="quickToggleNotAvailable(item)"
                       v-tooltip="item.status === 'not_available' ? 'Réactiver (= À collecter)' : 'Marquer non disponible'"
-                      :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border',
+                      :class="['inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors',
                                item.status === 'not_available'
                                  ? 'text-gray-700 bg-gray-100 border-gray-300 hover:bg-gray-200'
                                  : 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50 hover:text-gray-700']">
                 <NoSymbolIcon class="w-3.5 h-3.5" />
-                {{ item.status === 'not_available' ? 'Réactiver' : 'Non dispo' }}
               </button>
             </div>
           </li>
