@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 96;
+const TARGET_VERSION = 97;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3597,6 +3597,35 @@ function runMigrations() {
     db.pragma('user_version = 96');
   }
 
+  if (current < 97) {
+    // Lot — Partage d'un système BACS entre plusieurs zones fonctionnelles.
+    //
+    // Cas d'usage : une chaufferie commune alimente plusieurs cellules
+    // logistiques + ateliers. Aujourd'hui le modèle bacs_audit_systems
+    // (zone_id FK + UNIQUE(document_id, zone_id, system_category)) oblige
+    // à dupliquer le système une fois par zone, ce qui est faux.
+    //
+    // Approche conservative : on garde zone_id (zone "d'origine") et on
+    // ajoute une table d'extras pour les zones supplémentaires desservies.
+    // Les call sites existants (resync, exports, indicateurs R175) continuent
+    // de fonctionner sans modification — ils traitent toujours la zone
+    // d'origine. La nouvelle UI matérialise les extras comme des cartes
+    // miroir dans les autres zones, avec un badge « Partagé ».
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_system_extra_zones (
+        system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (system_id, zone_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_sys_extra_zones_zone
+        ON bacs_audit_system_extra_zones(zone_id);
+    `);
+
+    log.info('Migration 97 appliquee : bacs_audit_system_extra_zones (partage multi-zones)');
+    db.pragma('user_version = 97');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -5874,6 +5903,61 @@ const faqArticles = {
   },
 };
 
+// ── Bacs Audit — partage multi-zones d'un système (mig 97) ───────────
+const bacsAuditSystemZones = {
+  // Zones supplémentaires desservies par un système (en plus de sa zone
+  // d'origine system.zone_id). Renvoie [zoneId, ...].
+  listExtraForSystem(systemId) {
+    return db.prepare(
+      'SELECT zone_id FROM bacs_audit_system_extra_zones WHERE system_id = ? ORDER BY zone_id'
+    ).all(systemId).map(r => r.zone_id);
+  },
+
+  // Liste plate des { system_id, zone_id } pour tous les systèmes d'un
+  // document : utile pour préfixer la résolution des extras en GET systems
+  // sans faire un N+1.
+  listExtrasForDocument(documentId) {
+    return db.prepare(`
+      SELECT ez.system_id, ez.zone_id
+      FROM bacs_audit_system_extra_zones ez
+      JOIN bacs_audit_systems s ON s.id = ez.system_id
+      WHERE s.document_id = ?
+    `).all(documentId);
+  },
+
+  // Remplace l'ensemble des zones supplémentaires d'un système. Transaction
+  // pour atomicité (pas d'état intermédiaire visible).
+  setExtraForSystem(systemId, zoneIds) {
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM bacs_audit_system_extra_zones WHERE system_id = ?').run(systemId);
+      const stmt = db.prepare(
+        'INSERT INTO bacs_audit_system_extra_zones (system_id, zone_id) VALUES (?, ?)'
+      );
+      for (const zid of zoneIds) stmt.run(systemId, zid);
+    });
+    tx();
+  },
+
+  // Vérifie si une zone est déjà couverte par un autre système de la même
+  // catégorie pour un document donné. Renvoie l'id du système conflictuel
+  // si trouvé, null sinon. Utilisé pour empêcher d'ajouter une zone qui a
+  // déjà un système même catégorie (à la place : fusionner).
+  findConflictingSystem({ documentId, zoneId, systemCategory, excludeSystemId }) {
+    // Conflit possible : zone d'origine d'un autre système OR zone extra.
+    const direct = db.prepare(`
+      SELECT id FROM bacs_audit_systems
+      WHERE document_id = ? AND zone_id = ? AND system_category = ? AND id != ?
+    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
+    if (direct) return direct.id;
+    const extra = db.prepare(`
+      SELECT s.id FROM bacs_audit_system_extra_zones ez
+      JOIN bacs_audit_systems s ON s.id = ez.system_id
+      WHERE s.document_id = ? AND ez.zone_id = ? AND s.system_category = ? AND s.id != ?
+    `).get(documentId, zoneId, systemCategory, excludeSystemId || -1);
+    return extra?.id || null;
+  },
+};
+
 module.exports = {
   init,
   pdfBoilerplate,
@@ -5908,5 +5992,6 @@ module.exports = {
   crispSettings,
   faqCategories,
   faqArticles,
+  bacsAuditSystemZones,
   get db() { return db; },
 };

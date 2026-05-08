@@ -1,0 +1,135 @@
+<script setup>
+/**
+ * Sélecteur multi-zones pour partager un système BACS entre plusieurs
+ * zones fonctionnelles (ex. chaufferie commune Logistique + Ateliers).
+ *
+ * Affiche :
+ * - Un badge « Partagé · +N » si le système couvre plus d'une zone
+ * - Un dropdown avec checkboxes pour ajouter/retirer des zones supplémentaires
+ *   (la zone d'origine est marquée et non décochable)
+ *
+ * Émet `updated` après un patch réussi (le parent rafraîchit son state).
+ *
+ * Props :
+ *   system : { id, zone_id, system_category, extra_zone_ids }
+ *   zones : [{ zone_id, name, ... }]   liste de zones du document
+ *   systemLabel : libellé humain de la catégorie (« Chauffage », ...)
+ */
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ShareIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { updateBacsSystemZones } from '@/api'
+import { useNotification } from '@/composables/useNotification'
+
+const props = defineProps({
+  system: { type: Object, required: true },
+  zones: { type: Array, required: true },
+  systemLabel: { type: String, default: '' },
+})
+const emit = defineEmits(['updated'])
+const { error: notifyError, success } = useNotification()
+
+const open = ref(false)
+const saving = ref(false)
+const rootRef = ref(null)
+
+const extraIds = computed(() => props.system.extra_zone_ids || [])
+const sharedCount = computed(() => extraIds.value.length)
+
+// Liste des zones autres que la zone d'origine — les seules toggleables.
+const candidateZones = computed(() =>
+  props.zones.filter(z => z.zone_id !== props.system.zone_id),
+)
+const originZone = computed(() =>
+  props.zones.find(z => z.zone_id === props.system.zone_id),
+)
+
+function toggleOpen() { open.value = !open.value }
+function close() { open.value = false }
+
+async function toggleZone(zoneId, checked) {
+  if (saving.value) return
+  saving.value = true
+  const next = new Set(extraIds.value)
+  if (checked) next.add(zoneId); else next.delete(zoneId)
+  try {
+    await updateBacsSystemZones(props.system.id, [...next])
+    success(checked ? 'Zone ajoutée au partage' : 'Zone retirée du partage')
+    emit('updated')
+  } catch (e) {
+    if (e.response?.status === 409) {
+      const zoneName = candidateZones.value.find(z => z.zone_id === zoneId)?.name
+      notifyError(
+        `« ${zoneName || zoneId} » a déjà un système ${props.systemLabel}. Retire-le ou fusionne d'abord.`,
+      )
+    } else {
+      notifyError(e.response?.data?.detail || 'Mise à jour des zones impossible')
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+function onDocClick(e) {
+  if (rootRef.value && !rootRef.value.contains(e.target)) close()
+}
+onMounted(() => document.addEventListener('mousedown', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
+</script>
+
+<template>
+  <div ref="rootRef" class="relative inline-flex shrink-0 whitespace-nowrap">
+    <button
+      type="button"
+      @click="toggleOpen"
+      :class="[
+        'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
+        sharedCount > 0
+          ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+          : 'border-gray-300 text-gray-600 hover:bg-gray-50',
+      ]"
+      :title="sharedCount > 0
+        ? `Système partagé avec ${sharedCount} autre zone${sharedCount > 1 ? 's' : ''}`
+        : 'Partager ce système avec d\'autres zones'"
+    >
+      <ShareIcon class="w-4 h-4 shrink-0" />
+      <span v-if="sharedCount > 0">Partagé · +{{ sharedCount }}</span>
+      <span v-else>Zones</span>
+    </button>
+
+    <div
+      v-if="open"
+      class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg w-64 py-1 text-sm"
+    >
+      <div class="px-3 py-2 border-b border-gray-100">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Zones desservies</p>
+        <p class="text-[11px] text-gray-400 mt-0.5">
+          La même chaufferie / CTA / luminaire alimente plusieurs zones ?
+        </p>
+      </div>
+      <!-- Zone d'origine, marquée en lecture seule -->
+      <div class="px-3 py-2 flex items-center gap-2 bg-gray-50 cursor-default">
+        <CheckIcon class="w-4 h-4 text-gray-400 shrink-0" />
+        <span class="text-gray-700 truncate">{{ originZone?.name || 'Zone d\'origine' }}</span>
+        <span class="ml-auto text-[10px] text-gray-400 italic">Origine</span>
+      </div>
+      <!-- Zones candidates (toggleables) -->
+      <div v-if="!candidateZones.length" class="px-3 py-2 text-xs text-gray-400 italic">
+        Aucune autre zone à partager.
+      </div>
+      <label
+        v-for="z in candidateZones"
+        :key="z.zone_id"
+        class="px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer"
+      >
+        <input
+          type="checkbox"
+          :checked="extraIds.includes(z.zone_id)"
+          :disabled="saving"
+          @change="e => toggleZone(z.zone_id, e.target.checked)"
+          class="rounded border-gray-300 shrink-0"
+        />
+        <span class="text-gray-700 truncate">{{ z.name }}</span>
+      </label>
+    </div>
+  </div>
+</template>

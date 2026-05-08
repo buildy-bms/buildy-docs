@@ -721,10 +721,23 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     INSERT OR IGNORE INTO bacs_audit_systems (document_id, zone_id, system_category, present)
     VALUES (?, ?, ?, 0)
   `);
+  // Mig 97 : zones déjà couvertes par un système partagé (extra_zones) — on
+  // ne re-crée pas un système doublon dans ces zones, le partage suffit.
+  // Map<zone_id, Set<system_category>>.
+  const coveredByExtras = new Map();
+  for (const r of db.db.prepare(`
+    SELECT ez.zone_id, s.system_category FROM bacs_audit_system_extra_zones ez
+    JOIN bacs_audit_systems s ON s.id = ez.system_id
+    WHERE s.document_id = ?
+  `).all(documentId)) {
+    if (!coveredByExtras.has(r.zone_id)) coveredByExtras.set(r.zone_id, new Set());
+    coveredByExtras.get(r.zone_id).add(r.system_category);
+  }
   let systemsCount = 0;
   for (const z of zones) {
     const cats = z.nature ? (reqByNature[z.nature] || []) : [];
     for (const cat of cats) {
+      if (coveredByExtras.get(z.zone_id)?.has(cat)) continue;
       const r = insertSystem.run(documentId, z.zone_id, cat);
       if (r.changes) systemsCount++;
     }

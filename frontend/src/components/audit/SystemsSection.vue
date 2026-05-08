@@ -9,6 +9,7 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
+import SystemZoneSharing from '@/components/SystemZoneSharing.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsSystem, reorderBacsSystems } from '@/api'
@@ -47,8 +48,14 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { document, powerSummary } = storeToRefs(audit)
+const { document, powerSummary, zones: storeZones } = storeToRefs(audit)
 const { error } = useNotification()
+
+// Nom de la zone d'origine d'un système — utilisé sur les cartes miroirs
+// (vues partagées d'un système dans une zone qui n'est pas la sienne).
+function originZoneName(s) {
+  return storeZones.value.find(z => z.zone_id === s.zone_id)?.name || 'autre zone'
+}
 
 async function patchSystem(s, patch) {
   Object.assign(s, patch)
@@ -223,6 +230,19 @@ onBeforeUnmount(teardownSortables)
                     <span class="text-gray-500 italic truncate">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
                   </label>
                   <div class="flex items-center gap-2 shrink-0 justify-self-end">
+                    <SystemZoneSharing
+                      v-if="!s.is_shared_view && s.present"
+                      :system="s"
+                      :zones="storeZones"
+                      :system-label="systemLabels[s.system_category] || s.system_category"
+                      @updated="refreshAuditData" />
+                    <span
+                      v-if="s.is_shared_view"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md whitespace-nowrap"
+                      :title="`Mêmes équipements que la carte ${systemLabels[s.system_category] || s.system_category} de « ${originZoneName(s)} ». Édition partagée.`"
+                    >
+                      Partagé depuis « {{ originZoneName(s) }} »
+                    </span>
                     <button
                       type="button"
                       :disabled="!s.present"
