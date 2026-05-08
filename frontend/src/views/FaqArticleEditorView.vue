@@ -44,6 +44,37 @@ const dirty = computed(() => {
 
 const credentialsConfigured = computed(() => store.settings?.has_credentials || false)
 
+// ── Score SEO (heuristique côté backend, recalculé à chaque save) ──
+const seoChecks = ref([])
+const seoScore = computed(() => {
+  if (!original.value || original.value.seo_score === null || original.value.seo_score === undefined) return null
+  return original.value.seo_score
+})
+const seoBadgeClass = computed(() => {
+  const s = seoScore.value
+  if (s === null) return ''
+  if (s >= 80) return 'bg-emerald-50 text-emerald-700'
+  if (s >= 60) return 'bg-amber-50 text-amber-700'
+  return 'bg-red-50 text-red-700'
+})
+const seoTooltip = computed(() => {
+  if (!seoChecks.value.length) return `Score SEO ${seoScore.value || '?'}/100. Clique pour les détails.`
+  const failed = seoChecks.value.filter(c => !c.passed).slice(0, 3)
+  if (!failed.length) return `Score SEO ${seoScore.value}/100. Excellent — tous les critères passent.`
+  return `Score SEO ${seoScore.value}/100. À améliorer :\n` + failed.map(c => `• ${c.message}`).join('\n')
+})
+
+async function loadSeoScore() {
+  if (!original.value?.id) return
+  try {
+    const { data } = await (await import('@/api')).default.get(`/faq/articles/${original.value.id}/seo-score`)
+    seoChecks.value = data.checks || []
+    if (original.value && data.score !== undefined) {
+      original.value = { ...original.value, seo_score: data.score }
+    }
+  } catch (e) { /* silent — pas bloquant */ }
+}
+
 // ── Historique des versions ──
 const historyModalOpen = ref(false)
 
@@ -127,6 +158,7 @@ onMounted(async () => {
       status: article.status || 'draft',
       visibility: article.visibility || 'public',
     }
+    loadSeoScore() // async, non-bloquant
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Article introuvable')
   } finally {
@@ -165,6 +197,7 @@ async function save() {
     })
     original.value = data
     success('Enregistré')
+    loadSeoScore() // recalcule le score SEO après save
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec')
   } finally {
@@ -248,6 +281,12 @@ function back() {
         </span>
         <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
           Local uniquement
+        </span>
+        <!-- Badge SEO score : vert ≥ 80, ambre 60-79, rouge < 60 -->
+        <span v-if="seoScore !== null"
+              :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs whitespace-nowrap cursor-help', seoBadgeClass]"
+              :title="seoTooltip">
+          SEO {{ seoScore }}/100
         </span>
         <div class="ml-auto flex items-center gap-2">
           <a v-if="original?.crisp_url && original?.status === 'published'"

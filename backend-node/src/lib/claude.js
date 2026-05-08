@@ -6,6 +6,7 @@ const db = require('../database');
 const { resolveSectionPoints } = require('./points-resolver');
 const { BACS_INTRO_HTML, BACS_ARTICLES } = require('../seeds/bacs-articles');
 const { buildLibraryContext } = require('./library-context');
+const { scoreArticle } = require('./seo-scorer');
 
 let _client = null;
 function client() {
@@ -1092,9 +1093,78 @@ function _extractTitle(text, currentTitle) {
   return { html: outHtml, suggested_title };
 }
 
+// ── SEO helpers : few-shot examples + auto-rewrite loop ────────────
+// Voir lib/seo-scorer.js pour le détail des critères. Ce module charge :
+// 1. Les top 3 articles avec score >= 80 et les injecte en exemples
+//    "voici à quoi ressemble un article bien noté SEO" → mimétisme Claude.
+// 2. Wraps les générations dans une boucle : si score < 70, rappel à Claude
+//    avec ses propres failles → 2e passe corrige.
+
+function _buildFewShotBlock(opts = {}) {
+  const { excludeId = null, minScore = 80, limit = 3, maxCharsPerArticle = 1500 } = opts;
+  let examples;
+  try {
+    examples = db.faqArticles.listTopScored({ excludeId, minScore, limit });
+  } catch (e) {
+    return null; // bootstrap : DB pas encore migrée ou listTopScored absent
+  }
+  if (!examples || !examples.length) return null;
+  const blocks = examples.map((a, i) => {
+    const html = (a.content_html || '').slice(0, maxCharsPerArticle);
+    return `--- EXEMPLE ${i + 1} (score ${a.seo_score}/100) — "${a.title}" ---\n${html}`;
+  }).join('\n\n');
+  return [
+    `=== EXEMPLES D'ARTICLES BUILDY TRÈS BIEN RÉFÉRENCÉS ===`,
+    `Inspire-toi de leur structure, longueur, ton, intégration des mots-clés métier,`,
+    `hiérarchie H2/H3, gras, liens internes. Ne les recopie PAS — ils sont là pour`,
+    `te montrer le standard de qualité attendu.`,
+    ``,
+    blocks,
+  ].join('\n');
+}
+
+function _buildSeoFeedbackPrompt(html, scoreResult) {
+  const weakList = scoreResult.weakChecks
+    .map((c) => `- [${c.weight} pts] ${c.message}`)
+    .join('\n');
+  return [
+    `Ton article a un score SEO de ${scoreResult.score}/100. Refais-le en corrigeant ces points :`,
+    weakList,
+    ``,
+    `Garde le sens, le ton, les liens internes, la longueur approximative.`,
+    `Réponds par le HTML uniquement (avec marker TITLE en tête si tu améliores le titre).`,
+  ].join('\n');
+}
+
+// Wrapper auto-rewrite : génère, score, retry une fois si < 70.
+async function _withSeoLoop(genFn, { targetScore = 70, maxRetries = 1 } = {}) {
+  let result = await genFn(null);
+  let evaluation = scoreArticle({ title: result.suggested_title || '', contentHtml: result.html });
+  let attempts = 1;
+  while (evaluation.score < targetScore && attempts <= maxRetries) {
+    const feedback = _buildSeoFeedbackPrompt(result.html, evaluation);
+    const next = await genFn({ previousHtml: result.html, feedback });
+    const nextEval = scoreArticle({ title: next.suggested_title || result.suggested_title || '', contentHtml: next.html });
+    // On garde la meilleure des 2 passes (pas la dernière forcément)
+    if (nextEval.score >= evaluation.score) {
+      result = next;
+      evaluation = nextEval;
+    }
+    attempts++;
+  }
+  return {
+    ...result,
+    seo_score: evaluation.score,
+    seo_attempts: attempts,
+    seo_weak_checks: evaluation.weakChecks,
+  };
+}
+
 async function assistFaqRewrite({ article }) {
   if (!article) throw new Error('Article manquant');
   const corpus = buildBuildyCorpusContext({ mode: 'full' });
+  const fewShot = _buildFewShotBlock({ excludeId: article.id });
+
   const systemBlocks = [
     {
       type: 'text',
@@ -1107,31 +1177,44 @@ async function assistFaqRewrite({ article }) {
       cache_control: { type: 'ephemeral' },
     },
   ];
-  const userPrompt = [
-    `=== ARTICLE À RÉÉCRIRE ===`,
-    `Titre : ${article.title || ''}`,
-    `Catégorie : ${article.category_name || article.category || '—'}`,
-    ``,
-    `Contenu actuel (HTML) :`,
-    article.content_html || '<p></p>',
-    ``,
-    `Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`,
-  ].join('\n');
+  if (fewShot) {
+    systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
+  }
 
-  const resp = await client().messages.create({
-    model: config.claudeModel,
-    max_tokens: 2048,
-    system: systemBlocks,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  const { html, suggested_title } = _extractTitle(raw, article.title);
-  return { html, suggested_title, usage: resp.usage };
+  const callClaude = async (retryContext) => {
+    const userParts = [
+      `=== ARTICLE À RÉÉCRIRE ===`,
+      `Titre : ${article.title || ''}`,
+      `Catégorie : ${article.category_name || article.category || '—'}`,
+      ``,
+      `Contenu actuel (HTML) :`,
+      retryContext?.previousHtml || article.content_html || '<p></p>',
+      ``,
+    ];
+    if (retryContext?.feedback) {
+      userParts.push(retryContext.feedback);
+    } else {
+      userParts.push(`Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`);
+    }
+    const resp = await client().messages.create({
+      model: config.claudeModel,
+      max_tokens: 2048,
+      system: systemBlocks,
+      messages: [{ role: 'user', content: userParts.join('\n') }],
+    });
+    const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const { html, suggested_title } = _extractTitle(raw, article.title);
+    return { html, suggested_title, usage: resp.usage };
+  };
+
+  return _withSeoLoop(callClaude);
 }
 
 async function assistFaqGenerate({ question, categoryName = null }) {
   if (!question || !question.trim()) throw new Error('Question manquante');
   const corpus = buildBuildyCorpusContext({ mode: 'full' });
+  const fewShot = _buildFewShotBlock();
+
   const systemBlocks = [
     {
       type: 'text',
@@ -1144,24 +1227,38 @@ async function assistFaqGenerate({ question, categoryName = null }) {
       cache_control: { type: 'ephemeral' },
     },
   ];
-  const userPrompt = [
-    `=== QUESTION CLIENT ===`,
-    question.trim(),
-    ``,
-    categoryName ? `Catégorie cible : ${categoryName}` : null,
-    ``,
-    `Rédige l'article FAQ complet (titre + corps HTML).`,
-  ].filter(Boolean).join('\n');
+  if (fewShot) {
+    systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
+  }
 
-  const resp = await client().messages.create({
-    model: config.claudeModel,
-    max_tokens: 2048,
-    system: systemBlocks,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  const { html, suggested_title } = _extractTitle(raw, '');
-  return { html, suggested_title, usage: resp.usage };
+  const callClaude = async (retryContext) => {
+    const userParts = [
+      `=== QUESTION CLIENT ===`,
+      question.trim(),
+      ``,
+    ];
+    if (categoryName) userParts.push(`Catégorie cible : ${categoryName}`, '');
+
+    if (retryContext?.feedback) {
+      userParts.push(`=== ARTICLE GÉNÉRÉ AU 1ER PASSAGE ===`);
+      userParts.push(retryContext.previousHtml || '');
+      userParts.push('');
+      userParts.push(retryContext.feedback);
+    } else {
+      userParts.push(`Rédige l'article FAQ complet (titre + corps HTML).`);
+    }
+    const resp = await client().messages.create({
+      model: config.claudeModel,
+      max_tokens: 2048,
+      system: systemBlocks,
+      messages: [{ role: 'user', content: userParts.join('\n') }],
+    });
+    const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const { html, suggested_title } = _extractTitle(raw, '');
+    return { html, suggested_title, usage: resp.usage };
+  };
+
+  return _withSeoLoop(callClaude);
 }
 
 async function assistFaqSuggestMissing() {

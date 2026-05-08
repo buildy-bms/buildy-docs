@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 100;
+const TARGET_VERSION = 101;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3779,6 +3779,19 @@ function runMigrations() {
     db.pragma('user_version = 100');
   }
 
+  if (current < 101) {
+    // SEO score persistance pour articles FAQ.
+    // Permet : 1) badge SEO dans l'éditeur, 2) few-shot examples dans le
+    // prompt Claude (top articles ≥ 80), 3) auto-rewrite loop si < 70.
+    db.exec(`
+      ALTER TABLE faq_articles ADD COLUMN seo_score INTEGER;
+      ALTER TABLE faq_articles ADD COLUMN seo_checks_json TEXT;
+      ALTER TABLE faq_articles ADD COLUMN seo_scored_at DATETIME;
+    `);
+    log.info('Migration 101 appliquee : faq_articles.seo_score + seo_checks_json + seo_scored_at');
+    db.pragma('user_version = 101');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6054,6 +6067,39 @@ const faqArticles = {
   remove(id) {
     db.prepare('DELETE FROM faq_articles WHERE id = ?').run(id);
   },
+
+  // ── SEO score (mig 101) ──────────────────────────────────────────
+  // Persiste un score 0-100 + checks JSON + timestamp. Recalculé sur
+  // chaque save/pull/generate via lib/seo-scorer.js.
+  setSeoScore(id, { score, checks }) {
+    const checksJson = checks ? JSON.stringify(checks) : null;
+    db.prepare(`
+      UPDATE faq_articles
+      SET seo_score = ?, seo_checks_json = ?, seo_scored_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(score, checksJson, id);
+  },
+
+  // Liste les top articles pour few-shot examples Claude.
+  // Retourne articles avec score >= minScore, ordonnés par score DESC,
+  // optionnellement filtrés par même type d'article (pas de colonne
+  // article_type en DB pour l'instant — on retourne tout).
+  listTopScored({ excludeId = null, minScore = 80, limit = 3 } = {}) {
+    const where = ['seo_score IS NOT NULL', 'seo_score >= ?', "status = 'published'", 'crisp_url IS NOT NULL'];
+    const args = [minScore];
+    if (excludeId) {
+      where.push('id != ?');
+      args.push(excludeId);
+    }
+    args.push(limit);
+    return db.prepare(`
+      SELECT id, title, content_html, seo_score, crisp_url
+      FROM faq_articles
+      WHERE ${where.join(' AND ')}
+      ORDER BY seo_score DESC, updated_at DESC
+      LIMIT ?
+    `).all(...args);
+  },
 };
 
 // ── Bacs Audit — partage multi-zones d'un device (mig 98) ────────────
@@ -6138,6 +6184,17 @@ const bacsAuditChecklist = {
   // status='pending' sans créer de ligne (lazy create au 1er upsert).
   listForDocument(documentId) {
     const items = bacsChecklistCatalog.list({ active: true });
+    // Auto-create des rows manquantes (status='pending') pour que chaque
+    // item ait toujours un `id` stable. Sans ça, BacsPhotoButton reste
+    // invisible jusqu'au 1er upsert (le bouton requiert un id pour rattacher).
+    const existing = new Set(
+      db.prepare('SELECT catalog_key FROM bacs_audit_checklist WHERE document_id = ?').all(documentId).map(r => r.catalog_key)
+    );
+    const missing = items.filter(it => !existing.has(it.key));
+    if (missing.length) {
+      const ins = db.prepare('INSERT INTO bacs_audit_checklist (document_id, catalog_key, status) VALUES (?, ?, ?)');
+      db.transaction(() => { for (const it of missing) ins.run(documentId, it.key, 'pending'); })();
+    }
     const states = db.prepare(
       'SELECT * FROM bacs_audit_checklist WHERE document_id = ?'
     ).all(documentId);
