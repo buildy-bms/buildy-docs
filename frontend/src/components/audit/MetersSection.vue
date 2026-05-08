@@ -138,7 +138,6 @@ onBeforeUnmount(teardownMetersSortable)
           <th class="text-center py-2.5 w-44">Protocole(s)</th>
           <th class="text-center py-2.5 w-24">Notes</th>
           <th class="text-center py-2.5 w-24">Photos</th>
-          <th class="text-center py-2.5 w-16" title="Compteur Hors-Service — ignoré dans le plan d'action">HS</th>
           <th class="text-center px-5 py-2.5 w-12"></th>
         </tr>
       </thead>
@@ -194,6 +193,12 @@ onBeforeUnmount(teardownMetersSortable)
                       v-tooltip="'Communication câblée vers la GTB'">
                 <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
               </button>
+              <button type="button"
+                      @click="patchMeter(m, { out_of_service: !m.out_of_service })"
+                      :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']"
+                      v-tooltip="m.out_of_service ? 'Compteur hors service — ignoré dans le plan d\'action (cliquer pour réactiver)' : 'Marquer le compteur comme hors service'">
+                <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span> HS
+              </button>
             </div>
           </td>
           <td class="py-2.5 px-2">
@@ -209,13 +214,14 @@ onBeforeUnmount(teardownMetersSortable)
             <button
               type="button"
               @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
-              :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition',
+              :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
                 hasNotes(m.notes_html || m.notes)
-                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-              v-tooltip="'Editer les notes'">
-              <PencilSquareIcon class="w-4 h-4" />
-              {{ hasNotes(m.notes_html || m.notes) ? 'Notes' : '+ Notes' }}
+                  ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                  : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+              v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+              <PencilSquareIcon class="w-3.5 h-3.5" />
+              <span v-if="hasNotes(m.notes_html || m.notes)">Notes</span>
+              <span v-else>+ Notes</span>
             </button>
           </td>
           <td class="py-2.5 text-center">
@@ -225,11 +231,6 @@ onBeforeUnmount(teardownMetersSortable)
               :attach-to="{ meter_id: m.id }"
               :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
             />
-          </td>
-          <td class="py-2.5 text-center">
-            <input type="checkbox" :checked="!!m.out_of_service"
-                   @change="e => patchMeter(m, { out_of_service: e.target.checked })"
-                   class="rounded border-gray-300" />
           </td>
           <td class="px-5 py-2.5 text-right whitespace-nowrap">
             <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
@@ -241,7 +242,7 @@ onBeforeUnmount(teardownMetersSortable)
           </td>
         </PhotoDropTr>
         <tr class="bg-emerald-50/30">
-          <td colspan="10" class="px-5 py-3 text-center">
+          <td colspan="9" class="px-5 py-3 text-center">
             <button @click="emit('add-meter')" class="btn-success">
               <PlusIcon class="w-4 h-4" /> Ajouter un compteur
             </button>
@@ -250,7 +251,7 @@ onBeforeUnmount(teardownMetersSortable)
       </tbody>
       <tfoot v-if="!meters.length">
         <tr>
-          <td colspan="9" class="px-5 py-6 text-center text-xs text-gray-500">
+          <td colspan="8" class="px-5 py-6 text-center text-xs text-gray-500">
             Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
           </td>
         </tr>
@@ -311,12 +312,11 @@ onBeforeUnmount(teardownMetersSortable)
                   :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']">
             <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
           </button>
-          <label class="flag-pill flag-off cursor-pointer">
-            <input type="checkbox" :checked="!!m.out_of_service"
-                   @change="e => patchMeter(m, { out_of_service: e.target.checked })"
-                   class="w-3! h-3!" />
-            HS
-          </label>
+          <button type="button"
+                  @click="patchMeter(m, { out_of_service: !m.out_of_service })"
+                  :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']">
+            <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span> HS
+          </button>
         </div>
         <!-- Protocole(s) -->
         <div v-if="m.communicating">
