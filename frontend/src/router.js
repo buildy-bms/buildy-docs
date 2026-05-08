@@ -153,6 +153,12 @@ const routes = [
     component: () => import('@/views/FaqArticleEditorView.vue'),
     props: true,
   },
+  {
+    path: '/faq/settings',
+    name: 'faq-settings',
+    meta: { title: 'Paramètres FAQ' },
+    component: () => import('@/views/FaqSettingsView.vue'),
+  },
 ]
 
 const router = createRouter({

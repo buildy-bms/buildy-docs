@@ -11,7 +11,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import FaqRichTextEditor from '@/components/FaqRichTextEditor.vue'
 import FaqArticleHistoryModal from '@/components/FaqArticleHistoryModal.vue'
-import { pullFaqArticleFromCrisp } from '@/api'
+import { pullFaqArticleFromCrisp, faqAiRewriteTitle, faqAiRewriteDescription } from '@/api'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const router = useRouter()
@@ -21,6 +21,7 @@ const { confirm } = useConfirm()
 
 const draft = ref({
   title: '',
+  description: '',
   content_html: '',
   category_id: null,
   status: 'draft',
@@ -35,6 +36,7 @@ const dirty = computed(() => {
   if (!original.value) return false
   return (
     draft.value.title !== original.value.title ||
+    draft.value.description !== (original.value.description || '') ||
     draft.value.content_html !== (original.value.content_html || '') ||
     draft.value.category_id !== (original.value.category_id || null) ||
     draft.value.status !== original.value.status ||
@@ -43,6 +45,37 @@ const dirty = computed(() => {
 })
 
 const credentialsConfigured = computed(() => store.settings?.has_credentials || false)
+
+// ── Score SEO (heuristique côté backend, recalculé à chaque save) ──
+const seoChecks = ref([])
+const seoScore = computed(() => {
+  if (!original.value || original.value.seo_score === null || original.value.seo_score === undefined) return null
+  return original.value.seo_score
+})
+const seoBadgeClass = computed(() => {
+  const s = seoScore.value
+  if (s === null) return ''
+  if (s >= 80) return 'bg-emerald-50 text-emerald-700'
+  if (s >= 60) return 'bg-amber-50 text-amber-700'
+  return 'bg-red-50 text-red-700'
+})
+const seoTooltip = computed(() => {
+  if (!seoChecks.value.length) return `Score SEO ${seoScore.value || '?'}/100. Clique pour les détails.`
+  const failed = seoChecks.value.filter(c => !c.passed).slice(0, 3)
+  if (!failed.length) return `Score SEO ${seoScore.value}/100. Excellent — tous les critères passent.`
+  return `Score SEO ${seoScore.value}/100. À améliorer :\n` + failed.map(c => `• ${c.message}`).join('\n')
+})
+
+async function loadSeoScore() {
+  if (!original.value?.id) return
+  try {
+    const { data } = await (await import('@/api')).default.get(`/faq/articles/${original.value.id}/seo-score`)
+    seoChecks.value = data.checks || []
+    if (original.value && data.score !== undefined) {
+      original.value = { ...original.value, seo_score: data.score }
+    }
+  } catch (e) { /* silent — pas bloquant */ }
+}
 
 // ── Historique des versions ──
 const historyModalOpen = ref(false)
@@ -68,6 +101,36 @@ async function rewriteWithAI() {
   }
 }
 
+// ── Reformulation IA du titre seul ──
+const rewritingTitle = ref(false)
+async function rewriteTitleWithAI() {
+  rewritingTitle.value = true
+  try {
+    const { data } = await faqAiRewriteTitle(parseInt(props.id, 10))
+    if (data.title) draft.value.title = data.title
+    success('Titre reformulé par l\'IA.')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la reformulation du titre')
+  } finally {
+    rewritingTitle.value = false
+  }
+}
+
+// ── Reformulation / génération IA de la description ──
+const rewritingDescription = ref(false)
+async function rewriteDescriptionWithAI() {
+  rewritingDescription.value = true
+  try {
+    const { data } = await faqAiRewriteDescription(parseInt(props.id, 10))
+    if (data.description) draft.value.description = data.description
+    success(draft.value.description ? 'Description reformulée par l\'IA.' : 'Description générée par l\'IA.')
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la génération de description')
+  } finally {
+    rewritingDescription.value = false
+  }
+}
+
 // ── Recharger depuis Crisp ──
 const pulling = ref(false)
 async function pullFromCrisp() {
@@ -85,6 +148,7 @@ async function pullFromCrisp() {
     original.value = data
     draft.value = {
       title: data.title || '',
+      description: data.description || '',
       content_html: data.content_html || '',
       category_id: data.category_id || null,
       status: data.status || 'draft',
@@ -122,11 +186,13 @@ onMounted(async () => {
     original.value = article
     draft.value = {
       title: article.title || '',
+      description: article.description || '',
       content_html: article.content_html || '',
       category_id: article.category_id || null,
       status: article.status || 'draft',
       visibility: article.visibility || 'public',
     }
+    loadSeoScore() // async, non-bloquant
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Article introuvable')
   } finally {
@@ -142,6 +208,7 @@ watch(() => props.id, async (newId) => {
     original.value = article
     draft.value = {
       title: article.title || '',
+      description: article.description || '',
       content_html: article.content_html || '',
       category_id: article.category_id || null,
       status: article.status || 'draft',
@@ -158,6 +225,7 @@ async function save() {
   try {
     const data = await store.saveArticle(parseInt(props.id, 10), {
       title: draft.value.title,
+      description: draft.value.description || null,
       content_html: draft.value.content_html,
       category_id: draft.value.category_id,
       status: draft.value.status,
@@ -165,6 +233,7 @@ async function save() {
     })
     original.value = data
     success('Enregistré')
+    loadSeoScore() // recalcule le score SEO après save
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec')
   } finally {
@@ -249,6 +318,12 @@ function back() {
         <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
           Local uniquement
         </span>
+        <!-- Badge SEO score : vert ≥ 80, ambre 60-79, rouge < 60 -->
+        <span v-if="seoScore !== null"
+              :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs whitespace-nowrap cursor-help', seoBadgeClass]"
+              :title="seoTooltip">
+          SEO {{ seoScore }}/100
+        </span>
         <div class="ml-auto flex items-center gap-2">
           <a v-if="original?.crisp_url && original?.status === 'published'"
              :href="original.crisp_url" target="_blank" rel="noopener"
@@ -304,9 +379,43 @@ function back() {
 
       <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Titre</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-sm font-medium text-gray-700">Titre</label>
+            <button @click="rewriteTitleWithAI" :disabled="rewritingTitle || !original"
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50"
+                    title="Reformuler le titre avec l'IA (SEO)">
+              <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+              {{ rewritingTitle ? 'Reformulation…' : 'Reformuler avec IA' }}
+            </button>
+          </div>
           <input v-model="draft.title" type="text"
                  class="w-full px-3 py-2 text-lg border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-sm font-medium text-gray-700">
+              Meta-description SEO
+              <span class="text-xs font-normal text-gray-500">— affichée dans Google et sous le titre Crisp</span>
+            </label>
+            <button @click="rewriteDescriptionWithAI" :disabled="rewritingDescription || !original"
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition disabled:opacity-50"
+                    :title="(draft.description || '').trim() ? 'Reformuler la description avec l\'IA' : 'Générer une description avec l\'IA'">
+              <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+              {{ rewritingDescription ? 'Génération…' : ((draft.description || '').trim() ? 'Reformuler avec IA' : 'Générer avec IA') }}
+            </button>
+          </div>
+          <textarea v-model="draft.description" rows="2" maxlength="160"
+                    placeholder="1 phrase courte (140-155 chars idéal, 160 max). Ex : Pilotez à distance le chauffage et la climatisation de vos bâtiments tertiaires depuis Hyperveez."
+                    class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition resize-y"></textarea>
+          <div class="flex items-center justify-between mt-1 text-xs">
+            <span :class="(draft.description || '').length > 160 ? 'text-red-600' : (draft.description || '').length > 140 ? 'text-amber-600' : 'text-gray-500'">
+              {{ (draft.description || '').length }}/160 caractères
+            </span>
+            <span class="text-gray-400">Crisp tronque au-delà de 160</span>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

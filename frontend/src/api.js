@@ -461,6 +461,11 @@ export const saveFaqSettings = (data) => api.put('/faq/settings', data)
 export const testFaqConnection = () => api.post('/faq/test-connection')
 export const pullFaqFromCrisp = () => api.post('/faq/sync/pull')
 
+// Whitelist mots-clés SEO (override DB de DEFAULT_KEYWORDS)
+export const getFaqSeoKeywords = () => api.get('/faq/settings/seo-keywords')
+export const saveFaqSeoKeywords = (keywords) => api.put('/faq/settings/seo-keywords', { keywords })
+export const resetFaqSeoKeywords = () => api.post('/faq/settings/seo-keywords/reset')
+
 export const listFaqCategories = () => api.get('/faq/categories')
 export const createFaqCategory = (data) => api.post('/faq/categories', data)
 export const updateFaqCategory = (id, data) => api.patch(`/faq/categories/${id}`, data)
@@ -481,6 +486,8 @@ export const pushFaqArticle = (id) => api.post(`/faq/articles/${id}/push`)
 export const pullFaqArticleFromCrisp = (id) => api.post(`/faq/articles/${id}/pull`)
 
 export const faqAiRewrite = (article_id) => api.post('/faq/ai/rewrite', { article_id })
+export const faqAiRewriteTitle = (article_id) => api.post('/faq/ai/rewrite-title', { article_id })
+export const faqAiRewriteDescription = (article_id) => api.post('/faq/ai/rewrite-description', { article_id })
 // Génération article FAQ — accepte un objet riche.
 // Si `images` est fourni (Array<File>), on envoie en multipart/form-data
 // (Claude Vision). Sinon JSON simple.

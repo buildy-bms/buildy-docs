@@ -67,6 +67,7 @@ const nav = [
   { section: 'Système' },
   { name: 'Paramètres BACS', to: '/admin/bacs-parameters', icon: Cog6ToothIcon },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },
+  { name: 'Paramètres FAQ', to: '/faq/settings', icon: Cog6ToothIcon },
   { name: 'Textes standards PDF', to: '/admin/boilerplate', icon: DocumentDuplicateIcon },
   { name: 'Tableau des offres', to: '/admin/offerings-config', icon: DocumentDuplicateIcon },
   { name: 'Audit trail', to: '/audit', icon: ClockIcon },

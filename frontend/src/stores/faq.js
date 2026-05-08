@@ -141,7 +141,7 @@ export const useFaqStore = defineStore('faq', () => {
     return data
   }
   async function aiGenerate(question, categoryId = null) {
-    const { data } = await faqAiGenerate(question, categoryId)
+    const { data } = await faqAiGenerate({ question, category_id: categoryId })
     return data
   }
   async function aiSuggestMissing() {

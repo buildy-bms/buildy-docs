@@ -9,7 +9,18 @@
 const db = require('../database');
 const { loadCrispCredentials, crispClient } = require('./crisp');
 const { crispMarkdownToHtml, htmlToCrispMarkdown } = require('./crisp-markdown');
+const { scoreArticle } = require('./seo-scorer');
 const log = require('./logger').system;
+
+// Recalcule le score SEO d'un article après upsert (pull/push) et le persiste.
+function _recomputeSeoScoreById(articleId) {
+  if (!articleId) return null;
+  const a = db.faqArticles.getById(articleId);
+  if (!a) return null;
+  const r = scoreArticle({ title: a.title || '', contentHtml: a.content_html || '' });
+  db.faqArticles.setSeoScore(articleId, { score: r.score, checks: r.checks });
+  return r;
+}
 
 function _toCrispCategoryPayload(cat) {
   return {
@@ -23,8 +34,10 @@ function _toCrispCategoryPayload(cat) {
 function _toCrispArticlePayload(article) {
   // Crisp stocke le content en Markdown Crisp-flavored.
   // L'éditeur Tiptap produit du HTML -> conversion avant push.
+  // description : meta-description SEO (Crisp limite à 160 chars).
   return {
     title: article.title,
+    description: article.description || null,
     content: htmlToCrispMarkdown(article.content_html || ''),
   };
 }
@@ -100,6 +113,7 @@ async function pullFromCrisp({ locale } = {}) {
         crispId,
         categoryId: localCatId,
         title: full.title || 'Sans titre',
+        description: full.description || null,
         slug: full.slug || null,
         // Crisp renvoie le content en Markdown -> on convertit en HTML pour Tiptap.
         contentHtml: crispMarkdownToHtml(full.content || ''),
@@ -122,9 +136,11 @@ async function pullFromCrisp({ locale } = {}) {
           });
         } else {
           db.faqArticles.update(existing.id, payload);
+          _recomputeSeoScoreById(existing.id);
         }
       } else {
-        db.faqArticles.create(payload);
+        const created = db.faqArticles.create(payload);
+        if (created?.id) _recomputeSeoScoreById(created.id);
       }
       articlesPulled += 1;
     }
@@ -220,7 +236,7 @@ async function pushArticleToCrisp(articleId, userId = null) {
     // Save complet : Crisp exige title, description, content, featured, order
     await client.updateArticle(locale, crispId, {
       title: payload.title,
-      description: null,
+      description: payload.description,
       content: payload.content,
       featured: false,
       order: 0,
@@ -239,7 +255,7 @@ async function pushArticleToCrisp(articleId, userId = null) {
   } else {
     await client.updateArticle(locale, article.crisp_id, {
       title: payload.title,
-      description: null,
+      description: payload.description,
       content: payload.content,
       featured: false,
       order: 0,

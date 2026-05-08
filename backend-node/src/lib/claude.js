@@ -6,6 +6,7 @@ const db = require('../database');
 const { resolveSectionPoints } = require('./points-resolver');
 const { BACS_INTRO_HTML, BACS_ARTICLES } = require('../seeds/bacs-articles');
 const { buildLibraryContext } = require('./library-context');
+const { scoreArticle } = require('./seo-scorer');
 
 let _client = null;
 function client() {
@@ -948,6 +949,15 @@ const SYSTEM_PROMPT_FAQ_GENERATE = [
   `=== TITRE OBLIGATOIRE (SEO) ===`,
   `Commence ta réponse par le marker \`<!--TITLE: titre proposé-->\` puis enchaîne le HTML.`,
   `Critères d'un bon titre Helpdesk SEO : 40-60 caractères, commence par le mot-clé principal (action de l'utilisateur ou terme métier), formule en question si l'article répond à une question ("Comment configurer une alerte sur Hyperveez ?"), sinon forme nominale courte ("Décret BACS R175 : critères d'éligibilité"). Pas de guillemets, pas de virgule, pas de point final.`,
+  ``,
+  `=== META-DESCRIPTION OBLIGATOIRE (SEO) ===`,
+  `Juste après le marker TITLE, ajoute le marker \`<!--DESCRIPTION: meta-description-->\`.`,
+  `C'est la phrase qui apparaît sous le titre dans Google + le partage Crisp.`,
+  `Critères : MAX 160 caractères STRICT (Crisp tronque), idéal 140-155. 1 phrase informative.`,
+  `Inclure 1-2 mots-clés métier (GTB, supervision, hypervision, bâtiment tertiaire, décret BACS,`,
+  `chauffage/climatisation/ventilation, BACnet/Modbus selon le sujet). Verbe d'action en tête`,
+  `quand possible (Pilotez, Supervisez, Configurez, Diagnostiquez). Pas de "Buildy" en tête,`,
+  `pas de "Cet article".`,
 ].join('\n');
 
 const SYSTEM_PROMPT_FAQ_SUGGEST_MISSING = [
@@ -1090,20 +1100,235 @@ function buildBuildyCorpusContext({ mode = 'full' } = {}) {
 function _extractTitle(text, currentTitle) {
   let outHtml = text || '';
   let suggested_title = null;
-  const m = outHtml.match(/<!--\s*TITLE:\s*(.+?)\s*-->/i);
-  if (m) {
-    const proposed = (m[1] || '').trim();
+  let suggested_description = null;
+  const mt = outHtml.match(/<!--\s*TITLE:\s*(.+?)\s*-->/i);
+  if (mt) {
+    const proposed = (mt[1] || '').trim();
     if (proposed && proposed.toLowerCase() !== (currentTitle || '').toLowerCase()) {
       suggested_title = proposed;
     }
-    outHtml = outHtml.replace(m[0], '').trim();
+    outHtml = outHtml.replace(mt[0], '').trim();
   }
-  return { html: outHtml, suggested_title };
+  const md = outHtml.match(/<!--\s*DESCRIPTION:\s*([\s\S]+?)\s*-->/i);
+  if (md) {
+    suggested_description = (md[1] || '').trim().slice(0, 160);
+    outHtml = outHtml.replace(md[0], '').trim();
+  }
+  return { html: outHtml, suggested_title, suggested_description };
+}
+
+// ── SEO helpers : few-shot examples + auto-rewrite loop ────────────
+// Voir lib/seo-scorer.js pour le détail des critères. Ce module charge :
+// 1. Les top 3 articles avec score >= 80 et les injecte en exemples
+//    "voici à quoi ressemble un article bien noté SEO" → mimétisme Claude.
+// 2. Wraps les générations dans une boucle : si score < 70, rappel à Claude
+//    avec ses propres failles → 2e passe corrige.
+
+function _buildFewShotBlock(opts = {}) {
+  const { excludeId = null, minScore = 80, limit = 3, maxCharsPerArticle = 1500 } = opts;
+  let examples;
+  try {
+    examples = db.faqArticles.listTopScored({ excludeId, minScore, limit });
+  } catch (e) {
+    return null; // bootstrap : DB pas encore migrée ou listTopScored absent
+  }
+  if (!examples || !examples.length) return null;
+  const blocks = examples.map((a, i) => {
+    const html = (a.content_html || '').slice(0, maxCharsPerArticle);
+    return `--- EXEMPLE ${i + 1} (score ${a.seo_score}/100) — "${a.title}" ---\n${html}`;
+  }).join('\n\n');
+  return [
+    `=== EXEMPLES D'ARTICLES BUILDY TRÈS BIEN RÉFÉRENCÉS ===`,
+    `Inspire-toi de leur structure, longueur, ton, intégration des mots-clés métier,`,
+    `hiérarchie H2/H3, gras, liens internes. Ne les recopie PAS — ils sont là pour`,
+    `te montrer le standard de qualité attendu.`,
+    ``,
+    blocks,
+  ].join('\n');
+}
+
+function _buildSeoFeedbackPrompt(html, scoreResult) {
+  const weakList = scoreResult.weakChecks
+    .map((c) => `- [${c.weight} pts] ${c.message}`)
+    .join('\n');
+  return [
+    `Ton article a un score SEO de ${scoreResult.score}/100. Refais-le en corrigeant ces points :`,
+    weakList,
+    ``,
+    `Garde le sens, le ton, les liens internes, la longueur approximative.`,
+    `Réponds par le HTML uniquement (avec marker TITLE en tête si tu améliores le titre).`,
+  ].join('\n');
+}
+
+// Wrapper auto-rewrite : génère, score, retry une fois si < 70.
+async function _withSeoLoop(genFn, { targetScore = 70, maxRetries = 1 } = {}) {
+  let result = await genFn(null);
+  let evaluation = scoreArticle({ title: result.suggested_title || '', contentHtml: result.html });
+  let attempts = 1;
+  while (evaluation.score < targetScore && attempts <= maxRetries) {
+    const feedback = _buildSeoFeedbackPrompt(result.html, evaluation);
+    const next = await genFn({ previousHtml: result.html, feedback });
+    const nextEval = scoreArticle({ title: next.suggested_title || result.suggested_title || '', contentHtml: next.html });
+    // On garde la meilleure des 2 passes (pas la dernière forcément)
+    if (nextEval.score >= evaluation.score) {
+      result = next;
+      evaluation = nextEval;
+    }
+    attempts++;
+  }
+  return {
+    ...result,
+    seo_score: evaluation.score,
+    seo_attempts: attempts,
+    seo_weak_checks: evaluation.weakChecks,
+  };
+}
+
+// Helper : strip tous markers HTML et commentaires éventuels
+function _cleanInline(s) {
+  return String(s || '')
+    // strip <!-- ... --> markers (TITLE, DESCRIPTION, etc.)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // strip remaining HTML tags
+    .replace(/<[^>]*>/g, '')
+    // strip surrounding quotes/spaces
+    .replace(/^[\s"«»'`]+|[\s"«»'`]+$/g, '')
+    .replace(/[«»]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Helper : tronque à la dernière fin de phrase / espace propre avant maxLen.
+// Évite "...autonome de vos" coupé mid-mot.
+function _truncateClean(text, maxLen) {
+  const s = String(text || '').trim();
+  if (s.length <= maxLen) return s;
+  const cut = s.slice(0, maxLen);
+  // Cherche la dernière ponctuation forte (.!?) ; on accepte > 60% de maxLen
+  const minBoundary = Math.floor(maxLen * 0.6);
+  const lastPunct = Math.max(
+    cut.lastIndexOf('.'),
+    cut.lastIndexOf('!'),
+    cut.lastIndexOf('?'),
+  );
+  if (lastPunct >= minBoundary) {
+    return cut.slice(0, lastPunct + 1).trim();
+  }
+  // Sinon, dernière virgule ou point-virgule
+  const lastSoft = Math.max(cut.lastIndexOf(','), cut.lastIndexOf(';'), cut.lastIndexOf(':'));
+  if (lastSoft >= minBoundary) {
+    return cut.slice(0, lastSoft).trim() + '…';
+  }
+  // Sinon dernier espace
+  const lastSpace = cut.lastIndexOf(' ');
+  if (lastSpace >= minBoundary) {
+    return cut.slice(0, lastSpace).trim() + '…';
+  }
+  // Cas extrême : on cap brut au maxLen-1 + ellipse
+  return cut.slice(0, maxLen - 1).trim() + '…';
+}
+
+// Helper : nettoie le contenu fourni à Claude (retire markers + tags + comments)
+function _cleanContextHtml(html, maxChars) {
+  let s = String(html || '');
+  s = s.replace(/<!--[\s\S]*?-->/g, ''); // strip markers
+  s = stripHtml(s);
+  if (maxChars && s.length > maxChars) s = s.slice(0, maxChars);
+  return s;
+}
+
+// Reformulation IA du titre uniquement. Renvoie { title }.
+// Prompt minimal (n'inclut PAS SYSTEM_PROMPT_FAQ_REWRITE qui contient les
+// instructions sur les markers TITLE/DESCRIPTION et confond Claude).
+async function assistFaqRewriteTitle({ article }) {
+  if (!article) throw new Error('Article manquant');
+  const systemText = [
+    `Tu es un rédacteur SEO spécialisé en supervision technique du bâtiment (GTB) pour Buildy.`,
+    `Tu reformules UNIQUEMENT le titre d'un article FAQ pour optimiser le référencement Google.`,
+    ``,
+    `Critères :`,
+    `- 40 à 60 caractères.`,
+    `- Mot-clé métier en tête quand c'est naturel (GTB, hypervision, supervision, décret BACS,`,
+    `  chauffage, climatisation, etc. — uniquement ceux pertinents pour le sujet de l'article).`,
+    `- Forme question si l'article répond à une question ("Comment configurer une alerte GTB ?"),`,
+    `  sinon nominale courte ("Décret BACS R175 : critères d'éligibilité").`,
+    `- Pas de guillemets, pas de virgule en milieu, pas de point final.`,
+    `- Ne change pas le sens : le sujet reste le même.`,
+    ``,
+    `RÉPONSE : 1 ligne avec le NOUVEAU TITRE seul. Pas de préambule, pas de "Voici", pas de`,
+    `guillemets, pas de markdown, pas de balises HTML, pas de commentaires.`,
+  ].join('\n');
+  const userText = [
+    `Titre actuel : ${article.title || '(aucun)'}`,
+    article.description ? `Description : ${article.description}` : null,
+    ``,
+    `Contenu (extrait nettoyé) :`,
+    _cleanContextHtml(article.content_html || '', 800),
+  ].filter(Boolean).join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 200,
+    system: [{ type: 'text', text: systemText }],
+    messages: [{ role: 'user', content: userText }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  const title = _cleanInline(raw).slice(0, 200);
+  return { title, usage: resp.usage };
+}
+
+// Reformulation / génération IA de la description (meta-description SEO).
+// Renvoie { description }. Prompt minimal isolé.
+async function assistFaqRewriteDescription({ article }) {
+  if (!article) throw new Error('Article manquant');
+  const hasDescription = !!(article.description || '').trim();
+  const systemText = [
+    `Tu es un rédacteur SEO spécialisé en supervision technique du bâtiment (GTB) pour Buildy.`,
+    `Tu ${hasDescription ? 'reformules' : 'génères'} UNIQUEMENT la meta-description SEO d'un article FAQ.`,
+    `C'est la phrase qui apparaît sous le titre dans les résultats Google et dans le partage Crisp.`,
+    ``,
+    `LONGUEUR — règle ABSOLUE :`,
+    `- Cible STRICTE : 130 à 145 caractères, jamais plus.`,
+    `- Compte les caractères (espaces compris) avant de répondre.`,
+    `- La dernière phrase doit se TERMINER complètement (point final), pas être coupée.`,
+    `- Si tu hésites entre une formulation longue et une courte, prends la courte.`,
+    ``,
+    `STYLE :`,
+    `- 1 phrase complète, ton informatif et concret, sans superlatifs marketing.`,
+    `- Inclure 1 ou 2 mots-clés métier pertinents pour le sujet (GTB, supervision, hypervision,`,
+    `  bâtiment tertiaire, décret BACS, chauffage, climatisation, ventilation, BACnet, Modbus).`,
+    `- Commence si possible par un verbe d'action (Pilotez, Supervisez, Configurez, Diagnostiquez,`,
+    `  Découvrez, Comprenez) ou par le terme métier principal.`,
+    `- Pas de "Buildy" ni "Cet article" en tête. Pas de marketing creux ("solution complète", "puissant").`,
+    ``,
+    `RÉPONSE : 1 ligne contenant la SEULE description finale (130-145 chars). Pas de préambule,`,
+    `pas de "Voici", pas de guillemets, pas de markdown, pas de balises HTML, pas de commentaires `,
+    `<!-- --> ni de markers TITLE/DESCRIPTION.`,
+  ].join('\n');
+  const userText = [
+    `Titre : ${article.title || '(aucun)'}`,
+    hasDescription ? `Description actuelle : ${article.description}` : `(Pas de description, à créer)`,
+    ``,
+    `Contenu (extrait nettoyé, sans HTML ni markers) :`,
+    _cleanContextHtml(article.content_html || '', 1200),
+  ].join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 400,
+    system: [{ type: 'text', text: systemText }],
+    messages: [{ role: 'user', content: userText }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  const description = _truncateClean(_cleanInline(raw), 160);
+  return { description, usage: resp.usage };
 }
 
 async function assistFaqRewrite({ article }) {
   if (!article) throw new Error('Article manquant');
   const corpus = buildBuildyCorpusContext({ mode: 'full' });
+  const fewShot = _buildFewShotBlock({ excludeId: article.id });
+
   const systemBlocks = [
     {
       type: 'text',
@@ -1116,31 +1341,44 @@ async function assistFaqRewrite({ article }) {
       cache_control: { type: 'ephemeral' },
     },
   ];
-  const userPrompt = [
-    `=== ARTICLE À RÉÉCRIRE ===`,
-    `Titre : ${article.title || ''}`,
-    `Catégorie : ${article.category_name || article.category || '—'}`,
-    ``,
-    `Contenu actuel (HTML) :`,
-    article.content_html || '<p></p>',
-    ``,
-    `Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`,
-  ].join('\n');
+  if (fewShot) {
+    systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
+  }
 
-  const resp = await client().messages.create({
-    model: config.claudeModel,
-    max_tokens: 2048,
-    system: systemBlocks,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  const { html, suggested_title } = _extractTitle(raw, article.title);
-  return { html, suggested_title, usage: resp.usage };
+  const callClaude = async (retryContext) => {
+    const userParts = [
+      `=== ARTICLE À RÉÉCRIRE ===`,
+      `Titre : ${article.title || ''}`,
+      `Catégorie : ${article.category_name || article.category || '—'}`,
+      ``,
+      `Contenu actuel (HTML) :`,
+      retryContext?.previousHtml || article.content_html || '<p></p>',
+      ``,
+    ];
+    if (retryContext?.feedback) {
+      userParts.push(retryContext.feedback);
+    } else {
+      userParts.push(`Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`);
+    }
+    const resp = await client().messages.create({
+      model: config.claudeModel,
+      max_tokens: 2048,
+      system: systemBlocks,
+      messages: [{ role: 'user', content: userParts.join('\n') }],
+    });
+    const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const { html, suggested_title } = _extractTitle(raw, article.title);
+    return { html, suggested_title, usage: resp.usage };
+  };
+
+  return _withSeoLoop(callClaude);
 }
 
 async function assistFaqGenerate({ question, categoryName = null }) {
   if (!question || !question.trim()) throw new Error('Question manquante');
   const corpus = buildBuildyCorpusContext({ mode: 'full' });
+  const fewShot = _buildFewShotBlock();
+
   const systemBlocks = [
     {
       type: 'text',
@@ -1153,24 +1391,38 @@ async function assistFaqGenerate({ question, categoryName = null }) {
       cache_control: { type: 'ephemeral' },
     },
   ];
-  const userPrompt = [
-    `=== QUESTION CLIENT ===`,
-    question.trim(),
-    ``,
-    categoryName ? `Catégorie cible : ${categoryName}` : null,
-    ``,
-    `Rédige l'article FAQ complet (titre + corps HTML).`,
-  ].filter(Boolean).join('\n');
+  if (fewShot) {
+    systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
+  }
 
-  const resp = await client().messages.create({
-    model: config.claudeModel,
-    max_tokens: 2048,
-    system: systemBlocks,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  const { html, suggested_title } = _extractTitle(raw, '');
-  return { html, suggested_title, usage: resp.usage };
+  const callClaude = async (retryContext) => {
+    const userParts = [
+      `=== QUESTION CLIENT ===`,
+      question.trim(),
+      ``,
+    ];
+    if (categoryName) userParts.push(`Catégorie cible : ${categoryName}`, '');
+
+    if (retryContext?.feedback) {
+      userParts.push(`=== ARTICLE GÉNÉRÉ AU 1ER PASSAGE ===`);
+      userParts.push(retryContext.previousHtml || '');
+      userParts.push('');
+      userParts.push(retryContext.feedback);
+    } else {
+      userParts.push(`Rédige l'article FAQ complet (titre + corps HTML).`);
+    }
+    const resp = await client().messages.create({
+      model: config.claudeModel,
+      max_tokens: 2048,
+      system: systemBlocks,
+      messages: [{ role: 'user', content: userParts.join('\n') }],
+    });
+    const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const { html, suggested_title } = _extractTitle(raw, '');
+    return { html, suggested_title, usage: resp.usage };
+  };
+
+  return _withSeoLoop(callClaude);
 }
 
 async function assistFaqSuggestMissing() {
@@ -1214,6 +1466,7 @@ module.exports = {
   getActivePromptLibrary,
   // FAQ Buildy / Crisp
   assistFaqRewrite, assistFaqGenerate, assistFaqSuggestMissing,
+  assistFaqRewriteTitle, assistFaqRewriteDescription,
   buildBuildyCorpusContext,
   PROMPT_KEY_FAQ_REWRITE,
   PROMPT_KEY_FAQ_GENERATE,

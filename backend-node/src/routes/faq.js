@@ -27,6 +27,19 @@ const {
   assistFaqSuggestMissing,
 } = require('../lib/claude');
 const { uploadImage } = require('../lib/faq-image-upload');
+const { scoreArticle, DEFAULT_KEYWORDS, invalidateKeywordsCache } = require('../lib/seo-scorer');
+
+// Recalcule et persiste le score SEO d'un article. Idempotent, lazy : à appeler
+// après save/pull/generate pour garder la colonne seo_score à jour.
+function recomputeSeoScore(article) {
+  if (!article || !article.id) return null;
+  const result = scoreArticle({
+    title: article.title || '',
+    contentHtml: article.content_html || '',
+  });
+  db.faqArticles.setSeoScore(article.id, { score: result.score, checks: result.checks });
+  return result;
+}
 
 // ── Schemas ────────────────────────────────────────────────────────
 const settingsSchema = z.object({
@@ -47,6 +60,7 @@ const categorySchema = z.object({
 
 const articleCreateSchema = z.object({
   title: z.string().min(1, 'Titre requis'),
+  description: z.string().max(160, 'Description max 160 caractères (limite Crisp)').nullable().optional(),
   content_html: z.string().nullable().optional(),
   category_id: z.number().int().positive().nullable().optional(),
   status: z.enum(['draft', 'published']).optional(),
@@ -98,6 +112,63 @@ async function routes(fastify) {
     const creds = loadCrispCredentials();
     if (!creds) return { ok: false, error: 'Credentials Crisp non configurés' };
     return testCrispConnection(creds);
+  });
+
+  // ── Whitelist mots-clés SEO (override DB de DEFAULT_KEYWORDS) ─────
+  const seoKeywordsSchema = z.object({
+    keywords: z.array(
+      z.string().trim().min(1, 'Mot-clé vide').max(60, 'Mot-clé trop long (max 60 chars)')
+    ).min(1, 'Au moins un mot-clé requis').max(200, 'Maximum 200 mots-clés'),
+  });
+
+  function dedupKeywords(arr) {
+    const seen = new Map();
+    for (const raw of arr) {
+      const trimmed = String(raw || '').trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (!seen.has(key)) seen.set(key, trimmed);
+    }
+    return Array.from(seen.values());
+  }
+
+  fastify.get('/faq/settings/seo-keywords', async () => {
+    const override = db.faqSettings.getSeoKeywords();
+    return {
+      keywords: override && override.length > 0 ? override : DEFAULT_KEYWORDS,
+      defaults: DEFAULT_KEYWORDS,
+      is_default: !override || override.length === 0,
+    };
+  });
+
+  fastify.put('/faq/settings/seo-keywords', async (request, reply) => {
+    const parsed = seoKeywordsSchema.safeParse(request.body || {});
+    if (!parsed.success) {
+      return reply.code(400).send({ detail: parsed.error.issues[0].message });
+    }
+    const cleaned = dedupKeywords(parsed.data.keywords);
+    if (cleaned.length === 0) {
+      return reply.code(400).send({ detail: 'Au moins un mot-clé non vide requis' });
+    }
+    db.faqSettings.setSeoKeywords(cleaned);
+    invalidateKeywordsCache();
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'faq.seo_keywords.update',
+      payload: { count: cleaned.length },
+    });
+    return { keywords: cleaned, defaults: DEFAULT_KEYWORDS, is_default: false };
+  });
+
+  fastify.post('/faq/settings/seo-keywords/reset', async (request) => {
+    db.faqSettings.resetSeoKeywords();
+    invalidateKeywordsCache();
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'faq.seo_keywords.reset',
+      payload: {},
+    });
+    return { keywords: DEFAULT_KEYWORDS, defaults: DEFAULT_KEYWORDS, is_default: true };
   });
 
   fastify.post('/faq/sync/pull', async (request, reply) => {
@@ -234,13 +305,34 @@ async function routes(fastify) {
     }
     const patch = {};
     if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+    if (parsed.data.description !== undefined) patch.description = parsed.data.description;
     if (parsed.data.content_html !== undefined) patch.contentHtml = parsed.data.content_html;
     if (parsed.data.category_id !== undefined) patch.categoryId = parsed.data.category_id;
     if (parsed.data.status !== undefined) patch.status = parsed.data.status;
     if (parsed.data.visibility !== undefined) patch.visibility = parsed.data.visibility;
     if (parsed.data.locale !== undefined) patch.locale = parsed.data.locale;
     patch.dirty = 1;
-    return db.faqArticles.update(id, patch, request.authUser?.id || null);
+    const updated = db.faqArticles.update(id, patch, request.authUser?.id || null);
+    // Recalcul SEO si le contenu ou le titre a changé
+    if (parsed.data.title !== undefined || parsed.data.content_html !== undefined) {
+      recomputeSeoScore(updated);
+    }
+    return db.faqArticles.getById(id);
+  });
+
+  // Endpoint dédié : retourne le score SEO + checks détaillés (pour le badge éditeur)
+  fastify.get('/faq/articles/:id/seo-score', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    // Recalcul live à chaque appel (pas de cache, c'est rapide)
+    const result = scoreArticle({
+      title: article.title || '',
+      contentHtml: article.content_html || '',
+    });
+    // Persiste pour les requêtes futures (few-shot examples picker)
+    db.faqArticles.setSeoScore(id, { score: result.score, checks: result.checks });
+    return result;
   });
 
   fastify.delete('/faq/articles/:id', async (request, reply) => {
@@ -286,6 +378,36 @@ async function routes(fastify) {
       return result;
     } catch (e) {
       log.warn(`FAQ AI rewrite ${articleId}: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  // Reformulation IA du titre uniquement
+  fastify.post('/faq/ai/rewrite-title', async (request, reply) => {
+    const articleId = parseInt(request.body?.article_id, 10);
+    if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
+    const article = db.faqArticles.getById(articleId);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    try {
+      const { assistFaqRewriteTitle } = require('../lib/claude');
+      return await assistFaqRewriteTitle({ article });
+    } catch (e) {
+      log.warn(`FAQ AI rewrite-title ${articleId}: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  // Reformulation / génération IA de la description (meta-description SEO)
+  fastify.post('/faq/ai/rewrite-description', async (request, reply) => {
+    const articleId = parseInt(request.body?.article_id, 10);
+    if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
+    const article = db.faqArticles.getById(articleId);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    try {
+      const { assistFaqRewriteDescription } = require('../lib/claude');
+      return await assistFaqRewriteDescription({ article });
+    } catch (e) {
+      log.warn(`FAQ AI rewrite-description ${articleId}: ${e.message}`);
       return reply.code(500).send({ detail: e.message });
     }
   });

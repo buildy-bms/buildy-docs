@@ -16,9 +16,12 @@
 <script>
 (function() {
   // ── Hide empty paragraphs (artefacts Crisp + Word imports) ─────────
+  // ATTENTION : ne pas masquer les <p><img></p> (Crisp wrappe les images
+  // en paragraphe sans texte) ni les autres médias.
   function cleanEmptyParagraphs() {
     var paragraphs = document.querySelectorAll('.csh-article article p, .csh-article-content-text p');
     paragraphs.forEach(function(p) {
+      if (p.querySelector('img, iframe, video, audio, svg, picture, embed, object')) return;
       var text = (p.textContent || '').replace(/[\s  ​]/g, ''); // espaces, U+00A0, U+202F, U+200B
       if (!text) p.style.display = 'none';
     });
@@ -28,7 +31,10 @@
     var debounce;
     new MutationObserver(function() {
       clearTimeout(debounce);
-      debounce = setTimeout(cleanEmptyParagraphs, 150);
+      debounce = setTimeout(function() {
+        cleanEmptyParagraphs();
+        injectArticleExcerpt();
+      }, 150);
     }).observe(document.body, { childList: true, subtree: true });
   }
 
@@ -45,6 +51,22 @@
         search.focus();
       }
     });
+  }
+
+  // ── Description sous le H1 d'article (meta description SEO) ─────
+  function injectArticleExcerpt() {
+    var header = document.querySelector('.csh-article .csh-article-content-header');
+    if (!header || header.dataset.excerptInjected) return;
+    var h1 = header.querySelector('h1');
+    if (!h1) return;
+    var meta = document.querySelector('meta[name="description"]');
+    var text = meta ? (meta.getAttribute('content') || '').trim() : '';
+    if (!text) return;
+    header.dataset.excerptInjected = '1';
+    var p = document.createElement('p');
+    p.className = 'buildy-article-excerpt';
+    p.textContent = text;
+    h1.insertAdjacentElement('afterend', p);
   }
 
   // ── Compteur d'articles par catégorie sur la home ────────────────
@@ -81,6 +103,7 @@
     startObserver();
     bindSearchShortcut();
     injectCategoryCounts();
+    injectArticleExcerpt();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -973,6 +996,19 @@ article.csh-text-wrap > *:first-child {
   border-bottom: none !important;
   padding: 0 !important;
   margin: 0 0 28px 0 !important;
+}
+
+/* Description SEO injectée sous le H1 — chapeau gris navy lead */
+.csh-article .csh-article-content-header .buildy-article-excerpt {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 1.0625rem !important;
+  line-height: 1.55 !important;
+  color: #4a5568 !important;
+  font-weight: 400 !important;
+  margin: 14px 0 0 0 !important;
+  padding: 0 !important;
+  letter-spacing: 0 !important;
+  max-width: 70ch !important;
 }
 
 /* H2 — 1.6rem, weight 600 */
