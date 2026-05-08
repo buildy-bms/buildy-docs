@@ -39,12 +39,26 @@ function hasNotes(htmlOrText) {
 const { error } = useNotification()
 const { confirm } = useConfirm()
 
-// Liste des zones du document, alimentée par le store : nécessaire au
-// sélecteur DeviceZoneSharing par équipement. On lit auditStore.zones
-// directement plutôt que via storeToRefs — l'unwrap auto Vue + Pinia
-// state est déjà réactif, et la version storeToRefs causait une liste
-// vide côté DeviceZoneSharing dans certains contextes.
+// Liste des zones du document, alimentée par les systèmes existants
+// (chacun porte zone_id + zone_name via JOIN backend). C'est plus
+// robuste que auditStore.zones qui dépend de site_id : un audit sans
+// site rattaché n'a pas son store.zones rempli, mais ses systèmes ont
+// toujours leur zone_id puisque c'est une FK obligatoire.
 const auditStore = useAuditStore()
+const documentZones = computed(() => {
+  const map = new Map()
+  for (const s of auditStore.systems || []) {
+    if (s.zone_id != null && !map.has(s.zone_id)) {
+      map.set(s.zone_id, { zone_id: s.zone_id, name: s.zone_name || `Zone #${s.zone_id}` })
+    }
+  }
+  // Complète avec les zones du store si dispo (au cas où l'audit a des
+  // zones définies sans système matricé encore).
+  for (const z of auditStore.zones || []) {
+    if (!map.has(z.zone_id)) map.set(z.zone_id, { zone_id: z.zone_id, name: z.name })
+  }
+  return [...map.values()]
+})
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
@@ -291,7 +305,7 @@ async function removeDevice(d) {
                         hasNotes(d.notes_html || d.notes)
                           ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                           : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
-                      :title="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                      v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                 <PencilSquareIcon class="w-3.5 h-3.5" />
                 <span v-if="hasNotes(d.notes_html || d.notes)">Notes</span>
                 <span v-else>+ Notes</span>
@@ -304,7 +318,7 @@ async function removeDevice(d) {
                                (photosByDevice[d.id] || []).length
                                  ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
                                  : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
-                      :title="`${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`">
+                      v-tooltip="`${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`">
                 <CameraIcon class="w-3.5 h-3.5" />
                 <span v-if="(photosByDevice[d.id] || []).length">{{ (photosByDevice[d.id] || []).length }}</span>
                 <span v-else>+ Photo</span>
@@ -314,13 +328,13 @@ async function removeDevice(d) {
               <DeviceZoneSharing
                 :device="d"
                 :origin-zone-id="system.zone_id"
-                :zones="auditStore.zones"
+                :zones="documentZones"
                 @updated="emit('changed')" />
               <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
-              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" title="Dupliquer">
+              <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" v-tooltip="'Dupliquer'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
-              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition" title="Supprimer">
+              <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition" v-tooltip="'Supprimer'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </div>
@@ -390,19 +404,19 @@ async function removeDevice(d) {
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
                         :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
-                        title="Communication câblée vers la GTB">
+                        v-tooltip="'Communication câblée vers la GTB'">
                   <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
                         :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
-                        title="R175-3 4° — Arrêt manuel possible">
+                        v-tooltip="'R175-3 4° — Arrêt manuel possible'">
                   <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
                         :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
-                        title="R175-3 4° — Reprise autonome de la GTB">
+                        v-tooltip="'R175-3 4° — Reprise autonome de la GTB'">
                   <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
                 </button>
                 <!-- HS = pill destructive (rouge si actif), regroupée avec

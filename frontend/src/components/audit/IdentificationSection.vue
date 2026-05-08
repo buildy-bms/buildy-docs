@@ -65,7 +65,7 @@ const r175_6_applicable = computed(() => {
   <CollapsibleSection storage-key="identification" section-id="section-identification" :active="active">
     <template #header>
       <SectionHeader number="1"
-                     :title="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
+                     v-tooltip="audit.isBacs ? 'Identification du site &amp; applicabilité R175-2' : 'Identification du site'"
                      :icon="BuildingOffice2Icon" icon-color="text-indigo-600"
                      :step="step"
                      @validate="emit('validate-step', $event)"
@@ -94,7 +94,7 @@ const r175_6_applicable = computed(() => {
                  class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
           <button @click="emit('recompute-power')"
                   class="px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap"
-                  title="Cumul automatique des équipements chauffage + climatisation du site">
+                  v-tooltip="'Cumul automatique des équipements chauffage + climatisation du site'">
             <ArrowPathIcon class="w-3.5 h-3.5 inline-block -mt-0.5" /> Auto-calculer
           </button>
         </div>

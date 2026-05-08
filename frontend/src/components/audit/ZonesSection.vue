@@ -115,7 +115,7 @@ onBeforeUnmount(teardownZonesSortable)
 <template>
   <CollapsibleSection storage-key="zones" section-id="section-zones" :active="active">
     <template #header>
-      <SectionHeader number="2" title="Zones fonctionnelles"
+      <SectionHeader number="2" v-tooltip="'Zones fonctionnelles'"
                      :subtitle="audit.isBacs ? 'R175-1 6° — usages homogènes' : 'Découpage du site'"
                      :icon="MapPinIcon" icon-color="text-indigo-600"
                      :step="step"
@@ -160,7 +160,7 @@ onBeforeUnmount(teardownZonesSortable)
             <td class="text-center align-middle">
               <button type="button"
                       class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                      title="Glisser pour réordonner">
+                      v-tooltip="'Glisser pour réordonner'">
                 <Bars3Icon class="w-4 h-4" />
               </button>
             </td>
@@ -190,7 +190,7 @@ onBeforeUnmount(teardownZonesSortable)
                   hasNotes(z.notes_html || z.notes)
                     ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                     : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-                title="Editer les notes (avec assistance Claude)">
+                v-tooltip="'Editer les notes (avec assistance Claude)'">
                 <PencilSquareIcon class="w-4 h-4" />
                 {{ hasNotes(z.notes_html || z.notes) ? 'Notes' : '+ Notes' }}
               </button>
@@ -203,10 +203,10 @@ onBeforeUnmount(teardownZonesSortable)
                 :label="z.name" />
             </td>
             <td class="px-5 py-2 text-right whitespace-nowrap">
-              <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+              <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
-              <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+              <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>

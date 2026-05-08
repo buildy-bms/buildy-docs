@@ -102,7 +102,7 @@ onBeforeUnmount(teardownSortable)
 <template>
   <CollapsibleSection storage-key="thermal" section-id="section-thermal" :active="active">
     <template #header>
-      <SectionHeader number="5" title="Régulation thermique automatique"
+      <SectionHeader number="5" v-tooltip="'Régulation thermique automatique'"
                      subtitle="R175-6"
                      :icon="FireIcon" icon-color="text-red-500"
                      :step="step"
@@ -175,7 +175,7 @@ onBeforeUnmount(teardownSortable)
           <td class="text-center align-middle">
             <button type="button"
                     class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                    title="Glisser pour réordonner">
+                    v-tooltip="'Glisser pour réordonner'">
               <Bars3Icon class="w-4 h-4" />
             </button>
           </td>
@@ -287,7 +287,7 @@ onBeforeUnmount(teardownSortable)
                       hasNotes(t.notes_html || t.notes)
                         ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                         : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
-                    :title="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                    v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes' : 'Ajouter une note'">
               <PencilSquareIcon class="w-3.5 h-3.5" />
               {{ hasNotes(t.notes_html || t.notes) ? 'Notes' : '+ Notes' }}
             </button>

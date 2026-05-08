@@ -124,7 +124,7 @@ function hasNotes(html) {
   <CollapsibleSection storage-key="bms" section-id="section-bms" :active="active">
     <template #header>
       <SectionHeader :number="audit.isBacs ? '6' : '5'"
-                     :title="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
+                     v-tooltip="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
                      :subtitle="audit.isBacs ? 'R175-3 + R175-4 + R175-5' : 'Inventaire du superviseur en place'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-purple-600"
                      :step="step"
@@ -143,7 +143,7 @@ function hasNotes(html) {
               hasNotes(bms.notes_html)
                 ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-            title="Editer les notes GTB">
+            v-tooltip="'Editer les notes GTB'">
             <PencilSquareIcon class="w-4 h-4" />
             {{ hasNotes(bms.notes_html) ? 'Notes' : '+ Notes' }}
           </button>

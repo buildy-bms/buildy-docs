@@ -108,7 +108,7 @@ onBeforeUnmount(teardownMetersSortable)
 <template>
   <CollapsibleSection storage-key="meters" section-id="section-meters" :active="active">
     <template #header>
-      <SectionHeader number="4" title="Compteurs et mesurage"
+      <SectionHeader number="4" v-tooltip="'Compteurs et mesurage'"
                      :subtitle="audit.isBacs ? 'R175-3 1° — suivi continu, pas horaire, conservation 5 ans' : 'Compteurs présents et raccordés'"
                      :icon="BoltIcon" icon-color="text-emerald-600"
                      :step="step"
@@ -156,13 +156,13 @@ onBeforeUnmount(teardownMetersSortable)
           <td class="text-center align-middle">
             <button type="button"
                     class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                    title="Glisser pour réordonner">
+                    v-tooltip="'Glisser pour réordonner'">
               <Bars3Icon class="w-4 h-4" />
             </button>
           </td>
           <td class="px-5 py-2 text-gray-700 text-center">
             <span v-if="m.required && !m.present_actual && !m.out_of_service"
-                  class="text-red-600 mr-1" title="Compteur requis non présent">⚠</span>
+                  class="text-red-600 mr-1" v-tooltip="'Compteur requis non présent'">⚠</span>
             {{ m.zone_name || 'Compteur général' }}
           </td>
           <td class="py-2.5 text-center"><MeterTypePill :type="m.meter_type" /></td>
@@ -172,13 +172,13 @@ onBeforeUnmount(teardownMetersSortable)
               <button type="button"
                       @click="patchMeter(m, { required: !m.required })"
                       :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']"
-                      :title="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
+                      v-tooltip="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
                 <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span> Requis
               </button>
               <button type="button"
                       @click="patchMeter(m, { present_actual: !m.present_actual })"
                       :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']"
-                      :title="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
+                      v-tooltip="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
                 <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span> Présent
               </button>
               <button v-if="m.present_actual" type="button"
@@ -191,7 +191,7 @@ onBeforeUnmount(teardownMetersSortable)
               <button v-if="m.present_actual" type="button"
                       @click="patchMeter(m, { wired: !m.wired })"
                       :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']"
-                      title="Communication câblée vers la GTB">
+                      v-tooltip="'Communication câblée vers la GTB'">
                 <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
               </button>
             </div>
@@ -213,7 +213,7 @@ onBeforeUnmount(teardownMetersSortable)
                 hasNotes(m.notes_html || m.notes)
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                   : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-              title="Editer les notes">
+              v-tooltip="'Editer les notes'">
               <PencilSquareIcon class="w-4 h-4" />
               {{ hasNotes(m.notes_html || m.notes) ? 'Notes' : '+ Notes' }}
             </button>
@@ -232,10 +232,10 @@ onBeforeUnmount(teardownMetersSortable)
                    class="rounded border-gray-300" />
           </td>
           <td class="px-5 py-2.5 text-right whitespace-nowrap">
-            <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" title="Dupliquer">
+            <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
               <DocumentDuplicateIcon class="w-4 h-4" />
             </button>
-            <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+            <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>
@@ -268,7 +268,7 @@ onBeforeUnmount(teardownMetersSortable)
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span v-if="m.required && !m.present_actual && !m.out_of_service"
-                    class="text-red-600" title="Compteur requis non présent">⚠</span>
+                    class="text-red-600" v-tooltip="'Compteur requis non présent'">⚠</span>
               <span class="font-medium text-sm text-gray-800 truncate">
                 {{ m.zone_name || 'Compteur général' }}
               </span>

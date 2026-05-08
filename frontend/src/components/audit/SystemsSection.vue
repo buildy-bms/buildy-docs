@@ -118,7 +118,7 @@ onBeforeUnmount(teardownSortables)
 <template>
   <CollapsibleSection storage-key="systems" section-id="section-systems" :active="active">
     <template #header>
-      <SectionHeader number="3" title="Systèmes techniques par zone"
+      <SectionHeader number="3" v-tooltip="'Systèmes techniques par zone'"
                      :subtitle="audit.isBacs ? 'R175-1 4° + R175-3 3°, 4°' : 'Inventaire des systèmes'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-indigo-600"
                      :step="step"
@@ -156,7 +156,7 @@ onBeforeUnmount(teardownSortables)
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
             <button type="button" @click="emit('toggle-zone-collapsed', g.zone_id)"
                     class="p-1 -ml-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
-                    :title="collapsedZones.has(g.zone_id) ? 'Déplier la zone' : 'Replier la zone'">
+                    v-tooltip="collapsedZones.has(g.zone_id) ? 'Déplier la zone' : 'Replier la zone'">
               <ChevronDownIcon v-if="collapsedZones.has(g.zone_id)" class="w-4 h-4" />
               <ChevronUpIcon v-else class="w-4 h-4" />
             </button>
@@ -192,12 +192,12 @@ onBeforeUnmount(teardownSortables)
                      :style="'grid-template-columns: 20px 20px 28px 240px 90px 240px minmax(0, 1fr);'">
                   <button type="button"
                           class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                          title="Glisser pour réordonner">
+                          v-tooltip="'Glisser pour réordonner'">
                     <Bars3Icon class="w-3.5 h-3.5" />
                   </button>
                   <button v-if="s.present" type="button" @click="emit('toggle-system-collapsed', s.id)"
                           class="p-0.5 -ml-0.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition shrink-0"
-                          :title="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
+                          v-tooltip="collapsedSystems.has(s.id) ? 'Déplier la catégorie' : 'Replier la catégorie'">
                     <ChevronDownIcon v-if="collapsedSystems.has(s.id)" class="w-3.5 h-3.5" />
                     <ChevronUpIcon v-else class="w-3.5 h-3.5" />
                   </button>

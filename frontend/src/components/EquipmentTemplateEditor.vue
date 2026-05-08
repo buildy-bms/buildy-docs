@@ -449,7 +449,7 @@ async function destroy() {
 </script>
 
 <template>
-  <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
+  <BaseModal v-tooltip="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
     <!-- Bandeau statut de validation de la description (mig 89). -->
     <div v-if="isEdit"
          :class="['flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md border text-sm',
@@ -493,10 +493,10 @@ async function destroy() {
         <div class="flex flex-wrap items-center gap-1.5 px-2 py-1.5 min-h-10 bg-white border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-500 transition">
           <span v-for="s in linkedSections" :key="s.id"
                 class="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs">
-            <span class="truncate max-w-[24rem]" :title="s.path">{{ s.path }}</span>
+            <span class="truncate max-w-[24rem]" v-tooltip="s.path">{{ s.path }}</span>
             <button type="button" @click="removeParent(s)" :disabled="savingLink"
                     class="inline-flex items-center justify-center w-4 h-4 text-indigo-400 hover:text-white hover:bg-indigo-500 rounded-full transition disabled:opacity-50"
-                    title="Délier">
+                    v-tooltip="'Délier'">
               <XMarkIcon class="w-3 h-3" />
             </button>
           </span>
@@ -539,7 +539,7 @@ async function destroy() {
                    placeholder="Ex : Pompe à chaleur air/eau"
                    class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
             <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.name.trim()"
-                    :title="form.name.trim() ? 'Proposer un meilleur nom avec Claude' : 'Saisir d\'abord un nom'"
+                    v-tooltip="form.name.trim() ? 'Proposer un meilleur nom avec Claude' : 'Saisir d\'abord un nom'"
                     class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
               <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
             </button>
@@ -555,7 +555,7 @@ async function destroy() {
               Appliquer
             </button>
             <button type="button" @click="dismissSuggestedTitle"
-                    class="text-violet-400 hover:text-violet-700 shrink-0" title="Ignorer">
+                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
           </div>
@@ -658,7 +658,7 @@ async function destroy() {
         <div v-if="iconSearch.trim()" class="bg-white border border-gray-200 rounded-lg p-1.5 mt-1.5 max-h-28 overflow-y-auto grid grid-cols-10 gap-0.5">
           <button v-for="name in filteredIcons" :key="name" type="button" @click="selectIconName(name)"
                   :class="['inline-flex items-center justify-center w-7 h-7 rounded-md transition', form.icon_value === 'fa-' + name ? 'bg-indigo-100 ring-1 ring-indigo-400' : 'hover:bg-gray-100']"
-                  :title="name">
+                  v-tooltip="name">
             <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: 'fa-' + name, icon_color: form.icon_color }" size="sm" />
           </button>
           <p v-if="!filteredIcons.length" class="col-span-10 text-[11px] text-gray-400 italic text-center py-2">
@@ -670,8 +670,8 @@ async function destroy() {
           <span class="text-[11px] text-gray-500 mr-1">Couleur</span>
           <button v-for="c in COLOR_PRESETS" :key="c" type="button" @click="selectColor(c)"
                   :class="['w-4 h-4 rounded-full border-2 transition', form.icon_color === c ? 'border-gray-700 scale-110' : 'border-white ring-1 ring-gray-200']"
-                  :style="{ background: c }" :title="c"></button>
-          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" title="Couleur personnalisée" />
+                  :style="{ background: c }" v-tooltip="c"></button>
+          <input type="color" v-model="form.icon_color" class="w-5 h-5 rounded cursor-pointer ml-1 border border-gray-200" v-tooltip="'Couleur personnalisée'" />
         </div>
       </div>
       </fieldset>
@@ -718,7 +718,7 @@ async function destroy() {
               @click="addCustomProtocol"
               :disabled="!customProtocol.trim()"
               class="px-2 py-1 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Ajouter ce protocole à la liste"
+              v-tooltip="'Ajouter ce protocole à la liste'"
             >Ajouter</button>
           </div>
         </div>
@@ -808,7 +808,7 @@ async function destroy() {
       </button>
       <button v-else-if="isEdit"
               @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              :title="canValidate ? '' : 'Aucune description à valider'"
+              v-tooltip="canValidate ? '' : 'Aucune description à valider'"
               class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
         <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider la description' }}
       </button>
@@ -818,7 +818,7 @@ async function destroy() {
       </button>
       <button v-if="isEdit"
               @click="submitKeepOpen" :disabled="submitting || !form.name.trim()"
-              title="Enregistrer sans fermer"
+              v-tooltip="'Enregistrer sans fermer'"
               class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
         {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
