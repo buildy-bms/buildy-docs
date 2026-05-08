@@ -26,6 +26,8 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import { ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 import {
   getBacsChecklist, getBacsPhotoCoverage, updateBacsChecklistItem,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -225,13 +227,22 @@ async function removeFile(f) {
   } catch { error('Suppression impossible') }
 }
 
-// ─── Quick toggle « Non disponible » depuis la card ────────────────
+// ─── Quick toggle « Non disponible » avec optimistic update ─────────
+// On modifie l'objet en place (Vue détecte le changement de status sans
+// re-render la ligne entière). Pas de `load()` derrière → pas de
+// clignotement. Le serveur confirme en arrière-plan.
 async function quickToggleNotAvailable(item) {
   const newStatus = item.status === 'not_available' ? 'pending' : 'not_available'
+  const prev = item.status
+  item.status = newStatus
   try {
-    await updateBacsChecklistItem(props.docId, item.catalog_key, { status: newStatus })
-    await load()
-  } catch { error('Mise à jour impossible') }
+    const { data } = await updateBacsChecklistItem(props.docId, item.catalog_key, { status: newStatus })
+    item.id = data.id
+    item.status = data.status
+  } catch {
+    item.status = prev
+    error('Mise à jour impossible')
+  }
 }
 
 // ─── Drag-drop direct sur une ligne d'item (sans ouvrir la modale) ──
@@ -295,11 +306,15 @@ defineExpose({ refresh: load })
 </script>
 
 <template>
-  <CollapsibleSection
-    :icon="CheckIcon" :title="'Documents & photos collectées'"
-    :subtitle="`${totalScore} / ${totalPossible} collectés (${completionPct}%)`"
-    :step="step" :active="active" :anchor-id="'docs-checklist'"
-    @validate-step="emit('validate-step')" @invalidate-step="emit('invalidate-step')">
+  <CollapsibleSection storage-key="docs-checklist" section-id="section-docs-checklist" :active="active">
+    <template #header>
+      <SectionHeader number="8" title="Check-list documentaire"
+                     :subtitle="`${totalScore} / ${totalPossible} collectés (${completionPct}%)`"
+                     :icon="ClipboardDocumentCheckIcon" icon-color="text-indigo-600"
+                     :step="step"
+                     @validate="emit('validate-step', $event)"
+                     @invalidate="emit('invalidate-step', $event)" />
+    </template>
 
     <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-400">Chargement…</div>
 
@@ -374,12 +389,17 @@ defineExpose({ refresh: load })
             <!-- Actions inline -->
             <div class="flex items-center gap-1 shrink-0">
               <BacsPhotoButton
-                v-if="document?.site_uuid && item.id"
+                v-if="document?.site_uuid"
                 :site-uuid="document.site_uuid"
                 :attach-to="{ checklist_id: item.id }"
                 :label="item.label"
                 size="sm"
                 @changed="load({ silent: true })" />
+              <span v-else
+                    v-tooltip="'Rattacher un site à l\'audit pour activer les photos'"
+                    class="inline-flex items-center justify-center w-7 h-7 text-gray-300 bg-gray-50 border border-gray-200 rounded-md cursor-not-allowed">
+                <CameraIcon class="w-3.5 h-3.5" />
+              </span>
               <button type="button" @click.stop="openItem(item)"
                       v-tooltip="'Notes & fichiers'"
                       class="inline-flex items-center justify-center w-7 h-7 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100">
