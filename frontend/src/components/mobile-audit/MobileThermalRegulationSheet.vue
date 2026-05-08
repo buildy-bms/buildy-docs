@@ -11,9 +11,10 @@
  * - Cartes cliquables plein-largeur pour les toggles (zone tap >= 44pt) ;
  *   la checkbox visuelle reste à droite mais c'est tout le bloc qui est
  *   un button.
- * - Granularité (4 options fixes) : <select> natif iOS.
- * - Type/régulations creatable : SearchableSelect (déjà tactile via
- *   min-h-11 cf. mémoire feedback_searchable_select_creatable).
+ * - Toutes les listes déroulantes utilisent `<MobileNativeSelect>` =
+ *   `<select>` natif (picker système iOS). Les listes creatable (type
+ *   production, régulations P/D/E) ajoutent une option « ✏️ Autre —
+ *   saisir » qui révèle un input texte sous le select.
  * - Inputs numériques : inputmode="numeric" pattern="[0-9]*".
  * - Auto-save 400 ms (identique au comportement précédent), donc le sheet
  *   n'a pas de bouton « Enregistrer » dans son header (hide-save).
@@ -25,7 +26,7 @@ import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
-import SearchableSelect from '@/components/SearchableSelect.vue'
+import MobileNativeSelect from './MobileNativeSelect.vue'
 import {
   PRODUCTION_REGULATION_OPTIONS,
   DISTRIBUTION_REGULATION_OPTIONS,
@@ -160,22 +161,22 @@ async function patch(p) {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">🔧 Production</p>
           <MobileField label="Équipement de production">
-            <SearchableSelect
+            <MobileNativeSelect
               :model-value="thermalRow.generator_device_id"
-              @update:modelValue="v => patch({ generator_device_id: v != null ? parseInt(v, 10) : null })"
+              @update:modelValue="v => patch({ generator_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="deviceOptions"
               placeholder="— aucun équipement"
-              search-placeholder="Rechercher un équipement…"
             />
           </MobileField>
           <div v-if="thermalRow.generator_device_id" class="space-y-3 pl-4 border-l-4 border-amber-300">
             <MobileField label="Type de production">
-              <SearchableSelect
+              <MobileNativeSelect
                 :model-value="thermalRow.generator_type"
                 @update:modelValue="v => patch({ generator_type: v || null })"
                 :options="GENERATOR_OPTIONS"
                 creatable
-                placeholder="ex : pompe à chaleur, chaudière…"
+                placeholder="— Sélectionner —"
+                custom-placeholder="ex : chaudière condensation, PAC air-eau…"
               />
             </MobileField>
             <MobileField label="Âge de l'équipement (années)">
@@ -188,12 +189,13 @@ async function patch(p) {
               />
             </MobileField>
             <MobileField label="Régulation côté production">
-              <SearchableSelect
+              <MobileNativeSelect
                 :model-value="thermalRow.production_regulation"
                 @update:modelValue="v => patch({ production_regulation: v || null })"
                 :options="PRODUCTION_REGULATION_OPTIONS"
                 creatable
-                placeholder="ex : sonde extérieure…"
+                placeholder="— Sélectionner —"
+                custom-placeholder="ex : sonde extérieure…"
               />
             </MobileField>
           </div>
@@ -203,22 +205,22 @@ async function patch(p) {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">🚰 Distribution</p>
           <MobileField label="Équipement de distribution">
-            <SearchableSelect
+            <MobileNativeSelect
               :model-value="thermalRow.distribution_device_id"
-              @update:modelValue="v => patch({ distribution_device_id: v != null ? parseInt(v, 10) : null })"
+              @update:modelValue="v => patch({ distribution_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="deviceOptions"
               placeholder="— aucune (DRV, poêle…)"
-              search-placeholder="Rechercher un équipement…"
             />
           </MobileField>
           <div v-if="thermalRow.distribution_device_id" class="pl-4 border-l-4 border-amber-300">
             <MobileField label="Régulation côté distribution">
-              <SearchableSelect
+              <MobileNativeSelect
                 :model-value="thermalRow.distribution_regulation"
                 @update:modelValue="v => patch({ distribution_regulation: v || null })"
                 :options="DISTRIBUTION_REGULATION_OPTIONS"
                 creatable
-                placeholder="ex : pompe ΔP variable…"
+                placeholder="— Sélectionner —"
+                custom-placeholder="ex : pompe ΔP variable…"
               />
             </MobileField>
           </div>
@@ -228,22 +230,22 @@ async function patch(p) {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">♨️ Émission</p>
           <MobileField label="Équipement d'émission">
-            <SearchableSelect
+            <MobileNativeSelect
               :model-value="thermalRow.emission_device_id"
-              @update:modelValue="v => patch({ emission_device_id: v != null ? parseInt(v, 10) : null })"
+              @update:modelValue="v => patch({ emission_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="deviceOptions"
               placeholder="— aucun"
-              search-placeholder="Rechercher un équipement…"
             />
           </MobileField>
           <div v-if="thermalRow.emission_device_id" class="pl-4 border-l-4 border-amber-300">
             <MobileField label="Régulation côté émission">
-              <SearchableSelect
+              <MobileNativeSelect
                 :model-value="thermalRow.emission_regulation"
                 @update:modelValue="v => patch({ emission_regulation: v || null })"
                 :options="EMISSION_REGULATION_OPTIONS"
                 creatable
-                placeholder="ex : robinets thermostatiques…"
+                placeholder="— Sélectionner —"
+                custom-placeholder="ex : robinets thermostatiques…"
               />
             </MobileField>
           </div>
