@@ -17,9 +17,7 @@ function client() {
   return _client;
 }
 
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-}
+const { stripHtml } = require('./text-utils');
 
 /**
  * Construit le prompt SYSTEM (cache-friendly : invariant entre sections d'une
@@ -1161,6 +1159,9 @@ function _buildSeoFeedbackPrompt(html, scoreResult) {
 }
 
 // Wrapper auto-rewrite : génère, score, retry une fois si < 70.
+// Coupe la boucle si Claude n'arrive pas à progresser (cas pathologique :
+// contenu structurellement bas-score, ex. article très court). Économise
+// une 2e passe Claude inutile.
 async function _withSeoLoop(genFn, { targetScore = 70, maxRetries = 1 } = {}) {
   let result = await genFn(null);
   let evaluation = scoreArticle({ title: result.suggested_title || '', contentHtml: result.html });
@@ -1169,10 +1170,13 @@ async function _withSeoLoop(genFn, { targetScore = 70, maxRetries = 1 } = {}) {
     const feedback = _buildSeoFeedbackPrompt(result.html, evaluation);
     const next = await genFn({ previousHtml: result.html, feedback });
     const nextEval = scoreArticle({ title: next.suggested_title || result.suggested_title || '', contentHtml: next.html });
-    // On garde la meilleure des 2 passes (pas la dernière forcément)
-    if (nextEval.score >= evaluation.score) {
+    // On garde la meilleure des 2 passes.
+    if (nextEval.score > evaluation.score) {
       result = next;
       evaluation = nextEval;
+    } else {
+      // Aucune progression : pas la peine de retry de plus, on accepte le score.
+      break;
     }
     attempts++;
   }
@@ -1275,6 +1279,56 @@ async function assistFaqRewriteTitle({ article }) {
   const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
   const title = _cleanInline(raw).slice(0, 200);
   return { title, usage: resp.usage };
+}
+
+// Réécriture IA d'une sélection HTML dans l'éditeur (BubbleMenu Tiptap).
+// Renvoie { html } prêt à être inséré en remplacement de la sélection.
+// L'instruction est optionnelle (« raccourcir », « rendre plus pédagogue », ...).
+async function assistFaqRewriteSelection({ selectionHtml, instruction = '', article = null }) {
+  if (!selectionHtml || !selectionHtml.trim()) {
+    throw new Error('Sélection vide');
+  }
+  const systemText = [
+    `Tu es un rédacteur SEO spécialisé en supervision technique du bâtiment (GTB) pour Buildy.`,
+    `Tu réécris UNIQUEMENT le passage HTML fourni (article FAQ Buildy / Crisp Helpdesk),`,
+    `en respectant l'instruction utilisateur si elle est donnée. Sinon améliore clarté + lisibilité.`,
+    ``,
+    `RÈGLES STRICTES :`,
+    `- Ne sors JAMAIS du périmètre du passage. Pas d'ajout d'intro/conclusion/section nouvelle.`,
+    `- Conserve la même structure HTML que l'entrée (mêmes balises de niveau supérieur :`,
+    `  si l'entrée est <p>...</p>, sors <p>...</p>. Si <li>, sors <li>. Si plusieurs blocs,`,
+    `  même nombre de blocs).`,
+    `- Garde les <strong>, <em>, <a href> existants si pertinents (ne casse pas les liens internes).`,
+    `- Ne change pas le sens du passage. Reformule, pas de fabrication.`,
+    `- Mots-clés métier (GTB, supervision, hypervision, BACnet, etc.) : utilise-les si naturels`,
+    `  pour le sujet, sinon ne force pas.`,
+    `- N'ajoute pas de commentaire HTML <!-- --> ni de marker TITLE/DESCRIPTION.`,
+    ``,
+    `RÉPONSE : UNIQUEMENT le HTML réécrit, rien d'autre. Pas de préambule "Voici", pas de`,
+    `guillemets, pas de balises de code (\`\`\`), pas d'explication.`,
+  ].join('\n');
+  const userText = [
+    instruction ? `Instruction : ${instruction.trim()}` : `Instruction : aucune (améliore clarté/lisibilité).`,
+    article?.title ? `Contexte article : « ${article.title} »` : null,
+    ``,
+    `Passage HTML à réécrire :`,
+    selectionHtml,
+  ].filter(Boolean).join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 1500,
+    system: [{ type: 'text', text: systemText }],
+    messages: [{ role: 'user', content: userText }],
+  });
+  const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  // Nettoie : strip code fences ``` éventuels, strip markers HTML commentaires.
+  const html = raw
+    .replace(/^```(?:html)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .replace(/<!--\s*(?:TITLE|DESCRIPTION):[\s\S]*?-->/gi, '')
+    .trim();
+  return { html, usage: resp.usage };
 }
 
 // Reformulation / génération IA de la description (meta-description SEO).
@@ -1466,7 +1520,7 @@ module.exports = {
   getActivePromptLibrary,
   // FAQ Buildy / Crisp
   assistFaqRewrite, assistFaqGenerate, assistFaqSuggestMissing,
-  assistFaqRewriteTitle, assistFaqRewriteDescription,
+  assistFaqRewriteTitle, assistFaqRewriteDescription, assistFaqRewriteSelection,
   buildBuildyCorpusContext,
   PROMPT_KEY_FAQ_REWRITE,
   PROMPT_KEY_FAQ_GENERATE,

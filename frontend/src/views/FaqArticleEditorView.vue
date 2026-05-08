@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import {
   ChevronLeftIcon, ArrowUpOnSquareIcon, SparklesIcon, TrashIcon,
   CheckCircleIcon, ArrowTopRightOnSquareIcon,
@@ -200,6 +200,33 @@ onMounted(async () => {
   }
 })
 
+// ── Garde-fou perte de données ──────────────────────────────────────
+// 1. Fermeture onglet / refresh navigateur : prompt natif beforeunload.
+// 2. Navigation Vue Router interne (ex: clic sidebar) : confirm modal.
+function beforeUnloadHandler(e) {
+  if (!dirty.value) return
+  e.preventDefault()
+  e.returnValue = '' // Chrome exige cette assignation pour afficher le prompt.
+  return ''
+}
+
+onMounted(() => { window.addEventListener('beforeunload', beforeUnloadHandler) })
+onBeforeUnmount(() => { window.removeEventListener('beforeunload', beforeUnloadHandler) })
+
+onBeforeRouteLeave(async (to, from) => {
+  if (!dirty.value) return true
+  // Pas de confirm pour la navigation interne dans le même article (rare mais possible).
+  if (to.name === from.name && to.params.id === from.params.id) return true
+  const ok = await confirm({
+    title: 'Quitter sans enregistrer ?',
+    message: 'Les modifications de cet article ne sont pas sauvegardées. Elles seront perdues si tu quittes maintenant.',
+    confirmLabel: 'Quitter',
+    cancelLabel: 'Rester sur la page',
+    danger: true,
+  })
+  return ok
+})
+
 watch(() => props.id, async (newId) => {
   if (!newId) return
   loading.value = true
@@ -230,12 +257,36 @@ async function save() {
       category_id: draft.value.category_id,
       status: draft.value.status,
       visibility: draft.value.visibility,
+      // Optimistic locking : empêche un second onglet d'écraser nos changements.
+      expected_updated_at: original.value?.updated_at,
     })
     original.value = data
     success('Enregistré')
     loadSeoScore() // recalcule le score SEO après save
   } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec')
+    if (e.response?.status === 409) {
+      const ok = await confirm({
+        title: 'Conflit de version',
+        message: 'Cet article a été modifié dans un autre onglet ou par un autre utilisateur. Recharge la dernière version (tes modifications seront perdues), ou copie-colle ton texte avant de recharger.',
+        confirmLabel: 'Recharger',
+        cancelLabel: 'Garder mes modifications',
+        danger: true,
+      })
+      if (ok) {
+        const fresh = await store.loadArticle(parseInt(props.id, 10))
+        original.value = fresh
+        draft.value = {
+          title: fresh.title || '',
+          description: fresh.description || '',
+          content_html: fresh.content_html || '',
+          category_id: fresh.category_id || null,
+          status: fresh.status || 'draft',
+          visibility: fresh.visibility || 'public',
+        }
+      }
+    } else {
+      notifyError(e.response?.data?.detail || 'Échec')
+    }
   } finally {
     saving.value = false
   }
@@ -360,7 +411,8 @@ function back() {
             <ArrowUpOnSquareIcon class="w-4 h-4 shrink-0" />
             Publier vers Crisp
           </button>
-          <button @click="remove" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Supprimer">
+          <button @click="remove" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                  title="Supprimer cet article" aria-label="Supprimer cet article">
             <TrashIcon class="w-4 h-4" />
           </button>
         </div>

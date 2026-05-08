@@ -4,7 +4,7 @@ import {
   getFaqSettings, saveFaqSettings, testFaqConnection, pullFaqFromCrisp,
   listFaqCategories, createFaqCategory, updateFaqCategory, deleteFaqCategory, pushFaqCategory,
   listFaqArticles, getFaqArticle, createFaqArticle, updateFaqArticle, deleteFaqArticle, pushFaqArticle,
-  faqAiRewrite, faqAiGenerate, faqAiSuggestMissing,
+  faqAiRewrite, faqAiGenerate, faqAiSuggestMissing, faqAiRewriteSelection,
 } from '@/api'
 
 /**
@@ -140,12 +140,23 @@ export const useFaqStore = defineStore('faq', () => {
     const { data } = await faqAiRewrite(articleId)
     return data
   }
-  async function aiGenerate(question, categoryId = null) {
-    const { data } = await faqAiGenerate({ question, category_id: categoryId })
+  // Accepte 2 formes :
+  //   aiGenerate("question texte", categoryId)         — legacy, FaqBuildyView
+  //   aiGenerate({ question, category_id, article_type, images, ... })
+  // Préférer la forme objet pour les nouveaux call-sites (richer payload).
+  async function aiGenerate(questionOrPayload, categoryId = null) {
+    const payload = typeof questionOrPayload === 'object' && questionOrPayload !== null
+      ? questionOrPayload
+      : { question: questionOrPayload, category_id: categoryId }
+    const { data } = await faqAiGenerate(payload)
     return data
   }
   async function aiSuggestMissing() {
     const { data } = await faqAiSuggestMissing()
+    return data
+  }
+  async function aiRewriteSelection(payload) {
+    const { data } = await faqAiRewriteSelection(payload)
     return data
   }
 
@@ -160,6 +171,6 @@ export const useFaqStore = defineStore('faq', () => {
     pullFromCrisp,
     loadCategories, createCategory, updateCategory, removeCategory, pushCategory,
     loadArticles, loadArticle, createArticle, saveArticle, removeArticle, pushArticle,
-    aiRewrite, aiGenerate, aiSuggestMissing,
+    aiRewrite, aiGenerate, aiSuggestMissing, aiRewriteSelection,
   }
 })

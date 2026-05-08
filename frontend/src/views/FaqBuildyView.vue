@@ -528,13 +528,16 @@ function selectCategory(id) {
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
                   <div class="inline-flex items-center gap-1">
-                    <button v-if="a.dirty" @click="pushArticle(a)" class="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition" v-tooltip="'Publier vers Crisp'">
+                    <button v-if="a.dirty" @click="pushArticle(a)" class="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition"
+                            v-tooltip="'Publier vers Crisp'" :aria-label="`Publier « ${a.title} » vers Crisp`">
                       <ArrowUpOnSquareIcon class="w-4 h-4" />
                     </button>
-                    <button @click="openArticle(a)" class="p-1.5 hover:bg-gray-100 text-gray-600 rounded transition" v-tooltip="'Éditer'">
+                    <button @click="openArticle(a)" class="p-1.5 hover:bg-gray-100 text-gray-600 rounded transition"
+                            v-tooltip="'Éditer'" :aria-label="`Éditer « ${a.title} »`">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <button @click="deleteArticle(a)" class="p-1.5 hover:bg-red-50 text-red-500 rounded transition" v-tooltip="'Supprimer'">
+                    <button @click="deleteArticle(a)" class="p-1.5 hover:bg-red-50 text-red-500 rounded transition"
+                            v-tooltip="'Supprimer'" :aria-label="`Supprimer « ${a.title} »`">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>

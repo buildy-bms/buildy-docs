@@ -299,9 +299,29 @@ function _htmlInline(html) {
       .replace(/<code>([^<]*)<\/code>/gi, '`$1`');
   } while (s !== prev);
 
-  // Liens
-  s = s.replace(/<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href, label) => {
+  // Liens : on traite d'abord les embeds (data-embed="...") pour préserver le
+  // round-trip ${youtube}[label](id) → <a data-embed=...> → ${youtube}...
+  // Sinon le pattern générique <a> below les transformerait en lien plat.
+  s = s.replace(/<a\s+([^>]*)>([\s\S]*?)<\/a>/gi, (full, attrs, label) => {
     const cleanLabel = label.replace(/<[^>]+>/g, '').trim();
+    const hrefMatch = attrs.match(/\bhref="([^"]+)"/i);
+    const href = hrefMatch ? hrefMatch[1] : '';
+    const embedMatch = attrs.match(/\bdata-embed="(youtube|vimeo|dailymotion|frame)"/i);
+    if (embedMatch && href) {
+      const kind = embedMatch[1];
+      let id = href;
+      if (kind === 'youtube') {
+        const m = href.match(/(?:youtu\.be\/|[?&]v=|\/embed\/)([\w-]{11})/);
+        if (m) id = m[1];
+      } else if (kind === 'vimeo') {
+        const m = href.match(/vimeo\.com\/(\d+)/);
+        if (m) id = m[1];
+      } else if (kind === 'dailymotion') {
+        const m = href.match(/dailymotion\.com\/(?:video\/|embed\/video\/)([\w]+)/);
+        if (m) id = m[1];
+      }
+      return `\${${kind}}[${cleanLabel || id}](${id})`;
+    }
     return `[${cleanLabel || href}](${href})`;
   });
 

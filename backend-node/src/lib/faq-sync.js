@@ -12,6 +12,38 @@ const { crispMarkdownToHtml, htmlToCrispMarkdown } = require('./crisp-markdown')
 const { scoreArticle } = require('./seo-scorer');
 const log = require('./logger').system;
 
+// Lock applicatif en mémoire process pour éviter les pulls et pushes concurrents
+// (race condition : un pull pendant un push peut écraser l'article qu'on vient de
+// publier). Le lock est process-scoped → ok en single-PM2 (cas Buildy Docs).
+// Réentrant : `acquire` retourne un flag indiquant si on est l'owner racine ;
+// seul l'owner racine appelle `release`. TTL 5 min en cas de crash.
+const SYNC_LOCK_TTL_MS = 5 * 60 * 1000;
+let _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
+
+function acquireSyncLock(kind) {
+  if (_syncLock.active) {
+    const elapsed = Date.now() - _syncLock.startedAt;
+    if (elapsed >= SYNC_LOCK_TTL_MS) {
+      log.warn(`Sync lock stale ${_syncLock.kind} > ${SYNC_LOCK_TTL_MS}ms, on le force-libère.`);
+      _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
+    } else {
+      // Réentrance dans le même chemin async (ex : pushArticle → pushCategory).
+      _syncLock.depth += 1;
+      return false; // pas owner racine
+    }
+  }
+  _syncLock = { active: true, kind, startedAt: Date.now(), depth: 1 };
+  return true; // owner racine
+}
+
+function releaseSyncLock(isRoot) {
+  if (!isRoot) {
+    if (_syncLock.depth > 0) _syncLock.depth -= 1;
+    return;
+  }
+  _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
+}
+
 // Recalcule le score SEO d'un article après upsert (pull/push) et le persiste.
 function _recomputeSeoScoreById(articleId) {
   if (!articleId) return null;
@@ -52,11 +84,19 @@ async function pullFromCrisp({ locale } = {}) {
   let articlesPulled = 0;
   const conflicts = [];
 
+  const lockRoot = acquireSyncLock('pull');
   try {
     const cats = await client.listCategories(useLocale);
+    const seenCatCrispIds = new Set();
     for (const c of cats) {
       const crispId = c.category_id || c.id;
       if (!crispId) continue;
+      seenCatCrispIds.add(crispId);
+      // Si la catégorie portait un tombstone (suppression antérieure), Crisp l'a
+      // recréée → on accepte la résurrection en levant le tombstone.
+      if (db.faqCategoriesTombstones.has(crispId)) {
+        db.faqCategoriesTombstones.remove(crispId);
+      }
       const existing = db.faqCategories.getByCrispId(crispId);
       const payload = {
         crispId,
@@ -77,6 +117,18 @@ async function pullFromCrisp({ locale } = {}) {
       }
       categoriesPulled += 1;
     }
+
+    // Détecte les catégories locales avec crisp_id qui ne sont plus côté
+    // Crisp (supprimées remote) → tombstone pour bloquer le re-import et
+    // alerter l'utilisateur dans l'UI.
+    let ghosts = 0;
+    for (const c of db.faqCategories.list({ locale: useLocale })) {
+      if (c.crisp_id && !seenCatCrispIds.has(c.crisp_id)) {
+        db.faqCategoriesTombstones.add(c.crisp_id, { localId: c.id, reason: 'missing_in_remote_pull' });
+        ghosts += 1;
+      }
+    }
+    if (ghosts > 0) log.warn(`Pull Crisp : ${ghosts} catégorie(s) locale(s) absente(s) côté distant (tombstone posé).`);
 
     // Articles : endpoint flat /helpdesk/locale/{locale}/articles
     // Chaque article inclut category.category_id pour le rattachement.
@@ -113,7 +165,10 @@ async function pullFromCrisp({ locale } = {}) {
         crispId,
         categoryId: localCatId,
         title: full.title || 'Sans titre',
-        description: full.description || null,
+        // Description : priorité local si renseignée (l'IA peut l'avoir générée
+        // alors qu'elle est encore vide côté Crisp tant qu'on n'a pas push). Sinon
+        // remote, sinon null.
+        description: existing?.description || full.description || null,
         slug: full.slug || null,
         // Crisp renvoie le content en Markdown -> on convertit en HTML pour Tiptap.
         contentHtml: crispMarkdownToHtml(full.content || ''),
@@ -153,6 +208,8 @@ async function pullFromCrisp({ locale } = {}) {
   } catch (e) {
     db.crispSettings.setLastPull({ status: 'error', error: e.message });
     throw e;
+  } finally {
+    releaseSyncLock(lockRoot);
   }
 }
 
@@ -216,6 +273,8 @@ async function pushArticleToCrisp(articleId, userId = null) {
   const locale = article.locale || creds.defaultLocale;
   const client = crispClient(creds);
 
+  const lockRoot = acquireSyncLock(`push article ${articleId}`);
+  try {
   // S'assurer que la catégorie existe côté Crisp avant de pousser l'article
   let category = null;
   if (article.category_id) {
@@ -228,48 +287,60 @@ async function pushArticleToCrisp(articleId, userId = null) {
 
   const payload = _toCrispArticlePayload(article);
 
-  if (!article.crisp_id) {
+  // Snapshot pré-push : permet de retrouver l'état envoyé en cas de désync.
+  try { db.faqArticles.snapshot(article.id, { reason: 'before_push', userId }); } catch (e) {
+    log.warn(`Snapshot before_push article=${article.id} échec : ${e.message}`);
+  }
+
+  let crispId = article.crisp_id;
+  if (!crispId) {
     // Création : SDK addNewHelpdeskLocaleArticle prend juste un titre.
     const created = await client.createArticle(locale, article.title);
-    const crispId = created?.article_id || created?.id;
+    crispId = created?.article_id || created?.id;
     if (!crispId) throw new Error('Crisp createArticle : id manquant dans la réponse');
-    // Save complet : Crisp exige title, description, content, featured, order
-    await client.updateArticle(locale, crispId, {
-      title: payload.title,
-      description: payload.description,
-      content: payload.content,
-      featured: false,
-      order: 0,
-    });
-    if (category && category.crisp_id) {
-      await client.updateArticleCategory(locale, crispId, category.crisp_id);
-    }
-    if (article.status === 'published') {
-      await client.publishArticle(locale, crispId, true);
-    }
-    db.faqArticles.update(article.id, {
-      crispId,
-      dirty: 0,
-      pushedAt: new Date().toISOString(),
-    }, userId);
-  } else {
-    await client.updateArticle(locale, article.crisp_id, {
-      title: payload.title,
-      description: payload.description,
-      content: payload.content,
-      featured: false,
-      order: 0,
-    });
-    if (category && category.crisp_id) {
-      await client.updateArticleCategory(locale, article.crisp_id, category.crisp_id).catch(() => {});
-    }
-    await client.publishArticle(locale, article.crisp_id, article.status === 'published');
-    db.faqArticles.update(article.id, {
-      dirty: 0,
-      pushedAt: new Date().toISOString(),
-    }, userId);
+    // CRITIQUE : persister crisp_id IMMÉDIATEMENT après l'allocation côté Crisp,
+    // AVANT les updates suivants. Si un step ultérieur échoue, le retry user ne
+    // recréera pas un doublon Crisp (idempotence via crisp_id désormais set).
+    db.faqArticles.update(article.id, { crispId }, userId);
   }
+
+  // Save complet : Crisp exige title, description, content, featured, order.
+  await client.updateArticle(locale, crispId, {
+    title: payload.title,
+    description: payload.description,
+    content: payload.content,
+    featured: false,
+    order: 0,
+  });
+  if (category && category.crisp_id) {
+    try {
+      await client.updateArticleCategory(locale, crispId, category.crisp_id);
+    } catch (e) {
+      log.warn(`Crisp updateArticleCategory article=${crispId} cat=${category.crisp_id} : ${e.message}`);
+    }
+  }
+  await client.publishArticle(locale, crispId, article.status === 'published');
+
+  // Récupère l'URL publique Crisp générée (sinon n'est dispo qu'au prochain pull).
+  let crispUrl = null;
+  try {
+    const refreshed = await client.getArticle(locale, crispId);
+    crispUrl = refreshed?.url || null;
+  } catch (e) {
+    log.warn(`Crisp getArticle post-push ${crispId} : ${e.message}`);
+  }
+
+  // Dirty=0 + pushed_at UNIQUEMENT en fin de chaîne réussie.
+  db.faqArticles.update(article.id, {
+    dirty: 0,
+    pushedAt: new Date().toISOString(),
+    ...(crispUrl ? { crispUrl } : {}),
+  }, userId);
+
   return db.faqArticles.getById(article.id);
+  } finally {
+    releaseSyncLock(lockRoot);
+  }
 }
 
 async function deleteArticleOnCrisp(articleId) {

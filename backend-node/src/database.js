@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 104;
+const TARGET_VERSION = 105;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3833,6 +3833,22 @@ function runMigrations() {
     db.pragma('user_version = 104');
   }
 
+  if (current < 105) {
+    // Tombstones de categories Crisp supprimees cote distant : empeche le
+    // re-import au prochain pull. Posees au pull quand un crisp_id local
+    // n'apparait plus dans la liste Crisp, ou explicitement par l'API.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS faq_categories_tombstones (
+        crisp_id TEXT PRIMARY KEY,
+        local_id INTEGER,
+        deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        reason TEXT
+      );
+    `);
+    log.info('Migration 105 appliquee : faq_categories_tombstones');
+    db.pragma('user_version = 105');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -5934,6 +5950,25 @@ const crispSettings = {
   },
 };
 
+const faqCategoriesTombstones = {
+  list() {
+    return db.prepare('SELECT * FROM faq_categories_tombstones ORDER BY deleted_at DESC').all();
+  },
+  has(crispId) {
+    return !!db.prepare('SELECT 1 FROM faq_categories_tombstones WHERE crisp_id = ?').get(crispId);
+  },
+  add(crispId, { localId = null, reason = null } = {}) {
+    db.prepare(`
+      INSERT INTO faq_categories_tombstones (crisp_id, local_id, reason)
+      VALUES (?, ?, ?)
+      ON CONFLICT(crisp_id) DO UPDATE SET deleted_at = CURRENT_TIMESTAMP, reason = excluded.reason
+    `).run(crispId, localId, reason);
+  },
+  remove(crispId) {
+    db.prepare('DELETE FROM faq_categories_tombstones WHERE crisp_id = ?').run(crispId);
+  },
+};
+
 const faqSettings = {
   getSeoKeywords() {
     const row = db.prepare('SELECT seo_keywords_json FROM faq_settings WHERE id = 1').get();
@@ -6439,6 +6474,7 @@ module.exports = {
   aiPrompts,
   crispSettings,
   faqSettings,
+  faqCategoriesTombstones,
   faqCategories,
   faqArticles,
   bacsAuditDeviceZones,

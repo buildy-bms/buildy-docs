@@ -68,9 +68,7 @@ const ACRONYMS_TO_EXPAND = [
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function stripHtml(html) {
-  return String(html || '').replace(/<[^>]*>/g, ' ').replace(/&[#a-z0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
-}
+const { stripHtml } = require('./text-utils');
 
 function countWords(text) {
   return text ? text.split(/\s+/).filter(Boolean).length : 0;

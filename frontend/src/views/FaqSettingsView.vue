@@ -94,6 +94,21 @@ const seoIsDefault = ref(true)
 const seoNewInput = ref('')
 const seoOriginal = ref([])
 const seoSaving = ref(false)
+const SEO_SORT_KEY = 'buildy.docs.faqSeoPillSort'
+const seoSort = ref(localStorage.getItem(SEO_SORT_KEY) || 'added') // 'added' | 'alpha'
+function toggleSeoSort() {
+  seoSort.value = seoSort.value === 'alpha' ? 'added' : 'alpha'
+  localStorage.setItem(SEO_SORT_KEY, seoSort.value)
+}
+
+// Vue triée (n'altère pas l'ordre stocké : on persiste toujours dans l'ordre d'ajout).
+const seoKeywordsView = computed(() => {
+  if (seoSort.value !== 'alpha') return seoKeywords.value.map((k, idx) => ({ k, idx }))
+  return seoKeywords.value
+    .map((k, idx) => ({ k, idx }))
+    .slice()
+    .sort((a, b) => a.k.localeCompare(b.k, 'fr', { sensitivity: 'base' }))
+})
 
 const seoDirty = computed(() => {
   if (seoOriginal.value.length !== seoKeywords.value.length) return true
@@ -284,22 +299,30 @@ onMounted(async () => {
             Toute génération d'article est ensuite évaluée sur la couverture de cette liste.
           </p>
         </div>
-        <span class="text-xs text-gray-500 whitespace-nowrap shrink-0">
-          <strong class="text-gray-700">{{ seoKeywords.length }}</strong> mot{{ seoKeywords.length > 1 ? 's' : '' }}-clé{{ seoKeywords.length > 1 ? 's' : '' }}
+        <div class="text-xs text-gray-500 whitespace-nowrap shrink-0 text-right">
+          <div>
+            <strong class="text-gray-700">{{ seoKeywords.length }}</strong> mot{{ seoKeywords.length > 1 ? 's' : '' }}-clé{{ seoKeywords.length > 1 ? 's' : '' }}
+            <button type="button" @click="toggleSeoSort"
+                    class="ml-2 text-[11px] text-indigo-600 hover:text-indigo-800 underline"
+                    :title="seoSort === 'alpha' ? 'Tri actuel : alphabétique. Cliquer pour passer en ordre d\'ajout.' : 'Tri actuel : ordre d\'ajout. Cliquer pour passer en alphabétique.'">
+              {{ seoSort === 'alpha' ? 'A→Z' : '↺' }}
+            </button>
+          </div>
           <span v-if="seoIsDefault" class="block text-[11px] italic mt-0.5">Liste par défaut</span>
           <span v-else class="block text-[11px] italic mt-0.5 text-emerald-700">Liste personnalisée</span>
-        </span>
+        </div>
       </div>
 
       <!-- Pills -->
-      <div v-if="seoKeywords.length"
+      <div v-if="seoKeywordsView.length"
            class="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 border border-gray-100 rounded-lg min-h-16">
-        <span v-for="(kw, idx) in seoKeywords" :key="`${kw}-${idx}`"
+        <span v-for="entry in seoKeywordsView" :key="`${entry.k}-${entry.idx}`"
               class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm border border-indigo-100">
-          <span>{{ kw }}</span>
-          <button @click="removeKeyword(idx)"
+          <span>{{ entry.k }}</span>
+          <button @click="removeKeyword(entry.idx)"
                   class="text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 rounded-full w-4 h-4 inline-flex items-center justify-center"
-                  :title="`Retirer « ${kw} »`">
+                  :title="`Retirer « ${entry.k} »`"
+                  :aria-label="`Retirer le mot-clé « ${entry.k} »`">
             <XMarkIcon class="w-3 h-3" />
           </button>
         </span>

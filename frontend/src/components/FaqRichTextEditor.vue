@@ -12,6 +12,7 @@
  */
 import { ref, watch, onBeforeUnmount, computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { BubbleMenu } from '@tiptap/vue-3/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Blockquote from '@tiptap/extension-blockquote'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -28,6 +29,7 @@ import {
 import api from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import LinkInputModal from './LinkInputModal.vue'
+import FaqRewriteSelectionModal from './FaqRewriteSelectionModal.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -242,6 +244,47 @@ function onDrop(e) {
   }
 }
 
+// Paste : intercepte les images du presse-papiers (Cmd+V d'une capture écran).
+// Sans ce handler, Tiptap colle les images en data:image/... dans le HTML, ce
+// qui passe pas le push Crisp (taille + URL non-publique).
+function onPaste(e) {
+  const items = [...(e.clipboardData?.items || [])]
+  const imageItems = items.filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+  if (!imageItems.length) return
+  e.preventDefault()
+  for (const it of imageItems) {
+    const file = it.getAsFile()
+    if (file) onImageSelected({ target: { files: [file], value: '' } })
+  }
+}
+
+// ── BubbleMenu : réécrire la sélection avec l'IA ──────────────────
+const rewriteSelectionModalOpen = ref(false)
+const rewriteSelectionHtml = ref('')
+
+function openRewriteSelectionModal() {
+  if (!editor.value || !props.articleId) return
+  const { from, to } = editor.value.state.selection
+  if (from === to) return
+  // Sérialise la sélection en HTML (préserve gras / liens / structure).
+  const slice = editor.value.state.doc.slice(from, to)
+  const result = editor.value.view.serializeForClipboard(slice)
+  rewriteSelectionHtml.value = result.dom.innerHTML || ''
+  if (rewriteSelectionHtml.value) rewriteSelectionModalOpen.value = true
+}
+
+function applyRewrittenSelection(data) {
+  if (!editor.value || !data?.html) return
+  editor.value
+    .chain()
+    .focus()
+    .deleteSelection()
+    .insertContent(data.html)
+    .run()
+  rewriteSelectionModalOpen.value = false
+  emit('update:modelValue', editor.value.getHTML())
+}
+
 // ── Bouton IA "Réécrire avec IA" ──────────────────────────────────
 const aiRunning = ref(false)
 async function rewriteWithAi() {
@@ -365,12 +408,32 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
 
     <!-- Content -->
     <div class="overflow-y-auto" :style="{ minHeight: minHeight }"
-         @drop="onDrop" @dragover.prevent @click="onEditorClick">
+         @drop="onDrop" @dragover.prevent @click="onEditorClick" @paste="onPaste">
+      <!-- BubbleMenu : apparaît au-dessus d'une sélection non-vide. Permet de
+           réécrire le passage avec l'IA en gardant le contexte article. -->
+      <BubbleMenu v-if="editor && articleId" :editor="editor"
+                  :should-show="({ editor: ed, from, to }) => from !== to && !ed.isActive('image')">
+        <div class="inline-flex items-center gap-1 px-1 py-1 bg-white border border-gray-200 rounded-lg shadow-md">
+          <button type="button" @click="openRewriteSelectionModal"
+                  class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded text-violet-700 hover:bg-violet-50 transition whitespace-nowrap font-medium"
+                  title="Réécrire la sélection avec l'IA">
+            <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+            Réécrire avec IA
+          </button>
+        </div>
+      </BubbleMenu>
+
       <EditorContent :editor="editor" :class="editorClass" />
     </div>
 
     <LinkInputModal v-if="linkModalOpen" :prefill="linkPrefill"
                     @close="linkModalOpen = false" @submit="applyLink" />
+
+    <FaqRewriteSelectionModal v-if="rewriteSelectionModalOpen"
+                              :article-id="articleId"
+                              :selection-html="rewriteSelectionHtml"
+                              @close="rewriteSelectionModalOpen = false"
+                              @rewritten="applyRewrittenSelection" />
   </div>
 </template>
 

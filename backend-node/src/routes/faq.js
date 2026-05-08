@@ -68,7 +68,10 @@ const articleCreateSchema = z.object({
   locale: z.string().min(2).max(10).optional(),
 });
 
-const articleUpdateSchema = articleCreateSchema.partial();
+const articleUpdateSchema = articleCreateSchema.partial().extend({
+  // Optimistic locking : timestamp de la dernière version connue par le client.
+  expected_updated_at: z.string().optional(),
+});
 
 // ── Helpers ────────────────────────────────────────────────────────
 function settingsView() {
@@ -184,7 +187,7 @@ async function routes(fastify) {
       return result;
     } catch (e) {
       log.warn(`FAQ pull failed: ${e.message}`);
-      return reply.code(502).send({ detail: e.message });
+      return reply.code(e.status || 502).send({ detail: e.message });
     }
   });
 
@@ -276,6 +279,103 @@ async function routes(fastify) {
     return article;
   });
 
+  // ── Résolution de conflit pull/edit ──────────────────────────────
+  // Un article en conflit (dirty=1 + remote modifié) reste verrouillé tant
+  // que l'utilisateur n'a pas tranché : "garder local" ou "écraser par remote".
+  fastify.post('/faq/articles/:id/resolve-conflict', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const strategy = request.body?.strategy || request.query?.strategy;
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    if (!['local', 'remote'].includes(strategy)) {
+      return reply.code(400).send({ detail: 'strategy doit être "local" ou "remote"' });
+    }
+    if (strategy === 'local') {
+      // L'utilisateur garde sa version : on lève simplement le flag dirty au
+      // prochain push réussi. On force déjà ici dirty=1 pour qu'il sache que
+      // sa version doit être pushée pour réconcilier remote.
+      db.faqArticles.update(id, { dirty: 1 }, request.authUser?.id || null);
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.article.conflict_resolved',
+        payload: { article_id: id, strategy: 'local' },
+      });
+      return { ok: true, strategy: 'local', detail: 'Pousse vers Crisp pour propager ta version.' };
+    }
+    // strategy === 'remote' → snapshot puis re-pull cet article seul.
+    if (!article.crisp_id) {
+      return reply.code(400).send({ detail: 'Article jamais publié, "remote" non applicable.' });
+    }
+    try { db.faqArticles.snapshot(id, { reason: 'before_conflict_remote', userId: request.authUser?.id || null }); }
+    catch (e) { log.warn(`Snapshot before_conflict_remote ${id} échec : ${e.message}`); }
+    try {
+      const creds = loadCrispCredentials();
+      if (!creds) throw new Error('Credentials Crisp non configurés');
+      const { crispClient } = require('../lib/crisp');
+      const { crispMarkdownToHtml } = require('../lib/crisp-markdown');
+      const client = crispClient(creds);
+      const full = await client.getArticle(article.locale || creds.defaultLocale, article.crisp_id);
+      db.faqArticles.update(id, {
+        title: full.title || article.title,
+        description: full.description || null,
+        contentHtml: crispMarkdownToHtml(full.content || ''),
+        status: full.status === 'published' || full.published ? 'published' : 'draft',
+        dirty: 0,
+        pulledAt: new Date().toISOString(),
+        crispUrl: full.url || article.crisp_url || null,
+      }, request.authUser?.id || null);
+      const updated = db.faqArticles.getById(id);
+      recomputeSeoScore(updated);
+      db.auditLog.add({
+        userId: request.authUser?.id,
+        action: 'faq.article.conflict_resolved',
+        payload: { article_id: id, strategy: 'remote' },
+      });
+      return { ok: true, strategy: 'remote', article: updated };
+    } catch (e) {
+      log.warn(`Resolve conflict remote ${id}: ${e.message}`);
+      return reply.code(502).send({ detail: e.message });
+    }
+  });
+
+  // ── Historique de versions ───────────────────────────────────────
+  fastify.get('/faq/articles/:id/versions', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    return db.faqArticles.listVersions(id, { limit: 50 });
+  });
+
+  fastify.post('/faq/articles/:id/versions/:versionId/restore', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const versionId = parseInt(request.params.versionId, 10);
+    const article = db.faqArticles.getById(id);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    const version = db.faqArticles.getVersion(versionId);
+    if (!version || version.article_id !== id) {
+      return reply.code(404).send({ detail: 'Version introuvable' });
+    }
+    // Snapshot l'état actuel avant l'écrasement, pour permettre un revert.
+    try { db.faqArticles.snapshot(id, { reason: 'before_restore', userId: request.authUser?.id || null }); }
+    catch (e) { log.warn(`Snapshot before_restore article=${id} échec : ${e.message}`); }
+    // Restaure title + content_html + status. Description, category et meta divers
+    // ne sont pas dans la table de versions historique → restés inchangés.
+    db.faqArticles.update(id, {
+      title: version.title,
+      contentHtml: version.content_html,
+      status: version.status,
+      dirty: 1, // article diffère désormais de la version Crisp si déjà publié
+    }, request.authUser?.id || null);
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'faq.article.restore',
+      payload: { article_id: id, version_id: versionId, version_reason: version.reason },
+    });
+    const updated = db.faqArticles.getById(id);
+    recomputeSeoScore(updated);
+    return db.faqArticles.getById(id);
+  });
+
   fastify.post('/faq/articles', async (request, reply) => {
     const parsed = articleCreateSchema.safeParse(request.body || {});
     if (!parsed.success) {
@@ -299,6 +399,16 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const article = db.faqArticles.getById(id);
     if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    // Optimistic locking : si le client envoie expected_updated_at, on rejette
+    // si l'article a été modifié entre temps (édition concurrente 2 onglets).
+    // Header absent = comportement legacy (compat rétro).
+    const expected = request.body?.expected_updated_at || request.headers['if-match'];
+    if (expected && article.updated_at && expected !== article.updated_at) {
+      return reply.code(409).send({
+        detail: 'Cet article a été modifié ailleurs depuis votre dernier chargement.',
+        current_updated_at: article.updated_at,
+      });
+    }
     const parsed = articleUpdateSchema.safeParse(request.body || {});
     if (!parsed.success) {
       return reply.code(400).send({ detail: parsed.error.issues[0].message });
@@ -357,17 +467,25 @@ async function routes(fastify) {
       return updated;
     } catch (e) {
       log.warn(`FAQ push article ${id}: ${e.message}`);
-      return reply.code(502).send({ detail: e.message });
+      return reply.code(e.status || 502).send({ detail: e.message });
     }
   });
 
   // ── IA ──────────────────────────────────────────────────────────
+  // Helper : snapshot avant tout appel IA mutant. Permet la restauration via
+  // l'historique si Claude pourrit l'article. Idempotent, n'échoue jamais.
+  function snapshotBeforeAi(articleId, reason, userId) {
+    try { db.faqArticles.snapshot(articleId, { reason, userId }); }
+    catch (e) { log.warn(`Snapshot ${reason} article=${articleId} échec : ${e.message}`); }
+  }
+
   fastify.post('/faq/ai/rewrite', async (request, reply) => {
     const articleId = parseInt(request.body?.article_id, 10);
     if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
     const article = db.faqArticles.getById(articleId);
     if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
     const cat = article.category_id ? db.faqCategories.getById(article.category_id) : null;
+    snapshotBeforeAi(articleId, 'before_ai_rewrite', request.authUser?.id || null);
     try {
       const result = await assistFaqRewrite({
         article: { ...article, category_name: cat?.name || null },
@@ -388,6 +506,7 @@ async function routes(fastify) {
     if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
     const article = db.faqArticles.getById(articleId);
     if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    snapshotBeforeAi(articleId, 'before_ai_rewrite_title', request.authUser?.id || null);
     try {
       const { assistFaqRewriteTitle } = require('../lib/claude');
       return await assistFaqRewriteTitle({ article });
@@ -403,11 +522,31 @@ async function routes(fastify) {
     if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
     const article = db.faqArticles.getById(articleId);
     if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    snapshotBeforeAi(articleId, 'before_ai_rewrite_description', request.authUser?.id || null);
     try {
       const { assistFaqRewriteDescription } = require('../lib/claude');
       return await assistFaqRewriteDescription({ article });
     } catch (e) {
       log.warn(`FAQ AI rewrite-description ${articleId}: ${e.message}`);
+      return reply.code(500).send({ detail: e.message });
+    }
+  });
+
+  // Réécriture IA d'une sélection HTML dans l'éditeur (BubbleMenu Tiptap).
+  fastify.post('/faq/ai/rewrite-selection', async (request, reply) => {
+    const articleId = parseInt(request.body?.article_id, 10);
+    const selectionHtml = (request.body?.selection_html || '').trim();
+    const instruction = (request.body?.instruction || '').trim();
+    if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
+    if (!selectionHtml) return reply.code(400).send({ detail: 'selection_html requis' });
+    const article = db.faqArticles.getById(articleId);
+    if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
+    snapshotBeforeAi(articleId, 'before_ai_rewrite_selection', request.authUser?.id || null);
+    try {
+      const { assistFaqRewriteSelection } = require('../lib/claude');
+      return await assistFaqRewriteSelection({ article, selectionHtml, instruction });
+    } catch (e) {
+      log.warn(`FAQ AI rewrite-selection ${articleId}: ${e.message}`);
       return reply.code(500).send({ detail: e.message });
     }
   });
