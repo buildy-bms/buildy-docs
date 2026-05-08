@@ -138,7 +138,7 @@ onMounted(() => {
     type="button"
     @click.stop="openModal"
     class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap hover:bg-purple-100 hover:border-purple-300 cursor-pointer"
-    :title="`Voir l'extrait du décret BACS — ${formattedReference}`"
+    v-tooltip="`Voir l'extrait du décret BACS — ${formattedReference}`"
   >
     <ScaleIcon class="w-3 h-3" />
     {{ labelPrefix }} · {{ formattedReference }}

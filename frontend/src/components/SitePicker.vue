@@ -116,7 +116,7 @@ onMounted(loadSites)
         type="button"
         @click.stop="clear"
         class="text-gray-400 hover:text-red-600 p-1"
-        title="Retirer"
+        v-tooltip="'Retirer'"
       >
         <XMarkIcon class="w-4 h-4" />
       </button>

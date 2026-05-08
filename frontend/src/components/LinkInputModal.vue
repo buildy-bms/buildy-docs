@@ -49,7 +49,7 @@ function onRemove() {
 </script>
 
 <template>
-  <BaseModal title="Insérer un lien" size="lg" @close="emit('close')">
+  <BaseModal :title="'Insérer un lien'" size="lg" @close="emit('close')">
     <form @submit.prevent="onSubmit" class="space-y-3 min-w-lg">
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">URL</label>

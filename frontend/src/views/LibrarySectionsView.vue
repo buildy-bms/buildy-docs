@@ -488,7 +488,7 @@ onBeforeUnmount(teardownSortables)
       <table class="w-full text-sm" style="table-layout: auto">
         <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
           <tr>
-            <th class="text-center px-2 py-2.5 w-8" title="Tout cocher / décocher (lignes visibles)">
+            <th class="text-center px-2 py-2.5 w-8" v-tooltip="'Tout cocher / décocher (lignes visibles)'">
               <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30"
                      :checked="allFlatSelected"
                      :indeterminate.prop="!allFlatSelected && someFlatSelected"
@@ -498,7 +498,7 @@ onBeforeUnmount(teardownSortables)
             <th class="text-left px-4 py-2.5 whitespace-nowrap">Titre</th>
             <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
-            <th class="text-left px-4 py-2.5 whitespace-nowrap" title="Documents où cette section apparaît (AF / Brochure / Audit BACS / Audit GTB)">Documents</th>
+            <th class="text-left px-4 py-2.5 whitespace-nowrap" v-tooltip="'Documents où cette section apparaît (AF / Brochure / Audit BACS / Audit GTB)'">Documents</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
@@ -557,28 +557,28 @@ onBeforeUnmount(teardownSortables)
                 <span v-for="dk in t.document_kinds" :key="dk"
                       :class="['inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap',
                                documentKindBadgeClass(dk)]"
-                      :title="documentKindLabel(dk)">
+                      v-tooltip="documentKindLabel(dk)">
                   {{ documentKindShortLabel(dk) }}
                 </span>
               </div>
               <span v-else class="text-amber-700 italic text-[11px]" title="Cette section n'apparaît dans aucun document">⚠ aucun</span>
             </td>
             <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" title="AFs utilisant cette section / AFs avec mise à jour en attente">
+              <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" v-tooltip="'AFs utilisant cette section / AFs avec mise à jour en attente'">
                 {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
               </span>
               <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
-              <span v-else class="text-gray-300 italic" title="Jamais utilisée — candidate au nettoyage">∅</span>
+              <span v-else class="text-gray-300 italic" v-tooltip="'Jamais utilisée — candidate au nettoyage'">∅</span>
             </td>
             <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
               <button type="button" @click="openClone(t)"
                       class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition mr-1"
-                      title="Dupliquer cette section type (avec son sous-arbre)">
+                      v-tooltip="'Dupliquer cette section type (avec son sous-arbre)'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
               <button type="button" @click="openEditor(t)"
                       class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                      title="Éditer">
+                      v-tooltip="'Éditer'">
                 <PencilIcon class="w-4 h-4" />
               </button>
             </td>
@@ -613,7 +613,7 @@ onBeforeUnmount(teardownSortables)
         </button>
         <button type="button" @click="clearSelection"
                 class="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition whitespace-nowrap"
-                title="Annuler la sélection">
+                v-tooltip="'Annuler la sélection'">
           <XMarkIcon class="w-4 h-4" />
         </button>
       </div>
@@ -647,7 +647,7 @@ onBeforeUnmount(teardownSortables)
 
     <BulkRegenerateModal
       v-if="showBulk"
-      title="Régénérer les sections types avec Claude"
+      v-tooltip="'Régénérer les sections types avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -675,7 +675,7 @@ onBeforeUnmount(teardownSortables)
 
     <BaseModal
       v-if="cloning"
-      title="Dupliquer la section type"
+      :title="'Dupliquer la section type'"
       size="md"
       @close="cloning = null"
     >

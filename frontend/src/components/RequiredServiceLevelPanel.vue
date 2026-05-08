@@ -108,7 +108,7 @@ defineExpose({ refresh })
           type="button"
           @click="emit('goto-section', { number: j.number, id: j.section_id })"
           class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-full text-[11px] cursor-pointer transition-colors"
-          title="Aller à cette section"
+          v-tooltip="'Aller à cette section'"
         >
           <span class="text-gray-700 font-medium">{{ j.title }}</span>
           <ServiceLevelBadge v-if="minServiceLevel(j.level)" :level="minServiceLevel(j.level)" />
@@ -118,7 +118,7 @@ defineExpose({ refresh })
         </span>
       </template>
 
-      <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1 ml-auto" title="Recalculer">
+      <button @click="refresh" :disabled="loading" class="text-gray-400 hover:text-gray-700 shrink-0 p-1 ml-auto" v-tooltip="'Recalculer'">
         <ArrowPathIcon :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
       </button>
     </div>

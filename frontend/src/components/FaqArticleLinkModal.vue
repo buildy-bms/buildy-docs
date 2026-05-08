@@ -44,7 +44,7 @@ function pick(a) {
 </script>
 
 <template>
-  <BaseModal size="lg" title="Insérer un lien vers un article FAQ" @close="emit('close')">
+  <BaseModal size="lg" :title="'Insérer un lien vers un article FAQ'" @close="emit('close')">
     <div>
       <p class="text-sm text-gray-500 mb-3 -mt-1">
         Choisis un article publié sur help.buildy.fr — le lien sera inséré au curseur de l'éditeur.

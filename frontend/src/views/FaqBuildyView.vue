@@ -433,7 +433,7 @@ function selectCategory(id) {
         <div class="bg-white border border-gray-200 rounded-lg p-4 sticky top-4">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-gray-700">Catégories</h3>
-            <button @click="openCategoryModal()" class="p-1 hover:bg-gray-100 rounded shrink-0" title="Nouvelle catégorie">
+            <button @click="openCategoryModal()" class="p-1 hover:bg-gray-100 rounded shrink-0" v-tooltip="'Nouvelle catégorie'">
               <PlusIcon class="w-4 h-4 text-gray-500" />
             </button>
           </div>
@@ -508,7 +508,7 @@ function selectCategory(id) {
                 <td class="px-4 py-3">
                   <div class="font-medium text-gray-800 inline-flex items-center gap-2">
                     {{ a.title }}
-                    <span v-if="a.dirty" class="w-2 h-2 rounded-full bg-orange-400" title="Modifié localement, non publié" />
+                    <span v-if="a.dirty" class="w-2 h-2 rounded-full bg-orange-400" v-tooltip="'Modifié localement, non publié'" />
                   </div>
                 </td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ a.category_name || '—' }}</td>
@@ -528,13 +528,13 @@ function selectCategory(id) {
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
                   <div class="inline-flex items-center gap-1">
-                    <button v-if="a.dirty" @click="pushArticle(a)" class="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition" title="Publier vers Crisp">
+                    <button v-if="a.dirty" @click="pushArticle(a)" class="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition" v-tooltip="'Publier vers Crisp'">
                       <ArrowUpOnSquareIcon class="w-4 h-4" />
                     </button>
-                    <button @click="openArticle(a)" class="p-1.5 hover:bg-gray-100 text-gray-600 rounded transition" title="Éditer">
+                    <button @click="openArticle(a)" class="p-1.5 hover:bg-gray-100 text-gray-600 rounded transition" v-tooltip="'Éditer'">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <button @click="deleteArticle(a)" class="p-1.5 hover:bg-red-50 text-red-500 rounded transition" title="Supprimer">
+                    <button @click="deleteArticle(a)" class="p-1.5 hover:bg-red-50 text-red-500 rounded transition" v-tooltip="'Supprimer'">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>
@@ -581,7 +581,7 @@ function selectCategory(id) {
 
     <!-- Modale "Générer depuis une question" -->
     <BaseModal v-if="generateModalOpen" size="lg" :dismiss-on-backdrop="false"
-               @close="generateModalOpen = false" title="Générer un article depuis une question">
+               @close="generateModalOpen = false" :title="'Générer un article depuis une question'">
       <div class="space-y-5">
         <p class="text-sm text-gray-500 -mt-1">
           L'IA s'appuie sur le corpus Buildy (sections, équipements, fonctionnalités) pour produire un article cohérent en français professionnel.
@@ -615,7 +615,7 @@ function selectCategory(id) {
     </BaseModal>
 
     <!-- Modale suggestions IA -->
-    <BaseModal v-if="showSuggestions" size="lg" @close="showSuggestions = false" title="Articles FAQ manquants suggérés">
+    <BaseModal v-if="showSuggestions" size="lg" @close="showSuggestions = false" :title="'Articles FAQ manquants suggérés'">
       <div>
         <p class="text-sm text-gray-500 mb-4 -mt-1">
           L'IA a comparé le corpus Buildy à tes articles FAQ existants pour identifier les sujets non couverts.

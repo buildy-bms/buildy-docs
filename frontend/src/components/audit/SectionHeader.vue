@@ -9,7 +9,7 @@ import StepValidateBadge from '@/components/StepValidateBadge.vue'
 // Usage :
 //   <CollapsibleSection ...>
 //     <template #header>
-//       <SectionHeader number="6" v-tooltip="'Solution GTB / GTC'" subtitle="R175-3 / R175-4 / R175-5"
+//       <SectionHeader number="6" :title="'Solution GTB / GTC'" subtitle="R175-3 / R175-4 / R175-5"
 //                      :icon="WrenchScrewdriverIcon" icon-color="text-purple-600" :step="step"
 //                      @validate="emit('validate-step', $event)"
 //                      @invalidate="emit('invalidate-step', $event)">

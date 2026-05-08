@@ -190,26 +190,26 @@ function onSaveLink(url) {
     <div v-if="editor" class="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50 rounded-t-lg">
       <button type="button" @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Gras"><BoldIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="'Gras'"><BoldIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleItalic().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('italic') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Italique"><ItalicIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="'Italique'"><ItalicIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="editor.chain().focus().toggleBulletList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bulletList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Liste à puces"><ListBulletIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="'Liste à puces'"><ListBulletIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleOrderedList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('orderedList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Liste numérotée"><NumberedListIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="'Liste numérotée'"><NumberedListIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="setLink"
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Lien"><LinkIcon class="w-3.5 h-3.5" /></button>
+              v-tooltip="'Lien'"><LinkIcon class="w-3.5 h-3.5" /></button>
 
       <div v-if="assistContext" class="rte-library-popover-root ml-auto relative flex items-center">
         <button type="button" @click="callClaude" :disabled="assisting"
                 class="inline-flex items-center gap-1 pl-2 pr-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-l-md transition"
-                :title="formatUsageTooltip(claudeUsage)">
+                v-tooltip="formatUsageTooltip(claudeUsage)">
           <SparklesIcon class="w-3.5 h-3.5" :class="assisting ? 'animate-pulse' : ''" />
           {{ assisting
               ? (isEmpty ? 'Génération…' : 'Reformulation…')
@@ -224,7 +224,7 @@ function onSaveLink(url) {
         </button>
         <button type="button" @click="showLibraryMenu = !showLibraryMenu" :disabled="assisting"
                 class="px-1 py-0.5 text-violet-700 hover:text-violet-900 hover:bg-violet-50 disabled:opacity-50 rounded-r-md transition border-l border-violet-200"
-                title="Options de contexte bibliothèque">
+                v-tooltip="'Options de contexte bibliothèque'">
           <ChevronDownIcon class="w-3 h-3" />
         </button>
         <!-- Popover options corpus -->

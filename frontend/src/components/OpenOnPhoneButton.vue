@@ -68,7 +68,7 @@ async function copyLink() {
       type="button"
       @click="open = !open"
       class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 whitespace-nowrap"
-      title="Ouvrir cet audit sur ton téléphone (QR code + lien)"
+      v-tooltip="'Ouvrir cet audit sur ton téléphone (QR code + lien)'"
     >
       <DevicePhoneMobileIcon class="w-3.5 h-3.5 shrink-0" />
       Sur téléphone

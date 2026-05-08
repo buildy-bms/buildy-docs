@@ -540,7 +540,7 @@ async function destroy() {
                    :placeholder="mode === 'functionality' ? 'Ex : Pilotage à distance des consignes' : 'Ex : Connectivité du site'"
                    class="w-full pl-3 pr-9 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
             <button type="button" @click="suggestTitleOnly" :disabled="suggestingTitle || !form.title.trim()"
-                    :title="form.title.trim() ? 'Proposer un meilleur titre avec Claude' : 'Saisir d\'abord un titre'"
+                    v-tooltip="form.title.trim() ? 'Proposer un meilleur titre avec Claude' : 'Saisir d\'abord un titre'"
                     class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-violet-600 hover:text-violet-800 hover:bg-violet-50 disabled:opacity-30 rounded-md transition">
               <SparklesIcon class="w-4 h-4" :class="suggestingTitle ? 'animate-pulse' : ''" />
             </button>
@@ -557,7 +557,7 @@ async function destroy() {
               Appliquer
             </button>
             <button type="button" @click="dismissSuggestedTitle"
-                    class="text-violet-400 hover:text-violet-700 shrink-0" title="Ignorer">
+                    class="text-violet-400 hover:text-violet-700 shrink-0" v-tooltip="'Ignorer'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
           </div>
@@ -565,7 +565,7 @@ async function destroy() {
         <div class="grid grid-cols-2 gap-2">
           <div v-if="mode === 'functionality'">
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5"
-                   title="Affichée dans la liste, la brochure et le tableau des offres">
+                   v-tooltip="'Affichée dans la liste, la brochure et le tableau des offres'">
               Icône
             </label>
             <FaIconPicker v-model="form.icon_name" />
@@ -625,7 +625,7 @@ async function destroy() {
           <div class="flex flex-wrap gap-1.5">
             <button v-for="dk in documentKindsCatalog" :key="dk.kind" type="button"
                     @click="toggleDocumentKind(dk.kind)"
-                    :title="dk.description"
+                    v-tooltip="dk.description"
                     :class="['inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition whitespace-nowrap',
                              isDocumentKindActive(dk.kind)
                                ? 'bg-indigo-100 text-indigo-800 border-indigo-300 shadow-sm'
@@ -658,7 +658,7 @@ async function destroy() {
             <div class="inline-flex items-center bg-gray-50 rounded-md p-0.5 shrink-0">
               <button v-for="o in AVAIL_OPTIONS" :key="String(o.value)" type="button"
                       @click="form[lvl.field] = o.value"
-                      :title="o.label"
+                      v-tooltip="o.label"
                       :class="['inline-flex items-center justify-center w-6 h-5 text-xs rounded transition',
                                form[lvl.field] === o.value
                                  ? o.color + ' shadow-sm font-medium'
@@ -732,7 +732,7 @@ async function destroy() {
       </button>
       <button v-else-if="isEdit"
               @click="toggleValidation" :disabled="!canValidate || validating || submitting"
-              :title="canValidate ? '' : 'Aucun contenu à valider'"
+              v-tooltip="canValidate ? '' : 'Aucun contenu à valider'"
               class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition inline-flex items-center gap-1.5 disabled:opacity-50 whitespace-nowrap">
         <CheckBadgeIcon class="w-4 h-4 shrink-0" /> {{ validating ? '…' : 'Valider le contenu' }}
       </button>
@@ -744,7 +744,7 @@ async function destroy() {
            a editer) / avec fermer (validation finale). En creation, un seul. -->
       <button v-if="isEdit"
               @click="submitKeepOpen" :disabled="submitting || !form.title.trim()"
-              title="Enregistrer sans fermer"
+              v-tooltip="'Enregistrer sans fermer'"
               class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 rounded-lg transition disabled:opacity-50">
         {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
@@ -767,7 +767,7 @@ async function destroy() {
        Affiche un apercu texte + bouton restaurer. La restauration ne
        sauvegarde pas : le snapshot atterit dans la form, l'user clique
        Enregistrer pour confirmer (ce qui versionne le texte actuel). -->
-  <BaseModal v-if="showHistory" title="Historique du texte" size="lg" @close="showHistory = false">
+  <BaseModal v-if="showHistory" :title="'Historique du texte'" size="lg" @close="showHistory = false">
     <div v-if="historyLoading" class="py-12 text-center text-sm text-gray-400">
       Chargement…
     </div>

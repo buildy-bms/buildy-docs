@@ -364,13 +364,13 @@ onBeforeUnmount(() => {
                    class="w-full px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded text-sm" />
             <div class="px-2 mt-0.5 flex items-center gap-2 flex-wrap text-[11px] text-gray-400">
               <span class="truncate">{{ d.original_name }}</span>
-              <span v-if="d.taken_at" :title="exifTooltip(d)"
+              <span v-if="d.taken_at" v-tooltip="exifTooltip(d)"
                     class="inline-flex items-center gap-0.5 text-gray-500 shrink-0">
                 <ClockIcon class="w-3 h-3" />
                 {{ fmtTakenAt(d.taken_at) }}
               </span>
               <a v-if="gpsMapUrl(d)" :href="gpsMapUrl(d)" target="_blank" rel="noopener"
-                 :title="`Voir sur Google Maps — ${exifTooltip(d)}`"
+                 v-tooltip="`Voir sur Google Maps — ${exifTooltip(d)}`"
                  class="inline-flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 shrink-0"
                  @click.stop>
                 <MapPinIcon class="w-3 h-3" />
@@ -398,14 +398,14 @@ onBeforeUnmount(() => {
           <td class="px-3 py-2 text-right text-xs text-gray-500 tabular-nums align-middle whitespace-nowrap">{{ fmtSize(d.size_bytes) }}</td>
           <td class="px-3 py-2 text-center whitespace-nowrap align-middle">
             <button v-if="isImage(d)" @click="openPreview(d)"
-                    class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" title="Aperçu">
+                    class="text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Aperçu'">
               <EyeIcon class="w-4 h-4" />
             </button>
             <a :href="getSiteDocumentDownloadUrl(d.id)" target="_blank"
-               class="inline-block text-gray-400 hover:text-indigo-600 mx-0.5 p-1" title="Télécharger">
+               class="inline-block text-gray-400 hover:text-indigo-600 mx-0.5 p-1" v-tooltip="'Télécharger'">
               <ArrowDownTrayIcon class="w-4 h-4" />
             </a>
-            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-0.5 p-1" title="Supprimer">
+            <button @click="removeDoc(d)" class="text-gray-400 hover:text-red-600 mx-0.5 p-1" v-tooltip="'Supprimer'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>

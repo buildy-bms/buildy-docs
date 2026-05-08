@@ -449,7 +449,7 @@ async function destroy() {
 </script>
 
 <template>
-  <BaseModal v-tooltip="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
+  <BaseModal :title="isEdit ? `Éditer le modèle « ${template.name} »` : 'Nouveau modèle d\'équipement'" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
     <!-- Bandeau statut de validation de la description (mig 89). -->
     <div v-if="isEdit"
          :class="['flex items-center gap-2 px-2.5 py-1.5 mb-2 rounded-md border text-sm',

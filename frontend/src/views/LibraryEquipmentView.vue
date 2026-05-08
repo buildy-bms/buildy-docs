@@ -745,7 +745,7 @@ onMounted(async () => {
          sections AF qui referencent ce modele d'equipement). -->
     <BaseModal
       v-if="photosModalTemplate"
-      v-tooltip="`Captures d'écran — ${photosModalTemplate.name}`"
+      :title="`Captures d'écran — ${photosModalTemplate.name}`"
       size="lg"
       @close="closePhotos"
     >
@@ -763,7 +763,7 @@ onMounted(async () => {
 
     <BaseModal
       v-if="cloning"
-      v-tooltip="'Dupliquer le système technique'"
+      :title="'Dupliquer le système technique'"
       size="md"
       @close="cloning = null"
     >

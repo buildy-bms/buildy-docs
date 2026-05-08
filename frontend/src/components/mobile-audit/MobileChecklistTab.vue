@@ -160,6 +160,15 @@ function statusClass(s) {
     not_available:  'bg-gray-100 border-gray-200 opacity-70',
   }[s] || 'bg-white border-gray-200'
 }
+
+// Quick toggle « Non disponible » depuis la liste (sans ouvrir le sheet).
+async function quickToggleNotAvailable(it) {
+  const newStatus = it.status === 'not_available' ? 'pending' : 'not_available'
+  try {
+    await updateBacsChecklistItem(audit.docId, it.catalog_key, { status: newStatus })
+    await load()
+  } catch { error('Mise à jour impossible') }
+}
 </script>
 
 <template>
@@ -209,31 +218,41 @@ function statusClass(s) {
         Aucun item dans le catalogue.
       </div>
       <div v-else class="divide-y divide-gray-100">
-        <button v-for="it in items" :key="it.catalog_key"
-                @click="openItem(it)"
-                :class="['w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50', statusClass(it.status)]">
-          <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: it.icon_value || 'fa-file', icon_color: it.icon_color || '#6b7280' }" size="md" class="shrink-0" />
-          <div class="flex-1 min-w-0">
-            <p :class="['text-base font-medium leading-tight', it.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-900']">
-              {{ it.label }}
+        <div v-for="it in items" :key="it.catalog_key"
+             :class="['flex items-center gap-2 px-4 py-3 active:bg-gray-50', statusClass(it.status)]">
+          <button type="button" @click="openItem(it)"
+                  class="flex items-center gap-3 flex-1 min-w-0 text-left">
+            <EquipmentIcon :template="{ icon_kind: 'fa', icon_value: it.icon_value || 'fa-file', icon_color: it.icon_color || '#6b7280' }" size="md" class="shrink-0" />
+            <div class="flex-1 min-w-0">
+              <p :class="['text-base font-medium leading-tight', it.status === 'not_available' ? 'line-through text-gray-500' : 'text-gray-900']">
+                {{ it.label }}
+              </p>
+              <p class="text-xs mt-0.5 flex items-center gap-1">
+                <CheckIcon v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
+                <NoSymbolIcon v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-400" />
+                <ExclamationCircleIcon v-else class="w-3.5 h-3.5 text-amber-500" />
+                <span :class="{
+                  'text-emerald-700': it.status === 'available',
+                  'text-gray-500':    it.status === 'not_available',
+                  'text-amber-700':   it.status === 'pending',
+                }">
+                  <template v-if="it.status === 'available'">{{ it.files_count }} fichier{{ it.files_count > 1 ? 's' : '' }}</template>
+                  <template v-else-if="it.status === 'not_available'">{{ it.not_available_reason || 'Non disponible' }}</template>
+                  <template v-else>À collecter</template>
+                </span>
             </p>
-            <p class="text-xs mt-0.5 flex items-center gap-1">
-              <CheckIcon v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
-              <NoSymbolIcon v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-400" />
-              <ExclamationCircleIcon v-else class="w-3.5 h-3.5 text-amber-500" />
-              <span :class="{
-                'text-emerald-700': it.status === 'available',
-                'text-gray-500':    it.status === 'not_available',
-                'text-amber-700':   it.status === 'pending',
-              }">
-                <template v-if="it.status === 'available'">{{ it.files_count }} fichier{{ it.files_count > 1 ? 's' : '' }}</template>
-                <template v-else-if="it.status === 'not_available'">Non disponible</template>
-                <template v-else>À collecter</template>
-              </span>
-            </p>
-          </div>
-          <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0" />
-        </button>
+            </div>
+            <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0" />
+          </button>
+          <!-- Bouton Non dispo inline (ne ouvre pas le sheet) -->
+          <button type="button" @click.stop="quickToggleNotAvailable(it)"
+                  :class="['shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border',
+                           it.status === 'not_available'
+                             ? 'text-gray-700 bg-gray-100 border-gray-300 active:bg-gray-200'
+                             : 'text-gray-500 bg-white border-gray-200 active:bg-gray-50']">
+            <NoSymbolIcon class="w-5 h-5" />
+          </button>
+        </div>
       </div>
     </div>
 

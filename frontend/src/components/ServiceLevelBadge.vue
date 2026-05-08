@@ -36,7 +36,7 @@ const fullLabel = computed(() => FULL_LABEL[props.level] || props.level)
         v-for="atom in atoms"
         :key="atom"
         :class="['inline-flex items-center px-1.5 py-0 text-[9px] font-bold rounded border whitespace-nowrap shrink-0 tabular-nums', ATOM[atom].classes]"
-        :title="ATOM[atom].label"
+        v-tooltip="ATOM[atom].label"
       >
         {{ ATOM[atom].short }}
       </span>
@@ -45,7 +45,7 @@ const fullLabel = computed(() => FULL_LABEL[props.level] || props.level)
   <template v-else-if="level">
     <span
       :class="['inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded border whitespace-nowrap shrink-0', ATOM[level]?.classes || 'bg-gray-100 text-gray-700 border-gray-200']"
-      :title="fullLabel"
+      v-tooltip="fullLabel"
     >
       {{ fullLabel }}
     </span>

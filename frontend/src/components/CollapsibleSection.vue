@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
         type="button"
         @click.stop="toggle"
         class="ml-1 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition shrink-0"
-        :title="open ? 'Replier la section' : 'Déplier la section'"
+        v-tooltip="open ? 'Replier la section' : 'Déplier la section'"
       >
         <ChevronUpIcon v-if="open" class="w-4 h-4" />
         <ChevronDownIcon v-else class="w-4 h-4" />

@@ -557,7 +557,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                         verificationProgress.ratio === 1 ? 'text-emerald-600'
                         : verificationProgress.ratio >= 0.5 ? 'text-emerald-700'
                         : 'text-gray-500']"
-                      :title="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
+                      v-tooltip="`${verificationProgress.verified} sections vérifiées sur ${verificationProgress.total} sections incluses dans l'export`">
                   ✓ {{ verificationProgress.verified }} / {{ verificationProgress.total }}
                 </span>
                 <button
@@ -650,7 +650,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                   type="button"
                   @click="selectSection(ancestor.id)"
                   class="hover:text-indigo-700 transition-colors truncate max-w-xs"
-                  :title="ancestor.title"
+                  v-tooltip="ancestor.title"
                 >
                   <span v-if="ancestor.number" class="font-mono text-gray-400 mr-1">§{{ ancestor.number }}</span>
                   {{ ancestor.title }}
@@ -661,7 +661,7 @@ watch(() => route.params.id, async (newId, oldId) => {
               type="button"
               @click="projectionOpen = true"
               class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-              title="Afficher cette section en plein écran (vidéoprojecteur)"
+              v-tooltip="'Afficher cette section en plein écran (vidéoprojecteur)'"
             >
               <PresentationChartLineIcon class="w-3.5 h-3.5 shrink-0" />
               Projection
@@ -920,7 +920,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionGoto('prev')"
             class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-            title="Section précédente (←)"
+            v-tooltip="'Section précédente (←)'"
           >
             <ChevronLeftIcon class="w-4 h-4 shrink-0" />
             Précédent
@@ -928,7 +928,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionGoto('next')"
             class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300 rounded-lg bg-white transition-colors whitespace-nowrap"
-            title="Section suivante (→)"
+            v-tooltip="'Section suivante (→)'"
           >
             Suivant
             <ChevronRightIcon class="w-4 h-4 shrink-0" />
@@ -936,7 +936,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <button
             @click="projectionOpen = false"
             class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg bg-white transition-colors whitespace-nowrap"
-            title="Fermer (Échap)"
+            v-tooltip="'Fermer (Échap)'"
           >
             <XMarkIcon class="w-4 h-4 shrink-0" />
             Fermer
@@ -990,7 +990,7 @@ watch(() => route.params.id, async (newId, oldId) => {
                 type="button"
                 @click="projectionLightboxIndex = idx"
                 class="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400 transition-colors"
-                :title="att.original_name || att.filename"
+                v-tooltip="att.original_name || att.filename"
               >
                 <img
                   :src="projectionAttUrl(att)"
@@ -1015,7 +1015,7 @@ watch(() => route.params.id, async (newId, oldId) => {
         <button
           @click="projectionLightboxIndex = null"
           class="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg"
-          title="Fermer (Échap)"
+          v-tooltip="'Fermer (Échap)'"
         >
           <XMarkIcon class="w-6 h-6" />
         </button>

@@ -224,7 +224,7 @@ async function removeAudit() {
         <div
           v-if="!isOnline"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
-          title="Hors-ligne — les modifications ne sont pas sauvegardées"
+          v-tooltip="'Hors-ligne — les modifications ne sont pas sauvegardées'"
           aria-label="Hors-ligne"
         >
           <SignalSlashIcon class="w-5 h-5" />

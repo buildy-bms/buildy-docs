@@ -272,12 +272,12 @@ onMounted(() => {
             <span v-if="img.annotated" class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 text-xs font-medium">Annotée</span>
             <button type="button" @click="removeImage(img.id)"
                     class="absolute top-1 right-1 p-1 bg-white/90 hover:bg-red-50 text-red-500 rounded transition opacity-0 group-hover:opacity-100"
-                    title="Retirer">
+                    v-tooltip="'Retirer'">
               <XMarkIcon class="w-3.5 h-3.5" />
             </button>
             <button type="button" @click="openAnnotation(img)"
                     class="absolute bottom-1 left-1 p-1 bg-white/90 hover:bg-indigo-50 text-indigo-600 rounded transition opacity-0 group-hover:opacity-100"
-                    title="Annoter">
+                    v-tooltip="'Annoter'">
               <PencilSquareIcon class="w-3.5 h-3.5" />
             </button>
             <textarea v-model="img.annotation" rows="1" placeholder="Élément à mettre en évidence (optionnel)"

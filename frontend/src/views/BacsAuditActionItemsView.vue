@@ -316,7 +316,7 @@ onMounted(refresh)
             <td class="px-3 py-2 text-right">
               <button v-if="!it.auto_generated"
                       @click="removeItem(it)"
-                      class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" title="Supprimer">
+                      class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>
@@ -331,7 +331,7 @@ onMounted(refresh)
     </div>
 
     <!-- Modal ajout manuel -->
-    <BaseModal v-if="showAdd" title="Ajouter une action manuelle" size="md" @close="showAdd = false">
+    <BaseModal v-if="showAdd" :title="'Ajouter une action manuelle'" size="md" @close="showAdd = false">
       <form @submit.prevent="submitNew" class="space-y-3">
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Titre *</label>

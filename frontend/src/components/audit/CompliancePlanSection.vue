@@ -51,7 +51,7 @@ function hasNotes(html) {
 <template>
   <CollapsibleSection storage-key="review" section-id="section-review" :active="active">
     <template #header>
-      <SectionHeader number="11" title="Plan de mise en conformité"
+      <SectionHeader number="11" :title="'Plan de mise en conformité'"
                      :subtitle="`${visibleActionItems.length} action${visibleActionItems.length > 1 ? 's' : ''}${resolvedCount ? ' · ' + resolvedCount + ' résolue' + (resolvedCount > 1 ? 's' : '') + ' masquée' + (resolvedCount > 1 ? 's' : '') : ''}`"
                      :icon="ExclamationTriangleIcon" icon-color="text-orange-500"
                      :step="step"
@@ -137,7 +137,7 @@ function hasNotes(html) {
                   : (it.status === 'open'
                     ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100 ring-1 ring-red-200'
                     : 'border-gray-300 text-gray-600 hover:bg-gray-50')]"
-              :title="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'">
+              v-tooltip="hasNotes(it.alternative_solutions_html) ? 'Modifier les préconisations' : 'Aucune préconisation — cliquer pour rédiger'">
               <PencilSquareIcon class="w-3.5 h-3.5" />
               {{ hasNotes(it.alternative_solutions_html)
                   ? 'Modifier'

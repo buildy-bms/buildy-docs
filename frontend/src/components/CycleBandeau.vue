@@ -450,7 +450,7 @@ const exportDescription = computed(() => {
           v-else
           @click="startInlineEdit"
           class="cursor-text hover:bg-gray-100 rounded px-1 -mx-1"
-          title="Cliquer pour renommer rapidement (Entrée valide, Esc annule)"
+          v-tooltip="'Cliquer pour renommer rapidement (Entrée valide, Esc annule)'"
         >{{ af.project_name }}</span>
       </h2>
       <p v-if="af.site_address" class="text-xs text-gray-500 truncate">{{ af.site_address }}</p>
@@ -471,7 +471,7 @@ const exportDescription = computed(() => {
       <button
         @click="openExport('points-list')"
         class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-l-lg hover:bg-indigo-700"
-        title="Exporter la liste de points contractuelle en PDF A4 paysage"
+        v-tooltip="'Exporter la liste de points contractuelle en PDF A4 paysage'"
       >
         <TableCellsIcon class="w-4 h-4" />
         Points
@@ -502,7 +502,7 @@ const exportDescription = computed(() => {
     <button
       @click="openExport('synthesis')"
       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700"
-      title="Exporter le tableau de synthèse en PDF A4 paysage"
+      v-tooltip="'Exporter le tableau de synthèse en PDF A4 paysage'"
     >
       <TableCellsIcon class="w-4 h-4" />
       Synthèse
@@ -712,7 +712,7 @@ const exportDescription = computed(() => {
         v-if="exportKind !== 'synthesis'"
         type="button"
         @click="openPreview"
-        title="Aperçu HTML rapide du rendu (sans génération PDF)"
+        v-tooltip="'Aperçu HTML rapide du rendu (sans génération PDF)'"
         class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 text-sm font-medium rounded-lg hover:bg-indigo-100"
       >
         <EyeIcon class="w-4 h-4" />
@@ -731,7 +731,7 @@ const exportDescription = computed(() => {
 
   <PdfPreviewModal
     v-if="previewOpen"
-    :title="previewTitle"
+    v-tooltip="previewTitle"
     :preview-url="previewUrlComputed"
     :downloading="submitting"
     download-label="Générer le PDF"
@@ -827,7 +827,7 @@ const exportDescription = computed(() => {
   <AfInstancesModal v-if="showInstances" :af-id="af.id" @close="showInstances = false" @goto-section="(id) => emit('goto-section', id)" />
 
   <!-- Modale Pull biblio -> AF -->
-  <BaseModal v-if="showSyncLibrary" title="Synchroniser depuis la bibliothèque" size="md" @close="showSyncLibrary = false">
+  <BaseModal v-if="showSyncLibrary" :title="'Synchroniser depuis la bibliothèque'" size="md" @close="showSyncLibrary = false">
     <div class="space-y-4">
       <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
         <p class="text-xs font-semibold text-blue-900 inline-flex items-center gap-1.5">

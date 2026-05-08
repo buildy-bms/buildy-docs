@@ -430,17 +430,17 @@ onBeforeUnmount(teardownSortables)
       </div>
       <div class="flex items-center gap-2">
         <button @click="offeringsPreviewOpen = true"
-                title="Aperçu du tableau des offres Buildy (matrice fonctionnalités × niveaux E/S/P)"
+                v-tooltip="'Aperçu du tableau des offres Buildy (matrice fonctionnalités × niveaux E/S/P)'"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg whitespace-nowrap transition">
           <EyeIcon class="w-4 h-4" /> Aperçu offres
         </button>
         <button @click="downloadOfferingsPdf" :disabled="generatingOfferings"
-                title="Télécharger le PDF du catalogue Buildy 2026 (régénéré depuis la base)"
+                v-tooltip="'Télécharger le PDF du catalogue Buildy 2026 (régénéré depuis la base)'"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingOfferings ? 'Génération…' : 'Tableau des offres' }}
         </button>
         <button @click="downloadBrochurePdf" :disabled="generatingBrochure"
-                title="Télécharger la brochure : référentiel détaillé de chaque fonctionnalité (annexe au tableau des offres)"
+                v-tooltip="'Télécharger la brochure : référentiel détaillé de chaque fonctionnalité (annexe au tableau des offres)'"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingBrochure ? 'Génération…' : 'Brochure détaillée' }}
         </button>
@@ -492,7 +492,7 @@ onBeforeUnmount(teardownSortables)
           Vides <span class="text-gray-400 font-normal">{{ validationCounts.empty }}</span>
         </button>
         <button @click="validationFilter = 'pending'"
-                :title="'Vide + brouillon (tout ce qui n\'est pas encore validé)'"
+                v-tooltip="'Vide + brouillon (tout ce qui n\'est pas encore validé)'"
                 :class="['px-2.5 py-1 rounded-md transition font-medium',
                          validationFilter === 'pending' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-500 hover:text-gray-700']">
           À traiter <span class="text-gray-400 font-normal">{{ validationCounts.empty + validationCounts.draft }}</span>
@@ -580,21 +580,21 @@ onBeforeUnmount(teardownSortables)
                 <span v-else class="text-gray-300 italic text-xs">—</span>
               </td>
               <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
-                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" title="AFs utilisant cette fonctionnalité / AFs avec mise à jour en attente">
+                <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" v-tooltip="'AFs utilisant cette fonctionnalité / AFs avec mise à jour en attente'">
                   {{ t.affected_afs_count }} <span class="text-amber-600">↻{{ t.outdated_count }}</span>
                 </span>
                 <span v-else-if="t.affected_afs_count > 0" class="text-gray-500">{{ t.affected_afs_count }}</span>
-                <span v-else class="text-gray-300 italic" title="Jamais utilisée — candidate au nettoyage">∅</span>
+                <span v-else class="text-gray-300 italic" v-tooltip="'Jamais utilisée — candidate au nettoyage'">∅</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
                 <button type="button" @click="openClone(t)"
                         class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition mr-1"
-                        title="Dupliquer cette fonctionnalité (avec son sous-arbre)">
+                        v-tooltip="'Dupliquer cette fonctionnalité (avec son sous-arbre)'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
                 <button type="button" @click="openEditor(t)"
                         class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                        title="Éditer">
+                        v-tooltip="'Éditer'">
                   <PencilIcon class="w-4 h-4" />
                 </button>
               </td>
@@ -631,7 +631,7 @@ onBeforeUnmount(teardownSortables)
 
     <BulkRegenerateModal
       v-if="showBulk"
-      title="Régénérer les fonctionnalités avec Claude"
+      v-tooltip="'Régénérer les fonctionnalités avec Claude'"
       :items="bulkItems"
       :get-html="bulkGetHtml"
       :on-save-html="bulkSaveHtml"
@@ -661,7 +661,7 @@ onBeforeUnmount(teardownSortables)
 
     <PdfPreviewModal
       v-if="offeringsPreviewOpen"
-      title="Aperçu — Tableau des fonctionnalités Buildy"
+      v-tooltip="'Aperçu — Tableau des fonctionnalités Buildy'"
       :preview-url="previewOfferingsUrl()"
       :downloading="generatingOfferings"
       download-label="Télécharger le PDF"
@@ -671,7 +671,7 @@ onBeforeUnmount(teardownSortables)
 
     <BaseModal
       v-if="cloning"
-      title="Dupliquer la fonctionnalité"
+      :title="'Dupliquer la fonctionnalité'"
       size="md"
       @close="cloning = null"
     >

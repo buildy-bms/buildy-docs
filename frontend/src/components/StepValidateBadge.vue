@@ -32,7 +32,7 @@ const tooltip = computed(() => {
         : (step.complete
           ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
           : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50')]"
-    :title="tooltip"
+    v-tooltip="tooltip"
   >
     <CheckCircleIcon v-if="step.validated" class="w-4 h-4 text-emerald-600" />
     <CheckOutline v-else class="w-4 h-4" />

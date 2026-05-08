@@ -60,7 +60,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <button
         @click="close"
         class="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg"
-        :title="`Fermer (Esc)`"
+        v-tooltip="`Fermer (Esc)`"
         aria-label="Fermer la visionneuse"
       >
         <XMarkIcon class="w-6 h-6" />
@@ -71,7 +71,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-if="hasPrev"
         @click.stop="prev"
         class="absolute left-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full"
-        title="Précédent (←)"
+        v-tooltip="'Précédent (←)'"
         aria-label="Image précédente"
       >
         <ChevronLeftIcon class="w-7 h-7" />
@@ -82,7 +82,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-if="hasNext"
         @click.stop="next"
         class="absolute right-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full"
-        title="Suivant (→)"
+        v-tooltip="'Suivant (→)'"
         aria-label="Image suivante"
       >
         <ChevronRightIcon class="w-7 h-7" />

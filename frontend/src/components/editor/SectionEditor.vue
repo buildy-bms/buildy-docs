@@ -308,7 +308,7 @@ function onSaveLink(url) {
         v-if="templateLink"
         @click="openTemplate"
         class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-md shrink-0"
-        :title="`Ouvrir le modèle « ${templateLink.label} » dans la bibliothèque`"
+        v-tooltip="`Ouvrir le modèle « ${templateLink.label} » dans la bibliothèque`"
       >
         <span>📎</span>
         <span class="truncate max-w-32">{{ templateLink.label }}</span>
@@ -326,7 +326,7 @@ function onSaveLink(url) {
             ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
             : 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100',
         ]"
-        :title="isVerified ? 'Section marquée vérifiée — cliquer pour annuler' : 'Marquer cette section comme vérifiée'"
+        v-tooltip="isVerified ? 'Section marquée vérifiée — cliquer pour annuler' : 'Marquer cette section comme vérifiée'"
       >
         <CheckCircleIcon class="w-3.5 h-3.5" />
         {{ isVerified ? 'Vérifiée' : 'À vérifier' }}
@@ -351,36 +351,36 @@ function onSaveLink(url) {
     <div v-if="editor && !isReadOnly" class="flex items-center gap-1 px-3 py-2 border-b border-gray-100 bg-gray-50">
       <button @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Titre niveau 2"><H2Icon class="w-4 h-4" /></button>
+              v-tooltip="'Titre niveau 2'"><H2Icon class="w-4 h-4" /></button>
       <button @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('heading', { level: 3 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Titre niveau 3"><H3Icon class="w-4 h-4" /></button>
+              v-tooltip="'Titre niveau 3'"><H3Icon class="w-4 h-4" /></button>
       <span class="w-px h-5 bg-gray-300 mx-1"></span>
       <button @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Gras"><BoldIcon class="w-4 h-4" /></button>
+              v-tooltip="'Gras'"><BoldIcon class="w-4 h-4" /></button>
       <button @click="editor.chain().focus().toggleItalic().run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('italic') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Italique"><ItalicIcon class="w-4 h-4" /></button>
+              v-tooltip="'Italique'"><ItalicIcon class="w-4 h-4" /></button>
       <span class="w-px h-5 bg-gray-300 mx-1"></span>
       <button @click="editor.chain().focus().toggleBulletList().run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('bulletList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Liste à puces"><ListBulletIcon class="w-4 h-4" /></button>
+              v-tooltip="'Liste à puces'"><ListBulletIcon class="w-4 h-4" /></button>
       <button @click="editor.chain().focus().toggleOrderedList().run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('orderedList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Liste numérotée"><NumberedListIcon class="w-4 h-4" /></button>
+              v-tooltip="'Liste numérotée'"><NumberedListIcon class="w-4 h-4" /></button>
       <span class="w-px h-5 bg-gray-300 mx-1"></span>
       <button @click="editor.chain().focus().toggleBlockquote().run()"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('blockquote') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Citation"><ChatBubbleLeftRightIcon class="w-4 h-4" /></button>
+              v-tooltip="'Citation'"><ChatBubbleLeftRightIcon class="w-4 h-4" /></button>
       <button @click="setLink"
               :class="['p-1.5 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
-              title="Lien"><LinkIcon class="w-4 h-4" /></button>
+              v-tooltip="'Lien'"><LinkIcon class="w-4 h-4" /></button>
       <span class="flex-1"></span>
       <!-- Bouton Claude masqué temporairement (Lot 14.1) — code conservé, à réactiver plus tard -->
       <button v-if="false" @click="openClaude"
               class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-linear-to-r from-violet-600 to-indigo-600 text-white rounded hover:from-violet-700 hover:to-indigo-700"
-              title="Rédiger avec Claude">
+              v-tooltip="'Rédiger avec Claude'">
         <SparklesIcon class="w-3.5 h-3.5" /> Claude
       </button>
     </div>
@@ -410,7 +410,7 @@ function onSaveLink(url) {
     </div>
   </div>
 
-  <BaseModal v-if="showClaudeModal" title="Rédiger avec Claude" size="lg" @close="showClaudeModal = false">
+  <BaseModal v-if="showClaudeModal" :title="'Rédiger avec Claude'" size="lg" @close="showClaudeModal = false">
     <div class="space-y-3">
       <p class="text-xs text-gray-500">
         Claude va rédiger un brouillon pour cette section dans le style Buildy, en s'appuyant sur le contexte

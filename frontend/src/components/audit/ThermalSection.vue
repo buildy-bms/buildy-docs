@@ -102,7 +102,7 @@ onBeforeUnmount(teardownSortable)
 <template>
   <CollapsibleSection storage-key="thermal" section-id="section-thermal" :active="active">
     <template #header>
-      <SectionHeader number="5" v-tooltip="'Régulation thermique automatique'"
+      <SectionHeader number="5" :title="'Régulation thermique automatique'"
                      subtitle="R175-6"
                      :icon="FireIcon" icon-color="text-red-500"
                      :step="step"

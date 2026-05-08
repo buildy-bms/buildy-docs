@@ -163,23 +163,23 @@ async function toggleActive(item) {
               <div class="flex flex-col gap-1 shrink-0">
                 <button @click="move(item, 'up')" :disabled="idx === 0"
                         class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30"
-                        title="Monter">
+                        v-tooltip="'Monter'">
                   <ArrowUpIcon class="w-4 h-4" />
                 </button>
                 <button @click="move(item, 'down')" :disabled="idx === methodology.length - 1"
                         class="p-1 text-gray-400 hover:text-indigo-600 disabled:opacity-30"
-                        title="Descendre">
+                        v-tooltip="'Descendre'">
                   <ArrowDownIcon class="w-4 h-4" />
                 </button>
                 <button @click="toggleActive(item)"
                         class="p-1 text-gray-400 hover:text-indigo-600"
-                        :title="item.is_active ? 'Désactiver (ne plus inclure dans le PDF)' : 'Réactiver'">
+                        v-tooltip="item.is_active ? 'Désactiver (ne plus inclure dans le PDF)' : 'Réactiver'">
                   <EyeSlashIcon v-if="item.is_active" class="w-4 h-4" />
                   <EyeIcon v-else class="w-4 h-4" />
                 </button>
                 <button @click="removeItem(item)"
                         class="p-1 text-gray-400 hover:text-red-600"
-                        title="Supprimer">
+                        v-tooltip="'Supprimer'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

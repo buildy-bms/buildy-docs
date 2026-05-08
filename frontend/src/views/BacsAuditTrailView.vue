@@ -96,7 +96,7 @@ onMounted(refresh)
             <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(r.created_at) }}</td>
             <td class="px-4 py-2">
               <span :class="['inline-block px-2 py-0.5 text-[11px] font-medium rounded', actionBadge(r.action).color]"
-                    :title="r.action">
+                    v-tooltip="r.action">
                 {{ actionBadge(r.action).label }}
               </span>
             </td>

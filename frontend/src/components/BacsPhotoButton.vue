@@ -281,7 +281,7 @@ function exifTooltip(p) {
     <button
       type="button"
       :class="btnCls"
-      :title="label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos'"
+      v-tooltip="label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos'"
       @click="showGallery = !showGallery"
       @dragover.prevent="onDragOver"
       @dragenter.prevent="onDragEnter"
@@ -340,7 +340,7 @@ function exifTooltip(p) {
         Aucune photo. Glisse des images sur l'icone ou clique sur <strong>+ Ajouter</strong>.
       </div>
       <div v-else class="grid grid-cols-3 gap-1.5">
-        <div v-for="p in photos" :key="p.id" class="relative group" :title="exifTooltip(p)">
+        <div v-for="p in photos" :key="p.id" class="relative group" v-tooltip="exifTooltip(p)">
           <button type="button" @click="previewPhoto = p" class="block w-full">
             <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
                  loading="lazy" decoding="async"
@@ -348,13 +348,13 @@ function exifTooltip(p) {
           </button>
           <a v-if="gpsMapUrl(p)" :href="gpsMapUrl(p)" target="_blank" rel="noopener" @click.stop
              class="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/55 hover:bg-indigo-600 text-white flex items-center justify-center transition"
-             :title="`Voir sur Google Maps — ${exifTooltip(p)}`">
+             v-tooltip="`Voir sur Google Maps — ${exifTooltip(p)}`">
             <MapPinIcon class="w-3 h-3" />
           </a>
           <button
             @click="removePhoto(p)"
             class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center"
-            title="Supprimer"
+            v-tooltip="'Supprimer'"
           >
             <TrashIcon class="w-3 h-3" />
           </button>
@@ -363,7 +363,7 @@ function exifTooltip(p) {
             <ClockIcon class="w-2.5 h-2.5" />
             {{ fmtTakenAtShort(p.taken_at) }}
           </span>
-          <p v-if="p.title" class="text-[9px] text-gray-500 truncate mt-0.5" :title="p.title">{{ p.title }}</p>
+          <p v-if="p.title" class="text-[9px] text-gray-500 truncate mt-0.5" v-tooltip="p.title">{{ p.title }}</p>
         </div>
       </div>
 
@@ -438,7 +438,7 @@ function exifTooltip(p) {
                 <button
                   @click="removePhoto(p)"
                   class="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow"
-                  title="Supprimer"
+                  v-tooltip="'Supprimer'"
                 >
                   <TrashIcon class="w-4 h-4" />
                 </button>

@@ -268,7 +268,7 @@ function tableFor(direction) {
               <th class="py-1.5 px-2 text-center w-28">Type</th>
               <th class="py-1.5 px-2 text-center w-32">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
-              <th class="py-1.5 px-2 text-center w-20" title="Optionnel — la MOA peut décider de ne pas exiger ce point">Opt.</th>
+              <th class="py-1.5 px-2 text-center w-20" v-tooltip="'Optionnel — la MOA peut décider de ne pas exiger ce point'">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -296,16 +296,16 @@ function tableFor(direction) {
               </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 px-2 text-center" @click.stop>
-                <label class="inline-flex items-center justify-center cursor-pointer" title="Marquer comme optionnel">
+                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="'Marquer comme optionnel'">
                   <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </label>
               </td>
               <td class="py-1.5 px-2 text-center">
-                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" title="Restaurer la valeur du template">
+                <button v-if="p.source === 'local-edit'" @click="restorePoint(p)" class="opacity-0 group-hover:opacity-100 text-amber-600 hover:text-amber-800 mr-1" v-tooltip="'Restaurer la valeur du template'">
                   <ArrowUturnLeftIcon class="w-3.5 h-3.5 inline" />
                 </button>
-                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" title="Retirer ce point">
+                <button @click="removePoint(p)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Retirer ce point'">
                   <TrashIcon class="w-3.5 h-3.5 inline" />
                 </button>
               </td>
@@ -328,7 +328,7 @@ function tableFor(direction) {
               <th class="py-1.5 px-2 text-center w-28">Type</th>
               <th class="py-1.5 px-2 text-center w-32">Nature</th>
               <th class="py-1.5 px-2 text-center w-16">Unité</th>
-              <th class="py-1.5 px-2 text-center w-20" title="Optionnel — la MOA peut décider de ne pas exiger ce point">Opt.</th>
+              <th class="py-1.5 px-2 text-center w-20" v-tooltip="'Optionnel — la MOA peut décider de ne pas exiger ce point'">Opt.</th>
               <th class="py-1.5 px-2 w-16"></th>
             </tr>
           </thead>
@@ -356,7 +356,7 @@ function tableFor(direction) {
               </td>
               <td class="py-1.5 px-2 text-center text-xs text-gray-500">{{ p.unit || '—' }}</td>
               <td class="py-1.5 px-2 text-center" @click.stop>
-                <label class="inline-flex items-center justify-center cursor-pointer" title="Marquer comme optionnel">
+                <label class="inline-flex items-center justify-center cursor-pointer" v-tooltip="'Marquer comme optionnel'">
                   <input type="checkbox" :checked="p.is_optional" @change="toggleOptional(p)"
                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
                 </label>

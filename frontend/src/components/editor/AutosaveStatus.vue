@@ -49,7 +49,7 @@ const absoluteSaved = computed(() => {
     </template>
     <template v-else-if="state === 'error'">
       <ExclamationTriangleIcon class="w-3.5 h-3.5 text-red-500" />
-      <span class="text-red-600 font-medium" :title="error?.message">
+      <span class="text-red-600 font-medium" v-tooltip="error?.message">
         Sauvegarde impossible
         <span v-if="absoluteSaved" class="font-normal">— dernière validée {{ absoluteSaved }}</span>
       </span>
@@ -57,7 +57,7 @@ const absoluteSaved = computed(() => {
     </template>
     <template v-else-if="lastSaved">
       <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-500" />
-      <span class="text-gray-500" :title="absoluteSaved ? `Validée à ${absoluteSaved}` : ''">
+      <span class="text-gray-500" v-tooltip="absoluteSaved ? `Validée à ${absoluteSaved}` : ''">
         Enregistré {{ relativeSaved }}
       </span>
     </template>

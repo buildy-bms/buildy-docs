@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
           v-else
           class="w-full aspect-video bg-gray-100 flex flex-col items-center justify-center gap-2 text-center px-3 cursor-pointer hover:bg-gray-200"
           @click="retryCount.delete(att.id); failedIds.delete(att.id); failedIds = new Set(failedIds)"
-          title="Cliquer pour réessayer"
+          v-tooltip="'Cliquer pour réessayer'"
         >
           <ExclamationCircleIcon class="w-8 h-8 text-amber-500" />
           <p class="text-[11px] text-gray-600 leading-tight">
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
         <span
           v-if="isInherited(att)"
           class="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-indigo-600 text-white text-[10px] font-semibold rounded-md inline-flex items-center gap-1 z-10"
-          :title="att.source === 'section_template' ? 'Capture héritée du modèle de fonctionnalité' : 'Capture héritée du modèle d\'équipement'"
+          v-tooltip="att.source === 'section_template' ? 'Capture héritée du modèle de fonctionnalité' : 'Capture héritée du modèle d\'équipement'"
         >
           📎 Modèle
         </span>
@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
           v-if="!isInherited(att)"
           @click.stop="removeAttachment(att)"
           class="absolute top-1.5 right-1.5 p-1.5 bg-white/90 hover:bg-red-500 hover:text-white text-gray-600 rounded-md opacity-0 group-hover:opacity-100 transition z-10"
-          title="Supprimer"
+          v-tooltip="'Supprimer'"
         >
           <TrashIcon class="w-3.5 h-3.5" />
         </button>
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
         <div
           v-else
           class="relative z-10 w-full px-2 py-1 text-xs bg-indigo-50/40 border-t border-indigo-200 text-indigo-900 truncate"
-          :title="att.caption || 'Légende héritée du modèle'"
+          v-tooltip="att.caption || 'Légende héritée du modèle'"
         >
           {{ att.caption || 'Légende héritée du modèle' }}
         </div>
