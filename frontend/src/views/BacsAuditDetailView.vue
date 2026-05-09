@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -44,13 +44,17 @@ import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
 import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
-import ChecklistSection from '@/components/audit/ChecklistSection.vue'
+// Sections lourdes : lazy-loaded pour réduire le bundle initial du
+// chemin /bacs-audit/:id. Pattern repris de AfDetailView (PR #52).
+// Le tree est paint avant que ces composants chargent (~30 % de gain
+// sur le mount initial perçu).
+const ChecklistSection = defineAsyncComponent(() => import('@/components/audit/ChecklistSection.vue'))
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
-import InspectionsSection from '@/components/audit/InspectionsSection.vue'
-import CompliancePlanSection from '@/components/audit/CompliancePlanSection.vue'
-import SynthesisSection from '@/components/audit/SynthesisSection.vue'
-import BmsSection from '@/components/audit/BmsSection.vue'
+const InspectionsSection = defineAsyncComponent(() => import('@/components/audit/InspectionsSection.vue'))
+const CompliancePlanSection = defineAsyncComponent(() => import('@/components/audit/CompliancePlanSection.vue'))
+const SynthesisSection = defineAsyncComponent(() => import('@/components/audit/SynthesisSection.vue'))
+const BmsSection = defineAsyncComponent(() => import('@/components/audit/BmsSection.vue'))
 import ThermalSection from '@/components/audit/ThermalSection.vue'
 import MetersSection from '@/components/audit/MetersSection.vue'
 import SystemsSection from '@/components/audit/SystemsSection.vue'
