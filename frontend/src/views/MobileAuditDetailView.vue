@@ -245,15 +245,35 @@ async function removeAudit() {
         </button>
       </div>
 
-      <!-- Bandeau hors-ligne complet sous le header -->
+      <!-- Bandeau hors-ligne sous le header.
+           Mig PR #90/91 : on a une queue offline qui sauvegarde les
+           modifs en localStorage et les rejoue au retour réseau, donc
+           le ton n'est plus alarmiste. Couleur orange pour signaler
+           sans paniquer. -->
       <transition name="slide-down">
         <div
           v-if="!isOnline"
-          class="px-3 py-2 bg-red-600 text-white text-xs flex items-center gap-2 leading-tight"
+          class="px-3 py-2 bg-amber-500 text-white text-xs flex items-center gap-2 leading-tight"
         >
           <SignalSlashIcon class="w-4 h-4 shrink-0" />
           <span class="flex-1">
-            <strong>Hors-ligne.</strong> Tes modifications ne seront pas sauvegardées tant que la connexion n'est pas rétablie.
+            <strong>Hors-ligne.</strong> Tes modifications sont mises en attente
+            <span v-if="offlineQueue.pendingCount.value > 0">({{ offlineQueue.pendingCount.value }} en queue)</span>
+            et seront synchronisées dès le retour réseau.
+          </span>
+        </div>
+      </transition>
+      <!-- Bandeau « sync en cours » : online avec queue non vide. Indique
+           que des modifs faites hors-ligne sont en train d'être rejouées. -->
+      <transition name="slide-down">
+        <div
+          v-if="isOnline && offlineQueue.pendingCount.value > 0"
+          class="px-3 py-2 bg-amber-100 text-amber-900 text-xs flex items-center gap-2 leading-tight border-b border-amber-200"
+        >
+          <span class="inline-flex items-center justify-center w-4 h-4 shrink-0">⇪</span>
+          <span class="flex-1">
+            <strong>Synchronisation en cours…</strong>
+            {{ offlineQueue.pendingCount.value }} modification{{ offlineQueue.pendingCount.value > 1 ? 's' : '' }} en attente d'envoi au serveur.
           </span>
         </div>
       </transition>

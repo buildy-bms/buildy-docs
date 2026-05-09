@@ -149,6 +149,19 @@ async function main() {
       prefix: '/',
       wildcard: false,
     });
+    // Route explicite pour le Service Worker. `wildcard: false` ci-dessus
+    // pré-scan dist/ au boot et enregistre des routes par fichier — mais
+    // n'injecte pas le bon Content-Type ni le header `Service-Worker-
+    // Allowed: /` qui autorise le SW à un scope racine. On bypass.
+    // Critique pour la PWA : sans ce header, iOS Safari refuse parfois
+    // de mettre à jour le SW vers une nouvelle version.
+    fastify.get('/sw.js', async (request, reply) => {
+      reply
+        .header('Content-Type', 'application/javascript; charset=utf-8')
+        .header('Service-Worker-Allowed', '/')
+        .header('Cache-Control', 'no-cache')
+        .sendFile('sw.js');
+    });
     fastify.setNotFoundHandler((request, reply) => {
       // /api/* et /attachments/* doivent renvoyer 404 propres, pas le SPA.
       // (Sinon une image manquante recoit le index.html en text/html, et le
