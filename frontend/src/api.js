@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router, { resetAuth } from '@/router'
+import { isQueueable, enqueue } from '@/lib/offline-queue'
 
 const api = axios.create({
   baseURL: '/api',
@@ -17,9 +18,54 @@ api.interceptors.response.use(
       resetAuth()
       router.push('/login')
     }
+    // Mig PR-E (offline-first PWA) : si on perd le réseau pendant un
+    // PATCH/POST/DELETE sur une route audit, on push la mutation dans
+    // une queue localStorage et on retourne au caller un mock 202
+    // (acceptée pour replay ultérieur). Le store optimistic update
+    // reste valide. Au retour en ligne, useOfflineQueue déclenche le
+    // drain qui rejoue dans l'ordre. Les mutations marquées
+    // `_isOfflineReplay` ne sont pas re-queueables (anti-boucle).
+    const cfg = err.config || {}
+    const isNetwork = !err.response
+    const looksOffline = isNetwork && (typeof navigator === 'undefined' || !navigator.onLine || /Network Error|timeout/i.test(err.message || ''))
+    if (
+      looksOffline
+      && !cfg._isOfflineReplay
+      && isQueueable(cfg.method, cfg.url, cfg.headers?.['Content-Type'] || cfg.headers?.['content-type'])
+    ) {
+      const queued = enqueue({
+        method: cfg.method, url: cfg.url, data: cfg.data ? safeParseJson(cfg.data) : null,
+        headers: extractCustomHeaders(cfg.headers),
+      })
+      return {
+        status: 202,
+        statusText: 'Accepted (queued offline)',
+        data: { _queued: true, _localId: queued.id },
+        headers: {},
+        config: cfg,
+      }
+    }
     return Promise.reject(err)
   }
 )
+
+// axios sérialise data en JSON-string sur les requêtes JSON. On reparse
+// pour stocker proprement en localStorage (si on garde la string brute,
+// au replay axios la re-stringify et ça donne `"\"...\""`).
+function safeParseJson(raw) {
+  if (typeof raw !== 'string') return raw
+  try { return JSON.parse(raw) } catch { return raw }
+}
+// On ne stocke que les headers custom utiles ; les headers axios
+// internes (Content-Type, Accept, Cookie…) seront re-générés au replay.
+function extractCustomHeaders(headers) {
+  if (!headers) return null
+  const out = {}
+  for (const k of Object.keys(headers)) {
+    if (/^x-/i.test(k)) out[k] = headers[k]
+  }
+  return Object.keys(out).length ? out : null
+}
 
 // ── AFs ──
 export const listAfs = (params) => api.get('/afs', { params })
