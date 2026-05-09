@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -54,6 +54,12 @@ const auditStore = useAuditStore()
 // quand l'auditeur revient à l'app après un appel ou un changement
 // d'app) + polling 30 s tant que l'écran est visible.
 useAuditAutoSync()
+
+// Queue offline (PWA terrain) : injectée par App.vue. Un badge dans la
+// topbar indique le nombre de modifs en attente de sync au retour
+// réseau. Permet à l'auditeur en sous-sol de continuer à saisir sans
+// perdre ses changements.
+const offlineQueue = inject('offlineQueue', { pendingCount: ref(0) })
 const { document, loading } = storeToRefs(auditStore)
 const { error, success } = useNotification()
 const { isOnline } = useOnlineStatus()
@@ -207,14 +213,25 @@ async function removeAudit() {
             {{ document.client_name }}
           </p>
         </div>
-        <!-- Indicateur connexion : signal barré rouge pulse si hors-ligne -->
+        <!-- Indicateur connexion : signal barré rouge pulse si hors-ligne.
+             Si des modifs sont en attente (queue offline), badge orange
+             avec le compteur. Les 2 sont mutuellement exclusifs (offline =
+             priorité affichage). -->
         <div
           v-if="!isOnline"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-500/30 text-red-100 animate-pulse"
-          v-tooltip="'Hors-ligne — les modifications ne sont pas sauvegardées'"
+          v-tooltip="`Hors-ligne — ${offlineQueue.pendingCount.value || 0} modif(s) en attente de sync`"
           aria-label="Hors-ligne"
         >
           <SignalSlashIcon class="w-5 h-5" />
+        </div>
+        <div
+          v-else-if="offlineQueue.pendingCount.value > 0"
+          class="inline-flex items-center justify-center min-w-9 h-9 px-2 rounded-full bg-amber-500/30 text-amber-100 text-xs font-semibold"
+          v-tooltip="`${offlineQueue.pendingCount.value} modif(s) en cours de sync vers le serveur`"
+          aria-label="Sync en cours"
+        >
+          ⇪ {{ offlineQueue.pendingCount.value }}
         </div>
         <div class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/15 text-white/90">
           BACS
