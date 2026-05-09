@@ -246,14 +246,58 @@ nav.csh-navigation,
 
 .csh-navigation-wrap {
   display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
   gap: 16px !important;
   min-height: 48px !important;
+  padding: 14px 0 !important;
 }
 .csh-navigation-title-list,
 .csh-navigation-title-list-wrap {
   display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important; /* indispensable pour que le shrink interne fonctionne */
+  flex: 1 1 auto !important;
+}
+/* Le sujet contient le label "Articles sur :" + la pill catégorie. Doit rester
+   sur 1 ligne, ne jamais se shrinker. */
+.csh-navigation-title-list-subject {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+/* Le séparateur vertical est juste une barre fine. */
+.csh-navigation-title-list-separator-wrap {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+.csh-navigation-title-list-separator {
+  display: inline-block !important;
+  width: 1px !important;
+  height: 18px !important;
+  background: #cbd5e1 !important;
+}
+/* La description prend l'espace restant, shrinkable, ellipsis 1 ligne au lieu
+   de 2 (plus propre avec un layout horizontal). */
+.csh-navigation-title-list-description-wrap {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+.csh-navigation-title-list-description,
+.csh-navigation-title-list-description h6 {
+  margin: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  -webkit-line-clamp: 1 !important;
 }
 
 /* Lien "Retour" pilule blanche compacte */
