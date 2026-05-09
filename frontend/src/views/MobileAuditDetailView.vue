@@ -321,7 +321,7 @@ async function removeAudit() {
     <!-- Contenu de l'onglet actif (scroll vertical, un seul visible) -->
     <main
       class="flex-1 overflow-y-auto overscroll-contain"
-      :style="{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom))' }"
+      :style="{ paddingBottom: 'calc(56px + max(4px, env(safe-area-inset-bottom)))' }"
     >
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
       <template v-else-if="document">
@@ -367,8 +367,9 @@ async function removeAudit() {
           </button>
         </li>
       </ul>
-      <!-- Spacer safe-area bottom : home indicator iOS, mêmes bg que la nav -->
-      <div :style="{ height: 'env(safe-area-inset-bottom)' }"></div>
+      <!-- Spacer safe-area bottom : home indicator iOS. Min 4px sur iPad / Android sans notch
+           pour eviter une bordure inferieure visuellement collee a 0. -->
+      <div :style="{ height: 'max(4px, env(safe-area-inset-bottom))' }"></div>
     </nav>
 
     <!-- Sheet Paramètres audit -->
