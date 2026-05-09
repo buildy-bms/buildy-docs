@@ -64,6 +64,7 @@ import IdentificationSection from '@/components/audit/IdentificationSection.vue'
 import ZonesSection from '@/components/audit/ZonesSection.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useAuditAutoSync } from '@/composables/useAuditAutoSync'
+import { useGlobalSaveStatus } from '@/composables/useGlobalSaveStatus'
 import { useViewport } from '@/composables/useViewport'
 import MobileAuditNav from '@/components/MobileAuditNav.vue'
 import OpenOnPhoneButton from '@/components/OpenOnPhoneButton.vue'
@@ -75,6 +76,8 @@ const auditStore = useAuditStore()
 // 30 s tant que la page est visible. Évite à un binôme (auditeur PWA
 // terrain + chef de projet bureau) de devoir F5 pour voir les modifs.
 useAuditAutoSync()
+// Indicateur global de sauvegarde dans la toolbar (Vague 2 item 6).
+const saveStatus = useGlobalSaveStatus()
 const { isNarrow } = useViewport()
 const showShare = ref(false)
 const showEditMetadata = ref(false)
@@ -1112,6 +1115,28 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
+        <!-- Indicateur global de sauvegarde : agrégé depuis l'interceptor
+             axios. Idle au boot (rien à signaler), saving pendant les
+             requêtes, saved après succès, error sur fail réseau / 4xx
+             / 5xx. Donne à l'auditeur la certitude que ses modifs sont
+             bien parties (et signale clairement si pas). -->
+        <div v-if="saveStatus.state.value === 'saving'"
+             v-tooltip="`${saveStatus.inflight.value} sauvegarde(s) en cours…`"
+             class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-gray-500 bg-gray-50 rounded-md whitespace-nowrap">
+          <ArrowPathIcon class="w-3.5 h-3.5 shrink-0 animate-spin" /> Sauvegarde…
+        </div>
+        <div v-else-if="saveStatus.state.value === 'error'"
+             v-tooltip="saveStatus.lastError.value?.response?.data?.detail || 'La dernière sauvegarde a échoué'"
+             @click="saveStatus.clearError()"
+             class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-red-700 bg-red-50 rounded-md whitespace-nowrap cursor-pointer hover:bg-red-100">
+          <ExclamationTriangleIcon class="w-3.5 h-3.5 shrink-0" /> Erreur de sauvegarde
+        </div>
+        <div v-else-if="saveStatus.state.value === 'saved'"
+             v-tooltip="saveStatus.lastSavedAt.value ? `Dernière sauvegarde : ${saveStatus.lastSavedAt.value.toLocaleTimeString('fr-FR')}` : 'Tout est enregistré'"
+             class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-emerald-700 bg-emerald-50 rounded-md whitespace-nowrap">
+          <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> Enregistré
+        </div>
+
         <!-- Aperçu HTML (avant export PDF) -->
         <button @click="openPreview"
           v-tooltip="'Aperçu HTML rapide du rapport (sans génération PDF)'"
