@@ -5,21 +5,41 @@ import {
   WrenchScrewdriverIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ClockIcon,
+  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter } from '@/api'
 import MobileField from './MobileField.vue'
+import MobileInspectionsSheet from './MobileInspectionsSheet.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
 const audit = useAuditStore()
-const { document, bms, devices, meters, systems } = storeToRefs(audit)
+const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
 const { error } = useNotification()
 
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
+
+// Inspections R175-5-1 (sheet drill-down)
+const showInspections = ref(false)
+function openInspections() { showInspections.value = true }
+const inspectionStatus = computed(() => {
+  const list = inspections.value || []
+  if (!list.length) return { label: 'Aucune inspection tracée', tone: 'warn' }
+  const latest = list[0]
+  const overdue = latest.next_inspection_due_date && latest.next_inspection_due_date < todayIso.value
+  if (overdue) return { label: '⚠ Échéance dépassée', tone: 'warn' }
+  return {
+    label: latest.last_inspection_date
+      ? `Dernière : ${latest.last_inspection_date}${latest.last_inspection_inspector ? ' · ' + latest.last_inspection_inspector : ''}`
+      : `${list.length} inspection${list.length > 1 ? 's' : ''} tracée${list.length > 1 ? 's' : ''}`,
+    tone: 'ok',
+  }
+})
 
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
@@ -540,5 +560,32 @@ const USAGES = [
         </div>
       </div>
     </template>
+
+    <!-- Inspections périodiques R175-5-1 — déclencheur + sheet (BACS uniquement) -->
+    <button
+      v-if="isBacs"
+      type="button"
+      @click="openInspections"
+      class="mt-3 w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
+    >
+      <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center shrink-0">
+        <ClockIcon class="w-5 h-5" />
+      </span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-amber-900 truncate">
+          Inspections périodiques <span class="font-normal opacity-70">— R175-5-1</span>
+        </p>
+        <p :class="['text-xs mt-0.5 truncate',
+                    inspectionStatus.tone === 'warn' ? 'text-red-600 font-medium' : 'text-emerald-700']">
+          {{ inspectionStatus.label }}
+        </p>
+      </div>
+      <ChevronRightIcon class="w-5 h-5 text-amber-400 shrink-0" />
+    </button>
+
+    <MobileInspectionsSheet
+      :open="showInspections"
+      @close="showInspections = false"
+    />
   </div>
 </template>
