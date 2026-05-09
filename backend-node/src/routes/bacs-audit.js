@@ -16,6 +16,7 @@ const {
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
   assertBacsAuditExists, logBacsAudit,
 } = require('./bacs-audit/_shared');
+const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
 
 async function routes(fastify) {
   // Sous-plugins par domaine
@@ -60,6 +61,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
 
     const sets = [], args = [];
     const boolField = (k) => {
@@ -120,6 +122,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_meters
         (document_id, zone_id, usage, meter_type, equipment_id,
@@ -158,6 +161,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
 
     // Regle : un compteur non present ne peut pas etre integre a la GTB
     // (cf retour Kevin v2.5). Auto-decoche managed_by_bms si on passe a non present.
@@ -273,6 +277,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     // Toggle bool -> 0/1
     const fields = {};
     for (const [k, v] of Object.entries(body)) {
@@ -322,6 +327,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body || {}); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM bacs_audit_bms_components WHERE document_id = ?').get(documentId).m;
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_bms_components
@@ -357,6 +363,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
     if (sets.length) {
@@ -445,6 +452,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
@@ -497,6 +505,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_action_items
         (document_id, category, severity, r175_article, title, description, zone_id, equipment_id, auto_generated)
@@ -524,6 +533,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     // Pour items auto-generes, on n'autorise QUE l'edit des champs commerciaux
     if (row.auto_generated) {
       const allowed = ['commercial_notes', 'estimated_effort', 'status', 'position', 'alternative_solutions_html'];
@@ -590,6 +600,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const out = db.bacsAuditChecklist.upsert(id, key, body);
     logBacsAudit(request, 'bacs.checklist.update', id, { catalogKey: key, status: body.status });
     return out;
@@ -656,6 +667,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
 
     // Dédup et exclut la zone d'origine si fournie par erreur.
     const requested = [...new Set(body.extra_zone_ids)].filter(z => z !== dev.origin_zone_id);
@@ -715,6 +727,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
 
     // Pré-remplissage depuis un modèle bibliothèque (optionnel).
     let prefName = body.name || null;
@@ -789,6 +802,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
