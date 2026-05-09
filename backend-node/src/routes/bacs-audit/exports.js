@@ -170,7 +170,7 @@ async function routes(fastify) {
   // /Users/kevinbrocard/.claude/plans/stateful-moseying-porcupine.md
   fastify.get('/bacs-audit/__preview-fixture', async (request, reply) => {
     if (!DEV_PREVIEW_ENABLED) return reply.code(404).send({ detail: 'Not found' });
-    const data = buildFixturePreviewData({ user: null });
+    const data = await buildFixturePreviewData({ user: null });
     const html = renderHtml({
       template: 'bacs-audit', styles: 'styles-bacs-audit', data, fresh: true,
     });
@@ -191,7 +191,7 @@ async function routes(fastify) {
   // l'integrateur Buildy pour batir son devis.
   fastify.get('/bacs-audit/__preview-fixture/tables', async (request, reply) => {
     if (!DEV_PREVIEW_ENABLED) return reply.code(404).send({ detail: 'Not found' });
-    const data = buildFixturePreviewData({ user: null });
+    const data = await buildFixturePreviewData({ user: null });
     const html = renderHtml({
       template: 'bacs-audit-tables', styles: 'styles-bacs-audit-tables', data,
       pageFormat: 'A3', pageOrientation: 'landscape', fresh: true,
@@ -209,7 +209,7 @@ async function routes(fastify) {
   // ─── Atelier de design — Tableaux de synthèse (PDF, paysage, dev) ─
   fastify.get('/bacs-audit/__preview-fixture/tables/pdf', async (request, reply) => {
     if (!DEV_PREVIEW_ENABLED) return reply.code(404).send({ detail: 'Not found' });
-    const data = buildFixturePreviewData({ user: null });
+    const data = await buildFixturePreviewData({ user: null });
     const exportsDir = path.resolve(config.exportsDir);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `fixture-bacs-tables-${data.version}-${ts}.pdf`;
@@ -250,7 +250,7 @@ async function routes(fastify) {
   // livrable technico-commercial.
   fastify.get('/bacs-audit/__preview-fixture/pdf', async (request, reply) => {
     if (!DEV_PREVIEW_ENABLED) return reply.code(404).send({ detail: 'Not found' });
-    const data = buildFixturePreviewData({ user: null });
+    const data = await buildFixturePreviewData({ user: null });
     const { version, isBacs } = data;
     const exportsDir = path.resolve(config.exportsDir);
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
