@@ -53,8 +53,32 @@ function assertBacsAuditExists(documentId, request, reply, { requiredRole = 'rea
   return af;
 }
 
+/**
+ * Helper de journalisation des modifications d'un audit BACS. Wrap
+ * `db.auditLog.add` en injectant automatiquement le user courant et
+ * en silenciant les erreurs (le log ne doit jamais bloquer l'écriture
+ * métier — au pire, il est manqué).
+ *
+ * Utilisation à la fin d'une route write :
+ *   logBacsAudit(request, 'bacs.system.update', documentId, { systemId, fields });
+ *
+ * Convention d'action : `bacs.<entity>.<verb>` (verbe = create | update |
+ * delete | duplicate | reorder | merge | regenerate | upload | apply).
+ */
+function logBacsAudit(request, action, afId, payload = {}) {
+  try {
+    db.auditLog.add({
+      afId,
+      userId: request?.authUser?.id || null,
+      action,
+      payload,
+    });
+  } catch { /* fail-soft : pas de log = pas de bloquage */ }
+}
+
 module.exports = {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
   assertBacsAuditExists,
+  logBacsAudit,
 };

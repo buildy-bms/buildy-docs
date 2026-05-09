@@ -7,7 +7,7 @@
 const { z } = require('zod');
 const db = require('../../database');
 const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator');
-const { assertBacsAuditExists } = require('./_shared');
+const { assertBacsAuditExists, logBacsAudit } = require('./_shared');
 
 const inspectionFields = z.object({
   last_inspection_date: z.string().nullable().optional(),
@@ -42,6 +42,7 @@ async function routes(fastify) {
       INSERT INTO bacs_audit_inspections (document_id${cols.length ? ', ' + cols.join(', ') : ''})
       VALUES (?${cols.length ? ', ' + cols.map(() => '?').join(', ') : ''})
     `).run(documentId, ...cols.map(k => body[k]));
+    logBacsAudit(request, 'bacs.inspection.create', documentId, { inspectionId: r.lastInsertRowid });
     regenerateActionItems(documentId);
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_inspections WHERE id = ?').get(r.lastInsertRowid));
   });
@@ -59,6 +60,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_inspections SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.inspection.update', row.document_id, { inspectionId: id, fields: Object.keys(body) });
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_inspections WHERE id = ?').get(id);
@@ -69,6 +71,7 @@ async function routes(fastify) {
     const row = db.db.prepare('SELECT document_id FROM bacs_audit_inspections WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Inspection non trouvee' });
     db.db.prepare('DELETE FROM bacs_audit_inspections WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.inspection.delete', row.document_id, { inspectionId: id });
     regenerateActionItems(row.document_id);
     return reply.code(204).send();
   });

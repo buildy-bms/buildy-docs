@@ -14,7 +14,7 @@ const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
   RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
-  assertBacsAuditExists,
+  assertBacsAuditExists, logBacsAudit,
 } = require('./bacs-audit/_shared');
 
 async function routes(fastify) {
@@ -85,6 +85,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_systems SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.system.update', row.document_id, { systemId: id, fields: Object.keys(body) });
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
@@ -130,6 +131,7 @@ async function routes(fastify) {
       body.required ? 1 : 0, body.present_actual ? 1 : 0, body.communicating ? 1 : 0,
       body.communication_protocol || null, body.notes || null,
     );
+    logBacsAudit(request, 'bacs.meter.create', documentId, { meterId: r.lastInsertRowid, usage: body.usage, type: body.meter_type });
     regenerateActionItems(documentId);
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(r.lastInsertRowid));
   });
@@ -172,6 +174,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_meters SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.meter.update', row.document_id, { meterId: id, fields: Object.keys(body) });
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(id);
@@ -204,6 +207,7 @@ async function routes(fastify) {
     const row = db.db.prepare('SELECT document_id FROM bacs_audit_meters WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne meter non trouvee' });
     db.db.prepare('DELETE FROM bacs_audit_meters WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.meter.delete', row.document_id, { meterId: id });
     regenerateActionItems(row.document_id);
     return reply.code(204).send();
   });
@@ -284,6 +288,7 @@ async function routes(fastify) {
         VALUES (?, ${Object.keys(fields).map(() => '?').join(', ')}, CURRENT_TIMESTAMP)
         ON CONFLICT(document_id) DO UPDATE SET ${cols}, updated_at = CURRENT_TIMESTAMP
       `).run(documentId, ...values, ...values);
+      logBacsAudit(request, 'bacs.bms.update', documentId, { fields: Object.keys(fields) });
     }
     regenerateActionItems(documentId);
     return db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
@@ -329,6 +334,7 @@ async function routes(fastify) {
       body.location || null, body.ip_address || null, body.protocols || null,
       body.firmware_version || null, body.notes || null,
     );
+    logBacsAudit(request, 'bacs.bms_component.create', documentId, { componentId: r.lastInsertRowid, type: body.component_type });
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(r.lastInsertRowid));
   });
 
@@ -357,6 +363,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_bms_components SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.bms_component.update', row.document_id, { componentId: id, fields: Object.keys(body) });
     }
     return db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
   });
@@ -383,6 +390,7 @@ async function routes(fastify) {
     const row = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Composant non trouve' });
     db.db.prepare('DELETE FROM bacs_audit_bms_components WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.bms_component.delete', row.document_id, { componentId: id });
     return reply.code(204).send();
   });
 
@@ -446,6 +454,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_thermal_regulation SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.thermal.update', row.document_id, { thermalId: id, fields: Object.keys(body) });
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
@@ -494,6 +503,7 @@ async function routes(fastify) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
     `).run(documentId, body.category, body.severity, body.r175_article || null,
       body.title, body.description || null, body.zone_id || null, body.equipment_id || null);
+    logBacsAudit(request, 'bacs.action_item.create', documentId, { itemId: r.lastInsertRowid, severity: body.severity, title: body.title });
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(r.lastInsertRowid));
   });
 
@@ -528,18 +538,20 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       const values = Object.values(body);
       db.db.prepare(`UPDATE bacs_audit_action_items SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+      logBacsAudit(request, 'bacs.action_item.update', row.document_id, { itemId: id, fields: Object.keys(body), auto: !!row.auto_generated });
     }
     return db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(id);
   });
 
   fastify.delete('/bacs-audit/action-items/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
-    const row = db.db.prepare('SELECT auto_generated FROM bacs_audit_action_items WHERE id = ?').get(id);
+    const row = db.db.prepare('SELECT auto_generated, document_id FROM bacs_audit_action_items WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Item non trouve' });
     if (row.auto_generated) {
       return reply.code(400).send({ detail: 'Items auto-generes ne peuvent pas etre supprimes (ils disparaitront seuls a la prochaine regen). Utilise status=declined a la place.' });
     }
     db.db.prepare('DELETE FROM bacs_audit_action_items WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.action_item.delete', row.document_id, { itemId: id });
     return reply.code(204).send();
   });
 
@@ -548,6 +560,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(id, request, reply)) return;
     const result = regenerateActionItems(id);
+    logBacsAudit(request, 'bacs.action_item.regenerate', id, { result });
     return result;
   });
 
@@ -577,7 +590,9 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
-    return db.bacsAuditChecklist.upsert(id, key, body);
+    const out = db.bacsAuditChecklist.upsert(id, key, body);
+    logBacsAudit(request, 'bacs.checklist.update', id, { catalogKey: key, status: body.status });
+    return out;
   });
 
   fastify.get('/bacs-audit/:documentId/photo-coverage', async (request, reply) => {
@@ -652,6 +667,7 @@ async function routes(fastify) {
     }
 
     db.bacsAuditDeviceZones.setExtraForDevice(id, requested);
+    logBacsAudit(request, 'bacs.device.share', dev.document_id, { deviceId: id, extraZoneIds: requested });
 
     // Auto « Présent » : pour chaque zone supplémentaire désormais desservie,
     // s'assurer qu'il y a un système de la même catégorie marqué present=1.
@@ -735,6 +751,7 @@ async function routes(fastify) {
       body.communication_protocol || null,
       body.location || null, body.notes || null,
     );
+    logBacsAudit(request, 'bacs.device.create', sys.document_id, { systemId: sysId, deviceId: r.lastInsertRowid, fromTemplate: body.equipment_template_id || null });
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
     resyncBacsAuditWithSiteZones(sys.document_id);
     regenerateActionItems(sys.document_id);
@@ -781,6 +798,7 @@ async function routes(fastify) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);
       db.db.prepare(`UPDATE bacs_audit_system_devices SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+      logBacsAudit(request, 'bacs.device.update', dev.document_id, { deviceId: id, fields: Object.keys(body) });
     }
     // Energy source ou power changeants → recompute meters + actions
     resyncBacsAuditWithSiteZones(dev.document_id);
@@ -826,6 +844,7 @@ async function routes(fastify) {
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
     db.db.prepare('DELETE FROM bacs_audit_system_devices WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.device.delete', dev.document_id, { deviceId: id });
     regenerateActionItems(dev.document_id);
     return reply.code(204).send();
   });
