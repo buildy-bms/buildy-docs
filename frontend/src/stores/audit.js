@@ -14,6 +14,7 @@ import {
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
   getSite, updateSite,
+  getBacsGtbObservations, updateBacsGtbObservation,
 } from '@/api'
 
 export const useAuditStore = defineStore('audit', {
@@ -34,6 +35,9 @@ export const useAuditStore = defineStore('audit', {
     synthesisHtml: '',
     // Counts photos par entité (alimente badges « 📷 N »).
     photoCounts: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 },
+    // Notes par sujet de la carte GTB (mig 109). Tableau de
+    // { topic_key, label, observation_html, ... } chargé en parallèle.
+    gtbTopicNotes: [],
     // loading=true par defaut : evite que les sous-composants ne se
     // montent avec un state non initialise (notamment BmsComponentsTable
     // qui fetcherait avec docId=null sinon). Passe a false a la fin de
@@ -112,16 +116,18 @@ export const useAuditStore = defineStore('audit', {
             this.site = s.data
           } catch { this.site = null }
         }
-        const [dev, ps, ins, pc] = await Promise.all([
+        const [dev, ps, ins, pc, gtb] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
           getBacsInspections(docId),
           getBacsPhotoCounts(docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 } })),
+          getBacsGtbObservations(docId).catch(() => ({ data: [] })),
         ])
         this.devices = dev.data
         this.powerSummary = ps.data
         this.inspections = ins.data
         this.photoCounts = pc.data
+        this.gtbTopicNotes = gtb.data
       } finally {
         this.loading = false
       }
@@ -225,6 +231,17 @@ export const useAuditStore = defineStore('audit', {
     async saveBms() {
       await updateBacsBms(this.docId, this.bms)
       await this.refreshActionItems()
+    },
+
+    /**
+     * Sauvegarde la note d'un sujet de la carte GTB (mig 109).
+     * Met à jour le state local en place pour refléter immédiatement
+     * la nouvelle pastille « note présente » sur le bouton.
+     */
+    async saveGtbTopicNote(topicKey, html) {
+      await updateBacsGtbObservation(this.docId, topicKey, { observation_html: html || null })
+      const item = this.gtbTopicNotes.find(t => t.topic_key === topicKey)
+      if (item) item.observation_html = html || null
     },
 
     setSynthesisHtml(html) { this.synthesisHtml = html },

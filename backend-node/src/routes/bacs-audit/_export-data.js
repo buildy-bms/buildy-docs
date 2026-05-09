@@ -80,14 +80,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ORDER BY a.position, a.id
   `).all(documentId);
 
-  // Constats GTB hors-décret + opportunités Buildy (mig 108).
-  // Ne renvoie que les sujets renseignés (au moins une des deux zones
-  // de texte non vide) — un sujet vide n'apparaît pas dans le PDF.
-  const gtbObservationsAll = db.bacsAuditGtbObservations.listForDocument(documentId);
-  const gtbObservations = gtbObservationsAll.filter(o =>
-    (o.observation_html?.replace(/<[^>]*>/g, '').trim().length || 0) > 0 ||
-    (o.opportunity_html?.replace(/<[^>]*>/g, '').trim().length || 0) > 0
-  );
+  // Notes par sujet de la carte GTB (mig 108 + 109).
+  // Map { topic_key -> note_html } pour lookup direct dans le template
+  // PDF sous chaque sous-section du chapitre 6 GTB.
+  const bmsTopicNotes = db.bacsAuditGtbObservations.notesByTopic(documentId);
 
   // Charge tous les devices du document (joints au systeme parent)
   const devices = db.db.prepare(`
@@ -419,7 +415,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     buildySolution,
     actionItems,
     actionStats,
-    gtbObservations,
+    bmsTopicNotes,
     // actionItemsRaw expose en realite les items NUMEROTES (BACS-XXX) pour
     // que les tableaux de synthese puissent les afficher en forme finale.
     // Si on a besoin des bruts sans numerotation, ils sont reconstitubles

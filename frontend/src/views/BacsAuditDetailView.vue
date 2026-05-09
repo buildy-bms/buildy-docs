@@ -56,7 +56,6 @@ const InspectionsSection = defineAsyncComponent(() => import('@/components/audit
 const CompliancePlanSection = defineAsyncComponent(() => import('@/components/audit/CompliancePlanSection.vue'))
 const SynthesisSection = defineAsyncComponent(() => import('@/components/audit/SynthesisSection.vue'))
 const BmsSection = defineAsyncComponent(() => import('@/components/audit/BmsSection.vue'))
-const GtbObservationsSection = defineAsyncComponent(() => import('@/components/audit/GtbObservationsSection.vue'))
 import ThermalSection from '@/components/audit/ThermalSection.vue'
 import MetersSection from '@/components/audit/MetersSection.vue'
 import SystemsSection from '@/components/audit/SystemsSection.vue'
@@ -847,6 +846,11 @@ async function saveNotesModal(html) {
     } else if (m.entityType === 'bms') {
       const { data } = await updateBacsBms(docId, payload)
       bms.value = data
+    } else if (m.entityType === 'bms_topic') {
+      // Note libre par sujet de la carte GTB (mig 109). On passe par le
+      // store pour mettre à jour gtbTopicNotes en place (pastille « Note »
+      // sur le bouton se met à jour sans refresh).
+      await auditStore.saveGtbTopicNote(m.entityRef.topic_key, html)
     } else if (m.entityType === 'device') {
       const { data } = await updateBacsDevice(m.entityRef.id, payload)
       Object.assign(m.entityRef, data)
@@ -1365,10 +1369,6 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
       />
-
-      <!-- 11. Constats GTB & opportunités Buildy (mig 108) — narratif libre par sujet,
-           visible PDF même hors décret. -->
-      <GtbObservationsSection :active="false" />
 
       <!-- Plan de mise en conformité — masqué en mode site_audit -->
       <CompliancePlanSection
