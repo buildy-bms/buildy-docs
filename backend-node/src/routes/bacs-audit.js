@@ -27,7 +27,7 @@ async function routes(fastify) {
   // ─── Systems (R175-1 §4 + R175-3 §3) ───────────────────────────────
   fastify.get('/bacs-audit/:documentId/systems', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
       FROM bacs_audit_systems s
@@ -93,7 +93,7 @@ async function routes(fastify) {
   // ─── Meters (R175-3 §1) ────────────────────────────────────────────
   fastify.get('/bacs-audit/:documentId/meters', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
       LEFT JOIN zones z ON z.zone_id = m.zone_id
@@ -104,7 +104,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/meters', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     const schema = z.object({
       zone_id: z.number().int().positive().nullable().optional(),
       usage: z.enum(METER_USAGES),
@@ -212,13 +212,13 @@ async function routes(fastify) {
   // ─── BMS (R175-3 / R175-4 / R175-5) ────────────────────────────────
   fastify.get('/bacs-audit/:documentId/bms', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(id) || { document_id: id };
   });
 
   fastify.put('/bacs-audit/:documentId/bms', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     // Helper : accepte boolean, 0/1, true/false (string ou number) et null
     const boolish = z.preprocess((v) => {
       if (v === null || v === undefined) return v;
@@ -294,7 +294,7 @@ async function routes(fastify) {
 
   fastify.get('/bacs-audit/:documentId/bms-components', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT * FROM bacs_audit_bms_components
       WHERE document_id = ? ORDER BY position, id
@@ -303,7 +303,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/bms-components', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     const schema = z.object({
       component_type: z.enum(BMS_COMPONENT_TYPES).nullable().optional(),
       brand: z.string().nullable().optional(),
@@ -390,7 +390,7 @@ async function routes(fastify) {
   // ─── Thermal regulation (R175-6) ───────────────────────────────────
   fastify.get('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT t.*, z.name AS zone_name, z.nature AS zone_nature
       FROM bacs_audit_thermal_regulation t
@@ -454,7 +454,7 @@ async function routes(fastify) {
   // ─── Action items (plan de mise en conformite) ─────────────────────
   fastify.get('/bacs-audit/:documentId/action-items', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const { severity, category, status, zone_id } = request.query;
     let sql = `
       SELECT a.*, z.name AS zone_name, e.name AS equipment_name
@@ -475,7 +475,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/action-items', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     const schema = z.object({
       category: z.string().min(1),
       severity: z.enum(['blocking','major','minor']),
@@ -546,7 +546,7 @@ async function routes(fastify) {
   // POST /bacs-audit/:documentId/action-items/regenerate — relance manuelle
   fastify.post('/bacs-audit/:documentId/action-items/regenerate', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const result = regenerateActionItems(id);
     return result;
   });
@@ -558,14 +558,14 @@ async function routes(fastify) {
 
   fastify.get('/bacs-audit/:documentId/checklist', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.bacsAuditChecklist.listForDocument(id);
   });
 
   fastify.patch('/bacs-audit/:documentId/checklist/:catalogKey', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
     const key = request.params.catalogKey;
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     if (!db.bacsChecklistCatalog.getByKey(key)) {
       return reply.code(404).send({ detail: 'Item de catalogue introuvable' });
     }
@@ -582,7 +582,7 @@ async function routes(fastify) {
 
   fastify.get('/bacs-audit/:documentId/photo-coverage', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.bacsAuditChecklist.photoCoverage(id);
   });
 
@@ -594,7 +594,7 @@ async function routes(fastify) {
   // GET /bacs-audit/:documentId/devices — tous les devices du document, joints au système
   fastify.get('/bacs-audit/:documentId/devices', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const rows = db.db.prepare(`
       SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name
       FROM bacs_audit_system_devices d
@@ -840,7 +840,7 @@ async function routes(fastify) {
   // POST /bacs-audit/:documentId/zones/reorder { ids: [...] }
   fastify.post('/bacs-audit/:documentId/zones/reorder', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(id, reply);
+    const af = assertBacsAuditExists(id, request, reply);
     if (!af) return;
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
     const upd = db.db.prepare('UPDATE zones SET position = ? WHERE zone_id = ? AND site_id = ?');
@@ -851,7 +851,7 @@ async function routes(fastify) {
   // POST /bacs-audit/:documentId/systems/reorder { ids: [...] }
   fastify.post('/bacs-audit/:documentId/systems/reorder', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
     const upd = db.db.prepare('UPDATE bacs_audit_systems SET position = ? WHERE id = ? AND document_id = ?');
     const tx = db.db.transaction((arr) => {
@@ -864,7 +864,7 @@ async function routes(fastify) {
   // POST /bacs-audit/:documentId/meters/reorder { ids: [...] }
   fastify.post('/bacs-audit/:documentId/meters/reorder', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
     const upd = db.db.prepare('UPDATE bacs_audit_meters SET position = ? WHERE id = ? AND document_id = ?');
     const tx = db.db.transaction((arr) => {
@@ -877,7 +877,7 @@ async function routes(fastify) {
   // POST /bacs-audit/:documentId/thermal-regulation/reorder { ids: [...] }
   fastify.post('/bacs-audit/:documentId/thermal-regulation/reorder', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
     const upd = db.db.prepare('UPDATE bacs_audit_thermal_regulation SET position = ? WHERE id = ? AND document_id = ?');
     const tx = db.db.transaction((arr) => {
@@ -890,7 +890,7 @@ async function routes(fastify) {
   // GET /bacs-audit/:documentId/power-summary — synthèse puissances
   fastify.get('/bacs-audit/:documentId/power-summary', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const rows = db.db.prepare(`
       SELECT s.system_category AS category,
              COALESCE(SUM(d.power_kw), 0) AS total_kw,
@@ -923,7 +923,7 @@ async function routes(fastify) {
   // site (idempotent). Appele par la UI apres ajout d'une zone.
   fastify.post('/bacs-audit/:documentId/resync', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     let result;
     try { result = resyncBacsAuditWithSiteZones(id); }
     catch (e) { return reply.code(400).send({ detail: e.message }); }

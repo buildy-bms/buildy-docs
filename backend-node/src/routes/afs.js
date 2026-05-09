@@ -5,7 +5,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { uniqueSlug } = require('../lib/slug');
 const { seedAfStructure, seedBacsAuditStructure } = require('../lib/seeder');
-const { assertWrite } = require('../lib/af-permissions');
+const { assertWrite, assertRead } = require('../lib/af-permissions');
 
 // ── Zod schemas ──────────────────────────────────────────────────────
 const createAfSchema = z.object({
@@ -78,6 +78,9 @@ async function routes(fastify) {
     let items = db.afs.list({
       status: status || undefined,
       includeDeleted: includeDeleted === 'true',
+      // Mig 107 : filtrage strict par user. Tout doc qui n'est pas owned
+      // par le user et qui n'a pas de grant explicite est invisible.
+      forUserId: request.authUser?.id,
     });
     // Filtres post-list (le helper db.afs.list ne supporte pas encore kind/site_id)
     if (kind) items = items.filter(a => (a.kind || 'af') === kind);
@@ -141,7 +144,13 @@ async function routes(fastify) {
     const libraryHits = db.db.prepare(`SELECT id, slug, number, title, kind, is_functionality
       FROM section_templates WHERE title LIKE ? OR body_html LIKE ? OR bacs_articles LIKE ?
       ORDER BY is_functionality DESC, number LIMIT 20`).all(like, like, like);
-    return { af_ids: [...afIds], site_hits: siteHits, library_hits: libraryHits };
+    // Mig 107 : filtre les af_ids matchés sur ceux accessibles à l'user.
+    // Évite de leak l'existence de docs auxquels il n'a pas accès.
+    const userId = request.authUser?.id;
+    const visibleAfIds = userId
+      ? [...afIds].filter(id => db.afPermissions.hasAccess(id, userId, 'read').ok)
+      : [];
+    return { af_ids: visibleAfIds, site_hits: siteHits, library_hits: libraryHits };
   });
 
   // GET /api/afs/stats — counts par status
@@ -154,8 +163,10 @@ async function routes(fastify) {
 
   // GET /api/afs/:id — detail
   fastify.get('/afs/:id', async (request, reply) => {
-    const af = db.afs.getById(parseInt(request.params.id, 10));
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
     const site = af.site_id ? db.sites.getById(af.site_id) : null;
     const usersById = db.users.getByIds([af.created_by, af.updated_by]);
     return {
@@ -173,6 +184,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
     // Numerotation live (memes regles que arbo edition + PDF AF) : on recalcule
     // depuis la position courante. Le `s.number` figé en DB ne reflete plus
     // la position apres reordonnancement.
@@ -357,6 +369,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
 
     const to = request.query.to;
     if (!['validee', 'livree'].includes(to)) {
@@ -627,6 +640,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
 
     const excluded = new Set(
       (request.query.excluded || '')
@@ -672,10 +686,14 @@ async function routes(fastify) {
   });
 
   // ── Permissions / Partage AF (Lot 28) ──────────────────────────────
+  // Mig 107 : seul l'owner gère les grants (sinon n'importe qui pourrait
+  // s'auto-grant et contourner la restriction). La lecture des grants
+  // est ouverte aux personnes ayant accès au document.
   fastify.get('/afs/:id/permissions', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
     return {
       owner_id: af.created_by,
       grants: db.afPermissions.listByAf(id),
@@ -686,6 +704,9 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (af.created_by !== request.authUser?.id) {
+      return reply.code(403).send({ detail: 'Seul le propriétaire du document peut gérer les partages.' });
+    }
     const { user_id, role } = request.body || {};
     if (!user_id || !['read', 'write'].includes(role)) {
       return reply.code(400).send({ detail: 'user_id + role (read|write) requis' });
@@ -700,6 +721,11 @@ async function routes(fastify) {
 
   fastify.delete('/afs/:id/permissions/:userId', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (af.created_by !== request.authUser?.id) {
+      return reply.code(403).send({ detail: 'Seul le propriétaire du document peut gérer les partages.' });
+    }
     const userId = parseInt(request.params.userId, 10);
     db.afPermissions.revoke(id, userId);
     db.auditLog.add({ afId: id, userId: request.authUser?.id, action: 'af.share.revoke', payload: { user_id: userId } });
@@ -707,8 +733,9 @@ async function routes(fastify) {
   });
 
   // GET /api/afs/:id/audit — historique (50 dernieres entrees)
-  fastify.get('/afs/:id/audit', async (request) => {
+  fastify.get('/afs/:id/audit', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
+    if (!assertRead(request, reply, id)) return;
     return db.auditLog.recent(id, 50);
   });
 
@@ -718,6 +745,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
     const level = String(request.query?.level || '').toUpperCase();
     if (!['E', 'S', 'P'].includes(level)) {
       return reply.code(400).send({ detail: 'Niveau invalide (attendu E, S ou P)' });
@@ -755,6 +783,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const af = db.afs.getById(id);
     if (!af) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
     const { diffSectionVsTemplate } = require('../lib/template-propagation');
 
     // Source 1 — equipements (existant)

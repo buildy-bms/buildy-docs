@@ -25,7 +25,7 @@ async function routes(fastify) {
   // Re-livraison : nouveau tag avec suffixe -v2/-v3 (cf lib/git.js).
   fastify.post('/bacs-audit/:documentId/deliver', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
@@ -86,7 +86,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/validate-step', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const schema = z.object({
       step: z.enum(AUDIT_STEPS),
@@ -136,7 +136,7 @@ async function routes(fastify) {
   // en tete du PDF d'audit (chapitre 0 - Synthese executive).
   fastify.put('/bacs-audit/:documentId/synthesis', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const schema = z.object({ html: z.string().nullable().optional() });
     let body;
@@ -185,7 +185,7 @@ async function routes(fastify) {
       return reply.code(503).send({ detail: 'Assistant Claude non configure (ANTHROPIC_API_KEY manquant)' });
     }
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const site = af.site_id ? db.sites.getByIdInternal?.(af.site_id) || db.sites.getById(af.site_id) : null;
     const zones = site ? db.zones.listBySite(site.site_id) : [];

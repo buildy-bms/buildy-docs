@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 106;
+const TARGET_VERSION = 107;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3879,6 +3879,31 @@ function runMigrations() {
     log.info('Migration 106 appliquee : kind site_audit supprime');
   }
 
+  if (current < 107) {
+    // Permissions strictes par défaut : on bascule du mode « permissive »
+    // (mig 13 : tous les users connectés voient tous les docs sans entrée
+    // af_permissions) vers « creator-only par défaut ».
+    //
+    // Compat : pour ne pas couper l'accès à des collègues qui collaborent
+    // déjà sur des audits en prod, on snapshote l'état actuel = on insère
+    // un grant 'write' explicite pour tous les users existants sur tous
+    // les docs existants (sauf l'owner qui a déjà tous les droits via
+    // afs.created_by). À partir de cette migration, tous les NOUVEAUX
+    // docs sont strictement creator-only jusqu'au premier partage
+    // explicite via la modale « Partager ».
+    const inserted = db.prepare(`
+      INSERT OR IGNORE INTO af_permissions (af_id, user_id, role, granted_by)
+      SELECT a.id, u.id, 'write', a.created_by
+      FROM afs a
+      CROSS JOIN users u
+      WHERE a.deleted_at IS NULL
+        AND u.id != a.created_by
+    `).run().changes;
+    log.info(`Migration 107 : ${inserted} grant(s) legacy posé(s) (snapshot accès actuel)`);
+    db.pragma('user_version = 107');
+    log.info('Migration 107 appliquee : permissions strictes par defaut (creator-only + grants explicites)');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -3931,12 +3956,26 @@ const users = {
     db.prepare('UPDATE users SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
   ensureDevUser(email, displayName) {
-    const existing = db.prepare('SELECT * FROM users WHERE oidc_sub = ?').get('dev-bypass');
+    // On indexe par email (et pas un oidc_sub fixe) pour permettre
+    // de basculer entre plusieurs users en dev via les env vars
+    // DEV_BYPASS_EMAIL/DEV_BYPASS_NAME — utile pour tester les
+    // permissions multi-users.
+    const oidcSub = `dev-bypass:${email}`;
+    const existing = db.prepare('SELECT * FROM users WHERE oidc_sub = ?').get(oidcSub);
     if (existing) return existing;
+    // Compat avec l'ancien dev-bypass mono-user : si un user existe déjà
+    // avec cet email (créé sous l'oidc_sub legacy 'dev-bypass'), on le
+    // migre vers le nouveau schéma au lieu d'en créer un doublon — ça
+    // préserve les ownerships d'audits existants.
+    const byEmail = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    if (byEmail) {
+      db.prepare('UPDATE users SET oidc_sub = ? WHERE id = ?').run(oidcSub, byEmail.id);
+      return { ...byEmail, oidc_sub: oidcSub };
+    }
     const result = db.prepare(`
       INSERT INTO users (oidc_sub, oidc_issuer, email, display_name)
-      VALUES ('dev-bypass', 'local-dev', ?, ?)
-    `).run(email, displayName);
+      VALUES (?, 'local-dev', ?, ?)
+    `).run(oidcSub, email, displayName);
     return this.getById(result.lastInsertRowid);
   },
 };
@@ -4687,12 +4726,26 @@ const sectionTemplates = {
 
 // ── AFs ──────────────────────────────────────────────────────────────
 const afs = {
-  list({ status, includeDeleted = false } = {}) {
-    let sql = 'SELECT * FROM afs WHERE 1=1';
+  /**
+   * @param {object} [opts]
+   * @param {string} [opts.status]
+   * @param {boolean} [opts.includeDeleted=false]
+   * @param {number} [opts.forUserId] — filtre les docs accessibles à cet
+   *   utilisateur (mig 107 : creator-only par défaut). Owner OR grant
+   *   posé dans af_permissions. Si omis : retourne tous les docs (admin
+   *   uniquement, ou contextes internes).
+   */
+  list({ status, includeDeleted = false, forUserId } = {}) {
+    let sql = 'SELECT a.* FROM afs a WHERE 1=1';
     const params = [];
-    if (!includeDeleted) sql += ' AND deleted_at IS NULL';
-    if (status) { sql += ' AND status = ?'; params.push(status); }
-    sql += ' ORDER BY updated_at DESC';
+    if (!includeDeleted) sql += ' AND a.deleted_at IS NULL';
+    if (status) { sql += ' AND a.status = ?'; params.push(status); }
+    if (forUserId != null) {
+      sql += ` AND (a.created_by = ?
+        OR EXISTS (SELECT 1 FROM af_permissions p WHERE p.af_id = a.id AND p.user_id = ?))`;
+      params.push(forUserId, forUserId);
+    }
+    sql += ' ORDER BY a.updated_at DESC';
     return db.prepare(sql).all(...params);
   },
   getById(id) {
@@ -5423,9 +5476,14 @@ const afPermissions = {
   hasAccess(afId, userId, requiredRole = 'read') {
     if (!userId) return { ok: false, role: null };
     const af = db.prepare('SELECT created_by FROM afs WHERE id = ?').get(afId);
-    if (af?.created_by === userId) return { ok: true, role: 'owner' };
-    const perms = db.prepare('SELECT 1 FROM af_permissions WHERE af_id = ? LIMIT 1').get(afId);
-    if (!perms) return { ok: true, role: 'public' }; // Mode legacy : pas de permission posée → tous accèdent
+    if (!af) return { ok: false, role: null };
+    if (af.created_by === userId) return { ok: true, role: 'owner' };
+    // Mig 107 : modèle « creator-only par défaut ». L'accès n'est plus
+    // implicite — il faut une entrée explicite dans af_permissions.
+    // Compat : la mig 107 a snapshoté tous les docs existants en posant
+    // un grant 'write' à tous les users qui existaient au moment du
+    // déploiement. Tous les nouveaux docs (créés après la mig) sont
+    // strictement creator-only jusqu'au premier partage.
     const row = db.prepare('SELECT role FROM af_permissions WHERE af_id = ? AND user_id = ?').get(afId, userId);
     if (!row) return { ok: false, role: null };
     if (requiredRole === 'write' && row.role === 'read') return { ok: false, role: 'read' };

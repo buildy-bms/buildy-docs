@@ -82,7 +82,7 @@ async function routes(fastify) {
   // photos telephone + dictee Plaud Pro pour la restitution au bureau.
   fastify.post('/bacs-audit/:documentId/exports/checklist', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const data = buildChecklistData(documentId);
     if (!data) return reply.code(404).send({ detail: 'Audit introuvable' });
@@ -118,7 +118,7 @@ async function routes(fastify) {
 
   fastify.get('/bacs-audit/:documentId/action-items/export.csv', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const items = db.db.prepare(`
       SELECT a.*, z.name AS zone_name, e.name AS equipment_name
       FROM bacs_audit_action_items a
@@ -154,7 +154,7 @@ async function routes(fastify) {
   // de declencher un export PDF complet.
   fastify.get('/bacs-audit/:documentId/preview', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
@@ -294,7 +294,7 @@ async function routes(fastify) {
   // ─── Export PDF audit BACS ─────────────────────────────────────────
   fastify.post('/bacs-audit/:documentId/export-pdf', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
 
     const userId = request.authUser?.id;
@@ -380,7 +380,7 @@ async function routes(fastify) {
   // templates/pdf/bacs-audit-tables.hbs.
   fastify.post('/bacs-audit/:documentId/exports/tables', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    const af = assertBacsAuditExists(documentId, reply);
+    const af = assertBacsAuditExists(documentId, request, reply);
     if (!af) return;
 
     const userId = request.authUser?.id;
