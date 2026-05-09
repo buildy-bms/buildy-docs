@@ -84,9 +84,10 @@ onMounted(refresh)
   <BaseModal :title="'Partager cette AF'" size="lg" @close="emit('close')">
     <div class="space-y-5">
       <p class="text-xs text-gray-500 leading-relaxed">
-        Donnez accès à d'autres utilisateurs en lecture ou écriture.
-        <strong>Note V1 :</strong> tant qu'aucun partage n'est posé, l'AF reste visible par tous les utilisateurs Buildy
-        (mode legacy). Le partage sert pour l'instant à <em>formaliser</em> les responsabilités ; l'enforcement strict est prévu en V2.
+        Par défaut, ce document n'est visible que par son créateur.
+        Ajoutez ci-dessous les personnes qui doivent pouvoir le consulter
+        (lecture seule) ou le modifier (écriture). Seul le propriétaire
+        peut gérer les partages.
       </p>
 
       <!-- Liste des grants existants -->

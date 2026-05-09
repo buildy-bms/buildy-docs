@@ -108,7 +108,10 @@ onMounted(() => { if (props.open) refresh() })
   >
     <div class="p-4 space-y-4">
       <p class="text-sm text-gray-600 leading-relaxed">
-        Donne accès à d'autres collaborateurs Buildy en lecture ou écriture. Toute personne ajoutée pourra ouvrir cet audit avec son login PocketID habituel.
+        Par défaut, cet audit n'est visible que par toi. Ajoute ci-dessous
+        les collaborateurs qui doivent pouvoir l'ouvrir (avec leur login
+        PocketID) en lecture ou en écriture. Seul le propriétaire peut
+        gérer les partages.
       </p>
 
       <!-- Personnes ayant accès -->

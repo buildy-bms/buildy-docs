@@ -45,7 +45,7 @@ function loadAuditEntities(documentId) {
 async function routes(fastify) {
   fastify.get('/bacs-audit/:documentId/transcripts', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(
       'SELECT id, document_id, original_name, size_bytes, uploaded_at, suggestions_generated_at, suggestions_usage_input_tokens, suggestions_usage_output_tokens FROM bacs_audit_transcripts WHERE document_id = ? ORDER BY uploaded_at DESC'
     ).all(id);
@@ -53,7 +53,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/transcripts', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     const file = await request.file({ limits: { fileSize: 5 * 1024 * 1024 } });
     if (!file) return reply.code(400).send({ detail: 'Aucun fichier recu' });
     const buffer = await file.toBuffer();
@@ -136,7 +136,7 @@ async function routes(fastify) {
 
   fastify.get('/bacs-audit/:documentId/suggestions', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     const status = request.query.status;
     const sql = `SELECT * FROM bacs_audit_suggestions WHERE document_id = ?` +
                 (status ? ` AND status = ?` : ``) +

@@ -23,7 +23,7 @@ const inspectionFields = z.object({
 async function routes(fastify) {
   fastify.get('/bacs-audit/:documentId/inspections', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(id, reply)) return;
+    if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT * FROM bacs_audit_inspections
       WHERE document_id = ?
@@ -33,7 +33,7 @@ async function routes(fastify) {
 
   fastify.post('/bacs-audit/:documentId/inspections', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
-    if (!assertBacsAuditExists(documentId, reply)) return;
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
     let body;
     try { body = inspectionFields.parse(request.body || {}); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
