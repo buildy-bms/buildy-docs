@@ -56,6 +56,7 @@ const InspectionsSection = defineAsyncComponent(() => import('@/components/audit
 const CompliancePlanSection = defineAsyncComponent(() => import('@/components/audit/CompliancePlanSection.vue'))
 const SynthesisSection = defineAsyncComponent(() => import('@/components/audit/SynthesisSection.vue'))
 const BmsSection = defineAsyncComponent(() => import('@/components/audit/BmsSection.vue'))
+const GtbObservationsSection = defineAsyncComponent(() => import('@/components/audit/GtbObservationsSection.vue'))
 import ThermalSection from '@/components/audit/ThermalSection.vue'
 import MetersSection from '@/components/audit/MetersSection.vue'
 import SystemsSection from '@/components/audit/SystemsSection.vue'
@@ -1364,6 +1365,10 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
       />
+
+      <!-- 11. Constats GTB & opportunités Buildy (mig 108) — narratif libre par sujet,
+           visible PDF même hors décret. -->
+      <GtbObservationsSection :active="false" />
 
       <!-- Plan de mise en conformité — masqué en mode site_audit -->
       <CompliancePlanSection

@@ -20,8 +20,10 @@ const {
   DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
   PROMPT_KEY_BACS_SYNTHESIS,
   PROMPT_KEY_BACS_TRANSCRIPT,
+  PROMPT_KEY_BACS_GTB_OBSERVATION,
   DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
   DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT,
+  DEFAULT_SYSTEM_PROMPT_BACS_GTB_OBSERVATION,
 } = require('../lib/claude');
 
 // Catalogue des prompts exposes a l'admin (cle -> meta)
@@ -55,6 +57,11 @@ const PROMPT_CATALOG = {
     label: 'Audit BACS — Pré-remplissage depuis transcript Plaud Pro',
     description: 'Prompt système utilisé par l\'import de transcript de dictée (Plaud Pro). Extrait des suggestions structurées (zone/système/équipement/compteur/régulation) à partir du verbatim de la visite terrain.',
     default_body: DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT,
+  },
+  [PROMPT_KEY_BACS_GTB_OBSERVATION]: {
+    label: 'Audit BACS — Constats GTB hors-décret + opportunités',
+    description: 'Prompt système utilisé par le bouton "Suggérer avec Claude" sur chaque sujet GTB de la section Constats (mesurage, historisation, régulation, etc.). Produit deux paragraphes : observation factuelle + opportunité commerciale Buildy.',
+    default_body: DEFAULT_SYSTEM_PROMPT_BACS_GTB_OBSERVATION,
   },
 };
 
