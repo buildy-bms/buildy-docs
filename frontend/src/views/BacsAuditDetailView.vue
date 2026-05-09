@@ -675,8 +675,12 @@ async function validateStep(stepKey) {
 }
 
 async function invalidateStep(stepKey) {
+  const reason = window.prompt(
+    `Raison de l'invalidation de l'étape "${STEP_DEFINITIONS.find(s => s.key === stepKey)?.label}" (optionnel) :`,
+  )
+  if (reason === null) return
   try {
-    const { data } = await validateBacsAuditStep(docId, stepKey, false)
+    const { data } = await validateBacsAuditStep(docId, stepKey, false, reason.trim() || null)
     auditProgress.value = data.audit_progress || {}
   } catch (e) {
     error(e.response?.data?.detail || 'Annulation impossible')

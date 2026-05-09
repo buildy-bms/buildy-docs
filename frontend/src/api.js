@@ -388,6 +388,7 @@ export const getBacsChecklist = (docId) => api.get(`/bacs-audit/${docId}/checkli
 export const updateBacsChecklistItem = (docId, key, data) =>
   api.patch(`/bacs-audit/${docId}/checklist/${encodeURIComponent(key)}`, data)
 export const getBacsPhotoCoverage = (docId) => api.get(`/bacs-audit/${docId}/photo-coverage`)
+export const getBacsPhotoCounts = (docId) => api.get(`/bacs-audit/${docId}/photo-counts`)
 export const listChecklistCatalog = (params) => api.get('/bacs-checklist-catalog', { params })
 export const createChecklistCatalogItem = (data) => api.post('/bacs-checklist-catalog', data)
 export const updateChecklistCatalogItem = (key, data) =>
@@ -471,8 +472,8 @@ export const reorderBacsMeters = (docId, ids) =>
 export const reorderBacsThermal = (docId, ids) =>
   api.post(`/bacs-audit/${docId}/thermal-regulation/reorder`, { ids })
 export const getBacsPowerSummary = (docId) => api.get(`/bacs-audit/${docId}/power-summary`)
-export const validateBacsAuditStep = (docId, step, validated) =>
-  api.post(`/bacs-audit/${docId}/validate-step`, { step, validated })
+export const validateBacsAuditStep = (docId, step, validated, reason = null) =>
+  api.post(`/bacs-audit/${docId}/validate-step`, { step, validated, reason })
 export const updateBacsAuditSynthesis = (docId, html) =>
   api.put(`/bacs-audit/${docId}/synthesis`, { html })
 export const generateBacsAuditSynthesis = (docId) =>

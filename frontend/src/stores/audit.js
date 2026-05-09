@@ -10,7 +10,7 @@ import { defineStore } from 'pinia'
 import {
   getAf, getBacsSystems, getBacsMeters, getBacsBms, getBacsThermal,
   getBacsActionItems, getBacsDevices, getBacsPowerSummary,
-  getBacsInspections, listZones,
+  getBacsInspections, getBacsPhotoCounts, listZones,
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
   getSite, updateSite,
@@ -32,6 +32,8 @@ export const useAuditStore = defineStore('audit', {
     powerSummary: { by_category: {}, heating_cooling_total_kw: 0 },
     auditProgress: {},
     synthesisHtml: '',
+    // Counts photos par entité (alimente badges « 📷 N »).
+    photoCounts: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 },
     // loading=true par defaut : evite que les sous-composants ne se
     // montent avec un state non initialise (notamment BmsComponentsTable
     // qui fetcherait avec docId=null sinon). Passe a false a la fin de
@@ -110,14 +112,16 @@ export const useAuditStore = defineStore('audit', {
             this.site = s.data
           } catch { this.site = null }
         }
-        const [dev, ps, ins] = await Promise.all([
+        const [dev, ps, ins, pc] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
           getBacsInspections(docId),
+          getBacsPhotoCounts(docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 } })),
         ])
         this.devices = dev.data
         this.powerSummary = ps.data
         this.inspections = ins.data
+        this.photoCounts = pc.data
       } finally {
         this.loading = false
       }
@@ -145,10 +149,11 @@ export const useAuditStore = defineStore('audit', {
     },
 
     async refreshAuditCore() {
-      const [s, t, a, dev, ps, m] = await Promise.all([
+      const [s, t, a, dev, ps, m, pc] = await Promise.all([
         getBacsSystems(this.docId), getBacsThermal(this.docId),
         getBacsActionItems(this.docId), getBacsDevices(this.docId),
         getBacsPowerSummary(this.docId), getBacsMeters(this.docId),
+        getBacsPhotoCounts(this.docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 } })),
       ])
       this.systems = s.data
       this.thermal = t.data
@@ -156,6 +161,7 @@ export const useAuditStore = defineStore('audit', {
       this.devices = dev.data
       this.powerSummary = ps.data
       this.meters = m.data
+      this.photoCounts = pc.data
     },
 
     /**

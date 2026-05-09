@@ -92,6 +92,10 @@ async function routes(fastify) {
     const schema = z.object({
       step: z.enum(AUDIT_STEPS),
       validated: z.boolean(),
+      // Vague 4 audit BACS : raison facultative à l'invalidation, tracée
+      // dans audit_log pour qu'un binôme comprenne pourquoi un step
+      // précédemment validé a été remis en chantier.
+      reason: z.string().max(500).nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -120,7 +124,10 @@ async function routes(fastify) {
       afId: documentId,
       userId: request.authUser?.id,
       action: body.validated ? 'bacs_audit.step.validate' : 'bacs_audit.step.invalidate',
-      payload: { step: body.step },
+      payload: {
+        step: body.step,
+        ...(body.validated ? {} : { reason: body.reason || null }),
+      },
     });
 
     const validatedCount = AUDIT_STEPS.filter(s => progress[s]?.validated).length;
