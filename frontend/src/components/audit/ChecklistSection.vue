@@ -316,9 +316,9 @@ defineExpose({ refresh: load })
                      @invalidate="emit('invalidate-step', $event)" />
     </template>
 
-    <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-400">Chargement…</div>
+    <div v-if="loading" class="px-5 py-6 text-center text-sm text-gray-400">Chargement…</div>
 
-    <div v-else class="px-4 py-3 space-y-3">
+    <div v-else class="px-5 py-4 space-y-3">
       <!-- ── BLOC 1 : Couverture photo (KPI pleines) ───────────────────── -->
       <section ref="popoverRef">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-1.5">

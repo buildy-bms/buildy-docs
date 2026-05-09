@@ -94,7 +94,7 @@ function hasNotes(html) {
       </span>
       <span v-else class="italic text-emerald-700">✓ Aucune action corrective</span>
     </template>
-    <div class="px-4 py-3 space-y-3">
+    <div class="px-5 py-4 space-y-3">
       <div v-if="!visibleActionItems.length" class="py-10 text-center">
         <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
         <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
