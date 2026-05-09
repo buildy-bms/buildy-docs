@@ -228,6 +228,14 @@ async function routes(fastify) {
       ORDER BY (CASE a.severity WHEN 'blocking' THEN 0 WHEN 'major' THEN 1 ELSE 2 END), a.position, a.id
     `).all(documentId);
 
+    // Notes par sujet de la carte GTB (mig 109). Map { topic_key -> note_html }
+    // pour que Claude voie tout ce que l'auditeur a saisi sur chaque
+    // sous-section du chapitre 6 GTB (analyse fonctionnelle, usages,
+    // équipements, compteurs, R175-3 capacités / mise à dispo, R175-4,
+    // R175-5). Sans ça, ces notes apparaîtraient dans le PDF mais pas
+    // dans la note de synthèse — gros manque.
+    const gtbTopicNotesRaw = db.bacsAuditGtbObservations.notesByTopic(documentId);
+
     // Dump structure (notes incluses) pour permettre a Claude de produire
     // une synthese fidele aux donnees saisies sans avoir a inventer.
     const stripHtml = (s) => s ? String(s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : null;
@@ -294,13 +302,37 @@ async function routes(fastify) {
           lighting: !!bms.manages_lighting,
         },
         meets_r175_3_p1: !!bms.meets_r175_3_p1,
+        r175_3_p1_archival_format: bms.r175_3_p1_archival_format,
+        r175_3_p1_retention_verified: !!bms.r175_3_p1_retention_verified,
         meets_r175_3_p2: !!bms.meets_r175_3_p2,
+        r175_3_p2_anomaly_rules: stripHtml(bms.r175_3_p2_anomaly_rules_html),
+        data_provision_to_manager: !!bms.data_provision_to_manager,
+        data_provision_to_operators: !!bms.data_provision_to_operators,
+        data_provision_mechanism: bms.notes_data_provision,
+        data_provision_frequency: bms.data_provision_frequency,
+        data_provision_format: bms.data_provision_format,
         has_maintenance_procedures: !!bms.has_maintenance_procedures,
+        maintenance_periodicity: bms.maintenance_periodicity,
+        maintenance_responsible: bms.maintenance_responsible,
         operator_trained: !!bms.operator_trained,
         operator_training_date: bms.operator_training_date,
+        operator_training_provider: bms.operator_training_provider,
         overall_compliance: bms.overall_compliance,
         out_of_service: !!bms.out_of_service,
-        notes: stripHtml(bms.notes_html),
+        notes_global: stripHtml(bms.notes_html),
+        // Notes par sujet de la carte GTB (mig 109). L'auditeur a noté
+        // sous chaque sous-section ; Claude doit absolument en tenir
+        // compte pour produire une synthèse complète.
+        topic_notes: {
+          analyse_fonctionnelle: stripHtml(gtbTopicNotesRaw.analyse_fonctionnelle),
+          usages: stripHtml(gtbTopicNotesRaw.usages),
+          equipements: stripHtml(gtbTopicNotesRaw.equipements),
+          compteurs: stripHtml(gtbTopicNotesRaw.compteurs),
+          r175_3_capacites: stripHtml(gtbTopicNotesRaw.r175_3_capacites),
+          r175_3_mise_dispo: stripHtml(gtbTopicNotesRaw.r175_3_mise_dispo),
+          r175_4: stripHtml(gtbTopicNotesRaw.r175_4),
+          r175_5: stripHtml(gtbTopicNotesRaw.r175_5),
+        },
       } : null,
       thermal_regulation: thermal.map(t => ({
         zone: t.zone_name, regulation_type: t.regulation_type,
