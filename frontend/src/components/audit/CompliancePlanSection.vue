@@ -3,6 +3,7 @@ import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIc
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
+import Button from '@/components/Button.vue'
 
 // Section "Plan de mise en conformité" (R175 — actions correctives auto
 // + manuelles + annotations commerciales). Affiche les items visibles
@@ -63,13 +64,18 @@ function hasNotes(html) {
                      @validate="emit('validate-step', $event)"
                      @invalidate="emit('invalidate-step', $event)">
         <template #actions>
-          <button @click.stop="emit('regenerate')"
-                  :disabled="regenerating"
-                  title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
-                  class="inline-flex items-center gap-1 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-wait whitespace-nowrap">
-            <ArrowPathIcon :class="['w-3.5 h-3.5 shrink-0', regenerating ? 'animate-spin' : '']" />
+          <Button
+            variant="secondary"
+            size="sm"
+            :loading="regenerating"
+            @click.stop="emit('regenerate')"
+            title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
+          >
+            <template v-if="!regenerating" #icon-left>
+              <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" />
+            </template>
             {{ regenerating ? 'Régénération…' : 'Régénérer' }}
-          </button>
+          </Button>
           <button @click.stop="emit('open-commercial')"
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
             Vue commerciale →
