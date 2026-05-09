@@ -13,35 +13,31 @@ const { scoreArticle } = require('./seo-scorer');
 const log = require('./logger').system;
 
 // Lock applicatif en mémoire process pour éviter les pulls et pushes concurrents
-// (race condition : un pull pendant un push peut écraser l'article qu'on vient de
-// publier). Le lock est process-scoped → ok en single-PM2 (cas Buildy Docs).
-// Réentrant : `acquire` retourne un flag indiquant si on est l'owner racine ;
-// seul l'owner racine appelle `release`. TTL 5 min en cas de crash.
+// (race condition : un pull pendant un push peut écraser l'article qu'on vient
+// de publier). Process-scoped → ok en single-PM2.
+//
+// API simple : acquire throw 409 si quelqu'un d'autre détient déjà le lock.
+// TTL 5 min en cas de crash. Pour les appels nested intentionnels dans la
+// même chain (ex : pushArticleToCrisp → pushCategoryToCrisp pour auto-créer
+// une catégorie absente), passer `{ skipLock: true }` à la fonction nested.
 const SYNC_LOCK_TTL_MS = 5 * 60 * 1000;
-let _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
+let _syncLock = { active: false, kind: null, startedAt: 0 };
 
 function acquireSyncLock(kind) {
   if (_syncLock.active) {
     const elapsed = Date.now() - _syncLock.startedAt;
-    if (elapsed >= SYNC_LOCK_TTL_MS) {
-      log.warn(`Sync lock stale ${_syncLock.kind} > ${SYNC_LOCK_TTL_MS}ms, on le force-libère.`);
-      _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
-    } else {
-      // Réentrance dans le même chemin async (ex : pushArticle → pushCategory).
-      _syncLock.depth += 1;
-      return false; // pas owner racine
+    if (elapsed < SYNC_LOCK_TTL_MS) {
+      const e = new Error(`Une opération de synchronisation Crisp (${_syncLock.kind}) est déjà en cours.`);
+      e.status = 409;
+      throw e;
     }
+    log.warn(`Sync lock stale ${_syncLock.kind} > ${SYNC_LOCK_TTL_MS}ms, on le force-libère.`);
   }
-  _syncLock = { active: true, kind, startedAt: Date.now(), depth: 1 };
-  return true; // owner racine
+  _syncLock = { active: true, kind, startedAt: Date.now() };
 }
 
-function releaseSyncLock(isRoot) {
-  if (!isRoot) {
-    if (_syncLock.depth > 0) _syncLock.depth -= 1;
-    return;
-  }
-  _syncLock = { active: false, kind: null, startedAt: 0, depth: 0 };
+function releaseSyncLock() {
+  _syncLock = { active: false, kind: null, startedAt: 0 };
 }
 
 // Recalcule le score SEO d'un article après upsert (pull/push) et le persiste.
@@ -84,7 +80,7 @@ async function pullFromCrisp({ locale } = {}) {
   let articlesPulled = 0;
   const conflicts = [];
 
-  const lockRoot = acquireSyncLock('pull');
+  acquireSyncLock('pull');
   try {
     const cats = await client.listCategories(useLocale);
     const seenCatCrispIds = new Set();
@@ -209,11 +205,11 @@ async function pullFromCrisp({ locale } = {}) {
     db.crispSettings.setLastPull({ status: 'error', error: e.message });
     throw e;
   } finally {
-    releaseSyncLock(lockRoot);
+    releaseSyncLock();
   }
 }
 
-async function pushCategoryToCrisp(categoryId) {
+async function pushCategoryToCrisp(categoryId, { skipLock = false } = {}) {
   const creds = loadCrispCredentials();
   if (!creds) throw new Error('Credentials Crisp non configurés');
   const cat = db.faqCategories.getById(categoryId);
@@ -222,23 +218,28 @@ async function pushCategoryToCrisp(categoryId) {
   const client = crispClient(creds);
   const payload = _toCrispCategoryPayload(cat);
 
-  if (!cat.crisp_id) {
-    const created = await client.createCategory(locale, payload);
-    const crispId = created?.data?.category_id || created?.data?.id || created?.category_id;
-    if (!crispId) throw new Error('Crisp createCategory : id manquant dans la réponse');
-    db.faqCategories.update(cat.id, {
-      crispId,
-      dirty: 0,
-      pushedAt: new Date().toISOString(),
-    });
-  } else {
-    await client.updateCategory(locale, cat.crisp_id, payload);
-    db.faqCategories.update(cat.id, {
-      dirty: 0,
-      pushedAt: new Date().toISOString(),
-    });
+  if (!skipLock) acquireSyncLock(`push category ${categoryId}`);
+  try {
+    if (!cat.crisp_id) {
+      const created = await client.createCategory(locale, payload);
+      const crispId = created?.data?.category_id || created?.data?.id || created?.category_id;
+      if (!crispId) throw new Error('Crisp createCategory : id manquant dans la réponse');
+      db.faqCategories.update(cat.id, {
+        crispId,
+        dirty: 0,
+        pushedAt: new Date().toISOString(),
+      });
+    } else {
+      await client.updateCategory(locale, cat.crisp_id, payload);
+      db.faqCategories.update(cat.id, {
+        dirty: 0,
+        pushedAt: new Date().toISOString(),
+      });
+    }
+    return db.faqCategories.getById(cat.id);
+  } finally {
+    if (!skipLock) releaseSyncLock();
   }
-  return db.faqCategories.getById(cat.id);
 }
 
 async function deleteCategoryOnCrisp(categoryId, { force = false } = {}) {
@@ -273,14 +274,16 @@ async function pushArticleToCrisp(articleId, userId = null) {
   const locale = article.locale || creds.defaultLocale;
   const client = crispClient(creds);
 
-  const lockRoot = acquireSyncLock(`push article ${articleId}`);
+  acquireSyncLock(`push article ${articleId}`);
   try {
-  // S'assurer que la catégorie existe côté Crisp avant de pousser l'article
+  // S'assurer que la catégorie existe côté Crisp avant de pousser l'article.
+  // skipLock=true car on détient déjà le lock racine — l'auto-création de
+  // catégorie est une étape interne du push article.
   let category = null;
   if (article.category_id) {
     category = db.faqCategories.getById(article.category_id);
     if (category && !category.crisp_id) {
-      await pushCategoryToCrisp(category.id);
+      await pushCategoryToCrisp(category.id, { skipLock: true });
       category = db.faqCategories.getById(category.id);
     }
   }
@@ -339,7 +342,7 @@ async function pushArticleToCrisp(articleId, userId = null) {
 
   return db.faqArticles.getById(article.id);
   } finally {
-    releaseSyncLock(lockRoot);
+    releaseSyncLock();
   }
 }
 
@@ -367,4 +370,7 @@ module.exports = {
   deleteCategoryOnCrisp,
   pushArticleToCrisp,
   deleteArticleOnCrisp,
+  // Exposés pour les tests unitaires uniquement (private testing only).
+  __test_acquireSyncLock: acquireSyncLock,
+  __test_releaseSyncLock: releaseSyncLock,
 };
