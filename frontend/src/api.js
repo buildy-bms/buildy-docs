@@ -1,6 +1,7 @@
 import axios from 'axios'
 import router, { resetAuth } from '@/router'
 import { isQueueable, enqueue } from '@/lib/offline-queue'
+import { notifySaveStart, notifySaveEnd } from '@/composables/useGlobalSaveStatus'
 
 const api = axios.create({
   baseURL: '/api',
@@ -10,8 +11,20 @@ const api = axios.create({
 
 const PUBLIC_PATHS = ['/login']
 
+// Suivi global des écritures audit/AF — alimente l'indicateur unique
+// dans la toolbar (« Sauvegarde… » / « Tout enregistré »). On `start`
+// au request et `end` au response (succès ou échec). Inflight count
+// + dernier état persistent dans le composable singleton.
+api.interceptors.request.use((cfg) => {
+  notifySaveStart(cfg.method, cfg.url)
+  return cfg
+})
+
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    notifySaveEnd(res.config?.method, res.config?.url, { ok: true })
+    return res
+  },
   async (err) => {
     const onPublicPage = PUBLIC_PATHS.some((p) => window.location.pathname.startsWith(p))
     if (err.response?.status === 401 && !onPublicPage) {
@@ -42,6 +55,10 @@ api.interceptors.response.use(
         method: cfg.method, url: cfg.url, data: cfg.data ? safeParseJson(cfg.data) : null,
         headers: extractCustomHeaders(cfg.headers),
       })
+      // Du point de vue du caller, c'est un succès (la mutation sera
+      // rejouée). On marque l'indicateur global comme `saved` pour
+      // ne pas signaler une fausse erreur.
+      notifySaveEnd(cfg.method, cfg.url, { ok: true })
       return {
         status: 202,
         statusText: 'Accepted (queued offline)',
@@ -50,6 +67,7 @@ api.interceptors.response.use(
         config: cfg,
       }
     }
+    notifySaveEnd(cfg.method, cfg.url, { ok: false, error: err })
     return Promise.reject(err)
   }
 )
