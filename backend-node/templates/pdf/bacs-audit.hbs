@@ -642,6 +642,12 @@
       <span class="info-card-value">Document fourni par le propriétaire ou son exploitant</span>
     {{/if}}
   </div>
+  {{#if bmsTopicNotes.analyse_fonctionnelle}}
+  <div class="info-card info-card-wide">
+    <span class="info-card-label">Notes de l'auditeur</span>
+    <div class="info-card-value rich-notes">{{{bmsTopicNotes.analyse_fonctionnelle}}}</div>
+  </div>
+  {{/if}}
 </div>
 
 {{!-- Card 2 — Usages couverts vs non couverts par la GTB --}}
@@ -658,6 +664,11 @@
       <span class="usage-pill {{#if bms.manages_dhw}}usage-pill-dhw{{else}}usage-pill-off{{/if}}">{{{categoryIcon "dhw" "12"}}}ECS{{#unless bms.manages_dhw}} · non couvert{{/unless}}</span>
       <span class="usage-pill {{#if bms.manages_lighting}}usage-pill-lighting{{else}}usage-pill-off{{/if}}">{{{categoryIcon "lighting_indoor" "12"}}}Éclairage{{#unless bms.manages_lighting}} · non couvert{{/unless}}</span>
     </div>
+    {{#if bmsTopicNotes.usages}}
+    <div class="panel-inline-note">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.usages}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 
@@ -683,6 +694,11 @@
         </span>
       </div>
     </div>
+    {{#if bmsTopicNotes.r175_3_capacites}}
+    <div class="panel-inline-note">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.r175_3_capacites}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 
@@ -711,6 +727,11 @@
       <strong>Mécanisme :</strong> {{bms.notes_data_provision}}
     </div>
     {{/if}}
+    {{#if bmsTopicNotes.r175_3_mise_dispo}}
+    <div class="panel-inline-note">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.r175_3_mise_dispo}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 
@@ -728,6 +749,11 @@
         </span>
       </div>
     </div>
+    {{#if bmsTopicNotes.r175_4}}
+    <div class="panel-inline-note">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.r175_4}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 
@@ -753,12 +779,17 @@
       </div>
     </div>
     {{/if}}
+    {{#if bmsTopicNotes.r175_5}}
+    <div class="panel-inline-note">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.r175_5}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}
 
 {{!-- Card 7 — Équipements : intégrés vs à intégrer --}}
-{{#if (or bmsManagedDevices.length bmsUnmanagedDevices.length)}}
+{{#if (or (or bmsManagedDevices.length bmsUnmanagedDevices.length) bmsTopicNotes.equipements)}}
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">Équipements et leur intégration à la GTB</h3>
@@ -799,12 +830,17 @@
       {{/each}}
     </div>
     {{/if}}
+    {{#if bmsTopicNotes.equipements}}
+    <div class="panel-inline-note" style="margin: 3mm 4mm 0;">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.equipements}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}
 
 {{!-- Card 8 — Compteurs : intégrés vs à intégrer --}}
-{{#if (or bmsManagedMeters.length bmsUnmanagedMeters.length)}}
+{{#if (or (or bmsManagedMeters.length bmsUnmanagedMeters.length) bmsTopicNotes.compteurs)}}
 <div class="panel">
   <div class="panel-head">
     <h3 class="panel-title">Compteurs et leur intégration à la GTB</h3>
@@ -841,6 +877,11 @@
       {{/each}}
     </div>
     {{/if}}
+    {{#if bmsTopicNotes.compteurs}}
+    <div class="panel-inline-note" style="margin: 3mm 4mm 0;">
+      <strong>Notes de l'auditeur :</strong> <span class="rich-notes">{{{bmsTopicNotes.compteurs}}}</span>
+    </div>
+    {{/if}}
   </div>
 </div>
 {{/if}}
@@ -863,41 +904,6 @@
 {{/if}}
 {{else}}
 <p class="muted">Évaluation de la GTB non renseignée.</p>
-{{/if}}
-
-{{!-- ═══════════ Chapitre 6.5 — Constats GTB & opportunités Buildy ═══════════ --}}
-{{!-- Mig 108 : narratifs libres par sujet GTB (mesurage, historisation,
-     régulation, etc.), au-delà du décret R175. Tout est intégré au
-     rapport, même quand l'alinéa BACS est marqué « non concerné ». --}}
-{{#if gtbObservations.length}}
-<h1 class="chapter" data-toc-anchor="gtb-observations">{{{faIcon "comments" "#8b5cf6" "16"}}} Constats GTB & opportunités Buildy</h1>
-<div class="callout callout-info" style="margin-bottom: 6mm;">
-  <span class="callout-icon">💡</span>
-  <div class="callout-body">
-    Cette section regroupe les <strong>constats observés sur la GTB existante</strong>, au-delà du strict décret BACS.
-    Pour chaque sujet, l'auditeur précise l'état actuel et l'opportunité d'amélioration que Buildy peut apporter.
-  </div>
-</div>
-{{#each gtbObservations}}
-<div class="action-card" style="margin-bottom: 5mm;">
-  <div class="action-card-head">
-    <strong>{{label}}</strong>
-  </div>
-  {{#if description}}<div class="muted" style="margin-bottom: 2mm; font-size: 11px;">{{description}}</div>{{/if}}
-  {{#if observation_html}}
-    <div class="rich-notes" style="margin-bottom: 2mm;">
-      <p class="alt-solutions-label" style="margin-bottom: 1mm;">Observation :</p>
-      {{{observation_html}}}
-    </div>
-  {{/if}}
-  {{#if opportunity_html}}
-    <div class="alt-solutions">
-      <p class="alt-solutions-label" style="color: #8b5cf6;">Opportunité Buildy :</p>
-      {{{opportunity_html}}}
-    </div>
-  {{/if}}
-</div>
-{{/each}}
 {{/if}}
 
 {{!-- ═══════════ Chapitre 7 — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}

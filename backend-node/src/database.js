@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 108;
+const TARGET_VERSION = 109;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3963,6 +3963,52 @@ function runMigrations() {
     db.pragma('user_version = 108');
   }
 
+  if (current < 109) {
+    // Reset du catalogue gtb_topics_catalog : la mig 108 avait seedé
+    // 8 sujets génériques (mesurage, historisation, régulation…). On
+    // remplace par les VRAIS sous-titres de la carte GTB existante,
+    // pour que chaque h3 du chapitre 6 puisse recevoir une note libre
+    // via le pattern existant « + Note » (NotesEditorModal).
+    //
+    // On préserve les notes saisies sur les anciennes clés via un
+    // mapping (historisation -> r175_3_capacites, etc.) — meilleur
+    // effort, certaines anciennes clés sans correspondance directe
+    // sont juste laissées orphelines (lignes invisibles dans l'UI).
+    db.prepare(`
+      UPDATE bacs_audit_gtb_observations SET topic_key = 'r175_3_capacites'
+      WHERE topic_key IN ('historisation', 'supervision', 'alarms')
+    `).run();
+    db.prepare(`
+      UPDATE bacs_audit_gtb_observations SET topic_key = 'r175_3_mise_dispo'
+      WHERE topic_key = 'remote_access'
+    `).run();
+    db.prepare(`
+      UPDATE bacs_audit_gtb_observations SET topic_key = 'compteurs'
+      WHERE topic_key = 'metering'
+    `).run();
+    db.prepare(`
+      UPDATE bacs_audit_gtb_observations SET topic_key = 'usages'
+      WHERE topic_key IN ('regulation', 'programming', 'interoperability')
+    `).run();
+    db.prepare('DELETE FROM gtb_topics_catalog').run();
+    const seedTopics = [
+      { key: 'analyse_fonctionnelle', label: 'Analyse fonctionnelle de la GTB existante', position: 10 },
+      { key: 'usages',                label: 'Usages traités par la GTB',                  position: 20 },
+      { key: 'equipements',           label: 'Équipements intégrés à la GTB',              position: 30 },
+      { key: 'compteurs',             label: 'Compteurs intégrés à la GTB',                position: 40 },
+      { key: 'r175_3_capacites',      label: 'R175-3 — Capacités de la solution de supervision', position: 50 },
+      { key: 'r175_3_mise_dispo',     label: 'R175-3 — Mise à disposition des données',    position: 60 },
+      { key: 'r175_4',                label: 'R175-4 — Vérifications périodiques',         position: 70 },
+      { key: 'r175_5',                label: 'R175-5 — Formation exploitant',              position: 80 },
+    ];
+    const insTopic = db.prepare(`
+      INSERT INTO gtb_topics_catalog (key, label, position) VALUES (?, ?, ?)
+    `);
+    for (const t of seedTopics) insTopic.run(t.key, t.label, t.position);
+    log.info('Migration 109 appliquee : reset gtb_topics_catalog avec les sujets reels de la carte GTB');
+    db.pragma('user_version = 109');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6714,6 +6760,18 @@ const bacsAuditGtbObservations = {
     return db.prepare(
       'SELECT * FROM bacs_audit_gtb_observations WHERE document_id = ? AND topic_key = ?'
     ).get(documentId, topicKey);
+  },
+  // Map topic_key -> observation_html, pour l'export PDF (lookup direct
+  // sous chaque sous-section du chapitre 6 GTB).
+  notesByTopic(documentId) {
+    const rows = db.prepare(
+      'SELECT topic_key, observation_html FROM bacs_audit_gtb_observations WHERE document_id = ?'
+    ).all(documentId);
+    const map = {};
+    for (const r of rows) {
+      if (r.observation_html?.replace(/<[^>]*>/g, '').trim()) map[r.topic_key] = r.observation_html;
+    }
+    return map;
   },
 };
 

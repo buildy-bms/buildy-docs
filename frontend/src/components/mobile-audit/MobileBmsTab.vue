@@ -17,6 +17,7 @@ import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import MobileBmsTopicNoteButton from './MobileBmsTopicNoteButton.vue'
 
 const audit = useAuditStore()
 const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
@@ -157,9 +158,12 @@ const USAGES = [
       </label>
     </div>
 
-    <template v-if="!bms.out_of_service">
+    <!-- Mig 109 : on n'efface plus les sous-blocs quand la GTB est HS,
+         on les garde affichés (legerement opaques) pour que l'auditeur
+         puisse tout renseigner et ajouter des notes pour la traçabilité. -->
+    <template>
       <!-- Identification GTB -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
         <div class="px-4 py-3 border-b border-gray-100">
           <h3 class="text-base font-medium text-gray-900">Solution en place</h3>
         </div>
@@ -207,9 +211,12 @@ const USAGES = [
       </div>
 
       <!-- Usages traités -->
-      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
         <div class="px-4 py-3 border-b border-gray-100">
-          <h3 class="text-base font-medium text-gray-900">Usages traités par la GTB</h3>
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="text-base font-medium text-gray-900">Usages traités par la GTB</h3>
+            <MobileBmsTopicNoteButton topic-key="usages" topic-label="Usages traités par la GTB" />
+          </div>
           <p class="text-xs text-gray-500 mt-1 leading-relaxed">
             Coche chaque usage que la GTB pilote ou supervise réellement, même partiellement.
             Les usages absents du bâtiment ne sont pas concernés.
@@ -237,9 +244,11 @@ const USAGES = [
 
       <!-- R175-3 Capacités (BACS uniquement) -->
       <template v-if="isBacs">
-        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-100">
+        <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-2">
             <h3 class="text-base font-medium text-gray-900">Capacités R175-3</h3>
+            <MobileBmsTopicNoteButton topic-key="r175_3_capacites"
+                                      topic-label="R175-3 — Capacités de la solution de supervision" />
           </div>
           <div class="p-4 space-y-4">
             <label class="flex items-start justify-between gap-3 cursor-pointer">
@@ -306,9 +315,13 @@ const USAGES = [
         </div>
 
         <!-- R175-3 Mise à dispo des données -->
-        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
-            <h3 class="text-base font-medium text-gray-900">Mise à disposition des données</h3>
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="text-base font-medium text-gray-900">Mise à disposition des données</h3>
+              <MobileBmsTopicNoteButton topic-key="r175_3_mise_dispo"
+                                        topic-label="R175-3 — Mise à disposition des données" />
+            </div>
           </div>
           <div class="p-4 space-y-4">
             <p class="text-xs text-gray-500 leading-relaxed">
@@ -360,9 +373,12 @@ const USAGES = [
         </div>
 
         <!-- R175-4 Maintenance -->
-        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
-            <h3 class="text-base font-medium text-gray-900">R175-4 — Maintenance</h3>
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="text-base font-medium text-gray-900">R175-4 — Maintenance</h3>
+              <MobileBmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques" />
+            </div>
           </div>
           <div class="p-4 space-y-4">
             <label class="flex items-start justify-between gap-3 cursor-pointer">
@@ -400,9 +416,12 @@ const USAGES = [
         </div>
 
         <!-- R175-5 Formation -->
-        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
-            <h3 class="text-base font-medium text-gray-900">R175-5 — Formation exploitant</h3>
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="text-base font-medium text-gray-900">R175-5 — Formation exploitant</h3>
+              <MobileBmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant" />
+            </div>
           </div>
           <div class="p-4 space-y-4">
             <label class="flex items-start justify-between gap-3 cursor-pointer">
@@ -445,16 +464,20 @@ const USAGES = [
       </template>
 
       <!-- Équipements intégrés -->
-      <div v-if="devicesWithMeta.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
         <div class="px-4 py-3 border-b border-gray-100">
-          <h3 class="text-base font-medium text-gray-900">Équipements intégrés à la GTB</h3>
-          <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="text-base font-medium text-gray-900">Équipements intégrés à la GTB</h3>
+            <MobileBmsTopicNoteButton topic-key="equipements" topic-label="Équipements intégrés à la GTB" />
+          </div>
+          <p v-if="devicesWithMeta.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
             <strong>Intégré</strong> = l'équipement est connu de la GTB.
             <strong>Opérationnel</strong> = tu as vérifié sur place que la GTB voit
             réellement les valeurs et peut le piloter.
           </p>
+          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun équipement saisi.</p>
         </div>
-        <div class="divide-y divide-gray-100">
+        <div v-if="devicesWithMeta.length" class="divide-y divide-gray-100">
           <div
             v-for="d in devicesWithMeta"
             :key="d.id"
@@ -504,16 +527,20 @@ const USAGES = [
       </div>
 
       <!-- Compteurs intégrés -->
-      <div v-if="metersPresent.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
         <div class="px-4 py-3 border-b border-gray-100">
-          <h3 class="text-base font-medium text-gray-900">Compteurs intégrés à la GTB</h3>
-          <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+          <div class="flex items-start justify-between gap-2">
+            <h3 class="text-base font-medium text-gray-900">Compteurs intégrés à la GTB</h3>
+            <MobileBmsTopicNoteButton topic-key="compteurs" topic-label="Compteurs intégrés à la GTB" />
+          </div>
+          <p v-if="metersPresent.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
             Seuls les compteurs marqués « présents » dans l'onglet Compteurs apparaissent ici.
             <strong>Intégré</strong> = la GTB connaît le compteur.
             <strong>Opérationnel</strong> = les index remontent vraiment.
           </p>
+          <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun compteur présent à raccorder.</p>
         </div>
-        <div class="divide-y divide-gray-100">
+        <div v-if="metersPresent.length" class="divide-y divide-gray-100">
           <div
             v-for="m in metersPresent"
             :key="m.id"

@@ -28,8 +28,7 @@ import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
 import MobileSynthesisSheet from '@/components/mobile-audit/MobileSynthesisSheet.vue'
-import MobileGtbObservationsSheet from '@/components/mobile-audit/MobileGtbObservationsSheet.vue'
-import { UserPlusIcon, PencilSquareIcon, SparklesIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import { UserPlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -165,7 +164,6 @@ async function onMetadataSaved(updated) {
 }
 const showShare = ref(false)
 const showSynthesis = ref(false)
-const showGtbObservations = ref(false)
 const delivering = ref(false)
 
 function openShare() {
@@ -176,11 +174,6 @@ function openShare() {
 function openSynthesis() {
   showSettings.value = false
   showSynthesis.value = true
-}
-
-function openGtbObservations() {
-  showSettings.value = false
-  showGtbObservations.value = true
 }
 
 async function deliver() {
@@ -432,14 +425,6 @@ async function removeAudit() {
           Synthèse Claude
         </button>
 
-        <!-- Action : Constats GTB hors-décret (mig 108) -->
-        <button
-          @click="openGtbObservations"
-          class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-violet-700 bg-violet-50 border border-violet-200 active:bg-violet-100 rounded-xl"
-        >
-          <ChatBubbleLeftRightIcon class="w-5 h-5" />
-          Constats GTB & opportunités
-        </button>
 
         <!-- Action : Livrer -->
         <button
@@ -493,12 +478,6 @@ async function removeAudit() {
     <MobileSynthesisSheet
       :open="showSynthesis"
       @close="showSynthesis = false"
-    />
-
-    <!-- Sheet Constats GTB hors-decret (mig 108) -->
-    <MobileGtbObservationsSheet
-      :open="showGtbObservations"
-      @close="showGtbObservations = false"
     />
 
     <!-- Modifier les paramètres de l'audit — sheet plein écran iOS-natif

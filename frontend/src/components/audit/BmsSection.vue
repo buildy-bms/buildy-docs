@@ -14,6 +14,7 @@ import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
+import BmsTopicNoteButton from '@/components/audit/BmsTopicNoteButton.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter, uploadSiteDocument } from '@/api'
@@ -201,7 +202,7 @@ function hasNotes(html) {
                      @input="saveBmsDebounced"
                      class="input-base" />
             </div>
-            <div v-if="!bms.out_of_service" class="col-span-2">
+            <div :class="['col-span-2', bms.out_of_service ? 'opacity-70' : '']">
               <label class="block text-xs font-medium text-gray-700 mb-1">
                 Protocoles de mise à disposition des points
                 <span class="text-gray-400 font-normal">— vers la supervision Buildy ou un tiers</span>
@@ -219,14 +220,19 @@ function hasNotes(html) {
             <label class="flex items-center gap-2 cursor-pointer text-sm">
               <input type="checkbox" v-model="bms.out_of_service" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
               <span class="text-gray-700 font-medium">GTB Hors-Service</span>
-              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB et les sous-blocs ci-dessous sont masqués</span>
+              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB. Les sous-blocs restent saisissables (notes incluses) pour la traçabilité.</span>
             </label>
           </div>
 
           <div class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-              Analyse fonctionnelle de la GTB existante
-            </h3>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Analyse fonctionnelle de la GTB existante
+              </h3>
+              <BmsTopicNoteButton topic-key="analyse_fonctionnelle"
+                                  topic-label="Analyse fonctionnelle de la GTB existante"
+                                  @open-notes="emit('open-notes', $event)" />
+            </div>
             <div v-if="document?.audit_existing_af_status !== 'absent'">
               <div
                 :class="[
@@ -272,12 +278,16 @@ function hasNotes(html) {
             </label>
           </div>
 
-          <div v-if="!bms.out_of_service && audit.docId" class="border-t border-gray-100 pt-3">
+          <div v-if="audit.docId" :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
             <BmsComponentsTable :document-id="audit.docId" />
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Usages traités par la GTB</h3>
+          <div :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Usages traités par la GTB</h3>
+              <BmsTopicNoteButton topic-key="usages" topic-label="Usages traités par la GTB"
+                                  @open-notes="emit('open-notes', $event)" />
+            </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
               <label v-for="u in [
                        { key: 'manages_heating', cat: 'heating', label: 'Chauffage' },
@@ -298,12 +308,16 @@ function hasNotes(html) {
             </div>
           </div>
 
-          <div v-if="!bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-6">
+          <div :class="['border-t border-gray-100 pt-3 space-y-6', bms.out_of_service ? 'opacity-70' : '']">
             <div>
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                Équipements intégrés à la GTB
-                <span class="font-normal normal-case text-gray-500 text-[10px]">— « Opérationnel » = vérifié sur place par l'auditeur</span>
-              </h3>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Équipements intégrés à la GTB
+                  <span class="font-normal normal-case text-gray-500 text-[10px]">— « Opérationnel » = vérifié sur place par l'auditeur</span>
+                </h3>
+                <BmsTopicNoteButton topic-key="equipements" topic-label="Équipements intégrés à la GTB"
+                                    @open-notes="emit('open-notes', $event)" />
+              </div>
               <table v-if="devicesWithMeta.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
@@ -346,10 +360,14 @@ function hasNotes(html) {
               <p v-else class="text-xs text-gray-400 italic">Aucun équipement saisi.</p>
             </div>
             <div>
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                Compteurs intégrés à la GTB
-                <span class="font-normal normal-case text-gray-500 text-[10px]">— uniquement les compteurs présents</span>
-              </h3>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Compteurs intégrés à la GTB
+                  <span class="font-normal normal-case text-gray-500 text-[10px]">— uniquement les compteurs présents</span>
+                </h3>
+                <BmsTopicNoteButton topic-key="compteurs" topic-label="Compteurs intégrés à la GTB"
+                                    @open-notes="emit('open-notes', $event)" />
+              </div>
               <table v-if="metersPresent.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
@@ -397,13 +415,18 @@ function hasNotes(html) {
             </div>
           </div>
 
-          <div v-if="audit.isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
-              R175-3 — Capacités de la solution de supervision
-              <Tooltip text="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
-                <span class="font-normal normal-case text-gray-500 text-[10px]">ⓘ P3 et P4 sont au niveau des systèmes (section 3)</span>
-              </Tooltip>
-            </h3>
+          <div v-if="audit.isBacs" :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider inline-flex items-center gap-1">
+                R175-3 — Capacités de la solution de supervision
+                <Tooltip text="L'interopérabilité (P3) et l'arrêt manuel + autonome (P4) sont désormais évalués au niveau de chaque système — cf section 3.">
+                  <span class="font-normal normal-case text-gray-500 text-[10px]">ⓘ P3 et P4 sont au niveau des systèmes (section 3)</span>
+                </Tooltip>
+              </h3>
+              <BmsTopicNoteButton topic-key="r175_3_capacites"
+                                  topic-label="R175-3 — Capacités de la solution de supervision"
+                                  @open-notes="emit('open-notes', $event)" />
+            </div>
             <div class="space-y-2 text-sm">
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="bms.meets_r175_3_p1" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
@@ -437,11 +460,16 @@ function hasNotes(html) {
             </div>
           </div>
 
-          <div v-if="audit.isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-              R175-3 — Mise à disposition des données
-              <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
-            </h3>
+          <div v-if="audit.isBacs" :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                R175-3 — Mise à disposition des données
+                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(dernier alinéa)</span>
+              </h3>
+              <BmsTopicNoteButton topic-key="r175_3_mise_dispo"
+                                  topic-label="R175-3 — Mise à disposition des données"
+                                  @open-notes="emit('open-notes', $event)" />
+            </div>
             <div class="space-y-2 text-sm">
               <label class="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" v-model="bms.data_provision_to_manager" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
@@ -475,9 +503,13 @@ function hasNotes(html) {
             </template>
           </div>
 
-          <div v-if="audit.isBacs && !bms.out_of_service" class="border-t border-gray-100 pt-3 space-y-4">
+          <div v-if="audit.isBacs" :class="['border-t border-gray-100 pt-3 space-y-4', bms.out_of_service ? 'opacity-70' : '']">
             <div>
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-4 — Vérifications périodiques</h3>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">R175-4 — Vérifications périodiques</h3>
+                <BmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques"
+                                    @open-notes="emit('open-notes', $event)" />
+              </div>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" v-model="bms.has_maintenance_procedures" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Consignes écrites des maintenances passées</span>
@@ -500,7 +532,11 @@ function hasNotes(html) {
               </div>
             </div>
             <div>
-              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">R175-5 — Formation exploitant</h3>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">R175-5 — Formation exploitant</h3>
+                <BmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant"
+                                    @open-notes="emit('open-notes', $event)" />
+              </div>
               <label class="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" v-model="bms.operator_trained" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
                 <span>Exploitant formé à l'utilisation de la supervision</span>
