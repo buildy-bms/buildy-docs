@@ -672,7 +672,7 @@ async function invalidateStep(stepKey) {
     const { data } = await validateBacsAuditStep(docId, stepKey, false)
     auditProgress.value = data.audit_progress || {}
   } catch (e) {
-    error('Annulation impossible')
+    error(e.response?.data?.detail || 'Annulation impossible')
   }
 }
 
@@ -747,8 +747,8 @@ function onSynthesisInput(html) {
     try {
       await updateBacsAuditSynthesis(docId, html || null)
       if (document.value) document.value.audit_synthesis_html = html
-    } catch {
-      error('Sauvegarde synthese impossible')
+    } catch (e) {
+      error(e.response?.data?.detail || 'Sauvegarde synthèse impossible')
     }
   }, 600)
 }
@@ -871,8 +871,8 @@ function saveDocDebounced(patch) {
     try {
       const { data } = await updateAf(docId, patch)
       document.value = data
-    } catch {
-      error('Sauvegarde impossible')
+    } catch (e) {
+      error(e.response?.data?.detail || 'Sauvegarde impossible')
     }
   }, 400)
 }
@@ -888,8 +888,8 @@ async function recomputePowerFromEquipments() {
       bacs_total_power_source: 'auto',
     })
     success(`Puissance recalculée : ${data.heating_cooling_total_kw} kW (chauffage + climatisation)`)
-  } catch {
-    error('Calcul impossible')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Calcul de puissance impossible')
   }
 }
 
@@ -921,8 +921,8 @@ function saveBmsDebounced() {
       await updateBacsBms(docId, bms.value)
       const a = await getBacsActionItems(docId)
       actionItems.value = a.data
-    } catch {
-      error('Sauvegarde GTB impossible')
+    } catch (e) {
+      error(e.response?.data?.detail || 'Sauvegarde GTB impossible')
     }
   }, 500)
 }
@@ -936,12 +936,15 @@ async function patchActionItem(item, patch) {
   try {
     const { data } = await updateBacsActionItem(item.id, patch)
     Object.assign(item, data)
-  } catch {
-    error('Sauvegarde action impossible')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Sauvegarde action impossible')
   }
 }
 
+const regenerating = ref(false)
 async function regenerate() {
+  if (regenerating.value) return
+  regenerating.value = true
   try {
     // Resync : ajoute les rows manquantes (systems / thermal) si la matrice
     // nature_zone a evolue ou si des zones ont ete ajoutees au site
@@ -949,8 +952,10 @@ async function regenerate() {
     const { data } = await regenerateBacsActionItems(docId)
     success(`Régénération : +${data.added} nouvelles, ${data.updated} synchronisées, ${data.resolved} résolues`)
     await refreshAuditData()
-  } catch {
-    error('Régénération impossible')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Régénération impossible')
+  } finally {
+    regenerating.value = false
   }
 }
 
@@ -1341,6 +1346,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         :step="stepFor('review')"
         :severity-labels="SEVERITY_LABEL"
         :status-labels="STATUS_LABEL"
+        :regenerating="regenerating"
         @regenerate="regenerate"
         @open-commercial="router.push(`/bacs-audit/${docId}/action-items`)"
         @validate-step="validateStep"
