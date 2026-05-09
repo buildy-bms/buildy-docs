@@ -10,7 +10,7 @@ const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
 const { assistTranscriptMapping } = require('../../lib/claude');
-const { assertBacsAuditExists } = require('./_shared');
+const { assertBacsAuditExists, logBacsAudit } = require('./_shared');
 
 // Charge les entites de l'audit pour construire le squelette envoye a
 // Claude (id + nom + categorie). Le mapping passe par les noms / ids
@@ -68,6 +68,7 @@ async function routes(fastify) {
         (document_id, filename, original_name, size_bytes, text_content, uploaded_by)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(documentId, filename, file.filename || null, buffer.length, text, request.authUser?.id || null);
+    logBacsAudit(request, 'bacs.transcript.upload', documentId, { transcriptId: r.lastInsertRowid, sizeBytes: buffer.length, originalName: file.filename || null });
     return reply.code(201).send(
       db.db.prepare('SELECT id, document_id, original_name, size_bytes, uploaded_at FROM bacs_audit_transcripts WHERE id = ?').get(r.lastInsertRowid)
     );
@@ -131,6 +132,7 @@ async function routes(fastify) {
       WHERE id = ?
     `).run(result.usage?.input_tokens || null, result.usage?.output_tokens || null, tr.id);
 
+    logBacsAudit(request, 'bacs.transcript.suggestions', tr.document_id, { transcriptId: tr.id, count, usage: result.usage });
     return reply.code(201).send({ count, usage: result.usage });
   });
 
@@ -170,15 +172,17 @@ async function routes(fastify) {
       .run(sug.suggested_value, sug.target_id);
     db.db.prepare(`UPDATE bacs_audit_suggestions SET status = 'applied', decided_at = CURRENT_TIMESTAMP, decided_by = ? WHERE id = ?`)
       .run(request.authUser?.id || null, id);
+    logBacsAudit(request, 'bacs.suggestion.apply', sug.document_id, { suggestionId: id, target: `${sug.target_kind}#${sug.target_id}`, field: sug.field_name });
     return db.db.prepare('SELECT * FROM bacs_audit_suggestions WHERE id = ?').get(id);
   });
 
   fastify.post('/bacs-audit/suggestions/:id/reject', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
-    const sug = db.db.prepare('SELECT id FROM bacs_audit_suggestions WHERE id = ?').get(id);
+    const sug = db.db.prepare('SELECT id, document_id FROM bacs_audit_suggestions WHERE id = ?').get(id);
     if (!sug) return reply.code(404).send({ detail: 'Suggestion non trouvee' });
     db.db.prepare(`UPDATE bacs_audit_suggestions SET status = 'rejected', decided_at = CURRENT_TIMESTAMP, decided_by = ? WHERE id = ?`)
       .run(request.authUser?.id || null, id);
+    logBacsAudit(request, 'bacs.suggestion.reject', sug.document_id, { suggestionId: id });
     return db.db.prepare('SELECT * FROM bacs_audit_suggestions WHERE id = ?').get(id);
   });
 }
