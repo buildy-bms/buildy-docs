@@ -588,8 +588,12 @@ async function routes(fastify) {
 
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
   const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
-  const DEVICE_ROLES = ['production','distribution','emission','regulation','autre'];
   const DEVICE_COMM = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp','knx','mbus','mqtt','lorawan','autre','non_communicant','absent'];
+  // Note : `device_role` est volontairement non-enum (z.string libre)
+  // depuis la mig 99 — l'admin peut créer des niveaux custom (Régulation
+  // étage 2, Sous-comptage…) via le SearchableSelect creatable de
+  // l'éditeur de modèle d'équipement. Le PDF affiche la valeur brute
+  // si elle n'est pas dans ROLE_LABEL (cf _export-data.js fallback).
 
   // GET /bacs-audit/:documentId/devices — tous les devices du document, joints au système
   fastify.get('/bacs-audit/:documentId/devices', async (request, reply) => {
