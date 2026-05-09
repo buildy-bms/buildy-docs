@@ -60,7 +60,9 @@ useAuditAutoSync()
 // réseau. Permet à l'auditeur en sous-sol de continuer à saisir sans
 // perdre ses changements.
 const offlineQueue = inject('offlineQueue', { pendingCount: ref(0) })
-const { document, loading } = storeToRefs(auditStore)
+const {
+  document, loading, zones, systems, meters, bms, actionItems,
+} = storeToRefs(auditStore)
 const { error, success } = useNotification()
 const { isOnline } = useOnlineStatus()
 const { confirm } = useConfirm()
@@ -89,6 +91,43 @@ watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 // La logique R175-spécifique (régulation thermique, capacités GTB R175-3/4/5)
 // se masque à l'intérieur des onglets concernés selon le kind.
 const visibleTabs = computed(() => TABS)
+
+// Pastilles de complétude par onglet (Vague 3 item 13). Couleur :
+//  - 'red'  : un point d'attention bloque (action requise immédiate)
+//  - 'amber': commencé mais incomplet (peut continuer)
+//  - null   : rien à signaler (pas commencé OU complet)
+//
+// Volontairement permissif : on n'affiche pas un dot vert sur tout
+// (pollution visuelle), juste un dot rouge/jaune si l'auditeur doit
+// y revenir.
+const tabDot = computed(() => {
+  const out = {}
+  // Site : pas de dot (pas de critère bloquant simple)
+  out.site = null
+  // Zones : aucune zone → red, sinon null
+  out.zones = (zones.value?.length || 0) === 0 ? 'red' : null
+  // Systèmes : si au moins 1 système ni present ni not_concerned (à renseigner)
+  const sys = systems.value || []
+  const sysToFill = sys.filter(s => !s.present && !s.not_concerned).length
+  out.systems = sysToFill > 0 ? 'amber' : null
+  // Compteurs : si au moins 1 required absent → red
+  const m = meters.value || []
+  const missingMeters = m.filter(x => x.required && !x.present_actual && !x.out_of_service).length
+  out.meters = missingMeters > 0 ? 'red' : null
+  // GTB : si BMS vide (aucun champ rempli) → amber
+  const b = bms.value || {}
+  const bmsHasContent = !!(b.existing_solution || b.existing_solution_brand || b.location || b.overall_compliance)
+  out.bms = !bmsHasContent ? 'amber' : null
+  // Docs : on n'a pas l'état de la check-list dans le store (chargée par
+  // l'onglet à l'ouverture), pas de dot pour V1.
+  out.docs = null
+  // Plan : si actions blocking ouvertes → red, major → amber, sinon null
+  const actions = actionItems.value || []
+  const blocking = actions.filter(a => a.severity === 'blocking' && a.status !== 'done' && a.status !== 'declined').length
+  const major = actions.filter(a => a.severity === 'major' && a.status !== 'done' && a.status !== 'declined').length
+  out.plan = blocking > 0 ? 'red' : (major > 0 ? 'amber' : null)
+  return out
+})
 
 async function refresh() {
   try {
@@ -308,13 +347,22 @@ async function removeAudit() {
             type="button"
             @click="activeTab = tab.key"
             :class="[
-              'w-full h-full flex flex-col items-center justify-center gap-1 transition-colors select-none',
+              'w-full h-full flex flex-col items-center justify-center gap-1 transition-colors select-none relative',
               activeTab === tab.key
                 ? 'text-indigo-600'
                 : 'text-gray-500 active:text-gray-700'
             ]"
           >
-            <component :is="tab.icon" class="w-7 h-7 shrink-0" />
+            <span class="relative inline-flex">
+              <component :is="tab.icon" class="w-7 h-7 shrink-0" />
+              <!-- Dot complétude : rouge = action requise, amber = incomplet -->
+              <span
+                v-if="tabDot[tab.key]"
+                :class="['absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white',
+                  tabDot[tab.key] === 'red' ? 'bg-red-500' : 'bg-amber-400']"
+                :aria-label="tabDot[tab.key] === 'red' ? 'Action requise' : 'À compléter'"
+              ></span>
+            </span>
             <span class="text-[11px] font-medium leading-none">{{ tab.label }}</span>
           </button>
         </li>
