@@ -59,6 +59,7 @@ import CredentialsSection from '@/components/audit/CredentialsSection.vue'
 import IdentificationSection from '@/components/audit/IdentificationSection.vue'
 import ZonesSection from '@/components/audit/ZonesSection.vue'
 import { useAuditStore } from '@/stores/audit'
+import { useAuditAutoSync } from '@/composables/useAuditAutoSync'
 import { useViewport } from '@/composables/useViewport'
 import MobileAuditNav from '@/components/MobileAuditNav.vue'
 import OpenOnPhoneButton from '@/components/OpenOnPhoneButton.vue'
@@ -66,6 +67,10 @@ import ShareAfModal from '@/components/ShareAfModal.vue'
 import { UserPlusIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 
 const auditStore = useAuditStore()
+// Sync desktop ↔ PWA : revalide à chaque retour sur l'onglet + polling
+// 30 s tant que la page est visible. Évite à un binôme (auditeur PWA
+// terrain + chef de projet bureau) de devoir F5 pour voir les modifs.
+useAuditAutoSync()
 const { isNarrow } = useViewport()
 const showShare = ref(false)
 const showEditMetadata = ref(false)
