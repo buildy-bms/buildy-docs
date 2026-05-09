@@ -865,6 +865,41 @@
 <p class="muted">Évaluation de la GTB non renseignée.</p>
 {{/if}}
 
+{{!-- ═══════════ Chapitre 6.5 — Constats GTB & opportunités Buildy ═══════════ --}}
+{{!-- Mig 108 : narratifs libres par sujet GTB (mesurage, historisation,
+     régulation, etc.), au-delà du décret R175. Tout est intégré au
+     rapport, même quand l'alinéa BACS est marqué « non concerné ». --}}
+{{#if gtbObservations.length}}
+<h1 class="chapter" data-toc-anchor="gtb-observations">{{{faIcon "comments" "#8b5cf6" "16"}}} Constats GTB & opportunités Buildy</h1>
+<div class="callout callout-info" style="margin-bottom: 6mm;">
+  <span class="callout-icon">💡</span>
+  <div class="callout-body">
+    Cette section regroupe les <strong>constats observés sur la GTB existante</strong>, au-delà du strict décret BACS.
+    Pour chaque sujet, l'auditeur précise l'état actuel et l'opportunité d'amélioration que Buildy peut apporter.
+  </div>
+</div>
+{{#each gtbObservations}}
+<div class="action-card" style="margin-bottom: 5mm;">
+  <div class="action-card-head">
+    <strong>{{label}}</strong>
+  </div>
+  {{#if description}}<div class="muted" style="margin-bottom: 2mm; font-size: 11px;">{{description}}</div>{{/if}}
+  {{#if observation_html}}
+    <div class="rich-notes" style="margin-bottom: 2mm;">
+      <p class="alt-solutions-label" style="margin-bottom: 1mm;">Observation :</p>
+      {{{observation_html}}}
+    </div>
+  {{/if}}
+  {{#if opportunity_html}}
+    <div class="alt-solutions">
+      <p class="alt-solutions-label" style="color: #8b5cf6;">Opportunité Buildy :</p>
+      {{{opportunity_html}}}
+    </div>
+  {{/if}}
+</div>
+{{/each}}
+{{/if}}
+
 {{!-- ═══════════ Chapitre 7 — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "16"}}} 7. {{#if isBacs}}Plan de mise en conformité{{else}}Préconisations Buildy pour le devis{{/if}}</h1>
 

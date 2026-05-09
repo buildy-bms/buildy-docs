@@ -783,6 +783,21 @@ async function buildFixturePreviewData({ user = null } = {}) {
     actionItems,
     actionStats,
     actionItemsRaw: numberedItems,
+    // Mig 108 : 2-3 sujets remplis pour montrer le rendu PDF.
+    gtbObservations: [
+      {
+        topic_key: 'historisation', label: 'Historisation des données',
+        description: 'Profondeur d\'historique, fréquence, exploitabilité, sauvegarde.',
+        observation_html: '<p>L\'EcoStruxure conserve 30 jours d\'historique 1 minute, mais aucune sauvegarde externalisée. Les courbes de charge sont consultables mais pas exportables au format CSV.</p>',
+        opportunity_html: '<p>Buildy Connect peut récupérer les courbes via l\'API EcoStruxure et les pousser sur Hyperveez avec rétention 5 ans + export CSV à la demande, sans toucher à la GTB existante.</p>',
+      },
+      {
+        topic_key: 'remote_access', label: 'Accès distant et mobilité',
+        description: 'VPN, web client, app mobile, sécurité, multi-utilisateurs.',
+        observation_html: '<p>Accès distant uniquement via le PC du local technique (TeamViewer ad-hoc). Pas d\'app mobile pour le chef de site, pas de gestion multi-utilisateurs.</p>',
+        opportunity_html: '<p>L\'app Gojee (iOS/Android) donne aux exploitants un accès lecture sécurisé aux indicateurs clés (températures, alarmes, consommations) sans VPN. Authentification SSO Buildy ID.</p>',
+      },
+    ],
     synthesisHtml: document.audit_synthesis_html,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,

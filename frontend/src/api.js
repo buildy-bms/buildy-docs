@@ -389,6 +389,12 @@ export const updateBacsChecklistItem = (docId, key, data) =>
   api.patch(`/bacs-audit/${docId}/checklist/${encodeURIComponent(key)}`, data)
 export const getBacsPhotoCoverage = (docId) => api.get(`/bacs-audit/${docId}/photo-coverage`)
 export const getBacsPhotoCounts = (docId) => api.get(`/bacs-audit/${docId}/photo-counts`)
+// Constats GTB hors-décret + opportunités Buildy (mig 108)
+export const getBacsGtbObservations = (docId) => api.get(`/bacs-audit/${docId}/gtb-observations`)
+export const updateBacsGtbObservation = (docId, topicKey, data) =>
+  api.put(`/bacs-audit/${docId}/gtb-observations/${encodeURIComponent(topicKey)}`, data)
+export const suggestBacsGtbObservation = (docId, topicKey) =>
+  api.post(`/bacs-audit/${docId}/gtb-observations/${encodeURIComponent(topicKey)}/suggest`)
 export const listChecklistCatalog = (params) => api.get('/bacs-checklist-catalog', { params })
 export const createChecklistCatalogItem = (data) => api.post('/bacs-checklist-catalog', data)
 export const updateChecklistCatalogItem = (key, data) =>

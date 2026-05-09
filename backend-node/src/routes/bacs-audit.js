@@ -622,6 +622,72 @@ async function routes(fastify) {
     return db.bacsAuditChecklist.photoCountsByEntity(id);
   });
 
+  // ─── Constats GTB hors-décret + opportunités Buildy (mig 108) ─────
+  // Pour chaque sujet GTB (mesurage, historisation, régulation, etc.),
+  // l'auditeur saisit deux narratifs libres : observation + opportunité.
+  // Visibles dans le PDF même quand l'alinéa R175 est « non concerné ».
+  fastify.get('/bacs-audit/:documentId/gtb-observations', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, request, reply)) return;
+    return db.bacsAuditGtbObservations.listForDocument(id);
+  });
+
+  fastify.put('/bacs-audit/:documentId/gtb-observations/:topicKey', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const key = request.params.topicKey;
+    if (!assertBacsAuditExists(id, request, reply, { requiredRole: 'write' })) return;
+    if (!db.gtbTopicsCatalog.getByKey(key)) {
+      return reply.code(404).send({ detail: 'Sujet GTB introuvable' });
+    }
+    const schema = z.object({
+      observation_html: z.string().nullable().optional(),
+      opportunity_html: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
+    const out = db.bacsAuditGtbObservations.upsert(id, key, body);
+    logBacsAudit(request, 'bacs.gtb_observation.update', id, {
+      topic: key,
+      fields: Object.keys(body),
+    });
+    return out;
+  });
+
+  // Suggestion Claude pour un sujet GTB. Lit les données pertinentes
+  // de l'audit (devices, BMS, meters, AF existante) et propose
+  // observation + opportunité que l'auditeur valide/édite.
+  fastify.post('/bacs-audit/:documentId/gtb-observations/:topicKey/suggest', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const key = request.params.topicKey;
+    if (!assertBacsAuditExists(id, request, reply, { requiredRole: 'write' })) return;
+    const topic = db.gtbTopicsCatalog.getByKey(key);
+    if (!topic) return reply.code(404).send({ detail: 'Sujet GTB introuvable' });
+    const af = db.afs.get(id);
+    const dump = {
+      site_name: af?.site_name || null,
+      kind: af?.kind || null,
+      systems: db.db.prepare('SELECT system_category, label, mode_count, granularity_level FROM bacs_audit_systems WHERE document_id = ?').all(id),
+      bms: db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(id),
+      meters: db.db.prepare('SELECT meter_type, usage, label FROM bacs_audit_meters WHERE document_id = ?').all(id),
+      devices: db.db.prepare(`
+        SELECT d.label, d.brand, d.communication, d.device_role, s.system_category
+        FROM bacs_audit_system_devices d
+        JOIN bacs_audit_systems s ON s.id = d.system_id
+        WHERE s.document_id = ?
+      `).all(id),
+    };
+    try {
+      const claude = require('../lib/claude');
+      const out = await claude.assistGtbObservation({ topic, dump });
+      return out;
+    } catch (e) {
+      request.log.error({ err: e }, 'gtb_observation suggest failed');
+      return reply.code(500).send({ detail: e.message || 'Suggestion Claude échouée' });
+    }
+  });
+
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
   // ENERGY_SOURCES, DEVICE_COMM, GENERATOR_TYPES, etc. sont importés
   // depuis ./bacs-audit/_shared (Vague 4 item 15 — source unique pour

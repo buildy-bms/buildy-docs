@@ -1462,9 +1462,77 @@ async function assistFaqSuggestMissing() {
   };
 }
 
+// ─── Constats GTB hors-décret + opportunités Buildy (mig 108) ──────
+// Pour un sujet GTB donné (mesurage, historisation, régulation, etc.),
+// Claude lit le dump audit (systèmes, BMS, devices, compteurs) et
+// propose deux paragraphes courts : observation factuelle de l'état
+// actuel + opportunité commerciale Buildy. L'auditeur valide / édite
+// avant sauvegarde.
+const PROMPT_KEY_BACS_GTB_OBSERVATION = 'bacs.gtb_observation';
+const SYSTEM_PROMPT_GTB_OBSERVATION = [
+  `Tu es l'auditeur BACS senior de Buildy. Pour un sujet GTB donné`,
+  `(ex : historisation, régulation, programmation horaire), tu reçois`,
+  `un dump des données de l'audit (systèmes, BMS, devices, compteurs).`,
+  ``,
+  `Ta tâche : produire DEUX courts paragraphes en HTML Tiptap.`,
+  ``,
+  `1) <p>Observation : ...</p> — ce que l'auditeur constaterait`,
+  `   raisonnablement à partir des données saisies. Factuel, neutre,`,
+  `   sans jargon marketing. Si la donnée manque, dis-le explicitement`,
+  `   ("aucune donnée saisie sur l'historique de la GTB").`,
+  ``,
+  `2) <p>Opportunité Buildy : ...</p> — ce que Buildy peut apporter sur`,
+  `   ce sujet précis. Reste factuel et concret (pas de slogan). Mentionne`,
+  `   Hyperveez / Buildy Connect / Gojee si pertinent. Évite les promesses`,
+  `   non chiffrées.`,
+  ``,
+  `Sortie : un objet JSON strict { "observation_html": "<p>...</p>",`,
+  `"opportunity_html": "<p>...</p>" }. Pas de markdown, pas de fences.`,
+  `Aucune autre clé. HTML uniquement à l'intérieur des chaînes.`,
+].join('\n');
+
+async function assistGtbObservation({ topic, dump }) {
+  const systemPrompt = getActivePrompt(PROMPT_KEY_BACS_GTB_OBSERVATION, SYSTEM_PROMPT_GTB_OBSERVATION);
+  const userPrompt = [
+    `=== SUJET GTB ===`,
+    `key: ${topic.key}`,
+    `label: ${topic.label}`,
+    topic.description ? `description: ${topic.description}` : '',
+    ``,
+    `=== DUMP AUDIT ===`,
+    JSON.stringify(dump, null, 2),
+    ``,
+    `Réponds en JSON strict (clé observation_html + opportunity_html).`,
+  ].filter(Boolean).join('\n');
+
+  const resp = await client().messages.create({
+    model: config.claudeModel,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  const raw = (resp.content || [])
+    .filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  let parsed = {};
+  try {
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    parsed = JSON.parse(cleaned);
+  } catch {
+    parsed = { observation_html: raw, opportunity_html: '' };
+  }
+  return {
+    observation_html: parsed.observation_html || '',
+    opportunity_html: parsed.opportunity_html || '',
+    usage: resp.usage,
+  };
+}
+
 module.exports = {
   streamSection, buildPrompts, assistLibrary,
   assistAuditSynthesis, assistActionAlternatives, assistTranscriptMapping,
+  assistGtbObservation,
+  PROMPT_KEY_BACS_GTB_OBSERVATION,
+  DEFAULT_SYSTEM_PROMPT_BACS_GTB_OBSERVATION: SYSTEM_PROMPT_GTB_OBSERVATION,
   // Pour la page d'administration "Prompts IA"
   PROMPT_KEY_LIBRARY,
   DEFAULT_SYSTEM_PROMPT_LIBRARY: SYSTEM_PROMPT_LIBRARY,

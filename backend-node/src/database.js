@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 107;
+const TARGET_VERSION = 108;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3904,6 +3904,65 @@ function runMigrations() {
     log.info('Migration 107 appliquee : permissions strictes par defaut (creator-only + grants explicites)');
   }
 
+  if (current < 108) {
+    // Constats GTB hors-décret + opportunités Buildy.
+    // Pour chaque sujet GTB (mesurage, historisation, régulation,
+    // programmation, alarmes, supervision, accès distant,
+    // interopérabilité), l'auditeur saisit deux narratifs libres :
+    //  - observation : ce qu'il constate sur place (état actuel,
+    //    défauts, contournements, écarts) — indépendant de la
+    //    conformité R175.
+    //  - opportunity : ce que Buildy peut apporter ici (proposition
+    //    commerciale, amélioration, intégration hyperveez/connect).
+    // Visibles dans le rapport PDF même quand l'alinéa R175
+    // correspondant est marqué « non concerné ».
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS gtb_topics_catalog (
+        key TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        description TEXT,
+        icon_value TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bacs_audit_gtb_observations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        topic_key TEXT NOT NULL,
+        observation_html TEXT,
+        opportunity_html TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, topic_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_audit_gtb_obs_doc
+        ON bacs_audit_gtb_observations(document_id);
+    `);
+    const seedTopics = [
+      { key: 'metering',        label: 'Mesurage et comptage',          icon: 'fa-gauge',          desc: 'Compteurs présents, granularité, lisibilité, accessibilité.', position: 10 },
+      { key: 'historisation',   label: 'Historisation des données',     icon: 'fa-clock-rotate-left', desc: 'Profondeur d\'historique, fréquence, exploitabilité, sauvegarde.', position: 20 },
+      { key: 'regulation',      label: 'Régulation thermique',          icon: 'fa-temperature-half',  desc: 'Type de régulation (TOR, PI, PID), zones, dérives observées.', position: 30 },
+      { key: 'programming',     label: 'Programmation horaire',         icon: 'fa-calendar-days',     desc: 'Plages occupation/inoccupation, dérogations, modes spéciaux.', position: 40 },
+      { key: 'alarms',          label: 'Alarmes et défauts',            icon: 'fa-bell',              desc: 'Acquittement, hiérarchisation, notifications, journal des défauts.', position: 50 },
+      { key: 'supervision',     label: 'Supervision graphique',         icon: 'fa-chart-line',        desc: 'Synoptiques, vues d\'exploitation, courbes, ergonomie poste.', position: 60 },
+      { key: 'remote_access',   label: 'Accès distant et mobilité',     icon: 'fa-mobile-screen',     desc: 'VPN, web client, app mobile, sécurité, multi-utilisateurs.', position: 70 },
+      { key: 'interoperability',label: 'Interopérabilité et protocoles',icon: 'fa-network-wired',     desc: 'Modbus, BACnet, KNX, M-Bus, APIs, ouverture aux tiers.', position: 80 },
+    ];
+    const insTopic = db.prepare(`
+      INSERT INTO gtb_topics_catalog (key, label, description, icon_value, position)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    for (const t of seedTopics) {
+      try { insTopic.run(t.key, t.label, t.desc, t.icon, t.position); }
+      catch { /* ignore conflict */ }
+    }
+    log.info('Migration 108 appliquee : gtb_topics_catalog + bacs_audit_gtb_observations + seed 8 sujets');
+    db.pragma('user_version = 108');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6592,6 +6651,72 @@ const bacsAuditChecklist = {
   },
 };
 
+// ─── Constats GTB hors-décret + opportunités Buildy (mig 108) ──────
+const gtbTopicsCatalog = {
+  list({ active = true } = {}) {
+    const where = active === null ? '' : 'WHERE active = ?';
+    const args = active === null ? [] : [active ? 1 : 0];
+    return db.prepare(`
+      SELECT * FROM gtb_topics_catalog ${where}
+      ORDER BY position, key
+    `).all(...args);
+  },
+  getByKey(key) {
+    return db.prepare('SELECT * FROM gtb_topics_catalog WHERE key = ?').get(key);
+  },
+};
+
+const bacsAuditGtbObservations = {
+  // Liste pour un audit : merge catalog (actifs) + état si saisi.
+  // Pas de lazy create : pas d'id stable nécessaire (pas de pièces jointes
+  // à rattacher contrairement à la check-list).
+  listForDocument(documentId) {
+    const topics = gtbTopicsCatalog.list({ active: true });
+    const states = db.prepare(
+      'SELECT * FROM bacs_audit_gtb_observations WHERE document_id = ?'
+    ).all(documentId);
+    const stateByKey = new Map(states.map(s => [s.topic_key, s]));
+    return topics.map(t => {
+      const state = stateByKey.get(t.key);
+      return {
+        topic_key: t.key,
+        label: t.label,
+        description: t.description,
+        icon_value: t.icon_value,
+        position: t.position,
+        observation_html: state?.observation_html || null,
+        opportunity_html: state?.opportunity_html || null,
+        updated_at: state?.updated_at || null,
+      };
+    });
+  },
+  upsert(documentId, topicKey, patch = {}) {
+    const existing = db.prepare(
+      'SELECT id FROM bacs_audit_gtb_observations WHERE document_id = ? AND topic_key = ?'
+    ).get(documentId, topicKey);
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO bacs_audit_gtb_observations
+          (document_id, topic_key, observation_html, opportunity_html)
+        VALUES (?, ?, ?, ?)
+      `).run(documentId, topicKey,
+        patch.observation_html ?? null,
+        patch.opportunity_html ?? null);
+    } else {
+      db.prepare(`
+        UPDATE bacs_audit_gtb_observations
+        SET observation_html = COALESCE(?, observation_html),
+            opportunity_html = COALESCE(?, opportunity_html),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(patch.observation_html, patch.opportunity_html, existing.id);
+    }
+    return db.prepare(
+      'SELECT * FROM bacs_audit_gtb_observations WHERE document_id = ? AND topic_key = ?'
+    ).get(documentId, topicKey);
+  },
+};
+
 module.exports = {
   init,
   pdfBoilerplate,
@@ -6631,5 +6756,7 @@ module.exports = {
   bacsAuditDeviceZones,
   bacsChecklistCatalog,
   bacsAuditChecklist,
+  gtbTopicsCatalog,
+  bacsAuditGtbObservations,
   get db() { return db; },
 };
