@@ -26,7 +26,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { updateAf, deleteAf, deliverBacsAudit } from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
-import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
+import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
 import { UserPlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
@@ -408,9 +408,10 @@ async function removeAudit() {
       @close="showShare = false"
     />
 
-    <!-- Modifier les paramètres de l'audit (parité AF) -->
-    <EditAuditMetadataModal
-      v-if="showEditMetadata && document"
+    <!-- Modifier les paramètres de l'audit — sheet plein écran iOS-natif
+         (Vague 3 item 10, remplace la modale desktop centrée). -->
+    <MobileEditAuditMetadataSheet
+      :open="showEditMetadata"
       :audit="document"
       @close="showEditMetadata = false"
       @saved="onMetadataSaved"
