@@ -12,7 +12,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { listAfs } from '@/api'
 import {
-  DocumentTextIcon, ShieldCheckIcon, BookOpenIcon, ChartBarIcon,
+  DocumentTextIcon, ShieldCheckIcon, BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -42,7 +42,6 @@ watch(() => [props.siteId, props.excludeId], load)
 const KIND_META = {
   af: { label: 'AF', color: 'text-indigo-700 bg-indigo-50 border-indigo-200', icon: DocumentTextIcon, route: id => `/afs/${id}` },
   bacs_audit: { label: 'Audit BACS', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: ShieldCheckIcon, route: id => `/bacs-audit/${id}` },
-  site_audit: { label: 'Audit GTB', color: 'text-cyan-700 bg-cyan-50 border-cyan-200', icon: ChartBarIcon, route: id => `/site-audit/${id}` },
   brochure: { label: 'Brochure', color: 'text-violet-700 bg-violet-50 border-violet-200', icon: BookOpenIcon, route: id => `/brochures/${id}` },
 }
 

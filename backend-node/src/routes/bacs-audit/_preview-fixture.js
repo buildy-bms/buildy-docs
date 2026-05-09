@@ -34,16 +34,7 @@ const {
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
   APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL,
 } = require('./_labels');
-const { buildComplianceSummary, buildClassiqueSummary } = require('./_compliance-summary');
-
-// Synthese executive alternative pour l'audit GTB CLASSIQUE (kind = 'site_audit').
-// Meme site fictif (Atlas Sud), mais discours de devis Buildy au lieu de
-// conformite R175.
-const SYNTHESIS_HTML_CLASSIQUE = `
-  <p>La <strong>Plateforme Logistique Atlas Sud</strong> (45 000 m² bâtis, mise en service 2019) dispose d'une <strong>GTB Schneider EcoStruxure Building Operation</strong> déployée en 2019 par Sodexo Energy Services. Cette base couvre honnêtement les usages tertiaires du bloc Bureaux R+1 (chauffage / refroidissement / ventilation) et la chaufferie principale.</p>
-  <p>Le périmètre actuel laisse cependant <strong>de nombreuses opportunités d'extension</strong> : les <strong>aérothermes gaz Reznor</strong> des cellules logistiques sont autonomes (contacts secs uniquement), le <strong>DRV Daikin VRV IV</strong> des bureaux n'est pas remonté dans la GTB (protocole propriétaire P1/P2), le sub-comptage électrique par usage est largement absent, l'<strong>éclairage industriel</strong> des cellules ne dispose pas de remontée d'état, et la <strong>centrale photovoltaïque 250 kWc</strong> remonte uniquement sur le portail SMA sans intégration GTB.</p>
-  <p>Buildy propose 15 préconisations regroupées par lot d'intervention pour étendre la couverture de la GTB existante (passerelle CoolMaster Pro pour le DRV Daikin, automate intermédiaire Wago pour les aérothermes cellules, sub-comptages élec/gaz, intégration PV en Modbus TCP). <strong>L'objectif n'est pas de remplacer l'existant</strong> — la GTB Schneider est saine et exploitable — mais de l'étendre pour couvrir l'ensemble du périmètre fonctionnel du site et alimenter une démarche de pilotage énergétique unifiée.</p>
-`.trim();
+const { buildComplianceSummary } = require('./_compliance-summary');
 
 // ─── Photos ─────────────────────────────────────────────────────────
 // Placeholders 1280x720 generes par data/fixtures/photos/_generate.js.
@@ -540,14 +531,12 @@ const ACTIONS_RAW = [
 /**
  * @param {object} opts
  * @param {object|null} opts.user — user injecte (display_name pour authorName)
- * @param {'bacs_audit'|'site_audit'} opts.kind — type d'audit a simuler.
- *   - 'bacs_audit' (default) : audit BACS R175 complet (verdict R175, dashboard,
- *     plan de mise en conformite, annexes decret).
- *   - 'site_audit' : audit GTB classique (preparation devis Buildy, sans R175 :
- *     verdict couverture GTB, "preconisations Buildy", annexes simplifiees).
+ *
+ * Le kind 'site_audit' a été supprimé (mig 106) ; tout audit est désormais
+ * un bacs_audit avec verdict R175, dashboard, plan de mise en conformité
+ * et annexes décret.
  */
-function buildFixturePreviewData({ user = null, kind = 'bacs_audit' } = {}) {
-  const isBacsKind = kind === 'bacs_audit';
+function buildFixturePreviewData({ user = null } = {}) {
   // Zones : ajout natureLabel + photos
   const zones = ZONES_RAW.map(z => ({
     ...z,
@@ -756,41 +745,18 @@ function buildFixturePreviewData({ user = null, kind = 'bacs_audit' } = {}) {
     metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
   };
 
-  // Document : on clone le DOCUMENT BACS de reference et on l'adapte si
-  // kind === 'site_audit' (vidage des champs R175, slug + project name + synthese).
-  const document = isBacsKind ? DOCUMENT : {
-    ...DOCUMENT,
-    kind: 'site_audit',
-    project_name: 'Plateforme Atlas Sud — Préparation devis Buildy',
-    slug: 'plateforme-atlas-sud-classique',
-    bacs_total_power_kw: null,
-    bacs_district_heating_substation_kw: null,
-    bacs_building_permit_date: null,
-    bacs_generator_works_date: null,
-    bacs_applicability_status: null,
-    audit_existing_af_status: null,
-    audit_synthesis_html: SYNTHESIS_HTML_CLASSIQUE,
-  };
-
-  // Synthese — BACS calcule le verdict R175 + dashboard 8 axes ;
-  // classique calcule un verdict de couverture GTB sans dashboard R175.
-  const applicabilityLabelForSummary = isBacsKind
-    ? (APPLICABILITY_LABEL[DOCUMENT.bacs_applicability_status] || null)
-    : null;
-  const compliance = isBacsKind
-    ? buildComplianceSummary({
-        document, actionItems, actionItemsRaw: numberedItems, bms,
-        r175_6_applicable,
-        applicabilityLabel: applicabilityLabelForSummary,
-      })
-    : buildClassiqueSummary({
-        document, actionItems, actionItemsRaw: numberedItems, devices, bms,
-      });
+  const document = DOCUMENT;
+  const applicabilityLabelForSummary = APPLICABILITY_LABEL[DOCUMENT.bacs_applicability_status] || null;
+  const compliance = buildComplianceSummary({
+    document, actionItems, actionItemsRaw: numberedItems, bms,
+    r175_6_applicable,
+    applicabilityLabel: applicabilityLabelForSummary,
+  });
 
   return {
     document,
-    isBacs: isBacsKind,
-    isSiteAudit: !isBacsKind,
+    isBacs: true,
+    isSiteAudit: false,
     site: SITE,
     zones,
     systemsByZone,
@@ -810,12 +776,12 @@ function buildFixturePreviewData({ user = null, kind = 'bacs_audit' } = {}) {
     actionStats,
     actionItemsRaw: numberedItems,
     synthesisHtml: document.audit_synthesis_html,
-    heatingCoolingBreakdown: isBacsKind ? heatingCoolingBreakdown : [],
-    heatingCoolingTotal: isBacsKind ? Math.round(heatingCoolingTotal * 10) / 10 : 0,
-    r175_6_applicable: isBacsKind ? r175_6_applicable : { applies: false, reason: 'audit GTB hors décret BACS' },
-    complianceLabel: isBacsKind ? (COMPLIANCE_LABEL[BMS.overall_compliance] || null) : null,
+    heatingCoolingBreakdown,
+    heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
+    r175_6_applicable,
+    complianceLabel: COMPLIANCE_LABEL[BMS.overall_compliance] || null,
     applicabilityLabel: applicabilityLabelForSummary,
-    bacsArticles: isBacsKind ? bacsArticles : [],
+    bacsArticles,
     methodology,
     disclaimers,
     justifications: isBacsKind ? justifications : [],

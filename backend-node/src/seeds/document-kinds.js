@@ -26,11 +26,6 @@ const DOCUMENT_KINDS = [
     label: 'Audit BACS',
     description: 'Rapport d\'audit de conformité au décret BACS R175',
   },
-  {
-    kind: 'site_audit',
-    label: 'Audit GTB',
-    description: 'Audit GTB classique (devis Buildy hors décret)',
-  },
 ];
 
 const DOCUMENT_KINDS_BY_KIND = Object.fromEntries(DOCUMENT_KINDS.map(d => [d.kind, d]));

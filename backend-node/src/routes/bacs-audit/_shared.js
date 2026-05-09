@@ -18,8 +18,8 @@ function assertBacsAuditExists(documentId, reply) {
     reply.code(404).send({ detail: 'Document non trouve' });
     return null;
   }
-  if (af.kind !== 'bacs_audit' && af.kind !== 'site_audit') {
-    reply.code(400).send({ detail: 'Document n\'est pas un audit (BACS ou site)' });
+  if (af.kind !== 'bacs_audit') {
+    reply.code(400).send({ detail: 'Document n\'est pas un audit BACS' });
     return null;
   }
   return af;

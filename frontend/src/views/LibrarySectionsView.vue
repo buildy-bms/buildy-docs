@@ -383,13 +383,11 @@ const KIND_BADGE_CLASS = {
   af:         'bg-indigo-50 text-indigo-700 border-indigo-200',
   brochure:   'bg-emerald-50 text-emerald-700 border-emerald-200',
   bacs_audit: 'bg-amber-50 text-amber-800 border-amber-200',
-  site_audit: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 const KIND_SHORT_LABEL = {
   af: 'AF',
   brochure: 'Brochure',
   bacs_audit: 'Audit BACS',
-  site_audit: 'Audit GTB',
 }
 function documentKindBadgeClass(kind) {
   return KIND_BADGE_CLASS[kind] || 'bg-gray-50 text-gray-600 border-gray-200'

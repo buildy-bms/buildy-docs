@@ -473,25 +473,6 @@ function generatorDevicesForZoneCategory(zoneId, category) {
   return devices.value.filter(d => sysIds.includes(d.system_id))
 }
 
-// Switch entre kinds compatibles (BACS <-> site). PATCH le kind, refresh
-// les donnees, et redirige vers la route correspondante. Les saisies
-// existantes (zones, systemes, devices, compteurs, GTB, etc.) sont
-// preservees telles quelles ; seul l'affichage des blocs R175 change.
-async function switchKind(newKind) {
-  if (!document.value || newKind === document.value.kind) return
-  if (newKind !== 'bacs_audit' && newKind !== 'site_audit') return
-  try {
-    await updateAf(docId, { kind: newKind })
-    success(newKind === 'bacs_audit' ? 'Audit basculé en mode BACS' : 'Audit basculé en mode GTB (Classique)')
-    await refresh()
-    // Ré-aligner l'URL pour matcher le nouveau kind
-    const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
-    if (route.path !== target) router.replace(target)
-  } catch (e) {
-    error(e.response?.data?.detail || 'Bascule impossible')
-  }
-}
-
 // Panneau d'activité (slide-out a droite, comme dans l'AF detail).
 // Affiche les entrees du journal d'audit (validations, exports,
 // uploads, generations Claude, etc.) recuperees via /api/afs/:id/audit.
@@ -1114,15 +1095,6 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
             :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
           <span class="text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
-          <select
-            :value="document?.kind || 'bacs_audit'"
-            @change="e => switchKind(e.target.value)"
-            class="ml-2 text-xs px-2 py-1 border border-gray-200 rounded-lg bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition shrink-0"
-            title="Type d'audit"
-          >
-            <option value="bacs_audit">Audit BACS (R175)</option>
-            <option value="site_audit">Audit GTB (Classique)</option>
-          </select>
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">

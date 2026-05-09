@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 105;
+const TARGET_VERSION = 106;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -3847,6 +3847,36 @@ function runMigrations() {
     `);
     log.info('Migration 105 appliquee : faq_categories_tombstones');
     db.pragma('user_version = 105');
+  }
+
+  if (current < 106) {
+    // Suppression du kind 'site_audit' : decision produit, on n'utilise plus
+    // que 'bacs_audit' (plus complet et structure). Les site_audit existants
+    // sont convertis en bacs_audit (les annexes R175 deviendront visibles
+    // dans le PDF, pas de perte de donnees). On retire ensuite 'site_audit'
+    // du CHECK contraint via writable_schema (meme pattern que mig 59).
+    const converted = db.prepare(
+      "UPDATE afs SET kind = 'bacs_audit' WHERE kind = 'site_audit'"
+    ).run().changes;
+    if (converted > 0) {
+      log.info(`Migration 106 : ${converted} site_audit converti(s) en bacs_audit`);
+    }
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'afs'"
+      ).run(
+        "CHECK (kind IN ('af','bacs_audit','site_audit','brochure'))",
+        "CHECK (kind IN ('af','bacs_audit','brochure'))",
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    db.pragma('user_version = 106');
+    log.info('Migration 106 appliquee : kind site_audit supprime');
   }
 
   if (current > TARGET_VERSION) {

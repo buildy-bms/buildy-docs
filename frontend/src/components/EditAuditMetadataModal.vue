@@ -1,22 +1,24 @@
 <script setup>
 /**
- * Modale d'édition des paramètres d'un audit BACS / GTB classique :
- * Site rattaché, Client, Nom du projet, Type d'audit (kind).
+ * Modale d'édition des paramètres d'un audit BACS :
+ * Site rattaché, Client, Nom du projet.
  *
  * Pendant audit du composant CycleBandeau « Éditer les informations de l'AF »
  * mais simplifié (pas de service_level — l'audit ne porte pas de niveau d'offre).
  *
+ * Le sélecteur de kind a été retiré (mig 106) : tout audit est désormais
+ * un BACS R175.
+ *
  * Props :
- *   audit : { id, client_name, project_name, site_id, kind }
+ *   audit : { id, client_name, project_name, site_id }
  *
  * Émet :
  *   close → fermer sans rien faire
- *   saved (audit) → fermer et rafraîchir le parent (kind a pu changer → redirect)
+ *   saved (audit) → fermer et rafraîchir le parent
  */
 import { ref, watch, computed } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SitePicker from './SitePicker.vue'
-import { FireIcon, BuildingOffice2Icon } from '@heroicons/vue/24/outline'
 import { updateAf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
@@ -30,7 +32,6 @@ const form = ref({
   client_name: '',
   project_name: '',
   site_id: null,
-  kind: 'bacs_audit',
 })
 const submitting = ref(false)
 
@@ -40,7 +41,6 @@ watch(() => props.audit, (a) => {
     client_name: a.client_name || '',
     project_name: a.project_name || '',
     site_id: a.site_id || null,
-    kind: a.kind || 'bacs_audit',
   }
 }, { immediate: true })
 
@@ -62,7 +62,6 @@ async function submit() {
       client_name: form.value.client_name.trim(),
       project_name: form.value.project_name.trim(),
       site_id: form.value.site_id,
-      kind: form.value.kind,
     })
     success('Paramètres mis à jour')
     emit('saved', data)
@@ -119,46 +118,6 @@ async function submit() {
         </div>
       </section>
 
-      <!-- ── Type d'audit ──────────────────────────────────────────── -->
-      <section class="space-y-3">
-        <h3 class="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Type d'audit</h3>
-        <div class="grid grid-cols-2 gap-2">
-          <label
-            :class="[
-              'cursor-pointer rounded-lg border-2 px-4 py-3 transition-all flex items-center gap-3',
-              form.kind === 'bacs_audit'
-                ? 'border-orange-600 bg-orange-50 text-orange-900 shadow-sm'
-                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-            ]"
-          >
-            <input v-model="form.kind" value="bacs_audit" type="radio" class="sr-only" />
-            <FireIcon class="w-6 h-6 shrink-0" />
-            <div class="min-w-0">
-              <p class="text-sm font-semibold">BACS R175</p>
-              <p class="text-[11px] text-gray-500 leading-tight">Audit décret BACS</p>
-            </div>
-          </label>
-          <label
-            :class="[
-              'cursor-pointer rounded-lg border-2 px-4 py-3 transition-all flex items-center gap-3',
-              form.kind === 'site_audit'
-                ? 'border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm'
-                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-            ]"
-          >
-            <input v-model="form.kind" value="site_audit" type="radio" class="sr-only" />
-            <BuildingOffice2Icon class="w-6 h-6 shrink-0" />
-            <div class="min-w-0">
-              <p class="text-sm font-semibold">GTB classique</p>
-              <p class="text-[11px] text-gray-500 leading-tight">Devis hors décret</p>
-            </div>
-          </label>
-        </div>
-        <p class="text-[11px] text-gray-500 leading-relaxed">
-          Bascule sans perte de données. Les zones, compteurs, systèmes et photos sont conservés ;
-          seuls les blocs spécifiques R175 changent d'affichage et d'export.
-        </p>
-      </section>
     </form>
 
     <template #footer>

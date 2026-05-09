@@ -15,8 +15,6 @@ import {
   Cog6ToothIcon,
   TrashIcon,
   CheckCircleIcon,
-  FireIcon,
-  BuildingOffice2Icon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
@@ -72,7 +70,6 @@ const STORAGE_KEY = `mobile-audit-tab:${docId}`
 const activeTab = ref(localStorage.getItem(STORAGE_KEY) || 'site')
 watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 
-const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
 // Tous les onglets visibles dans les deux modes (BACS + site_audit).
 // La logique R175-spécifique (régulation thermique, capacités GTB R175-3/4/5)
@@ -112,29 +109,11 @@ async function onMetadataSaved(updated) {
   }
 }
 const showShare = ref(false)
-const switching = ref(false)
 const delivering = ref(false)
 
 function openShare() {
   showSettings.value = false
   showShare.value = true
-}
-
-async function switchKind(newKind) {
-  if (!document.value || newKind === document.value.kind) return
-  if (newKind !== 'bacs_audit' && newKind !== 'site_audit') return
-  switching.value = true
-  try {
-    await updateAf(docId, { kind: newKind })
-    success(newKind === 'bacs_audit' ? 'Audit basculé en mode BACS' : 'Audit basculé en mode GTB')
-    await refresh()
-    const target = newKind === 'bacs_audit' ? `/bacs-audit/${docId}` : `/site-audit/${docId}`
-    if (route.path !== target) router.replace(target)
-  } catch (e) {
-    error(e.response?.data?.detail || 'Bascule impossible')
-  } finally {
-    switching.value = false
-  }
 }
 
 async function deliver() {
@@ -214,7 +193,7 @@ async function removeAudit() {
         </button>
         <div class="flex-1 min-w-0">
           <h1 class="text-base font-medium truncate leading-tight">
-            {{ document?.project_name || (isBacs ? 'Audit BACS' : 'Audit GTB') }}
+            {{ document?.project_name || 'Audit BACS' }}
           </h1>
           <p v-if="document?.client_name" class="text-[11px] text-white/70 truncate leading-tight">
             {{ document.client_name }}
@@ -230,7 +209,7 @@ async function removeAudit() {
           <SignalSlashIcon class="w-5 h-5" />
         </div>
         <div class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/15 text-white/90">
-          {{ isBacs ? 'BACS' : 'GTB' }}
+          BACS
         </div>
         <button
           @click="showSettings = true"
@@ -314,41 +293,6 @@ async function removeAudit() {
           <PencilSquareIcon class="w-5 h-5" />
           Modifier les paramètres
         </button>
-
-        <!-- Type d'audit (kind) -->
-        <div>
-          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Type d'audit</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              @click="switchKind('bacs_audit')"
-              :disabled="switching"
-              :class="['flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition disabled:opacity-50',
-                       isBacs
-                         ? 'border-orange-500 bg-orange-50 text-orange-700'
-                         : 'border-gray-200 bg-white text-gray-600']"
-            >
-              <FireIcon class="w-7 h-7" />
-              <span class="text-sm font-medium">BACS R175</span>
-            </button>
-            <button
-              type="button"
-              @click="switchKind('site_audit')"
-              :disabled="switching"
-              :class="['flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition disabled:opacity-50',
-                       !isBacs
-                         ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                         : 'border-gray-200 bg-white text-gray-600']"
-            >
-              <BuildingOffice2Icon class="w-7 h-7" />
-              <span class="text-sm font-medium">GTB classique</span>
-            </button>
-          </div>
-          <p class="text-xs text-gray-500 mt-2 leading-relaxed">
-            Bascule sans perte de données. Les saisies (zones, compteurs, systèmes…)
-            sont conservées ; seuls les blocs spécifiques R175 changent d'affichage.
-          </p>
-        </div>
 
         <!-- Statut audit -->
         <div v-if="document?.delivered_at" class="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">

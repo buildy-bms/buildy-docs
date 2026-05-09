@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import {
   ChevronRightIcon,
   FireIcon,
-  BuildingOffice2Icon,
   ClockIcon,
   CheckCircleIcon,
   PencilSquareIcon,
@@ -25,7 +24,6 @@ const { isOnline } = useOnlineStatus()
 
 const audits = ref([])
 const loading = ref(true)
-const filter = ref(localStorage.getItem('mobile-home-filter') || 'all') // 'all' | 'bacs_audit' | 'site_audit'
 
 const STATUS_LABEL = {
   draft:    { label: 'Brouillon', cls: 'bg-gray-100 text-gray-700' },
@@ -37,10 +35,8 @@ async function refresh() {
   loading.value = true
   try {
     const { data } = await listAfs()
-    // Mobile : on ne liste QUE les audits (bacs_audit + site_audit), pas les AF/brochures
-    audits.value = (data || []).filter(a =>
-      (a.kind || 'af') === 'bacs_audit' || (a.kind || 'af') === 'site_audit'
-    )
+    // Mobile : on ne liste QUE les audits BACS (mig 106 a unifié les kinds), pas les AF/brochures
+    audits.value = (data || []).filter(a => (a.kind || 'af') === 'bacs_audit')
   } catch {
     error('Échec du chargement des audits')
   } finally {
@@ -50,21 +46,12 @@ async function refresh() {
 
 onMounted(refresh)
 
-const filteredAudits = computed(() => {
-  let list = audits.value
-  if (filter.value !== 'all') list = list.filter(a => (a.kind || 'af') === filter.value)
-  // Tri par date d'édition desc (plus récent en haut)
-  return [...list].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
-})
-
-function selectFilter(v) {
-  filter.value = v
-  localStorage.setItem('mobile-home-filter', v)
-}
+const filteredAudits = computed(() =>
+  [...audits.value].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+)
 
 function openAudit(a) {
-  const path = (a.kind === 'site_audit') ? `/site-audit/${a.id}` : `/bacs-audit/${a.id}`
-  router.push(path)
+  router.push(`/bacs-audit/${a.id}`)
 }
 
 function relativeTime(s) {
@@ -80,8 +67,6 @@ function relativeTime(s) {
 
 const stats = computed(() => ({
   total: audits.value.length,
-  bacs: audits.value.filter(a => a.kind === 'bacs_audit').length,
-  site: audits.value.filter(a => a.kind === 'site_audit').length,
 }))
 
 // Création nouvel audit
@@ -166,38 +151,9 @@ const initials = computed(() => {
 
     <!-- Filter chips -->
     <div class="shrink-0 bg-white border-b border-gray-200 px-3 py-2 flex items-center gap-2 overflow-x-auto">
-      <button
-        type="button"
-        @click="selectFilter('all')"
-        :class="['px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap shrink-0 transition',
-                 filter === 'all'
-                   ? 'bg-indigo-600 text-white'
-                   : 'bg-gray-100 text-gray-700']"
-      >
-        Tous <span class="opacity-60">· {{ stats.total }}</span>
-      </button>
-      <button
-        type="button"
-        @click="selectFilter('bacs_audit')"
-        :class="['px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap shrink-0 transition inline-flex items-center gap-1.5',
-                 filter === 'bacs_audit'
-                   ? 'bg-orange-500 text-white'
-                   : 'bg-gray-100 text-gray-700']"
-      >
-        <FireIcon class="w-4 h-4" />
-        BACS <span class="opacity-60">· {{ stats.bacs }}</span>
-      </button>
-      <button
-        type="button"
-        @click="selectFilter('site_audit')"
-        :class="['px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap shrink-0 transition inline-flex items-center gap-1.5',
-                 filter === 'site_audit'
-                   ? 'bg-emerald-600 text-white'
-                   : 'bg-gray-100 text-gray-700']"
-      >
-        <BuildingOffice2Icon class="w-4 h-4" />
-        GTB <span class="opacity-60">· {{ stats.site }}</span>
-      </button>
+      <span class="px-4 py-2 text-sm font-medium rounded-full bg-indigo-600 text-white whitespace-nowrap">
+        Audits BACS <span class="opacity-70">· {{ stats.total }}</span>
+      </span>
     </div>
 
     <!-- Liste -->
@@ -232,18 +188,16 @@ const initials = computed(() => {
           @click="openAudit(a)"
           class="w-full bg-white rounded-2xl border border-gray-200 p-4 text-left active:bg-gray-50 flex items-start gap-3"
         >
-          <!-- Icone kind -->
-          <div :class="['w-12 h-12 rounded-xl inline-flex items-center justify-center shrink-0',
-                        a.kind === 'bacs_audit' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600']">
-            <FireIcon v-if="a.kind === 'bacs_audit'" class="w-6 h-6" />
-            <BuildingOffice2Icon v-else class="w-6 h-6" />
+          <!-- Icône audit BACS -->
+          <div class="w-12 h-12 rounded-xl inline-flex items-center justify-center shrink-0 bg-orange-50 text-orange-600">
+            <FireIcon class="w-6 h-6" />
           </div>
 
           <!-- Contenu -->
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between gap-2">
               <p class="text-base font-medium text-gray-900 truncate leading-tight">
-                {{ a.project_name || (a.kind === 'bacs_audit' ? 'Audit BACS' : 'Audit GTB') }}
+                {{ a.project_name || 'Audit BACS' }}
               </p>
               <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0 mt-0.5" />
             </div>
@@ -275,33 +229,6 @@ const initials = computed(() => {
       @save="submitCreate"
     >
       <div class="p-4 space-y-4">
-        <MobileField label="Type d'audit">
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              @click="newForm.kind = 'bacs_audit'"
-              :class="['flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition',
-                       newForm.kind === 'bacs_audit'
-                         ? 'border-orange-500 bg-orange-50 text-orange-700'
-                         : 'border-gray-200 bg-white text-gray-600']"
-            >
-              <FireIcon class="w-7 h-7" />
-              <span class="text-sm font-medium">BACS R175</span>
-            </button>
-            <button
-              type="button"
-              @click="newForm.kind = 'site_audit'"
-              :class="['flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition',
-                       newForm.kind === 'site_audit'
-                         ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                         : 'border-gray-200 bg-white text-gray-600']"
-            >
-              <BuildingOffice2Icon class="w-7 h-7" />
-              <span class="text-sm font-medium">GTB classique</span>
-            </button>
-          </div>
-        </MobileField>
-
         <MobileField label="Site" required hint="Choisis le site sur lequel l'audit sera réalisé.">
           <SitePicker
             :model-value="selectedSite"

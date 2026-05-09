@@ -37,7 +37,7 @@ const { buildComplianceSummary } = require('./_compliance-summary');
 /**
  * Construit le bundle de donnees a passer au template bacs-audit.hbs.
  *
- * @param {object} af — la ligne `documents` (deja fetchee, kind='bacs_audit' ou 'site_audit')
+ * @param {object} af — la ligne `documents` (deja fetchee, kind='bacs_audit')
  * @param {object} opts
  * @param {object|null} opts.user — user courant (pour authorName)
  * @param {boolean} opts.previewMode — true pour preview HTML (skip generation chemin sortie + version mock)
@@ -313,7 +313,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ? discRows.map(r => r.body_html)
     : bacsAuditDisclaimersStatic;
 
-  const isBacs = af.kind === 'bacs_audit';
+  // Le kind 'site_audit' a été supprimé (mig 106) ; tout audit est désormais
+  // un bacs_audit. On garde isBacs/isSiteAudit en sortie pour compat des
+  // templates existants — les `{{#if isBacs}}` continuent à s'appliquer.
+  const isBacs = true;
 
   // ── Charts (lot B2) ──
   // Donut severite : 3 segments des actions correctives.

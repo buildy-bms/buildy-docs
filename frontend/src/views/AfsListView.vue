@@ -132,7 +132,7 @@ const filteredSorted = computed(() => {
     if (sortBy.value === 'status') { av = STATUS_ORDER[a.status] ?? 99; bv = STATUS_ORDER[b.status] ?? 99 }
     else if (sortBy.value === 'updated_at') { av = a.updated_at || ''; bv = b.updated_at || '' }
     else if (sortBy.value === 'kind') {
-      const KIND_ORDER = { af: 0, bacs_audit: 1, site_audit: 2, brochure: 3 }
+      const KIND_ORDER = { af: 0, bacs_audit: 1, brochure: 2 }
       av = KIND_ORDER[a.kind || 'af'] ?? 99
       bv = KIND_ORDER[b.kind || 'af'] ?? 99
     }
@@ -142,8 +142,8 @@ const filteredSorted = computed(() => {
       bv = LEVEL_ORDER[b.service_level] ?? 99
     }
     else if (sortBy.value === 'bacs_progress') {
-      av = (a.kind === 'bacs_audit' || a.kind === 'site_audit') ? bacsProgress(a).percent : -1
-      bv = (b.kind === 'bacs_audit' || b.kind === 'site_audit') ? bacsProgress(b).percent : -1
+      av = a.kind === 'bacs_audit' ? bacsProgress(a).percent : -1
+      bv = b.kind === 'bacs_audit' ? bacsProgress(b).percent : -1
     }
     else { av = (a[sortBy.value] || '').toString().toLowerCase(); bv = (b[sortBy.value] || '').toString().toLowerCase() }
     if (av < bv) return sortDir.value === 'asc' ? -1 : 1
@@ -246,16 +246,14 @@ async function refresh() {
 
 async function submitCreate() {
   if (!newAf.value.client_name.trim() || !newAf.value.project_name.trim()) return
-  if ((newAf.value.kind === 'bacs_audit' || newAf.value.kind === 'site_audit') && !newAf.value.site_id) {
-    const label = newAf.value.kind === 'bacs_audit' ? 'audit BACS' : 'audit GTB'
-    error(`Un ${label} doit être rattaché à un site`)
+  if (newAf.value.kind === 'bacs_audit' && !newAf.value.site_id) {
+    error('Un audit BACS doit être rattaché à un site')
     return
   }
   submitting.value = true
   try {
     const { data } = await createAf(newAf.value)
     const kindLabel = data.kind === 'bacs_audit' ? 'Audit BACS'
-      : data.kind === 'site_audit' ? 'Audit GTB'
       : data.kind === 'brochure' ? 'Brochure' : 'AF'
     success(`${kindLabel} créé : ${data.client_name} — ${data.project_name}${data.sections_count ? ` (${data.sections_count} sections seedées)` : ''}`)
     showCreate.value = false
@@ -322,7 +320,6 @@ function formatDate(s) {
 // Dispatcher vers la bonne vue selon le kind du document
 function routeForDoc(doc) {
   if (doc.kind === 'bacs_audit') return `/bacs-audit/${doc.id}`
-  if (doc.kind === 'site_audit') return `/site-audit/${doc.id}`
   if (doc.kind === 'brochure') return `/brochures/${doc.id}`
   return `/afs/${doc.id}`
 }
@@ -389,7 +386,7 @@ onMounted(refresh)
       </span>
       <div class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-0.5 text-xs">
         <button
-          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'site_audit',l:'Audit GTB'}]"
+          v-for="opt in [{v:'all',l:'Tous'}, {v:'af',l:'AF'}, {v:'bacs_audit',l:'Audit BACS'}, {v:'brochure',l:'Brochure'}]"
           :key="opt.v"
           @click="kindFilter = opt.v"
           :class="[
@@ -493,11 +490,6 @@ onMounted(refresh)
                   v-tooltip="'Audit BACS — décret R175'"
                 >BACS</span>
                 <span
-                  v-else-if="row.af.kind === 'site_audit'"
-                  class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-emerald-100 text-emerald-700"
-                  v-tooltip="'Audit GTB (Classique) — préparation devis Buildy'"
-                >GTB</span>
-                <span
                   v-else-if="row.af.kind === 'brochure'"
                   class="inline-block px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-purple-100 text-purple-700"
                 >Brochure</span>
@@ -527,7 +519,7 @@ onMounted(refresh)
               </td>
               <!-- Avancement (barre BACS) -->
               <td class="px-4 py-2.5 whitespace-nowrap">
-                <div v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'" class="flex items-center gap-2">
+                <div v-if="row.af.kind === 'bacs_audit'" class="flex items-center gap-2">
                   <div class="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                     <div class="h-full bg-emerald-500 transition-all"
                          :style="{ width: bacsProgress(row.af).percent + '%' }"></div>
@@ -553,8 +545,8 @@ onMounted(refresh)
                           class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Versions'">
                     <BookmarkIcon class="w-4 h-4" />
                   </button>
-                  <button v-if="row.af.kind === 'bacs_audit' || row.af.kind === 'site_audit'"
-                          @click.stop="router.push(`${row.af.kind === 'site_audit' ? '/site-audit' : '/bacs-audit'}/${row.af.id}/audit-trail`)"
+                  <button v-if="row.af.kind === 'bacs_audit'"
+                          @click.stop="router.push(`/bacs-audit/${row.af.id}/audit-trail`)"
                           class="text-gray-300 hover:text-indigo-600 p-1 transition-colors" v-tooltip="'Historique'">
                     <ClockIcon class="w-4 h-4" />
                   </button>
@@ -640,12 +632,11 @@ onMounted(refresh)
         <!-- Selecteur de kind -->
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Type de document *</label>
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <label
               v-for="opt in [
                 { value: 'af', label: 'Analyse Fonctionnelle', desc: 'Plan AF GTB pour DOE' },
                 { value: 'bacs_audit', label: 'Audit BACS', desc: 'Conformité décret R175' },
-                { value: 'site_audit', label: 'Audit GTB (Classique)', desc: 'Préparation devis Buildy (hors décret)' },
                 // Brochure : option masquee — feature pas encore prete.
                 // Les brochures existantes (kind='brochure' en DB) restent visibles dans la liste.
                 // { value: 'brochure', label: 'Brochure', desc: 'Document commercial composé' },
@@ -681,7 +672,7 @@ onMounted(refresh)
           </label>
           <SitePicker
             v-model="newAf.site_id"
-            :required="newAf.kind === 'bacs_audit' || newAf.kind === 'site_audit'"
+            :required="newAf.kind === 'bacs_audit'"
             @change="onSiteChange"
           />
         </div>
@@ -764,13 +755,12 @@ onMounted(refresh)
         <button @click="showCreate = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuler</button>
         <button
           @click="submitCreate"
-          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || ((newAf.kind === 'bacs_audit' || newAf.kind === 'site_audit') && !newAf.site_id)"
+          :disabled="submitting || !newAf.client_name.trim() || !newAf.project_name.trim() || (newAf.kind === 'bacs_audit' && !newAf.site_id)"
           class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           {{
             submitting ? 'Création…'
             : newAf.kind === 'bacs_audit' ? 'Créer l\'audit BACS'
-            : newAf.kind === 'site_audit' ? 'Créer l\'audit GTB'
             : newAf.kind === 'brochure' ? 'Créer la brochure'
             : 'Créer l\'AF'
           }}
