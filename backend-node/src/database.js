@@ -6527,6 +6527,69 @@ const bacsAuditChecklist = {
       bms: { total: bmsRow ? 1 : 0, covered: bmsFiles > 0 ? 1 : 0, files_count: bmsFiles },
     };
   },
+
+  /**
+   * Counts de photos par entité (Vague 4 audit BACS — affordance UI :
+   * badge « 📷 N » sur chaque ligne dans MetersSection / SystemsSection
+   * / etc. plutôt que d'aller dans la check-list documentaire).
+   *
+   * Retourne un objet plat :
+   *   { zones: { [zoneId]: count }, systems: { [systemId]: count },
+   *     meters: { [meterId]: count }, devices: { [deviceId]: count },
+   *     bms: count }
+   */
+  photoCountsByEntity(documentId) {
+    const af = db.prepare('SELECT site_id FROM afs WHERE id = ?').get(documentId);
+    if (!af) return { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 };
+
+    const tally = (col, scope) => {
+      // Pour zones : seulement celles du site rattaché.
+      // Pour systems / meters / devices : seulement ceux de ce document.
+      let rows;
+      if (col === 'bacs_audit_zone_id') {
+        rows = db.prepare(`
+          SELECT ${col} AS id, COUNT(*) AS n
+          FROM site_documents sd
+          JOIN zones z ON z.zone_id = sd.${col}
+          WHERE sd.${col} IS NOT NULL AND z.site_id = ?
+          GROUP BY ${col}
+        `).all(af.site_id);
+      } else if (col === 'bacs_audit_device_id') {
+        rows = db.prepare(`
+          SELECT ${col} AS id, COUNT(*) AS n
+          FROM site_documents sd
+          JOIN bacs_audit_system_devices d ON d.id = sd.${col}
+          JOIN bacs_audit_systems s ON s.id = d.system_id
+          WHERE sd.${col} IS NOT NULL AND s.document_id = ?
+          GROUP BY ${col}
+        `).all(documentId);
+      } else {
+        // bacs_audit_system_id, bacs_audit_meter_id : direct via document_id
+        const tbl = scope === 'systems' ? 'bacs_audit_systems' : 'bacs_audit_meters';
+        rows = db.prepare(`
+          SELECT sd.${col} AS id, COUNT(*) AS n
+          FROM site_documents sd
+          JOIN ${tbl} t ON t.id = sd.${col}
+          WHERE sd.${col} IS NOT NULL AND t.document_id = ?
+          GROUP BY sd.${col}
+        `).all(documentId);
+      }
+      const out = {};
+      for (const r of rows) out[r.id] = r.n;
+      return out;
+    };
+
+    const zones = tally('bacs_audit_zone_id', 'zones');
+    const systems = tally('bacs_audit_system_id', 'systems');
+    const meters = tally('bacs_audit_meter_id', 'meters');
+    const devices = tally('bacs_audit_device_id', 'devices');
+    const bms = db.prepare(`
+      SELECT COUNT(*) AS n FROM site_documents
+      WHERE bacs_audit_bms_document_id = ?
+    `).get(documentId).n;
+
+    return { zones, systems, meters, devices, bms };
+  },
 };
 
 module.exports = {

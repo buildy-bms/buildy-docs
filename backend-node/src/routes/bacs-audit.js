@@ -613,6 +613,15 @@ async function routes(fastify) {
     return db.bacsAuditChecklist.photoCoverage(id);
   });
 
+  // Counts par entité — alimente les badges « 📷 N » dans les sections
+  // (Vague 4 audit BACS). Bien plus utile que la couverture agrégée
+  // pour l'affordance UI.
+  fastify.get('/bacs-audit/:documentId/photo-counts', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(id, request, reply)) return;
+    return db.bacsAuditChecklist.photoCountsByEntity(id);
+  });
+
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
   // ENERGY_SOURCES, DEVICE_COMM, GENERATOR_TYPES, etc. sont importés
   // depuis ./bacs-audit/_shared (Vague 4 item 15 — source unique pour
