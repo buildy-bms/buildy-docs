@@ -4,13 +4,24 @@ const db = require('../../database');
 
 const SYSTEM_CATEGORIES = ['heating','cooling','ventilation','dhw',
   'lighting_indoor','lighting_outdoor','electricity_production'];
+// COMMUNICATION_VALUES : protocoles déclarés au niveau d'un *système*.
+// DEVICE_COMM ajoute lorawan + utilisé pour les devices physiques (mig 70).
 const COMMUNICATION_VALUES = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
   'knx','mbus','mqtt','autre','non_communicant','absent'];
+const DEVICE_COMM = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+  'knx','mbus','mqtt','lorawan','autre','non_communicant','absent'];
 const METER_USAGES = ['heating','cooling','dhw','pv','lighting','other'];
 const METER_TYPES = ['electric','electric_production','gas','water','thermal'];
 const RECOMMENDATIONS = ['to_add','to_replace','to_connect','compliant'];
 const REGULATION_TYPES = ['per_room','per_zone','central_only','none'];
 const GENERATOR_TYPES = ['gas','electric','heat_pump','wood_appliance','district_heating','other'];
+const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating',
+  'fuel_oil','solar','biomass','autre'];
+// `device_role` est volontairement non-enum (z.string libre) depuis la
+// mig 99 — l'admin peut créer des niveaux custom (Production étage 2,
+// Sous-comptage gaz…) via le SearchableSelect creatable de l'éditeur
+// de modèle d'équipement. Le PDF affiche la valeur brute si elle n'est
+// pas dans ROLE_LABEL (cf _export-data.js fallback).
 
 /**
  * Vérifie qu'un document BACS existe ET que l'utilisateur courant a au
@@ -77,8 +88,9 @@ function logBacsAudit(request, action, afId, payload = {}) {
 }
 
 module.exports = {
-  SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
-  RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
+  SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
+  METER_USAGES, METER_TYPES, RECOMMENDATIONS,
+  REGULATION_TYPES, GENERATOR_TYPES, ENERGY_SOURCES,
   assertBacsAuditExists,
   logBacsAudit,
 };
