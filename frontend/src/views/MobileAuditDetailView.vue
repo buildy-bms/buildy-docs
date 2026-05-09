@@ -27,7 +27,8 @@ import { updateAf, deleteAf, deliverBacsAudit } from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
-import { UserPlusIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
+import MobileSynthesisSheet from '@/components/mobile-audit/MobileSynthesisSheet.vue'
+import { UserPlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -162,11 +163,17 @@ async function onMetadataSaved(updated) {
   }
 }
 const showShare = ref(false)
+const showSynthesis = ref(false)
 const delivering = ref(false)
 
 function openShare() {
   showSettings.value = false
   showShare.value = true
+}
+
+function openSynthesis() {
+  showSettings.value = false
+  showSynthesis.value = true
 }
 
 async function deliver() {
@@ -409,6 +416,15 @@ async function removeAudit() {
           Partager l'audit
         </button>
 
+        <!-- Action : Synthèse Claude (PR-V Vague 3 item 12) -->
+        <button
+          @click="openSynthesis"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-violet-700 bg-violet-50 border border-violet-200 active:bg-violet-100 rounded-xl"
+        >
+          <SparklesIcon class="w-5 h-5" />
+          Synthèse Claude
+        </button>
+
         <!-- Action : Livrer -->
         <button
           @click="deliver"
@@ -455,6 +471,12 @@ async function removeAudit() {
       :open="showShare"
       :doc-id="docId"
       @close="showShare = false"
+    />
+
+    <!-- Sheet Synthese Claude (PR-V) -->
+    <MobileSynthesisSheet
+      :open="showSynthesis"
+      @close="showSynthesis = false"
     />
 
     <!-- Modifier les paramètres de l'audit — sheet plein écran iOS-natif
