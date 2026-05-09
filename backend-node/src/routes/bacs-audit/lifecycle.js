@@ -9,6 +9,7 @@ const config = require('../../config');
 const db = require('../../database');
 const log = require('../../lib/logger').system;
 const { assistAuditSynthesis } = require('../../lib/claude');
+const { sanitize: sanitizeHtmlField } = require('../../lib/html-sanitize');
 const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator');
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../../lib/seeder');
 const gitLib = require('../../lib/git');
@@ -142,7 +143,7 @@ async function routes(fastify) {
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
-    db.afs.update(documentId, { audit_synthesis_html: body.html ?? null });
+    db.afs.update(documentId, { audit_synthesis_html: sanitizeHtmlField(body.html) ?? null });
     return db.afs.getById(documentId);
   });
 
@@ -166,7 +167,7 @@ async function routes(fastify) {
     try {
       const { html, usage } = await assistActionAlternatives(ctx);
       db.db.prepare('UPDATE bacs_audit_action_items SET alternative_solutions_html = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(html, id);
+        .run(sanitizeHtmlField(html), id);
       db.auditLog.add({
         afId: item.document_id,
         userId: request.authUser?.id,
@@ -323,7 +324,9 @@ async function routes(fastify) {
     try {
       const { html, usage } = await assistAuditSynthesis(auditDump);
       db.afs.update(documentId, {
-        audit_synthesis_html: html,
+        // Sanitize même côté Claude — au cas où un prompt injection
+        // ou un comportement modèle aboutirait à du HTML hostile.
+        audit_synthesis_html: sanitizeHtmlField(html),
         audit_synthesis_generated_at: new Date().toISOString(),
       });
       db.auditLog.add({

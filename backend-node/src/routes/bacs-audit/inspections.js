@@ -8,6 +8,7 @@ const { z } = require('zod');
 const db = require('../../database');
 const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator');
 const { assertBacsAuditExists, logBacsAudit } = require('./_shared');
+const { sanitizeBodyHtmlFields } = require('../../lib/html-sanitize');
 
 const inspectionFields = z.object({
   last_inspection_date: z.string().nullable().optional(),
@@ -37,6 +38,7 @@ async function routes(fastify) {
     let body;
     try { body = inspectionFields.parse(request.body || {}); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const cols = Object.keys(body);
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_inspections (document_id${cols.length ? ', ' + cols.join(', ') : ''})
@@ -54,6 +56,7 @@ async function routes(fastify) {
     let body;
     try { body = inspectionFields.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    sanitizeBodyHtmlFields(body);
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) { sets.push(`${k} = ?`); args.push(v); }
     if (sets.length) {
