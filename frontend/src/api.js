@@ -27,9 +27,14 @@ api.interceptors.response.use(
     // `_isOfflineReplay` ne sont pas re-queueables (anti-boucle).
     const cfg = err.config || {}
     const isNetwork = !err.response
-    const looksOffline = isNetwork && (typeof navigator === 'undefined' || !navigator.onLine || /Network Error|timeout/i.test(err.message || ''))
+    // iOS Safari (surtout PWA standalone) ne flippe pas toujours
+    // `navigator.onLine` à false au moment du fail — on considère donc
+    // toute erreur sans response comme un signal offline pour les
+    // routes queueables. C'est plus permissif que la version 1 qui
+    // exigeait `!navigator.onLine`, et c'est ce qui permet à la queue
+    // de s'enclencher sur device réel.
     if (
-      looksOffline
+      isNetwork
       && !cfg._isOfflineReplay
       && isQueueable(cfg.method, cfg.url, cfg.headers?.['Content-Type'] || cfg.headers?.['content-type'])
     ) {
