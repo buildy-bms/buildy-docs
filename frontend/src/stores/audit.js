@@ -158,6 +158,36 @@ export const useAuditStore = defineStore('audit', {
       this.meters = m.data
     },
 
+    /**
+     * Rafraîchit l'audit complet (document + entités) sans repasser par
+     * le `$reset` qui causerait un flash UI. Utilisé pour la sync
+     * desktop ↔ PWA : revalidation au focus + polling 30 s. Toutes les
+     * sous-vues qui lisent le store via `storeToRefs` se mettent à jour
+     * en place sans démontage.
+     */
+    async softRefresh() {
+      if (!this.docId) return
+      try {
+        const d = await getAf(this.docId)
+        // on ne remplace que les champs métier qui peuvent évoluer côté
+        // un autre client (statut, métadonnées, synthèse, progression).
+        if (this.document) {
+          Object.assign(this.document, d.data)
+        } else {
+          this.document = d.data
+        }
+        try { this.auditProgress = JSON.parse(d.data.audit_progress || '{}') }
+        catch { /* keep previous */ }
+        this.synthesisHtml = d.data.audit_synthesis_html || this.synthesisHtml
+        const [bms] = await Promise.all([
+          getBacsBms(this.docId),
+        ])
+        this.bms = bms.data || {}
+        await this.refreshAuditCore()
+        await this.refreshInspections()
+      } catch { /* network glitch — silencieux, sera retenté au prochain tick */ }
+    },
+
     async addInspection() {
       await createBacsInspection(this.docId, {})
       await this.refreshInspections()

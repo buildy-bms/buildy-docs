@@ -18,6 +18,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
+import { useAuditAutoSync } from '@/composables/useAuditAutoSync'
 import { useNotification } from '@/composables/useNotification'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useConfirm } from '@/composables/useConfirm'
@@ -47,6 +48,10 @@ import MobileChecklistTab from '@/components/mobile-audit/MobileChecklistTab.vue
 const route = useRoute()
 const router = useRouter()
 const auditStore = useAuditStore()
+// Sync desktop ↔ PWA : revalide à chaque retour sur l'onglet (utile
+// quand l'auditeur revient à l'app après un appel ou un changement
+// d'app) + polling 30 s tant que l'écran est visible.
+useAuditAutoSync()
 const { document, loading } = storeToRefs(auditStore)
 const { error, success } = useNotification()
 const { isOnline } = useOnlineStatus()
