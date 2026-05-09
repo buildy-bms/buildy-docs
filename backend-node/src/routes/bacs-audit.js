@@ -12,8 +12,9 @@ const log = require('../lib/logger').system;
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
 const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const {
-  SYSTEM_CATEGORIES, COMMUNICATION_VALUES, METER_USAGES, METER_TYPES,
-  RECOMMENDATIONS, REGULATION_TYPES, GENERATOR_TYPES,
+  SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
+  METER_USAGES, METER_TYPES, RECOMMENDATIONS,
+  REGULATION_TYPES, GENERATOR_TYPES, ENERGY_SOURCES,
   assertBacsAuditExists, logBacsAudit,
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
@@ -613,13 +614,9 @@ async function routes(fastify) {
   });
 
   // ─── Devices (multi-systèmes par catégorie x zone) ────────────────
-  const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
-  const DEVICE_COMM = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp','knx','mbus','mqtt','lorawan','autre','non_communicant','absent'];
-  // Note : `device_role` est volontairement non-enum (z.string libre)
-  // depuis la mig 99 — l'admin peut créer des niveaux custom (Régulation
-  // étage 2, Sous-comptage…) via le SearchableSelect creatable de
-  // l'éditeur de modèle d'équipement. Le PDF affiche la valeur brute
-  // si elle n'est pas dans ROLE_LABEL (cf _export-data.js fallback).
+  // ENERGY_SOURCES, DEVICE_COMM, GENERATOR_TYPES, etc. sont importés
+  // depuis ./bacs-audit/_shared (Vague 4 item 15 — source unique pour
+  // que la DB CHECK + Zod + labels PDF restent alignés).
 
   // GET /bacs-audit/:documentId/devices — tous les devices du document, joints au système
   fastify.get('/bacs-audit/:documentId/devices', async (request, reply) => {

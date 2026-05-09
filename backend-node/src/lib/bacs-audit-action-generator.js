@@ -382,8 +382,12 @@ function regenerateActionItems(documentId) {
   for (const [key, e] of existingByKey) {
     const t = target.get(key);
     if (!t) {
-      // Plus dans la cible -> gap resolu, marquer 'done' (sauf si deja done/declined)
-      if (e.status === 'open' || e.status === 'quoted' || e.status === 'in_progress') {
+      // Plus dans la cible -> gap resolu, marquer 'done'.
+      // Concerne les items open/quoted/in_progress (gap résolu naturellement)
+      // ET les items declined dont la source a disparu (sinon ils restent
+      // orphelins et polluent les compteurs/PDF — Vague 4 item 16 de l'audit).
+      // Les items déjà 'done' ne sont pas re-touchés (idempotence).
+      if (e.status !== 'done') {
         db.db.prepare(`
           UPDATE bacs_audit_action_items
           SET status = 'done', updated_at = CURRENT_TIMESTAMP
