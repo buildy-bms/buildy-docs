@@ -36,6 +36,7 @@ import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import Button from '@/components/Button.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
@@ -1142,43 +1143,38 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         </div>
 
         <!-- Aperçu HTML (avant export PDF) -->
-        <button @click="openPreview"
-          v-tooltip="'Aperçu HTML rapide du rapport (sans génération PDF)'"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap">
-          <EyeIcon class="w-4 h-4 shrink-0" />
+        <Button variant="secondary" size="md" @click="openPreview"
+          v-tooltip="'Aperçu HTML rapide du rapport (sans génération PDF)'">
+          <template #icon-left><EyeIcon class="w-4 h-4 shrink-0" /></template>
           Aperçu
-        </button>
+        </Button>
 
         <!-- Exports PDF principaux (style cohérent avec AF : indigo solide) -->
-        <button @click="exportPdf" :disabled="exporting"
-          title="Génère le rapport d'audit complet en PDF A4"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 whitespace-nowrap">
-          <DocumentArrowDownIcon class="w-4 h-4" />
+        <Button variant="primary" size="md" :loading="exporting" @click="exportPdf"
+          title="Génère le rapport d'audit complet en PDF A4">
+          <template #icon-left><DocumentArrowDownIcon class="w-4 h-4" /></template>
           {{ exporting ? 'Génération…' : 'Rapport' }}
-        </button>
-        <button @click="exportTablesPdf" :disabled="exportingTables"
-          title="Génère les tableaux de synthèse (A3 paysage) destinés à l'intégrateur"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 whitespace-nowrap">
-          <TableCellsIcon class="w-4 h-4" />
+        </Button>
+        <Button variant="primary" size="md" :loading="exportingTables" @click="exportTablesPdf"
+          title="Génère les tableaux de synthèse (A3 paysage) destinés à l'intégrateur">
+          <template #icon-left><TableCellsIcon class="w-4 h-4" /></template>
           {{ exportingTables ? 'Génération…' : 'Synthèse' }}
-        </button>
+        </Button>
 
         <!-- Livrer (CTA principal vert) -->
-        <button @click="deliver" :disabled="delivering"
-          v-tooltip="'Génère le PDF final + fige le snapshot Git'"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-60 whitespace-nowrap">
-          <CheckCircleIcon class="w-4 h-4 shrink-0" />
+        <Button variant="success" size="md" :loading="delivering" @click="deliver"
+          v-tooltip="'Génère le PDF final + fige le snapshot Git'">
+          <template #icon-left><CheckCircleIcon class="w-4 h-4 shrink-0" /></template>
           {{ delivering ? 'Livraison…' : 'Livrer' }}
-        </button>
+        </Button>
 
         <!-- Menu Plus (cohérent avec AF) -->
         <div ref="settingsMenuRef" class="relative inline-flex">
-          <button @click="showSettingsMenu = !showSettingsMenu"
-            title="Plus d'actions"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap">
-            <EllipsisHorizontalIcon class="w-4 h-4 shrink-0" />
+          <Button variant="secondary" size="md" @click="showSettingsMenu = !showSettingsMenu"
+            title="Plus d'actions">
+            <template #icon-left><EllipsisHorizontalIcon class="w-4 h-4 shrink-0" /></template>
             Plus
-          </button>
+          </Button>
           <div v-if="showSettingsMenu"
                class="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-56 py-1 whitespace-nowrap"
                @click.stop>
