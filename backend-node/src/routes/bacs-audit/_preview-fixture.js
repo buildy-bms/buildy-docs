@@ -36,6 +36,14 @@ const {
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
 
+// Lazy require de pdf-charts (chartjs-node-canvas) — même pattern que
+// _export-data.js pour éviter de polluer require.cache au boot Fastify.
+let _charts = null;
+function getCharts() {
+  if (!_charts) _charts = require('../../lib/pdf-charts');
+  return _charts;
+}
+
 // ─── Photos ─────────────────────────────────────────────────────────
 // Placeholders 1280x720 generes par data/fixtures/photos/_generate.js.
 // Charges en data URL pour embed dans le HTML/PDF (pas de fetch reseau).
@@ -536,7 +544,7 @@ const ACTIONS_RAW = [
  * un bacs_audit avec verdict R175, dashboard, plan de mise en conformité
  * et annexes décret.
  */
-function buildFixturePreviewData({ user = null } = {}) {
+async function buildFixturePreviewData({ user = null } = {}) {
   // Zones : ajout natureLabel + photos
   const zones = ZONES_RAW.map(z => ({
     ...z,
@@ -784,14 +792,38 @@ function buildFixturePreviewData({ user = null } = {}) {
     bacsArticles,
     methodology,
     disclaimers,
-    justifications: isBacsKind ? justifications : [],
+    justifications,
     authorName: user?.display_name || 'Auditeur Buildy (fixture)',
     exportDate,
-    version: isBacsKind ? 'bacs-vAPERCU' : 'classique-vAPERCU',
+    version: 'bacs-vAPERCU',
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-    // Charts désactivés en v1 du fixture (cf. plan)
-    sevDonutDataUrl: null,
-    barUsagePowerDataUrl: null,
+    // Charts générés via chartjs-node-canvas (Vague 4 item 17) :
+    // donut sévérité + bar usage power. Permet à la preview HTML/PDF
+    // d'être visuellement fidèle au PDF prod (sinon cases blanches).
+    sevDonutDataUrl: await getCharts().donutSeverity({
+      blocking: actionStats.blocking,
+      major: actionStats.major,
+      minor: actionStats.minor,
+    }),
+    barUsagePowerDataUrl: await (async () => {
+      const powerByUsage = new Map();
+      for (const d of devices) {
+        if (d.power_kw == null) continue;
+        const cat = d.system_category || 'autre';
+        powerByUsage.set(cat, (powerByUsage.get(cat) || 0) + Number(d.power_kw));
+      }
+      const USAGE_ORDER = ['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor'];
+      const items = USAGE_ORDER.filter(u => powerByUsage.has(u)).map(u => ({
+        label: SYSTEM_LABEL[u] || u,
+        kw: Math.round(powerByUsage.get(u) * 10) / 10,
+        color: getCharts().COLORS[u === 'heating' ? 'heating'
+          : u === 'cooling' ? 'cooling'
+          : u === 'ventilation' ? 'ventilation'
+          : u === 'dhw' ? 'dhw'
+          : 'lighting'],
+      }));
+      return items.length ? getCharts().barUsagePower({ items }) : null;
+    })(),
     barItems: [],
   };
 }
