@@ -19,10 +19,8 @@ const {
   DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
   DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
   PROMPT_KEY_BACS_SYNTHESIS,
-  PROMPT_KEY_SITE_AUDIT_SYNTHESIS,
   PROMPT_KEY_BACS_TRANSCRIPT,
   DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
-  DEFAULT_SYSTEM_PROMPT_SITE_AUDIT_SYNTHESIS,
   DEFAULT_SYSTEM_PROMPT_BACS_TRANSCRIPT,
 } = require('../lib/claude');
 
@@ -50,13 +48,8 @@ const PROMPT_CATALOG = {
   },
   [PROMPT_KEY_BACS_SYNTHESIS]: {
     label: 'Audit BACS — Synthèse R175',
-    description: 'Prompt système utilisé par le bouton "Générer la synthèse" sur les audits BACS (kind = bacs_audit). Construit la note de synthèse réglementaire transmise au client à partir du dump complet de l\'audit.',
+    description: 'Prompt système utilisé par le bouton "Générer la synthèse" sur les audits BACS. Construit la note de synthèse réglementaire transmise au client à partir du dump complet de l\'audit.',
     default_body: DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
-  },
-  [PROMPT_KEY_SITE_AUDIT_SYNTHESIS]: {
-    label: 'Audit Site (devis Buildy) — Synthèse commerciale',
-    description: 'Prompt système utilisé par le bouton "Générer la synthèse" sur les audits Site (kind = site_audit, hors décret BACS). Note commerciale orientée besoins du site et fonctionnalités Buildy.',
-    default_body: DEFAULT_SYSTEM_PROMPT_SITE_AUDIT_SYNTHESIS,
   },
   [PROMPT_KEY_BACS_TRANSCRIPT]: {
     label: 'Audit BACS — Pré-remplissage depuis transcript Plaud Pro',

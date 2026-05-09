@@ -182,14 +182,9 @@ function buildComplianceSummary({
 }
 
 /**
- * Variante "classique" (audit GTB hors décret BACS) — calcule un verdict
- * de couverture GTB plutôt qu'un verdict de conformité R175. Sert pour la
- * cover et la page « L'essentiel » des audits `kind === 'site_audit'`.
- *
- * Verdict basé sur le ratio devices intégrés GTB / devices présents :
- *  - >= 80% intégrés → 'compliant' (couverture quasi totale)
- *  - >= 30% intégrés → 'partial'   (couverture partielle, à étendre)
- *  - < 30% intégrés  → 'non_compliant' (refonte conseillée)
+ * @deprecated kind 'site_audit' supprimé (mig 106). Conservé pour
+ * éviter de casser un import externe pendant la transition. Toute
+ * nouvelle synthèse passe par buildComplianceSummary.
  */
 const COVERAGE_LABEL = {
   compliant:     'Couverture étendue',

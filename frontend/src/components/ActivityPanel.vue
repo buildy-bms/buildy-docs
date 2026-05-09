@@ -5,8 +5,8 @@ import { getAfAudit } from '@/api'
 
 const props = defineProps({
   afId: { type: Number, required: true },
-  // 'af' | 'bacs_audit' | 'site_audit' — utilisé pour adapter les libellés
-  // génériques (af.update → « a modifié l'audit » au lieu de « a modifié l'AF »).
+  // 'af' | 'bacs_audit' — utilisé pour adapter les libellés génériques
+  // (af.update → « a modifié l'audit » au lieu de « a modifié l'AF »).
   kind: { type: String, default: 'af' },
   // Affiche une croix de fermeture dans le header (slide-out usage).
   closable: { type: Boolean, default: false },
@@ -14,7 +14,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const isAudit = computed(() => props.kind === 'bacs_audit' || props.kind === 'site_audit')
+const isAudit = computed(() => props.kind === 'bacs_audit')
 const docLabel = computed(() => isAudit.value ? 'l\'audit' : 'l\'AF')
 
 const entries = ref([])
@@ -41,9 +41,10 @@ const ACTION_LABELS = computed(() => ({
   'af.update': { label: `a modifié ${docLabel.value}`, color: 'text-gray-700' },
   'af.create': { label: `a créé ${docLabel.value}`, color: 'text-emerald-700' },
   'claude.draft': { label: 'a généré un brouillon Claude', color: 'text-violet-700' },
-  // Audits BACS / GTB
+  // Audits BACS (le legacy site_audit.create reste mappé pour les
+  // entrées audit_log historiques générées avant la mig 106).
   'bacs_audit.create': { label: 'a créé l\'audit', color: 'text-emerald-700' },
-  'site_audit.create': { label: 'a créé l\'audit GTB', color: 'text-emerald-700' },
+  'site_audit.create': { label: 'a créé l\'audit', color: 'text-emerald-700' },
   'bacs_audit.step.validate': { label: 'a validé une étape', color: 'text-emerald-700' },
   'bacs_audit.step.invalidate': { label: 'a annulé une validation d\'étape', color: 'text-amber-700' },
   'bacs_audit.synthesis.generate': { label: 'a généré la synthèse Claude', color: 'text-violet-700' },

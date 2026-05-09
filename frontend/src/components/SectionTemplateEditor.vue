@@ -81,7 +81,7 @@ const form = ref({
   avail_s: null,
   avail_p: null,
   // Multi-tagging par type de document Buildy (Lot — migration 78).
-  // Liste de strings parmi document_kinds catalogue (af / brochure / bacs_audit / site_audit).
+  // Liste de strings parmi document_kinds catalogue (af / brochure / bacs_audit).
   // Defaut a la creation : ['af']. Une section avec liste vide n'apparait nulle part.
   document_kinds: ['af'],
 })
@@ -102,7 +102,6 @@ async function loadDocumentKinds() {
       { kind: 'af', label: 'Analyse fonctionnelle' },
       { kind: 'brochure', label: 'Brochure commerciale' },
       { kind: 'bacs_audit', label: 'Audit BACS' },
-      { kind: 'site_audit', label: 'Audit GTB' },
     ]
   }
 }

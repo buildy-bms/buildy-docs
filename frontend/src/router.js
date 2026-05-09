@@ -33,14 +33,11 @@ const routes = [
     props: true,
   },
   {
-    // Variante site (devis Buildy) — meme composant, kind=site_audit
-    // basculé en interne via le champ document.kind. Le composant
-    // affiche conditionnellement les blocs R175 selon ce kind.
+    // Rétrocompat : les anciens audits GTB classiques (kind=site_audit) ont
+    // été convertis en bacs_audit (mig 106). Les bookmarks /site-audit/:id
+    // existants redirigent automatiquement vers /bacs-audit/:id.
     path: '/site-audit/:id',
-    name: 'site-audit-detail',
-    meta: { title: 'Audit GTB (Classique)', fullscreenMobile: true },
-    component: () => import('@/views/AuditDetailRouter.vue'),
-    props: true,
+    redirect: to => ({ name: 'bacs-audit-detail', params: { id: to.params.id } }),
   },
   {
     path: '/bacs-audit/:id/action-items',
@@ -57,12 +54,9 @@ const routes = [
     props: true,
   },
   {
-    // Variante site_audit — meme composant
+    // Rétrocompat : ancien chemin site_audit, redirige vers le bacs_audit.
     path: '/site-audit/:id/audit-trail',
-    name: 'site-audit-trail',
-    meta: { title: 'Historique audit GTB' },
-    component: () => import('@/views/BacsAuditTrailView.vue'),
-    props: true,
+    redirect: to => ({ name: 'bacs-audit-trail', params: { id: to.params.id } }),
   },
   {
     path: '/afs/:id/versions',

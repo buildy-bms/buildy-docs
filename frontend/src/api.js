@@ -241,7 +241,7 @@ export const updateSectionTemplate = (id, data, { cascadeDocumentKinds } = {}) =
   api.patch(`/section-templates/${id}`, data, {
     params: cascadeDocumentKinds === false ? { cascade_document_kinds: 0 } : {},
   })
-// Catalogue des types de documents Buildy (af / brochure / bacs_audit / site_audit).
+// Catalogue des types de documents Buildy (af / brochure / bacs_audit).
 // Retourne array<{ kind, label, description }>. Utilise pour alimenter le multi-select
 // dans la modale d'edition d'une section type.
 export const listDocumentKinds = () => api.get('/section-templates/document-kinds')

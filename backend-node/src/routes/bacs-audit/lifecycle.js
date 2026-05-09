@@ -321,7 +321,7 @@ async function routes(fastify) {
     };
 
     try {
-      const { html, usage } = await assistAuditSynthesis(auditDump, af.kind || 'bacs_audit');
+      const { html, usage } = await assistAuditSynthesis(auditDump);
       db.afs.update(documentId, {
         audit_synthesis_html: html,
         audit_synthesis_generated_at: new Date().toISOString(),

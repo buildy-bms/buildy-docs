@@ -1,4 +1,4 @@
-// Store Pinia centralisant l'état d'un audit BACS / site_audit ouvert.
+// Store Pinia centralisant l'état d'un audit BACS ouvert.
 // Évite le props drilling vers les sous-composants (Inspections, Plan,
 // Synthese, et a terme BMS / Systemes / Compteurs / Thermal / Devices).
 //
@@ -41,8 +41,12 @@ export const useAuditStore = defineStore('audit', {
   }),
 
   getters: {
-    isBacs: (s) => s.document?.kind === 'bacs_audit',
-    isSiteAudit: (s) => s.document?.kind === 'site_audit',
+    // Le kind 'site_audit' a été supprimé (mig 106) ; tout audit est un
+    // bacs_audit. On garde isBacs/isSiteAudit en getter pour compat des
+    // composants qui les utilisent en `v-if`/`v-else` jusqu'au nettoyage
+    // complet des conditionnelles.
+    isBacs: () => true,
+    isSiteAudit: () => false,
     siteUuid: (s) => s.document?.site_uuid || null,
     todayIso: () => new Date().toISOString().slice(0, 10),
     latestInspection: (s) => s.inspections[0] || null,
