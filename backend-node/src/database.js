@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 117;
+const TARGET_VERSION = 118;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4459,6 +4459,96 @@ function runMigrations() {
     tx();
     log.info(`Migration 117 appliquee : default_device_role/device_role -> JSON array (${tplCount} tpl + ${devCount} devices migres)`);
     db.pragma('user_version = 117');
+  }
+
+  if (current < 118) {
+    // Ajout des FK manquantes pour le rattachement template/instance ↔
+    // categorie systeme. Historique : `equipment_templates.category` et
+    // `equipment_instance_categories.category_key` etaient des TEXT libres
+    // sans FK -- valeurs orphelines silencieuses possibles, rename de
+    // categorie key necessitait une cascade manuelle.
+    //
+    // Cette mig recree les 2 tables avec FK :
+    //   REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE NO ACTION
+    // - ON UPDATE CASCADE : un rename de key propage automatiquement
+    //   (plus besoin du UPDATE manuel dans la route PATCH).
+    // - ON DELETE NO ACTION : interdit le DELETE direct, force a passer
+    //   par le guard 409 de la route DELETE.
+    //
+    // Note : `sections.system_category_key` n'est PAS migrée ici. La table
+    // sections est trop massive et lourde de dependances pour un recreate
+    // safe en prod ; la cascade manuelle dans la route PATCH reste en place
+    // pour cette colonne.
+    //
+    // Pre-check : nettoyer les orphelines pour ne pas faire echouer le
+    // recreate (FK strict). Les orphelines deviennent NULL.
+    const orphTplCleanup = db.prepare(`
+      UPDATE equipment_templates SET category = NULL
+      WHERE category IS NOT NULL AND category NOT IN (SELECT key FROM system_categories_db)
+    `).run();
+    const orphInstCleanup = db.prepare(`
+      DELETE FROM equipment_instance_categories
+      WHERE category_key NOT IN (SELECT key FROM system_categories_db)
+    `).run();
+    if (orphTplCleanup.changes || orphInstCleanup.changes) {
+      log.warn(`Migration 118 : orphelines nettoyees avant recreate FK -- ${orphTplCleanup.changes} equipment_templates.category, ${orphInstCleanup.changes} equipment_instance_categories rows`);
+    }
+
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      // === equipment_templates ===
+      db.exec(`
+        CREATE TABLE equipment_templates_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          category TEXT REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE NO ACTION,
+          bacs_articles TEXT,
+          description_html TEXT,
+          icon_kind TEXT,
+          icon_value TEXT,
+          icon_color TEXT,
+          current_version INTEGER NOT NULL DEFAULT 1,
+          created_by INTEGER REFERENCES users(id),
+          updated_by INTEGER REFERENCES users(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          preferred_protocols TEXT,
+          bacs_justification TEXT,
+          content_validated_at TEXT,
+          content_validated_by INTEGER REFERENCES users(id),
+          default_energy_source TEXT,
+          default_device_role TEXT,
+          position INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO equipment_templates_new SELECT * FROM equipment_templates;
+        DROP TABLE equipment_templates;
+        ALTER TABLE equipment_templates_new RENAME TO equipment_templates;
+      `);
+      // === equipment_instance_categories ===
+      db.exec(`
+        CREATE TABLE equipment_instance_categories_new (
+          instance_id INTEGER NOT NULL REFERENCES equipment_instances(id) ON DELETE CASCADE,
+          category_key TEXT NOT NULL REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE CASCADE,
+          PRIMARY KEY (instance_id, category_key)
+        );
+        INSERT INTO equipment_instance_categories_new SELECT * FROM equipment_instance_categories;
+        DROP TABLE equipment_instance_categories;
+        ALTER TABLE equipment_instance_categories_new RENAME TO equipment_instance_categories;
+        CREATE INDEX IF NOT EXISTS idx_eic_instance ON equipment_instance_categories(instance_id);
+      `);
+    });
+    tx();
+
+    // Validation integrite + reactivation FK
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 118 : FK errors detectes apres recreate');
+      throw new Error('Migration 118 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 118 appliquee : FK posees sur equipment_templates.category + equipment_instance_categories.category_key (ON UPDATE CASCADE ON DELETE NO ACTION/CASCADE)');
+    db.pragma('user_version = 118');
   }
 
   if (current > TARGET_VERSION) {
