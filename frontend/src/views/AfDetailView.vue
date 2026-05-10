@@ -780,7 +780,10 @@ watch(() => route.params.id, async (newId, oldId) => {
           <!-- Pour kind='equipment' : description + tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">
             <EquipmentDescriptionPanel v-if="selectedSection.equipment_template_id" :section="selectedSection" @updated="onSectionUpdated" />
-            <PointsTable :section-id="selectedSection.id" :equipment-template-id="selectedSection.equipment_template_id" />
+            <PointsTable
+              :key="`pt-${selectedSection.id}-v${selectedSection.equipment_template_version || 0}`"
+              :section-id="selectedSection.id"
+              :equipment-template-id="selectedSection.equipment_template_id" />
             <EquipmentInstancesTable :section-id="selectedSection.id" :af-id="af.id" :template-id="selectedSection.equipment_template_id" />
           </template>
 
@@ -972,6 +975,7 @@ watch(() => route.params.id, async (newId, oldId) => {
           <!-- Points typiques -->
           <PointsTable
             v-if="selectedSection.kind === 'equipment'"
+            :key="`pt-${selectedSection.id}-v${selectedSection.equipment_template_version || 0}`"
             :section-id="selectedSection.id"
             :equipment-template-id="selectedSection.equipment_template_id"
           />
