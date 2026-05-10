@@ -90,6 +90,7 @@ function sortValue(d, key) {
     case 'name': return (d.name || '').toLowerCase()
     case 'brand': return (d.brand || '').toLowerCase()
     case 'model_reference': return (d.model_reference || '').toLowerCase()
+    case 'quantity': return Number(d.quantity) || 1
     case 'power_kw': return Number(d.power_kw) || 0
     case 'energy_source': return (d.energy_source || '').toLowerCase()
     case 'location': return (d.location || '').toLowerCase()
@@ -360,6 +361,9 @@ async function removeDevice(d) {
             <th @click="toggleSort('model_reference')" class="sortable">
               <span>Référence</span><span class="sort-ico">{{ sortKey === 'model_reference' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
+            <th @click="toggleSort('quantity')" class="sortable">
+              <span>Qté</span><span class="sort-ico">{{ sortKey === 'quantity' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
             <th @click="toggleSort('power_kw')" class="sortable">
               <span>Puiss.</span><span class="sort-ico">{{ sortKey === 'power_kw' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
@@ -386,11 +390,13 @@ async function removeDevice(d) {
                          isSharedFromOtherZone(d) ? 'bg-emerald-50/30' : ''].join(' ')"
             @changed="refreshPhotos">
             <!-- Nom (le badge "Partagé depuis" est porté par la couleur
-                 de fond verte de la ligne et le tooltip du bouton partage). -->
-            <td class="px-2 py-2 align-middle min-w-56">
+                 de fond verte de la ligne et le tooltip du bouton partage).
+                 Largeur auto au contenu : pas de min-w. -->
+            <td class="px-2 py-2 align-middle">
               <input type="text" :value="d.name" placeholder="Nommer ce système"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                     class="w-full font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+                     :size="Math.max((d.name || '').length, 18)"
+                     class="font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
             </td>
             <!-- Marque -->
             <td class="px-2 py-2 align-middle">
@@ -403,6 +409,14 @@ async function removeDevice(d) {
               <input type="text" :value="d.model_reference" placeholder="Varmax 70"
                      @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
                      :class="inputCls" class="min-w-32 placeholder:italic placeholder:text-gray-300" />
+            </td>
+            <!-- Quantité (par défaut 1, mig 134) -->
+            <td class="px-2 py-2 align-middle whitespace-nowrap">
+              <div class="w-14 mx-auto">
+                <input type="number" min="1" step="1" :value="d.quantity ?? 1"
+                       @blur="e => patchDevice(d, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })"
+                       :class="inputCls" class="text-center" />
+              </div>
             </td>
             <!-- Puissance -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">

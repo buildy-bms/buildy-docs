@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 133;
+const TARGET_VERSION = 134;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5540,6 +5540,18 @@ function runMigrations() {
     db.pragma('foreign_keys = ON');
     log.info('Migration 133 appliquee : section_templates.parent_template_id passe en ON DELETE CASCADE (cleanup + fix structurel)');
     db.pragma('user_version = 133');
+  }
+
+  if (current < 134) {
+    // Quantite par systeme : un meme device peut representer N exemplaires
+    // identiques (ex. 12 radiateurs identiques sur une zone, 4 PAC murales
+    // sur un toit). Defaut 1 (compatible avec l'existant).
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices
+        ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;
+    `);
+    log.info('Migration 134 appliquee : bacs_audit_system_devices.quantity (defaut 1)');
+    db.pragma('user_version = 134');
   }
 
   if (current > TARGET_VERSION) {
