@@ -383,7 +383,7 @@ const ACTIONS_RAW = [
       </ul>
       <p><strong>Justification du choix :</strong> on conserve la GTB existante plutôt que d\'introduire un système de comptage tiers — cohérence opérationnelle pour Sodexo et reporting unifié pour Atlas Logistics.</p>`,
     commercial_notes: 'Devis estimé 2 800 € HT matériel + 1 200 € HT pose/intégration. À chiffrer sur catalogue Schneider iEM 2025.',
-    source_table: 'bacs_audit_meters', source_id: 7002 },
+    source_meter_id: 7002 },
   { id: 9002, severity: 'blocking', r175_article: 'R175-3 3°', zone_id: 2, status: 'in_progress',
     title: 'Intégrer le DRV Daikin VRV IV via passerelle CoolMaster Pro',
     description: 'Le DRV Daikin VRV IV des bureaux (E-003 / E-003-bis) utilise le protocole propriétaire P1/P2 (D-III Net) et n\'est pas interopérable nativement avec la GTB Schneider EcoStruxure (BACnet IP). Le R175-3 3° exige l\'interopérabilité des systèmes techniques avec la solution de supervision.',
@@ -397,7 +397,7 @@ const ACTIONS_RAW = [
       </ul>
       <p>Une fois la passerelle en place, on récupère par UI : état marche/arrêt, consigne température, mode (chaud/froid/auto), température ambiante, code défaut. Permet de calculer un COP indirect et d\'alimenter la règle d\'anomalie R175-3 §2 déjà en place dans EcoStruxure.</p>`,
     commercial_notes: 'Devis émis le 2025-04-12 sous référence BUILDY-DEV-2025-0412 (CoolMaster Pro 1 800 € HT + intégration Buildy 2 100 € HT).',
-    source_table: 'bacs_audit_system_devices', source_id: 2001 },
+    source_device_id: 2001 },
   { id: 9003, severity: 'blocking', r175_article: 'R175-3 3°', zone_id: 1, status: 'open',
     title: 'Rendre les aérothermes Reznor cellules pilotables et observables par la GTB',
     description: 'Les 12 aérothermes gaz Reznor des cellules logistiques (E-001) ne disposent que de contacts secs marche/arrêt, sans interface communicante. L\'exigence R175-3 3° d\'interopérabilité n\'est pas satisfaite, et le suivi horaire des consommations par zone (R175-3 1°) est impossible.',
@@ -410,7 +410,7 @@ const ACTIONS_RAW = [
       </ul>
       <p>Cette solution évite le remplacement coûteux des aérothermes (qui ont 5 ans et fonctionnent bien). On apporte la couche de pilotage et de remontée GTB sans toucher à l\'organe de production. Variante avec optimisation par mesure CO₂ (pour démarrage modulé selon occupation) chiffrable en option.</p>`,
     commercial_notes: 'Lot complet (auto + cablage + intégration) estimé 18 000 € HT. À sécuriser avec le sub-comptage M-002 dans le même chantier TGBT.',
-    source_table: 'bacs_audit_system_devices', source_id: 1001 },
+    source_device_id: 1001 },
   { id: 9004, severity: 'blocking', r175_article: 'R175-3 1°', zone_id: null, status: 'open',
     title: 'Compléter le suivi continu pas horaire pour couvrir les usages absents',
     description: 'EcoStruxure archive bien en pas horaire les usages couverts par la GTB (CTA, ventilations communicantes, compteurs intégrés). Mais 4 usages échappent au suivi : aérothermes cellules, DRV bureaux, ECS thermodynamique, éclairage. Le R175-3 1° impose le suivi de l\'ensemble des usages ; tant que ces 4 trous existent, l\'exigence n\'est pas satisfaite.',
@@ -423,7 +423,7 @@ const ACTIONS_RAW = [
       </ul>
       <p>Estimation : 1 j paramétrage + 0.5 j contrôle.</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_bms', source_id: BMS.document_id },
+    source_bms_document_id: BMS.document_id },
   { id: 9005, severity: 'blocking', r175_article: 'R175-3 dernier alinéa', zone_id: null, status: 'open',
     title: 'Mettre en place une procédure de mise à disposition des données aux exploitants',
     description: 'Le R175-3 dernier alinéa exige que les données de la GTB soient mises à disposition à la fois du gestionnaire du bâtiment (Atlas Logistics) ET des exploitants des systèmes techniques (Sodexo pour le FM, mainteneur DRV Daikin, exploitant PV SMA). Aujourd\'hui seul Atlas Logistics reçoit le tableau de bord mensuel — Sodexo et les autres mainteneurs n\'ont pas d\'accès structuré aux données.',
@@ -436,7 +436,7 @@ const ACTIONS_RAW = [
       <p>Procédure documentaire associée : signature d\'avenants aux contrats d\'exploitation pour formaliser la mise à disposition (Buildy fournit le modèle). Audit annuel de l\'effectivité de la transmission.</p>
       <p>Effort : déploiement BuildyView 3 j + accompagnement procédure 1 j.</p>`,
     commercial_notes: 'Abonnement BuildyView Atlas Sud : 240 €/mois. Setup initial 4 200 € HT.',
-    source_table: 'bacs_audit_bms', source_id: BMS.document_id },
+    source_bms_document_id: BMS.document_id },
 
   // ─── 6 MAJEURES ───
   { id: 9006, severity: 'major', r175_article: 'R175-3 1°', zone_id: 5, status: 'open',
@@ -449,7 +449,7 @@ const ACTIONS_RAW = [
         <li>Création tableau de bord production vs consommation : 0.5 j</li>
       </ul>`,
     commercial_notes: 'Action peu coûteuse, à intégrer dans le lot Cellules pour mutualiser le déplacement.',
-    source_table: 'bacs_audit_meters', source_id: 7006 },
+    source_meter_id: 7006 },
   { id: 9007, severity: 'major', r175_article: 'R175-3 1°', zone_id: 3, status: 'quoted',
     title: 'Remplacer le compteur eau ECS HS (M-005)',
     description: 'Le compteur eau ECS Sappel Aquadis+ (M-005) a sa tête électronique HS depuis l\'orage de juillet 2024 (foudre). Index relevé manuellement, suivi horaire impossible. Non-conformité R175-3 1° sur l\'usage ECS.',
@@ -460,14 +460,14 @@ const ACTIONS_RAW = [
         <li>Intégration GTB : passerelle M-Bus → Modbus si filaire, ou concentrateur radio si M-Bus radio (à confirmer selon contraintes site)</li>
       </ul>`,
     commercial_notes: 'Devis BUILDY-DEV-2025-0327, 1 450 € HT global. Validé client en attente bon de commande.',
-    source_table: 'bacs_audit_meters', source_id: 7005 },
+    source_meter_id: 7005 },
   { id: 9008, severity: 'major', r175_article: 'R175-6', zone_id: 2, status: 'open',
     title: 'Compléter le zonage thermique R175-6 sur les Bureaux',
     description: 'Le DRV Daikin pilote actuellement les 12 UI bureaux avec 1 seule consigne globale. Le R175-6 impose une régulation thermique automatique avec des sondes par pièce ou par zone. Sur un open-space + bureaux fermés + salles de réunion, 1 seule consigne ne suffit pas.',
     alternative_solutions_html: `<p><strong>Préconisation Buildy.</strong> À traiter conjointement avec BACS-002 (intégration DRV via CoolMaster Pro). Une fois la passerelle posée, créer dans EcoStruxure 4 zones de consigne distinctes : open-space N+1 nord, open-space N+1 sud, salles de réunion (3), bureaux fermés direction (2). Chaque zone régulée par sa sonde T° ambiante de l\'UI Daikin correspondante.</p>
       <p>Effort : paramétrage seul, pas de matériel additionnel (les sondes sont déjà dans les UI). 1 j configuration + 0.5 j tests.</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_thermal_regulation', source_id: 8002 },
+    source_thermal_id: 8002 },
   { id: 9009, severity: 'major', r175_article: 'R175-5', zone_id: null, status: 'open',
     title: 'Compléter la formation R175-5 de l\'exploitant',
     description: 'L\'exploitant Sodexo a été formé en septembre 2023 sur le paramétrage CTA + DRV (formation Schneider initiale). Mais la formation n\'a pas couvert : la lecture des courbes de tendance long terme, l\'interprétation des règles d\'anomalie R175-3 §2, l\'export et l\'analyse des CSV horaires. Aucune mise à jour depuis 2023.',
@@ -480,14 +480,14 @@ const ACTIONS_RAW = [
       </ul>
       <p>À cadencer annuellement (formation continue). Buildy peut prendre en charge ce volet récurrent.</p>`,
     commercial_notes: 'Formation 1 j Sodexo : 1 600 € HT. Forfait annuel renouvelable proposé à 1 200 €/an.',
-    source_table: 'bacs_audit_bms', source_id: BMS.document_id },
+    source_bms_document_id: BMS.document_id },
   { id: 9010, severity: 'major', r175_article: 'R175-4', zone_id: null, status: 'open',
     title: 'Formaliser et dater la procédure de maintenance R175-4',
     description: 'Sodexo réalise bien des interventions trimestrielles + une révision annuelle, mais la procédure de maintenance écrite n\'est pas datée ni versionnée formellement. R175-4 exige une procédure de vérifications périodiques tracée.',
     alternative_solutions_html: `<p><strong>Préconisation Buildy.</strong> Audit du contrat Sodexo existant + rédaction (ou mise à jour) du document « Procédure de vérifications périodiques R175-4 » daté, versionné, signé par les 3 parties (Atlas Logistics, Sodexo, Buildy). Stockage dans BuildyView avec rappel automatique de revue annuelle.</p>
       <p>Effort Buildy : 1 j rédaction + 0.5 j atelier signature.</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_bms', source_id: BMS.document_id },
+    source_bms_document_id: BMS.document_id },
   { id: 9011, severity: 'major', r175_article: 'R175-3 1°', zone_id: 1, status: 'open',
     title: 'Rendre communicant le compteur gaz aérothermes (M-004)',
     description: 'Le compteur gaz Itron Cyble Sensor sur l\'arrivée gaz aérothermes cellules est présent mais sa sortie impulsion n\'est pas raccordée à la GTB. La consommation gaz cellules n\'est donc pas tracée en pas horaire.',
@@ -497,7 +497,7 @@ const ACTIONS_RAW = [
         <li>Pose + intégration : 0.5 j</li>
       </ul>`,
     commercial_notes: 'À intégrer dans le lot TGBT cellules. Coût marginal ~600 € HT.',
-    source_table: 'bacs_audit_meters', source_id: 7004 },
+    source_meter_id: 7004 },
 
   // ─── 4 MINEURES ───
   { id: 9012, severity: 'minor', r175_article: 'R175-3 §2', zone_id: 1, status: 'open',
@@ -511,25 +511,25 @@ const ACTIONS_RAW = [
       </ul>
       <p>Effort marginal après BACS-003 : 0.5 j paramétrage.</p>`,
     commercial_notes: 'À proposer en option après mise en service BACS-003. ROI rapide.',
-    source_table: 'bacs_audit_action_items', source_id: null },
+    manual: true },
   { id: 9013, severity: 'minor', r175_article: 'R175-3 §2', zone_id: 2, status: 'open',
     title: 'Ajouter un monitoring CO₂ dans les bureaux',
     description: 'Pas d\'exigence stricte R175 mais bonne pratique : sonde CO₂ par zone bureaux pour piloter la CTA en débit variable selon occupation réelle (économie ventilation + qualité d\'air).',
     alternative_solutions_html: `<p><strong>Préconisation Buildy.</strong> Pose de 4 sondes CO₂ KNX (1 par zone bureaux) raccordées au routeur KNX/IP du bloc bureaux + intégration à EcoStruxure. Pilotage de la CTA Aldes en débit variable selon CO₂ max des 4 zones.</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_action_items', source_id: null },
+    manual: true },
   { id: 9014, severity: 'minor', r175_article: 'R175-3 §2', zone_id: 5, status: 'open',
     title: 'Détection de présence sur l\'éclairage parking',
     description: 'L\'éclairage parking LED (E-008) fonctionne aujourd\'hui plein régime de la tombée du jour à l\'aube. Ajout de détecteurs de présence par poche pour réduire à 30 % en l\'absence d\'activité — économie estimée 35-45 % sur la consommation éclairage parking.',
     alternative_solutions_html: `<p><strong>Préconisation Buildy.</strong> Pose de 6 détecteurs hyperfréquence sur mâts (1 par poche), gradation 30 %/100 % via driver des luminaires LED existants (compatibles 0-10 V). Pas d\'intégration GTB nécessaire (régulation locale).</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_action_items', source_id: null },
+    manual: true },
   { id: 9015, severity: 'minor', r175_article: null, zone_id: null, status: 'open',
     title: 'Mettre en place le reporting CEE BAT-TH-116',
     description: 'Le décret BACS et le dispositif CEE BAT-TH-116 sont distincts mais complémentaires. Sur un site de cette taille, valoriser les actions correctives via CEE est pertinent. Buildy peut accompagner le montage du dossier CEE.',
     alternative_solutions_html: `<p><strong>Préconisation Buildy.</strong> Accompagnement Buildy au montage CEE BAT-TH-116 : dossier technique + suivi 12 mois + revente kWh CUMAC. À chiffrer après réalisation des actions bloquantes (l\'éligibilité dépend des kWh économisés mesurés).</p>`,
     commercial_notes: null,
-    source_table: 'bacs_audit_action_items', source_id: null },
+    manual: true },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -704,11 +704,21 @@ async function buildFixturePreviewData({ user = null } = {}) {
     minor: actionItems.minor.length,
   };
 
-  // Justifications (Annexe C)
+  // Justifications (Annexe C). Cf. _export-data.js : derive le label
+  // depuis la FK non-NULL (apres mig 125).
+  function actionSourceLabel(a) {
+    if (a.source_system_id)        return `système (#${a.source_system_id})`;
+    if (a.source_meter_id)         return `compteur (#${a.source_meter_id})`;
+    if (a.source_thermal_id)       return `régulation thermique (#${a.source_thermal_id})`;
+    if (a.source_device_id)        return `équipement (#${a.source_device_id})`;
+    if (a.source_inspection_id)    return `inspection (#${a.source_inspection_id})`;
+    if (a.source_bms_document_id)  return `GTB (${a.source_subtype || ''})`;
+    return 'Item manuel';
+  }
   const justifications = numberedItems.map(a => ({
     title: a.title,
     article: a.r175_article || '—',
-    source: a.source_table ? `${a.source_table} (#${a.source_id})` : 'Item manuel',
+    source: actionSourceLabel(a),
     description: a.description || a.title,
   }));
 
