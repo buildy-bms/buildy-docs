@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 126;
+const TARGET_VERSION = 127;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5143,6 +5143,125 @@ function runMigrations() {
     `);
     log.info('Migration 126 appliquee : 32 index partiels sur les FK ownership / author / auxiliaires');
     db.pragma('user_version = 126');
+  }
+
+  if (current < 127) {
+    // Timestamps uniformes (Lot 5) : created_at + updated_at sur toutes
+    // les tables mutables qui n'avaient qu'un des deux (ou aucun).
+    //
+    // SQLite refuse `ALTER TABLE ADD COLUMN ... DEFAULT CURRENT_TIMESTAMP`
+    // (defaut non-constant). Strategie :
+    //   1. ADD COLUMN nullable
+    //   2. Backfill depuis le peer colonne (created_at <-> updated_at),
+    //      ou depuis la table parente pour les 1:1.
+    //   3. AFTER INSERT trigger qui remplit les NULL avec CURRENT_TIMESTAMP
+    //      pour que les futures insertions sans timestamp explicite
+    //      restent uniformes.
+
+    // ── updated_at sur tables qui ont deja created_at ────────────────
+    db.exec(`
+      ALTER TABLE af_zones                ADD COLUMN updated_at TEXT;
+      ALTER TABLE equipment_instances     ADD COLUMN updated_at TEXT;
+      ALTER TABLE section_point_overrides ADD COLUMN updated_at TEXT;
+      ALTER TABLE users                   ADD COLUMN updated_at TEXT;
+
+      UPDATE af_zones                SET updated_at = created_at WHERE updated_at IS NULL;
+      UPDATE equipment_instances     SET updated_at = created_at WHERE updated_at IS NULL;
+      UPDATE section_point_overrides SET updated_at = created_at WHERE updated_at IS NULL;
+      UPDATE users                   SET updated_at = created_at WHERE updated_at IS NULL;
+    `);
+
+    // ── created_at sur tables qui n'avaient qu'updated_at (ou rien) ──
+    db.exec(`
+      ALTER TABLE bacs_audit_bms              ADD COLUMN created_at TEXT;
+      ALTER TABLE offering_levels             ADD COLUMN created_at TEXT;
+      ALTER TABLE ai_prompts                  ADD COLUMN created_at TEXT;
+      ALTER TABLE equipment_template_points   ADD COLUMN created_at TEXT;
+      ALTER TABLE equipment_template_points   ADD COLUMN updated_at TEXT;
+    `);
+
+    // bacs_audit_bms est 1:1 avec afs : on derive le created_at depuis l'AF parente.
+    db.exec(`
+      UPDATE bacs_audit_bms
+      SET created_at = (SELECT created_at FROM afs WHERE afs.id = bacs_audit_bms.document_id)
+      WHERE created_at IS NULL;
+    `);
+
+    // offering_levels et ai_prompts : on backfill depuis updated_at.
+    db.exec(`
+      UPDATE offering_levels SET created_at = updated_at WHERE created_at IS NULL;
+      UPDATE ai_prompts      SET created_at = updated_at WHERE created_at IS NULL;
+    `);
+
+    // equipment_template_points : pas de timestamp existant. On derive
+    // depuis le template parent pour created_at, et on aligne updated_at.
+    db.exec(`
+      UPDATE equipment_template_points
+      SET created_at = (SELECT created_at FROM equipment_templates WHERE equipment_templates.id = equipment_template_points.template_id)
+      WHERE created_at IS NULL;
+      UPDATE equipment_template_points SET updated_at = created_at WHERE updated_at IS NULL;
+    `);
+
+    // ── Triggers AFTER INSERT pour auto-populer NULL -> CURRENT_TIMESTAMP ──
+    // Permet a tout INSERT (legacy ou futur) sans timestamp explicite d'avoir
+    // des dates coherentes sans toucher au code applicatif.
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_af_zones_ts AFTER INSERT ON af_zones
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE af_zones SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_equipment_instances_ts AFTER INSERT ON equipment_instances
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE equipment_instances SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_section_point_overrides_ts AFTER INSERT ON section_point_overrides
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE section_point_overrides SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_users_ts AFTER INSERT ON users
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE users SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_offering_levels_ts AFTER INSERT ON offering_levels
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE offering_levels SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_equipment_template_points_ts AFTER INSERT ON equipment_template_points
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE equipment_template_points SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE id = NEW.id; END;
+
+      -- bacs_audit_bms : PK = document_id (1:1 avec afs), pas \`id\`.
+      CREATE TRIGGER IF NOT EXISTS trg_bacs_audit_bms_ts AFTER INSERT ON bacs_audit_bms
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE bacs_audit_bms SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE document_id = NEW.document_id; END;
+
+      -- ai_prompts : PK = key (TEXT).
+      CREATE TRIGGER IF NOT EXISTS trg_ai_prompts_ts AFTER INSERT ON ai_prompts
+        WHEN NEW.created_at IS NULL OR NEW.updated_at IS NULL
+        BEGIN UPDATE ai_prompts SET
+          created_at = COALESCE(NEW.created_at, CURRENT_TIMESTAMP),
+          updated_at = COALESCE(NEW.updated_at, NEW.created_at, CURRENT_TIMESTAMP)
+          WHERE key = NEW.key; END;
+    `);
+
+    log.info('Migration 127 appliquee : timestamps uniformes (created_at + updated_at sur 8 tables, 8 triggers AFTER INSERT)');
+    db.pragma('user_version = 127');
   }
 
   if (current > TARGET_VERSION) {
