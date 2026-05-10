@@ -12,6 +12,7 @@ import { regenerateBacsActionItems, updateBacsActionItem } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileNativeSelect from './MobileNativeSelect.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
 const audit = useAuditStore()
 const { actionItems, document } = storeToRefs(audit)
@@ -244,6 +245,17 @@ async function saveEdit() {
             class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 resize-y"
           ></textarea>
         </MobileField>
+
+        <!-- Photos terrain attachées à cette action -->
+        <div v-if="document?.site_uuid" class="pt-2">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
+          <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ action_item_id: editing.id }"
+            :label="editing.title || 'Action'"
+            size="md"
+          />
+        </div>
 
         <p v-if="editing.auto_generated" class="text-xs text-gray-500 leading-relaxed">
           Item généré automatiquement depuis l'audit. Le titre, la description

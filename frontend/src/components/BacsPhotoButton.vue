@@ -59,6 +59,7 @@ const filterParams = computed(() => {
   if (props.attachTo.system_id != null)       p.bacs_audit_system_id = props.attachTo.system_id
   if (props.attachTo.device_id != null)       p.bacs_audit_device_id = props.attachTo.device_id
   if (props.attachTo.bms_document_id != null) p.bacs_audit_bms_document_id = props.attachTo.bms_document_id
+  if (props.attachTo.action_item_id != null)  p.bacs_audit_action_item_id = props.attachTo.action_item_id
   return p
 })
 
