@@ -22,6 +22,8 @@ import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
+import { COMM_OPTIONS } from '@/lib/audit-options'
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -222,6 +224,10 @@ function openCreateDevice(system) {
     name: '', brand: '', model_reference: '', power_kw: null,
     // Multi-rôle (mig 117) : array.
     energy_source: null, device_role: [], location: '',
+    // Communication : protocoles multi (string JSON) + câblé.
+    communication_protocols: null, wired: false,
+    // État R175-3 4° + Hors service.
+    meets_r175_3_p4: false, meets_r175_3_p4_autonomous: false, out_of_service: false,
   }
   editingDevice.value = { mode: 'create', system }
 }
@@ -248,6 +254,17 @@ async function saveDevice() {
       energy_source: deviceForm.value.energy_source,
       device_role: Array.isArray(deviceForm.value.device_role) ? deviceForm.value.device_role : [],
       location: deviceForm.value.location?.trim() || null,
+      // Communication (regroupe Protocoles + Câblé pour cohérence desktop).
+      communication_protocols: deviceForm.value.communication_protocols ?? null,
+      // Le legacy `communication_protocol` (single) est nullé : la source
+      // de vérité côté écriture est désormais `communication_protocols`
+      // (cohérent avec patchDevice de SystemDevicesTable).
+      communication_protocol: null,
+      wired: !!deviceForm.value.wired,
+      // État R175-3 4° + Hors service.
+      meets_r175_3_p4: !!deviceForm.value.meets_r175_3_p4,
+      meets_r175_3_p4_autonomous: !!deviceForm.value.meets_r175_3_p4_autonomous,
+      out_of_service: !!deviceForm.value.out_of_service,
     }
     if (!payload.name && !payload.brand && !payload.model_reference) {
       error('Renseigne au moins un nom, une marque ou une référence')
@@ -530,6 +547,112 @@ async function removeDevice(d) {
             class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
           />
         </MobileField>
+
+        <!-- Communication : Protocoles d'abord puis Câblé (regroupement
+             cohérent avec la sous-section desktop). -->
+        <div class="space-y-2">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Communication</p>
+          <MobileField label="Protocole(s)">
+            <ProtocolMultiPicker
+              :model-value="deviceForm.communication_protocols ?? null"
+              :options="COMM_OPTIONS"
+              size="sm"
+              placeholder="Aucun protocole"
+              @update:modelValue="v => deviceForm.communication_protocols = v"
+            />
+          </MobileField>
+          <button
+            type="button"
+            @click="deviceForm.wired = !deviceForm.wired"
+            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-base text-gray-900 font-medium">Câblé</p>
+              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">
+                Communication câblée vers la GTB
+              </p>
+            </div>
+            <span
+              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
+                       deviceForm.wired
+                         ? 'bg-emerald-500 border-emerald-500 text-white'
+                         : 'bg-white border-gray-300']"
+              aria-hidden="true"
+            >
+              <svg v-if="deviceForm.wired" viewBox="0 0 16 16" class="w-5 h-5">
+                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <!-- État R175-3 4° + Hors service. Boutons toggle plein-largeur. -->
+        <div class="space-y-2">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">État</p>
+          <button
+            type="button"
+            @click="deviceForm.meets_r175_3_p4 = !deviceForm.meets_r175_3_p4"
+            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-base text-gray-900 font-medium">Arrêt manuel possible</p>
+              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">R175-3 4° — coupure manuelle</p>
+            </div>
+            <span
+              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
+                       deviceForm.meets_r175_3_p4
+                         ? 'bg-emerald-500 border-emerald-500 text-white'
+                         : 'bg-white border-gray-300']"
+              aria-hidden="true"
+            >
+              <svg v-if="deviceForm.meets_r175_3_p4" viewBox="0 0 16 16" class="w-5 h-5">
+                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </button>
+          <button
+            type="button"
+            @click="deviceForm.meets_r175_3_p4_autonomous = !deviceForm.meets_r175_3_p4_autonomous"
+            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-base text-gray-900 font-medium">Reprise autonome</p>
+              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">R175-3 4° — fonctionne sans la GTB</p>
+            </div>
+            <span
+              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
+                       deviceForm.meets_r175_3_p4_autonomous
+                         ? 'bg-emerald-500 border-emerald-500 text-white'
+                         : 'bg-white border-gray-300']"
+              aria-hidden="true"
+            >
+              <svg v-if="deviceForm.meets_r175_3_p4_autonomous" viewBox="0 0 16 16" class="w-5 h-5">
+                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </button>
+          <button
+            type="button"
+            @click="deviceForm.out_of_service = !deviceForm.out_of_service"
+            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-base font-medium" :class="deviceForm.out_of_service ? 'text-red-700' : 'text-gray-900'">Hors service</p>
+              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">Ignoré dans le plan d'action</p>
+            </div>
+            <span
+              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
+                       deviceForm.out_of_service
+                         ? 'bg-red-600 border-red-600 text-white'
+                         : 'bg-white border-gray-300']"
+              aria-hidden="true"
+            >
+              <svg v-if="deviceForm.out_of_service" viewBox="0 0 16 16" class="w-5 h-5">
+                <path d="M4 4l8 8M4 12l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+            </span>
+          </button>
+        </div>
 
         <template v-if="editingDevice?.mode === 'edit'">
           <!-- Partage multi-zones (mig 98) : un même équipement physique

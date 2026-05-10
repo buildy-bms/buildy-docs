@@ -37,28 +37,28 @@ async function submit() {
 <template>
   <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Nom du système</label>
           <input v-model="form.name" type="text" autofocus
                  placeholder="ex : Chaudière gaz principale, Groupe DRV…"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                 class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Localisation</label>
           <input v-model="form.location" type="text"
                  placeholder="ex : Local technique sous-sol, Toiture…"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                 class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Marque</label>
           <input v-model="form.brand" type="text" placeholder="ex : Atlantic, Daikin, Aldes…"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                 class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Référence / modèle</label>
           <input v-model="form.model_reference" type="text" placeholder="ex : Varmax 70, VRV-IV 75…"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                 class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Énergie</label>
@@ -70,9 +70,9 @@ async function submit() {
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Puissance (kW)</label>
-          <input v-model.number="form.power_kw" type="number" min="0" step="0.1"
+          <input v-model.number="form.power_kw" type="number" inputmode="decimal" pattern="[0-9.,]*" min="0" step="0.1"
                  placeholder="—"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+                 class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x)</label>
@@ -93,19 +93,19 @@ async function submit() {
             placeholder="Sélectionner un protocole"
           />
         </div>
-        <div class="col-span-2">
+        <div class="sm:col-span-2">
           <label class="block text-xs font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optionnel)</span></label>
           <textarea v-model="form.notes" rows="2" placeholder="Observations terrain (état, mise en service, particularités…)"
-                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"></textarea>
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"></textarea>
         </div>
       </div>
-      <div class="flex items-center justify-end gap-2 pt-2">
+      <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"
-                class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
+                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
           Annuler
         </button>
         <button type="submit" :disabled="!canSubmit() || submitting"
-                class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
+                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
           {{ submitting ? 'Création…' : 'Ajouter le système' }}
         </button>
       </div>

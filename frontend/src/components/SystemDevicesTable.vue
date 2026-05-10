@@ -427,9 +427,8 @@ async function removeDevice(d) {
             </div>
           </div>
 
-          <!-- LIGNE 2 : Localisation (4/12) + Liaison GTB (auto) + Protocoles
-               (le reste). Grid 12 colonnes cohérent avec la ligne 1, plus
-               de flex-1 qui étirait Localisation sur toute la largeur. -->
+          <!-- LIGNE 2 : Localisation (4/12) + État (4/12, sans Câblé) +
+               Communication (4/12 : Protocoles puis Câblé regroupés). -->
           <div class="mt-2 grid grid-cols-12 gap-x-3 gap-y-2 items-start">
             <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Localisation</label>
@@ -440,12 +439,6 @@ async function removeDevice(d) {
             <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">État</label>
               <div class="flex items-center gap-1.5 h-7 flex-wrap">
-                <button type="button"
-                        @click="patchDevice(d, { wired: !d.wired })"
-                        :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'Communication câblée vers la GTB'">
-                  <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
-                </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
                         :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
@@ -469,14 +462,22 @@ async function removeDevice(d) {
               </div>
             </div>
             <div class="col-span-12 md:col-span-4">
-              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Protocole(s)</label>
-              <ProtocolMultiPicker
-                :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
-                :options="COMM_OPTIONS"
-                size="xs"
-                placeholder="Aucun"
-                @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
-              />
+              <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Communication</label>
+              <div class="space-y-1.5">
+                <ProtocolMultiPicker
+                  :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
+                  :options="COMM_OPTIONS"
+                  size="xs"
+                  placeholder="Aucun protocole"
+                  @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
+                />
+                <button type="button"
+                        @click="patchDevice(d, { wired: !d.wired })"
+                        :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
+                        v-tooltip="'Communication câblée vers la GTB'">
+                  <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
+                </button>
+              </div>
             </div>
           </div>
         </div>
