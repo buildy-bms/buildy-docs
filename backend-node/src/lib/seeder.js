@@ -617,8 +617,11 @@ function seedSystemCategoriesOnBoot() {
     const c = SYSTEM_CATEGORIES[i];
     if (db.systemCategoriesDb.getByKey(c.key)) continue;
     const icon = ICONS[c.key] || { icon: 'fa-cube', color: '#6b7280' };
+    // Mig 121 : `slugs` n'existe plus en colonne. Le rattachement
+    // template <-> categorie est porte par equipment_templates.category
+    // (seede separement par les fichiers seeds/equipment-templates/*.js).
     db.systemCategoriesDb.create({
-      key: c.key, label: c.label, bacs: c.bacs, slugs: c.slugs,
+      key: c.key, label: c.label, bacs: c.bacs,
       iconValue: icon.icon, iconColor: icon.color, position: i * 10,
     });
     created++;

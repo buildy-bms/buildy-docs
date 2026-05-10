@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 119;
+const TARGET_VERSION = 122;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4639,6 +4639,291 @@ function runMigrations() {
     db.pragma('user_version = 119');
   }
 
+  if (current < 120) {
+    // CHECK constraints sur les enums TEXT qui n'en avaient pas. Empeche les
+    // INSERT directs (CSV / scripts maint / nouvelles routes mal validees)
+    // d'introduire des valeurs orphelines silencieuses.
+    //
+    // 3 tables affectees :
+    //   - equipment_template_points.fact_check_status (5 valeurs)
+    //   - sections.fact_check_status (5 valeurs, meme set)
+    //   - equipments.communication_protocol (10 valeurs)
+    //
+    // Toutes par recreate de la table (SQLite ne permet pas d'ajouter un
+    // CHECK constraint a une colonne existante sans recreate).
+    //
+    // Pre-check : on identifie les valeurs orphelines existantes et on les
+    // resette a la valeur par defaut ('unverified' / NULL) pour ne pas
+    // faire echouer l'INSERT au recreate (CHECK strict).
+    const FACT_CHECK_VALID = ['unverified', 'verified', 'backend_only', 'in_progress', 'documented'];
+    const COMM_PROTO_VALID = ['modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp','knx','mbus','mqtt','analog','none','other'];
+
+    const orphFcEtp = db.prepare(`
+      UPDATE equipment_template_points SET fact_check_status = 'unverified'
+      WHERE fact_check_status NOT IN (${FACT_CHECK_VALID.map(() => '?').join(',')})
+    `).run(...FACT_CHECK_VALID);
+    const orphFcSec = db.prepare(`
+      UPDATE sections SET fact_check_status = 'unverified'
+      WHERE fact_check_status IS NOT NULL
+        AND fact_check_status NOT IN (${FACT_CHECK_VALID.map(() => '?').join(',')})
+    `).run(...FACT_CHECK_VALID);
+    const orphCommEq = db.prepare(`
+      UPDATE equipments SET communication_protocol = NULL
+      WHERE communication_protocol IS NOT NULL
+        AND communication_protocol NOT IN (${COMM_PROTO_VALID.map(() => '?').join(',')})
+    `).run(...COMM_PROTO_VALID);
+    if (orphFcEtp.changes || orphFcSec.changes || orphCommEq.changes) {
+      log.warn(`Migration 120 : valeurs orphelines normalisees avant CHECK -- ${orphFcEtp.changes} ETP.fact_check, ${orphFcSec.changes} sections.fact_check, ${orphCommEq.changes} equipments.communication_protocol`);
+    }
+
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      // === equipment_template_points (fact_check_status CHECK) ===
+      db.exec(`
+        CREATE TABLE equipment_template_points_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          template_id INTEGER NOT NULL REFERENCES equipment_templates(id) ON DELETE CASCADE,
+          slug TEXT NOT NULL,
+          position INTEGER NOT NULL DEFAULT 0,
+          label TEXT NOT NULL,
+          data_type TEXT NOT NULL,
+          direction TEXT NOT NULL CHECK (direction IN ('read', 'write')),
+          unit TEXT,
+          notes TEXT,
+          is_optional INTEGER DEFAULT 0,
+          hyperveez_facets TEXT,
+          fact_check_status TEXT DEFAULT 'unverified'
+            CHECK (fact_check_status IN ('unverified','verified','backend_only','in_progress','documented')),
+          fact_check_url TEXT,
+          tech_name TEXT,
+          nature TEXT,
+          UNIQUE(template_id, slug)
+        );
+        INSERT INTO equipment_template_points_new SELECT
+          id, template_id, slug, position, label, data_type, direction,
+          unit, notes, is_optional, hyperveez_facets, fact_check_status,
+          fact_check_url, tech_name, nature
+        FROM equipment_template_points;
+        DROP TABLE equipment_template_points;
+        ALTER TABLE equipment_template_points_new RENAME TO equipment_template_points;
+        CREATE INDEX IF NOT EXISTS idx_etp_template ON equipment_template_points(template_id, position);
+      `);
+
+      // === sections (fact_check_status CHECK + tout le reste preserve) ===
+      db.exec(`
+        CREATE TABLE sections_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          parent_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL DEFAULT 0,
+          number TEXT,
+          title TEXT NOT NULL,
+          service_level TEXT,
+          service_level_source TEXT,
+          bacs_articles TEXT,
+          bacs_justification TEXT,
+          body_html TEXT,
+          body_yjs BLOB,
+          kind TEXT NOT NULL DEFAULT 'standard'
+            CHECK (kind IN ('standard', 'equipment', 'synthesis', 'hyperveez_page', 'zones')),
+          included_in_export INTEGER NOT NULL DEFAULT 1,
+          generic_note INTEGER NOT NULL DEFAULT 0,
+          fact_check_status TEXT DEFAULT 'unverified'
+            CHECK (fact_check_status IS NULL OR fact_check_status IN ('unverified','verified','backend_only','in_progress','documented')),
+          equipment_template_id INTEGER REFERENCES equipment_templates(id),
+          equipment_template_version INTEGER,
+          hyperveez_page_slug TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_by INTEGER REFERENCES users(id),
+          section_template_id INTEGER REFERENCES section_templates(id),
+          section_template_version INTEGER,
+          opted_out_by_moa INTEGER NOT NULL DEFAULT 0,
+          demanded_by_moa INTEGER NOT NULL DEFAULT 0,
+          optin_paid_option INTEGER NOT NULL DEFAULT 0,
+          description_html_override TEXT,
+          system_category_key TEXT REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE SET NULL
+        );
+        INSERT INTO sections_new SELECT
+          id, af_id, parent_id, position, number, title, service_level,
+          service_level_source, bacs_articles, bacs_justification, body_html,
+          body_yjs, kind, included_in_export, generic_note, fact_check_status,
+          equipment_template_id, equipment_template_version, hyperveez_page_slug,
+          created_at, updated_at, updated_by, section_template_id,
+          section_template_version, opted_out_by_moa, demanded_by_moa,
+          optin_paid_option, description_html_override, system_category_key
+        FROM sections;
+        DROP TABLE sections;
+        ALTER TABLE sections_new RENAME TO sections;
+        CREATE INDEX IF NOT EXISTS idx_sections_af_parent ON sections(af_id, parent_id, position);
+        CREATE INDEX IF NOT EXISTS idx_sections_kind ON sections(af_id, kind);
+        CREATE INDEX IF NOT EXISTS idx_sections_template ON sections(equipment_template_id) WHERE equipment_template_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_sections_system_category ON sections(af_id, system_category_key) WHERE system_category_key IS NOT NULL;
+        CREATE TRIGGER IF NOT EXISTS sections_fts_delete
+          AFTER DELETE ON sections BEGIN
+            DELETE FROM sections_fts WHERE section_id = old.id;
+          END;
+      `);
+
+      // === equipments (communication_protocol CHECK) ===
+      db.exec(`
+        CREATE TABLE equipments_new (
+          equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          zone_id INTEGER NOT NULL REFERENCES zones(zone_id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          power_kw REAL,
+          communication_protocol TEXT
+            CHECK (communication_protocol IS NULL OR communication_protocol IN
+              ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp','knx','mbus','mqtt','analog','none','other')),
+          installation_date TEXT,
+          status TEXT NOT NULL DEFAULT 'operational'
+            CHECK (status IN ('designed','commissioned','tested','operational','decommissioned')),
+          bacs_classification TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TEXT
+        );
+        INSERT INTO equipments_new SELECT
+          equipment_id, zone_id, name, type, power_kw, communication_protocol,
+          installation_date, status, bacs_classification, notes,
+          created_at, updated_at, deleted_at
+        FROM equipments;
+        DROP TABLE equipments;
+        ALTER TABLE equipments_new RENAME TO equipments;
+        CREATE INDEX IF NOT EXISTS idx_equipments_zone ON equipments(zone_id);
+        CREATE INDEX IF NOT EXISTS idx_equipments_type ON equipments(type);
+      `);
+    });
+    tx();
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 120 : FK errors detectes');
+      throw new Error('Migration 120 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 120 appliquee : CHECK constraints sur fact_check_status (ETP+sections) + communication_protocol (equipments)');
+    db.pragma('user_version = 120');
+  }
+
+  if (current < 121) {
+    // Drop colonne morte `system_categories_db.slugs` : depuis la PR #124
+    // (mig precedente non versionnee), la valeur est calculee a la volee
+    // dans systemCategoriesDb.list/getById/getByKey via :
+    //   SELECT slug FROM equipment_templates WHERE category = ? ORDER BY name
+    // La colonne stockee n'est plus la verite et peut diverger silencieusement.
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE system_categories_db_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key TEXT NOT NULL UNIQUE,
+          label TEXT NOT NULL,
+          bacs TEXT,
+          icon_value TEXT DEFAULT 'fa-cube',
+          icon_color TEXT DEFAULT '#6b7280',
+          position INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO system_categories_db_new
+          (id, key, label, bacs, icon_value, icon_color, position)
+        SELECT id, key, label, bacs, icon_value, icon_color, position
+        FROM system_categories_db;
+        DROP TABLE system_categories_db;
+        ALTER TABLE system_categories_db_new RENAME TO system_categories_db;
+      `);
+    });
+    tx();
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 121 : FK errors detectes');
+      throw new Error('Migration 121 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 121 appliquee : colonne morte system_categories_db.slugs supprimee (calcul a la volee depuis equipment_templates.category)');
+    db.pragma('user_version = 121');
+  }
+
+  if (current < 122) {
+    // FK manquantes ON DELETE SET NULL sur sections : `equipment_template_id`
+    // et `section_template_id` etaient en NO ACTION. Concretement, DELETE
+    // d'un equipment_template ou d'un section_template echouait avec
+    // SQLITE_CONSTRAINT_FOREIGNKEY si une section pointait dessus, meme
+    // quand l'AF etait soft-deletee. On contournait avec un UPDATE manuel
+    // dans les routes DELETE des templates. Mieux : que la FK fasse le job.
+    //
+    // Ce 4e recreate de sections ajoute :
+    //   equipment_template_id REFERENCES equipment_templates(id) ON DELETE SET NULL
+    //   section_template_id REFERENCES section_templates(id) ON DELETE SET NULL
+    // (Les autres FK et le CHECK fact_check_status restent inchanges.)
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE sections_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          parent_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL DEFAULT 0,
+          number TEXT,
+          title TEXT NOT NULL,
+          service_level TEXT,
+          service_level_source TEXT,
+          bacs_articles TEXT,
+          bacs_justification TEXT,
+          body_html TEXT,
+          body_yjs BLOB,
+          kind TEXT NOT NULL DEFAULT 'standard'
+            CHECK (kind IN ('standard', 'equipment', 'synthesis', 'hyperveez_page', 'zones')),
+          included_in_export INTEGER NOT NULL DEFAULT 1,
+          generic_note INTEGER NOT NULL DEFAULT 0,
+          fact_check_status TEXT DEFAULT 'unverified'
+            CHECK (fact_check_status IS NULL OR fact_check_status IN ('unverified','verified','backend_only','in_progress','documented')),
+          equipment_template_id INTEGER REFERENCES equipment_templates(id) ON DELETE SET NULL,
+          equipment_template_version INTEGER,
+          hyperveez_page_slug TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_by INTEGER REFERENCES users(id),
+          section_template_id INTEGER REFERENCES section_templates(id) ON DELETE SET NULL,
+          section_template_version INTEGER,
+          opted_out_by_moa INTEGER NOT NULL DEFAULT 0,
+          demanded_by_moa INTEGER NOT NULL DEFAULT 0,
+          optin_paid_option INTEGER NOT NULL DEFAULT 0,
+          description_html_override TEXT,
+          system_category_key TEXT REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE SET NULL
+        );
+        INSERT INTO sections_new SELECT
+          id, af_id, parent_id, position, number, title, service_level,
+          service_level_source, bacs_articles, bacs_justification, body_html,
+          body_yjs, kind, included_in_export, generic_note, fact_check_status,
+          equipment_template_id, equipment_template_version, hyperveez_page_slug,
+          created_at, updated_at, updated_by, section_template_id,
+          section_template_version, opted_out_by_moa, demanded_by_moa,
+          optin_paid_option, description_html_override, system_category_key
+        FROM sections;
+        DROP TABLE sections;
+        ALTER TABLE sections_new RENAME TO sections;
+        CREATE INDEX IF NOT EXISTS idx_sections_af_parent ON sections(af_id, parent_id, position);
+        CREATE INDEX IF NOT EXISTS idx_sections_kind ON sections(af_id, kind);
+        CREATE INDEX IF NOT EXISTS idx_sections_template ON sections(equipment_template_id) WHERE equipment_template_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_sections_system_category ON sections(af_id, system_category_key) WHERE system_category_key IS NOT NULL;
+        CREATE TRIGGER IF NOT EXISTS sections_fts_delete
+          AFTER DELETE ON sections BEGIN
+            DELETE FROM sections_fts WHERE section_id = old.id;
+          END;
+      `);
+    });
+    tx();
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 122 : FK errors detectes');
+      throw new Error('Migration 122 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 122 appliquee : sections.equipment_template_id + sections.section_template_id passent en ON DELETE SET NULL');
+    db.pragma('user_version = 122');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6171,22 +6456,24 @@ const systemCategoriesDb = {
     if (!r) return null;
     return { ...r, slugs: _slugsForKey(r.key) };
   },
-  create({ key, label, bacs, slugs, iconValue, iconColor, position }) {
+  create({ key, label, bacs, iconValue, iconColor, position }) {
+    // Note (mig 121) : la colonne `slugs` est supprimee. La liste des
+    // equipements rattaches est calculee a la volee via _slugsForKey
+    // depuis equipment_templates.category.
     const result = db.prepare(`
-      INSERT INTO system_categories_db (key, label, bacs, slugs, icon_value, icon_color, position)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(key, label, bacs || null, JSON.stringify(slugs || []),
+      INSERT INTO system_categories_db (key, label, bacs, icon_value, icon_color, position)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(key, label, bacs || null,
             iconValue || 'fa-cube', iconColor || '#6b7280', position || 0);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { key, label, bacs, slugs, iconValue, iconColor, position }) {
+  update(id, { key, label, bacs, iconValue, iconColor, position }) {
     const fields = [], params = [];
     // key editable (validation unicite faite cote route — UNIQUE constraint
     // ici en filet de securite). Voir route PATCH pour la cascade.
     if (key !== undefined && key !== null) { fields.push('key = ?'); params.push(key); }
     if (label !== undefined) { fields.push('label = ?'); params.push(label); }
     if (bacs !== undefined) { fields.push('bacs = ?'); params.push(bacs); }
-    if (slugs !== undefined) { fields.push('slugs = ?'); params.push(JSON.stringify(slugs)); }
     if (iconValue !== undefined) { fields.push('icon_value = ?'); params.push(iconValue); }
     if (iconColor !== undefined) { fields.push('icon_color = ?'); params.push(iconColor); }
     if (position !== undefined) { fields.push('position = ?'); params.push(position); }
