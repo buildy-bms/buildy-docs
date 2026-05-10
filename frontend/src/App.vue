@@ -6,6 +6,7 @@ import AppLayout from './components/AppLayout.vue'
 import NotificationToast from './components/NotificationToast.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import InstallBanner from './components/InstallBanner.vue'
+import VersionUpdateBanner from './components/VersionUpdateBanner.vue'
 import { useViewport } from './composables/useViewport'
 import { useOfflineQueue } from './composables/useOfflineQueue'
 
@@ -31,6 +32,7 @@ const skipAppLayout = computed(() =>
     <NotificationToast />
     <ConfirmDialog />
     <InstallBanner />
+    <VersionUpdateBanner />
     <template v-if="skipAppLayout">
       <router-view />
     </template>

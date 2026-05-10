@@ -25,6 +25,45 @@ import {
 } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
+import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
+import MeterUsagePill from '@/components/MeterUsagePill.vue'
+import MeterTypePill from '@/components/MeterTypePill.vue'
+import { BuildingOffice2Icon, MapPinIcon, BoltIcon, ClipboardDocumentListIcon } from '@heroicons/vue/24/outline'
+
+const emit = defineEmits(['navigate'])
+
+// Labels FR des natures de zone (pour le sheet KPI). Reste minimaliste :
+// pour les natures absentes du mapping, on retombe sur la valeur brute.
+const ZONE_NATURE_LABEL = {
+  offices: 'Bureaux',
+  meeting_rooms: 'Salles de réunion',
+  open_space: 'Open space',
+  reception: 'Accueil',
+  retail: 'Commerce',
+  it_room: 'Local informatique',
+  technical_room: 'Local technique',
+  warehouse: 'Stockage',
+  logistic_cell: 'Cellule logistique',
+  parking_indoor: 'Parking intérieur',
+  parking_outdoor: 'Parking extérieur',
+  circulation: 'Circulation',
+  basement: 'Sous-sol',
+  rooftop: 'Toiture',
+}
+const SYSTEM_CAT_LABEL = {
+  heating: 'Chauffage',
+  cooling: 'Refroidissement',
+  ventilation: 'Ventilation',
+  dhw: 'ECS',
+  lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur',
+  electricity_production: 'Production photovoltaïque',
+}
+
+function navigateAndClose(kind /* , entityId */) {
+  emit('navigate', { kind })
+  closeCoverage()
+}
 
 const audit = useAuditStore()
 const { document } = storeToRefs(audit)
@@ -252,20 +291,114 @@ async function quickToggleNotAvailable(it) {
             {{ coverageDetail.covered }} <span class="text-gray-400 text-base font-normal">/ {{ coverageDetail.total }}</span>
           </p>
         </div>
-        <p v-if="coverageDetail.total === 0" class="text-sm text-gray-500 text-center py-6">
+
+        <!-- Cas particuliers Site / GTB : 1 entité unique → on propose juste
+             un raccourci vers l'onglet correspondant pour prendre la photo. -->
+        <button
+          v-if="(coverageDetail.kind === 'site' || coverageDetail.kind === 'bms') && coverageDetail.total > 0 && coverageDetail.covered === 0"
+          type="button"
+          @click="navigateAndClose(coverageDetail.kind)"
+          class="w-full flex items-center gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+        >
+          <span class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 inline-flex items-center justify-center shrink-0">
+            <BuildingOffice2Icon v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
+            <ClipboardDocumentListIcon v-else class="w-5 h-5" />
+          </span>
+          <span class="flex-1 text-left">
+            <span class="block text-base text-gray-900 font-medium">
+              {{ coverageDetail.kind === 'site' ? 'Aller à la page Site' : 'Aller à la page GTB' }}
+            </span>
+            <span class="block text-xs text-amber-700 mt-0.5">Aucune photo · à prendre</span>
+          </span>
+          <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+        </button>
+        <button
+          v-else-if="(coverageDetail.kind === 'site' || coverageDetail.kind === 'bms') && coverageDetail.covered > 0"
+          type="button"
+          @click="navigateAndClose(coverageDetail.kind)"
+          class="w-full flex items-center gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
+        >
+          <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 inline-flex items-center justify-center shrink-0">
+            <BuildingOffice2Icon v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
+            <ClipboardDocumentListIcon v-else class="w-5 h-5" />
+          </span>
+          <span class="flex-1 text-left">
+            <span class="block text-base text-gray-900 font-medium">
+              {{ coverageDetail.kind === 'site' ? 'Voir / ajouter des photos du site' : 'Voir / ajouter des photos GTB' }}
+            </span>
+            <span class="block text-xs text-emerald-700 mt-0.5">✓ Couvert</span>
+          </span>
+          <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+        </button>
+
+        <!-- Site / GTB sans entité (cas vide impossible normalement) -->
+        <p v-else-if="coverageDetail.total === 0" class="text-sm text-gray-500 text-center py-6">
           Aucune entité de ce type dans l'audit.
         </p>
-        <p v-else-if="coverageDetail.covered === coverageDetail.total" class="text-sm text-emerald-700 text-center py-6">
-          ✓ Toutes les entités ont au moins une photo.
-        </p>
-        <template v-else-if="coverageDetail.missing.length">
+
+        <!-- Toutes les entités sont couvertes : message + raccourci vers l'onglet -->
+        <template v-else-if="coverageDetail.covered === coverageDetail.total">
+          <p class="text-sm text-emerald-700 text-center py-3">
+            ✓ Toutes les entités ont au moins une photo.
+          </p>
+          <button
+            type="button"
+            @click="navigateAndClose(coverageDetail.kind)"
+            class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white rounded-xl border border-gray-200 text-base text-gray-700 active:bg-gray-50"
+          >
+            Aller à l'onglet {{ coverageDetail.label }}
+            <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+          </button>
+        </template>
+
+        <!-- Liste des entités sans photo, cliquables (zones / systems / meters) -->
+        <template v-else-if="coverageDetail.missing && coverageDetail.missing.length">
           <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
             {{ coverageDetail.missing.length }} sans photo
           </p>
           <ul class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-            <li v-for="m in coverageDetail.missing" :key="m.id"
-                class="px-4 py-3 text-base text-gray-800">
-              {{ m.name }}
+            <li v-for="m in coverageDetail.missing" :key="m.id">
+              <button
+                type="button"
+                @click="navigateAndClose(coverageDetail.kind, m.id)"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50"
+              >
+                <!-- Icône / pictogramme selon le type d'entité -->
+                <span class="shrink-0">
+                  <MapPinIcon v-if="coverageDetail.kind === 'zones'" class="w-6 h-6 text-indigo-600" />
+                  <SystemCategoryIcon
+                    v-else-if="coverageDetail.kind === 'systems'"
+                    :category="m.category"
+                    size="md"
+                  />
+                  <BoltIcon v-else-if="coverageDetail.kind === 'meters'" class="w-6 h-6 text-amber-600" />
+                </span>
+                <div class="flex-1 min-w-0">
+                  <!-- Zones : nom + nature -->
+                  <template v-if="coverageDetail.kind === 'zones'">
+                    <p class="text-base text-gray-900 font-medium truncate">{{ m.name }}</p>
+                    <p v-if="m.nature" class="text-xs text-gray-500 truncate">{{ ZONE_NATURE_LABEL[m.nature] || m.nature }}</p>
+                  </template>
+                  <!-- Systèmes : catégorie + zone -->
+                  <template v-else-if="coverageDetail.kind === 'systems'">
+                    <p class="text-base text-gray-900 font-medium truncate">{{ SYSTEM_CAT_LABEL[m.category] || m.category }}</p>
+                    <p v-if="m.zone_name" class="text-xs text-gray-500 truncate">📍 {{ m.zone_name }}</p>
+                  </template>
+                  <!-- Compteurs : pills usage + type, zone en sous-titre -->
+                  <template v-else-if="coverageDetail.kind === 'meters'">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <MeterUsagePill :usage="m.usage" />
+                      <MeterTypePill :type="m.meter_type" />
+                    </div>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">
+                      📍 {{ m.zone_name || 'Compteur général' }}
+                    </p>
+                  </template>
+                  <!-- Fallback (jamais utilisé en pratique) -->
+                  <p v-else class="text-base text-gray-900 truncate">{{ m.name }}</p>
+                </div>
+                <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+              </button>
             </li>
           </ul>
         </template>

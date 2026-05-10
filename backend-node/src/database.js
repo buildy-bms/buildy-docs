@@ -8245,7 +8245,7 @@ const bacsAuditChecklist = {
     // (un audit peut avoir des zones-fantômes du site rattaché qu'il
     // n'utilise pas — on ne les compte que si elles ont au moins 1 système).
     const sysRows = db.prepare(`
-      SELECT DISTINCT s.zone_id, z.name
+      SELECT DISTINCT s.zone_id, z.name, z.nature
       FROM bacs_audit_systems s
       LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
@@ -8259,7 +8259,11 @@ const bacsAuditChecklist = {
       `).all(...zoneIds).map(r => r.zone_id);
     const zonesCovered = new Set(zonesWithPhotos);
     const zonesMissing = sysRows.filter(r => !zonesCovered.has(r.zone_id))
-      .map(r => ({ id: r.zone_id, name: r.name || `Zone #${r.zone_id}` }));
+      .map(r => ({
+        id: r.zone_id,
+        name: r.name || `Zone #${r.zone_id}`,
+        nature: r.nature || null,
+      }));
 
     // Systèmes : on compte ceux marqués present=1. Une photo sur un device
     // du système compte aussi (le device est physique, l'instance compte).
@@ -8285,13 +8289,19 @@ const bacsAuditChecklist = {
     const sysMissing = sysAll.filter(s => !sysCovered.has(s.id))
       .map(s => ({
         id: s.id,
+        category: s.system_category,
+        zone_id: s.zone_id,
+        zone_name: zoneNameById.get(s.zone_id) || null,
         name: `${s.system_category} — ${zoneNameById.get(s.zone_id) || `Zone #${s.zone_id}`}`,
       }));
 
-    // Compteurs
-    const metersAll = db.prepare(
-      'SELECT id, usage, meter_type FROM bacs_audit_meters WHERE document_id = ?'
-    ).all(documentId);
+    // Compteurs (avec zone pour navigation + identification PWA)
+    const metersAll = db.prepare(`
+      SELECT m.id, m.usage, m.meter_type, m.zone_id, z.name AS zone_name
+      FROM bacs_audit_meters m
+      LEFT JOIN zones z ON z.id = m.zone_id
+      WHERE m.document_id = ?
+    `).all(documentId);
     const meterIds = metersAll.map(m => m.id);
     const metersWithPhotos = meterIds.length === 0 ? [] :
       db.prepare(`
@@ -8301,7 +8311,14 @@ const bacsAuditChecklist = {
       `).all(...meterIds).map(r => r.id);
     const metersCovered = new Set(metersWithPhotos);
     const metersMissing = metersAll.filter(m => !metersCovered.has(m.id))
-      .map(m => ({ id: m.id, name: `${m.usage} / ${m.meter_type}` }));
+      .map(m => ({
+        id: m.id,
+        usage: m.usage,
+        meter_type: m.meter_type,
+        zone_id: m.zone_id,
+        zone_name: m.zone_name || null,
+        name: `${m.usage} / ${m.meter_type}${m.zone_name ? ' · ' + m.zone_name : ' · général'}`,
+      }));
 
     // BMS / GTB : table bacs_audit_bms a document_id comme PK (1 ligne par
     // audit). La FK site_documents.bacs_audit_bms_document_id pointe vers
