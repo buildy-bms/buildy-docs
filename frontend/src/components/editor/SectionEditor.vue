@@ -23,6 +23,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import LinkInputModal from '@/components/LinkInputModal.vue'
 import BacsBadge from '@/components/BacsBadge.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
+import SectionSyncModal from '@/components/SectionSyncModal.vue'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -81,35 +82,24 @@ function dismissSectionTplBanner() {
   newSectionTplVersion.value = null
 }
 
-// Bouton "MAJ depuis biblio" toujours disponible (independant de la
-// detection de nouvelle version). Force le re-pull du contenu canonique
-// du template + le bump de version pinnee. Utile quand l'utilisateur a
-// modifie localement et veut revenir au modele.
-const syncingFromLibrary = ref(false)
-async function syncSectionFromLibrary() {
-  if (syncingFromLibrary.value) return
+// Bouton "MAJ depuis biblio" : ouvre une modal qui laisse l'utilisateur
+// choisir quels champs (titre / contenu / niveau / articles BACS / etc.)
+// recuperer depuis la bibliotheque. Le sync est selectif, plus
+// d'ecrasement total surprise.
+const showSyncModal = ref(false)
+async function openSyncModal() {
   if (!props.section.equipment_template_id && !props.section.section_template_id) return
-  const ok = await confirm({
-    title: 'Mettre à jour depuis la bibliothèque ?',
-    message: 'Le contenu de cette section sera remplacé par la dernière version canonique de la bibliothèque. Tes modifications locales seront perdues.',
-    confirmLabel: 'Mettre à jour',
-    danger: true,
-  })
-  if (!ok) return
-  syncingFromLibrary.value = true
-  try {
-    await flushAll()
-    const { data } = await applySectionTemplateUpdate(props.section.id)
-    // Recharge le contenu de l'editeur depuis la reponse serveur.
-    if (editor.value) editor.value.commands.setContent(data.body_html || '')
-    title.value = data.title || title.value
-    newSectionTplVersion.value = null
-    emit('updated', data)
-  } catch (e) {
-    notifyError(e?.response?.data?.detail || 'Échec de la synchronisation depuis la bibliothèque')
-  } finally {
-    syncingFromLibrary.value = false
+  await flushAll() // sauvegarde l'edition en cours avant de comparer aux valeurs biblio
+  showSyncModal.value = true
+}
+function onSyncUpdated(updatedSection) {
+  // Recharge le contenu de l'editeur depuis la reponse serveur.
+  if (editor.value && updatedSection.body_html != null) {
+    editor.value.commands.setContent(updatedSection.body_html || '')
   }
+  if (updatedSection.title) title.value = updatedSection.title
+  newSectionTplVersion.value = null
+  emit('updated', updatedSection)
 }
 
 watch(() => props.section.id, () => {
@@ -348,13 +338,12 @@ function onSaveLink(url) {
       </button>
       <button
         v-if="templateLink && !isReadOnly"
-        @click="syncSectionFromLibrary"
-        :disabled="syncingFromLibrary"
-        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-md shrink-0 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-        v-tooltip="'Remplacer le contenu de cette section par la dernière version de la bibliothèque'"
+        @click="openSyncModal"
+        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-md shrink-0 whitespace-nowrap"
+        v-tooltip="'Choisir quels champs récupérer depuis la bibliothèque'"
       >
-        <ArrowPathIcon :class="['w-3 h-3 shrink-0', syncingFromLibrary ? 'animate-spin' : '']" />
-        <span>{{ syncingFromLibrary ? 'MAJ…' : 'MAJ biblio' }}</span>
+        <ArrowPathIcon class="w-3 h-3 shrink-0" />
+        <span>MAJ biblio</span>
       </button>
       <ServiceLevelBadge :level="section.service_level" />
       <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
@@ -516,6 +505,13 @@ function onSaveLink(url) {
     :initial-url="linkInitialUrl"
     @save="onSaveLink"
     @close="showLinkModal = false"
+  />
+
+  <SectionSyncModal
+    v-if="showSyncModal"
+    :section="section"
+    @updated="onSyncUpdated"
+    @close="showSyncModal = false"
   />
 </template>
 

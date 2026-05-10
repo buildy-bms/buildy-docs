@@ -966,25 +966,45 @@ async function routes(fastify) {
   });
 
   // POST /api/sections/:id/template-update/apply — synchronise la section sur la version courante.
-  // - Equipement : bumpe equipment_template_version (les points sont resolus dynamiquement).
-  // - Section narrative / fonctionnalite : copie body_html du template vers la section
-  //   et bumpe section_template_version. Le contenu local est ecrase (cf. confirmation cote UI).
+  //
+  // Body optionnel : { fields?: string[] } pour un sync selectif depuis
+  // la modal SectionSyncModal. Si `fields` est fourni, seuls ces champs
+  // sont ecrases ; sinon comportement legacy (sync complet : title +
+  // body_html + version_pin selon le type de template).
+  //
+  // Champs supportes (mappes vers la valeur canonique du template) :
+  //   - 'title'             : equipment_template.name OR section_template.title
+  //   - 'body_html'         : section_template.body_html (uniquement section_template)
+  //   - 'description_html'  : equipment_template.description_html -> sections.description_html_override
+  //   - 'service_level'     : section_template.service_level (uniquement section_template)
+  //   - 'bacs_articles'     : section_template.bacs_articles (uniquement section_template)
+  // La version pinnee est toujours bumpee a current_version.
   fastify.post('/sections/:id/template-update/apply', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
     const userId = request.authUser?.id;
+    const requestedFields = Array.isArray(request.body?.fields) ? request.body.fields : null;
+    const wantsField = (k) => requestedFields == null || requestedFields.includes(k);
 
     if (section.equipment_template_id) {
       const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
-      const updated = db.sections.update(id, {
-        equipmentTemplateVersion: tpl.current_version,
-        updatedBy: userId,
-      });
+      if (!tpl) return reply.code(404).send({ detail: 'Modèle equipement introuvable' });
+      const fields = { equipmentTemplateVersion: tpl.current_version, updatedBy: userId };
+      if (requestedFields == null) {
+        // Legacy : pas de body_html dans equipment_template ; on bumpe juste la version.
+      } else {
+        if (wantsField('title') && tpl.name) fields.title = tpl.name;
+        if (wantsField('description_html')) fields.descriptionHtmlOverride = tpl.description_html || null;
+      }
+      const updated = db.sections.update(id, fields);
       db.auditLog.add({
         afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
         action: 'section.template.sync',
-        payload: { source: 'equipment', from: section.equipment_template_version, to: tpl.current_version },
+        payload: {
+          source: 'equipment', fields: requestedFields,
+          from: section.equipment_template_version, to: tpl.current_version,
+        },
       });
       return updated;
     }
@@ -992,20 +1012,32 @@ async function routes(fastify) {
     if (section.section_template_id) {
       const tpl = db.sectionTemplates.getById(section.section_template_id);
       if (!tpl) return reply.code(404).send({ detail: 'Template introuvable' });
-      const updated = db.sections.update(id, {
-        bodyHtml: tpl.body_html,
-        sectionTemplateVersion: tpl.current_version,
-        updatedBy: userId,
-      });
-      // Re-index FTS (le body change)
-      const bodyText = (tpl.body_html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      db.sections.reindexFts(id, section.af_id, section.title, bodyText);
-      // Note : audit_log.template_id a une FK vers equipment_templates(id), donc
-      // on ne peut PAS y mettre un section_template_id. On le stocke dans payload.
+      const fields = { sectionTemplateVersion: tpl.current_version, updatedBy: userId };
+      const wantsBody = requestedFields == null
+        ? true // Legacy : full sync = body_html ecrase
+        : wantsField('body_html');
+      if (wantsBody) fields.bodyHtml = tpl.body_html;
+      if (requestedFields != null) {
+        if (wantsField('title') && tpl.title) fields.title = tpl.title;
+        if (wantsField('service_level')) {
+          fields.serviceLevel = tpl.service_level || null;
+          fields.serviceLevelSource = tpl.service_level ? 'template' : null;
+        }
+        if (wantsField('bacs_articles')) fields.bacsArticles = tpl.bacs_articles || null;
+      }
+      const updated = db.sections.update(id, fields);
+      if (wantsBody) {
+        const bodyText = (tpl.body_html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        db.sections.reindexFts(id, section.af_id, fields.title || section.title, bodyText);
+      }
       db.auditLog.add({
         afId: section.af_id, sectionId: id, userId,
         action: 'section.template.sync',
-        payload: { source: 'section_template', section_template_id: tpl.id, from: section.section_template_version, to: tpl.current_version },
+        payload: {
+          source: 'section_template', section_template_id: tpl.id,
+          fields: requestedFields,
+          from: section.section_template_version, to: tpl.current_version,
+        },
       });
       return updated;
     }
