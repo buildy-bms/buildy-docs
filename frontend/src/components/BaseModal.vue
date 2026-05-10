@@ -5,7 +5,7 @@ import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps({
   title: { type: String, required: true },
-  size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg' | 'xl'
+  size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg' | 'xl' | 'full'
   // Par defaut un clic sur le backdrop ferme. Pour les modales d'edition
   // avec saisie utilisateur (formulaires longs), passer `:dismiss-on-backdrop="false"`
   // pour eviter une perte accidentelle (clic a cote = pas de fermeture).
@@ -24,6 +24,9 @@ const sizeClass = {
   md: 'min-w-[24rem] max-w-[min(92vw,36rem)]',
   lg: 'min-w-[28rem] max-w-[min(92vw,48rem)]',
   xl: 'min-w-[36rem] max-w-[min(92vw,64rem)]',
+  // 'full' : pas de cap (en plus du max-w-[92vw] du conteneur de base).
+  // La modale s'elargit jusqu'a 92vw pour absorber les tableaux larges.
+  full: 'min-w-[36rem]',
 }[props.size] || 'min-w-[24rem] max-w-[min(92vw,36rem)]'
 
 const dialogRef = ref(null)

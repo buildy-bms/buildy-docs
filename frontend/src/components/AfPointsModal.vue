@@ -57,6 +57,22 @@ function gotoSection(sectionId) {
   emit('close')
 }
 
+// Memes palettes que `editor/PointsTable.vue` pour preserver la coherence
+// visuelle (la modale et l'editeur affichent les memes pilules).
+const NATURE_COLORS = {
+  'Booléen':              { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  'Numérique':            { bg: 'bg-cyan-50',   text: 'text-cyan-700',   border: 'border-cyan-200' },
+  'Enum':                 { bg: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-200' },
+  'Chaîne de caractères': { bg: 'bg-slate-50',  text: 'text-slate-700',  border: 'border-slate-200' },
+}
+const TYPE_COLORS = {
+  Mesure:   { bg: 'bg-blue-50',     text: 'text-blue-700' },
+  'État':   { bg: 'bg-gray-100',    text: 'text-gray-700' },
+  Alarme:   { bg: 'bg-red-50',      text: 'text-red-700' },
+  Commande: { bg: 'bg-emerald-50',  text: 'text-emerald-700' },
+  Consigne: { bg: 'bg-amber-50',    text: 'text-amber-700' },
+}
+
 const cols = [
   { key: 'section_number', label: 'Section #', align: 'left' },
   { key: 'section_title', label: 'Section', align: 'left' },
@@ -65,13 +81,14 @@ const cols = [
   { key: 'label', label: 'Libellé', align: 'left' },
   { key: 'data_type', label: 'Type', align: 'left' },
   { key: 'direction', label: 'Sens', align: 'center' },
+  { key: 'nature', label: 'Nature', align: 'left' },
   { key: 'unit', label: 'Unité', align: 'left' },
-  { key: 'is_optional', label: 'Obligatoire', align: 'center' },
+  { key: 'is_optional', label: 'Optionnel', align: 'center' },
 ]
 </script>
 
 <template>
-  <BaseModal title="Tous les points de l'AF" size="lg" @close="emit('close')">
+  <BaseModal title="Tous les points de l'AF" size="full" @close="emit('close')">
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
     <template v-else>
       <!-- Synthese compteurs -->
@@ -145,12 +162,22 @@ const cols = [
               <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{ p.equipment_template_name || '—' }}</td>
               <td class="px-3 py-2 whitespace-nowrap"><code v-if="p.tech_name" class="text-[11px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded">{{ p.tech_name }}</code><span v-else class="text-gray-400">—</span></td>
               <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ p.label }}</td>
-              <td class="px-3 py-2 whitespace-nowrap"><span class="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">{{ p.data_type }}</span></td>
-              <td class="px-3 py-2 whitespace-nowrap text-center"><span :class="['text-[11px] px-1.5 py-0.5 rounded', p.direction === 'read' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800']">{{ p.direction === 'read' ? 'R' : 'W' }}</span></td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', TYPE_COLORS[p.data_type]?.bg || 'bg-gray-100', TYPE_COLORS[p.data_type]?.text || 'text-gray-700']">{{ p.data_type }}</span>
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap text-center">
+                <span :class="['text-[11px] px-1.5 py-0.5 rounded font-medium', p.direction === 'read' ? 'bg-indigo-100 text-indigo-800' : 'bg-rose-100 text-rose-800']">{{ p.direction === 'read' ? 'R' : 'W' }}</span>
+              </td>
+              <td class="px-3 py-2 whitespace-nowrap">
+                <span v-if="p.nature && NATURE_COLORS[p.nature]"
+                      :class="['text-[11px] px-1.5 py-0.5 rounded border font-medium', NATURE_COLORS[p.nature].bg, NATURE_COLORS[p.nature].text, NATURE_COLORS[p.nature].border]">{{ p.nature }}</span>
+                <span v-else class="text-gray-400">—</span>
+              </td>
               <td class="px-3 py-2 whitespace-nowrap text-gray-600">{{ p.unit || '—' }}</td>
               <td class="px-3 py-2 whitespace-nowrap text-center">
-                <span v-if="!p.is_optional" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">Obligatoire</span>
-                <span v-else class="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Optionnel</span>
+                <span :class="['inline-block w-4 h-4 rounded border align-middle', p.is_optional ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300']">
+                  <span v-if="p.is_optional" class="block text-white text-[10px] leading-4 text-center">✓</span>
+                </span>
               </td>
               <td class="px-2"></td>
             </tr>

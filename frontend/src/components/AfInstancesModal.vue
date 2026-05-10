@@ -88,7 +88,7 @@ const cols = [
 </script>
 
 <template>
-  <BaseModal title="Instances d'équipements du projet" size="lg" @close="emit('close')">
+  <BaseModal title="Instances d'équipements du projet" size="full" @close="emit('close')">
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
     <template v-else>
       <!-- Synthese par template -->
