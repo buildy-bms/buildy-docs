@@ -353,7 +353,12 @@ function openExport(kind) {
 }
 
 async function submitExport() {
-  if (!exportMotif.value.trim()) return
+  // Si l'utilisateur lance directement depuis l'apercu sans motif rempli
+  // (le bouton "Aperçu" du formulaire d'export n'exige pas le motif),
+  // on remplit un motif par defaut plutot que de rester silencieux.
+  if (!exportMotif.value.trim()) {
+    exportMotif.value = 'Génération depuis l\'aperçu'
+  }
   submitting.value = true
   try {
     const fn = exportKind.value === 'af' ? exportAf
