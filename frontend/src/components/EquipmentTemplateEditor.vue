@@ -407,6 +407,12 @@ async function save({ close = true } = {}) {
     }
     let res
     if (isEdit.value) {
+      // Slug editable : on l'envoie uniquement s'il a change pour eviter
+      // un round-trip d'unicite si l'utilisateur n'y touche pas.
+      const slugTrim = form.value.slug.trim()
+      if (slugTrim && slugTrim !== props.template.slug) {
+        payload.slug = slugTrim
+      }
       res = await updateEquipmentTemplate(props.template.id, payload)
       liveTemplate.value = res.data
       success('Modèle mis à jour')
@@ -594,11 +600,18 @@ async function destroy() {
         </div>
       </div>
 
-      <div v-if="!isEdit">
-        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Slug <span class="text-gray-400 font-normal">— auto si vide</span></label>
+      <div>
+        <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+          Slug
+          <span v-if="!isEdit" class="text-gray-400 font-normal">— auto si vide</span>
+          <span v-else class="text-gray-400 font-normal">— identifiant technique stable</span>
+        </label>
         <input v-model="form.slug" type="text" autocomplete="off" data-1p-ignore="true"
                placeholder="pac-air-eau"
                class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+        <p v-if="isEdit" class="mt-1 text-[10px] text-amber-700">
+          ⚠️ Le slug est référencé par le seed ; modifier en connaissance de cause. Préférer renommer le nom.
+        </p>
       </div>
       </fieldset>
 

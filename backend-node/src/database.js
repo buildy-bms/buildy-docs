@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 109;
+const TARGET_VERSION = 111;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4009,6 +4009,71 @@ function runMigrations() {
     db.pragma('user_version = 109');
   }
 
+  if (current < 110) {
+    // Dedup global des sections equipement par AF.
+    // Bug : libraryExtendAf() dedupliquait par fratrie uniquement, donc un meme
+    // equipment_template (ex: borne-irve, production-electricite avec
+    // category='electricite') etait clone sous chaque parent narratif partageant
+    // cette categorie. Resultat : "Production d'electricite" en 3.4.8 ET 3.5,
+    // "IRVE" en 3.4.4 ET 3.13, etc.
+    // Le fix code-level vit dans lib/seeder.js (set globallyExistingTplIds).
+    // Cette migration nettoie les AFs deja seedees : pour chaque
+    // (af_id, equipment_template_id) en doublon, on garde la section avec la
+    // plus petite position (apparition la plus haute du plan = canonique) et
+    // on supprime les autres avec leurs cascades.
+    const dupes = db.prepare(`
+      SELECT af_id, equipment_template_id, COUNT(*) AS n
+      FROM sections
+      WHERE equipment_template_id IS NOT NULL
+      GROUP BY af_id, equipment_template_id
+      HAVING n > 1
+    `).all();
+    let totalRemoved = 0;
+    const auditInsert = db.prepare(`
+      INSERT INTO audit_log (af_id, action, payload) VALUES (?, ?, ?)
+    `);
+    const dedupeTx = db.transaction(() => {
+      for (const d of dupes) {
+        const sectionsForPair = db.prepare(`
+          SELECT id, number, position, parent_id
+          FROM sections
+          WHERE af_id = ? AND equipment_template_id = ?
+          ORDER BY position ASC, id ASC
+        `).all(d.af_id, d.equipment_template_id);
+        const [keep, ...remove] = sectionsForPair;
+        if (!remove.length) continue;
+        for (const s of remove) {
+          db.prepare('DELETE FROM sections WHERE id = ?').run(s.id);
+          totalRemoved++;
+        }
+        auditInsert.run(
+          d.af_id,
+          'af.dedupe.equipment',
+          JSON.stringify({
+            equipment_template_id: d.equipment_template_id,
+            kept: { id: keep.id, number: keep.number, position: keep.position },
+            removed: remove.map(s => ({ id: s.id, number: s.number, position: s.position })),
+          })
+        );
+      }
+    });
+    dedupeTx();
+    log.info(`Migration 110 appliquee : dedup global equipement par AF (${dupes.length} paires, ${totalRemoved} sections supprimees)`);
+    db.pragma('user_version = 110');
+  }
+
+  if (current < 111) {
+    // Override de la description fonctionnelle d'une section equipement au
+    // niveau de l'AF, sans toucher au template biblio. Quand NULL, l'AF
+    // affiche/exporte la description canonique de equipment_templates ;
+    // quand non-NULL, c'est cette valeur qui est rendue. Le bouton
+    // "Recuperer depuis le modele" remet la colonne a NULL.
+    try { db.exec('ALTER TABLE sections ADD COLUMN description_html_override TEXT'); }
+    catch { /* deja ajoutee */ }
+    log.info('Migration 111 appliquee : sections.description_html_override');
+    db.pragma('user_version = 111');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -4144,7 +4209,7 @@ const equipmentTemplates = {
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, updatedBy }) {
+  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -4164,7 +4229,8 @@ const equipmentTemplates = {
 
     db.prepare(`
       UPDATE equipment_templates
-      SET name = COALESCE(?, name),
+      SET slug = COALESCE(?, slug),
+          name = COALESCE(?, name),
           category = COALESCE(?, category),
           bacs_articles = COALESCE(?, bacs_articles),
           bacs_justification = COALESCE(?, bacs_justification),
@@ -4179,7 +4245,7 @@ const equipmentTemplates = {
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, updatedBy || null, id);
+    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -5005,7 +5071,8 @@ const sections = {
   update(id, fields) {
     const allowed = [
       'parent_id', 'position', 'number', 'title', 'service_level', 'service_level_source',
-      'bacs_articles', 'bacs_justification', 'body_html', 'kind', 'included_in_export', 'generic_note',
+      'bacs_articles', 'bacs_justification', 'body_html', 'description_html_override',
+      'kind', 'included_in_export', 'generic_note',
       'opted_out_by_moa', 'demanded_by_moa', 'optin_paid_option',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
       'section_template_id', 'section_template_version',

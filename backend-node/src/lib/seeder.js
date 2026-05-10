@@ -393,6 +393,14 @@ function libraryExtendAf(afId) {
     childrenOf.get(p).push(s);
   }
   const tplById = new Map(allLib.map(t => [t.id, t]));
+  // Dedup global a l'AF : un meme equipment_template ne doit etre injecte qu'une
+  // seule fois dans toute l'AF, jamais sous plusieurs parents qui partagent une
+  // meme library_category. Sans ce set global, ex: borne-irve + production-electricite
+  // (tous les deux category='electricite') etaient clones sous chaque parent ayant
+  // 'electricite' dans library_categories.
+  const globallyExistingTplIds = new Set(
+    sections.filter(s => s.equipment_template_id).map(s => s.equipment_template_id)
+  );
   let added = 0;
   for (const [parentId, kids] of childrenOf) {
     if (!parentId) continue; // top-level : on n'extend pas la racine
@@ -417,12 +425,11 @@ function libraryExtendAf(afId) {
       if (t?.category) cats.add(t.category);
     }
     if (!cats.size) continue;
-    const existingTplIds = new Set(eqKids.map(k => k.equipment_template_id));
     let nextIdx = kids.length;
     let nextPos = kids.reduce((m, k) => Math.max(m, k.position || 0), 0);
     for (const lib of allLib) {
       if (!lib.category || !cats.has(lib.category)) continue;
-      if (existingTplIds.has(lib.id)) continue;
+      if (globallyExistingTplIds.has(lib.id)) continue;
       nextIdx++;
       nextPos += 10;
       const number = parent.number ? `${parent.number}.${nextIdx}` : null;
@@ -432,6 +439,7 @@ function libraryExtendAf(afId) {
         equipmentTemplateId: lib.id, equipmentTemplateVersion: lib.current_version,
         bacsArticles: null, bodyHtml: null, genericNote: 0,
       });
+      globallyExistingTplIds.add(lib.id);
       added++;
     }
   }

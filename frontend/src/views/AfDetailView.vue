@@ -775,7 +775,7 @@ watch(() => route.params.id, async (newId, oldId) => {
 
           <!-- Pour kind='equipment' : description + tableaux points + instances -->
           <template v-if="selectedSection.kind === 'equipment'">
-            <EquipmentDescriptionPanel v-if="selectedSection.equipment_template_id" :template-id="selectedSection.equipment_template_id" />
+            <EquipmentDescriptionPanel v-if="selectedSection.equipment_template_id" :section="selectedSection" @updated="onSectionUpdated" />
             <PointsTable :section-id="selectedSection.id" :equipment-template-id="selectedSection.equipment_template_id" />
             <EquipmentInstancesTable :section-id="selectedSection.id" :af-id="af.id" :template-id="selectedSection.equipment_template_id" />
           </template>
@@ -959,10 +959,11 @@ watch(() => route.params.id, async (newId, oldId) => {
           />
           <p v-else class="text-gray-400 italic text-lg">Aucun contenu rédigé pour cette section.</p>
 
-          <!-- Equipment description (heritee de la bibliotheque) -->
+          <!-- Equipment description (heritee de la bibliotheque, override possible) -->
           <EquipmentDescriptionPanel
             v-if="selectedSection.kind === 'equipment' && selectedSection.equipment_template_id"
-            :template-id="selectedSection.equipment_template_id"
+            :section="selectedSection"
+            @updated="onSectionUpdated"
           />
           <!-- Points typiques -->
           <PointsTable

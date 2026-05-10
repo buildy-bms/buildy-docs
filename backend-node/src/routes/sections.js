@@ -13,9 +13,11 @@ const updateSectionSchema = z.object({
   bacs_articles: z.string().nullable().optional(),
   bacs_justification: z.string().nullable().optional(),
   body_html: z.string().nullable().optional(),
+  description_html_override: z.string().nullable().optional(),
   included_in_export: z.boolean().optional(),
   fact_check_status: z.enum(['unverified', 'verified', 'backend_only', 'in_progress', 'documented']).optional(),
   section_template_version: z.number().int().optional(),
+  equipment_template_version: z.number().int().optional(),
   opted_out_by_moa: z.boolean().optional(),
   demanded_by_moa: z.boolean().optional(),
   optin_paid_option: z.boolean().optional(),
@@ -255,11 +257,13 @@ async function routes(fastify) {
       bacsArticles: body.bacs_articles,
       bacsJustification: body.bacs_justification,
       bodyHtml: body.body_html,
+      descriptionHtmlOverride: body.description_html_override,
       includedInExport,
       optedOutByMoa,
       demandedByMoa,
       optinPaidOption,
       sectionTemplateVersion: body.section_template_version,
+      equipmentTemplateVersion: body.equipment_template_version,
       factCheckStatus: body.fact_check_status,
       updatedBy: userId,
     });
@@ -512,6 +516,53 @@ async function routes(fastify) {
     return updated;
   });
 
+  // POST /api/instances/:id/duplicate — clone une instance + ses zones + categories
+  fastify.post('/instances/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const src = db.db.prepare('SELECT * FROM equipment_instances WHERE id = ?').get(id);
+    if (!src) return reply.code(404).send({ detail: 'Instance non trouvée' });
+    const section = db.sections.getById(src.section_id);
+    if (!assertWrite(request, reply, section.af_id)) return;
+
+    // Suffixe la reference : pattern "<base>-<NN>" (ex: POMP-01) -> increment ;
+    // sinon "<original> (copie)" / "<original> (copie 2)"...
+    const siblings = db.equipmentInstances.listBySection(src.section_id);
+    const usedRefs = new Set(siblings.map(s => s.reference));
+    let newRef = null;
+    const m = String(src.reference || '').match(/^(.*?)(\d+)$/);
+    if (m) {
+      const base = m[1];
+      const padLen = m[2].length;
+      let n = parseInt(m[2], 10) + 1;
+      while (usedRefs.has(`${base}${String(n).padStart(padLen, '0')}`)) n++;
+      newRef = `${base}${String(n).padStart(padLen, '0')}`;
+    } else {
+      let suffix = ' (copie)';
+      let i = 2;
+      while (usedRefs.has(`${src.reference || ''}${suffix}`)) suffix = ` (copie ${i++})`;
+      newRef = `${src.reference || ''}${suffix}`.trim() || 'Copie';
+    }
+    const maxPos = siblings.reduce((m2, s) => Math.max(m2, s.position || 0), 0);
+    const clone = db.equipmentInstances.create(src.section_id, {
+      reference: newRef,
+      location: src.location,
+      qty: src.qty,
+      notes: src.notes,
+      position: maxPos + 10,
+    });
+    // Cascade des associations
+    const zones = db.instanceZones.listForInstance(id);
+    if (zones.length) db.instanceZones.setForInstance(clone.id, zones.map(z => z.id));
+    const cats = db.instanceCategories.listForInstance(id);
+    if (cats.length) db.instanceCategories.setForInstance(clone.id, cats.map(c => c.key || c));
+    db.auditLog.add({
+      afId: section.af_id, sectionId: src.section_id, userId: request.authUser?.id,
+      action: 'section.instance.duplicate',
+      payload: { source_id: id, source_ref: src.reference, new_id: clone.id, new_ref: newRef },
+    });
+    return clone;
+  });
+
   // DELETE /api/instances/:id
   fastify.delete('/instances/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
@@ -755,6 +806,37 @@ async function routes(fastify) {
     }
     db.afZones.delete(id);
     return { ok: true };
+  });
+
+  // POST /api/zones/:id/duplicate — clone une zone (sans cascade des
+  // equipment_instance_zones, le clone repart "vierge" cote affectations).
+  fastify.post('/zones/:id/duplicate', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const src = db.db.prepare('SELECT * FROM af_zones WHERE id = ?').get(id);
+    if (!src) return reply.code(404).send({ detail: 'Zone non trouvée' });
+    const sec = db.sections.getById(src.section_id);
+    if (!assertWrite(request, reply, sec.af_id)) return;
+    const siblings = db.afZones.listBySection(src.section_id);
+    const usedNames = new Set(siblings.map(s => s.name));
+    let newName = `${src.name} (copie)`;
+    let i = 2;
+    while (usedNames.has(newName)) newName = `${src.name} (copie ${i++})`;
+    const maxPos = siblings.reduce((m, s) => Math.max(m, s.position || 0), 0);
+    const clone = db.afZones.create(src.section_id, {
+      position: maxPos + 10,
+      name: newName,
+      surfaceM2: src.surface_m2,
+      occupationType: src.occupation_type,
+      occupationMaxPersonnes: src.occupation_max_personnes,
+      horaires: src.horaires,
+      qaiContraintes: src.qai_contraintes,
+      notes: src.notes,
+    });
+    db.auditLog.add({
+      afId: sec.af_id, sectionId: src.section_id, userId: request.authUser?.id,
+      action: 'zone.duplicate', payload: { source_id: id, source_name: src.name, new_id: clone.id, new_name: newName },
+    });
+    return clone;
   });
 
   // GET /api/sections/:id/template-update — diff entre version pinnee et version courante.
