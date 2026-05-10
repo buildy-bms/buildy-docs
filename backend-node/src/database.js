@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 111;
+const TARGET_VERSION = 115;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4074,6 +4074,334 @@ function runMigrations() {
     db.pragma('user_version = 111');
   }
 
+  if (current < 112) {
+    // Refactor catégories : la catégorie système devient le parent direct
+    // des équipements dans l'arbo AF, au lieu de passer par des sections
+    // narratives intermédiaires (ancien `2.1 Chauffage & Climatisation`,
+    // `2.2 Ventilation`...). La colonne `system_category_key` discrimine ces
+    // nœuds des sections narratives standard (kind reste 'standard' pour ne
+    // pas avoir à toucher au CHECK constraint -- recreate table = lourd).
+    try { db.exec('ALTER TABLE sections ADD COLUMN system_category_key TEXT'); }
+    catch { /* deja ajoutee */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_sections_system_category ON sections(af_id, system_category_key) WHERE system_category_key IS NOT NULL'); }
+    catch { /* idem */ }
+    log.info('Migration 112 appliquee : sections.system_category_key + index');
+    db.pragma('user_version = 112');
+  }
+
+  if (current < 113) {
+    // Re-parentage des sections kind='equipment' sous des nœuds catégorie
+    // dans chaque AF active. Pour chaque AF :
+    //   1) Trouver le chapitre "Périmètre des équipements supervisés" (chap 2).
+    //   2) Créer les nœuds catégorie depuis system_categories_db (un par cat).
+    //   3) Re-parenter les sections kind='equipment' sous leur catégorie via
+    //      equipment_templates.category.
+    //   4) Supprimer les anciens parents narratifs (kind='standard' enfants
+    //      directs du chap 2 devenus sans descendant).
+    // Tout en transaction par AF (rollback si erreur).
+    const cats = db.prepare('SELECT key, label, position, icon_value, icon_color FROM system_categories_db ORDER BY position, id').all();
+    if (!cats.length) {
+      log.warn('Migration 113 : system_categories_db vide, skip refactor (re-run après seed)');
+      db.pragma('user_version = 113');
+    } else {
+      const catByKey = new Map(cats.map(c => [c.key, c]));
+      const afs = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+      let totalAfs = 0;
+      let totalCatsCreated = 0;
+      let totalEquipmentMoved = 0;
+      let totalNarrativesDeleted = 0;
+      const auditInsert = db.prepare(`
+        INSERT INTO audit_log (af_id, action, payload) VALUES (?, ?, ?)
+      `);
+
+      for (const af of afs) {
+        const tx = db.transaction(() => {
+          // 1) Trouver le chap 2 : préférer slug='2' du section_template, sinon
+          // titre exact, sinon premier top-level après "Préambule".
+          let chap2 = db.prepare(`
+            SELECT s.id, s.position FROM sections s
+            LEFT JOIN section_templates t ON t.id = s.section_template_id
+            WHERE s.af_id = ? AND s.parent_id IS NULL AND (
+              t.slug = '2' OR s.title = 'Périmètre des équipements supervisés'
+              OR s.title LIKE 'Périmètre des équipements%'
+            )
+            LIMIT 1
+          `).get(af.id);
+          if (!chap2) return; // AF sans chap 2 — skip
+
+          // 2) Créer les nœuds catégorie sous chap2 (idempotent : skip si déjà créé)
+          const existingCatNodes = db.prepare(
+            'SELECT id, system_category_key FROM sections WHERE af_id = ? AND parent_id = ? AND system_category_key IS NOT NULL'
+          ).all(af.id, chap2.id);
+          const catNodeByKey = new Map(existingCatNodes.map(r => [r.system_category_key, r.id]));
+          let basePos = (db.prepare(
+            'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id = ?'
+          ).get(af.id, chap2.id)).m;
+          const insertCat = db.prepare(`
+            INSERT INTO sections (af_id, parent_id, position, number, title, kind, system_category_key, included_in_export)
+            VALUES (?, ?, ?, NULL, ?, 'standard', ?, 1)
+          `);
+          for (const c of cats) {
+            if (catNodeByKey.has(c.key)) continue;
+            basePos += 10;
+            const r = insertCat.run(af.id, chap2.id, basePos, c.label, c.key);
+            catNodeByKey.set(c.key, r.lastInsertRowid);
+            totalCatsCreated++;
+          }
+
+          // 3) Re-parenter les sections kind='equipment' descendantes du chap 2
+          // ou ailleurs (cas pathologique) sous leur catégorie.
+          const equipSections = db.prepare(`
+            SELECT s.id, s.parent_id, s.equipment_template_id, eqt.category, s.position
+            FROM sections s
+            JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+            WHERE s.af_id = ? AND s.kind = 'equipment'
+          `).all(af.id);
+          for (const es of equipSections) {
+            const targetParent = catNodeByKey.get(es.category);
+            if (!targetParent) continue; // catégorie inconnue — laisse tel quel
+            if (es.parent_id === targetParent) continue; // déjà bon
+            const maxChildPos = (db.prepare(
+              'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id = ?'
+            ).get(af.id, targetParent)).m;
+            db.prepare('UPDATE sections SET parent_id = ?, position = ? WHERE id = ?')
+              .run(targetParent, maxChildPos + 10, es.id);
+            totalEquipmentMoved++;
+          }
+
+          // 4) Supprimer les anciens parents narratifs : enfants directs du
+          // chap 2, kind='standard', sans system_category_key (donc pas un
+          // nœud catégorie qu'on vient de créer), sans aucun descendant
+          // restant.
+          const orphanNarratives = db.prepare(`
+            SELECT s.id, s.title FROM sections s
+            WHERE s.af_id = ?
+              AND s.parent_id = ?
+              AND s.kind = 'standard'
+              AND (s.system_category_key IS NULL)
+              AND NOT EXISTS (SELECT 1 FROM sections c WHERE c.parent_id = s.id)
+          `).all(af.id, chap2.id);
+          for (const o of orphanNarratives) {
+            db.prepare('DELETE FROM sections WHERE id = ?').run(o.id);
+            totalNarrativesDeleted++;
+          }
+
+          auditInsert.run(af.id, 'af.refactor.categories', JSON.stringify({
+            chap2_id: chap2.id,
+            categories_created: totalCatsCreated,
+            equipment_moved: totalEquipmentMoved,
+            narratives_deleted: totalNarrativesDeleted,
+          }));
+        });
+        tx();
+        totalAfs++;
+      }
+      log.info(`Migration 113 appliquee : refactor categories sur ${totalAfs} AF(s) — ${totalCatsCreated} cat node(s), ${totalEquipmentMoved} equipement(s) re-parente(s), ${totalNarrativesDeleted} narratif(s) supprimé(s)`);
+      db.pragma('user_version = 113');
+    }
+  }
+
+  if (current < 114) {
+    // Finalisation refactor categories :
+    //   (a) Rattrape les sections AF kind='equipment' avec equipment_template_id
+    //       NULL mais section_template_id non null (heritage Lot 33). Met a
+    //       jour sections.equipment_template_id depuis le section_template lie.
+    //   (b) Re-applique le re-parentage de mig 113 pour ces sections nouvellement
+    //       reliees.
+    //   (c) Supprime les anciens parents narratifs maintenant orphelins.
+    //   (d) Tombstone + DELETE des section_templates narratifs intermediaires
+    //       (slugs '2.1', '2.2', '2.4', '2.6', '2.8' du plan-af). Empeche le
+    //       seedSectionTemplatesOnBoot de les recreer.
+
+    // (a) Set equipment_template_id quand heritable depuis section_template
+    const fixedRes = db.prepare(`
+      UPDATE sections SET equipment_template_id = (
+        SELECT st.equipment_template_id FROM section_templates st
+        WHERE st.id = sections.section_template_id
+      )
+      WHERE kind = 'equipment'
+        AND equipment_template_id IS NULL
+        AND section_template_id IS NOT NULL
+        AND (SELECT st.equipment_template_id FROM section_templates st WHERE st.id = sections.section_template_id) IS NOT NULL
+    `).run();
+
+    // (b) + (c) Re-applique re-parentage sur ces sections + cleanup narratifs
+    const cats114 = db.prepare('SELECT key, label, position FROM system_categories_db ORDER BY position, id').all();
+    let movedAdditional = 0;
+    let narrativesDeletedAdditional = 0;
+    if (cats114.length) {
+      const afs = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+      const auditInsert = db.prepare(`INSERT INTO audit_log (af_id, action, payload) VALUES (?, ?, ?)`);
+      for (const af of afs) {
+        const tx = db.transaction(() => {
+          const chap2 = db.prepare(`
+            SELECT s.id FROM sections s
+            LEFT JOIN section_templates t ON t.id = s.section_template_id
+            WHERE s.af_id = ? AND s.parent_id IS NULL AND (
+              t.slug = '2' OR s.title LIKE 'Périmètre des équipements%'
+            )
+            LIMIT 1
+          `).get(af.id);
+          if (!chap2) return;
+          const catNodes = db.prepare(`
+            SELECT id, system_category_key FROM sections
+            WHERE af_id = ? AND parent_id = ? AND system_category_key IS NOT NULL
+          `).all(af.id, chap2.id);
+          const catNodeByKey = new Map(catNodes.map(r => [r.system_category_key, r.id]));
+          const equipSections = db.prepare(`
+            SELECT s.id, s.parent_id, eqt.category
+            FROM sections s
+            JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+            WHERE s.af_id = ? AND s.kind = 'equipment'
+          `).all(af.id);
+          let localMoved = 0;
+          for (const es of equipSections) {
+            const target = catNodeByKey.get(es.category);
+            if (!target || es.parent_id === target) continue;
+            const maxP = (db.prepare('SELECT COALESCE(MAX(position),0) AS m FROM sections WHERE af_id = ? AND parent_id = ?').get(af.id, target)).m;
+            db.prepare('UPDATE sections SET parent_id = ?, position = ? WHERE id = ?').run(target, maxP + 10, es.id);
+            localMoved++;
+          }
+          // Cleanup recursif des narratifs orphelins (multi-passes : un narratif
+          // peut devenir orphelin apres suppression d'un autre narratif).
+          let localDeleted = 0;
+          let pass;
+          do {
+            const orphans = db.prepare(`
+              SELECT s.id FROM sections s
+              WHERE s.af_id = ? AND s.parent_id = ? AND s.kind = 'standard'
+                AND s.system_category_key IS NULL
+                AND NOT EXISTS (SELECT 1 FROM sections c WHERE c.parent_id = s.id)
+            `).all(af.id, chap2.id);
+            pass = orphans.length;
+            for (const o of orphans) {
+              db.prepare('DELETE FROM sections WHERE id = ?').run(o.id);
+              localDeleted++;
+            }
+          } while (pass > 0);
+          movedAdditional += localMoved;
+          narrativesDeletedAdditional += localDeleted;
+          if (localMoved || localDeleted) {
+            auditInsert.run(af.id, 'af.refactor.categories.finalize', JSON.stringify({
+              moved: localMoved, deleted_narratives: localDeleted,
+            }));
+          }
+        });
+        tx();
+      }
+    }
+    log.info(`Migration 114 (a/b/c) : ${fixedRes.changes} section(s) re-link, ${movedAdditional} re-parente(s), ${narrativesDeletedAdditional} narratif(s) supprime(s)`);
+
+    // (d) Tombstone + DELETE des section_templates narratifs intermediaires
+    // (slugs '2.1', '2.2', '2.4', '2.6', '2.8'). Detacher les enfants
+    // section_templates avant DELETE (parent_template_id n'a pas
+    // ON DELETE CASCADE) — on les promote en orphelins (parent NULL),
+    // ils ne seront plus instancies par seedAfStructure (filtre kind=equipment
+    // && !equipment_template_id) mais ne sont pas non plus reseed (ils
+    // existent deja en DB).
+    const obsoleteNarrativeSlugs = ['2.1', '2.2', '2.4', '2.6', '2.8'];
+    let tombstoned = 0;
+    let deleted = 0;
+    for (const slug of obsoleteNarrativeSlugs) {
+      try {
+        const ts = db.prepare('INSERT OR IGNORE INTO deleted_section_template_slugs (slug) VALUES (?)').run(slug);
+        if (ts.changes) tombstoned++;
+      } catch { /* table might not exist on very old DBs — safe to skip */ }
+      const tplRow = db.prepare('SELECT id FROM section_templates WHERE slug = ?').get(slug);
+      if (!tplRow) continue;
+      // Detacher les enfants section_templates AVANT DELETE
+      db.prepare('UPDATE section_templates SET parent_template_id = NULL WHERE parent_template_id = ?').run(tplRow.id);
+      // SET NULL aussi sur sections.section_template_id (devrait etre auto par
+      // FK SET NULL declare a la mig 30, mais securisons).
+      db.prepare('UPDATE sections SET section_template_id = NULL WHERE section_template_id = ?').run(tplRow.id);
+      const del = db.prepare('DELETE FROM section_templates WHERE id = ?').run(tplRow.id);
+      deleted += del.changes;
+    }
+    log.info(`Migration 114 (d) : ${tombstoned} tombstone(s), ${deleted} section_template(s) narratif(s) supprime(s)`);
+    db.pragma('user_version = 114');
+  }
+
+  if (current < 115) {
+    // Aligne equipment_templates.category sur system_categories_db.key.
+    // Bug historique : certaines categories en DB ne matchent aucune key
+    // (ex: 'electricite', 'eclairage') -> equipements jamais re-parentes
+    // par mig 113/114. On unifie ici, puis on repete le re-parentage.
+    const remaps = [
+      { slug: 'production-electricite', cat: 'pv' },
+      { slug: 'borne-irve',             cat: 'autres' },
+      { slug: 'prises-pilotees',        cat: 'prises' },
+      { slug: 'contacteur-pilote',      cat: 'autres' },
+      { slug: 'disjoncteur-of',         cat: 'autres' },
+      { slug: 'disjoncteur-sd',         cat: 'autres' },
+      { slug: 'eclairage-interieur',    cat: 'eclairage_int' },
+      { slug: 'eclairage-exterieur',    cat: 'eclairage_ext' },
+    ];
+    let remapped = 0;
+    for (const r of remaps) {
+      const res = db.prepare('UPDATE equipment_templates SET category = ? WHERE slug = ? AND category != ?')
+        .run(r.cat, r.slug, r.cat);
+      if (res.changes) remapped++;
+    }
+    log.info(`Migration 115 : ${remapped} equipment_template(s) re-categorise(s)`);
+
+    // Re-applique le re-parentage de mig 114 (categories nouvellement alignees)
+    const cats115 = db.prepare('SELECT key FROM system_categories_db ORDER BY position').all();
+    if (cats115.length) {
+      const afs = db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+      let movedFinal = 0;
+      let narrativesDeletedFinal = 0;
+      for (const af of afs) {
+        const tx = db.transaction(() => {
+          const chap2 = db.prepare(`
+            SELECT s.id FROM sections s
+            LEFT JOIN section_templates t ON t.id = s.section_template_id
+            WHERE s.af_id = ? AND s.parent_id IS NULL AND (
+              t.slug = '2' OR s.title LIKE 'Périmètre des équipements%'
+            )
+            LIMIT 1
+          `).get(af.id);
+          if (!chap2) return;
+          const catNodes = db.prepare(`
+            SELECT id, system_category_key FROM sections
+            WHERE af_id = ? AND parent_id = ? AND system_category_key IS NOT NULL
+          `).all(af.id, chap2.id);
+          const catNodeByKey = new Map(catNodes.map(r => [r.system_category_key, r.id]));
+          const equipSections = db.prepare(`
+            SELECT s.id, s.parent_id, eqt.category
+            FROM sections s
+            JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+            WHERE s.af_id = ? AND s.kind = 'equipment'
+          `).all(af.id);
+          for (const es of equipSections) {
+            const target = catNodeByKey.get(es.category);
+            if (!target || es.parent_id === target) continue;
+            const maxP = (db.prepare('SELECT COALESCE(MAX(position),0) AS m FROM sections WHERE af_id = ? AND parent_id = ?').get(af.id, target)).m;
+            db.prepare('UPDATE sections SET parent_id = ?, position = ? WHERE id = ?').run(target, maxP + 10, es.id);
+            movedFinal++;
+          }
+          // Cleanup narratifs orphelins (multi-passes)
+          let pass;
+          do {
+            const orphans = db.prepare(`
+              SELECT s.id FROM sections s
+              WHERE s.af_id = ? AND s.parent_id = ? AND s.kind = 'standard'
+                AND s.system_category_key IS NULL
+                AND NOT EXISTS (SELECT 1 FROM sections c WHERE c.parent_id = s.id)
+            `).all(af.id, chap2.id);
+            pass = orphans.length;
+            for (const o of orphans) {
+              db.prepare('DELETE FROM sections WHERE id = ?').run(o.id);
+              narrativesDeletedFinal++;
+            }
+          } while (pass > 0);
+        });
+        tx();
+      }
+      log.info(`Migration 115 (re-parent) : ${movedFinal} re-parente(s), ${narrativesDeletedFinal} narratif(s) supprime(s)`);
+    }
+    db.pragma('user_version = 115');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -4990,10 +5318,14 @@ const sections = {
              eqt.icon_kind AS eq_icon_kind,
              eqt.icon_value AS eq_icon_value,
              eqt.icon_color AS eq_icon_color,
-             eqt.category AS eq_category
+             eqt.category AS eq_category,
+             scd.label AS cat_label,
+             scd.icon_value AS cat_icon_value,
+             scd.icon_color AS cat_icon_color
       FROM sections s
       LEFT JOIN section_templates stt ON stt.id = s.section_template_id
       LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+      LEFT JOIN system_categories_db scd ON scd.key = s.system_category_key
       WHERE s.af_id = ?
       ORDER BY s.parent_id NULLS FIRST, s.position, s.id
     `).all(afId);
@@ -5013,6 +5345,7 @@ const sections = {
              s.opted_out_by_moa, s.demanded_by_moa, s.optin_paid_option,
              s.equipment_template_id, s.equipment_template_version,
              s.section_template_id, s.section_template_version,
+             s.system_category_key,
              s.hyperveez_page_slug, s.created_at, s.updated_at, s.updated_by,
              CASE
                WHEN s.body_html IS NULL OR s.body_html = '' THEN 1
@@ -5026,10 +5359,14 @@ const sections = {
              eqt.icon_kind AS eq_icon_kind,
              eqt.icon_value AS eq_icon_value,
              eqt.icon_color AS eq_icon_color,
-             eqt.category AS eq_category
+             eqt.category AS eq_category,
+             scd.label AS cat_label,
+             scd.icon_value AS cat_icon_value,
+             scd.icon_color AS cat_icon_color
       FROM sections s
       LEFT JOIN section_templates stt ON stt.id = s.section_template_id
       LEFT JOIN equipment_templates eqt ON eqt.id = s.equipment_template_id
+      LEFT JOIN system_categories_db scd ON scd.key = s.system_category_key
       WHERE s.af_id = ?
       ORDER BY s.parent_id NULLS FIRST, s.position, s.id
     `).all(afId);
@@ -5053,18 +5390,21 @@ const sections = {
   },
   create({ afId, parentId, position, number, title, serviceLevel, serviceLevelSource,
            bacsArticles, bodyHtml, kind, equipmentTemplateId, equipmentTemplateVersion,
-           hyperveezPageSlug, includedInExport = 1, genericNote = 0 }) {
+           hyperveezPageSlug, systemCategoryKey,
+           includedInExport = 1, genericNote = 0 }) {
     const result = db.prepare(`
       INSERT INTO sections
         (af_id, parent_id, position, number, title, service_level, service_level_source,
          bacs_articles, body_html, kind, included_in_export, generic_note,
-         equipment_template_id, equipment_template_version, hyperveez_page_slug)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         equipment_template_id, equipment_template_version, hyperveez_page_slug,
+         system_category_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       afId, parentId || null, position || 0, number || null, title,
       serviceLevel || null, serviceLevelSource || null, bacsArticles || null,
       bodyHtml || null, kind || 'standard', includedInExport, genericNote,
-      equipmentTemplateId || null, equipmentTemplateVersion || null, hyperveezPageSlug || null
+      equipmentTemplateId || null, equipmentTemplateVersion || null, hyperveezPageSlug || null,
+      systemCategoryKey || null
     );
     return this.getById(result.lastInsertRowid);
   },
@@ -5076,7 +5416,7 @@ const sections = {
       'opted_out_by_moa', 'demanded_by_moa', 'optin_paid_option',
       'fact_check_status', 'equipment_template_id', 'equipment_template_version',
       'section_template_id', 'section_template_version',
-      'hyperveez_page_slug',
+      'hyperveez_page_slug', 'system_category_key',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {

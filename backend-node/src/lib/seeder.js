@@ -376,72 +376,74 @@ function seedAfStructure(afId) {
  * duplique. Numerotation continue (suit la derniere fratrie inseree).
  */
 function libraryExtendAf(afId) {
+  // Refactor categories : la categorie systeme est le parent direct des
+  // equipements. Cette fonction :
+  //   1) Trouve le chapitre 2 ("Perimetre des equipements supervises") de l'AF.
+  //   2) Cree (idempotent) les noeuds categorie sous chap 2 depuis system_categories_db.
+  //   3) Pour chaque equipment_template de la biblio : si pas deja present dans
+  //      l'AF, l'instancie sous le noeud categorie correspondant (via
+  //      equipment_templates.category).
+  // Plus de double indirection via section_templates.library_categories. Plus
+  // de doublons possibles structurellement (cat node = unique par AF).
   const allLib = db.equipmentTemplates.list();
   if (!allLib.length) return 0;
-  const sections = db.db.prepare(`
-    SELECT s.id, s.parent_id, s.number, s.kind, s.equipment_template_id, s.position,
-           s.title, stt.library_categories AS tpl_library_categories
-    FROM sections s
-    LEFT JOIN section_templates stt ON stt.id = s.section_template_id
-    WHERE s.af_id = ? ORDER BY s.parent_id NULLS FIRST, s.position
-  `).all(afId);
-  const byId = new Map(sections.map(s => [s.id, s]));
-  const childrenOf = new Map();
-  for (const s of sections) {
-    const p = s.parent_id || 0;
-    if (!childrenOf.has(p)) childrenOf.set(p, []);
-    childrenOf.get(p).push(s);
-  }
-  const tplById = new Map(allLib.map(t => [t.id, t]));
-  // Dedup global a l'AF : un meme equipment_template ne doit etre injecte qu'une
-  // seule fois dans toute l'AF, jamais sous plusieurs parents qui partagent une
-  // meme library_category. Sans ce set global, ex: borne-irve + production-electricite
-  // (tous les deux category='electricite') etaient clones sous chaque parent ayant
-  // 'electricite' dans library_categories.
+
+  // Trouver chap 2
+  const chap2 = db.db.prepare(`
+    SELECT s.id FROM sections s
+    LEFT JOIN section_templates t ON t.id = s.section_template_id
+    WHERE s.af_id = ? AND s.parent_id IS NULL AND (
+      t.slug = '2' OR s.title LIKE 'Périmètre des équipements%'
+    )
+    LIMIT 1
+  `).get(afId);
+  if (!chap2) return 0;
+
+  // Etat actuel : cat nodes existants + tous les equipment_template_id presents
+  const existingCatNodes = db.db.prepare(`
+    SELECT id, system_category_key FROM sections
+    WHERE af_id = ? AND parent_id = ? AND system_category_key IS NOT NULL
+  `).all(afId, chap2.id);
+  const catNodeByKey = new Map(existingCatNodes.map(r => [r.system_category_key, r.id]));
   const globallyExistingTplIds = new Set(
-    sections.filter(s => s.equipment_template_id).map(s => s.equipment_template_id)
+    db.db.prepare('SELECT equipment_template_id FROM sections WHERE af_id = ? AND equipment_template_id IS NOT NULL').all(afId).map(r => r.equipment_template_id)
   );
+
   let added = 0;
-  for (const [parentId, kids] of childrenOf) {
-    if (!parentId) continue; // top-level : on n'extend pas la racine
-    const parent = byId.get(parentId);
-    if (!parent) continue;
-    // Categories cibles : (1) declaratif via section_templates.library_categories
-    // sur le parent (Lot mig 95), augmente par (2) detection automatique des
-    // categories des enfants equipment deja inseres. Le declaratif protege
-    // contre la perte de categorie quand un equipement de la lib est supprime
-    // (ex : drv tombstone -> la cat 'climatisation' disparaitrait sans le
-    // declaratif, et unite-interieure-drv ne serait plus injectee).
-    const cats = new Set();
-    if (parent.tpl_library_categories) {
-      try {
-        const declared = JSON.parse(parent.tpl_library_categories);
-        if (Array.isArray(declared)) for (const c of declared) cats.add(c);
-      } catch { /* JSON invalide -> ignore */ }
-    }
-    const eqKids = kids.filter(k => k.kind === 'equipment' && k.equipment_template_id);
-    for (const k of eqKids) {
-      const t = tplById.get(k.equipment_template_id);
-      if (t?.category) cats.add(t.category);
-    }
-    if (!cats.size) continue;
-    let nextIdx = kids.length;
-    let nextPos = kids.reduce((m, k) => Math.max(m, k.position || 0), 0);
-    for (const lib of allLib) {
-      if (!lib.category || !cats.has(lib.category)) continue;
-      if (globallyExistingTplIds.has(lib.id)) continue;
-      nextIdx++;
-      nextPos += 10;
-      const number = parent.number ? `${parent.number}.${nextIdx}` : null;
-      db.sections.create({
-        afId, parentId, position: nextPos, number,
-        title: lib.name, kind: 'equipment',
-        equipmentTemplateId: lib.id, equipmentTemplateVersion: lib.current_version,
-        bacsArticles: null, bodyHtml: null, genericNote: 0,
-      });
-      globallyExistingTplIds.add(lib.id);
-      added++;
-    }
+
+  // 1) Cree les cat nodes manquants
+  const cats = db.systemCategoriesDb.list();
+  let basePosCat = (db.db.prepare(
+    'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id = ?'
+  ).get(afId, chap2.id)).m;
+  const insertCat = db.db.prepare(`
+    INSERT INTO sections (af_id, parent_id, position, number, title, kind, system_category_key, included_in_export)
+    VALUES (?, ?, ?, NULL, ?, 'standard', ?, 1)
+  `);
+  for (const c of cats) {
+    if (catNodeByKey.has(c.key)) continue;
+    basePosCat += 10;
+    const r = insertCat.run(afId, chap2.id, basePosCat, c.label, c.key);
+    catNodeByKey.set(c.key, r.lastInsertRowid);
+  }
+
+  // 2) Materialise les equipments manquants sous leur cat node
+  for (const lib of allLib) {
+    if (!lib.category) continue;
+    const catNodeId = catNodeByKey.get(lib.category);
+    if (!catNodeId) continue; // categorie inexistante en biblio (orpheline) — skip
+    if (globallyExistingTplIds.has(lib.id)) continue;
+    const maxP = (db.db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM sections WHERE af_id = ? AND parent_id = ?'
+    ).get(afId, catNodeId)).m;
+    db.sections.create({
+      afId, parentId: catNodeId, position: maxP + 10, number: null,
+      title: lib.name, kind: 'equipment',
+      equipmentTemplateId: lib.id, equipmentTemplateVersion: lib.current_version,
+      bacsArticles: null, bodyHtml: null, genericNote: 0,
+    });
+    globallyExistingTplIds.add(lib.id);
+    added++;
   }
   return added;
 }

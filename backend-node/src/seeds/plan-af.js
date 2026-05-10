@@ -75,75 +75,15 @@ const PLAN_AF = [
   },
 
   // ═══════════ Chapitre 2 — Périmètre des équipements ═══════════
+  // Lot — Refactor catégories : ce chapitre n'a plus d'enfants statiques dans
+  // le plan. À la création d'une AF, libraryExtendAf() crée les nœuds
+  // catégorie depuis system_categories_db sous le chap 2, puis instancie
+  // chaque equipment_template de la biblio sous sa catégorie (via
+  // equipment_templates.category). Source unique de vérité = la biblio +
+  // system_categories_db. Plus de doublons possibles structurellement.
   {
     number: '2', title: 'Périmètre des équipements supervisés', kind: 'standard',
     body_placeholder: `Introduction du chapitre — la solution Buildy est agnostique des marques, fabricants et protocoles. Les équipements ci-dessous représentent les catégories typiquement intégrées. Le périmètre exact est défini dans le bon de commande.`,
-    children: [
-      {
-        number: '2.1', title: 'Chauffage & Climatisation', kind: 'standard',
-        bacs_articles: 'R175-1 §1, §2',
-        body_placeholder: 'Introduction de section : présenter le regroupement chauffage/climatisation et expliquer que ces systèmes assurent le traitement thermique du bâtiment, avec leur propre logique de régulation embarquée.',
-        children: [
-          { number: '2.1.1', title: 'Chaudières / générateurs de chaleur', kind: 'equipment', equipment_template_slug: 'chaudiere', generic_note: 1 },
-          { number: '2.1.2', title: 'Aérothermes', kind: 'equipment', equipment_template_slug: 'aerotherme', generic_note: 1 },
-          { number: '2.1.3', title: 'Destratificateurs', kind: 'equipment', equipment_template_slug: 'destratificateur', generic_note: 1 },
-          { number: '2.1.4', title: 'Systèmes DRV / VRV / VRF', kind: 'equipment', equipment_template_slug: 'drv', generic_note: 1 },
-          { number: '2.1.5', title: 'Rooftops', kind: 'equipment', equipment_template_slug: 'rooftop', generic_note: 1 },
-        ],
-      },
-      {
-        number: '2.2', title: 'Ventilation', kind: 'standard',
-        bacs_articles: 'R175-1 §3',
-        body_placeholder: 'Introduction de section : présenter la ventilation comme l\'ensemble des systèmes assurant le renouvellement de l\'air intérieur.',
-        children: [
-          { number: '2.2.1', title: 'Centrale de traitement d\'air (CTA)', kind: 'equipment', equipment_template_slug: 'cta', generic_note: 1 },
-          { number: '2.2.2', title: 'Autres systèmes de ventilation', kind: 'equipment', equipment_template_slug: 'ventilation-generique', generic_note: 1 },
-        ],
-      },
-      {
-        number: '2.3', title: 'Production d\'eau chaude sanitaire', kind: 'equipment',
-        bacs_articles: 'R175-1 §4',
-        equipment_template_slug: 'ecs', generic_note: 1,
-      },
-      {
-        number: '2.4', title: 'Éclairage et prises de courant pilotées', kind: 'standard',
-        bacs_articles: 'R175-1 §4 (éclairage)',
-        body_placeholder: 'Introduction : éclairage seul concerné par le décret BACS.',
-        children: [
-          { number: '2.4.1', title: 'Éclairage intérieur', kind: 'equipment', equipment_template_slug: 'eclairage-interieur', generic_note: 1 },
-          { number: '2.4.2', title: 'Éclairage extérieur', kind: 'equipment', equipment_template_slug: 'eclairage-exterieur', generic_note: 1 },
-          { number: '2.4.3', title: 'Prises de courant pilotées', kind: 'equipment', equipment_template_slug: 'prises-pilotees', generic_note: 1 },
-        ],
-      },
-      {
-        number: '2.5', title: 'Production d\'électricité sur site', kind: 'equipment',
-        bacs_articles: 'R175-1 §4',
-        equipment_template_slug: 'production-electricite', generic_note: 1,
-      },
-      {
-        number: '2.6', title: 'Comptage énergétique et fluidique', kind: 'standard',
-        body_placeholder: 'Introduction : compteurs électricité, gaz, eau, calories. Hors périmètre BACS direct mais contribue à l\'exigence R175-3 §1.',
-        children: [
-          { number: '2.6.1', title: 'Compteurs électriques', kind: 'equipment', equipment_template_slug: 'compteur-electrique', generic_note: 1 },
-          { number: '2.6.2', title: 'Compteurs gaz', kind: 'equipment', equipment_template_slug: 'compteur-gaz', generic_note: 1 },
-          { number: '2.6.3', title: 'Compteurs eau', kind: 'equipment', equipment_template_slug: 'compteur-eau', generic_note: 1 },
-          { number: '2.6.4', title: 'Compteurs calories', kind: 'equipment', equipment_template_slug: 'compteur-calories', generic_note: 1 },
-        ],
-      },
-      { number: '2.7', title: 'Qualité de l\'air intérieur', kind: 'equipment', equipment_template_slug: 'qai', generic_note: 1 },
-      {
-        number: '2.8', title: 'Occultation', kind: 'standard',
-        body_placeholder: 'Introduction : volets et stores motorisés.',
-        children: [
-          { number: '2.8.1', title: 'Volets', kind: 'equipment', equipment_template_slug: 'volets', generic_note: 1 },
-          { number: '2.8.2', title: 'Stores', kind: 'equipment', equipment_template_slug: 'stores', generic_note: 1 },
-        ],
-      },
-      { number: '2.9', title: 'Équipements de process industriel', kind: 'equipment', equipment_template_slug: 'process-industriel', generic_note: 1 },
-      { number: '2.10', title: 'Équipements génériques', kind: 'equipment', equipment_template_slug: 'equipement-generique', generic_note: 1,
-        body_placeholder: 'Tout équipement pour lequel Buildy remonte typiquement un état de fonctionnement ou un défaut de synthèse.',
-      },
-    ],
   },
 
   // ═══════════ Chapitre 3 — Monitoring ═══════════

@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'contacteur-pilote',
   name: 'Contacteur piloté',
-  category: 'electricite',
+  category: 'autres',
   bacs_articles: null,
   bacs_justification: null,
   preferred_protocols: 'KNX/IP,Modbus TCP,Modbus RTU',

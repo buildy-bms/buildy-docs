@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'prises-pilotees',
   name: 'Prises de courant pilotées',
-  category: 'electricite',
+  category: 'prises',
   bacs_articles: null,
   bacs_justification: null,
   preferred_protocols: 'KNX/IP,Modbus TCP,Zigbee',

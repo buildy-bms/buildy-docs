@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'eclairage-exterieur',
   name: 'Éclairage extérieur',
-  category: 'eclairage',
+  category: 'eclairage_ext',
   bacs_articles: null,
   bacs_justification: null,
   preferred_protocols: 'KNX/IP,DALI,Modbus TCP,LoRaWAN',

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { PlusCircleIcon, TrashIcon, BuildingOfficeIcon, PencilSquareIcon, DocumentDuplicateIcon, ArrowsUpDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
-import api, { getAfZonesMatrix, duplicateZone } from '@/api'
+import api, { getAfZonesMatrix, duplicateAfZone } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTableSortFilter } from '@/composables/useTableSortFilter'
@@ -101,7 +101,7 @@ async function deleteZone(zone) {
 
 async function duplicateRow(zone) {
   try {
-    await duplicateZone(zone.id)
+    await duplicateAfZone(zone.id)
     notifySuccess('Zone dupliquée')
     await refresh()
   } catch (e) {

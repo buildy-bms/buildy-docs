@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'disjoncteur-sd',
   name: 'Disjoncteur — signalisation défaut SD',
-  category: 'electricite',
+  category: 'autres',
   bacs_articles: null,
   bacs_justification: null,
   preferred_protocols: 'Modbus TCP',
