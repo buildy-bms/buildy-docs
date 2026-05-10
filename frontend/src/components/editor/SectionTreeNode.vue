@@ -66,9 +66,12 @@ const displayedNumber = computed(() => {
 // Section ad-hoc = créée à la volée dans cette AF (« Ajouter une sous-section »)
 // sans pendant biblio. La promotion vers la biblio en crée un section_template
 // dédié et lie cette section au nouveau template.
+// Les noeuds catégorie (system_category_key) generes par libraryExtendAf sont
+// rattaches a la biblio via la categorie — pas ad-hoc.
 const isAdHoc = computed(() =>
   !props.node.section_template_id &&
   !props.node.equipment_template_id &&
+  !props.node.system_category_key &&
   props.node.kind === 'standard'
 )
 const optedOut = computed(() => props.node.opted_out_by_moa === 1)
