@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 125;
+const TARGET_VERSION = 126;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5084,6 +5084,65 @@ function runMigrations() {
     db.pragma('foreign_keys = ON');
     log.info('Migration 125 appliquee : action_items polymorphisme type (6 FK colonnes au lieu de source_table+source_id)');
     db.pragma('user_version = 125');
+  }
+
+  if (current < 126) {
+    // Index FK manquants (Lot 4) : ajoute des index partiels
+    // (`WHERE col IS NOT NULL`) sur tous les FK d'audit / propriete / auteur
+    // qui n'en ont pas. Index partiel = pas de cout sur les lignes ou la
+    // colonne est NULL (cas frequent pour `updated_by`, `decided_by`...).
+    //
+    // Beneficie : queries "qu'est-ce que cet utilisateur a cree/modifie",
+    // soft-delete cascade users, lookups d'audit log par user, et tout
+    // futur listing filtre par auteur.
+    db.exec(`
+      -- *_by colonnes ownership / activite
+      CREATE INDEX IF NOT EXISTS idx_af_inspections_created_by      ON af_inspections(created_by)               WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_af_perm_granted_by             ON af_permissions(granted_by)               WHERE granted_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_afs_created_by                 ON afs(created_by)                          WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_afs_updated_by                 ON afs(updated_by)                          WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_ai_prompt_versions_created_by  ON ai_prompt_versions(created_by)           WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_ai_prompts_updated_by          ON ai_prompts(updated_by)                   WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_attachments_uploaded_by        ON attachments(uploaded_by)                 WHERE uploaded_by             IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_bacs_suggestions_decided_by    ON bacs_audit_suggestions(decided_by)       WHERE decided_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_bacs_transcripts_uploaded_by   ON bacs_audit_transcripts(uploaded_by)      WHERE uploaded_by             IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_eq_tpl_content_validated_by    ON equipment_templates(content_validated_by) WHERE content_validated_by   IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_eq_tpl_created_by              ON equipment_templates(created_by)          WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_eq_tpl_updated_by              ON equipment_templates(updated_by)          WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_exports_exported_by            ON exports(exported_by)                     WHERE exported_by             IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_faq_article_versions_created_by ON faq_article_versions(created_by)        WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_created_by        ON faq_articles(created_by)                 WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_faq_articles_updated_by        ON faq_articles(updated_by)                 WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_offering_levels_updated_by     ON offering_levels(updated_by)              WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_pdf_boilerplate_updated_by     ON pdf_boilerplate(updated_by)              WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_section_overrides_created_by   ON section_point_overrides(created_by)      WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_section_tpl_content_validated_by ON section_templates(content_validated_by) WHERE content_validated_by   IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_section_tpl_updated_by         ON section_templates(updated_by)            WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_sections_updated_by            ON sections(updated_by)                     WHERE updated_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_site_credentials_created_by    ON site_credentials(created_by)             WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_site_documents_uploaded_by     ON site_documents(uploaded_by)              WHERE uploaded_by             IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_sites_created_by               ON sites(created_by)                        WHERE created_by              IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_sites_updated_by               ON sites(updated_by)                        WHERE updated_by              IS NOT NULL;
+
+      -- author_id (versions)
+      CREATE INDEX IF NOT EXISTS idx_eq_tpl_versions_author         ON equipment_template_versions(author_id)   WHERE author_id               IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_section_tpl_versions_author    ON section_template_versions(author_id)     WHERE author_id               IS NOT NULL;
+
+      -- audit_log.user_id (af_id deja indexe)
+      CREATE INDEX IF NOT EXISTS idx_audit_log_user                 ON audit_log(user_id, created_at DESC)      WHERE user_id                 IS NOT NULL;
+
+      -- bacs_audit_action_items : zone_id / equipment_id (FK auxiliaires)
+      CREATE INDEX IF NOT EXISTS idx_bacs_actions_zone              ON bacs_audit_action_items(zone_id)         WHERE zone_id                 IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_bacs_actions_equipment         ON bacs_audit_action_items(equipment_id)    WHERE equipment_id            IS NOT NULL;
+
+      -- bacs_audit_meters.equipment_id (FK auxiliaire vers equipments)
+      CREATE INDEX IF NOT EXISTS idx_bacs_meters_equipment          ON bacs_audit_meters(equipment_id)          WHERE equipment_id            IS NOT NULL;
+
+      -- bacs_audit_systems.equipment_id (FK auxiliaire)
+      CREATE INDEX IF NOT EXISTS idx_bacs_systems_equipment         ON bacs_audit_systems(equipment_id)         WHERE equipment_id            IS NOT NULL;
+    `);
+    log.info('Migration 126 appliquee : 32 index partiels sur les FK ownership / author / auxiliaires');
+    db.pragma('user_version = 126');
   }
 
   if (current > TARGET_VERSION) {
