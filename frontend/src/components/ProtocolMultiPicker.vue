@@ -111,10 +111,16 @@ const buttonCls = computed(() => {
       @click="open ? (open = false) : openPopover()"
     >
       <span v-if="!selected.length" class="text-gray-400 italic flex-1 text-left">{{ placeholder }}</span>
-      <span v-else class="flex flex-wrap gap-1 flex-1 text-left">
-        <span v-for="(label, i) in selectedLabels" :key="i"
-              class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
-          {{ label }}
+      <span v-else class="flex items-center gap-1 flex-1 text-left whitespace-nowrap">
+        <!-- 1er protocole en pill, "+N" badge si d'autres existent. Click
+             sur le bouton ouvre le popover qui les liste tous. -->
+        <span class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
+          {{ selectedLabels[0] }}
+        </span>
+        <span v-if="selectedLabels.length > 1"
+              class="inline-flex items-center px-1.5 py-0 rounded bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-200"
+              :title="selectedLabels.slice(1).join(', ')">
+          +{{ selectedLabels.length - 1 }}
         </span>
       </span>
       <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 shrink-0"

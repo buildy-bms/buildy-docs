@@ -840,6 +840,8 @@ async function routes(fastify) {
       managed_by_bms: z.boolean().nullable().optional(),
       out_of_service: z.boolean().nullable().optional(),
       bms_integration_out_of_service: z.boolean().nullable().optional(),
+      // Mig 134 : nombre d'exemplaires identiques de ce device sur la zone.
+      quantity: z.number().int().min(1).optional(),
     });
     const schema = schemaPatch;
     let body;
