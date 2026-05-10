@@ -176,7 +176,7 @@ onBeforeUnmount(teardownSortables)
                    Les usages "non concerné" restent visibles (grisés via
                    opacity-60 + bordure dashed dans le :class plus bas). -->
               <div :data-id="s.id"
-                   :class="['system-card rounded-lg overflow-hidden border bg-white',
+                   :class="['system-card rounded-lg border bg-white',
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
                                                           : 'border-gray-200 bg-gray-50/40')]">
