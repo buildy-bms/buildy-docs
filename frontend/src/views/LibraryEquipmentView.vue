@@ -4,8 +4,8 @@ import { ref, onMounted, computed } from 'vue'
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
 
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate } from '@/api'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate, reorderEquipmentTemplates } from '@/api'
 import ContentValidationDot from '@/components/ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -289,6 +289,45 @@ const grouped = computed(() => {
   return groups
 })
 
+// Reorder up/down : swap avec le voisin de la meme categorie, puis envoie
+// le nouvel ordre au backend qui re-calcule les positions.
+const reordering = ref(false)
+async function moveInCategory(template, direction) {
+  if (reordering.value) return
+  // Liste des templates de la meme categorie dans l'ordre canonique courant
+  // (ignore filtres recherche/validation pour eviter les sauts visuels).
+  const peers = templates.value
+    .filter(t => (t.category || 'autres') === (template.category || 'autres'))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, 'fr'))
+  const idx = peers.findIndex(t => t.id === template.id)
+  if (idx < 0) return
+  const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+  if (targetIdx < 0 || targetIdx >= peers.length) return
+  const next = [...peers]
+  ;[next[idx], next[targetIdx]] = [next[targetIdx], next[idx]]
+  reordering.value = true
+  try {
+    await reorderEquipmentTemplates(template.category || 'autres', next.map(t => t.id))
+    await refresh()
+  } catch (e) {
+    notifyError(e?.response?.data?.detail || 'Échec du réordonnancement')
+  } finally {
+    reordering.value = false
+  }
+}
+function isFirstInCategory(t) {
+  const peers = templates.value
+    .filter(p => (p.category || 'autres') === (t.category || 'autres'))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, 'fr'))
+  return peers[0]?.id === t.id
+}
+function isLastInCategory(t) {
+  const peers = templates.value
+    .filter(p => (p.category || 'autres') === (t.category || 'autres'))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name, 'fr'))
+  return peers[peers.length - 1]?.id === t.id
+}
+
 // Catalogue dynamique : alimenté par le composable useSystemCategories
 // (table `system_categories_db`). Plus de liste hardcodée — toute catégorie
 // créée par l'admin apparaît automatiquement dans les groupements et la
@@ -517,11 +556,27 @@ onMounted(async () => {
                 </td>
                 <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ it.t.current_version }}</td>
                 <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
-                  <button type="button" @click="openClone(it.t)"
-                          class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                          v-tooltip="'Dupliquer ce système technique (avec ses points et captures)'">
-                    <DocumentDuplicateIcon class="w-4 h-4" />
-                  </button>
+                  <div class="inline-flex items-center gap-0.5">
+                    <button type="button"
+                            @click="moveInCategory(it.t, 'up')"
+                            :disabled="reordering || isFirstInCategory(it.t) || normalize(searchQuery).length >= 2"
+                            class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
+                            v-tooltip="'Monter dans la catégorie'">
+                      <ArrowUpIcon class="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button"
+                            @click="moveInCategory(it.t, 'down')"
+                            :disabled="reordering || isLastInCategory(it.t) || normalize(searchQuery).length >= 2"
+                            class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
+                            v-tooltip="'Descendre dans la catégorie'">
+                      <ArrowDownIcon class="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" @click="openClone(it.t)"
+                            class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                            v-tooltip="'Dupliquer ce système technique (avec ses points et captures)'">
+                      <DocumentDuplicateIcon class="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             </template>
