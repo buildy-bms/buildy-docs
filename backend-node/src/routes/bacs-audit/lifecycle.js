@@ -162,12 +162,21 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const item = db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(id);
     if (!item) return reply.code(404).send({ detail: 'Action non trouvee' });
+    // Source kind derive de la FK non-NULL pour donner du contexte a Claude.
+    const sourceKind =
+      item.source_system_id      ? 'system'
+      : item.source_meter_id     ? 'meter'
+      : item.source_thermal_id   ? 'thermal_regulation'
+      : item.source_device_id    ? 'device'
+      : item.source_inspection_id ? 'inspection'
+      : item.source_bms_document_id ? 'bms'
+      : null;
     const ctx = {
       title: item.title,
       description: item.description,
       severity: item.severity,
       r175_article: item.r175_article,
-      source_table: item.source_table,
+      source_table: sourceKind,
       source_subtype: item.source_subtype,
       action_kind: item.action_kind,
     };

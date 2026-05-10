@@ -257,11 +257,21 @@ async function buildBacsAuditExportData(af, opts = {}) {
     minor: actionItems.minor.length,
   };
 
-  // Justifications (Annexe C)
+  // Justifications (Annexe C). La source est derivee de la FK non-NULL
+  // (mig 125) pour rester lisible dans le PDF.
+  function actionSourceLabel(a) {
+    if (a.source_system_id)        return `système (#${a.source_system_id})`;
+    if (a.source_meter_id)         return `compteur (#${a.source_meter_id})`;
+    if (a.source_thermal_id)       return `régulation thermique (#${a.source_thermal_id})`;
+    if (a.source_device_id)        return `équipement (#${a.source_device_id})`;
+    if (a.source_inspection_id)    return `inspection (#${a.source_inspection_id})`;
+    if (a.source_bms_document_id)  return `GTB (${a.source_subtype || ''})`;
+    return 'Item manuel';
+  }
   const justifications = actionItemsRaw.map(a => ({
     title: a.title,
     article: a.r175_article || '—',
-    source: a.source_table ? `${a.source_table} (#${a.source_id})` : 'Item manuel',
+    source: actionSourceLabel(a),
     description: a.description || a.title,
   }));
 

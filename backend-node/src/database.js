@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 124;
+const TARGET_VERSION = 125;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4959,6 +4959,131 @@ function runMigrations() {
     `);
     log.info('Migration 124 appliquee : users.deleted_at ajoute (soft-delete uniformise)');
     db.pragma('user_version = 124');
+  }
+
+  if (current < 125) {
+    // Polymorphisme type (Lot 3) : action_items remplace
+    // (source_table TEXT, source_id INTEGER) par 6 FK colonnes nullables
+    // avec ON DELETE CASCADE et un CHECK "au plus 1 FK non-NULL".
+    //
+    // Avantages :
+    //   - Integrite referentielle DB (orphan impossibles a la creation)
+    //   - Cascade automatique : supprimer un device -> ses action_items
+    //     disparaissent (au lieu de devenir des orphelins silencieux).
+    //   - Plus de string libre 'systems'/'meters'/etc. mal typee.
+    //
+    // BMS : la table bacs_audit_bms a une PK = document_id (1:1 avec
+    // afs), donc source_bms_document_id reference afs(id). Le
+    // discriminator entre les differents checks BMS (R175-3 P1, P2,
+    // maintenance, training, data_provision_*) passe via source_subtype.
+    //
+    // Orphans : 10 lignes pre-existantes pointent vers des devices/meters
+    // hard-deletes. Pour preserver les donnees, on les migre avec FK=NULL
+    // (l'item devient "deconnecte de sa source" mais reste visible).
+    db.pragma('foreign_keys = OFF');
+    const m125tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE bacs_audit_action_items_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          category TEXT NOT NULL,
+          severity TEXT NOT NULL CHECK (severity IN ('blocking','major','minor')),
+          r175_article TEXT,
+          title TEXT NOT NULL,
+          description TEXT,
+          zone_id INTEGER REFERENCES zones(id) ON DELETE SET NULL,
+          equipment_id INTEGER REFERENCES equipments(id) ON DELETE SET NULL,
+          source_system_id INTEGER REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+          source_meter_id INTEGER REFERENCES bacs_audit_meters(id) ON DELETE CASCADE,
+          source_thermal_id INTEGER REFERENCES bacs_audit_thermal_regulation(id) ON DELETE CASCADE,
+          source_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE CASCADE,
+          source_inspection_id INTEGER REFERENCES bacs_audit_inspections(id) ON DELETE CASCADE,
+          source_bms_document_id INTEGER REFERENCES afs(id) ON DELETE CASCADE,
+          source_subtype TEXT,
+          auto_generated INTEGER NOT NULL DEFAULT 1,
+          commercial_notes TEXT,
+          estimated_effort TEXT CHECK (estimated_effort IS NULL OR estimated_effort IN ('low','medium','high')),
+          status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','quoted','in_progress','done','declined')),
+          position INTEGER NOT NULL DEFAULT 0,
+          alternative_solutions_html TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          CHECK (
+            (source_system_id IS NOT NULL) +
+            (source_meter_id IS NOT NULL) +
+            (source_thermal_id IS NOT NULL) +
+            (source_device_id IS NOT NULL) +
+            (source_inspection_id IS NOT NULL) +
+            (source_bms_document_id IS NOT NULL) <= 1
+          )
+        );
+
+        INSERT INTO bacs_audit_action_items_new (
+          id, document_id, category, severity, r175_article, title, description,
+          zone_id, equipment_id,
+          source_system_id, source_meter_id, source_thermal_id,
+          source_device_id, source_inspection_id, source_bms_document_id,
+          source_subtype, auto_generated, commercial_notes, estimated_effort,
+          status, position, alternative_solutions_html, created_at, updated_at
+        )
+        SELECT
+          a.id, a.document_id, a.category, a.severity, a.r175_article, a.title, a.description,
+          a.zone_id, a.equipment_id,
+          CASE WHEN a.source_table='systems'            AND EXISTS(SELECT 1 FROM bacs_audit_systems x            WHERE x.id = a.source_id) THEN a.source_id END,
+          CASE WHEN a.source_table='meters'             AND EXISTS(SELECT 1 FROM bacs_audit_meters x             WHERE x.id = a.source_id) THEN a.source_id END,
+          CASE WHEN a.source_table='thermal_regulation' AND EXISTS(SELECT 1 FROM bacs_audit_thermal_regulation x WHERE x.id = a.source_id) THEN a.source_id END,
+          CASE WHEN a.source_table='devices'            AND EXISTS(SELECT 1 FROM bacs_audit_system_devices x     WHERE x.id = a.source_id) THEN a.source_id END,
+          CASE WHEN a.source_table='inspections'        AND a.source_id > 0
+                                                        AND EXISTS(SELECT 1 FROM bacs_audit_inspections x       WHERE x.id = a.source_id) THEN a.source_id END,
+          CASE WHEN a.source_table='bms'                THEN a.document_id END,
+          -- Subtype : preserve l'existant si pose. Sinon derive un
+          -- discriminator pour bms (anciennement source_id) et pour
+          -- l'inspection synthetique "no_inspection" (anciennement source_id=0).
+          COALESCE(
+            a.source_subtype,
+            CASE
+              WHEN a.source_table = 'bms' AND a.source_id = 1 THEN 'r175_3_p1'
+              WHEN a.source_table = 'bms' AND a.source_id = 2 THEN 'r175_3_p2'
+              WHEN a.source_table = 'bms' AND a.source_id = 5 THEN 'maintenance'
+              WHEN a.source_table = 'bms' AND a.source_id = 6 THEN 'training'
+              WHEN a.source_table = 'bms' AND a.source_id = 7 THEN 'data_provision_manager'
+              WHEN a.source_table = 'bms' AND a.source_id = 8 THEN 'data_provision_operators'
+              WHEN a.source_table = 'inspections' AND a.source_id = 0 THEN 'no_inspection'
+              ELSE NULL
+            END
+          ),
+          a.auto_generated, a.commercial_notes, a.estimated_effort,
+          a.status, a.position, a.alternative_solutions_html, a.created_at, a.updated_at
+        FROM bacs_audit_action_items a;
+      `);
+
+      const oldCount = db.prepare('SELECT COUNT(*) AS n FROM bacs_audit_action_items').get().n;
+      const newCount = db.prepare('SELECT COUNT(*) AS n FROM bacs_audit_action_items_new').get().n;
+      if (oldCount !== newCount) {
+        throw new Error(`Migration 125 : count mismatch ${oldCount} -> ${newCount}`);
+      }
+
+      db.exec(`
+        DROP TABLE bacs_audit_action_items;
+        ALTER TABLE bacs_audit_action_items_new RENAME TO bacs_audit_action_items;
+        CREATE INDEX idx_bacs_actions_doc                ON bacs_audit_action_items(document_id, severity, position);
+        CREATE INDEX idx_bacs_actions_source_system      ON bacs_audit_action_items(source_system_id)       WHERE source_system_id      IS NOT NULL;
+        CREATE INDEX idx_bacs_actions_source_meter       ON bacs_audit_action_items(source_meter_id)        WHERE source_meter_id       IS NOT NULL;
+        CREATE INDEX idx_bacs_actions_source_thermal     ON bacs_audit_action_items(source_thermal_id)      WHERE source_thermal_id     IS NOT NULL;
+        CREATE INDEX idx_bacs_actions_source_device      ON bacs_audit_action_items(source_device_id)       WHERE source_device_id      IS NOT NULL;
+        CREATE INDEX idx_bacs_actions_source_inspection  ON bacs_audit_action_items(source_inspection_id)   WHERE source_inspection_id  IS NOT NULL;
+        CREATE INDEX idx_bacs_actions_source_bms         ON bacs_audit_action_items(source_bms_document_id) WHERE source_bms_document_id IS NOT NULL;
+      `);
+
+      const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+      if (fkErrors.length) {
+        throw new Error('Migration 125 : FK errors -- ' + JSON.stringify(fkErrors));
+      }
+    });
+    m125tx();
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 125 appliquee : action_items polymorphisme type (6 FK colonnes au lieu de source_table+source_id)');
+    db.pragma('user_version = 125');
   }
 
   if (current > TARGET_VERSION) {

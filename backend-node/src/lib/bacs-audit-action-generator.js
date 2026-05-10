@@ -4,9 +4,11 @@
  * Genere les actions correctives `bacs_audit_action_items` a partir des
  * donnees de l'audit BACS (systems / meters / bms / thermal_regulation).
  *
- * Idempotent : les items auto-generes sont identifies par
- * (source_table, source_id). Si la donnee source change, l'item est mis
- * a jour. Si la source est resolue (gap comble), l'item passe en done.
+ * Idempotent : les items auto-generes sont identifies par la combinaison
+ * (FK source non-NULL, source_subtype). Si la donnee source change,
+ * l'item est mis a jour. Si la source est resolue (gap comble), l'item
+ * passe en done. Si la source est hard-deletee, l'item disparait via FK
+ * ON DELETE CASCADE (mig 125).
  *
  * Items manuels (auto_generated=0) ne sont jamais touches.
  *
@@ -58,15 +60,27 @@ function isBuildySolution(bms) {
   return /buildy/.test(text);
 }
 
+// Cle d'idempotence : derivee de la FK source non-NULL (1 max parmi 6)
+// + source_subtype. Permet le matching `existingByKey` sur regen.
+function keyOfItem(item) {
+  if (item.source_system_id != null)        return `s:${item.source_system_id}:${item.source_subtype || ''}`;
+  if (item.source_meter_id != null)         return `m:${item.source_meter_id}:${item.source_subtype || ''}`;
+  if (item.source_thermal_id != null)       return `t:${item.source_thermal_id}:${item.source_subtype || ''}`;
+  if (item.source_device_id != null)        return `d:${item.source_device_id}:${item.source_subtype || ''}`;
+  if (item.source_inspection_id != null)    return `i:${item.source_inspection_id}:${item.source_subtype || ''}`;
+  if (item.source_bms_document_id != null)  return `b:${item.source_bms_document_id}:${item.source_subtype || ''}`;
+  // Item synthetique sans FK (ex : inspection 'no_inspection')
+  return `_:${item.source_subtype || ''}`;
+}
+
 /**
  * Construit la liste cible d'actions a poser pour un document.
- * Retourne un Map<key, item> ou key = `${source_table}:${source_id}`.
+ * Retourne un Map<key, item> ou key = keyOfItem(item).
  */
 function computeTargetActions(documentId) {
   const target = new Map();
   function addTarget(item) {
-    const key = `${item.source_table}:${item.source_id}:${item.source_subtype || ''}`;
-    target.set(key, item);
+    target.set(keyOfItem(item), item);
   }
 
   // Systems (R175-1 §4 + R175-3 §3 + §4)
@@ -92,7 +106,7 @@ function computeTargetActions(documentId) {
     // Système présent + non communicant (legacy : on garde la règle communication=non_communicant)
     if (s.communication === 'non_communicant') {
       addTarget({
-        source_table: 'systems', source_id: s.id, source_subtype: 'non_communicant',
+        source_system_id: s.id, source_subtype: 'non_communicant',
         category: 'communication_upgrade', severity: 'major',
         r175_article: 'R175-3 §3',
         title: `Rendre communicant le système de ${catFr}${zoneStr}`,
@@ -118,7 +132,7 @@ function computeTargetActions(documentId) {
       const devName2 = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
       if (d.managed_by_bms && d.bms_integration_out_of_service) {
         addTarget({
-          source_table: 'devices', source_id: d.id, source_subtype: 'bms_link_broken',
+          source_device_id: d.id, source_subtype: 'bms_link_broken',
           category: 'bms_upgrade', severity: 'major',
           r175_article: 'R175-3 §3',
           title: `Rétablir la liaison GTB de « ${devName2} »`,
@@ -136,7 +150,7 @@ function computeTargetActions(documentId) {
         d.communication_protocol === 'absent';
       if (isNonCommunicating) {
         addTarget({
-          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p3',
+          source_device_id: d.id, source_subtype: 'r175_3_p3',
           category: 'communication_upgrade', severity: 'major',
           r175_article: 'R175-3 §3',
           title: `Rendre communicant l'équipement « ${devName} »`,
@@ -148,7 +162,7 @@ function computeTargetActions(documentId) {
       // R175-3 §4 — arret manuel possible
       if (d.meets_r175_3_p4 === 0) {
         addTarget({
-          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p4',
+          source_device_id: d.id, source_subtype: 'r175_3_p4',
           category: 'bms_upgrade', severity: 'major',
           r175_article: 'R175-3 §4',
           title: `Permettre l'arrêt manuel de « ${devName} »`,
@@ -160,7 +174,7 @@ function computeTargetActions(documentId) {
       // R175-3 §4 — fonctionnement autonome
       if (d.meets_r175_3_p4_autonomous === 0) {
         addTarget({
-          source_table: 'devices', source_id: d.id, source_subtype: 'r175_3_p4_autonomous',
+          source_device_id: d.id, source_subtype: 'r175_3_p4_autonomous',
           category: 'bms_upgrade', severity: 'major',
           r175_article: 'R175-3 §4',
           title: `Activer le fonctionnement autonome de « ${devName} »`,
@@ -184,7 +198,7 @@ function computeTargetActions(documentId) {
     const zoneStr = m.zone_name ? ` en zone « ${m.zone_name} »` : ' (général bâtiment)';
     if (m.required && !m.present_actual) {
       addTarget({
-        source_table: 'meters', source_id: m.id,
+        source_meter_id: m.id,
         category: 'meter_addition', severity: 'blocking',
         r175_article: 'R175-3 §1',
         title: `Ajouter compteur ${typeFr}${zoneStr} — ${usageFr}`,
@@ -193,7 +207,7 @@ function computeTargetActions(documentId) {
       });
     } else if (m.present_actual && !m.communicating) {
       addTarget({
-        source_table: 'meters', source_id: m.id,
+        source_meter_id: m.id,
         category: 'meter_connection', severity: 'major',
         r175_article: 'R175-3 §1',
         title: `Raccorder le compteur ${typeFr}${zoneStr}`,
@@ -205,7 +219,7 @@ function computeTargetActions(documentId) {
     // releve pas correctement)
     if (m.managed_by_bms && m.bms_integration_out_of_service) {
       addTarget({
-        source_table: 'meters', source_id: m.id, source_subtype: 'bms_link_broken',
+        source_meter_id: m.id, source_subtype: 'bms_link_broken',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §3',
         title: `Rétablir la liaison GTB du compteur ${typeFr}${zoneStr}`,
@@ -215,12 +229,15 @@ function computeTargetActions(documentId) {
     }
   }
 
-  // BMS (R175-3 P1-P4, R175-4, R175-5)
+  // BMS (R175-3 P1-P4, R175-4, R175-5).
+  // BMS = 1:1 avec l'AF, donc on rattache via source_bms_document_id =
+  // documentId. Le discriminator entre les checks (P1, P2, maintenance...)
+  // passe par source_subtype.
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
   if (bms && !bms.out_of_service) {
     if (bms.meets_r175_3_p1 === 0) {
       addTarget({
-        source_table: 'bms', source_id: 1,
+        source_bms_document_id: documentId, source_subtype: 'r175_3_p1',
         category: 'data_retention_upgrade', severity: 'blocking',
         r175_article: 'R175-3 §1',
         title: 'Etendre la retention des donnees a 5 ans minimum',
@@ -229,7 +246,7 @@ function computeTargetActions(documentId) {
     }
     if (bms.meets_r175_3_p2 === 0) {
       addTarget({
-        source_table: 'bms', source_id: 2,
+        source_bms_document_id: documentId, source_subtype: 'r175_3_p2',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §2',
         title: 'Activer la détection des pertes d\'efficacité',
@@ -240,7 +257,7 @@ function computeTargetActions(documentId) {
     // (cf section systems ci-dessus), pas dans la GTB.
     if (bms.has_maintenance_procedures === 0) {
       addTarget({
-        source_table: 'bms', source_id: 5,
+        source_bms_document_id: documentId, source_subtype: 'maintenance',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-4',
         title: 'Établir des consignes écrites de maintenance du BACS',
@@ -250,7 +267,7 @@ function computeTargetActions(documentId) {
     // R175-3 dernier alinea : mise a disposition des donnees
     if (bms.data_provision_to_manager === 0) {
       addTarget({
-        source_table: 'bms', source_id: 7,
+        source_bms_document_id: documentId, source_subtype: 'data_provision_manager',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-3',
         title: 'Documenter la mise à disposition des données au gestionnaire du bâtiment',
@@ -259,7 +276,7 @@ function computeTargetActions(documentId) {
     }
     if (bms.data_provision_to_operators === 0) {
       addTarget({
-        source_table: 'bms', source_id: 8,
+        source_bms_document_id: documentId, source_subtype: 'data_provision_operators',
         category: 'documentation', severity: 'major',
         r175_article: 'R175-3',
         title: 'Documenter la transmission des données aux exploitants des systèmes techniques',
@@ -269,7 +286,7 @@ function computeTargetActions(documentId) {
     // R175-5 : formation. Skip si la solution en place est Buildy (support natif).
     if (bms.operator_trained === 0 && !isBuildySolution(bms)) {
       addTarget({
-        source_table: 'bms', source_id: 6,
+        source_bms_document_id: documentId, source_subtype: 'training',
         category: 'training', severity: 'major',
         r175_article: 'R175-5',
         title: 'Former l\'exploitant au paramétrage du BACS',
@@ -299,7 +316,7 @@ function computeTargetActions(documentId) {
       if (exempt) continue;
       if (!t.has_automatic_regulation) {
         addTarget({
-          source_table: 'thermal_regulation', source_id: t.id,
+          source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
           r175_article: 'R175-6',
           title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`,
@@ -316,8 +333,10 @@ function computeTargetActions(documentId) {
   ).all(documentId);
   const today = new Date().toISOString().slice(0, 10);
   if (inspections.length === 0) {
+    // Item synthetique : aucune inspection en DB, donc pas de FK.
+    // source_subtype = 'no_inspection' assure l'unicite de la cle d'idempotence.
     addTarget({
-      source_table: 'inspections', source_id: 0,
+      source_subtype: 'no_inspection',
       category: 'documentation', severity: 'major',
       r175_article: 'R175-5-1',
       title: 'Programmer une inspection périodique du BACS par un tiers',
@@ -327,7 +346,7 @@ function computeTargetActions(documentId) {
     const latest = inspections[0];
     if (latest.next_inspection_due_date && latest.next_inspection_due_date < today) {
       addTarget({
-        source_table: 'inspections', source_id: latest.id,
+        source_inspection_id: latest.id,
         category: 'documentation', severity: 'major',
         r175_article: 'R175-5-1',
         title: 'Inspection périodique R175-5-1 dépassée — replanifier',
@@ -363,7 +382,10 @@ function regenerateActionItems(documentId) {
   const target = computeTargetActions(documentId);
 
   const existing = db.db.prepare(`
-    SELECT id, source_table, source_id, source_subtype, status, category, severity, r175_article,
+    SELECT id,
+           source_system_id, source_meter_id, source_thermal_id,
+           source_device_id, source_inspection_id, source_bms_document_id,
+           source_subtype, status, category, severity, r175_article,
            title, description, zone_id, equipment_id
     FROM bacs_audit_action_items
     WHERE document_id = ? AND auto_generated = 1
@@ -371,9 +393,7 @@ function regenerateActionItems(documentId) {
 
   const existingByKey = new Map();
   for (const e of existing) {
-    if (e.source_table && e.source_id != null) {
-      existingByKey.set(`${e.source_table}:${e.source_id}:${e.source_subtype || ''}`, e);
-    }
+    existingByKey.set(keyOfItem(e), e);
   }
 
   let added = 0, updated = 0, resolved = 0;
@@ -415,9 +435,11 @@ function regenerateActionItems(documentId) {
   const ins = db.db.prepare(`
     INSERT INTO bacs_audit_action_items
       (document_id, category, severity, r175_article, title, description,
-       zone_id, equipment_id, source_table, source_id, source_subtype,
-       auto_generated, status, position)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'open', ?)
+       zone_id, equipment_id,
+       source_system_id, source_meter_id, source_thermal_id,
+       source_device_id, source_inspection_id, source_bms_document_id,
+       source_subtype, auto_generated, status, position)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'open', ?)
   `);
   let pos = 0;
   for (const [key, t] of target) {
@@ -425,7 +447,9 @@ function regenerateActionItems(documentId) {
     ins.run(
       documentId, t.category, t.severity, t.r175_article || null, t.title,
       t.description || null, t.zone_id || null, t.equipment_id || null,
-      t.source_table, t.source_id, t.source_subtype || null, pos * 10,
+      t.source_system_id || null, t.source_meter_id || null, t.source_thermal_id || null,
+      t.source_device_id || null, t.source_inspection_id || null, t.source_bms_document_id || null,
+      t.source_subtype || null, pos * 10,
     );
     added++;
     pos++;
