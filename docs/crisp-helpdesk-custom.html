@@ -321,6 +321,20 @@ a.csh-navigation-back, .csh-navigation-back,
   gap: 4px !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
   transition: all 0.15s ease !important;
+  /* Texte sur 1 ligne avec ellipsis si la sidebar est trop étroite. */
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+/* Le label texte interne (csh-button-label, csh-button-text, etc.) doit aussi
+   nowrap sinon il wrappe dans son span même si le bouton parent ne wrappe pas. */
+.csh-category-aside-back .csh-button > *,
+.csh-article-aside-back .csh-button > * {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
 }
 a.csh-navigation-back:hover, .csh-navigation-back:hover,
 .csh-category-aside-back .csh-button:hover,
