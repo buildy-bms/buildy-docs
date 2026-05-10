@@ -238,6 +238,23 @@ async function routes(fastify) {
     }
   });
 
+  // POST /api/equipment-templates/reorder — reorder dans une categorie
+  fastify.post('/equipment-templates/reorder', async (request, reply) => {
+    const body = request.body || {};
+    const category = typeof body.category === 'string' ? body.category : null;
+    const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(Boolean) : [];
+    if (!category || !ids.length) {
+      return reply.code(400).send({ detail: 'category + ids requis' });
+    }
+    const moved = db.equipmentTemplates.reorderInCategory(category, ids);
+    db.auditLog.add({
+      userId: request.authUser?.id,
+      action: 'template.reorder',
+      payload: { category, ids, moved },
+    });
+    return { ok: true, moved };
+  });
+
   // POST /api/equipment-templates/:id/validate-content — marque la
   // description comme valide. Toute modif ulterieure du description_html
   // re-clear ce statut automatiquement (equipmentTemplates.update).

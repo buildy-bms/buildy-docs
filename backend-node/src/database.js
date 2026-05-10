@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 115;
+const TARGET_VERSION = 116;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4402,6 +4402,30 @@ function runMigrations() {
     db.pragma('user_version = 115');
   }
 
+  if (current < 116) {
+    // Ordre stable des equipment_templates dans la biblio (et donc dans l'arbo
+    // AF apres libraryExtendAf). Ajout d'une colonne `position`. Initialise
+    // par categorie en numerotant les rows existants par ordre alphabetique
+    // du nom (ordre actuel par defaut).
+    try { db.exec('ALTER TABLE equipment_templates ADD COLUMN position INTEGER NOT NULL DEFAULT 0'); }
+    catch { /* deja ajoutee */ }
+    // Backfill : pour chaque categorie, numerote les rows par ordre alpha (ordre actuel)
+    const rowsByCat = db.prepare('SELECT id, category, name FROM equipment_templates ORDER BY category, name').all();
+    const posByCat = new Map();
+    const updateStmt = db.prepare('UPDATE equipment_templates SET position = ? WHERE id = ?');
+    const tx = db.transaction(() => {
+      for (const r of rowsByCat) {
+        const k = r.category || '';
+        const next = (posByCat.get(k) || 0) + 10;
+        posByCat.set(k, next);
+        updateStmt.run(next, r.id);
+      }
+    });
+    tx();
+    log.info(`Migration 116 appliquee : equipment_templates.position seede sur ${rowsByCat.length} row(s)`);
+    db.pragma('user_version = 116');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -4505,12 +4529,15 @@ const sessions = {
 // ── Equipment templates (bibliotheque) ───────────────────────────────
 const equipmentTemplates = {
   list({ category } = {}) {
+    // Ordre : categorie (selon position de system_categories_db pour rester
+    // coherent avec l'arbo AF), puis position dans la categorie, puis nom.
     const sql = `
       SELECT et.*, u.display_name AS content_validated_by_name
       FROM equipment_templates et
       LEFT JOIN users u ON u.id = et.content_validated_by
+      LEFT JOIN system_categories_db scd ON scd.key = et.category
       ${category ? 'WHERE et.category = ?' : ''}
-      ORDER BY ${category ? 'et.name' : 'et.category, et.name'}
+      ORDER BY scd.position, et.category, et.position, et.name
     `;
     return category ? db.prepare(sql).all(category) : db.prepare(sql).all();
   },
@@ -4581,6 +4608,24 @@ const equipmentTemplates = {
   },
   bumpVersion(id) {
     db.prepare('UPDATE equipment_templates SET current_version = current_version + 1 WHERE id = ?').run(id);
+  },
+  // Reordonne les rows d'une categorie selon orderedIds. Position en
+  // increments de 10. Les ids absents de l'array gardent leur position
+  // actuelle (placés a la fin).
+  reorderInCategory(category, orderedIds) {
+    if (!Array.isArray(orderedIds) || !orderedIds.length) return 0;
+    const validIds = db.prepare(
+      `SELECT id FROM equipment_templates WHERE category = ? AND id IN (${orderedIds.map(() => '?').join(',')})`
+    ).all(category, ...orderedIds).map(r => r.id);
+    const validSet = new Set(validIds);
+    const filtered = orderedIds.filter(id => validSet.has(id));
+    const tx = db.transaction(() => {
+      filtered.forEach((id, idx) => {
+        db.prepare('UPDATE equipment_templates SET position = ? WHERE id = ?').run((idx + 1) * 10, id);
+      });
+    });
+    tx();
+    return filtered.length;
   },
   // Clone à plat d'un equipment_template : le template + ses points +
   // ses attachments. Slug unique généré via slugifyName (callback). Les

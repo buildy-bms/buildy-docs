@@ -283,6 +283,7 @@ export const listEquipmentTemplates = (params) => api.get('/equipment-templates'
 export const getEquipmentTemplate = (id) => api.get(`/equipment-templates/${id}`)
 export const createEquipmentTemplate = (data) => api.post('/equipment-templates', data)
 export const updateEquipmentTemplate = (id, data) => api.patch(`/equipment-templates/${id}`, data)
+export const reorderEquipmentTemplates = (category, ids) => api.post('/equipment-templates/reorder', { category, ids })
 export const deleteEquipmentTemplate = (id) => api.delete(`/equipment-templates/${id}`)
 export const cloneEquipmentTemplate = (id, data) => api.post(`/equipment-templates/${id}/clone`, data)
 
