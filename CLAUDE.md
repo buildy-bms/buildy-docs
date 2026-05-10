@@ -155,6 +155,19 @@ Statuts AF : `'draft' | 'validated' | 'commissioning' | 'commissioned' | 'delive
 Statuts audit BACS : `'draft' | 'review' | 'delivered'`
 Statuts brochure : `'draft' | 'published'`
 
+### Convention soft-delete (Lot 2, mig 124)
+
+3 patterns selon la nature de l'entite :
+
+1. **`deleted_at` (soft-delete)** : entites metier que l'utilisateur peut perdre par erreur et qu'il faut pouvoir restaurer. Filtrer `WHERE deleted_at IS NULL` dans toutes les listes. Tables concernees : `afs`, `sites`, `zones`, `equipments`, `users`.
+
+   - **Cascade transactionnelle** : `sites.softDelete(id)` marque le site + ses zones + les equipements de ces zones avec le **meme timestamp** (capture `strftime('%Y-%m-%d %H:%M:%f', 'now')` une fois). `restore(id)` ne ranime que les enfants dont `deleted_at` matche le timestamp du parent — preserve les suppressions manuelles anterieures. Idem `zones.softDelete` -> equipements.
+   - **Users** : hard-delete impossible (FK `created_by`/`updated_by`/`uploaded_by`). `softDelete` coupe l'acces (`getByOidcSub` filtre `deleted_at`) sans casser l'audit trail. `getById` / `getByIds` renvoient TOUJOURS y compris les soft-deleted (pour resoudre les noms dans l'historique). Pour la liste UI, utiliser `users.listActive()` ou filtrer dans la requete.
+
+2. **Tombstones (anti-reseed)** : entites bibliotheque dont la suppression doit empecher le re-seed automatique au prochain boot. Tables : `deleted_section_template_slugs`, `deleted_equipment_template_slugs`, `faq_categories_tombstones`. Le seeder verifie le tombstone avant d'inserer ; les routes POST effacent le tombstone (= resurrection explicite). Pattern complementaire au soft-delete (pas alternatif).
+
+3. **Hard-delete** : tout le reste — logs (`audit_log`), sessions, FTS index, donnees referentielles (`*_catalog`, `*_matrix`), versions immuables (`*_versions`), enfants en cascade FK (`bacs_audit_*`, `equipment_instances`, `sections` — leur cycle de vie est portee par l'AF parente), junctions tables, queues de sync, transients.
+
 ## Bibliotheque & Plan AF
 - **3 pages dediees** (Lot 32, cf. `frontend/src/router.js:81-106`) :
   - `/library/sections` -> `LibrarySectionsView.vue` (sections types narratives, hierarchie editable)

@@ -73,6 +73,7 @@ async function routes(fastify) {
     const localRows = db.db.prepare(`
       SELECT id, email, display_name, first_name, last_name, last_seen_at
       FROM users
+      WHERE deleted_at IS NULL
       ORDER BY display_name, email
     `).all().map(u => ({ ...u, _source: 'local' }));
 
