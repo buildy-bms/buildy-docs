@@ -967,79 +967,91 @@ async function routes(fastify) {
 
   // POST /api/sections/:id/template-update/apply — synchronise la section sur la version courante.
   //
-  // Body optionnel : { fields?: string[] } pour un sync selectif depuis
-  // la modal SectionSyncModal. Si `fields` est fourni, seuls ces champs
-  // sont ecrases ; sinon comportement legacy (sync complet : title +
-  // body_html + version_pin selon le type de template).
+  // Body optionnel : { parts?: ('bacs' | 'fonctionnel' | 'points')[] }.
+  // Si fourni, sync selectif sur les parts demandees ; sinon comportement
+  // legacy (= sync 'fonctionnel' uniquement, pour compat).
   //
-  // Champs supportes (mappes vers la valeur canonique du template) :
-  //   - 'title'             : equipment_template.name OR section_template.title
-  //   - 'body_html'         : section_template.body_html (uniquement section_template)
-  //   - 'description_html'  : equipment_template.description_html -> sections.description_html_override
-  //   - 'service_level'     : section_template.service_level (uniquement section_template)
-  //   - 'bacs_articles'     : section_template.bacs_articles (uniquement section_template)
+  // Parts (semantique metier, alignee sur la modal SectionSyncModal) :
+  //   - 'bacs'        : copie bacs_articles + bacs_justification du template.
+  //   - 'fonctionnel' : pour equipment_template -> description_html_override.
+  //                     pour section_template   -> body_html.
+  //   - 'points'      : reset de la table de points. Supprime tous les
+  //                     section_point_overrides pour que la resolution
+  //                     dynamique remonte directement sur les
+  //                     equipment_template_points canoniques.
+  //                     N'a de sens que pour les sections equipement.
   // La version pinnee est toujours bumpee a current_version.
   fastify.post('/sections/:id/template-update/apply', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const section = db.sections.getById(id);
     if (!section) return reply.code(404).send({ detail: 'Section non trouvée' });
     const userId = request.authUser?.id;
-    const requestedFields = Array.isArray(request.body?.fields) ? request.body.fields : null;
-    const wantsField = (k) => requestedFields == null || requestedFields.includes(k);
+    const requestedParts = Array.isArray(request.body?.parts) ? request.body.parts : null;
+    // Legacy : pas de parts -> sync 'fonctionnel' uniquement (= ancien
+    // comportement template-update/apply qui ecrasait body_html).
+    const parts = new Set(requestedParts || ['fonctionnel']);
+    let pointsOverridesDeleted = 0;
 
     if (section.equipment_template_id) {
       const tpl = db.equipmentTemplates.getById(section.equipment_template_id);
       if (!tpl) return reply.code(404).send({ detail: 'Modèle equipement introuvable' });
       const fields = { equipmentTemplateVersion: tpl.current_version, updatedBy: userId };
-      if (requestedFields == null) {
-        // Legacy : pas de body_html dans equipment_template ; on bumpe juste la version.
-      } else {
-        if (wantsField('title') && tpl.name) fields.title = tpl.name;
-        if (wantsField('description_html')) fields.descriptionHtmlOverride = tpl.description_html || null;
+      if (parts.has('bacs')) {
+        fields.bacsArticles = tpl.bacs_articles || null;
+        fields.bacsJustification = tpl.bacs_justification || null;
       }
-      const updated = db.sections.update(id, fields);
+      if (parts.has('fonctionnel')) {
+        fields.descriptionHtmlOverride = tpl.description_html || null;
+      }
+      db.sections.update(id, fields);
+      if (parts.has('points')) {
+        // Reset des overrides locaux : la section retourne au comportement
+        // canonique (resolveSectionPoints renverra equipment_template_points).
+        const ovs = db.sectionPointOverrides.listBySection(id);
+        pointsOverridesDeleted = ovs.length;
+        if (pointsOverridesDeleted > 0) {
+          db.sectionPointOverrides.deleteBySection(id);
+        }
+      }
       db.auditLog.add({
         afId: section.af_id, sectionId: id, templateId: tpl.id, userId,
         action: 'section.template.sync',
         payload: {
-          source: 'equipment', fields: requestedFields,
+          source: 'equipment', parts: [...parts],
+          points_overrides_deleted: pointsOverridesDeleted,
           from: section.equipment_template_version, to: tpl.current_version,
         },
       });
-      return updated;
+      return db.sections.getById(id);
     }
 
     if (section.section_template_id) {
       const tpl = db.sectionTemplates.getById(section.section_template_id);
       if (!tpl) return reply.code(404).send({ detail: 'Template introuvable' });
       const fields = { sectionTemplateVersion: tpl.current_version, updatedBy: userId };
-      const wantsBody = requestedFields == null
-        ? true // Legacy : full sync = body_html ecrase
-        : wantsField('body_html');
-      if (wantsBody) fields.bodyHtml = tpl.body_html;
-      if (requestedFields != null) {
-        if (wantsField('title') && tpl.title) fields.title = tpl.title;
-        if (wantsField('service_level')) {
-          fields.serviceLevel = tpl.service_level || null;
-          fields.serviceLevelSource = tpl.service_level ? 'template' : null;
-        }
-        if (wantsField('bacs_articles')) fields.bacsArticles = tpl.bacs_articles || null;
+      if (parts.has('bacs')) {
+        fields.bacsArticles = tpl.bacs_articles || null;
+        // section_templates n'a pas bacs_justification ; on n'ecrase rien si null.
       }
-      const updated = db.sections.update(id, fields);
+      const wantsBody = parts.has('fonctionnel');
+      if (wantsBody) fields.bodyHtml = tpl.body_html;
+      // 'points' : pas applicable aux sections narratives (pas d'overrides
+      // de points lies a un section_template). Silencieusement ignore.
+      db.sections.update(id, fields);
       if (wantsBody) {
         const bodyText = (tpl.body_html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        db.sections.reindexFts(id, section.af_id, fields.title || section.title, bodyText);
+        db.sections.reindexFts(id, section.af_id, section.title, bodyText);
       }
       db.auditLog.add({
         afId: section.af_id, sectionId: id, userId,
         action: 'section.template.sync',
         payload: {
           source: 'section_template', section_template_id: tpl.id,
-          fields: requestedFields,
+          parts: [...parts],
           from: section.section_template_version, to: tpl.current_version,
         },
       });
-      return updated;
+      return db.sections.getById(id);
     }
 
     return reply.code(400).send({ detail: 'Section sans template' });

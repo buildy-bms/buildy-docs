@@ -134,8 +134,10 @@ export const deleteSectionOverride = (sectionId, overrideId) =>
   api.delete(`/sections/${sectionId}/overrides/${overrideId}`)
 export const listSectionInstances = (id) => api.get(`/sections/${id}/instances`)
 export const getSectionTemplateUpdate = (id) => api.get(`/sections/${id}/template-update`)
-export const applySectionTemplateUpdate = (id, fields = null) =>
-  api.post(`/sections/${id}/template-update/apply`, fields ? { fields } : {})
+// parts : ['bacs', 'fonctionnel', 'points'] (cf. SectionSyncModal).
+// Si null, sync legacy (= 'fonctionnel' par defaut backend).
+export const applySectionTemplateUpdate = (id, parts = null) =>
+  api.post(`/sections/${id}/template-update/apply`, parts ? { parts } : {})
 export const dismissSectionTemplateUpdate = (id) => api.post(`/sections/${id}/template-update/dismiss`)
 // Insere un section_template manquant dans une AF (source 'new_section' / 'new_functionality')
 export const addMissingTemplateToAf = (afId, templateId) =>
