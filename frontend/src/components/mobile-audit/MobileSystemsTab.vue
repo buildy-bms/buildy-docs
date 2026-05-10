@@ -220,7 +220,8 @@ function openLibraryDevicePicker(system) {
 function openCreateDevice(system) {
   deviceForm.value = {
     name: '', brand: '', model_reference: '', power_kw: null,
-    energy_source: null, device_role: null, location: '',
+    // Multi-rôle (mig 117) : array.
+    energy_source: null, device_role: [], location: '',
   }
   editingDevice.value = { mode: 'create', system }
 }
@@ -229,7 +230,9 @@ function openEditDevice(d, currentSystem) {
   // son système d'origine pour le sheet d'édition : c'est sa zone d'origine
   // qui doit s'afficher comme « Origine » dans le sélecteur de partage.
   const originSystem = systems.value.find(s => s.id === d.system_id) || currentSystem
-  deviceForm.value = { ...d }
+  // Multi-rôle : normalise device_role en array (mig 117).
+  const role = Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])
+  deviceForm.value = { ...d, device_role: role }
   editingDevice.value = { mode: 'edit', system: originSystem, device: d }
 }
 function closeDevice() { editingDevice.value = null }
@@ -243,7 +246,7 @@ async function saveDevice() {
       model_reference: deviceForm.value.model_reference?.trim() || null,
       power_kw: deviceForm.value.power_kw === '' || deviceForm.value.power_kw === null ? null : Number(deviceForm.value.power_kw),
       energy_source: deviceForm.value.energy_source,
-      device_role: deviceForm.value.device_role,
+      device_role: Array.isArray(deviceForm.value.device_role) ? deviceForm.value.device_role : [],
       location: deviceForm.value.location?.trim() || null,
     }
     if (!payload.name && !payload.brand && !payload.model_reference) {
@@ -507,13 +510,15 @@ async function removeDevice(d) {
           </select>
         </MobileField>
 
-        <MobileField label="Nature">
-          <select
+        <MobileField label="Niveau(x)">
+          <SearchableSelect
             v-model="deviceForm.device_role"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
-          >
-            <option v-for="o in ROLE_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-          </select>
+            :options="ROLE_OPTIONS"
+            :multiple="true"
+            :clearable="true"
+            :creatable="true"
+            placeholder="Sélectionner un ou plusieurs niveaux"
+          />
         </MobileField>
 
         <MobileField label="Localisation">

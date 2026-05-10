@@ -14,7 +14,8 @@ const emit = defineEmits(['close', 'submit'])
 
 const form = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
-  energy_source: null, device_role: null, communication_protocol: null,
+  // Multi-rôle (mig 117).
+  energy_source: null, device_role: [], communication_protocol: null,
   location: '', notes: '',
 })
 const submitting = ref(false)
@@ -74,11 +75,14 @@ async function submit() {
                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Nature</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x)</label>
           <SearchableSelect
             v-model="form.device_role"
             :options="roleOptions"
-            placeholder="Sélectionner une nature"
+            :multiple="true"
+            :clearable="true"
+            :creatable="true"
+            placeholder="Sélectionner un ou plusieurs niveaux"
           />
         </div>
         <div>

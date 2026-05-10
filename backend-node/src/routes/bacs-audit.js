@@ -18,6 +18,15 @@ const {
   assertBacsAuditExists, logBacsAudit,
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
+const { parseRoles, serializeRoles } = require('../lib/device-roles');
+
+// Mapping d'un row device vers l'API : parse `device_role` en array (mig 117).
+function mapDevice(d) {
+  if (!d) return d;
+  return { ...d, device_role: parseRoles(d.device_role) };
+}
+// Schema Zod commun : `device_role` accepte string (legacy) | array | null.
+const deviceRoleSchema = z.union([z.string(), z.array(z.string()), z.null()]).optional();
 
 async function routes(fastify) {
   // Sous-plugins par domaine
@@ -677,7 +686,7 @@ async function routes(fastify) {
       if (!extrasByDevice.has(e.device_id)) extrasByDevice.set(e.device_id, []);
       extrasByDevice.get(e.device_id).push(e.zone_id);
     }
-    return rows.map(d => ({ ...d, extra_zone_ids: extrasByDevice.get(d.id) || [] }));
+    return rows.map(d => ({ ...mapDevice(d), extra_zone_ids: extrasByDevice.get(d.id) || [] }));
   });
 
   // PATCH /bacs-audit/devices/:id/zones — partage du device avec d'autres
@@ -732,7 +741,7 @@ async function routes(fastify) {
     regenerateActionItems(dev.document_id);
 
     return {
-      ...db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id),
+      ...mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id)),
       extra_zone_ids: db.bacsAuditDeviceZones.listExtraForDevice(id),
     };
   });
@@ -753,7 +762,7 @@ async function routes(fastify) {
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
-      device_role: z.string().nullable().optional(),
+      device_role: deviceRoleSchema,
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
@@ -767,7 +776,9 @@ async function routes(fastify) {
     // Pré-remplissage depuis un modèle bibliothèque (optionnel).
     let prefName = body.name || null;
     let prefEnergy = body.energy_source || null;
-    let prefRole = body.device_role || null;
+    // Multi-rôle : si l'utilisateur a fourni un device_role, on l'utilise ;
+    // sinon fallback sur les rôles par défaut du template biblio.
+    let prefRoles = parseRoles(body.device_role);
     if (body.equipment_template_id) {
       const tpl = db.equipmentTemplates.getById(body.equipment_template_id);
       if (!tpl) return reply.code(404).send({ detail: 'Modèle bibliothèque introuvable' });
@@ -782,8 +793,9 @@ async function routes(fastify) {
       // peut customiser dans la modale avant de valider).
       if (!prefName) prefName = tpl.name;
       if (!prefEnergy) prefEnergy = tpl.default_energy_source || null;
-      if (!prefRole) prefRole = tpl.default_device_role || null;
+      if (!prefRoles.length) prefRoles = parseRoles(tpl.default_device_role);
     }
+    const prefRole = serializeRoles(prefRoles);
 
     // Position : derniere + 10
     const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM bacs_audit_system_devices WHERE system_id = ?').get(sysId).p;
@@ -803,7 +815,7 @@ async function routes(fastify) {
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
     resyncBacsAuditWithSiteZones(sys.document_id);
     regenerateActionItems(sys.document_id);
-    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid));
+    return reply.code(201).send(mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid)));
   });
 
   // PATCH /bacs-audit/devices/:id
@@ -820,7 +832,7 @@ async function routes(fastify) {
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
-      device_role: z.string().nullable().optional(),
+      device_role: deviceRoleSchema,
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       communication_protocols: z.string().nullable().optional(),
       wired: z.boolean().nullable().optional(),
@@ -840,7 +852,9 @@ async function routes(fastify) {
     sanitizeBodyHtmlFields(body);
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
-      const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
+      let val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
+      // Multi-rôle : array → JSON array string en DB.
+      if (k === 'device_role') val = serializeRoles(parseRoles(v));
       sets.push(`${k} = ?`); args.push(val);
     }
     if (sets.length) {
@@ -852,7 +866,7 @@ async function routes(fastify) {
     // Energy source ou power changeants → recompute meters + actions
     resyncBacsAuditWithSiteZones(dev.document_id);
     regenerateActionItems(dev.document_id);
-    return db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id);
+    return mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id));
   });
 
   // DELETE /bacs-audit/devices/:id
@@ -882,7 +896,7 @@ async function routes(fastify) {
     regenerateActionItems(dev.document_id);
     db.auditLog.add({ afId: dev.document_id, userId: request.authUser?.id,
       action: 'bacs_device.duplicate', payload: { source_device_id: id, new_device_id: r.lastInsertRowid } });
-    return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid));
+    return reply.code(201).send(mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid)));
   });
 
   fastify.delete('/bacs-audit/devices/:id', async (request, reply) => {

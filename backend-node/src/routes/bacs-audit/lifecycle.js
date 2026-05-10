@@ -507,8 +507,13 @@ async function routes(fastify) {
       if (!d.sys) continue;
       // Heuristique : devices communicants supposes interoperables et integres GTB
       const interop = !['absent', 'non_communicant'].includes(d.comm);
+      // Multi-rôle (mig 117) : serialize en JSON array. d.role peut etre string
+      // legacy (fixture) ou array.
+      const roleSerialized = d.role
+        ? JSON.stringify(Array.isArray(d.role) ? d.role : [d.role])
+        : null;
       insDev.run(
-        d.sys, d.name, d.brand, d.model, d.power, d.energy, d.role, d.comm, d.location,
+        d.sys, d.name, d.brand, d.model, d.power, d.energy, roleSerialized, d.comm, d.location,
         interop ? 1 : 0,                                // arret manuel si communicant
         interop ? 1 : 0,                                // autonome
         interop ? 1 : 0,                                // managed_by_bms

@@ -32,7 +32,14 @@ function energyLabel(value) {
   return ENERGY_OPTIONS.find(o => o.value === value)?.label || value
 }
 function roleLabel(value) {
-  return ROLE_OPTIONS.find(o => o.value === value)?.label || value
+  // Multi-rôle (mig 117) : value peut être array, scalaire (legacy) ou null.
+  const arr = Array.isArray(value) ? value : (value ? [value] : [])
+  return arr
+    .map(v => ROLE_OPTIONS.find(o => o.value === v)?.label || v)
+    .join(' / ')
+}
+function hasRole(value) {
+  return Array.isArray(value) ? value.length > 0 : !!value
 }
 
 const { error: notifyError, success: notifySuccess } = useNotification()
@@ -606,7 +613,7 @@ onMounted(async () => {
                     <span v-else class="text-[11px] text-gray-300 italic">—</span>
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
-                    <span v-if="t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
+                    <span v-if="hasRole(t.default_device_role)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
                     <span v-else class="text-[11px] text-gray-300 italic">—</span>
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
@@ -666,7 +673,7 @@ onMounted(async () => {
                 <span v-else class="text-[11px] text-gray-300 italic">—</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span v-if="t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
+                <span v-if="hasRole(t.default_device_role)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
                 <span v-else class="text-[11px] text-gray-300 italic">—</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">

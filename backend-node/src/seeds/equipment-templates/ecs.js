@@ -8,7 +8,7 @@ module.exports = {
   bacs_justification: null,
   preferred_protocols: 'Modbus TCP,Modbus RTU,M-Bus IP',
   default_energy_source: 'electric',
-  default_device_role: 'production',
+  default_device_role: ['production'],
   icon_kind: 'fa',
   icon_value: 'fa-droplet',
   icon_color: '#0ea5e9',
