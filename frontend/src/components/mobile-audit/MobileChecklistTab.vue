@@ -60,8 +60,8 @@ const SYSTEM_CAT_LABEL = {
   electricity_production: 'Production photovoltaïque',
 }
 
-function navigateAndClose(kind /* , entityId */) {
-  emit('navigate', { kind })
+function navigateAndClose(kind, entityId) {
+  emit('navigate', { kind, entityId })
   closeCoverage()
 }
 

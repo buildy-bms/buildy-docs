@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   WrenchScrewdriverIcon,
@@ -105,6 +105,27 @@ const ROLE_OPTIONS = [
 ]
 
 const collapsedZones = ref(new Set())
+
+// Focus inter-tab : MobileChecklistTab navigue ici avec un system_id à
+// mettre en avant. On déplie la zone, scrolle vers la card, et applique
+// un anneau ambre temporaire pour l'identifier visuellement.
+const focusedSystemId = ref(null)
+watch(() => audit.pendingFocus, (focus) => {
+  if (!focus || focus.kind !== 'systems' || focus.id == null) return
+  const sys = systems.value.find(s => s.id === focus.id)
+  if (sys) {
+    collapsedZones.value.delete(sys.zone_id)
+    collapsedZones.value = new Set(collapsedZones.value)
+    focusedSystemId.value = sys.id
+    nextTick(() => {
+      const el = window.document.querySelector(`[data-system-id="${sys.id}"]`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    setTimeout(() => { focusedSystemId.value = null }, 2500)
+  }
+  audit.pendingFocus = null
+}, { immediate: true })
+
 function toggleZone(zoneId) {
   const s = new Set(collapsedZones.value)
   if (s.has(zoneId)) s.delete(zoneId); else s.add(zoneId)
@@ -344,8 +365,10 @@ async function removeDevice(d) {
         <!-- Systèmes -->
         <div v-show="!collapsedZones.has(g.zone_id)" class="divide-y divide-gray-100">
           <div v-for="s in g.items" :key="s.id"
+               :data-system-id="s.id"
                :class="['px-4 py-4 transition',
-                        s.not_concerned ? 'opacity-50 bg-gray-50' : '']">
+                        s.not_concerned ? 'opacity-50 bg-gray-50' : '',
+                        focusedSystemId === s.id ? 'bg-amber-50 ring-2 ring-amber-300' : '']">
             <div class="flex items-center gap-3">
               <SystemCategoryIcon :category="s.system_category" size="md" />
               <div class="flex-1 min-w-0">

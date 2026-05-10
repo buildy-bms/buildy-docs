@@ -97,10 +97,11 @@ watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 // standalone n'a pas (encore) tiré le rafraîchissement.
 watch(activeTab, () => auditStore.softRefresh())
 
-// Navigation depuis les KPIs de couverture photo (onglet Docs) → bascule
-// l'onglet et permet d'ouvrir directement l'entité ciblée (TODO: ouvrir
-// le sheet d'édition correspondant en passant entityId via un store).
-function onNavigateFromDocs({ kind /* , entityId */ }) {
+// Navigation depuis les KPIs de couverture photo (onglet Docs) : bascule
+// l'onglet et set un pendingFocus dans le store. Le tab cible (zones /
+// meters / systems) observe pendingFocus pour ouvrir directement l'entité
+// puis le reset.
+function onNavigateFromDocs({ kind, entityId }) {
   const tabByKind = {
     site: 'site',
     zones: 'zones',
@@ -110,6 +111,9 @@ function onNavigateFromDocs({ kind /* , entityId */ }) {
   }
   const target = tabByKind[kind]
   if (target) activeTab.value = target
+  if (entityId != null) {
+    auditStore.pendingFocus = { kind, id: entityId }
+  }
 }
 
 
