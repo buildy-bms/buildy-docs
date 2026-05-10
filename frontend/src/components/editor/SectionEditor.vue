@@ -8,9 +8,10 @@ import {
   BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon,
   H1Icon, H2Icon, H3Icon, LinkIcon, ChatBubbleLeftRightIcon,
   SparklesIcon, StopIcon, ArrowTopRightOnSquareIcon, CheckCircleIcon,
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
-import { updateSection, getSectionTemplate } from '@/api'
+import { updateSection, getSectionTemplate, applySectionTemplateUpdate } from '@/api'
 import SafeHtml from '@/components/SafeHtml.vue'
 import { useAutosave } from '@/composables/useAutosave'
 import { useClaudeDraft } from '@/composables/useClaudeDraft'
@@ -78,6 +79,37 @@ function dismissSectionTplBanner() {
   updateSection(props.section.id, { section_template_version: newSectionTplVersion.value.current_version })
     .catch((e) => notifyError(e?.response?.data?.detail || 'Échec de la synchronisation de version'))
   newSectionTplVersion.value = null
+}
+
+// Bouton "MAJ depuis biblio" toujours disponible (independant de la
+// detection de nouvelle version). Force le re-pull du contenu canonique
+// du template + le bump de version pinnee. Utile quand l'utilisateur a
+// modifie localement et veut revenir au modele.
+const syncingFromLibrary = ref(false)
+async function syncSectionFromLibrary() {
+  if (syncingFromLibrary.value) return
+  if (!props.section.equipment_template_id && !props.section.section_template_id) return
+  const ok = await confirm({
+    title: 'Mettre à jour depuis la bibliothèque ?',
+    message: 'Le contenu de cette section sera remplacé par la dernière version canonique de la bibliothèque. Tes modifications locales seront perdues.',
+    confirmLabel: 'Mettre à jour',
+    danger: true,
+  })
+  if (!ok) return
+  syncingFromLibrary.value = true
+  try {
+    await flushAll()
+    const { data } = await applySectionTemplateUpdate(props.section.id)
+    // Recharge le contenu de l'editeur depuis la reponse serveur.
+    if (editor.value) editor.value.commands.setContent(data.body_html || '')
+    title.value = data.title || title.value
+    newSectionTplVersion.value = null
+    emit('updated', data)
+  } catch (e) {
+    notifyError(e?.response?.data?.detail || 'Échec de la synchronisation depuis la bibliothèque')
+  } finally {
+    syncingFromLibrary.value = false
+  }
 }
 
 watch(() => props.section.id, () => {
@@ -313,6 +345,16 @@ function onSaveLink(url) {
         <span>📎</span>
         <span class="truncate max-w-32">{{ templateLink.label }}</span>
         <ArrowTopRightOnSquareIcon class="w-3 h-3" />
+      </button>
+      <button
+        v-if="templateLink && !isReadOnly"
+        @click="syncSectionFromLibrary"
+        :disabled="syncingFromLibrary"
+        class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200 rounded-md shrink-0 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+        v-tooltip="'Remplacer le contenu de cette section par la dernière version de la bibliothèque'"
+      >
+        <ArrowPathIcon :class="['w-3 h-3 shrink-0', syncingFromLibrary ? 'animate-spin' : '']" />
+        <span>{{ syncingFromLibrary ? 'MAJ…' : 'MAJ biblio' }}</span>
       </button>
       <ServiceLevelBadge :level="section.service_level" />
       <BacsBadge v-if="section.bacs_articles" :reference="section.bacs_articles" :context="section.kind === 'equipment' ? 'equipment' : 'section'" />
