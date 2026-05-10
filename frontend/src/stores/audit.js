@@ -188,6 +188,14 @@ export const useAuditStore = defineStore('audit', {
           getBacsBms(this.docId),
         ])
         this.bms = bms.data || {}
+        // Rafraîchit aussi les zones (sinon une zone créée/supprimée côté
+        // desktop n'apparaît pas en PWA tant qu'on ne reload pas la page).
+        if (d.data.site_id) {
+          try {
+            const z = await listZones(d.data.site_id)
+            this.zones = z.data
+          } catch { /* on garde les zones existantes en cas d'echec */ }
+        }
         await this.refreshAuditCore()
         await this.refreshInspections()
       } catch { /* network glitch — silencieux, sera retenté au prochain tick */ }

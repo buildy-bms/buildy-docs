@@ -76,7 +76,10 @@ const auditStore = useAuditStore()
 // Sync desktop ↔ PWA : revalide à chaque retour sur l'onglet + polling
 // 30 s tant que la page est visible. Évite à un binôme (auditeur PWA
 // terrain + chef de projet bureau) de devoir F5 pour voir les modifs.
-useAuditAutoSync()
+// Sync agressif aussi côté desktop : si l'auditeur PWA crée/modifie une
+// entité depuis le terrain, le chef de projet desktop la voit dans
+// les 5 secondes sans F5.
+useAuditAutoSync({ intervalMs: 5000 })
 // Indicateur global de sauvegarde dans la toolbar (Vague 2 item 6).
 const saveStatus = useGlobalSaveStatus()
 const { isNarrow } = useViewport()

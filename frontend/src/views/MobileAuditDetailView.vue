@@ -54,7 +54,11 @@ const auditStore = useAuditStore()
 // Sync desktop ↔ PWA : revalide à chaque retour sur l'onglet (utile
 // quand l'auditeur revient à l'app après un appel ou un changement
 // d'app) + polling 30 s tant que l'écran est visible.
-useAuditAutoSync()
+// PWA : sync agressif (5s) — une chaudière ajoutée desktop doit apparaître
+// quasi instantanément côté terrain pour que l'auditeur ne saisisse pas
+// en double. Charge réseau négligeable (l'écran d'audit est dédié, pas
+// d'autres polls concurrents).
+useAuditAutoSync({ intervalMs: 5000 })
 
 // Queue offline (PWA terrain) : injectée par App.vue. Un badge dans la
 // topbar indique le nombre de modifs en attente de sync au retour

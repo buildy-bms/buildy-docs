@@ -93,7 +93,11 @@ onBeforeUnmount(() => {
 })
 
 const buttonCls = computed(() => {
-  const sz = props.size === 'xs' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
+  // Sur mobile (< sm = 640px), force min-h 44px + text-base (anti-zoom Safari)
+  // pour respecter les cibles tactiles iOS, peu importe la taille demandée.
+  const sz = props.size === 'xs'
+    ? 'px-3 py-3 sm:px-2 sm:py-1 min-h-11 sm:min-h-0 text-base sm:text-[11px]'
+    : 'px-3 py-3 sm:px-2.5 sm:py-1.5 min-h-11 sm:min-h-0 text-base sm:text-xs'
   return `w-full inline-flex items-center justify-between gap-1 ${sz} border border-gray-200 rounded-lg bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed`
 })
 </script>
@@ -136,12 +140,12 @@ const buttonCls = computed(() => {
           :key="o.value || 'null'"
           type="button"
           @click="toggle(o.value)"
-          class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-emerald-50/50 transition"
+          class="w-full flex items-center gap-3 px-3 py-3 sm:py-1.5 min-h-11 sm:min-h-0 text-base sm:text-xs text-left active:bg-emerald-100 sm:hover:bg-emerald-50/50 transition"
           :class="selected.includes(o.value) ? 'text-emerald-700 font-medium' : 'text-gray-700'"
         >
-          <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0',
+          <span :class="['w-7 h-7 sm:w-4 sm:h-4 rounded border-2 sm:border flex items-center justify-center shrink-0',
                          selected.includes(o.value) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300']">
-            <CheckIcon v-if="selected.includes(o.value)" class="w-3 h-3 text-white" />
+            <CheckIcon v-if="selected.includes(o.value)" class="w-5 h-5 sm:w-3 sm:h-3 text-white" />
           </span>
           {{ o.label }}
         </button>

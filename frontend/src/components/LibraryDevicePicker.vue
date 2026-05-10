@@ -212,14 +212,57 @@ async function pickTemplate(t) {
         Aucun modèle ne correspond aux filtres.
       </div>
 
-      <!-- Liste des modèles : tableau compact responsive -->
-      <div v-else class="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <!-- Liste : 2 rendus selon viewport -->
+      <template v-else>
+      <!-- PWA / mobile : stack de cards plein-largeur, bouton 44px tactile -->
+      <div class="sm:hidden space-y-2">
+        <div
+          v-for="t in filtered"
+          :key="t.id"
+          class="bg-white border border-gray-200 rounded-xl p-3 flex flex-col gap-2.5"
+        >
+          <div class="flex items-start gap-2.5 min-w-0">
+            <EquipmentIcon
+              :icon-kind="t.icon_kind"
+              :icon-value="t.icon_value"
+              :icon-color="t.icon_color"
+              class="shrink-0 mt-0.5"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-base text-gray-900 leading-snug">{{ t.name }}</div>
+              <div class="text-xs text-gray-500 mt-0.5">
+                <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
+                <span v-if="t.default_energy_source && hasRole(t.default_device_role)"> · </span>
+                <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
+                <span v-if="!t.default_energy_source && !hasRole(t.default_device_role)" class="text-gray-300">—</span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            @click="pickTemplate(t)"
+            :disabled="!!adding[t.id]"
+            :class="[
+              'w-full inline-flex items-center justify-center gap-1.5 px-4 py-3 min-h-11 text-base font-medium rounded-lg transition',
+              recentlyAdded.has(t.id)
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 active:bg-emerald-100'
+                : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50'
+            ]"
+          >
+            <CheckIcon v-if="recentlyAdded.has(t.id)" class="w-4 h-4 shrink-0" />
+            {{ adding[t.id] ? 'Ajout…' : recentlyAdded.has(t.id) ? 'Ajouté · Encore ?' : 'Ajouter' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Desktop : tableau compact -->
+      <div class="hidden sm:block border border-gray-200 rounded-lg overflow-hidden bg-white">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
             <tr>
               <th class="px-3 py-2 text-left font-medium">Modèle</th>
-              <th class="px-3 py-2 text-left font-medium hidden sm:table-cell whitespace-nowrap">Énergie</th>
-              <th class="px-3 py-2 text-left font-medium hidden sm:table-cell whitespace-nowrap">Niveau</th>
+              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Énergie</th>
+              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Niveau</th>
               <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Action</th>
             </tr>
           </thead>
@@ -235,19 +278,14 @@ async function pickTemplate(t) {
                   />
                   <div class="min-w-0">
                     <div class="font-medium text-gray-900 truncate">{{ t.name }}</div>
-                    <div class="text-xs text-gray-400 sm:hidden mt-0.5">
-                      <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
-                      <span v-if="t.default_energy_source && hasRole(t.default_device_role)"> · </span>
-                      <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
-                    </div>
                   </div>
                 </div>
               </td>
-              <td class="px-3 py-2.5 text-gray-600 hidden sm:table-cell whitespace-nowrap">
+              <td class="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                 <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
                 <span v-else class="text-gray-300">—</span>
               </td>
-              <td class="px-3 py-2.5 text-gray-600 hidden sm:table-cell whitespace-nowrap">
+              <td class="px-3 py-2.5 text-gray-600 whitespace-nowrap">
                 <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
                 <span v-else class="text-gray-300">—</span>
               </td>
@@ -257,7 +295,7 @@ async function pickTemplate(t) {
                   @click="pickTemplate(t)"
                   :disabled="!!adding[t.id]"
                   :class="[
-                    'inline-flex items-center justify-center gap-1 px-3 py-2 sm:py-1.5 min-h-11 sm:min-h-0 text-sm sm:text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
+                    'inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
                     recentlyAdded.has(t.id)
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                       : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
@@ -271,6 +309,7 @@ async function pickTemplate(t) {
           </tbody>
         </table>
       </div>
+      </template>
 
       <!-- Footer : fermer -->
       <div class="flex items-center justify-end pt-2 border-t border-gray-100">
