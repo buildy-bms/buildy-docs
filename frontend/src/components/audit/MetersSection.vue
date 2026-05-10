@@ -214,14 +214,12 @@ onBeforeUnmount(teardownMetersSortable)
             <button
               type="button"
               @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
-              :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
+              :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
                 hasNotes(m.notes_html || m.notes)
-                  ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                  : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                  ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                  : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
               v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
-              <PencilSquareIcon class="w-3.5 h-3.5" />
-              <span v-if="hasNotes(m.notes_html || m.notes)">Notes</span>
-              <span v-else>+ Notes</span>
+              <PencilSquareIcon class="w-4 h-4" />
             </button>
           </td>
           <td class="py-2.5 text-center">

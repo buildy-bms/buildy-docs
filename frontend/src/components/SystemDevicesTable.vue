@@ -385,11 +385,9 @@ async function removeDevice(d) {
             :row-class="[d.out_of_service ? 'opacity-60' : '',
                          isSharedFromOtherZone(d) ? 'bg-emerald-50/30' : ''].join(' ')"
             @changed="refreshPhotos">
-            <!-- Nom + badge partage -->
+            <!-- Nom (le badge "Partagé depuis" est porté par la couleur
+                 de fond verte de la ligne et le tooltip du bouton partage). -->
             <td class="px-2 py-2 align-middle min-w-56">
-              <div v-if="isSharedFromOtherZone(d)" class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5">
-                Partagé depuis « {{ originZoneNameFor(d) }} »
-              </div>
               <input type="text" :value="d.name" placeholder="Nommer ce système"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                      class="w-full font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
@@ -408,11 +406,11 @@ async function removeDevice(d) {
             </td>
             <!-- Puissance -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="relative w-28">
+              <div class="relative w-20 mx-auto">
                 <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
                        @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       :class="inputCls" class="text-right pr-7 placeholder:text-gray-300" />
-                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
+                       :class="inputCls" class="text-right pr-6 placeholder:text-gray-300" />
+                <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>
             <!-- Énergie -->
@@ -492,31 +490,33 @@ async function removeDevice(d) {
                 </button>
               </div>
             </td>
-            <!-- Actions : Notes / Photo / Partage / Dup / Suppr -->
-            <td class="px-2 py-2 align-middle whitespace-nowrap text-right">
-              <div class="inline-flex items-center gap-1.5">
+            <!-- Actions : icones seules + tooltip (compteur photo en badge) -->
+            <td class="px-2 py-2 align-middle whitespace-nowrap">
+              <div class="inline-flex items-center gap-0.5">
                 <button type="button" @click="emit('open-device-notes', d)"
-                        :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
+                        :class="['p-1.5 rounded-md transition',
                           hasNotes(d.notes_html || d.notes)
-                            ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                            : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                            ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                            : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
                         v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
-                  <PencilSquareIcon class="w-3.5 h-3.5" />
-                  <span v-if="hasNotes(d.notes_html || d.notes)">Notes</span>
-                  <span v-else>+ Notes</span>
+                  <PencilSquareIcon class="w-4 h-4" />
                 </button>
                 <input type="file" accept="image/*" class="hidden"
                        :ref="el => { if (el) fileInputs[d.id] = el }"
                        @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
                 <button @click="pickPhotoFor(d.id)"
-                        :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition',
+                        :class="['relative p-1.5 rounded-md transition',
                                  (photosByDevice[d.id] || []).length
-                                   ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                                   : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
-                        v-tooltip="`${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`">
-                  <CameraIcon class="w-3.5 h-3.5" />
-                  <span v-if="(photosByDevice[d.id] || []).length">{{ (photosByDevice[d.id] || []).length }}</span>
-                  <span v-else>+ Photo</span>
+                                   ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                                   : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+                        v-tooltip="(photosByDevice[d.id] || []).length
+                          ? `${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`
+                          : 'Ajouter une photo'">
+                  <CameraIcon class="w-4 h-4" />
+                  <span v-if="(photosByDevice[d.id] || []).length"
+                        class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[9px] font-semibold bg-emerald-600 text-white rounded-full">
+                    {{ (photosByDevice[d.id] || []).length }}
+                  </span>
                 </button>
                 <DeviceZoneSharing
                   :device="d"
@@ -524,10 +524,10 @@ async function removeDevice(d) {
                   :zones="documentZones"
                   @updated="emit('changed')" />
                 <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
-                <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1 rounded transition" v-tooltip="'Dupliquer'">
+                <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
-                <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition" v-tooltip="'Supprimer'">
+                <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

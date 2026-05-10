@@ -235,13 +235,12 @@ onBeforeUnmount(teardownSortable)
                       currentHtml: t.notes_html || t.notes || '',
                       noteField: 'notes_html',
                     })"
-                    :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
+                    :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
                       hasNotes(t.notes_html || t.notes)
-                        ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                        : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                        ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                        : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
                     v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-              <PencilSquareIcon class="w-3.5 h-3.5 shrink-0" />
-              {{ hasNotes(t.notes_html || t.notes) ? 'Notes' : '+ Notes' }}
+              <PencilSquareIcon class="w-4 h-4 shrink-0" />
             </button>
           </td>
         </tr>
@@ -304,13 +303,12 @@ onBeforeUnmount(teardownSortable)
                           currentHtml: t[LEVEL_NOTES_FIELD[lvl.key]] || '',
                           noteField: LEVEL_NOTES_FIELD[lvl.key],
                         })"
-                        :class="['inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
+                        :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
                           hasNotes(t[LEVEL_NOTES_FIELD[lvl.key]])
-                            ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                            : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700']"
+                            ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                            : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
                         v-tooltip="hasNotes(t[LEVEL_NOTES_FIELD[lvl.key]]) ? 'Modifier la note ' + lvl.label.toLowerCase() : 'Ajouter une note ' + lvl.label.toLowerCase()">
-                  <PencilSquareIcon class="w-3.5 h-3.5 shrink-0" />
-                  {{ hasNotes(t[LEVEL_NOTES_FIELD[lvl.key]]) ? 'Notes' : '+ Notes' }}
+                  <PencilSquareIcon class="w-4 h-4 shrink-0" />
                 </button>
               </div>
             </div>

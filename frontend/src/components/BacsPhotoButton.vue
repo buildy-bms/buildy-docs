@@ -232,19 +232,18 @@ async function saveCaptions() {
 const btnCls = computed(() => {
   // Aligné sur le style des autres boutons d'action (Notes, HS, Câblé,
   // Arrêt manuel) : rounded-md, px-2 py-1, text-[11px], icône w-3.5 h-3.5,
-  // tons border-200/text-700/bg-50 cohérents.
-  const base = 'inline-flex items-center justify-center gap-1 rounded-md border transition font-medium whitespace-nowrap'
+  // Mobile : bouton plein-largeur tactile (44px). Desktop : icon-only
+  // avec badge compteur en pastille flottante (pattern adopté pour Notes
+  // / Partage / Photo dans toute l'app desktop).
+  const base = 'inline-flex items-center justify-center rounded-md transition whitespace-nowrap'
   if (isMobile.value) {
-    return `${base} px-4 py-3.5 text-base w-full bg-indigo-600 border-indigo-600 text-white active:bg-indigo-700`
+    return `${base} gap-1 px-4 py-3.5 text-base w-full font-medium border bg-indigo-600 border-indigo-600 text-white active:bg-indigo-700`
   }
-  const size = props.size === 'md'
-    ? 'px-2.5 py-1 text-xs'
-    : 'px-2 py-1 text-[11px]'
-  if (isDragOver.value) return `${base} ${size} border-indigo-500 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300/50`
+  if (isDragOver.value) return `${base} relative p-1.5 bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300/50`
   const tone = photos.value.length
-    ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-    : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700'
-  return `${base} ${size} ${tone}`
+    ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+  return `${base} relative p-1.5 ${tone}`
 })
 
 // Affichage des EXIF (date capture, GPS, appareil) sous chaque tile et
@@ -291,14 +290,16 @@ function exifTooltip(p) {
       @dragleave.prevent="onDragLeave"
       @drop.prevent="onDrop"
     >
-      <CameraIcon :class="['shrink-0', isMobile ? 'w-5 h-5' : 'w-3.5 h-3.5']" />
+      <CameraIcon :class="['shrink-0', isMobile ? 'w-5 h-5' : 'w-4 h-4']" />
       <template v-if="isMobile">
         <span class="font-medium">Photos<span v-if="photos.length"> ({{ photos.length }})</span></span>
       </template>
       <template v-else>
-        <span v-if="isDragOver">Déposer ici</span>
-        <span v-else-if="photos.length">{{ photos.length }} photo<span v-if="photos.length > 1">s</span></span>
-        <span v-else>+ Photo</span>
+        <span v-if="isDragOver" class="ml-1 text-[11px]">↓</span>
+        <span v-else-if="photos.length"
+              class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[9px] font-semibold bg-emerald-600 text-white rounded-full">
+          {{ photos.length }}
+        </span>
       </template>
     </button>
 

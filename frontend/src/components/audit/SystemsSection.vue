@@ -227,12 +227,12 @@ onBeforeUnmount(teardownSortables)
                       type="button"
                       :disabled="!s.present"
                       @click="emit('open-notes', { title: 'Notes systeme', contextLabel: (systemLabels[s.system_category] || s.system_category) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
-                      :class="['inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border transition disabled:opacity-30 disabled:cursor-not-allowed',
+                      :class="['inline-flex items-center justify-center p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed',
                         hasNotes(s.notes_html || s.notes)
-                          ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                          : 'border-gray-300 text-gray-600 hover:bg-gray-50']">
+                          ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                          : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+                      v-tooltip="hasNotes(s.notes_html || s.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                       <PencilSquareIcon class="w-4 h-4" />
-                      {{ hasNotes(s.notes_html || s.notes) ? 'Notes' : '+ Notes' }}
                     </button>
                     <BacsPhotoButton
                       v-if="document?.site_uuid && s.present"
