@@ -19,11 +19,15 @@ const showAdd = ref(false)
 const draftPoint = ref({ label: '', data_type: 'Mesure', direction: 'read', unit: '', tech_name: '', nature: '', is_optional: false })
 
 // Couleurs des badges de nature (chip dans la table)
+// Palette canonique alignee sur la liste de points PDF
+// (cf. `templates/pdf/styles-points.css` .badge-nature) :
+//   Booléen  -> vert (emerald), Numérique -> violet,
+//   Enum     -> orange, Chaîne   -> gris (slate)
 const NATURE_COLORS = {
-  'Booléen':              { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  'Numérique':            { bg: 'bg-cyan-50',   text: 'text-cyan-700',   border: 'border-cyan-200' },
-  'Enum':                 { bg: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-200' },
-  'Chaîne de caractères': { bg: 'bg-slate-50',  text: 'text-slate-700',  border: 'border-slate-200' },
+  'Booléen':              { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  'Numérique':            { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200' },
+  'Enum':                 { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200' },
+  'Chaîne de caractères': { bg: 'bg-slate-50',   text: 'text-slate-700',   border: 'border-slate-200' },
 }
 
 const TYPE_COLORS = {
