@@ -463,17 +463,19 @@ async function removeDevice(d) {
             </div>
             <div class="col-span-12 md:col-span-4">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Communication</label>
-              <div class="space-y-1.5">
-                <ProtocolMultiPicker
-                  :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
-                  :options="COMM_OPTIONS"
-                  size="xs"
-                  placeholder="Aucun protocole"
-                  @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
-                />
+              <div class="flex items-center gap-1.5">
+                <div class="flex-1 min-w-0">
+                  <ProtocolMultiPicker
+                    :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
+                    :options="COMM_OPTIONS"
+                    size="xs"
+                    placeholder="Aucun protocole"
+                    @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
+                  />
+                </div>
                 <button type="button"
                         @click="patchDevice(d, { wired: !d.wired })"
-                        :class="['flag-pill', d.wired ? 'flag-on' : 'flag-off']"
+                        :class="['flag-pill shrink-0', d.wired ? 'flag-on' : 'flag-off']"
                         v-tooltip="'Communication câblée vers la GTB'">
                   <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
                 </button>

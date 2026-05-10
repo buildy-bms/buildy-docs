@@ -11,6 +11,7 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateAf, getBacsPowerSummary } from '@/api'
 import MobileField from './MobileField.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
 const audit = useAuditStore()
 const { document, site, powerSummary } = storeToRefs(audit)
@@ -151,6 +152,17 @@ const generatorWorksDone = computed({
             {{ site.customer_name }}
           </div>
         </MobileField>
+
+        <!-- Photos générales du site (façade, toiture, vue d'ensemble…) -->
+        <div v-if="document?.site_uuid" class="pt-1">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos du site</p>
+          <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{}"
+            :label="site?.name || document?.client_name || 'Site'"
+            size="md"
+          />
+        </div>
       </div>
     </div>
 
