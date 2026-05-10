@@ -37,6 +37,17 @@ function roleLabel(value) {
 
 const { error: notifyError, success: notifySuccess } = useNotification()
 
+// Catalogue dynamique : alimenté par le composable useSystemCategories
+// (table `system_categories_db`). Plus de liste hardcodée — toute catégorie
+// créée par l'admin apparaît automatiquement dans les groupements et la
+// vue détail. Le tri suit `position` du catalogue DB.
+//
+// IMPORTANT : déclaration en tête du setup car référencé par les computed
+// `flatEquipmentItems` plus bas. Si on déclarait après, le watch sur ce
+// computed tenterait de l'évaluer au setup et lèverait un ReferenceError
+// (TDZ) sur dbCategories.
+const { categories: dbCategories, labelOf: categoryLabel } = useSystemCategories()
+
 const router = useRouter()
 const route = useRoute()
 const versions = ref([])
@@ -411,11 +422,7 @@ function isLastInCategory(t) {
   return peers[peers.length - 1]?.id === t.id
 }
 
-// Catalogue dynamique : alimenté par le composable useSystemCategories
-// (table `system_categories_db`). Plus de liste hardcodée — toute catégorie
-// créée par l'admin apparaît automatiquement dans les groupements et la
-// vue détail. Le tri suit `position` du catalogue DB.
-const { categories: dbCategories, labelOf: categoryLabel } = useSystemCategories()
+// (dbCategories + categoryLabel sont déclarés en tête du setup.)
 
 async function refresh() {
   loading.value = true
