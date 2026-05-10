@@ -44,6 +44,10 @@ export const useAuditStore = defineStore('audit', {
     // loadAudit().
     loading: true,
     saving: false,
+    // Demande de focus inter-tab : MobileChecklistTab (KPIs) bascule
+    // l'onglet et set ce flag, le tab cible (zones / meters / systems)
+    // l'observe pour ouvrir directement l'entité, puis le reset.
+    pendingFocus: null, // { kind, id } ou null
   }),
 
   getters: {

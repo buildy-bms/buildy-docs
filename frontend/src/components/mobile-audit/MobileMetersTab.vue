@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   BoltIcon,
@@ -76,6 +76,14 @@ function openEdit(m) {
   editing.value = { mode: 'edit', meter: m }
 }
 function close() { editing.value = null }
+
+// Ouverture directe depuis l'onglet Docs (KPIs couverture photo).
+watch(() => audit.pendingFocus, (focus) => {
+  if (!focus || focus.kind !== 'meters' || focus.id == null) return
+  const meter = meters.value.find(m => m.id === focus.id)
+  if (meter) openEdit(meter)
+  audit.pendingFocus = null
+}, { immediate: true })
 
 async function save() {
   saving.value = true

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   Squares2X2Icon,
@@ -59,6 +59,16 @@ function openEdit(z) {
 function close() {
   editing.value = null
 }
+
+// Ouverture directe depuis l'onglet Docs (KPIs couverture photo) :
+// MobileChecklistTab set audit.pendingFocus = { kind: 'zones', id }
+// puis bascule l'onglet ; on l'observe ici pour ouvrir le sheet d'édition.
+watch(() => audit.pendingFocus, (focus) => {
+  if (!focus || focus.kind !== 'zones' || focus.id == null) return
+  const zone = zones.value.find(z => z.zone_id === focus.id)
+  if (zone) openEdit(zone)
+  audit.pendingFocus = null
+}, { immediate: true })
 
 async function save() {
   if (!editForm.value.name?.trim()) {
