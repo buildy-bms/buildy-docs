@@ -654,17 +654,10 @@ async function routes(fastify) {
         label: b.label, bacs: b.bacs, slugs: b.slugs,
         iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
       });
-      // Cascade key rename :
-      // - equipment_templates.category : FK ON UPDATE CASCADE (mig 118)
-      // - equipment_instance_categories.category_key : FK ON UPDATE CASCADE (mig 118)
-      // → ces 2 propagent automatiquement via la FK quand l'UPDATE de
-      //   system_categories_db.key tombe (gere par db.systemCategoriesDb.update
-      //   plus haut dans la transaction).
-      // - sections.system_category_key : pas de FK (cf. mig 118 pour la
-      //   raison) → cascade manuelle ici.
-      if (nextKey) {
-        db.db.prepare('UPDATE sections SET system_category_key = ? WHERE system_category_key = ?').run(nextKey, cur.key);
-      }
+      // Cascade key rename gere integralement par les FK ON UPDATE CASCADE
+      // posees aux migs 118 (equipment_templates.category +
+      // equipment_instance_categories.category_key) et 119 (sections.system_category_key).
+      // Plus de cascade manuelle ici.
       // Source unique : si `slugs` est explicitement fourni dans le PATCH,
       // on synchronise `equipment_templates.category` :
       //   - templates dont le slug est dans newSlugs et qui n'ont pas

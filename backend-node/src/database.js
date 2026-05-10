@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 118;
+const TARGET_VERSION = 119;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4549,6 +4549,94 @@ function runMigrations() {
     db.pragma('foreign_keys = ON');
     log.info('Migration 118 appliquee : FK posees sur equipment_templates.category + equipment_instance_categories.category_key (ON UPDATE CASCADE ON DELETE NO ACTION/CASCADE)');
     db.pragma('user_version = 118');
+  }
+
+  if (current < 119) {
+    // Finalisation des FK categorie : `sections.system_category_key` rejoint
+    // les autres avec FK ON UPDATE CASCADE ON DELETE SET NULL.
+    // Recreate de la table sections avec preservation de tous les indexes
+    // et du trigger sections_fts_delete.
+    //
+    // Pre-check : nettoyer orphelines avant le recreate (sinon FK strict
+    // rejette).
+    const orphSecCleanup = db.prepare(`
+      UPDATE sections SET system_category_key = NULL
+      WHERE system_category_key IS NOT NULL
+        AND system_category_key NOT IN (SELECT key FROM system_categories_db)
+    `).run();
+    if (orphSecCleanup.changes) {
+      log.warn(`Migration 119 : ${orphSecCleanup.changes} sections.system_category_key orphelines mises a NULL avant recreate FK`);
+    }
+
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE sections_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          af_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+          parent_id INTEGER REFERENCES sections(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL DEFAULT 0,
+          number TEXT,
+          title TEXT NOT NULL,
+          service_level TEXT,
+          service_level_source TEXT,
+          bacs_articles TEXT,
+          bacs_justification TEXT,
+          body_html TEXT,
+          body_yjs BLOB,
+          kind TEXT NOT NULL DEFAULT 'standard'
+            CHECK (kind IN ('standard', 'equipment', 'synthesis', 'hyperveez_page', 'zones')),
+          included_in_export INTEGER NOT NULL DEFAULT 1,
+          generic_note INTEGER NOT NULL DEFAULT 0,
+          fact_check_status TEXT DEFAULT 'unverified',
+          equipment_template_id INTEGER REFERENCES equipment_templates(id),
+          equipment_template_version INTEGER,
+          hyperveez_page_slug TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_by INTEGER REFERENCES users(id),
+          section_template_id INTEGER REFERENCES section_templates(id),
+          section_template_version INTEGER,
+          opted_out_by_moa INTEGER NOT NULL DEFAULT 0,
+          demanded_by_moa INTEGER NOT NULL DEFAULT 0,
+          optin_paid_option INTEGER NOT NULL DEFAULT 0,
+          description_html_override TEXT,
+          system_category_key TEXT REFERENCES system_categories_db(key) ON UPDATE CASCADE ON DELETE SET NULL
+        );
+        INSERT INTO sections_new SELECT
+          id, af_id, parent_id, position, number, title, service_level,
+          service_level_source, bacs_articles, bacs_justification, body_html,
+          body_yjs, kind, included_in_export, generic_note, fact_check_status,
+          equipment_template_id, equipment_template_version, hyperveez_page_slug,
+          created_at, updated_at, updated_by, section_template_id,
+          section_template_version, opted_out_by_moa, demanded_by_moa,
+          optin_paid_option, description_html_override, system_category_key
+        FROM sections;
+        -- Le trigger sections_fts_delete est ON DELETE FROM sections, donc
+        -- DROP TABLE sections le supprime aussi. On le recree apres rename.
+        DROP TABLE sections;
+        ALTER TABLE sections_new RENAME TO sections;
+        -- Indexes
+        CREATE INDEX IF NOT EXISTS idx_sections_af_parent ON sections(af_id, parent_id, position);
+        CREATE INDEX IF NOT EXISTS idx_sections_kind ON sections(af_id, kind);
+        CREATE INDEX IF NOT EXISTS idx_sections_template ON sections(equipment_template_id) WHERE equipment_template_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_sections_system_category ON sections(af_id, system_category_key) WHERE system_category_key IS NOT NULL;
+        -- Trigger FTS delete (sync sections_fts)
+        CREATE TRIGGER IF NOT EXISTS sections_fts_delete
+          AFTER DELETE ON sections BEGIN
+            DELETE FROM sections_fts WHERE section_id = old.id;
+          END;
+      `);
+    });
+    tx();
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 119 : FK errors detectes');
+      throw new Error('Migration 119 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 119 appliquee : FK sections.system_category_key -> system_categories_db.key (ON UPDATE CASCADE ON DELETE SET NULL) + indexes + trigger FTS preserves');
+    db.pragma('user_version = 119');
   }
 
   if (current > TARGET_VERSION) {
