@@ -351,28 +351,28 @@ async function removeDevice(d) {
       <table class="systems-data-table w-full text-sm">
         <thead>
           <tr>
-            <th @click="toggleSort('name')" class="sortable text-left">
+            <th @click="toggleSort('name')" class="sortable">
               <span>Nom</span><span class="sort-ico">{{ sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th @click="toggleSort('brand')" class="sortable text-left">
+            <th @click="toggleSort('brand')" class="sortable">
               <span>Marque</span><span class="sort-ico">{{ sortKey === 'brand' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th @click="toggleSort('model_reference')" class="sortable text-left">
+            <th @click="toggleSort('model_reference')" class="sortable">
               <span>Référence</span><span class="sort-ico">{{ sortKey === 'model_reference' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th @click="toggleSort('power_kw')" class="sortable text-right">
+            <th @click="toggleSort('power_kw')" class="sortable">
               <span>Puiss.</span><span class="sort-ico">{{ sortKey === 'power_kw' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th @click="toggleSort('energy_source')" class="sortable text-left">
+            <th @click="toggleSort('energy_source')" class="sortable">
               <span>Énergie</span><span class="sort-ico">{{ sortKey === 'energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th class="text-left">Rôle</th>
-            <th @click="toggleSort('location')" class="sortable text-left">
+            <th>Rôle</th>
+            <th @click="toggleSort('location')" class="sortable">
               <span>Localisation</span><span class="sort-ico">{{ sortKey === 'location' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
             </th>
-            <th class="text-left">Communication</th>
-            <th class="text-left">État</th>
-            <th class="text-right">Actions</th>
+            <th>Communication</th>
+            <th>État</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -564,6 +564,7 @@ async function removeDevice(d) {
   position: sticky;
   top: 0;
   z-index: 1;
+  text-align: center;
 }
 .systems-data-table thead th:last-child {
   border-right: none;
@@ -588,6 +589,17 @@ async function removeDevice(d) {
   border-bottom: 1px solid #f3f4f6;
   border-right: 1px solid #f9fafb;
   vertical-align: middle;
+  text-align: center;
+}
+/* Centre les contenus internes (input/SearchableSelect/divs) sans casser
+   leur layout. text-align cible inputs ; les flex internes (Communication,
+   État, Actions) restent OK car ils ont déjà justify-* explicites. */
+.systems-data-table tbody td input[type="text"],
+.systems-data-table tbody td input[type="number"] {
+  text-align: center;
+}
+.systems-data-table tbody td > div.flex {
+  justify-content: center;
 }
 .systems-data-table tbody td:last-child {
   border-right: none;
