@@ -9,6 +9,7 @@ const config = require('../../config');
 const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
+const { parseRoles } = require('../../lib/device-roles');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
@@ -97,7 +98,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const devicesBySystem = new Map();
   for (const d of devices) {
     d.energyLabel = d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—';
-    d.roleLabel = d.device_role ? (ROLE_LABEL[d.device_role] || d.device_role) : '—';
+    // Multi-rôle (mig 117) : array → labels FR jointsavec ' / '.
+    const roles = parseRoles(d.device_role);
+    d.device_role = roles; // expose array (utile si template Hbs y accède directement)
+    d.roleLabel = roles.length ? roles.map(r => ROLE_LABEL[r] || r).join(' / ') : '—';
     d.commLabel = d.communication_protocol
       ? (COMM_LABEL[d.communication_protocol] || d.communication_protocol)
       : 'Non communicant';

@@ -29,7 +29,9 @@ function faName(icon) {
 }
 
 const props = defineProps({
-  modelValue: { type: [String, Number, null], default: null },
+  // mono : String | Number | null
+  // multi : Array<String | Number>
+  modelValue: { type: [String, Number, Array, null], default: null },
   options: { type: Array, default: () => [] },
   placeholder: { type: String, default: 'Sélectionner…' },
   searchPlaceholder: { type: String, default: 'Rechercher…' },
@@ -43,6 +45,9 @@ const props = defineProps({
   // apparaît et émet update:modelValue avec la chaîne saisie. La valeur
   // courante non listée s'affiche aussi telle quelle dans le trigger.
   creatable: { type: Boolean, default: false },
+  // Mode multi-select : modelValue = array, click sur une option toggle,
+  // popover reste ouvert. Affichage chips dans le trigger.
+  multiple: { type: Boolean, default: false },
 })
 
 const triggerCls = computed(() => [
@@ -87,12 +92,32 @@ function updatePopoverPosition() {
   }
 }
 
+// Helpers pour les 2 modes (mono | multi).
+const selectedValues = computed(() => {
+  if (props.multiple) {
+    return Array.isArray(props.modelValue) ? props.modelValue : []
+  }
+  return props.modelValue == null || props.modelValue === '' ? [] : [props.modelValue]
+})
+function isSelected(val) {
+  return selectedValues.value.some(v => v === val)
+}
+
 const selectedOption = computed(() =>
   props.options.find(o => o.value === props.modelValue) || null
 )
+// Liste d'options sélectionnées en mode multi (pour rendu chips dans le trigger).
+const selectedOptions = computed(() => {
+  if (!props.multiple) return []
+  return selectedValues.value.map(v => {
+    const opt = props.options.find(o => o.value === v)
+    return opt || { value: v, label: String(v) }
+  })
+})
 // En mode creatable, une valeur courante non listée doit quand même
 // s'afficher dans le trigger (sinon elle paraît "perdue").
 const customLabel = computed(() => {
+  if (props.multiple) return null
   if (!props.creatable || selectedOption.value || props.modelValue == null
       || props.modelValue === '') return null
   return String(props.modelValue)
@@ -144,6 +169,16 @@ function toggle() {
 }
 
 function pick(option) {
+  if (props.multiple) {
+    const cur = selectedValues.value
+    const next = cur.some(v => v === option.value)
+      ? cur.filter(v => v !== option.value)
+      : [...cur, option.value]
+    emit('update:modelValue', next)
+    // Reste ouvert en mode multi pour permettre l'ajout de plusieurs valeurs.
+    nextTick(() => updatePopoverPosition())
+    return
+  }
   emit('update:modelValue', option.value)
   open.value = false
   search.value = ''
@@ -151,9 +186,22 @@ function pick(option) {
   window.removeEventListener('resize', updatePopoverPosition)
 }
 
+function removeChip(val) {
+  if (!props.multiple) return
+  emit('update:modelValue', selectedValues.value.filter(v => v !== val))
+}
+
 function createCustom() {
   const q = search.value.trim()
   if (!q) return
+  if (props.multiple) {
+    if (!selectedValues.value.includes(q)) {
+      emit('update:modelValue', [...selectedValues.value, q])
+    }
+    search.value = ''
+    nextTick(() => updatePopoverPosition())
+    return
+  }
   emit('update:modelValue', q)
   open.value = false
   search.value = ''
@@ -203,7 +251,7 @@ onMounted(() => document.addEventListener('mousedown', onDocClick))
 onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
 
 function clear() {
-  emit('update:modelValue', null)
+  emit('update:modelValue', props.multiple ? [] : null)
 }
 </script>
 
@@ -211,17 +259,39 @@ function clear() {
   <div ref="rootRef" class="relative" @keydown="onKeydown">
     <button ref="triggerRef" type="button" @click="toggle" :disabled="disabled"
             :class="triggerCls">
-      <FontAwesomeIcon
-        v-if="selectedOption?.icon"
-        :icon="['fas', faName(selectedOption.icon)]"
-        :style="{ color: selectedOption.color || '#6b7280' }"
-        class="w-4 h-4 shrink-0"
-      />
-      <span class="flex-1 text-left truncate"
-            :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
-        {{ selectedOption?.label || customLabel || placeholder }}
-      </span>
-      <button v-if="clearable && (selectedOption || customLabel) && !disabled" type="button"
+      <!-- Mode multi : chips. Click sur ✕ retire la valeur sans ouvrir le popover. -->
+      <template v-if="multiple">
+        <span v-if="!selectedOptions.length"
+              class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
+        <span v-else class="flex-1 flex flex-wrap items-center gap-1">
+          <span v-for="o in selectedOptions" :key="o.value"
+                class="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
+            <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
+                             :style="{ color: o.color || '#6b7280' }"
+                             class="w-3 h-3 shrink-0" />
+            <span class="truncate max-w-40">{{ o.label }}</span>
+            <button v-if="!disabled" type="button" @click.stop="removeChip(o.value)"
+                    class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-500 transition"
+                    v-tooltip="'Retirer'">
+              <XMarkIcon class="w-2.5 h-2.5" />
+            </button>
+          </span>
+        </span>
+      </template>
+      <!-- Mode mono : un seul label -->
+      <template v-else>
+        <FontAwesomeIcon
+          v-if="selectedOption?.icon"
+          :icon="['fas', faName(selectedOption.icon)]"
+          :style="{ color: selectedOption.color || '#6b7280' }"
+          class="w-4 h-4 shrink-0"
+        />
+        <span class="flex-1 text-left truncate"
+              :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
+          {{ selectedOption?.label || customLabel || placeholder }}
+        </span>
+      </template>
+      <button v-if="clearable && (multiple ? selectedOptions.length : (selectedOption || customLabel)) && !disabled" type="button"
               @click.stop="clear"
               class="text-gray-400 hover:text-gray-600 -my-1 p-0.5 rounded"
               v-tooltip="'Effacer la sélection'">
@@ -249,7 +319,7 @@ function clear() {
                   @mouseenter="activeIndex = i"
                   :data-active="activeIndex === i"
                   :class="['w-full flex items-center gap-2.5 px-3 py-1.5 sm:py-1.5 text-sm text-left transition min-h-11 sm:min-h-0',
-                           o.value === modelValue ? 'bg-indigo-50 text-indigo-700 font-medium'
+                           isSelected(o.value) ? 'bg-indigo-50 text-indigo-700 font-medium'
                              : (activeIndex === i ? 'bg-gray-50 text-gray-900' : 'text-gray-700 hover:bg-gray-50')]">
             <span v-if="o.indent" class="text-gray-300" :style="{ paddingLeft: `${(o.indent - 1) * 12}px` }">└─</span>
             <FontAwesomeIcon
@@ -261,7 +331,7 @@ function clear() {
             <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
             <span class="flex-1 truncate">{{ o.label }}</span>
             <span v-if="o.hint" class="text-[11px] text-gray-400 truncate">{{ o.hint }}</span>
-            <CheckIcon v-if="o.value === modelValue" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <CheckIcon v-if="isSelected(o.value)" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
           <div v-if="!filteredOptions.length && !canCreate" class="px-3 py-3 text-xs text-gray-400 italic text-center">
             Aucun résultat

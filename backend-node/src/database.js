@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 116;
+const TARGET_VERSION = 117;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4424,6 +4424,41 @@ function runMigrations() {
     tx();
     log.info(`Migration 116 appliquee : equipment_templates.position seede sur ${rowsByCat.length} row(s)`);
     db.pragma('user_version = 116');
+  }
+
+  if (current < 117) {
+    // Multi-niveau : `default_device_role` (equipment_templates) et
+    // `device_role` (bacs_audit_system_devices) passent de string scalaire
+    // a JSON array dans la meme colonne TEXT. Idempotent : si la valeur
+    // est deja un JSON array valide, ne touche pas.
+    function toJsonArray(val) {
+      if (val == null) return null;
+      const s = String(val).trim();
+      if (!s) return null;
+      if (s.startsWith('[')) {
+        try { const parsed = JSON.parse(s); if (Array.isArray(parsed)) return s; } catch { /* legacy */ }
+      }
+      return JSON.stringify([s]);
+    }
+    let tplCount = 0;
+    let devCount = 0;
+    const tx = db.transaction(() => {
+      const tplRows = db.prepare('SELECT id, default_device_role FROM equipment_templates WHERE default_device_role IS NOT NULL').all();
+      const updTpl = db.prepare('UPDATE equipment_templates SET default_device_role = ? WHERE id = ?');
+      for (const r of tplRows) {
+        const next = toJsonArray(r.default_device_role);
+        if (next !== r.default_device_role) { updTpl.run(next, r.id); tplCount++; }
+      }
+      const devRows = db.prepare('SELECT id, device_role FROM bacs_audit_system_devices WHERE device_role IS NOT NULL').all();
+      const updDev = db.prepare('UPDATE bacs_audit_system_devices SET device_role = ? WHERE id = ?');
+      for (const r of devRows) {
+        const next = toJsonArray(r.device_role);
+        if (next !== r.device_role) { updDev.run(next, r.id); devCount++; }
+      }
+    });
+    tx();
+    log.info(`Migration 117 appliquee : default_device_role/device_role -> JSON array (${tplCount} tpl + ${devCount} devices migres)`);
+    db.pragma('user_version = 117');
   }
 
   if (current > TARGET_VERSION) {

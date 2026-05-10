@@ -8,7 +8,7 @@ module.exports = {
   bacs_justification: '<p>L\'article R175-1 définit un <strong>système de chauffage</strong> comme la combinaison des composantes nécessaires pour assurer l\'augmentation contrôlée de la température de l\'air intérieur. Une chaudière (et plus largement tout générateur de chaleur) entre directement dans cette définition.</p><p>Le décret impose que la chaudière soit <strong>interopérable</strong> avec les autres systèmes techniques, qu\'elle puisse être <strong>arrêtée manuellement</strong> et qu\'elle soit <strong>gérée de manière autonome</strong> au sein du système BACS, avec un suivi continu de ses paramètres et la remontée des alarmes.</p><p>L\'intégration de la chaudière dans la solution Buildy permet de répondre à ces obligations en remontant les températures, pressions, puissances et défauts, et en exposant les commandes de marche/arrêt et les consignes de température.</p>',
   preferred_protocols: 'Modbus TCP,BACnet/IP,Modbus RTU',
   default_energy_source: 'gas',
-  default_device_role: 'production',
+  default_device_role: ['production'],
   icon_kind: 'fa',
   icon_value: 'fa-fire',
   icon_color: '#ef4444',

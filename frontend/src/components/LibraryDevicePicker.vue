@@ -102,12 +102,17 @@ function normalizeText(s) {
   return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
+function rolesArr(v) {
+  return Array.isArray(v) ? v : (v ? [v] : [])
+}
 const filtered = computed(() => {
   const q = normalizeText(search.value.trim())
   return templates.value.filter(t => {
     if (q && !normalizeText(t.name).includes(q)) return false
     if (energyFilter.value && t.default_energy_source !== energyFilter.value) return false
-    if (roleFilter.value && t.default_device_role !== roleFilter.value) return false
+    // Multi-rôle (mig 117) : un template apparaît si son array de rôles
+    // contient le rôle filtré.
+    if (roleFilter.value && !rolesArr(t.default_device_role).includes(roleFilter.value)) return false
     return true
   })
 })
@@ -116,7 +121,13 @@ function energyLabel(value) {
   return ENERGY_OPTIONS.find(o => o.value === value)?.label || ''
 }
 function roleLabel(value) {
-  return ROLE_OPTIONS.find(o => o.value === value)?.label || ''
+  // Multi-rôle : array → labels FR joints par ' / '. Scalaire (legacy) → label simple.
+  return rolesArr(value)
+    .map(v => ROLE_OPTIONS.find(o => o.value === v)?.label || v)
+    .join(' / ')
+}
+function hasRole(value) {
+  return rolesArr(value).length > 0
 }
 
 const recentlyAdded = ref(new Set())
@@ -226,8 +237,8 @@ async function pickTemplate(t) {
                     <div class="font-medium text-gray-900 truncate">{{ t.name }}</div>
                     <div class="text-xs text-gray-400 sm:hidden mt-0.5">
                       <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
-                      <span v-if="t.default_energy_source && t.default_device_role"> · </span>
-                      <span v-if="t.default_device_role">{{ roleLabel(t.default_device_role) }}</span>
+                      <span v-if="t.default_energy_source && hasRole(t.default_device_role)"> · </span>
+                      <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
                     </div>
                   </div>
                 </div>
@@ -237,7 +248,7 @@ async function pickTemplate(t) {
                 <span v-else class="text-gray-300">—</span>
               </td>
               <td class="px-3 py-2.5 text-gray-600 hidden sm:table-cell whitespace-nowrap">
-                <span v-if="t.default_device_role">{{ roleLabel(t.default_device_role) }}</span>
+                <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
                 <span v-else class="text-gray-300">—</span>
               </td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap">

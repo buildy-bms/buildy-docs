@@ -18,7 +18,7 @@ module.exports = {
   bacs_justification: '<p>L\'article R175-1 définit un <strong>système de ventilation</strong> comme la combinaison des composantes nécessaires pour assurer le renouvellement de l\'air intérieur. Une CTA entre dans cette définition, et selon sa configuration peut aussi répondre aux définitions de système de chauffage (§1) et de climatisation (§2).</p><p>Le décret impose que ces systèmes soient <strong>interopérables</strong> avec les autres systèmes techniques du bâtiment, qu\'ils puissent être <strong>arrêtés manuellement</strong> et qu\'ils soient <strong>gérés de manière autonome</strong> par le système BACS (suivi continu, alarmes, programmation horaire).</p><p>L\'intégration de la CTA dans la solution Buildy permet de répondre à ces obligations en supervisant les températures, les débits, les états des composants et en exposant les commandes nécessaires au pilotage à distance.</p>',
   preferred_protocols: 'Modbus TCP,BACnet/IP',
   default_energy_source: 'electric',
-  default_device_role: 'distribution',
+  default_device_role: ['distribution'],
   icon_kind: 'fa',
   icon_value: 'fa-fan',
   icon_color: '#3b82f6',

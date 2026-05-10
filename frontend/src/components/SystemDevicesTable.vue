@@ -97,7 +97,8 @@ function originZoneIdOf(d) {
 
 const newDevice = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
-  energy_source: null, device_role: null, communication_protocol: null,
+  // Multi-rôle : array (mig 117).
+  energy_source: null, device_role: [], communication_protocol: null,
   location: '', notes: '',
 })
 
@@ -188,14 +189,15 @@ async function addDevice() {
       model_reference: newDevice.value.model_reference || null,
       power_kw: newDevice.value.power_kw === '' ? null : Number(newDevice.value.power_kw),
       energy_source: newDevice.value.energy_source,
-      device_role: newDevice.value.device_role,
+      // Multi-rôle : envoie array (peut être vide → backend coerce en null).
+      device_role: Array.isArray(newDevice.value.device_role) ? newDevice.value.device_role : [],
       communication_protocol: newDevice.value.communication_protocol,
       location: newDevice.value.location || null,
       notes: newDevice.value.notes || null,
     })
     newDevice.value = {
       name: '', brand: '', model_reference: '', power_kw: null,
-      energy_source: null, device_role: null, communication_protocol: null,
+      energy_source: null, device_role: [], communication_protocol: null,
       location: '', notes: '',
     }
     emit('changed')
@@ -413,10 +415,11 @@ async function removeDevice(d) {
             <div class="col-span-5 md:col-span-2">
               <label class="block text-[10px] font-medium uppercase tracking-wide text-gray-400 mb-0.5">Rôle</label>
               <SearchableSelect
-                :model-value="d.device_role"
-                @update:model-value="v => patchDevice(d, { device_role: v || null })"
+                :model-value="Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])"
+                @update:model-value="v => patchDevice(d, { device_role: Array.isArray(v) ? v : [] })"
                 :options="ROLE_OPTIONS"
-                :clearable="false"
+                :multiple="true"
+                :clearable="true"
                 :creatable="true"
                 size="sm"
                 placeholder="Rôle"

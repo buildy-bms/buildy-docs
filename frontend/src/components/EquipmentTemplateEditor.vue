@@ -90,7 +90,8 @@ const form = ref({
   icon_value: 'fa-cube',
   icon_color: '#6b7280',
   default_energy_source: null,
-  default_device_role: null,
+  // Multi-rôle : array (peut être vide). Persisté en JSON array côté DB.
+  default_device_role: [],
 })
 
 const selectedCategory = computed(() =>
@@ -231,7 +232,11 @@ watch(() => props.template, (t) => {
       icon_value: t.icon_value || 'fa-cube',
       icon_color: t.icon_color || '#6b7280',
       default_energy_source: t.default_energy_source || null,
-      default_device_role: t.default_device_role || null,
+      // Multi-rôle : backend retourne un array (mig 117). Si valeur scalaire
+      // legacy ou null, normalise en array.
+      default_device_role: Array.isArray(t.default_device_role)
+        ? t.default_device_role
+        : (t.default_device_role ? [t.default_device_role] : []),
     }
   }
 }, { immediate: true })
@@ -291,7 +296,10 @@ async function save({ close = true } = {}) {
       icon_value: form.value.icon_value,
       icon_color: form.value.icon_color,
       default_energy_source: form.value.default_energy_source || null,
-      default_device_role: form.value.default_device_role || null,
+      // Multi-rôle : array vide → null (clear), sinon array.
+      default_device_role: (Array.isArray(form.value.default_device_role) && form.value.default_device_role.length)
+        ? form.value.default_device_role
+        : null,
     }
     let res
     if (isEdit.value) {
@@ -486,7 +494,8 @@ async function destroy() {
             <SearchableSelect
               v-model="form.default_device_role"
               :options="ROLE_OPTIONS"
-              placeholder="—"
+              placeholder="Sélectionne un ou plusieurs niveaux…"
+              :multiple="true"
               :clearable="true"
               :creatable="true"
             />

@@ -5,12 +5,17 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { slugify } = require('../lib/slug');
 const { snapshotAndBump } = require('../lib/template-propagation');
+const { parseRoles, serializeRoles } = require('../lib/device-roles');
 
 // Énergies = enum fermé (aligné sur bacs_audit_system_devices.energy_source).
-// Niveau (default_device_role) = TEXT libre depuis la mig 99 : l'admin
-// peut ajouter ses propres niveaux (au-delà de Production / Distribution /
-// Émission / Régulation) via le SearchableSelect creatable de la modale.
+// Niveau (default_device_role) = TEXT libre + multi-select (mig 117).
+// L'admin peut ajouter ses propres niveaux (au-delà de Production /
+// Distribution / Émission / Régulation / Autre) via le SearchableSelect
+// creatable de la modale. Stocké en JSON array dans la colonne TEXT.
 const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','fuel_oil','solar','biomass','autre'];
+// Accepte string scalaire (legacy), array (nouveau), ou null. Le route
+// handler normalise via parseRoles + serializeRoles avant le passage en DB.
+const deviceRoleSchema = z.union([z.string(), z.array(z.string()), z.null()]).optional();
 
 const createTemplateSchema = z.object({
   slug: z.string().optional(),
@@ -24,7 +29,7 @@ const createTemplateSchema = z.object({
   icon_color: z.string().nullable().optional(),
   preferred_protocols: z.string().nullable().optional(),
   default_energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
-  default_device_role: z.string().nullable().optional(),
+  default_device_role: deviceRoleSchema,
 });
 
 // Le slug reste editable (Lot AF QoL) ; verification d'unicite + check
@@ -46,12 +51,15 @@ const pointSchema = z.object({
 
 // Heritage BACS depuis la categorie : un equipment_template n'a plus son
 // propre bacs_articles depuis le Lot 35 — il l'herite de sa categorie.
+// Parse aussi default_device_role en array (mig 117 multi-niveau) pour
+// que le frontend recoive toujours un array, jamais un JSON string.
 function inheritBacsFromCategory(template, categoriesByKey) {
   const cat = template.category ? categoriesByKey.get(template.category) : null;
   return {
     ...template,
     bacs_articles: cat?.bacs || null,
     bacs_inherited_from: cat ? { key: cat.key, label: cat.label } : null,
+    default_device_role: parseRoles(template.default_device_role),
   };
 }
 
@@ -135,7 +143,8 @@ async function routes(fastify) {
       iconColor: body.icon_color,
       preferredProtocols: body.preferred_protocols,
       defaultEnergySource: body.default_energy_source,
-      defaultDeviceRole: body.default_device_role,
+      // Multi-rôle : array d'entrée → JSON array string en DB.
+      defaultDeviceRole: serializeRoles(parseRoles(body.default_device_role)),
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -174,9 +183,13 @@ async function routes(fastify) {
     const defaultEnergySource = ('default_energy_source' in body)
       ? (body.default_energy_source ?? '__clear__')
       : undefined;
-    const defaultDeviceRole = ('default_device_role' in body)
-      ? (body.default_device_role ?? '__clear__')
-      : undefined;
+    // Multi-rôle : `null` ou array vide → '__clear__' (vide explicitement).
+    // Sinon serialise en JSON array string.
+    let defaultDeviceRole = undefined;
+    if ('default_device_role' in body) {
+      const roles = parseRoles(body.default_device_role);
+      defaultDeviceRole = roles.length ? serializeRoles(roles) : '__clear__';
+    }
     const updated = db.equipmentTemplates.update(id, {
       slug: nextSlug,
       name: body.name,

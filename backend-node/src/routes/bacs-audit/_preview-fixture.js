@@ -556,10 +556,16 @@ async function buildFixturePreviewData({ user = null } = {}) {
   // managed_by_bms derive du protocole de communication pour le fixture).
   // + indexation par system_id pour reconstruire systems.devices
   const COMMUNICANT_PROTOS_FIXTURE = ['modbus_tcp', 'modbus_rtu', 'bacnet_ip', 'bacnet_mstp', 'knx', 'mbus', 'mqtt'];
-  const devices = DEVICES_RAW.map(d => ({
+  // Multi-rôle (mig 117) : si la fixture déclare un scalaire, on le passe
+  // en array de 1 élément pour rester cohérent avec le format API.
+  const toRolesArr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  const devices = DEVICES_RAW.map(d => {
+    const roles = toRolesArr(d.device_role);
+    return ({
     ...d,
+    device_role: roles,
     energyLabel: d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—',
-    roleLabel: d.device_role ? (ROLE_LABEL[d.device_role] || d.device_role) : '—',
+    roleLabel: roles.length ? roles.map(r => ROLE_LABEL[r] || r).join(' / ') : '—',
     commLabel: d.communication_protocol
       ? (COMM_LABEL[d.communication_protocol] || d.communication_protocol)
       : 'Non communicant',
@@ -567,7 +573,8 @@ async function buildFixturePreviewData({ user = null } = {}) {
     zone_name: ZONES_RAW.find(z => z.zone_id === SYSTEMS_RAW.find(s => s.id === d.system_id)?.zone_id)?.name,
     system_category: SYSTEMS_RAW.find(s => s.id === d.system_id)?.system_category,
     photos: (d.photoFiles || []).map((f, i) => photoItem(`d-${d.id}-${i}`, f)).filter(Boolean),
-  }));
+    });
+  });
   const devicesBySystem = new Map();
   for (const d of devices) {
     if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);

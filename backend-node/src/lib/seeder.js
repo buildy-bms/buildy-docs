@@ -5,6 +5,7 @@ const log = require('./logger').system;
 
 const ALL_TEMPLATES = require('../seeds/equipment-templates');
 const { buildSnapshot, snapshotAndBump } = require('./template-propagation');
+const { parseRoles, serializeRoles } = require('./device-roles');
 // HYPERVEEZ_PAGES n'est plus utilisé (Lot 22 — section 10 supprimée), conservé pour usage futur.
 // eslint-disable-next-line no-unused-vars
 const { PLAN_AF } = require('../seeds/plan-af');
@@ -68,7 +69,9 @@ function seedLibraryOnBoot() {
         iconColor: tpl.icon_color,
         preferredProtocols: tpl.preferred_protocols,
         defaultEnergySource: tpl.default_energy_source,
-        defaultDeviceRole: tpl.default_device_role,
+        // Multi-rôle (mig 117) : serialize en JSON array string. Le seed
+        // peut declarer un array (recommandé) ou un scalaire legacy.
+        defaultDeviceRole: serializeRoles(parseRoles(tpl.default_device_role)),
       });
       for (const p of (tpl.points || [])) {
         db.equipmentTemplatePoints.create(created.id, {
@@ -91,7 +94,9 @@ function seedLibraryOnBoot() {
       // Enrichissement non destructif : ne touche pas si l'admin a déjà saisi
       // une valeur (idempotent même après edit manuel — cf. memoire seeder).
       if (!existing.default_energy_source && tpl.default_energy_source) updates.defaultEnergySource = tpl.default_energy_source;
-      if (!existing.default_device_role && tpl.default_device_role) updates.defaultDeviceRole = tpl.default_device_role;
+      if (!existing.default_device_role && tpl.default_device_role) {
+        updates.defaultDeviceRole = serializeRoles(parseRoles(tpl.default_device_role));
+      }
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
 

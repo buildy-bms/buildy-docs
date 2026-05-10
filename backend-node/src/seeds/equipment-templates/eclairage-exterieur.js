@@ -8,7 +8,7 @@ module.exports = {
   bacs_justification: null,
   preferred_protocols: 'KNX/IP,DALI,Modbus TCP,LoRaWAN',
   default_energy_source: 'electric',
-  default_device_role: 'emission',
+  default_device_role: ['emission'],
   icon_kind: 'fa',
   icon_value: 'fa-lightbulb',
   icon_color: '#eab308',
