@@ -69,7 +69,7 @@
         <th class="col-dir">Sens</th>
         <th class="col-nature">Nature</th>
         <th class="col-unit">Unité</th>
-        <th class="col-commentaire">Commentaire intégrateur</th>
+        <th class="col-optional">Optionnel</th>
       </tr>
     </thead>
     <tbody>
@@ -79,12 +79,12 @@
         <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{/if}}</td>
         <td class="col-loc">{{#if isFirstOfInstance}}{{instanceLocation}}{{/if}}</td>
         <td class="col-tech">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
-        <td class="col-label">{{label}}{{#if is_optional}} <span class="point-optional-tag">(optionnel)</span>{{/if}}</td>
+        <td class="col-label">{{label}}</td>
         <td class="col-type"><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
         <td class="col-dir"><span class="badge-dir dir-{{dirLabel}}">{{dirLabel}}</span></td>
         <td class="col-nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>
         <td class="col-unit">{{#if unit}}{{unit}}{{else}}—{{/if}}</td>
-        <td class="col-commentaire"></td>
+        <td class="col-optional"><span class="checkbox{{#if is_optional}} checked{{/if}}">{{#if is_optional}}✓{{/if}}</span></td>
       </tr>
       {{/each}}
     </tbody>
