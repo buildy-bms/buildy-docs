@@ -644,8 +644,11 @@ async function routes(fastify) {
       nextKey = candidate;
     }
 
+    const effectiveKey = nextKey || cur.key;
     const tx = db.db.transaction(() => {
-      // Update du row systemcategories_db (label/bacs/icon/position/slugs/key)
+      // Update du row systemcategories_db (label/bacs/icon/position/slugs/key).
+      // `slugs` ecrit en DB pour conserver l'invariant historique mais la
+      // verite reste `equipment_templates.category` (cf. db.systemCategoriesDb.list).
       db.systemCategoriesDb.update(id, {
         key: nextKey,
         label: b.label, bacs: b.bacs, slugs: b.slugs,
@@ -656,6 +659,28 @@ async function routes(fastify) {
         db.db.prepare('UPDATE equipment_templates SET category = ? WHERE category = ?').run(nextKey, cur.key);
         db.db.prepare('UPDATE equipment_instance_categories SET category_key = ? WHERE category_key = ?').run(nextKey, cur.key);
         db.db.prepare('UPDATE sections SET system_category_key = ? WHERE system_category_key = ?').run(nextKey, cur.key);
+      }
+      // Source unique : si `slugs` est explicitement fourni dans le PATCH,
+      // on synchronise `equipment_templates.category` :
+      //   - templates dont le slug est dans newSlugs et qui n'ont pas
+      //     deja cette categorie -> SET category = effectiveKey
+      //   - templates avec category = effectiveKey mais qui ne sont plus
+      //     dans newSlugs -> SET category = NULL (orphelin assume par
+      //     l'admin qui a decoche)
+      if (Array.isArray(b.slugs)) {
+        const newSlugs = b.slugs.filter(s => typeof s === 'string' && s.trim());
+        const newSlugsSet = new Set(newSlugs);
+        // Detacher les templates plus dans la liste
+        const detachStmt = db.db.prepare('UPDATE equipment_templates SET category = NULL WHERE category = ? AND slug = ?');
+        const currentlyInCat = db.db.prepare('SELECT slug FROM equipment_templates WHERE category = ?').all(effectiveKey).map(r => r.slug);
+        for (const s of currentlyInCat) {
+          if (!newSlugsSet.has(s)) detachStmt.run(effectiveKey, s);
+        }
+        // Attacher les nouveaux
+        const attachStmt = db.db.prepare('UPDATE equipment_templates SET category = ? WHERE slug = ?');
+        for (const s of newSlugs) {
+          if (!currentlyInCat.includes(s)) attachStmt.run(effectiveKey, s);
+        }
       }
     });
     try { tx(); }
