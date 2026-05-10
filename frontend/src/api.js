@@ -151,6 +151,7 @@ export const setInstanceCategories = (id, category_keys) => api.put(`/instances/
 export const listSystemCategories = () => api.get('/system-categories')
 export const createSystemCategory = (data) => api.post('/system-categories', data)
 export const updateSystemCategory = (id, data) => api.patch(`/system-categories/${id}`, data)
+export const getSystemCategoryUsage = (id) => api.get(`/system-categories/${id}/usage`)
 export const deleteSystemCategory = (id) => api.delete(`/system-categories/${id}`)
 export const listAfAllZones = (afId) => api.get(`/afs/${afId}/all-zones`)
 export const getAfZonesMatrix = (afId) => api.get(`/afs/${afId}/zones-matrix`)

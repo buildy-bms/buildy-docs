@@ -5986,8 +5986,11 @@ const systemCategoriesDb = {
             iconValue || 'fa-cube', iconColor || '#6b7280', position || 0);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { label, bacs, slugs, iconValue, iconColor, position }) {
+  update(id, { key, label, bacs, slugs, iconValue, iconColor, position }) {
     const fields = [], params = [];
+    // key editable (validation unicite faite cote route — UNIQUE constraint
+    // ici en filet de securite). Voir route PATCH pour la cascade.
+    if (key !== undefined && key !== null) { fields.push('key = ?'); params.push(key); }
     if (label !== undefined) { fields.push('label = ?'); params.push(label); }
     if (bacs !== undefined) { fields.push('bacs = ?'); params.push(bacs); }
     if (slugs !== undefined) { fields.push('slugs = ?'); params.push(JSON.stringify(slugs)); }
