@@ -114,7 +114,7 @@ async function routes(fastify) {
         OR site_address LIKE ? OR title LIKE ? OR audit_synthesis_html LIKE ?)`)
       .all(like, like, like, like, like));
     collect(db.db.prepare(`SELECT a.id AS af_id FROM afs a
-      JOIN sites s ON s.site_id = a.site_id
+      JOIN sites s ON s.id = a.site_id
       WHERE a.deleted_at IS NULL AND s.deleted_at IS NULL
         AND (s.name LIKE ? OR s.customer_name LIKE ? OR s.address LIKE ?)`)
       .all(like, like, like));
@@ -139,7 +139,7 @@ async function routes(fastify) {
         OR location LIKE ? OR model_reference LIKE ? OR notes_html LIKE ?
         OR notes_data_provision LIKE ?`)
       .all(like, like, like, like, like, like));
-    const siteHits = db.db.prepare(`SELECT site_id, site_uuid, name, customer_name, address
+    const siteHits = db.db.prepare(`SELECT id AS site_id, site_uuid, name, customer_name, address
       FROM sites WHERE deleted_at IS NULL AND (name LIKE ? OR customer_name LIKE ? OR address LIKE ?)
       LIMIT 10`).all(like, like, like);
     const libraryHits = db.db.prepare(`SELECT id, slug, number, title, kind, is_functionality

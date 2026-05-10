@@ -42,7 +42,7 @@ async function routes(fastify) {
     return db.db.prepare(`
       SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
       FROM bacs_audit_systems s
-      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.position, s.system_category
     `).all(id);
@@ -109,7 +109,7 @@ async function routes(fastify) {
     if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
       SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
-      LEFT JOIN zones z ON z.zone_id = m.zone_id
+      LEFT JOIN zones z ON z.id = m.zone_id
       WHERE m.document_id = ?
       ORDER BY z.position NULLS LAST, m.position, m.usage, m.meter_type
     `).all(id);
@@ -419,7 +419,7 @@ async function routes(fastify) {
     return db.db.prepare(`
       SELECT t.*, z.name AS zone_name, z.nature AS zone_nature
       FROM bacs_audit_thermal_regulation t
-      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      LEFT JOIN zones z ON z.id = t.zone_id
       WHERE t.document_id = ?
       ORDER BY t.position, z.position, z.name,
                CASE t.category WHEN 'heating' THEN 0 ELSE 1 END
@@ -486,8 +486,8 @@ async function routes(fastify) {
     let sql = `
       SELECT a.*, z.name AS zone_name, e.name AS equipment_name
       FROM bacs_audit_action_items a
-      LEFT JOIN zones z ON z.zone_id = a.zone_id
-      LEFT JOIN equipments e ON e.equipment_id = a.equipment_id
+      LEFT JOIN zones z ON z.id = a.zone_id
+      LEFT JOIN equipments e ON e.id = a.equipment_id
       WHERE a.document_id = ?
     `;
     const args = [id];
@@ -673,7 +673,7 @@ async function routes(fastify) {
       SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
-      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.system_category, d.position, d.id
     `).all(id);
@@ -717,7 +717,7 @@ async function routes(fastify) {
     const requested = [...new Set(body.extra_zone_ids)].filter(z => z !== dev.origin_zone_id);
     // Vérifier que chaque zone existe (sécurité)
     for (const zid of requested) {
-      if (!db.db.prepare('SELECT 1 FROM zones WHERE zone_id = ?').get(zid)) {
+      if (!db.db.prepare('SELECT 1 FROM zones WHERE id = ?').get(zid)) {
         return reply.code(400).send({ detail: `Zone #${zid} introuvable.` });
       }
     }
@@ -929,7 +929,7 @@ async function routes(fastify) {
     const af = assertBacsAuditExists(id, request, reply);
     if (!af) return;
     const ids = (request.body?.ids || []).map(n => parseInt(n, 10)).filter(Boolean);
-    const upd = db.db.prepare('UPDATE zones SET position = ? WHERE zone_id = ? AND site_id = ?');
+    const upd = db.db.prepare('UPDATE zones SET position = ? WHERE id = ? AND site_id = ?');
     for (let i = 0; i < ids.length; i++) upd.run((i + 1) * 10, ids[i], af.site_id);
     return { ok: true };
   });
@@ -995,7 +995,7 @@ async function routes(fastify) {
              s.system_category, z.name AS zone_name
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
-      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
         AND s.system_category IN ('heating','cooling')
         AND d.power_kw IS NOT NULL

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 122;
+const TARGET_VERSION = 123;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4924,6 +4924,31 @@ function runMigrations() {
     db.pragma('user_version = 122');
   }
 
+  if (current < 123) {
+    // Convention PK uniforme : les 3 tables historiques avec PK `<table>_id`
+    // sont renommees en `id` (cohrence avec les tables modernes : afs, sections,
+    // equipment_templates, system_categories_db, etc.)
+    //   - sites.site_id -> sites.id
+    //   - zones.zone_id -> zones.id
+    //   - equipments.equipment_id -> equipments.id
+    //
+    // SQLite 3.26+ propage automatiquement le RENAME COLUMN aux FK descendantes
+    // (les FK qui referencent `zones(zone_id)` deviennent `zones(id)`). Pas de
+    // recreate massif requis. Les FK COLUMNS portees par les tables enfant
+    // gardent leur nom (ex: equipments.zone_id, afs.site_id), c'est juste la
+    // PK qui change.
+    db.exec('ALTER TABLE sites RENAME COLUMN site_id TO id');
+    db.exec('ALTER TABLE zones RENAME COLUMN zone_id TO id');
+    db.exec('ALTER TABLE equipments RENAME COLUMN equipment_id TO id');
+    const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+    if (fkErrors.length) {
+      log.error({ fkErrors }, 'Migration 123 : FK errors detectes');
+      throw new Error('Migration 123 echouee : FK errors -- ' + JSON.stringify(fkErrors));
+    }
+    log.info('Migration 123 appliquee : sites/zones/equipments PK renommees en `id` (FK descendantes propagees automatiquement par SQLite)');
+    db.pragma('user_version = 123');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6712,9 +6737,15 @@ const auditLog = {
 };
 
 // ── Sites (synchro bidirectionnelle avec Fleet Manager) ─────────────
+// Alias `id AS site_id` pour compat API frontend (Lot 1 : PK uniformisee
+// en `id` cote DB ; le frontend continue de lire `site_id`/`zone_id`/`equipment_id`).
+const SITES_SELECT = '*, id AS site_id';
+const ZONES_SELECT = '*, id AS zone_id';
+const EQUIPMENTS_SELECT = '*, id AS equipment_id';
+
 const sites = {
   list({ includeDeleted = false, search } = {}) {
-    let sql = 'SELECT * FROM sites WHERE 1=1';
+    let sql = `SELECT ${SITES_SELECT} FROM sites WHERE 1=1`;
     const params = [];
     if (!includeDeleted) sql += ' AND deleted_at IS NULL';
     if (search) {
@@ -6726,10 +6757,10 @@ const sites = {
     return db.prepare(sql).all(...params);
   },
   getById(id) {
-    return db.prepare('SELECT * FROM sites WHERE site_id = ?').get(id);
+    return db.prepare(`SELECT ${SITES_SELECT} FROM sites WHERE id = ?`).get(id);
   },
   getByUuid(uuid) {
-    return db.prepare('SELECT * FROM sites WHERE site_uuid = ?').get(uuid);
+    return db.prepare(`SELECT ${SITES_SELECT} FROM sites WHERE site_uuid = ?`).get(uuid);
   },
   create({ siteUuid, name, customerName, address, notes, createdBy, syncedAt }) {
     const result = db.prepare(`
@@ -6753,28 +6784,28 @@ const sites = {
     if (!sets.length) return this.getById(id);
     sets.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
-    db.prepare(`UPDATE sites SET ${sets.join(', ')} WHERE site_id = ?`).run(...params);
+    db.prepare(`UPDATE sites SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
   softDelete(id) {
-    db.prepare('UPDATE sites SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE site_id = ?').run(id);
+    db.prepare('UPDATE sites SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
   restore(id) {
-    db.prepare('UPDATE sites SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE site_id = ?').run(id);
+    db.prepare('UPDATE sites SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
 };
 
 // ── Zones (locales Buildy Docs, attachees a un site) ───────────────
 const zones = {
   listBySite(siteId, { includeDeleted = false } = {}) {
-    let sql = 'SELECT * FROM zones WHERE site_id = ?';
+    let sql = `SELECT ${ZONES_SELECT} FROM zones WHERE site_id = ?`;
     const params = [siteId];
     if (!includeDeleted) sql += ' AND deleted_at IS NULL';
     sql += ' ORDER BY position, name';
     return db.prepare(sql).all(...params);
   },
   getById(id) {
-    return db.prepare('SELECT * FROM zones WHERE zone_id = ?').get(id);
+    return db.prepare(`SELECT ${ZONES_SELECT} FROM zones WHERE id = ?`).get(id);
   },
   create({ siteId, name, nature, position, surfaceM2, notes }) {
     const result = db.prepare(`
@@ -6794,18 +6825,18 @@ const zones = {
     if (!sets.length) return this.getById(id);
     sets.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
-    db.prepare(`UPDATE zones SET ${sets.join(', ')} WHERE zone_id = ?`).run(...params);
+    db.prepare(`UPDATE zones SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
   softDelete(id) {
-    db.prepare('UPDATE zones SET deleted_at = CURRENT_TIMESTAMP WHERE zone_id = ?').run(id);
+    db.prepare('UPDATE zones SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
 };
 
 // ── Equipements (et compteurs) ──────────────────────────────────────
 const equipments = {
   listByZone(zoneId, { includeDeleted = false } = {}) {
-    let sql = 'SELECT * FROM equipments WHERE zone_id = ?';
+    let sql = `SELECT ${EQUIPMENTS_SELECT} FROM equipments WHERE zone_id = ?`;
     const params = [zoneId];
     if (!includeDeleted) sql += ' AND deleted_at IS NULL';
     sql += ' ORDER BY name';
@@ -6813,8 +6844,8 @@ const equipments = {
   },
   listBySite(siteId, { includeDeleted = false } = {}) {
     let sql = `
-      SELECT e.* FROM equipments e
-      JOIN zones z ON z.zone_id = e.zone_id
+      SELECT e.*, e.id AS equipment_id FROM equipments e
+      JOIN zones z ON z.id = e.zone_id
       WHERE z.site_id = ?
     `;
     const params = [siteId];
@@ -6823,7 +6854,7 @@ const equipments = {
     return db.prepare(sql).all(...params);
   },
   getById(id) {
-    return db.prepare('SELECT * FROM equipments WHERE equipment_id = ?').get(id);
+    return db.prepare(`SELECT ${EQUIPMENTS_SELECT} FROM equipments WHERE id = ?`).get(id);
   },
   create({ zoneId, name, type, powerKw, communicationProtocol, installationDate, status, bacsClassification, notes }) {
     const result = db.prepare(`
@@ -6858,18 +6889,18 @@ const equipments = {
     if (!sets.length) return this.getById(id);
     sets.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
-    db.prepare(`UPDATE equipments SET ${sets.join(', ')} WHERE equipment_id = ?`).run(...params);
+    db.prepare(`UPDATE equipments SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
   softDelete(id) {
-    db.prepare('UPDATE equipments SET deleted_at = CURRENT_TIMESTAMP WHERE equipment_id = ?').run(id);
+    db.prepare('UPDATE equipments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
   // Cumul puissance chauffage + climatisation pour le seuil R175-2
   sumBacsPowerForSite(siteId) {
     const rows = db.prepare(`
       SELECT e.power_kw, e.bacs_classification
       FROM equipments e
-      JOIN zones z ON z.zone_id = e.zone_id
+      JOIN zones z ON z.id = e.zone_id
       WHERE z.site_id = ? AND e.deleted_at IS NULL AND z.deleted_at IS NULL
         AND e.status != 'decommissioned' AND e.power_kw IS NOT NULL
     `).all(siteId);
@@ -7535,7 +7566,7 @@ const bacsAuditChecklist = {
     const sysRows = db.prepare(`
       SELECT DISTINCT s.zone_id, z.name
       FROM bacs_audit_systems s
-      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
     `).all(documentId);
     const zoneIds = sysRows.map(r => r.zone_id).filter(Boolean);
@@ -7632,7 +7663,7 @@ const bacsAuditChecklist = {
         rows = db.prepare(`
           SELECT ${col} AS id, COUNT(*) AS n
           FROM site_documents sd
-          JOIN zones z ON z.zone_id = sd.${col}
+          JOIN zones z ON z.id = sd.${col}
           WHERE sd.${col} IS NOT NULL AND z.site_id = ?
           GROUP BY ${col}
         `).all(af.site_id);

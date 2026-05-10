@@ -199,7 +199,7 @@ async function routes(fastify) {
     const zones = site ? db.zones.listBySite(site.site_id) : [];
     const systems = db.db.prepare(`
       SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
-      FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
+      FROM bacs_audit_systems s LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.system_category
     `).all(documentId);
@@ -207,23 +207,23 @@ async function routes(fastify) {
       SELECT d.*, s.system_category, z.name AS zone_name
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
-      LEFT JOIN zones z ON z.zone_id = s.zone_id
+      LEFT JOIN zones z ON z.id = s.zone_id
       WHERE s.document_id = ?
     `).all(documentId);
     const meters = db.db.prepare(`
       SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
-      LEFT JOIN zones z ON z.zone_id = m.zone_id
+      LEFT JOIN zones z ON z.id = m.zone_id
       WHERE m.document_id = ?
     `).all(documentId);
     const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
     const thermal = db.db.prepare(`
       SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
-      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      LEFT JOIN zones z ON z.id = t.zone_id
       WHERE t.document_id = ?
     `).all(documentId);
     const actionItems = db.db.prepare(`
       SELECT a.*, z.name AS zone_name FROM bacs_audit_action_items a
-      LEFT JOIN zones z ON z.zone_id = a.zone_id
+      LEFT JOIN zones z ON z.id = a.zone_id
       WHERE a.document_id = ? AND a.status NOT IN ('done','declined')
       ORDER BY (CASE a.severity WHEN 'blocking' THEN 0 WHEN 'major' THEN 1 ELSE 2 END), a.position, a.id
     `).all(documentId);
