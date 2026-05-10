@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'disjoncteur-of',
   name: 'Disjoncteur — état OF (ouvert/fermé)',
-  category: 'electricite',
+  category: 'autres',
   bacs_articles: null,
   bacs_justification: null,
   preferred_protocols: 'Modbus TCP',

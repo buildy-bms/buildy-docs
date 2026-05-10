@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'production-electricite',
   name: 'Production d\'électricité sur site',
-  category: 'electricite',
+  category: 'pv',
   bacs_articles: 'R175-1 §4',
   bacs_justification: '<p>L\'article R175-1 inclut explicitement la <strong>production d\'électricité sur site</strong> dans la définition des systèmes techniques de bâtiment (§4). Les installations photovoltaïques, cogénérations et micro-éoliennes entrent donc dans le périmètre du décret BACS.</p><p>Le décret impose que ces installations soient <strong>supervisées en continu</strong>, qu\'elles soient <strong>interopérables</strong> avec les autres systèmes techniques (notamment pour optimiser l\'autoconsommation) et qu\'elles puissent être <strong>arrêtées manuellement</strong>.</p><p>L\'intégration de la production électrique dans la solution Buildy permet de remonter la puissance instantanée, l\'énergie produite, l\'énergie injectée et les défauts pour piloter l\'autoconsommation et détecter les pertes de production.</p>',
   preferred_protocols: 'Modbus TCP,Modbus RTU,SunSpec',

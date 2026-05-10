@@ -143,7 +143,7 @@ export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instan
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
 export const duplicateInstance = (id) => api.post(`/instances/${id}/duplicate`)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
-export const duplicateZone = (id) => api.post(`/zones/${id}/duplicate`)
+export const duplicateAfZone = (id) => api.post(`/zones/${id}/duplicate`)
 export const listInstanceZones = (id) => api.get(`/instances/${id}/zones`)
 export const setInstanceZones = (id, zone_ids) => api.put(`/instances/${id}/zones`, { zone_ids })
 export const listInstanceCategories = (id) => api.get(`/instances/${id}/categories`)

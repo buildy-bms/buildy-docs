@@ -288,9 +288,15 @@ const titleHtml = computed(() => {
         </span>
       </Tooltip>
 
+      <!-- Noeud catégorie système (refactor categories) : icone depuis system_categories_db -->
+      <EquipmentIcon
+        v-if="node.system_category_key && node.cat_icon_value"
+        :template="{ icon_kind: 'fa', icon_value: node.cat_icon_value, icon_color: node.cat_icon_color }"
+        size="xs"
+      />
       <!-- Icone equipement coloree (kind='equipment') prioritaire sur tpl_icon_name. -->
       <EquipmentIcon
-        v-if="node.kind === 'equipment' && node.eq_icon_value"
+        v-else-if="node.kind === 'equipment' && node.eq_icon_value"
         :template="{ icon_kind: node.eq_icon_kind, icon_value: node.eq_icon_value, icon_color: node.eq_icon_color }"
         size="xs"
       />

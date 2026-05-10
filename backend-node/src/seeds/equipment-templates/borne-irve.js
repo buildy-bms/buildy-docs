@@ -3,7 +3,7 @@
 module.exports = {
   slug: 'borne-irve',
   name: 'Borne de recharge VE (IRVE)',
-  category: 'electricite',
+  category: 'autres',
   bacs_articles: 'R175-1 §4',
   bacs_justification: '<p>L\'article R175-1 §4 du décret BACS inclut explicitement la <strong>production d\'électricité sur site</strong> dans la définition des systèmes techniques de bâtiment, mais la consommation pilotable est tout autant concernée par les obligations de suivi.</p><p>Une borne de recharge pour véhicule électrique (IRVE) constitue une charge significative et pilotable. Elle entre dans le périmètre des systèmes à <strong>superviser, arrêter manuellement et gérer de manière autonome</strong> au sens du décret, notamment pour le pilotage de l\'autoconsommation et le déplacement de la charge en heures creuses.</p><p>L\'intégration des bornes IRVE dans la solution Buildy permet de superviser l\'état d\'autorisation de fonctionnement, l\'énergie délivrée et de transmettre les commandes d\'autorisation correspondantes.</p>',
   preferred_protocols: 'OCPP,Modbus TCP',
