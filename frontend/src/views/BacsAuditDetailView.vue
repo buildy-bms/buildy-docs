@@ -548,6 +548,16 @@ async function addZone(payload) {
 // ── Stepper (9 etapes a valider manuellement) ──
 const { auditProgress, synthesisHtml } = storeToRefs(auditStore)
 const activeStepKey = ref(null)
+
+// État replié/déplié du stepper, persisté localStorage. Permet de gagner
+// ~150px de largeur sur la zone principale quand l'auditeur a validé sa
+// progression et n'a plus besoin des labels.
+const STEPPER_KEY = 'bacs-audit-stepper-collapsed'
+const stepperCollapsed = ref(localStorage.getItem(STEPPER_KEY) === '1')
+function toggleStepperCollapsed() {
+  stepperCollapsed.value = !stepperCollapsed.value
+  localStorage.setItem(STEPPER_KEY, stepperCollapsed.value ? '1' : '0')
+}
 const siteDocCounts = ref({ doe: 0, photo: 0 })
 const siteCredCount = ref(0)
 
@@ -1244,14 +1254,18 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4 items-start">
+    <div v-else
+         :class="['grid grid-cols-1 gap-4 items-start',
+                  stepperCollapsed ? 'lg:grid-cols-[56px_1fr]' : 'lg:grid-cols-[200px_1fr]']">
       <!-- Stepper vertical sticky : visible tout au long du scroll de la page (desktop uniquement) -->
       <BacsAuditStepper
         :steps="stepperSteps"
         :active-step-key="activeStepKey"
+        :collapsed="stepperCollapsed"
         @step-click="onStepClick"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
+        @toggle-collapsed="toggleStepperCollapsed"
         class="hidden lg:block sticky top-4 self-start"
       />
 

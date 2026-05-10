@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon } from '@heroicons/vue/24/outline'
 
 /**
  * Stepper vertical persistant pour piloter l'audit BACS de bout en
@@ -9,13 +9,16 @@ import { CheckCircleIcon } from '@heroicons/vue/24/outline'
  *  - "complete" : conditions automatiques satisfaites (auto-saisie)
  *  - "validated" : signe-off manuel persisté (audit_progress JSON)
  *  - "active" : section actuellement scrollée par l'utilisateur
+ *
+ * Mode collapsed : juste les pastilles numérotées, gain de largeur ~150px.
  */
 const props = defineProps({
   steps: { type: Array, required: true },
   activeStepKey: { type: String, default: null },
+  collapsed: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['validate-step', 'invalidate-step', 'step-click'])
+const emit = defineEmits(['validate-step', 'invalidate-step', 'step-click', 'toggle-collapsed'])
 
 const validatedCount = computed(() => props.steps.filter(s => s.validated).length)
 const completionPercent = computed(() => Math.round((validatedCount.value / props.steps.length) * 100))
@@ -40,8 +43,21 @@ function connectorClass(s) {
 </script>
 
 <template>
-  <aside class="bg-white border border-gray-200 rounded-lg shadow-sm">
-    <header class="px-4 py-3 border-b border-gray-200">
+  <aside class="bg-white border border-gray-200 rounded-lg shadow-sm relative">
+    <!-- Toggle collapse : icône en haut à droite, persiste localStorage. -->
+    <button
+      type="button"
+      @click="$emit('toggle-collapsed')"
+      :class="['absolute top-2 z-20 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition',
+               collapsed ? 'left-1/2 -translate-x-1/2' : 'right-2']"
+      :aria-label="collapsed ? 'Déplier le stepper' : 'Replier le stepper'"
+      v-tooltip="collapsed ? 'Déplier' : 'Replier'"
+    >
+      <ChevronDoubleLeftIcon v-if="!collapsed" class="w-4 h-4" />
+      <ChevronDoubleRightIcon v-else class="w-4 h-4" />
+    </button>
+
+    <header v-if="!collapsed" class="px-4 py-3 border-b border-gray-200 pr-10">
       <h2 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">Progression de l'audit</h2>
       <div class="mt-2 flex items-center gap-2">
         <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -53,30 +69,40 @@ function connectorClass(s) {
         </span>
       </div>
     </header>
+    <!-- Mode collapsed : juste un compteur compact en haut. -->
+    <header v-else class="pt-9 pb-2 text-center border-b border-gray-200">
+      <span class="text-[10px] font-semibold text-gray-700">
+        {{ validatedCount }}/{{ steps.length }}
+      </span>
+    </header>
 
-    <ol class="px-4 py-3 space-y-0">
+    <ol :class="collapsed ? 'px-2 py-3 space-y-0' : 'px-4 py-3 space-y-0'">
       <li
         v-for="(s, idx) in steps"
         :key="s.key"
-        class="relative flex items-start gap-2.5"
+        :class="['relative flex items-start',
+                 collapsed ? 'justify-center' : 'gap-2.5']"
       >
         <!-- Connector line vers l'étape suivante -->
         <span
           v-if="idx < steps.length - 1"
-          :class="['absolute left-2.75 top-6 w-0.5 h-full', connectorClass(s)]"
+          :class="['absolute top-6 w-0.5 h-full', connectorClass(s),
+                   collapsed ? 'left-1/2 -translate-x-1/2' : 'left-2.75']"
           aria-hidden="true"
         ></span>
         <button
           type="button"
           @click="$emit('step-click', s.key)"
           :class="['relative z-10 shrink-0 w-5.5 h-5.5 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition shadow-sm',
-                   circleClass(s)]"
-          v-tooltip="s.description"
+                   circleClass(s),
+                   collapsed ? 'mb-3' : '']"
+          v-tooltip="collapsed ? `${idx + 1}. ${s.label}` : s.description"
         >
           <CheckCircleIcon v-if="s.validated" class="w-3.5 h-3.5" />
           <span v-else>{{ idx + 1 }}</span>
         </button>
         <button
+          v-if="!collapsed"
           type="button"
           @click="$emit('step-click', s.key)"
           class="text-left flex-1 min-w-0 pb-3 group"
@@ -91,8 +117,8 @@ function connectorClass(s) {
       </li>
     </ol>
 
-    <!-- Validation rapide de l'étape active -->
-    <div v-if="activeStepKey" class="border-t border-gray-100 px-4 py-3">
+    <!-- Validation rapide de l'étape active (étendu uniquement) -->
+    <div v-if="activeStepKey && !collapsed" class="border-t border-gray-100 px-4 py-3">
       <template v-for="s in steps" :key="s.key">
         <div v-if="s.key === activeStepKey">
           <p class="text-[11px] text-gray-500 leading-snug mb-2">{{ s.description }}</p>
