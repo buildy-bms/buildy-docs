@@ -1,14 +1,16 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { PlusCircleIcon, TrashIcon, MapPinIcon, PencilSquareIcon, BuildingOfficeIcon, TagIcon } from '@heroicons/vue/24/outline'
+import { PlusCircleIcon, TrashIcon, MapPinIcon, PencilSquareIcon, BuildingOfficeIcon, TagIcon, DocumentDuplicateIcon, ArrowsUpDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
 import {
   listSectionInstances, addSectionInstance, updateInstance, deleteInstance,
+  duplicateInstance,
   listInstanceZones, setInstanceZones, listAfAllZones,
   listInstanceCategories, setInstanceCategories, listSystemCategories,
   getEquipmentTemplate,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useTableSortFilter } from '@/composables/useTableSortFilter'
 import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
@@ -155,6 +157,19 @@ async function removeInstance(inst) {
   }
 }
 
+async function duplicateRow(inst) {
+  try {
+    await duplicateInstance(inst.id)
+    notifySuccess('Instance dupliquée')
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la duplication')
+  }
+}
+
+const { sortKey, sortDir, columnFilters, processed: visibleInstances, toggleSort, setFilter } =
+  useTableSortFilter(instances, { defaultSortKey: null })
+
 watch(() => props.sectionId, refresh)
 onMounted(refresh)
 </script>
@@ -189,16 +204,45 @@ onMounted(refresh)
     <table v-else class="w-full text-sm">
       <thead class="bg-gray-50 text-[11px] text-gray-500 uppercase">
         <tr>
-          <th class="text-left px-5 py-2 font-medium">Référence</th>
-          <th class="text-left px-2 py-2 font-medium">Localisation</th>
+          <th class="text-left px-5 py-2 font-medium select-none">
+            <button @click="toggleSort('reference')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              Référence
+              <ArrowUpIcon v-if="sortKey === 'reference' && sortDir === 'asc'" class="w-3 h-3" />
+              <ArrowDownIcon v-else-if="sortKey === 'reference' && sortDir === 'desc'" class="w-3 h-3" />
+              <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+            </button>
+          </th>
+          <th class="text-left px-2 py-2 font-medium select-none">
+            <button @click="toggleSort('location')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              Localisation
+              <ArrowUpIcon v-if="sortKey === 'location' && sortDir === 'asc'" class="w-3 h-3" />
+              <ArrowDownIcon v-else-if="sortKey === 'location' && sortDir === 'desc'" class="w-3 h-3" />
+              <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+            </button>
+          </th>
           <th class="text-left px-2 py-2 font-medium">Zones fonctionnelles</th>
           <th class="text-left px-2 py-2 font-medium">Catégories d'usage</th>
-          <th class="text-left px-2 py-2 font-medium w-12">Qté</th>
-          <th class="px-5 py-2 w-20"></th>
+          <th class="text-left px-2 py-2 font-medium w-12 select-none">
+            <button @click="toggleSort('qty')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+              Qté
+              <ArrowUpIcon v-if="sortKey === 'qty' && sortDir === 'asc'" class="w-3 h-3" />
+              <ArrowDownIcon v-else-if="sortKey === 'qty' && sortDir === 'desc'" class="w-3 h-3" />
+              <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+            </button>
+          </th>
+          <th class="px-5 py-2 w-24"></th>
+        </tr>
+        <tr class="bg-white border-t border-gray-100">
+          <th class="px-5 py-1.5"><input :value="columnFilters.reference || ''" @input="setFilter('reference', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+          <th class="px-2 py-1.5"><input :value="columnFilters.location || ''" @input="setFilter('location', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+          <th class="px-2 py-1.5"></th>
+          <th class="px-2 py-1.5"></th>
+          <th class="px-2 py-1.5"><input :value="columnFilters.qty || ''" @input="setFilter('qty', $event.target.value)" type="text" placeholder="…" class="w-full px-1 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+          <th class="px-5 py-1.5"></th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="inst in instances" :key="inst.id" class="border-t border-gray-100 group hover:bg-indigo-50/30">
+        <tr v-for="inst in visibleInstances" :key="inst.id" class="border-t border-gray-100 group hover:bg-indigo-50/30">
           <td class="px-5 py-2 font-medium text-gray-800">{{ inst.reference }}</td>
           <td class="px-2 py-2 text-gray-600">
             <span v-if="inst.location" class="inline-flex items-center gap-1">
@@ -229,9 +273,12 @@ onMounted(refresh)
             <span v-else class="text-gray-400 italic">—</span>
           </td>
           <td class="px-2 py-2 text-gray-600">{{ inst.qty }}</td>
-          <td class="px-5 py-2 text-right">
+          <td class="px-5 py-2 text-right whitespace-nowrap">
             <button @click="openEdit(inst)" class="opacity-0 group-hover:opacity-100 text-indigo-600 hover:text-indigo-800 mr-2" v-tooltip="'Éditer'">
               <PencilSquareIcon class="w-3.5 h-3.5 inline" />
+            </button>
+            <button @click="duplicateRow(inst)" class="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-900 mr-2" v-tooltip="'Dupliquer'">
+              <DocumentDuplicateIcon class="w-3.5 h-3.5 inline" />
             </button>
             <button @click="removeInstance(inst)" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700" v-tooltip="'Supprimer'">
               <TrashIcon class="w-3.5 h-3.5 inline" />

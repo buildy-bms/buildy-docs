@@ -1483,3 +1483,12 @@ table.points-mini .badge-type {
 .bacs-article-body li { margin: 0.5mm 0; }
 .bacs-article-body strong { color: #1b2842; font-weight: 600; }
 .bacs-article-body em { color: #6b7280; }
+
+/* Point optionnel — tag discret apres le libelle dans les tableaux de points */
+.point-optional-tag {
+  font-size: 8pt;
+  color: #9ca3af;
+  font-style: italic;
+  font-weight: 400;
+  margin-left: 1mm;
+}

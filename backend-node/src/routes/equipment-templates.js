@@ -27,7 +27,9 @@ const createTemplateSchema = z.object({
   default_device_role: z.string().nullable().optional(),
 });
 
-const updateTemplateSchema = createTemplateSchema.partial().omit({ slug: true });
+// Le slug reste editable (Lot AF QoL) ; verification d'unicite + check
+// tombstone faits manuellement dans le PATCH ci-dessous.
+const updateTemplateSchema = createTemplateSchema.partial();
 
 const pointSchema = z.object({
   slug: z.string().min(1),
@@ -152,6 +154,21 @@ async function routes(fastify) {
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
     const userId = request.authUser?.id;
+    // Slug editable : valide unicite + tombstone (resurrection refusee).
+    let nextSlug = undefined;
+    if (typeof body.slug === 'string' && body.slug.trim() && body.slug !== tpl.slug) {
+      const candidate = slugify(body.slug);
+      if (!candidate) return reply.code(400).send({ detail: 'Slug invalide' });
+      const conflict = db.equipmentTemplates.getBySlug(candidate);
+      if (conflict && conflict.id !== id) {
+        return reply.code(409).send({ detail: 'Un template avec ce slug existe déjà' });
+      }
+      const tombstoned = db.db.prepare('SELECT 1 FROM deleted_equipment_template_slugs WHERE slug = ?').get(candidate);
+      if (tombstoned) {
+        return reply.code(409).send({ detail: 'Ce slug est marqué comme supprimé. Recréer un template avec ce slug si besoin.' });
+      }
+      nextSlug = candidate;
+    }
     // Sentinel '__clear__' : vide explicitement un défaut depuis l'editeur admin
     // (le SearchableSelect efface en envoyant null, on traduit ici).
     const defaultEnergySource = ('default_energy_source' in body)
@@ -161,6 +178,7 @@ async function routes(fastify) {
       ? (body.default_device_role ?? '__clear__')
       : undefined;
     const updated = db.equipmentTemplates.update(id, {
+      slug: nextSlug,
       name: body.name,
       category: body.category,
       // bacs_articles : herite de la categorie depuis le Lot 35 (jamais ecrit ici)
@@ -174,6 +192,9 @@ async function routes(fastify) {
       defaultDeviceRole,
       updatedBy: userId,
     });
+    if (nextSlug) {
+      log.warn(`Equipment template slug changed: ${tpl.slug} → ${nextSlug} (id #${id}, user #${userId}). References hardcodees (system-categories.js, plan-af.js) potentiellement a verifier.`);
+    }
     // Si la description ou les protocoles changent, on cree une nouvelle version
     if ('preferred_protocols' in body && body.preferred_protocols !== tpl.preferred_protocols) {
       snapshotAndBump(id, { changelog: 'Mise a jour protocoles preferes', authorId: userId });

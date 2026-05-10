@@ -4,11 +4,13 @@ import {
   CheckBadgeIcon, ArrowLeftIcon,
   DocumentArrowDownIcon, TableCellsIcon, ClockIcon, ChevronDownIcon,
   RocketLaunchIcon, PencilSquareIcon, UserGroupIcon, ListBulletIcon,
+  Squares2X2Icon,
   EllipsisHorizontalIcon, Cog6ToothIcon, RectangleStackIcon, EyeIcon,
   ArrowPathIcon, BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import ShareAfModal from './ShareAfModal.vue'
 import AfInstancesModal from './AfInstancesModal.vue'
+import AfPointsModal from './AfPointsModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
 import SitePicker from './SitePicker.vue'
 import PdfPreviewModal from './PdfPreviewModal.vue'
@@ -41,17 +43,18 @@ const submitting = ref(false)
 const showExport = ref(false)
 const exportKind = ref('points-list') // 'points-list' | 'af'
 const exportMotif = ref('')
-// Annexes cochees par defaut sur l'export AF — le DOE livre est presque
-// toujours attendu avec annexe BACS + tableau des offres. L'utilisateur peut
-// decocher au cas par cas.
+// Annexe BACS cochee par defaut sur l'export AF — le DOE livre est presque
+// toujours attendu avec. Le tableau des offres etait avant ici aussi mais il
+// fait doublon avec la section deja presente dans l'arborescence (chapitre
+// "Niveaux de service"), supprime du choix utilisateur.
 const exportIncludeBacs = ref(true)
-const exportIncludeOfferings = ref(true)
 const lastExportId = ref(null)
 const lastExportInfo = ref(null)
 
 // Lot 28 — partage AF
 const showShare = ref(false)
 const showInstances = ref(false)
+const showPoints = ref(false)
 // Pull biblio -> AF (modale de confirmation)
 const showSyncLibrary = ref(false)
 const syncLibraryOverwriteBodies = ref(false)
@@ -339,7 +342,6 @@ function openExport(kind) {
   exportKind.value = kind
   exportMotif.value = ''
   exportIncludeBacs.value = true
-  exportIncludeOfferings.value = true
   lastExportId.value = null
   lastExportInfo.value = null
   exportExcluded.value = new Set()
@@ -360,7 +362,6 @@ async function submitExport() {
     const payload = { motif: exportMotif.value.trim() }
     if (exportKind.value === 'af') {
       payload.includeBacsAnnex = exportIncludeBacs.value
-      payload.includeOfferingsAnnex = exportIncludeOfferings.value
     }
     if (exportExcluded.value.size > 0) payload.excluded_section_ids = [...exportExcluded.value]
     const { data } = await fn(props.af.id, payload)
@@ -397,7 +398,7 @@ const previewOpen = ref(false)
 const previewKind = ref(null)
 const previewUrlComputed = computed(() => {
   if (!previewKind.value) return ''
-  if (previewKind.value === 'af') return previewAfUrl(props.af.id, exportIncludeBacs.value, exportIncludeOfferings.value)
+  if (previewKind.value === 'af') return previewAfUrl(props.af.id, exportIncludeBacs.value)
   if (previewKind.value === 'points-list') return previewPointsListUrl(props.af.id)
   return ''
 })
@@ -514,6 +515,14 @@ const exportDescription = computed(() => {
     >
       <ListBulletIcon class="w-4 h-4 shrink-0" />
       Instances
+    </button>
+    <button
+      @click="showPoints = true"
+      class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 whitespace-nowrap"
+      title="Vue tableau de tous les points de données de l'AF"
+    >
+      <Squares2X2Icon class="w-4 h-4 shrink-0" />
+      Points
     </button>
     <!-- Plus d'actions (Partager, Activité, Versions) regroupées dans
          un menu pour limiter le nombre de boutons visibles dans la barre. -->
@@ -677,22 +686,6 @@ const exportDescription = computed(() => {
             </span>
           </label>
         </div>
-        <div class="flex items-start gap-2">
-          <input
-            v-model="exportIncludeOfferings"
-            type="checkbox"
-            id="offerings-annex"
-            class="mt-0.5 w-4 h-4 rounded border-gray-200 text-emerald-600 focus:ring-emerald-500"
-          />
-          <label for="offerings-annex" class="text-xs text-gray-700 cursor-pointer flex-1">
-            Inclure le <strong>Tableau des fonctionnalités Buildy</strong>
-            <span class="block text-[11px] text-gray-400 mt-0.5">
-              Récapitulatif des fonctionnalités par niveau de service. Filtré
-              automatiquement (les fonctionnalités refusées par le MOA sont
-              retirées) ; le niveau ciblé par cette AF est mis en évidence.
-            </span>
-          </label>
-        </div>
       </div>
       <div v-if="lastExportId" class="p-3 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
         <p>✓ PDF généré et téléchargé. Si le téléchargement n'a pas démarré,
@@ -825,6 +818,7 @@ const exportDescription = computed(() => {
   <!-- Modale partage AF (Lot 28) -->
   <ShareAfModal v-if="showShare" :af-id="af.id" @close="showShare = false" />
   <AfInstancesModal v-if="showInstances" :af-id="af.id" @close="showInstances = false" @goto-section="(id) => emit('goto-section', id)" />
+  <AfPointsModal v-if="showPoints" :af-id="af.id" @close="showPoints = false" @goto-section="(id) => emit('goto-section', id)" />
 
   <!-- Modale Pull biblio -> AF -->
   <BaseModal v-if="showSyncLibrary" :title="'Synchroniser depuis la bibliothèque'" size="md" @close="showSyncLibrary = false">

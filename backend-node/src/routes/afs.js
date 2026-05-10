@@ -6,6 +6,7 @@ const log = require('../lib/logger').system;
 const { uniqueSlug } = require('../lib/slug');
 const { seedAfStructure, seedBacsAuditStructure } = require('../lib/seeder');
 const { assertWrite, assertRead } = require('../lib/af-permissions');
+const { resolveSectionPoints } = require('../lib/points-resolver');
 
 // ── Zod schemas ──────────────────────────────────────────────────────
 const createAfSchema = z.object({
@@ -216,6 +217,66 @@ async function routes(fastify) {
       ...i,
       section_number: liveNum.get(i.section_id) || i.section_number || '',
     }));
+  });
+
+  // GET /api/afs/:id/points — liste a plat de tous les points (resolus
+  // template + overrides) de toutes les sections kind='equipment' de l'AF.
+  // Numerotation live des sections (meme regle que /instances).
+  fastify.get('/afs/:id/points', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const af = db.afs.getById(id);
+    if (!af || af.deleted_at) return reply.code(404).send({ detail: 'AF non trouvée' });
+    if (!assertRead(request, reply, id)) return;
+    const allSections = db.sections.listByAf(id);
+    const liveNum = (() => {
+      const map = new Map();
+      const byParent = new Map();
+      for (const s of allSections) {
+        if (s.included_in_export === 0) continue;
+        const k = s.parent_id || 'root';
+        if (!byParent.has(k)) byParent.set(k, []);
+        byParent.get(k).push(s);
+      }
+      for (const arr of byParent.values()) {
+        arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      }
+      function walk(parentKey, prefix) {
+        const arr = byParent.get(parentKey) || [];
+        arr.forEach((s, idx) => {
+          const num = prefix ? `${prefix}.${idx + 1}` : String(idx + 1);
+          map.set(s.id, num);
+          walk(s.id, num);
+        });
+      }
+      walk('root', '');
+      return map;
+    })();
+    const equipmentSections = allSections.filter(s => s.kind === 'equipment');
+    const out = [];
+    for (const sec of equipmentSections) {
+      const points = resolveSectionPoints(sec.id);
+      const tplName = sec.equipment_template_id
+        ? db.equipmentTemplates.getById(sec.equipment_template_id)?.name || sec.title
+        : sec.title;
+      for (const p of points) {
+        out.push({
+          point_id: p.id,
+          section_id: sec.id,
+          section_number: liveNum.get(sec.id) || sec.number || '',
+          section_title: sec.title,
+          equipment_template_id: sec.equipment_template_id,
+          equipment_template_name: tplName,
+          label: p.label,
+          tech_name: p.tech_name || '',
+          data_type: p.data_type,
+          direction: p.direction,
+          unit: p.unit || '',
+          nature: p.nature || '',
+          is_optional: !!p.is_optional,
+        });
+      }
+    }
+    return out;
   });
 
   // POST /api/afs — creation

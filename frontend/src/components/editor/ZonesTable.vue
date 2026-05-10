@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { PlusCircleIcon, TrashIcon, BuildingOfficeIcon, PencilSquareIcon } from '@heroicons/vue/24/outline'
-import api, { getAfZonesMatrix } from '@/api'
+import { PlusCircleIcon, TrashIcon, BuildingOfficeIcon, PencilSquareIcon, DocumentDuplicateIcon, ArrowsUpDownIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
+import api, { getAfZonesMatrix, duplicateZone } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useTableSortFilter } from '@/composables/useTableSortFilter'
 import BaseModal from '@/components/BaseModal.vue'
 import Tooltip from '@/components/Tooltip.vue'
 
@@ -28,7 +29,7 @@ const draft = ref(emptyDraft())
 const editing = ref(null)
 const editForm = ref(emptyDraft())
 
-const OCCUPATION_TYPES = ['Bureaux', 'Logistique', 'Atelier', 'Locaux techniques', 'Circulation', 'Parking', 'Salle serveur', 'Sanitaires', 'Restauration', 'Réunion', 'Extérieur', 'Autre']
+const OCCUPATION_TYPES = ['Bureaux', 'Logistique', 'Atelier', 'Locaux techniques', 'Armoire électrique', 'Circulation', 'Parking', 'Salle serveur', 'Sanitaires', 'Restauration', 'Réunion', 'Extérieur', 'Autre']
 
 function emptyDraft() {
   return { name: '', surface_m2: null, occupation_type: '' }
@@ -97,6 +98,19 @@ async function deleteZone(zone) {
   try { await api.delete(`/zones/${zone.id}`); await refresh() }
   catch (e) { notifyError('Échec suppression') }
 }
+
+async function duplicateRow(zone) {
+  try {
+    await duplicateZone(zone.id)
+    notifySuccess('Zone dupliquée')
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la duplication')
+  }
+}
+
+const { sortKey, sortDir, columnFilters, processed: visibleZones, toggleSort, setFilter } =
+  useTableSortFilter(zones, { defaultSortKey: null })
 
 watch(() => props.sectionId, refresh)
 onMounted(refresh)
@@ -196,14 +210,41 @@ onMounted(refresh)
       <table v-else-if="zones.length" class="w-full text-sm">
         <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
           <tr>
-            <th class="text-left px-5 py-2 font-semibold">Zone</th>
-            <th class="text-right px-4 py-2 font-semibold w-28">Surface</th>
-            <th class="text-left px-4 py-2 font-semibold w-52">Type d'occupation</th>
-            <th class="px-4 py-2 w-24"></th>
+            <th class="text-left px-5 py-2 font-semibold select-none">
+              <button @click="toggleSort('name')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+                Zone
+                <ArrowUpIcon v-if="sortKey === 'name' && sortDir === 'asc'" class="w-3 h-3" />
+                <ArrowDownIcon v-else-if="sortKey === 'name' && sortDir === 'desc'" class="w-3 h-3" />
+                <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+              </button>
+            </th>
+            <th class="text-right px-4 py-2 font-semibold w-28 select-none">
+              <button @click="toggleSort('surface_m2')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+                Surface
+                <ArrowUpIcon v-if="sortKey === 'surface_m2' && sortDir === 'asc'" class="w-3 h-3" />
+                <ArrowDownIcon v-else-if="sortKey === 'surface_m2' && sortDir === 'desc'" class="w-3 h-3" />
+                <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+              </button>
+            </th>
+            <th class="text-left px-4 py-2 font-semibold w-52 select-none">
+              <button @click="toggleSort('occupation_type')" class="inline-flex items-center gap-1 hover:text-indigo-700">
+                Type d'occupation
+                <ArrowUpIcon v-if="sortKey === 'occupation_type' && sortDir === 'asc'" class="w-3 h-3" />
+                <ArrowDownIcon v-else-if="sortKey === 'occupation_type' && sortDir === 'desc'" class="w-3 h-3" />
+                <ArrowsUpDownIcon v-else class="w-3 h-3 text-gray-300" />
+              </button>
+            </th>
+            <th class="px-4 py-2 w-32"></th>
+          </tr>
+          <tr class="bg-white border-t border-gray-100">
+            <th class="px-5 py-1.5"><input :value="columnFilters.name || ''" @input="setFilter('name', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+            <th class="px-2 py-1.5"><input :value="columnFilters.surface_m2 || ''" @input="setFilter('surface_m2', $event.target.value)" type="text" placeholder="…" class="w-full px-1 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+            <th class="px-4 py-1.5"><input :value="columnFilters.occupation_type || ''" @input="setFilter('occupation_type', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
+            <th class="px-4 py-1.5"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="z in zones" :key="z.id" class="border-t border-gray-100 group hover:bg-indigo-50/40 transition-colors">
+          <tr v-for="z in visibleZones" :key="z.id" class="border-t border-gray-100 group hover:bg-indigo-50/40 transition-colors">
             <td class="px-5 py-2.5 font-semibold text-gray-800">{{ z.name }}</td>
             <td class="px-4 py-2.5 text-right tabular-nums text-gray-600">
               <span v-if="z.surface_m2">{{ z.surface_m2 }} <span class="text-gray-400">m²</span></span>
@@ -214,6 +255,11 @@ onMounted(refresh)
               <Tooltip text="Éditer la zone">
                 <button @click="openEdit(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-opacity">
                   <PencilSquareIcon class="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
+              <Tooltip text="Dupliquer la zone">
+                <button @click="duplicateRow(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 text-gray-600 transition-opacity ml-1">
+                  <DocumentDuplicateIcon class="w-3.5 h-3.5" />
                 </button>
               </Tooltip>
               <Tooltip text="Supprimer la zone">

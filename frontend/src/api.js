@@ -109,6 +109,7 @@ export const getAfTemplateUpdates = (id) => api.get(`/afs/${id}/template-updates
 export const syncAfFromLibrary = (id, { overwriteBodies = false } = {}) =>
   api.post(`/afs/${id}/sync-library`, { overwrite_bodies: overwriteBodies })
 export const listAfInstances = (afId) => api.get(`/afs/${afId}/instances`)
+export const listAfPoints = (afId) => api.get(`/afs/${afId}/points`)
 export const getAfRequiredLevel = (id, excludedIds = []) =>
   api.get(`/afs/${id}/required-level`, { params: excludedIds.length ? { excluded: excludedIds.join(',') } : {} })
 
@@ -140,7 +141,9 @@ export const addMissingTemplateToAf = (afId, templateId) =>
   api.post(`/afs/${afId}/template-updates/add-missing/${templateId}`)
 export const addSectionInstance = (id, data) => api.post(`/sections/${id}/instances`, data)
 export const updateInstance = (id, data) => api.patch(`/instances/${id}`, data)
+export const duplicateInstance = (id) => api.post(`/instances/${id}/duplicate`)
 export const deleteInstance = (id) => api.delete(`/instances/${id}`)
+export const duplicateZone = (id) => api.post(`/zones/${id}/duplicate`)
 export const listInstanceZones = (id) => api.get(`/instances/${id}/zones`)
 export const setInstanceZones = (id, zone_ids) => api.put(`/instances/${id}/zones`, { zone_ids })
 export const listInstanceCategories = (id) => api.get(`/instances/${id}/categories`)
@@ -212,10 +215,9 @@ export const exportSynthesis = (afId, data) =>
   api.post(`/afs/${afId}/exports/synthesis`, data)
 export const downloadExportUrl = (id) => `/api/exports/${id}/download`
 // URLs preview HTML (rendu Handlebars sans Puppeteer, pour iframe)
-export const previewAfUrl = (afId, includeBacsAnnex = false, includeOfferingsAnnex = false) => {
+export const previewAfUrl = (afId, includeBacsAnnex = false) => {
   const qs = []
   if (includeBacsAnnex) qs.push('includeBacsAnnex=1')
-  if (includeOfferingsAnnex) qs.push('includeOfferingsAnnex=1')
   return `/api/afs/${afId}/exports/af/preview${qs.length ? '?' + qs.join('&') : ''}`
 }
 export const previewPointsListUrl = (afId) =>
