@@ -5961,22 +5961,37 @@ const equipmentInstances = {
 };
 
 // ── Catalogue editable des categories de systemes (Lot 32) ──
+//
+// La source de verite du rattachement template <-> categorie est
+// `equipment_templates.category` (string libre). La colonne historique
+// `system_categories_db.slugs` (JSON array stockee en DB) est conservee
+// pour compatibilite mais n'est plus la verite : `slugs` est CALCULE
+// a la volee dans list/getById/getByKey en dynamique depuis
+// `equipment_templates.category = key`. Au write (PATCH), `slugs` peut
+// etre fourni ; on propage via UPDATE equipment_templates.category
+// (cf. route PATCH /system-categories/:id pour la logique).
+function _slugsForKey(key) {
+  if (!key) return [];
+  return db.prepare('SELECT slug FROM equipment_templates WHERE category = ? ORDER BY name')
+    .all(key)
+    .map(r => r.slug);
+}
 const systemCategoriesDb = {
   list() {
     return db.prepare('SELECT * FROM system_categories_db ORDER BY position, id').all().map(r => ({
       ...r,
-      slugs: r.slugs ? JSON.parse(r.slugs) : [],
+      slugs: _slugsForKey(r.key),
     }));
   },
   getByKey(key) {
     const r = db.prepare('SELECT * FROM system_categories_db WHERE key = ?').get(key);
     if (!r) return null;
-    return { ...r, slugs: r.slugs ? JSON.parse(r.slugs) : [] };
+    return { ...r, slugs: _slugsForKey(r.key) };
   },
   getById(id) {
     const r = db.prepare('SELECT * FROM system_categories_db WHERE id = ?').get(id);
     if (!r) return null;
-    return { ...r, slugs: r.slugs ? JSON.parse(r.slugs) : [] };
+    return { ...r, slugs: _slugsForKey(r.key) };
   },
   create({ key, label, bacs, slugs, iconValue, iconColor, position }) {
     const result = db.prepare(`
