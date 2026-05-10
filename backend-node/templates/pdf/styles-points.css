@@ -786,26 +786,26 @@ table.systems-table tfoot td {
   width: 269mm;
 }
 table.points {
-  width: 269mm;
+  width: 100%;
+  max-width: 269mm; /* A4 paysage utile (297 - 2x14mm marges) */
   border-collapse: collapse;
-  table-layout: fixed;
+  /* table-layout: auto -> les largeurs s'adaptent au contenu de chaque
+     colonne plutot qu'a des slots fixes en mm. Les colonnes etroites
+     (badges, checkbox) sont contraintes via width 1% + nowrap pour
+     forcer le moteur a leur allouer le minimum, le reste va aux
+     colonnes "longues" (Catégorie, Repère, Localisation, Donnée). */
+  table-layout: auto;
   font-size: 7.5pt;
 }
-/* Largeurs calibrées pour A4 paysage 269mm utile (297 - 2×14mm)
-   Total : 34 + 22 + 34 + 34 + 81 + 15 + 9 + 15 + 11 + 14 = 269 mm
-   La colonne Commentaire intégrateur a été remplacée par Optionnel
-   (checkbox 14mm) ; le surplus est redistribué vers label/loc/tech. */
-table.points col, /* fallback */
-table.points th.col-cat,      table.points td.col-cat      { width: 34mm; }
-table.points th.col-ref,      table.points td.col-ref      { width: 22mm; }
-table.points th.col-loc,      table.points td.col-loc      { width: 34mm; }
-table.points th.col-tech,     table.points td.col-tech     { width: 34mm; }
-table.points th.col-label,    table.points td.col-label    { width: 81mm; }
-table.points th.col-type,     table.points td.col-type     { width: 15mm; }
-table.points th.col-dir,      table.points td.col-dir      { width:  9mm; }
-table.points th.col-nature,   table.points td.col-nature   { width: 15mm; }
-table.points th.col-unit,     table.points td.col-unit     { width: 11mm; }
-table.points th.col-optional, table.points td.col-optional { width: 14mm; text-align: center; }
+/* Colonnes compactes : width 1% + nowrap = "prends le minimum vital".
+   Le moteur de layout distribue alors la largeur restante aux colonnes
+   longues (sans width fixe), qui s'adaptent au contenu reel. */
+table.points th.col-type,     table.points td.col-type     { width: 1%; white-space: nowrap; }
+table.points th.col-dir,      table.points td.col-dir      { width: 1%; white-space: nowrap; text-align: center; }
+table.points th.col-nature,   table.points td.col-nature   { width: 1%; white-space: nowrap; }
+table.points th.col-unit,     table.points td.col-unit     { width: 1%; white-space: nowrap; text-align: center; }
+table.points th.col-optional, table.points td.col-optional { width: 1%; white-space: nowrap; text-align: center; }
+table.points th.col-ref,      table.points td.col-ref      { width: 1%; white-space: nowrap; }
 
 table.points thead { display: table-header-group; } /* répétition headers sur chaque page */
 table.points tr { page-break-inside: avoid; }
@@ -830,11 +830,11 @@ table.points td {
   border-bottom: 0.3mm solid #e8ebf0;
   border-right: 0.3mm solid #f3f4f6;
   vertical-align: middle;
-
-  /* Règle d'or Lot 19 : jamais de retour à la ligne */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Avec table-layout: auto, on laisse le contenu wrap naturellement
+     dans les colonnes longues (Catégorie, Repère, Localisation, Donnée).
+     Les colonnes compactes ont leur propre nowrap defini ci-dessus. */
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 table.points tbody tr:nth-child(even) td { background: #fafbfc; }
@@ -949,23 +949,26 @@ table.summary-table tfoot td {
   color: #1b2842;
 }
 
-/* Checkbox PDF : carre 3.5mm avec coche centree quand `checked`.
-   Utilise dans la colonne "Optionnel" de la liste des points. */
+/* Checkbox PDF : pastille ronde 4mm avec coche centree quand `checked`.
+   Charte Buildy : rond + emerald (vert). Pas de cadre lourd, badge
+   sobre style "etiquette validee". Utilise dans la colonne "Optionnel"
+   de la liste des points. */
 table.points td.col-optional .checkbox {
   display: inline-block;
-  width: 3.5mm;
-  height: 3.5mm;
-  border: 0.35mm solid #9ca3af;
-  border-radius: 0.6mm;
+  width: 4mm;
+  height: 4mm;
+  border: 0.35mm solid #d1d5db;
+  border-radius: 50%;
   background: #ffffff;
   vertical-align: middle;
   text-align: center;
-  line-height: 3.2mm;
-  font-size: 6.5pt;
+  line-height: 3.6mm;
+  font-size: 7pt;
   font-weight: 700;
   color: #ffffff;
+  box-sizing: border-box;
 }
 table.points td.col-optional .checkbox.checked {
-  background: #1b2842;
-  border-color: #1b2842;
+  background: #10b981; /* emerald-500 */
+  border-color: #10b981;
 }
