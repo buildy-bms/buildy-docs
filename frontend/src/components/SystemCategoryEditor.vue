@@ -9,7 +9,7 @@ import { TrashIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
 import BacsArticlesPicker from './BacsArticlesPicker.vue'
-import { createSystemCategory, updateSystemCategory, deleteSystemCategory, listEquipmentTemplates } from '@/api'
+import { createSystemCategory, updateSystemCategory, deleteSystemCategory, getSystemCategoryUsage, listEquipmentTemplates } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 
@@ -90,8 +90,16 @@ async function submit() {
     }
     let res
     if (isEdit.value) {
+      // Key editable : envoie uniquement si elle a change pour eviter
+      // un round-trip cascade inutile.
+      const keyTrim = form.value.key.trim()
+      if (keyTrim && keyTrim !== props.category.key) {
+        payload.key = keyTrim
+      }
       res = await updateSystemCategory(props.category.id, payload)
-      success('Catégorie mise à jour')
+      success(payload.key
+        ? `Catégorie mise à jour, clé renommée et cascade appliquée (équipements + instances + sections)`
+        : 'Catégorie mise à jour')
     } else {
       payload.key = form.value.key.trim()
       res = await createSystemCategory(payload)
@@ -107,9 +115,25 @@ async function submit() {
 
 async function destroy() {
   if (!isEdit.value) return
+  // Pre-check usage : informe l'utilisateur du nombre d'éléments qui
+  // référencent encore la catégorie (la route DELETE renverra 409 sinon).
+  let usage = null
+  try {
+    const { data } = await getSystemCategoryUsage(props.category.id)
+    usage = data
+  } catch { /* on continue sans le pre-check, l'API rejettera */ }
+  const total = usage ? (usage.equipment_templates + usage.instance_categories + usage.sections) : 0
+  if (total > 0) {
+    const parts = []
+    if (usage.equipment_templates) parts.push(`${usage.equipment_templates} système(s) bibliothèque`)
+    if (usage.instance_categories) parts.push(`${usage.instance_categories} instance(s) d'audit`)
+    if (usage.sections) parts.push(`${usage.sections} section(s) AF`)
+    notifyError(`Catégorie « ${props.category.label} » utilisée par ${parts.join(', ')}. Détache d'abord les éléments concernés (ou renomme la clé pour les déplacer en cascade).`)
+    return
+  }
   const ok = await confirm({
     title: 'Supprimer la catégorie ?',
-    message: `« ${props.category.label} »\n\nLes instances qui l'avaient sélectionnée la perdent.`,
+    message: `« ${props.category.label} »\n\nAucun équipement ne la référence. Suppression irréversible.`,
     confirmLabel: 'Supprimer',
     danger: true,
   })
@@ -135,10 +159,19 @@ async function destroy() {
                  class="w-full px-3 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Key (interne) *</label>
-          <input v-model="form.key" type="text" required :disabled="isEdit" autocomplete="off"
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Key (interne) *
+            <span v-if="isEdit" class="text-gray-400 font-normal">— éditable, propagation auto</span>
+          </label>
+          <input v-model="form.key" type="text" required autocomplete="off"
                  placeholder="chauffage"
-                 class="w-full px-3 py-2 border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500" />
+                 pattern="[a-zA-Z0-9_]+"
+                 title="Lettres, chiffres et underscore uniquement"
+                 class="w-full px-3 py-2 border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p v-if="isEdit" class="mt-1 text-[10px] text-amber-700">
+            ⚠️ Modifier la clé met à jour en cascade tous les systèmes biblio,
+            instances d'audit et sections AF qui la référencent.
+          </p>
         </div>
       </div>
 

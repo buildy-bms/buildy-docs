@@ -619,20 +619,94 @@ async function routes(fastify) {
     return created;
   });
 
-  // PATCH /api/system-categories/:id — modifier
+  // PATCH /api/system-categories/:id — modifier (label/bacs/icon/position
+  // librement éditables ; key éditable AVEC propagation cascade aux 3
+  // tables qui la référencent en string libre, pas de FK).
   fastify.patch('/system-categories/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
-    if (!db.systemCategoriesDb.getById(id)) return reply.code(404).send({ detail: 'Categorie non trouvee' });
+    const cur = db.systemCategoriesDb.getById(id);
+    if (!cur) return reply.code(404).send({ detail: 'Categorie non trouvee' });
     const b = request.body || {};
-    return db.systemCategoriesDb.update(id, {
-      label: b.label, bacs: b.bacs, slugs: b.slugs,
-      iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
+
+    // Renommage de la key : valide unicite, propage la cascade en
+    // transaction sur equipment_templates.category +
+    // equipment_instance_categories.category_key + sections.system_category_key.
+    let nextKey = undefined;
+    if (typeof b.key === 'string' && b.key.trim() && b.key !== cur.key) {
+      const candidate = b.key.trim();
+      if (!/^[a-z0-9_]+$/i.test(candidate)) {
+        return reply.code(400).send({ detail: 'Slug invalide (lettres, chiffres, underscore uniquement)' });
+      }
+      const conflict = db.systemCategoriesDb.getByKey(candidate);
+      if (conflict && conflict.id !== id) {
+        return reply.code(409).send({ detail: `Une catégorie avec la clé « ${candidate} » existe déjà` });
+      }
+      nextKey = candidate;
+    }
+
+    const tx = db.db.transaction(() => {
+      // Update du row systemcategories_db (label/bacs/icon/position/slugs/key)
+      db.systemCategoriesDb.update(id, {
+        key: nextKey,
+        label: b.label, bacs: b.bacs, slugs: b.slugs,
+        iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
+      });
+      // Cascade key rename
+      if (nextKey) {
+        db.db.prepare('UPDATE equipment_templates SET category = ? WHERE category = ?').run(nextKey, cur.key);
+        db.db.prepare('UPDATE equipment_instance_categories SET category_key = ? WHERE category_key = ?').run(nextKey, cur.key);
+        db.db.prepare('UPDATE sections SET system_category_key = ? WHERE system_category_key = ?').run(nextKey, cur.key);
+      }
     });
+    try { tx(); }
+    catch (err) {
+      log.error({ err, id, oldKey: cur.key, nextKey }, 'PATCH system_category cascade echec');
+      return reply.code(500).send({ detail: `Mise à jour impossible : ${err.message || 'erreur DB'}` });
+    }
+    if (nextKey) {
+      log.info(`Categorie systeme renommee : ${cur.key} -> ${nextKey} (cascade equipment_templates + instance_categories + sections)`);
+      db.auditLog.add({ userId: request.authUser?.id, action: 'system_category.rename',
+        payload: { id, old_key: cur.key, new_key: nextKey } });
+    }
+    return db.systemCategoriesDb.getById(id);
+  });
+
+  // GET /api/system-categories/:id/usage — compte les usages avant DELETE
+  fastify.get('/system-categories/:id/usage', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const cur = db.systemCategoriesDb.getById(id);
+    if (!cur) return reply.code(404).send({ detail: 'Categorie non trouvee' });
+    return {
+      key: cur.key,
+      equipment_templates: db.db.prepare('SELECT COUNT(*) AS c FROM equipment_templates WHERE category = ?').get(cur.key).c,
+      instance_categories: db.db.prepare('SELECT COUNT(*) AS c FROM equipment_instance_categories WHERE category_key = ?').get(cur.key).c,
+      sections: db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE system_category_key = ?').get(cur.key).c,
+    };
   });
 
   // DELETE /api/system-categories/:id
-  fastify.delete('/system-categories/:id', async (request) => {
-    db.systemCategoriesDb.delete(parseInt(request.params.id, 10));
+  // Refuse 409 si la catégorie est utilisée — l'utilisateur doit
+  // d'abord déplacer les équipements/instances/sections vers une autre cat.
+  fastify.delete('/system-categories/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const cur = db.systemCategoriesDb.getById(id);
+    if (!cur) return reply.code(404).send({ detail: 'Categorie non trouvee' });
+    const tplCount = db.db.prepare('SELECT COUNT(*) AS c FROM equipment_templates WHERE category = ?').get(cur.key).c;
+    const instCount = db.db.prepare('SELECT COUNT(*) AS c FROM equipment_instance_categories WHERE category_key = ?').get(cur.key).c;
+    const secCount = db.db.prepare('SELECT COUNT(*) AS c FROM sections WHERE system_category_key = ?').get(cur.key).c;
+    const total = tplCount + instCount + secCount;
+    if (total > 0) {
+      const parts = [];
+      if (tplCount) parts.push(`${tplCount} système(s) bibliothèque`);
+      if (instCount) parts.push(`${instCount} instance(s) d'audit`);
+      if (secCount) parts.push(`${secCount} section(s) AF`);
+      return reply.code(409).send({
+        detail: `Catégorie « ${cur.label} » utilisée par ${parts.join(', ')}. Détache d'abord les éléments concernés avant de la supprimer.`,
+      });
+    }
+    db.systemCategoriesDb.delete(id);
+    db.auditLog.add({ userId: request.authUser?.id, action: 'system_category.delete',
+      payload: { id, key: cur.key, label: cur.label } });
     return { ok: true };
   });
 
