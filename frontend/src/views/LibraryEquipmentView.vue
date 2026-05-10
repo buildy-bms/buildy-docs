@@ -144,18 +144,21 @@ async function bulkSaveHtml(it, html) {
 
 const viewMode = ref(localStorage.getItem('library-view-mode') || 'table')
 const searchQuery = ref('')
-// Tri par defaut : `position` (ordre canonique biblio = celui pousse dans
-// l'arbre AF par libraryExtendAf). Cliquer sur une colonne du tableau
-// switche vers son tri (alpha, etc.). Le drag-drop / les fleches up/down
-// fonctionnent uniquement sur le tri 'position' (sinon les changements
-// de position seraient invisibles, ecrases par le tri courant).
-const sortBy = ref('position')
+// Tri par defaut : `null` (ordre canonique du backend = ORDER BY
+// system_categories_db.position, equipment_templates.position, name).
+// Cliquer sur une colonne du tableau switche vers ce tri (alpha, etc.).
+// Le drag-drop / les fleches up/down fonctionnent uniquement sur l'ordre
+// canonique (sinon les changements de position seraient invisibles,
+// ecrases par le tri courant).
+const sortBy = ref(null)
 const sortDir = ref('asc')
 const validationFilter = ref('all') // 'all'|'pending'|'empty'|'draft'|'validated'
 function setViewMode(m) { viewMode.value = m; localStorage.setItem('library-view-mode', m) }
 function toggleSort(c) {
-  if (sortBy.value === c) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  else { sortBy.value = c; sortDir.value = 'asc' }
+  if (sortBy.value === c) {
+    if (sortDir.value === 'asc') { sortDir.value = 'desc' }
+    else { sortBy.value = null; sortDir.value = 'asc' } // 3e clic = retour ordre canonique
+  } else { sortBy.value = c; sortDir.value = 'asc' }
 }
 function normalize(s) { return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') }
 
@@ -185,31 +188,24 @@ const filteredSorted = computed(() => {
       return s === validationFilter.value
     })
   }
-  // Map des positions de categorie (ordre du catalogue system_categories_db)
-  // pour preserver le regroupement par cat dans le tri 'position'.
-  const catOrder = new Map(dbCategories.value.map((c, i) => [c.key, i]))
-  list = [...list].sort((a, b) => {
-    if (sortBy.value === 'position') {
-      // Tri par cat (selon system_categories_db.position) puis equipment_templates.position
-      const ca = catOrder.has(a.category) ? catOrder.get(a.category) : 9999
-      const cb = catOrder.has(b.category) ? catOrder.get(b.category) : 9999
-      if (ca !== cb) return sortDir.value === 'asc' ? ca - cb : cb - ca
-      const pa = a.position ?? 0
-      const pb = b.position ?? 0
-      if (pa !== pb) return sortDir.value === 'asc' ? pa - pb : pb - pa
-      return (a.name || '').localeCompare(b.name || '', 'fr')
-    }
-    let av, bv
-    if (sortBy.value === 'points_count' || sortBy.value === 'sections_using_count' || sortBy.value === 'current_version') {
-      av = a[sortBy.value] || 0; bv = b[sortBy.value] || 0
-    } else {
-      av = (a[sortBy.value] || '').toString().toLowerCase()
-      bv = (b[sortBy.value] || '').toString().toLowerCase()
-    }
-    if (av < bv) return sortDir.value === 'asc' ? -1 : 1
-    if (av > bv) return sortDir.value === 'asc' ? 1 : -1
-    return 0
-  })
+  // Tri canonique (sortBy === null) : ne re-trie pas, on garde l'ordre du
+  // backend qui est deja `system_categories_db.position`, puis
+  // `equipment_templates.position`, puis `name`. C'est sur cet ordre que les
+  // fleches up/down + drag-drop appliquent leurs changements de position.
+  if (sortBy.value !== null) {
+    list = [...list].sort((a, b) => {
+      let av, bv
+      if (sortBy.value === 'points_count' || sortBy.value === 'sections_using_count' || sortBy.value === 'current_version') {
+        av = a[sortBy.value] || 0; bv = b[sortBy.value] || 0
+      } else {
+        av = (a[sortBy.value] || '').toString().toLowerCase()
+        bv = (b[sortBy.value] || '').toString().toLowerCase()
+      }
+      if (av < bv) return sortDir.value === 'asc' ? -1 : 1
+      if (av > bv) return sortDir.value === 'asc' ? 1 : -1
+      return 0
+    })
+  }
   return list
 })
 
@@ -314,7 +310,7 @@ const grouped = computed(() => {
 // serait écrasé par le tri courant et invisible).
 const reordering = ref(false)
 const canDrag = computed(() =>
-  sortBy.value === 'position' && sortDir.value === 'asc' && normalize(searchQuery.value).length < 2
+  sortBy.value === null && normalize(searchQuery.value).length < 2
 )
 const tbodyRef = ref(null)
 let sortableInstance = null

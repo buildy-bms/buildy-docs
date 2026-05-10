@@ -21,7 +21,12 @@ import BacsBadge from './BacsBadge.vue'
 
 const props = defineProps({
   reference: { type: String, required: true },
+  // Override AF (sections.bacs_justification) — priorité 1.
   justification: { type: String, default: null },
+  // Texte biblio (equipment_templates.bacs_justification) — priorité 2,
+  // utilisé pour les sections kind='equipment' avant le fallback summary
+  // article BACS générique.
+  templateJustification: { type: String, default: null },
   context: { type: String, default: 'section' }, // 'section' | 'equipment'
   editable: { type: Boolean, default: false },
   sectionId: { type: Number, default: null },
@@ -56,7 +61,18 @@ const fallbackText = computed(() => {
   return summaries.join(' ')
 })
 
-const displayedText = computed(() => props.justification?.trim() || fallbackText.value)
+// Cascade : override AF > biblio (templateJustification) > summary article BACS générique
+const displayedText = computed(() =>
+  props.justification?.trim() ||
+  props.templateJustification?.trim() ||
+  fallbackText.value
+)
+const isFromTemplate = computed(() =>
+  !props.justification?.trim() && !!props.templateJustification?.trim()
+)
+const isFromArticleSummary = computed(() =>
+  !props.justification?.trim() && !props.templateJustification?.trim() && !!fallbackText.value
+)
 
 function startEdit() {
   draft.value = props.justification || ''
@@ -116,7 +132,10 @@ watch(() => props.justification, () => { editing.value = false })
         </div>
 
         <div v-else-if="displayedText" class="mt-2 text-sm text-gray-700 leading-relaxed bacs-context-prose" v-html="displayedText"></div>
-        <p v-if="!editing && displayedText && !justification && fallbackText" class="text-[11px] text-gray-400 italic mt-1.5">
+        <p v-if="!editing && isFromTemplate" class="text-[11px] text-gray-400 italic mt-1.5">
+          (texte hérité de la bibliothèque — édite pour adapter à ce projet)
+        </p>
+        <p v-else-if="!editing && isFromArticleSummary" class="text-[11px] text-gray-400 italic mt-1.5">
           (résumé automatique de l'article — précise le lien si besoin)
         </p>
       </div>

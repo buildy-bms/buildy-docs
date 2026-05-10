@@ -5364,6 +5364,8 @@ const sections = {
              eqt.icon_value AS eq_icon_value,
              eqt.icon_color AS eq_icon_color,
              eqt.category AS eq_category,
+             eqt.bacs_justification AS eq_bacs_justification,
+             eqt.bacs_articles AS eq_bacs_articles,
              scd.label AS cat_label,
              scd.icon_value AS cat_icon_value,
              scd.icon_color AS cat_icon_color
@@ -5405,6 +5407,8 @@ const sections = {
              eqt.icon_value AS eq_icon_value,
              eqt.icon_color AS eq_icon_color,
              eqt.category AS eq_category,
+             eqt.bacs_justification AS eq_bacs_justification,
+             eqt.bacs_articles AS eq_bacs_articles,
              scd.label AS cat_label,
              scd.icon_value AS cat_icon_value,
              scd.icon_color AS cat_icon_color
@@ -5420,6 +5424,9 @@ const sections = {
     return db.prepare(`
       SELECT s.*, u.display_name AS updated_by_name, u.email AS updated_by_email,
              eqt.slug AS equipment_template_slug, eqt.name AS equipment_template_name,
+             eqt.bacs_justification AS eq_bacs_justification,
+             eqt.bacs_articles AS eq_bacs_articles,
+             eqt.description_html AS eq_description_html,
              stt.slug AS section_template_slug, stt.title AS section_template_title,
              stt.is_functionality AS section_template_is_functionality,
              stt.avail_e AS tpl_avail_e,

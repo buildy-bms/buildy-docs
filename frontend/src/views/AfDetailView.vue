@@ -755,14 +755,18 @@ watch(() => route.params.id, async (newId, oldId) => {
             @updated="onSectionUpdated"
           />
 
-          <!-- Encart "lien avec le décret BACS" en card séparée sous l'éditeur. -->
+          <!-- Encart "lien avec le décret BACS" en card séparée sous l'éditeur.
+               Reference effective : section override > biblio
+               (eq_bacs_articles) — pour qu'une section equipement remonte
+               toujours au moins l'article BACS rattaché à son template biblio. -->
           <div
-            v-if="selectedSection.bacs_articles"
+            v-if="selectedSection.bacs_articles || selectedSection.eq_bacs_articles"
             class="bg-white rounded-lg border border-gray-200 p-4"
           >
             <BacsContextBox
-              :reference="selectedSection.bacs_articles"
+              :reference="selectedSection.bacs_articles || selectedSection.eq_bacs_articles"
               :justification="selectedSection.bacs_justification"
+              :template-justification="selectedSection.eq_bacs_justification"
               :context="selectedSection.kind === 'equipment' ? 'equipment' : 'section'"
               :section-id="selectedSection.id"
               editable
