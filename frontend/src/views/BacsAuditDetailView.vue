@@ -479,11 +479,22 @@ const bmsSteps = computed(() => {
 // Devices disponibles comme générateurs pour une (zone, catégorie).
 // On filtre sur la category — un device de chauffage n'a aucun sens
 // comme générateur de la régulation clim et inversement.
+// Inclut aussi les devices partagés depuis une autre zone via
+// bacs_audit_device_extra_zones (mig 98) : une chaufferie commune
+// dessert plusieurs zones et doit apparaître dans toutes.
 function generatorDevicesForZoneCategory(zoneId, category) {
+  const sysById = new Map(systems.value.map(s => [s.id, s]))
   const sysIds = systems.value
     .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
     .map(s => s.id)
-  return devices.value.filter(d => sysIds.includes(d.system_id))
+  return devices.value.filter(d => {
+    if (sysIds.includes(d.system_id)) return true
+    if (Array.isArray(d.extra_zone_ids) && d.extra_zone_ids.includes(zoneId)) {
+      const parentSys = sysById.get(d.system_id)
+      return parentSys?.system_category === category
+    }
+    return false
+  })
 }
 
 // Panneau d'activité (slide-out a droite, comme dans l'AF detail).
@@ -809,11 +820,15 @@ const notesModal = ref({
   // entityRef: ref reactive a la ligne en cours d'edition (pour Object.assign)
   entityType: null,
   entityRef: null,
+  // Champ DB où sauver le HTML. Par défaut `notes_html`, mais peut être
+  // surchargé pour cibler un champ spécifique (ex. `production_notes_html`
+  // sur la régulation thermique pour la note d'un niveau précis).
+  noteField: 'notes_html',
   // Contexte transmis a Claude
   assistContext: null,
 })
 
-function openNotesModal({ title, contextLabel, entityType, entityRef, currentHtml }) {
+function openNotesModal({ title, contextLabel, entityType, entityRef, currentHtml, noteField }) {
   notesModal.value = {
     open: true,
     title,
@@ -821,6 +836,7 @@ function openNotesModal({ title, contextLabel, entityType, entityRef, currentHtm
     html: currentHtml || '',
     entityType,
     entityRef,
+    noteField: noteField || 'notes_html',
     assistContext: {
       kind: 'bacs_audit_notes',
       title: contextLabel || title,
@@ -832,7 +848,8 @@ function openNotesModal({ title, contextLabel, entityType, entityRef, currentHtm
 async function saveNotesModal(html) {
   const m = notesModal.value
   if (!m.entityRef || !m.entityType) return
-  const payload = { notes_html: html || null }
+  const field = m.noteField || 'notes_html'
+  const payload = { [field]: html || null }
   try {
     if (m.entityType === 'zone') {
       const { data } = await updateZone(m.entityRef.zone_id, payload)
@@ -855,6 +872,9 @@ async function saveNotesModal(html) {
       const { data } = await updateBacsDevice(m.entityRef.id, payload)
       Object.assign(m.entityRef, data)
     } else if (m.entityType === 'thermal') {
+      // Couvre notes globales (notes_html) + notes par niveau
+      // (production_notes_html, distribution_notes_html, emission_notes_html)
+      // via le `noteField` transmis par ThermalSection.
       const { data } = await updateBacsThermal(m.entityRef.id, payload)
       Object.assign(m.entityRef, data)
     } else if (m.entityType === 'action_item_alternatives') {

@@ -434,11 +434,17 @@ async function routes(fastify) {
       // facultatifs — certaines configs (DRV) sautent la distribution.
       distribution_device_id: z.number().int().nullable().optional(),
       emission_device_id: z.number().int().nullable().optional(),
-      // Migration 88 : régulation par niveau (sonde extérieure, V3V,
-      // robinets thermo…). Texte libre avec suggestions côté UI.
-      production_regulation: z.string().nullable().optional(),
-      distribution_regulation: z.string().nullable().optional(),
-      emission_regulation: z.string().nullable().optional(),
+      // Migration 129 : équipement de régulation par niveau (sonde,
+      // thermostat, GTB) qui pilote l'équipement-process du niveau.
+      // Distinct du <level>_device_id qui pointe la chaudière/pompe/radiateur.
+      production_regulation_device_id: z.number().int().nullable().optional(),
+      distribution_regulation_device_id: z.number().int().nullable().optional(),
+      emission_regulation_device_id: z.number().int().nullable().optional(),
+      // Migration 129 : note libre par niveau, en plus de la note globale
+      // `notes_html` au niveau du couple zone × catégorie.
+      production_notes_html: z.string().nullable().optional(),
+      distribution_notes_html: z.string().nullable().optional(),
+      emission_notes_html: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       // Migration 84 : notes riches via la modale partagée (system / device /
       // meter / thermal — même UX). `notes` legacy conservé pour les saisies

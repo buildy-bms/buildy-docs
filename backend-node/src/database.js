@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 128;
+const TARGET_VERSION = 129;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5306,6 +5306,50 @@ function runMigrations() {
     `);
     log.info('Migration 128 appliquee : 7 colonnes mortes droppees (notes_p1/p2/p3/p4/p4_autonomous/maintenance/training, 0 records)');
     db.pragma('user_version = 128');
+  }
+
+  if (current < 129) {
+    // Card 05 Regulation thermique R175-6 : decoupage par niveau (Production /
+    // Distribution / Emission). Trois ajouts par niveau :
+    //   - <level>_regulation_device_id  : FK vers l'equipement de regulation
+    //     (sonde, thermostat, GTB) qui realise la regulation. Distinct du
+    //     <level>_device_id qui pointe l'equipement-process (chaudiere, pompe,
+    //     radiateur).
+    //   - <level>_notes_html            : note libre par niveau, en plus des
+    //     notes globales `notes_html` (couple zone x categorie).
+    // Les anciens champs <level>_regulation (TEXT creatable, "sonde exterieure",
+    // "V3V melange"...) deviennent redondants : on copie leur contenu vers la
+    // colonne <level>_notes_html du meme niveau (encadre <p>) puis on drop.
+    db.exec(`
+      ALTER TABLE bacs_audit_thermal_regulation
+        ADD COLUMN production_regulation_device_id INTEGER
+          REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL;
+      ALTER TABLE bacs_audit_thermal_regulation
+        ADD COLUMN distribution_regulation_device_id INTEGER
+          REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL;
+      ALTER TABLE bacs_audit_thermal_regulation
+        ADD COLUMN emission_regulation_device_id INTEGER
+          REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN production_notes_html TEXT;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN distribution_notes_html TEXT;
+      ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN emission_notes_html TEXT;
+
+      UPDATE bacs_audit_thermal_regulation
+         SET production_notes_html = '<p>' || production_regulation || '</p>'
+       WHERE production_regulation IS NOT NULL AND TRIM(production_regulation) <> '';
+      UPDATE bacs_audit_thermal_regulation
+         SET distribution_notes_html = '<p>' || distribution_regulation || '</p>'
+       WHERE distribution_regulation IS NOT NULL AND TRIM(distribution_regulation) <> '';
+      UPDATE bacs_audit_thermal_regulation
+         SET emission_notes_html = '<p>' || emission_regulation || '</p>'
+       WHERE emission_regulation IS NOT NULL AND TRIM(emission_regulation) <> '';
+
+      ALTER TABLE bacs_audit_thermal_regulation DROP COLUMN production_regulation;
+      ALTER TABLE bacs_audit_thermal_regulation DROP COLUMN distribution_regulation;
+      ALTER TABLE bacs_audit_thermal_regulation DROP COLUMN emission_regulation;
+    `);
+    log.info('Migration 129 appliquee : thermal_regulation P/D/E (FK regulation_device_id + notes_html par niveau, drop *_regulation TEXT)');
+    db.pragma('user_version = 129');
   }
 
   if (current > TARGET_VERSION) {
