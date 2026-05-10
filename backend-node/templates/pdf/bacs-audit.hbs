@@ -572,27 +572,72 @@
 {{/if}}
 
 {{#if thermal.length}}
-<table>
-  <thead><tr><th>Zone</th><th>Usage</th><th>Régulation auto</th><th>Type</th><th>Générateur</th><th>Âge</th><th>Exempté bois</th><th>Notes</th></tr></thead>
-  <tbody>
-    {{#each thermal}}
-      <tr>
-        <td>{{zone_name}}</td>
-        <td>
-          <span class="usage-inline">
-            {{{categoryIcon category "14"}}}<span class="usage-inline-label">{{categoryLabel}}</span>
-          </span>
-        </td>
-        <td class="bool-cell"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
-        <td>{{regulationLabel}}</td>
-        <td>{{generatorLabel}}</td>
-        <td>{{#if generator_age_years}}{{generator_age_years}} ans{{/if}}</td>
-        <td class="bool-cell">{{#if generator_exempt_wood}}<span class="bool-yes">✓</span> <span class="muted">R175-6 II</span>{{else}}<span class="bool-no">✗</span>{{/if}}</td>
-        <td>{{notes}}</td>
-      </tr>
+{{!-- Mig 129 : 1 carte par couple (zone × catégorie) avec en-tête (champs
+     communs) + 3 sous-blocs niveau (Production / Distribution / Émission)
+     contenant équipement-process + équipement de régulation + notes par
+     niveau. Cohérent avec l'ergonomie auditeur (3 sous-lignes par bloc). --}}
+{{#each thermal}}
+<div class="thermal-card">
+  <div class="thermal-head">
+    <div class="thermal-head-id">
+      <span class="thermal-zone">{{zone_name}}</span>
+      <span class="thermal-usage">
+        {{{categoryIcon category "12"}}}<span class="thermal-usage-label">{{categoryLabel}}</span>
+      </span>
+    </div>
+    <div class="thermal-head-meta">
+      <span class="thermal-meta-item">
+        <span class="thermal-meta-label">Régul. auto</span>
+        <span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span>
+      </span>
+      {{#if has_automatic_regulation}}
+      <span class="thermal-meta-item">
+        <span class="thermal-meta-label">Granularité</span>
+        <span>{{regulationLabel}}</span>
+      </span>
+      {{/if}}
+      {{#if generator_exempt_wood}}
+      <span class="thermal-meta-item">
+        <span class="bool-yes">✓ Exempté bois (R175-6 II)</span>
+      </span>
+      {{/if}}
+    </div>
+    {{#if notes_html}}
+    <div class="thermal-notes-global rich-notes">{{{notes_html}}}</div>
+    {{else}}{{#if notes}}
+    <div class="thermal-notes-global">{{notes}}</div>
+    {{/if}}{{/if}}
+  </div>
+  <div class="thermal-levels">
+    {{#each levels}}
+    <div class="thermal-level">
+      <div class="thermal-level-head">
+        <span class="thermal-level-label">{{label}}</span>
+      </div>
+      <div class="thermal-level-body">
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Équipement</span>
+          <span class="thermal-field-value">{{#if device_name}}{{device_name}}{{else}}<span class="muted">—</span>{{/if}}</span>
+        </span>
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Équipement de régulation</span>
+          <span class="thermal-field-value">{{#if regulation_device_name}}{{regulation_device_name}}{{else}}<span class="muted">—</span>{{/if}}</span>
+        </span>
+        {{#if ../generatorLabel}}{{#if (eq key "production")}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Type production</span>
+          <span class="thermal-field-value">{{../generatorLabel}}{{#if ../generator_age_years}} · {{../generator_age_years}} ans{{/if}}</span>
+        </span>
+        {{/if}}{{/if}}
+      </div>
+      {{#if notes_html}}
+      <div class="thermal-level-notes rich-notes">{{{notes_html}}}</div>
+      {{/if}}
+    </div>
     {{/each}}
-  </tbody>
-</table>
+  </div>
+</div>
+{{/each}}
 {{else}}
 <p class="muted">Régulation thermique non documentée.</p>
 {{/if}}

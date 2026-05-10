@@ -19,19 +19,27 @@
  * - Auto-save 400 ms (identique au comportement précédent), donc le sheet
  *   n'a pas de bouton « Enregistrer » dans son header (hide-save).
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileNativeSelect from './MobileNativeSelect.vue'
-import {
-  PRODUCTION_REGULATION_OPTIONS,
-  DISTRIBUTION_REGULATION_OPTIONS,
-  EMISSION_REGULATION_OPTIONS,
-} from '@/composables/thermalRegulationOptions'
+import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
+
+const LEVEL_NOTES_FIELD = {
+  production: 'production_notes_html',
+  distribution: 'distribution_notes_html',
+  emission: 'emission_notes_html',
+}
+const LEVEL_LABEL = {
+  production: 'Production',
+  distribution: 'Distribution',
+  emission: 'Émission',
+}
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -61,20 +69,48 @@ const sheetTitle = computed(() => {
   return zoneName.value ? `${cat} — ${zoneName.value}` : `Régulation ${cat.toLowerCase()}`
 })
 
-// Liste des équipements de la zone + catégorie (mêmes critères que la
-// version inline qu'on remplace).
-const deviceOptions = computed(() => {
+// Liste des équipements de la zone + catégorie. Inclut les équipements
+// partagés depuis une autre zone via bacs_audit_device_extra_zones (mig 98) :
+// une chaufferie commune dessert plusieurs zones et doit y apparaître.
+const candidateDevices = computed(() => {
+  const sysById = new Map(systems.value.map(s => [s.id, s]))
   const sysIds = systems.value
     .filter(s => s.zone_id === props.zoneId && s.present && s.system_category === props.category)
     .map(s => s.id)
-  return devices.value
-    .filter(d => sysIds.includes(d.system_id))
-    .map(d => ({
-      value: d.id,
-      label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,
-      hint: d.brand && d.model_reference ? `${d.brand} ${d.model_reference}` : (d.brand || d.model_reference || ''),
-    }))
+  return devices.value.filter(d => {
+    if (sysIds.includes(d.system_id)) return true
+    if (Array.isArray(d.extra_zone_ids) && d.extra_zone_ids.includes(props.zoneId)) {
+      const parentSys = sysById.get(d.system_id)
+      return parentSys?.system_category === props.category
+    }
+    return false
+  })
 })
+
+function toOption(d) {
+  return {
+    value: d.id,
+    label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,
+    hint: d.brand && d.model_reference ? `${d.brand} ${d.model_reference}` : (d.brand || d.model_reference || ''),
+  }
+}
+
+// Filtrage tolérant par rôle : pertinents en tête, sans rôle en bas, rôles
+// incompatibles masqués (cohérent avec ThermalSection desktop).
+const productionDeviceOptions = computed(() =>
+  filterAndSortByRole(candidateDevices.value, 'production').map(toOption)
+)
+const distributionDeviceOptions = computed(() =>
+  filterAndSortByRole(candidateDevices.value, 'distribution').map(toOption)
+)
+const emissionDeviceOptions = computed(() =>
+  filterAndSortByRole(candidateDevices.value, 'emission').map(toOption)
+)
+// Liste partagée pour les 3 sélecteurs « équipement de régulation » P/D/E.
+// Filtre rôle 'regulation' (sondes, thermostats, GTB, vannes motorisées).
+const regulationDeviceOptions = computed(() =>
+  filterAndSortByRole(candidateDevices.value, 'regulation').map(toOption)
+)
 
 const GENERATOR_OPTIONS = [
   { value: 'gas', label: 'Gaz' },
@@ -97,6 +133,50 @@ async function patch(p) {
       await audit.refreshActionItems()
     } catch { error('Sauvegarde régulation impossible') }
   }, 400)
+}
+
+// ── Sous-MobileSheet de notes par niveau (production / distribution /
+// émission). Pattern identique à MobileBmsTopicNoteButton : textarea simple,
+// conversion text ↔ HTML basique. Le formatage rich saisi côté desktop est
+// aplati à l'ouverture mobile et perdu au save (mention dans le footer).
+
+const noteSheetLevel = ref(null) // 'production' | 'distribution' | 'emission'
+const noteSheetText = ref('')
+
+const noteSheetOpen = computed(() => noteSheetLevel.value !== null)
+const noteSheetTitle = computed(() => {
+  if (!noteSheetLevel.value) return ''
+  return `Note ${LEVEL_LABEL[noteSheetLevel.value].toLowerCase()}`
+})
+
+function htmlToText(html) {
+  if (!html) return ''
+  return html.replace(/<\/?p[^>]*>/gi, '\n').replace(/<[^>]*>/g, '').trim()
+}
+function textToHtml(text) {
+  if (!text || !text.trim()) return ''
+  return text.split(/\n+/).filter(Boolean)
+    .map(p => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`).join('')
+}
+function hasLevelNote(level) {
+  const html = thermalRow.value?.[LEVEL_NOTES_FIELD[level]] || ''
+  return !!html.replace(/<[^>]*>/g, '').trim()
+}
+
+function openLevelNote(level) {
+  noteSheetLevel.value = level
+  noteSheetText.value = htmlToText(thermalRow.value?.[LEVEL_NOTES_FIELD[level]] || '')
+}
+function closeLevelNote() {
+  noteSheetLevel.value = null
+  noteSheetText.value = ''
+}
+async function saveLevelNote() {
+  const lvl = noteSheetLevel.value
+  if (!lvl) return
+  const field = LEVEL_NOTES_FIELD[lvl]
+  await patch({ [field]: textToHtml(noteSheetText.value) || null })
+  closeLevelNote()
 }
 </script>
 
@@ -164,40 +244,51 @@ async function patch(p) {
             <MobileNativeSelect
               :model-value="thermalRow.generator_device_id"
               @update:modelValue="v => patch({ generator_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
-              :options="deviceOptions"
+              :options="productionDeviceOptions"
               placeholder="— aucun équipement"
             />
           </MobileField>
-          <div v-if="thermalRow.generator_device_id" class="space-y-3 pl-4 border-l-4 border-amber-300">
-            <MobileField label="Type de production">
+          <div class="space-y-3 pl-4 border-l-4 border-amber-300">
+            <template v-if="thermalRow.generator_device_id">
+              <MobileField label="Type de production">
+                <MobileNativeSelect
+                  :model-value="thermalRow.generator_type"
+                  @update:modelValue="v => patch({ generator_type: v || null })"
+                  :options="GENERATOR_OPTIONS"
+                  creatable
+                  placeholder="— Sélectionner —"
+                  custom-placeholder="ex : chaudière condensation, PAC air-eau…"
+                />
+              </MobileField>
+              <MobileField label="Âge de l'équipement (années)">
+                <input
+                  type="number" inputmode="numeric" pattern="[0-9]*" min="0"
+                  :value="thermalRow.generator_age_years ?? ''"
+                  @blur="e => patch({ generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
+                  placeholder="ex : 8"
+                  class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                />
+              </MobileField>
+            </template>
+            <MobileField label="Équipement de régulation (sonde, thermostat, GTB)">
               <MobileNativeSelect
-                :model-value="thermalRow.generator_type"
-                @update:modelValue="v => patch({ generator_type: v || null })"
-                :options="GENERATOR_OPTIONS"
-                creatable
-                placeholder="— Sélectionner —"
-                custom-placeholder="ex : chaudière condensation, PAC air-eau…"
+                :model-value="thermalRow.production_regulation_device_id"
+                @update:modelValue="v => patch({ production_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
+                :options="regulationDeviceOptions"
+                placeholder="— aucun"
               />
             </MobileField>
-            <MobileField label="Âge de l'équipement (années)">
-              <input
-                type="number" inputmode="numeric" pattern="[0-9]*" min="0"
-                :value="thermalRow.generator_age_years ?? ''"
-                @blur="e => patch({ generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                placeholder="ex : 8"
-                class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
-              />
-            </MobileField>
-            <MobileField label="Régulation côté production">
-              <MobileNativeSelect
-                :model-value="thermalRow.production_regulation"
-                @update:modelValue="v => patch({ production_regulation: v || null })"
-                :options="PRODUCTION_REGULATION_OPTIONS"
-                creatable
-                placeholder="— Sélectionner —"
-                custom-placeholder="ex : sonde extérieure…"
-              />
-            </MobileField>
+            <button
+              type="button"
+              @click="openLevelNote('production')"
+              :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
+                hasLevelNote('production')
+                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
+                  : 'border-gray-200 text-gray-600 bg-white']"
+            >
+              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              {{ hasLevelNote('production') ? 'Note production' : '+ Note production' }}
+            </button>
           </div>
         </div>
 
@@ -208,21 +299,30 @@ async function patch(p) {
             <MobileNativeSelect
               :model-value="thermalRow.distribution_device_id"
               @update:modelValue="v => patch({ distribution_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
-              :options="deviceOptions"
+              :options="distributionDeviceOptions"
               placeholder="— aucune (DRV, poêle…)"
             />
           </MobileField>
-          <div v-if="thermalRow.distribution_device_id" class="pl-4 border-l-4 border-amber-300">
-            <MobileField label="Régulation côté distribution">
+          <div class="space-y-3 pl-4 border-l-4 border-amber-300">
+            <MobileField label="Équipement de régulation">
               <MobileNativeSelect
-                :model-value="thermalRow.distribution_regulation"
-                @update:modelValue="v => patch({ distribution_regulation: v || null })"
-                :options="DISTRIBUTION_REGULATION_OPTIONS"
-                creatable
-                placeholder="— Sélectionner —"
-                custom-placeholder="ex : pompe ΔP variable…"
+                :model-value="thermalRow.distribution_regulation_device_id"
+                @update:modelValue="v => patch({ distribution_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
+                :options="regulationDeviceOptions"
+                placeholder="— aucun"
               />
             </MobileField>
+            <button
+              type="button"
+              @click="openLevelNote('distribution')"
+              :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
+                hasLevelNote('distribution')
+                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
+                  : 'border-gray-200 text-gray-600 bg-white']"
+            >
+              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              {{ hasLevelNote('distribution') ? 'Note distribution' : '+ Note distribution' }}
+            </button>
           </div>
         </div>
 
@@ -233,21 +333,30 @@ async function patch(p) {
             <MobileNativeSelect
               :model-value="thermalRow.emission_device_id"
               @update:modelValue="v => patch({ emission_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
-              :options="deviceOptions"
+              :options="emissionDeviceOptions"
               placeholder="— aucun"
             />
           </MobileField>
-          <div v-if="thermalRow.emission_device_id" class="pl-4 border-l-4 border-amber-300">
-            <MobileField label="Régulation côté émission">
+          <div class="space-y-3 pl-4 border-l-4 border-amber-300">
+            <MobileField label="Équipement de régulation">
               <MobileNativeSelect
-                :model-value="thermalRow.emission_regulation"
-                @update:modelValue="v => patch({ emission_regulation: v || null })"
-                :options="EMISSION_REGULATION_OPTIONS"
-                creatable
-                placeholder="— Sélectionner —"
-                custom-placeholder="ex : robinets thermostatiques…"
+                :model-value="thermalRow.emission_regulation_device_id"
+                @update:modelValue="v => patch({ emission_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
+                :options="regulationDeviceOptions"
+                placeholder="— aucun"
               />
             </MobileField>
+            <button
+              type="button"
+              @click="openLevelNote('emission')"
+              :class="['w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition',
+                hasLevelNote('emission')
+                  ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
+                  : 'border-gray-200 text-gray-600 bg-white']"
+            >
+              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              {{ hasLevelNote('emission') ? 'Note émission' : '+ Note émission' }}
+            </button>
           </div>
         </div>
       </template>
@@ -287,6 +396,26 @@ async function patch(p) {
     <!-- Cas où aucune ligne n'existe encore (ne devrait pas arriver mais protège) -->
     <div v-else class="p-8 text-center text-sm text-gray-500">
       Aucune régulation thermique enregistrée pour cette zone.
+    </div>
+  </MobileSheet>
+
+  <!-- Sous-MobileSheet de notes par niveau (Production / Distribution / Émission).
+       Pattern identique à MobileBmsTopicNoteButton : textarea simple, pas Tiptap. -->
+  <MobileSheet :open="noteSheetOpen" :title="noteSheetTitle" save-label="Enregistrer"
+               @close="closeLevelNote" @save="saveLevelNote">
+    <div class="p-4 space-y-3">
+      <p class="text-xs text-gray-500 leading-relaxed">
+        Note libre pour ce niveau (état observé, défauts, contournements). Apparaîtra dans le PDF rapport sous cette sous-section.
+      </p>
+      <textarea
+        v-model="noteSheetText"
+        rows="8"
+        placeholder="Ce que tu observes…"
+        class="w-full text-sm rounded-lg border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+      ></textarea>
+      <p class="text-[11px] text-gray-400 italic">
+        Formatage simplifié sur mobile (pas de gras / listes). Saisir une note riche depuis le poste de bureau si besoin.
+      </p>
     </div>
   </MobileSheet>
 </template>

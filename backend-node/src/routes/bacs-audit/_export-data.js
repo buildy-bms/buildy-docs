@@ -232,12 +232,48 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // de la section 4 (sinon on n'affiche rien, plutot que des cards vides).
   const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
 
+  // Map id → device pour résoudre les FK équipement / équipement de régulation
+  // (mig 129) à l'export. Sinon les noms ne s'afficheraient pas dans le PDF.
+  const devicesById = new Map(devices.map(d => [d.id, d]));
+  const deviceNameOrDash = id => {
+    if (id == null) return null;
+    const d = devicesById.get(id);
+    if (!d) return null;
+    return d.name || d.brand || d.model_reference || `Équipement #${d.id}`;
+  };
+
   const thermal = thermalRaw.map(t => ({
     ...t,
     category: t.category || 'heating',
     categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
     regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
     generatorLabel: t.generator_type ? (GENERATOR_LABEL[t.generator_type] || t.generator_type) : '—',
+    // Mig 129 : décomposition par niveau Production / Distribution / Émission.
+    // Chaque niveau expose nom de l'équipement-process + nom de l'équipement
+    // de régulation + notes HTML.
+    levels: [
+      {
+        key: 'production',
+        label: 'Production',
+        device_name: deviceNameOrDash(t.generator_device_id),
+        regulation_device_name: deviceNameOrDash(t.production_regulation_device_id),
+        notes_html: t.production_notes_html || '',
+      },
+      {
+        key: 'distribution',
+        label: 'Distribution',
+        device_name: deviceNameOrDash(t.distribution_device_id),
+        regulation_device_name: deviceNameOrDash(t.distribution_regulation_device_id),
+        notes_html: t.distribution_notes_html || '',
+      },
+      {
+        key: 'emission',
+        label: 'Émission',
+        device_name: deviceNameOrDash(t.emission_device_id),
+        regulation_device_name: deviceNameOrDash(t.emission_regulation_device_id),
+        notes_html: t.emission_notes_html || '',
+      },
+    ],
   }));
 
   // Plan de mise en conformite groupe par severite

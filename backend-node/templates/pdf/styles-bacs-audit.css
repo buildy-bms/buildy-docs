@@ -1896,3 +1896,87 @@ h3.subheading {
 .r175-3-ok { background: #d1fae5; color: #065f46; border: 0.3pt solid #6ee7b7; }
 .r175-3-ko { background: #fee2e2; color: #991b1b; border: 0.3pt solid #fca5a5; }
 .r175-3-row td { background: transparent !important; }
+
+/* ── Régulation thermique R175-6 (mig 129) ─────────────────────────
+   1 carte par couple (zone × catégorie). En-tête avec champs communs,
+   puis 3 sous-blocs niveau (Production / Distribution / Émission). */
+.thermal-card {
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 2mm;
+  margin: 0 0 4mm;
+  page-break-inside: avoid;
+  overflow: hidden;
+}
+.thermal-head {
+  background: #f9fafb;
+  padding: 2.5mm 3mm 2mm;
+  border-bottom: 0.4pt solid #e5e7eb;
+}
+.thermal-head-id {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin-bottom: 1mm;
+}
+.thermal-zone {
+  font-size: 9.5pt;
+  font-weight: 600;
+  color: #111827;
+}
+.thermal-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 1mm;
+  font-size: 8.5pt;
+  color: #4b5563;
+}
+.thermal-usage-label { font-weight: 500; }
+.thermal-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm;
+  font-size: 8pt;
+  color: #4b5563;
+}
+.thermal-meta-item { display: inline-flex; align-items: center; gap: 1mm; }
+.thermal-meta-label { color: #6b7280; }
+.thermal-notes-global { margin-top: 1.8mm; font-size: 8pt; color: #374151; }
+.thermal-levels { display: flex; flex-direction: column; }
+.thermal-level {
+  padding: 2mm 3mm;
+  border-top: 0.3pt solid #f3f4f6;
+}
+.thermal-level:first-child { border-top: 0; }
+.thermal-level-head { margin-bottom: 1mm; }
+.thermal-level-label {
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4pt;
+  color: #1b2842;
+}
+.thermal-level-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm 8mm;
+}
+.thermal-level-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4mm;
+  min-width: 50mm;
+}
+.thermal-field-label {
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.3pt;
+  color: #9ca3af;
+}
+.thermal-field-value { font-size: 8.5pt; color: #111827; }
+.thermal-level-notes {
+  margin-top: 1.5mm;
+  padding-top: 1.5mm;
+  border-top: 0.3pt dashed #e5e7eb;
+  font-size: 8pt;
+  color: #374151;
+}
