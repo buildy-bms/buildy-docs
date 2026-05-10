@@ -6,8 +6,9 @@ import { Bars3Icon } from '@heroicons/vue/24/outline'
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
 
-import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/vue/24/outline'
-import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate, reorderEquipmentTemplates } from '@/api'
+import { ChevronLeftIcon, BookmarkIcon, TableCellsIcon, Squares2X2Icon, MagnifyingGlassIcon, XMarkIcon, PlusIcon, PencilSquareIcon, SparklesIcon, DocumentDuplicateIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { listEquipmentTemplates, getEquipmentTemplate, getTemplateVersions, getTemplateAffectedAfs, updateEquipmentTemplate, uploadEquipmentTemplateAttachment, cloneEquipmentTemplate, reorderEquipmentTemplates, deleteEquipmentTemplate } from '@/api'
+import { useConfirm } from '@/composables/useConfirm'
 import ContentValidationDot from '@/components/ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -103,6 +104,37 @@ async function onDeleted() {
   showEditor.value = false
   selected.value = null
   await refresh()
+}
+
+const { confirm } = useConfirm()
+async function deleteFromList(t) {
+  // Pre-check : si des AFs actives utilisent ce template, on prefixe le
+  // message de confirmation avec le nombre d'AFs concernees pour eviter
+  // les surprises (la route DELETE refuse de toute facon avec 409 dans
+  // ce cas, mais l'UI doit prevenir avant le clic).
+  const usedCount = t.sections_using_count || 0
+  const msg = usedCount > 0
+    ? `« ${t.name} » est utilisé dans ${usedCount} section(s) AF active(s). Détache-le d'abord avant de pouvoir le supprimer.`
+    : `Supprimer définitivement « ${t.name} » de la bibliothèque ?\n\nCette action est irréversible. Le slug est tombstoned : il ne pourra pas être réinstancié au prochain boot du seeder.`
+  if (usedCount > 0) {
+    notifyError(msg)
+    return
+  }
+  const ok = await confirm({
+    title: `Supprimer « ${t.name} » ?`,
+    message: msg,
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteEquipmentTemplate(t.id)
+    notifySuccess(`« ${t.name} » supprimé`)
+    if (selected.value?.id === t.id) selected.value = null
+    await refresh()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la suppression')
+  }
 }
 
 const affectedAfs = ref([])
@@ -641,6 +673,15 @@ onMounted(async () => {
                       <button type="button" @click="openClone(t)"
                               class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
                               v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                      <button type="button" @click="deleteFromList(t)"
+                              :disabled="t.sections_using_count > 0"
+                              class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
+                              :title="t.sections_using_count > 0
+                                ? `Utilisé dans ${t.sections_using_count} section(s) AF active(s) — détache d'abord pour pouvoir supprimer`
+                                : 'Supprimer ce système technique'"
+                              v-tooltip="t.sections_using_count > 0 ? null : 'Supprimer ce système technique'">
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -691,9 +732,20 @@ onMounted(async () => {
               </td>
               <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
               <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
-                <button type="button" @click="openClone(t)"
-                        class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                        v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                <div class="inline-flex items-center gap-0.5">
+                  <button type="button" @click="openClone(t)"
+                          class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                          v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                  <button type="button" @click="deleteFromList(t)"
+                          :disabled="t.sections_using_count > 0"
+                          class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
+                          :title="t.sections_using_count > 0
+                            ? `Utilisé dans ${t.sections_using_count} section(s) AF active(s) — détache d'abord pour pouvoir supprimer`
+                            : 'Supprimer ce système technique'"
+                          v-tooltip="t.sections_using_count > 0 ? null : 'Supprimer ce système technique'">
+                    <TrashIcon class="w-4 h-4" />
+                  </button>
+                </div>
               </td>
             </tr>
             <tr v-if="!filteredSorted.length">
