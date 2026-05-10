@@ -322,21 +322,17 @@ async function routes(fastify) {
       return reply.code(409).send({ detail: `${inUse} section(s) utilisent encore ce template — détacher d'abord.` });
     }
 
-    // Detacher les references orphelines avant DELETE :
-    // - sections d'AFs SOFT-DELETED (deleted_at NOT NULL) qui peuvent
-    //   encore pointer vers ce template (FK sans ON DELETE clause -> RESTRICT
-    //   bloquerait sinon).
-    // - audit_log: log d'abord (avec templateId encore valide, FK SET NULL
-    //   convertirait template_id en NULL apres DELETE de toute façon, mais
-    //   on prefere l'INSERT explicit avant le DELETE).
-    // Les autres FK ont leur cascade declare en schema (CASCADE / SET NULL).
+    // Toutes les FK depuis equipment_templates ont leur cascade declarative
+    // depuis la mig 122 :
+    //   - sections.equipment_template_id : ON DELETE SET NULL (mig 122)
+    //   - audit_log.template_id : ON DELETE SET NULL
+    //   - section_templates.equipment_template_id : ON DELETE SET NULL
+    //   - equipment_template_points / versions / attachments : CASCADE
+    // Plus besoin de detach manuel. On log + DELETE + tombstone en transaction.
     db.auditLog.add({ templateId: id, userId: request.authUser?.id, action: 'template.delete' });
     const tx = db.db.transaction(() => {
-      db.db.prepare('UPDATE sections SET equipment_template_id = NULL, equipment_template_version = NULL WHERE equipment_template_id = ?').run(id);
       db.equipmentTemplates.delete(id);
-      // Tombstone : empeche la recreation au prochain boot via seedLibraryOnBoot
-      // (parite avec deleted_section_template_slugs). Toujours pose, meme si le
-      // slug n'est pas dans le seed (idempotent via INSERT OR IGNORE).
+      // Tombstone : empeche la recreation au prochain boot via seedLibraryOnBoot.
       db.db.prepare('INSERT OR IGNORE INTO deleted_equipment_template_slugs (slug) VALUES (?)').run(tpl.slug);
     });
     try { tx(); }

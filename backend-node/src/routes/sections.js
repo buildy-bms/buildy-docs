@@ -613,10 +613,16 @@ async function routes(fastify) {
     if (!b.key || !b.label) return reply.code(400).send({ detail: 'key + label requis' });
     if (db.systemCategoriesDb.getByKey(b.key)) return reply.code(409).send({ detail: 'Cette key existe deja' });
     const created = db.systemCategoriesDb.create({
-      key: b.key, label: b.label, bacs: b.bacs, slugs: b.slugs,
+      key: b.key, label: b.label, bacs: b.bacs,
       iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
     });
-    return created;
+    // Si l'admin a coche des slugs (templates) a la creation, on synchronise
+    // equipment_templates.category vers cette nouvelle key.
+    if (Array.isArray(b.slugs) && b.slugs.length) {
+      const stmt = db.db.prepare('UPDATE equipment_templates SET category = ? WHERE slug = ?');
+      for (const s of b.slugs) if (typeof s === 'string' && s.trim()) stmt.run(b.key, s.trim());
+    }
+    return db.systemCategoriesDb.getByKey(b.key);
   });
 
   // PATCH /api/system-categories/:id — modifier (label/bacs/icon/position
@@ -646,12 +652,12 @@ async function routes(fastify) {
 
     const effectiveKey = nextKey || cur.key;
     const tx = db.db.transaction(() => {
-      // Update du row systemcategories_db (label/bacs/icon/position/slugs/key).
-      // `slugs` ecrit en DB pour conserver l'invariant historique mais la
-      // verite reste `equipment_templates.category` (cf. db.systemCategoriesDb.list).
+      // Update du row systemcategories_db (label/bacs/icon/position/key).
+      // `slugs` n'existe plus en DB depuis la mig 121 ; la liste est calculee
+      // a la volee depuis equipment_templates.category.
       db.systemCategoriesDb.update(id, {
         key: nextKey,
-        label: b.label, bacs: b.bacs, slugs: b.slugs,
+        label: b.label, bacs: b.bacs,
         iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
       });
       // Cascade key rename gere integralement par les FK ON UPDATE CASCADE
