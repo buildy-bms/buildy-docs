@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 132;
+const TARGET_VERSION = 133;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5441,6 +5441,107 @@ function runMigrations() {
     db.pragma('user_version = 132');
   }
 
+  if (current < 133) {
+    // ── Fix : section_templates.parent_template_id ON DELETE CASCADE ──
+    //
+    // Bug isole 2026-05-10 : la FK etait en ON DELETE SET NULL. Quand
+    // l'utilisateur a supprime les templates parents 2.1/2.2/2.4/2.6/2.8
+    // depuis l'UI biblio, leurs 16+ enfants (2.1.1 Chaudieres, 2.1.2
+    // Aerothermes, 2.4.1 Eclairage int, 2.6.1 Compteurs elec, etc.) ont
+    // vu leur parent_template_id passer a NULL au lieu d'etre supprimes
+    // en cascade. Resultat : ils sont apparus comme top-level dans le
+    // seeder, et la nouvelle AF #39 a recu 16 sections doublons au
+    // niveau racine.
+    //
+    // Cette migration :
+    //   1) Nettoie les section_templates orphelins (parent NULL + slug
+    //      avec un point), avec tombstone des slugs (anti-reseed).
+    //   2) Supprime les sections root-level (parent_id IS NULL) qui ont
+    //      ete creees a partir de ces orphelins. Limite a AF #39 :
+    //      les AFs plus anciennes ont leurs sections correctement
+    //      placees sous leur ancien parent (avant la suppression de
+    //      celui-ci) et restent intactes — juste leur section_template_id
+    //      sera NULL apres le drop des orphelins (FK SET NULL).
+    //   3) Recree section_templates avec FK parent_template_id en
+    //      ON DELETE CASCADE pour empecher la recidive.
+    const orphans = db.prepare(
+      "SELECT id, slug FROM section_templates WHERE parent_template_id IS NULL AND slug LIKE '%.%'"
+    ).all();
+    if (orphans.length) {
+      const orphanIds = orphans.map(o => o.id);
+      const placeholders = orphanIds.map(() => '?').join(',');
+      // Tombstones AVANT delete (sinon getById echoue dans la route DELETE)
+      const tsStmt = db.prepare(
+        'INSERT OR IGNORE INTO deleted_section_template_slugs (slug, deleted_at) VALUES (?, CURRENT_TIMESTAMP)'
+      );
+      for (const o of orphans) tsStmt.run(o.slug);
+      // Supprime les sections root-level orphelines (toutes AFs, pour
+      // robustesse — en pratique seule l'AF #39 est concernee).
+      const sectionsCleaned = db.prepare(
+        `DELETE FROM sections WHERE parent_id IS NULL AND section_template_id IN (${placeholders})`
+      ).run(...orphanIds);
+      // Drop les templates orphelins. Les sections restantes qui les
+      // referencent (dans des AFs plus anciennes) auront leur
+      // section_template_id mis a NULL via la FK SET NULL existante
+      // (mig 122).
+      const tplCleaned = db.prepare(
+        `DELETE FROM section_templates WHERE id IN (${placeholders})`
+      ).run(...orphanIds);
+      log.info(`Migration 133 cleanup : ${orphans.length} templates orphelins droppes, ${sectionsCleaned.changes} sections root nettoyees`);
+    } else {
+      log.info('Migration 133 cleanup : aucun template orphelin a nettoyer');
+    }
+
+    // Pour changer la FK parent_template_id de SET NULL -> CASCADE,
+    // SQLite impose une recreation complete de la table. On copie
+    // dynamiquement la liste des colonnes existantes (sans hardcoder)
+    // pour rester robuste si des colonnes ont ete ajoutees via ALTER.
+    const cols = db.prepare("PRAGMA table_info(section_templates)").all().map(c => c.name);
+    const colsCsv = cols.map(c => `"${c}"`).join(', ');
+    // Recupere la def CREATE TABLE complete (pour preserver les types
+    // exacts), on substitue juste la clause SET NULL -> CASCADE sur
+    // parent_template_id.
+    const sqlMaster = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='section_templates'"
+    ).get();
+    let createSql = sqlMaster.sql;
+    // Pattern : parent_template_id INTEGER REFERENCES section_templates(id) ON DELETE SET NULL
+    // -> parent_template_id INTEGER REFERENCES section_templates_new(id) ON DELETE CASCADE
+    createSql = createSql.replace(
+      /(parent_template_id\s+INTEGER\s+REFERENCES\s+)section_templates(\(id\)\s+ON\s+DELETE\s+)SET\s+NULL/i,
+      '$1section_templates_new$2CASCADE'
+    );
+    // Replace table name in CREATE clause
+    createSql = createSql.replace(
+      /CREATE\s+TABLE\s+(IF\s+NOT\s+EXISTS\s+)?["']?section_templates["']?/i,
+      'CREATE TABLE section_templates_new'
+    );
+
+    db.pragma('foreign_keys = OFF');
+    const tx = db.transaction(() => {
+      db.exec(createSql);
+      db.exec(`INSERT INTO section_templates_new (${colsCsv}) SELECT ${colsCsv} FROM section_templates;`);
+      db.exec('DROP TABLE section_templates;');
+      db.exec('ALTER TABLE section_templates_new RENAME TO section_templates;');
+      // Recreate indexes (best-effort, IF NOT EXISTS)
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_section_templates_parent ON section_templates(parent_template_id, position);
+        CREATE INDEX IF NOT EXISTS idx_section_templates_position ON section_templates(position);
+        CREATE INDEX IF NOT EXISTS idx_section_templates_slug ON section_templates(slug);
+        CREATE INDEX IF NOT EXISTS idx_section_tpl_content_validated_by ON section_templates(content_validated_by) WHERE content_validated_by IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_section_tpl_updated_by ON section_templates(updated_by) WHERE updated_by IS NOT NULL;
+      `);
+      const fkErrors = db.prepare('PRAGMA foreign_key_check').all();
+      if (fkErrors.length) {
+        throw new Error('Migration 133 : FK errors -- ' + JSON.stringify(fkErrors));
+      }
+    });
+    tx();
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 133 appliquee : section_templates.parent_template_id passe en ON DELETE CASCADE (cleanup + fix structurel)');
+    db.pragma('user_version = 133');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -5897,6 +5998,21 @@ const sectionTemplates = {
       SELECT COUNT(*) AS c FROM sections s
         JOIN afs a ON a.id = s.af_id
        WHERE s.section_template_id = ? AND a.deleted_at IS NULL
+    `).get(id);
+    return r?.c || 0;
+  },
+  // Compte les descendants (tous niveaux) d'un section_template via CTE
+  // recursive. Sert au warning avant DELETE : la FK est CASCADE (mig 133),
+  // donc supprimer un parent emporte tout le sous-arbre.
+  countDescendants(id) {
+    const r = db.prepare(`
+      WITH RECURSIVE descendants(id) AS (
+        SELECT id FROM section_templates WHERE parent_template_id = ?
+        UNION ALL
+        SELECT st.id FROM section_templates st
+        JOIN descendants d ON st.parent_template_id = d.id
+      )
+      SELECT COUNT(*) AS c FROM descendants
     `).get(id);
     return r?.c || 0;
   },

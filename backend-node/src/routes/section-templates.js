@@ -264,33 +264,60 @@ async function routes(fastify) {
 
     const force = String(request.query?.force || '') === '1';
     const affected = db.sectionTemplates.countAffectedAfs(id); // AFs vivantes uniquement
+    // mig 133 : FK parent_template_id en CASCADE -> supprimer un parent
+    // emporte tout le sous-arbre. On compte les descendants pour avertir
+    // explicitement l'utilisateur (sinon il pourrait detruire 15+ enfants
+    // sans s'en rendre compte).
+    const descendants = db.sectionTemplates.countDescendants(id);
 
-    if (affected > 0 && !force) {
+    if ((affected > 0 || descendants > 0) && !force) {
       // L'UI doit re-poser la question avec ?force=1 si l'utilisateur confirme.
+      const parts = [];
+      if (descendants > 0) parts.push(`${descendants} section${descendants > 1 ? 's' : ''} type${descendants > 1 ? 's' : ''} enfant${descendants > 1 ? 's' : ''} ${descendants > 1 ? 'seront' : 'sera'} aussi supprimé${descendants > 1 ? 's' : ''}`);
+      if (affected > 0) parts.push(`${affected} AF${affected > 1 ? 's' : ''} utilise${affected > 1 ? 'nt' : ''} cette section type`);
       return reply.code(409).send({
-        detail: `${affected} AF(s) utilisent cette section type. Confirmer pour la supprimer dans toutes les AFs.`,
+        detail: parts.join(' ; ') + '. Confirmer pour supprimer.',
         affected_count: affected,
+        descendants_count: descendants,
       });
     }
 
-    // Cascade systematique : on retire les sections AVANT de supprimer le template
-    // (sinon FK constraint viole : sections.section_template_id -> section_templates.id).
-    // On retire toutes les sections, y compris celles d'AFs archivees, qui sont
-    // ce qui causait des 500 quand affected_count etait 0 mais qu'il restait des
-    // references "fantomes".
-    const r = db.db.prepare('DELETE FROM sections WHERE section_template_id = ?').run(id);
+    // Liste les ids du sous-arbre (template + descendants) AVANT delete
+    // pour pouvoir tombstone les slugs en cascade.
+    const subtreeRows = db.db.prepare(`
+      WITH RECURSIVE subtree(id, slug) AS (
+        SELECT id, slug FROM section_templates WHERE id = ?
+        UNION ALL
+        SELECT st.id, st.slug FROM section_templates st
+        JOIN subtree s ON st.parent_template_id = s.id
+      )
+      SELECT id, slug FROM subtree
+    `).all(id);
+    const subtreeIds = subtreeRows.map(r => r.id);
+    const placeholders = subtreeIds.map(() => '?').join(',');
+
+    // Cascade systematique des sections AF : on retire les sections AVANT
+    // de supprimer les templates (sinon FK constraint viole). On vise tout
+    // le sous-arbre. Sans cette etape la mig 133 FK CASCADE supprimerait
+    // les templates en chaine, mais les sections.section_template_id
+    // serait juste mis a NULL (mig 122) - les sections orphelines
+    // resteraient dans les AFs.
+    const r = db.db.prepare(
+      `DELETE FROM sections WHERE section_template_id IN (${placeholders})`
+    ).run(...subtreeIds);
     const cascadeCount = r.changes;
 
+    // Delete le template racine ; FK CASCADE (mig 133) emporte les enfants.
     db.sectionTemplates.delete(id);
-    // Tombstone : empeche la recreation au prochain boot par seedSectionTemplates.
-    db.deletedSectionTemplateSlugs.add(tpl.slug);
+    // Tombstones pour tout le sous-arbre (empeche reseed des slugs).
+    for (const row of subtreeRows) db.deletedSectionTemplateSlugs.add(row.slug);
 
     db.auditLog.add({
       userId: request.authUser?.id,
       action: 'section_template.delete',
-      payload: { id, slug: tpl.slug, cascade: cascadeCount },
+      payload: { id, slug: tpl.slug, cascade: cascadeCount, descendants_dropped: descendants },
     });
-    return reply.code(200).send({ ok: true, cascade_count: cascadeCount });
+    return reply.code(200).send({ ok: true, cascade_count: cascadeCount, descendants_count: descendants });
   });
 
   fastify.patch('/section-templates/reorder', async (request, reply) => {
