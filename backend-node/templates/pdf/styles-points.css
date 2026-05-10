@@ -806,6 +806,9 @@ table.points th.col-nature,   table.points td.col-nature   { width: 1%; white-sp
 table.points th.col-unit,     table.points td.col-unit     { width: 1%; white-space: nowrap; text-align: center; }
 table.points th.col-optional, table.points td.col-optional { width: 1%; white-space: nowrap; text-align: center; }
 table.points th.col-ref,      table.points td.col-ref      { width: 1%; white-space: nowrap; }
+/* Le nom technique (code identifiant) ne doit jamais wrap : il sert
+   d'identifiant unique et casse en plusieurs lignes le rend illisible. */
+table.points th.col-tech,     table.points td.col-tech     { white-space: nowrap; }
 
 table.points thead { display: table-header-group; } /* répétition headers sur chaque page */
 table.points tr { page-break-inside: avoid; }
