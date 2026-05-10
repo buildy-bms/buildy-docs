@@ -1,5 +1,7 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
+import Sortable from 'sortablejs'
+import { Bars3Icon } from '@heroicons/vue/24/outline'
 
 // Quand integre dans LibrarySystemsView (onglet), on cache le titre/intro
 defineProps({ embedded: { type: Boolean, default: false } })
@@ -142,7 +144,12 @@ async function bulkSaveHtml(it, html) {
 
 const viewMode = ref(localStorage.getItem('library-view-mode') || 'table')
 const searchQuery = ref('')
-const sortBy = ref('name')
+// Tri par defaut : `position` (ordre canonique biblio = celui pousse dans
+// l'arbre AF par libraryExtendAf). Cliquer sur une colonne du tableau
+// switche vers son tri (alpha, etc.). Le drag-drop / les fleches up/down
+// fonctionnent uniquement sur le tri 'position' (sinon les changements
+// de position seraient invisibles, ecrases par le tri courant).
+const sortBy = ref('position')
 const sortDir = ref('asc')
 const validationFilter = ref('all') // 'all'|'pending'|'empty'|'draft'|'validated'
 function setViewMode(m) { viewMode.value = m; localStorage.setItem('library-view-mode', m) }
@@ -178,7 +185,20 @@ const filteredSorted = computed(() => {
       return s === validationFilter.value
     })
   }
+  // Map des positions de categorie (ordre du catalogue system_categories_db)
+  // pour preserver le regroupement par cat dans le tri 'position'.
+  const catOrder = new Map(dbCategories.value.map((c, i) => [c.key, i]))
   list = [...list].sort((a, b) => {
+    if (sortBy.value === 'position') {
+      // Tri par cat (selon system_categories_db.position) puis equipment_templates.position
+      const ca = catOrder.has(a.category) ? catOrder.get(a.category) : 9999
+      const cb = catOrder.has(b.category) ? catOrder.get(b.category) : 9999
+      if (ca !== cb) return sortDir.value === 'asc' ? ca - cb : cb - ca
+      const pa = a.position ?? 0
+      const pb = b.position ?? 0
+      if (pa !== pb) return sortDir.value === 'asc' ? pa - pb : pb - pa
+      return (a.name || '').localeCompare(b.name || '', 'fr')
+    }
     let av, bv
     if (sortBy.value === 'points_count' || sortBy.value === 'sections_using_count' || sortBy.value === 'current_version') {
       av = a[sortBy.value] || 0; bv = b[sortBy.value] || 0
@@ -289,9 +309,76 @@ const grouped = computed(() => {
   return groups
 })
 
-// Reorder up/down : swap avec le voisin de la meme categorie, puis envoie
-// le nouvel ordre au backend qui re-calcule les positions.
+// Reorder : drag-drop SortableJS + boutons up/down. Activé uniquement quand
+// on est en tri 'position' et hors recherche (sinon le réordonnancement
+// serait écrasé par le tri courant et invisible).
 const reordering = ref(false)
+const canDrag = computed(() =>
+  sortBy.value === 'position' && sortDir.value === 'asc' && normalize(searchQuery.value).length < 2
+)
+const tbodyRef = ref(null)
+let sortableInstance = null
+
+async function applyReorderFromDom() {
+  if (!tbodyRef.value || reordering.value) return
+  // Lit l'ordre courant des tr items (data-id + data-cat) dans le tbody.
+  const rows = Array.from(tbodyRef.value.querySelectorAll('tr[data-id][data-cat]'))
+  const idsByCat = new Map()
+  for (const tr of rows) {
+    const id = parseInt(tr.dataset.id, 10)
+    const cat = tr.dataset.cat
+    if (!idsByCat.has(cat)) idsByCat.set(cat, [])
+    idsByCat.get(cat).push(id)
+  }
+  reordering.value = true
+  try {
+    for (const [cat, ids] of idsByCat) {
+      // Skip si l'ordre n'a pas change pour cette categorie (compare avec
+      // l'ordre courant en memoire, par position).
+      const currentOrder = templates.value
+        .filter(t => (t.category || 'autres') === cat)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map(t => t.id)
+      if (currentOrder.length === ids.length && currentOrder.every((v, i) => v === ids[i])) continue
+      await reorderEquipmentTemplates(cat, ids)
+    }
+    await refresh()
+  } catch (e) {
+    notifyError(e?.response?.data?.detail || 'Échec du réordonnancement')
+    await refresh()
+  } finally {
+    reordering.value = false
+  }
+}
+
+function setupSortable() {
+  if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null }
+  if (!tbodyRef.value || !canDrag.value) return
+  sortableInstance = Sortable.create(tbodyRef.value, {
+    handle: '.drag-handle',
+    draggable: 'tr[data-id]',
+    filter: 'tr.cat-header',
+    preventOnFilter: true,
+    animation: 150,
+    ghostClass: 'opacity-40',
+    chosenClass: 'bg-indigo-50',
+    // Empêche le drop dans une autre catégorie : si la ligne cible n'a pas
+    // le même data-cat (ou est un cat-header), on bloque le mouvement.
+    onMove: (evt) => {
+      const draggedCat = evt.dragged?.dataset?.cat
+      const relatedCat = evt.related?.dataset?.cat
+      if (!draggedCat || !relatedCat) return false
+      return draggedCat === relatedCat
+    },
+    onEnd: () => { applyReorderFromDom() },
+  })
+}
+
+watch([canDrag, flatEquipmentItems], () => {
+  nextTick(() => setupSortable())
+})
+onMounted(() => nextTick(() => setupSortable()))
+onBeforeUnmount(() => { if (sortableInstance) sortableInstance.destroy() })
 async function moveInCategory(template, direction) {
   if (reordering.value) return
   // Liste des templates de la meme categorie dans l'ordre canonique courant
@@ -482,12 +569,12 @@ onMounted(async () => {
               <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref="tbodyRef">
             <template v-for="(it, idx) in flatEquipmentItems" :key="it.kind === 'category' ? `cat-${it.cat}` : `tpl-${it.t.id}`">
               <!-- Ligne parente synthetique : un en-tete de categorie. Pas
                    d'action, juste un libelle aligne sur la cellule Titre. -->
               <tr v-if="it.kind === 'category'"
-                  class="border-t border-gray-100 bg-gray-50/40">
+                  class="border-t border-gray-100 bg-gray-50/40 cat-header">
                 <td class="px-4 py-1.5"></td>
                 <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
                   {{ it.label }}
@@ -495,14 +582,21 @@ onMounted(async () => {
                 </td>
               </tr>
               <!-- Ligne equipement : depth=1, ↳, drag-drop d'image -->
-              <tr v-else :data-id="it.t.id"
+              <tr v-else :data-id="it.t.id" :data-cat="it.t.category || 'autres'"
                   :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
                            dragOverRowId === it.t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
                   @click="openTemplate(it.t)"
                   @dragover="onRowDragOver($event, it.t)"
                   @dragleave="onRowDragLeave"
                   @drop="onRowDrop($event, it.t)">
-                <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="it.t" size="sm" /></td>
+                <td class="px-4 py-2 text-center whitespace-nowrap">
+                  <div class="inline-flex items-center gap-1.5">
+                    <span v-if="canDrag" class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop title="Glisser pour réorganiser dans la catégorie">
+                      <Bars3Icon class="w-3.5 h-3.5" />
+                    </span>
+                    <EquipmentIcon :template="it.t" size="sm" />
+                  </div>
+                </td>
                 <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap"
                     :style="it.visual_depth ? `padding-left: ${16 + it.visual_depth * 18}px` : ''">
                   <span v-if="it.visual_depth" class="text-gray-400 mr-1.5">↳</span>
