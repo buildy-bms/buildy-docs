@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 131;
+const TARGET_VERSION = 132;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5425,6 +5425,20 @@ function runMigrations() {
     });
     cleanup131();
     db.pragma('user_version = 131');
+  }
+
+  if (current < 132) {
+    // Permet d'attacher des photos terrain a une action du plan de mise
+    // en conformite (parite avec zones / systems / meters / devices /
+    // GTB qui ont deja leur FK sur site_documents).
+    db.exec(`
+      ALTER TABLE site_documents ADD COLUMN bacs_audit_action_item_id INTEGER
+        REFERENCES bacs_audit_action_items(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_site_docs_bacs_action
+        ON site_documents(bacs_audit_action_item_id);
+    `);
+    log.info('Migration 132 appliquee : site_documents.bacs_audit_action_item_id (photos par action plan)');
+    db.pragma('user_version = 132');
   }
 
   if (current > TARGET_VERSION) {

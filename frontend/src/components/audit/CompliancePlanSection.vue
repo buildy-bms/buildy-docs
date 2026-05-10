@@ -4,6 +4,7 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Button from '@/components/Button.vue'
+import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 
 // Section "Plan de mise en conformité" (R175 — actions correctives auto
 // + manuelles + annotations commerciales). Affiche les items visibles
@@ -35,6 +36,9 @@ const props = defineProps({
   // train de tourner (sinon les items disparaissent puis réapparaissent
   // sans feedback, donne l'impression que rien ne se passe).
   regenerating: { type: Boolean, default: false },
+  // site_uuid de l'audit pour rattacher les photos terrain de chaque
+  // action via le bouton « Photos » (parité avec zones / systems / etc.).
+  siteUuid: { type: String, default: '' },
 })
 
 const emit = defineEmits([
@@ -156,6 +160,13 @@ function hasNotes(html) {
                   ? 'Modifier'
                   : (it.status === 'open' ? '⚠ Rédiger' : '+ Rédiger') }}
             </button>
+          </div>
+          <div v-if="siteUuid">
+            <label class="block text-[10px] font-medium text-gray-500 mb-0.5">Photos</label>
+            <BacsPhotoButton
+              :site-uuid="siteUuid"
+              :attach-to="{ action_item_id: it.id }"
+              :label="it.title || 'Action'" />
           </div>
         </div>
         <div v-if="hasNotes(it.alternative_solutions_html)"

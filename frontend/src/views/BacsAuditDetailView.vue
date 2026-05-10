@@ -1401,6 +1401,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         :severity-labels="SEVERITY_LABEL"
         :status-labels="STATUS_LABEL"
         :regenerating="regenerating"
+        :site-uuid="document?.site_uuid || ''"
         @regenerate="regenerate"
         @open-commercial="router.push(`/bacs-audit/${docId}/action-items`)"
         @validate-step="validateStep"
