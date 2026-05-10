@@ -250,12 +250,17 @@ async function buildAfExportData(af, opts = {}) {
       const description_html = (sec.description_html_override != null && sec.description_html_override !== '')
         ? sec.description_html_override
         : (tpl?.description_html || null);
+      // Override AF a la priorite sur la justification biblio (cascade
+      // identique a la description : section.bacs_justification > biblio).
+      const bacs_justification = (sec.bacs_justification && sec.bacs_justification.trim())
+        ? sec.bacs_justification
+        : (tpl?.bacs_justification || null);
       equipment = {
         description_html,
         points_read: points.filter(p => p.direction === 'read'),
         points_write: points.filter(p => p.direction === 'write'),
         preferred_protocols: protocols,
-        bacs_justification: tpl?.bacs_justification || null,
+        bacs_justification,
       };
     }
 
