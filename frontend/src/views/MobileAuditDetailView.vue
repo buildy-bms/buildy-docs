@@ -24,6 +24,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useConfirm } from '@/composables/useConfirm'
 import { updateAf, deleteAf, deliverBacsAudit } from '@/api'
+import api from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
@@ -148,6 +149,18 @@ async function refresh() {
 }
 
 onMounted(refresh)
+
+// Numéro de version (affiché dans le sheet paramètres pour faciliter le
+// support : Kévin sait quelle version tourne sur la PWA du terrain).
+const appVersion = ref('')
+const buildSha = ref('')
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/health')
+    appVersion.value = data.version
+    buildSha.value = data.build_sha || ''
+  } catch { /* offline */ }
+})
 
 function goBack() {
   if (window.history.length > 1) router.back()
@@ -473,6 +486,11 @@ async function removeAudit() {
             Action irréversible. L'audit, les zones, compteurs, systèmes et photos seront perdus.
           </p>
         </div>
+
+        <!-- Numéro de version Buildy Docs -->
+        <p class="pt-2 text-center text-[11px] text-gray-400">
+          Buildy Docs v{{ appVersion || '0.1.0' }}<span v-if="buildSha"> · {{ buildSha }}</span>
+        </p>
       </div>
     </MobileSheet>
 

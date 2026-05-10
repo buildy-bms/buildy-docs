@@ -81,11 +81,22 @@ async function main() {
     },
   });
 
+  // SHA git court du déploiement courant : permet au support de savoir
+  // exactement quelle version tourne sur le VPS / la PWA d'un auditeur,
+  // au-delà du `version` statique de package.json. Lu une fois au boot.
+  let buildSha = '';
+  try {
+    buildSha = require('child_process')
+      .execSync('git rev-parse --short HEAD', { cwd: __dirname + '/../..' })
+      .toString().trim();
+  } catch { /* dossier non versionné en prod, on garde '' */ }
+
   // Health check (no auth)
   fastify.get('/api/health', async () => ({
     status: 'ok',
     uptime: Math.round(process.uptime()),
     version: require('../package.json').version,
+    build_sha: buildSha,
   }));
 
   // Auth hook global (protege /api/* sauf endpoints publics)

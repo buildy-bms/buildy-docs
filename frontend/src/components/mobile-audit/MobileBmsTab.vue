@@ -160,8 +160,8 @@ const USAGES = [
 
     <!-- Mig 109 : on n'efface plus les sous-blocs quand la GTB est HS,
          on les garde affichés (legerement opaques) pour que l'auditeur
-         puisse tout renseigner et ajouter des notes pour la traçabilité. -->
-    <template>
+         puisse tout renseigner et ajouter des notes pour la traçabilité.
+         Pas de <template> wrapper sans directive : Vue 3 ne rend rien. -->
       <!-- Identification GTB -->
       <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
         <div class="px-4 py-3 border-b border-gray-100">
@@ -586,7 +586,6 @@ const USAGES = [
           </div>
         </div>
       </div>
-    </template>
 
     <!-- Inspections périodiques R175-5-1 — déclencheur + sheet (BACS uniquement) -->
     <button

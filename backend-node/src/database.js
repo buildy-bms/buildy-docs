@@ -8265,8 +8265,22 @@ const bacsAuditChecklist = {
       SELECT COUNT(*) AS n FROM site_documents
       WHERE bacs_audit_bms_document_id = ?
     `).get(documentId).n;
+    // Photos du site (sans rattachement à une entité spécifique : façade,
+    // toiture, vue d'ensemble…). On couvre les photos du site rattaché à
+    // l'audit qui n'ont AUCUNE FK BACS ; sinon on dédoublerait avec les
+    // counts par entité (zone / system / meter / device / bms).
+    const site = db.prepare(`
+      SELECT COUNT(*) AS n FROM site_documents
+      WHERE site_id = ? AND category = 'photo'
+        AND bacs_audit_zone_id IS NULL
+        AND bacs_audit_system_id IS NULL
+        AND bacs_audit_meter_id IS NULL
+        AND bacs_audit_device_id IS NULL
+        AND bacs_audit_bms_document_id IS NULL
+        AND bacs_audit_action_item_id IS NULL
+    `).get(af.site_id).n;
 
-    return { zones, systems, meters, devices, bms };
+    return { zones, systems, meters, devices, bms, site };
   },
 };
 
