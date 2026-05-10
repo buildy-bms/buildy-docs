@@ -161,18 +161,18 @@ async function pickTemplate(t) {
         Tu pourras ensuite renseigner marque, référence et puissance directement sur l'équipement.
       </p>
 
-      <!-- Filtres -->
-      <div class="flex flex-wrap gap-2 items-stretch">
-        <div class="relative flex-1 min-w-56">
+      <!-- Filtres : grille 1 col mobile, ligne flex-wrap au-dessus de 640px -->
+      <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-stretch">
+        <div class="relative sm:flex-1 sm:min-w-56">
           <MagnifyingGlassIcon class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
             v-model="search"
             type="text"
             placeholder="Rechercher un modèle…"
-            class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+            class="w-full pl-9 pr-3 py-2 min-h-11 sm:min-h-0 text-base sm:text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
           />
         </div>
-        <div class="w-44">
+        <div class="sm:w-44">
           <SearchableSelect
             v-model="energyFilter"
             :options="ENERGY_FILTER_OPTIONS"
@@ -180,7 +180,7 @@ async function pickTemplate(t) {
             :clearable="false"
           />
         </div>
-        <div class="w-44">
+        <div class="sm:w-44">
           <SearchableSelect
             v-model="roleFilter"
             :options="ROLE_FILTER_OPTIONS"
@@ -257,7 +257,7 @@ async function pickTemplate(t) {
                   @click="pickTemplate(t)"
                   :disabled="!!adding[t.id]"
                   :class="[
-                    'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
+                    'inline-flex items-center justify-center gap-1 px-3 py-2 sm:py-1.5 min-h-11 sm:min-h-0 text-sm sm:text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
                     recentlyAdded.has(t.id)
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                       : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
@@ -277,7 +277,7 @@ async function pickTemplate(t) {
         <button
           type="button"
           @click="emit('close')"
-          class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap"
+          class="inline-flex items-center justify-center gap-1 px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap"
         >
           <XMarkIcon class="w-4 h-4" /> Fermer
         </button>

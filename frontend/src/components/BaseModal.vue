@@ -15,19 +15,20 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-// max-w utilise min(92vw, X) pour fonctionner aussi en cap viewport-narrow
-// (mobile) sans avoir besoin du `max-w-[92vw]` sur les classes de base —
-// sinon les deux classes coexistent et la plus permissive (92vw) gagne sur
-// grand ecran, neutralisant la cap par taille.
+// Sur mobile (< sm = 640px), `min-w-0` evite le debordement horizontal :
+// le conteneur respecte juste `max-w-[min(92vw, X)]`. Au-dessus de 640px,
+// `sm:min-w-[Xrem]` reprend pour ne pas avoir une modale trop etroite sur
+// des formulaires larges. max-w utilise min(92vw, X) pour cap aussi sur
+// grand ecran sans neutraliser la cap par taille.
 const sizeClass = {
-  sm: 'min-w-[18rem] max-w-[min(92vw,28rem)]',
-  md: 'min-w-[24rem] max-w-[min(92vw,36rem)]',
-  lg: 'min-w-[28rem] max-w-[min(92vw,48rem)]',
-  xl: 'min-w-[36rem] max-w-[min(92vw,64rem)]',
+  sm: 'min-w-0 sm:min-w-[18rem] max-w-[min(92vw,28rem)]',
+  md: 'min-w-0 sm:min-w-[24rem] max-w-[min(92vw,36rem)]',
+  lg: 'min-w-0 sm:min-w-[28rem] max-w-[min(92vw,48rem)]',
+  xl: 'min-w-0 sm:min-w-[36rem] max-w-[min(92vw,64rem)]',
   // 'full' : pas de cap (en plus du max-w-[92vw] du conteneur de base).
   // La modale s'elargit jusqu'a 92vw pour absorber les tableaux larges.
-  full: 'min-w-[36rem]',
-}[props.size] || 'min-w-[24rem] max-w-[min(92vw,36rem)]'
+  full: 'min-w-0 sm:min-w-[36rem]',
+}[props.size] || 'min-w-0 sm:min-w-[24rem] max-w-[min(92vw,36rem)]'
 
 const dialogRef = ref(null)
 const titleId = computed(() => `modal-title-${Math.random().toString(36).slice(2, 9)}`)
