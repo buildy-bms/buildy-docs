@@ -62,9 +62,6 @@ async function routes(fastify) {
       meets_r175_3_p3: z.boolean().nullable().optional(),
       meets_r175_3_p4: z.boolean().nullable().optional(),
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
-      notes_p3: z.string().nullable().optional(),
-      notes_p4: z.string().nullable().optional(),
-      notes_p4_autonomous: z.string().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
       not_concerned: z.boolean().nullable().optional(),
     });
@@ -89,9 +86,6 @@ async function routes(fastify) {
     boolField('meets_r175_3_p4');
     boolField('meets_r175_3_p4_autonomous');
     boolField('managed_by_bms');
-    if ('notes_p3' in body) { sets.push('notes_p3 = ?'); args.push(body.notes_p3); }
-    if ('notes_p4' in body) { sets.push('notes_p4 = ?'); args.push(body.notes_p4); }
-    if ('notes_p4_autonomous' in body) { sets.push('notes_p4_autonomous = ?'); args.push(body.notes_p4_autonomous); }
     if ('notes_html' in body) { sets.push('notes_html = ?'); args.push(body.notes_html); }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
@@ -257,13 +251,9 @@ async function routes(fastify) {
       manages_lighting: boolish,
       meets_r175_3_p1: boolish,
       meets_r175_3_p2: boolish,
-      notes_p1: z.string().nullable().optional(),
-      notes_p2: z.string().nullable().optional(),
       has_maintenance_procedures: boolish,
-      notes_maintenance: z.string().nullable().optional(),
       operator_trained: boolish,
       operator_training_date: z.string().nullable().optional(),
-      notes_training: z.string().nullable().optional(),
       overall_compliance: z.enum(['compliant','partial','non_compliant']).nullable().optional(),
       out_of_service: boolish,
       notes_html: z.string().nullable().optional(),
