@@ -23,6 +23,8 @@ import EquipmentPointsEditor from '@/components/EquipmentPointsEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useRouter, useRoute } from 'vue-router'
@@ -104,6 +106,50 @@ async function onDeleted() {
   showEditor.value = false
   selected.value = null
   await refresh()
+}
+
+// ── Bulk selection sur la liste des modeles ─────────────────────────
+const bulkBusy = ref(false)
+// `bulkSel` = checkbox-driven selection, distinct du `selected` (template ouvert
+// dans l'editeur a droite). bulkVisibleIds = ids visibles apres filtre+tri.
+const bulkVisibleIds = computed(() => filteredSorted.value.map(t => t.id))
+const bulkSel = useBulkSelection(() => bulkVisibleIds.value)
+
+async function bulkDelete() {
+  if (!bulkSel.size.value) return
+  const targets = filteredSorted.value.filter(t => bulkSel.has(t.id))
+  const blocked = targets.filter(t => (t.sections_using_count || 0) > 0)
+  const deletable = targets.filter(t => !((t.sections_using_count || 0) > 0))
+  if (blocked.length) {
+    notifyError(`${blocked.length} modèle${blocked.length > 1 ? 's sont' : ' est'} encore utilisé${blocked.length > 1 ? 's' : ''} dans des AF actives, ${blocked.length > 1 ? 'ils' : 'il'} ${blocked.length > 1 ? 'seront' : 'sera'} ignoré${blocked.length > 1 ? 's' : ''}.`)
+  }
+  if (!deletable.length) return
+  const ok = await confirm({
+    title: `Supprimer ${deletable.length} modèle${deletable.length > 1 ? 's' : ''} ?`,
+    message: 'Suppression définitive (slug tombstoned). Action irréversible.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  bulkBusy.value = true
+  try {
+    await Promise.all(deletable.map(t => deleteEquipmentTemplate(t.id).catch(() => null)))
+    bulkSel.clear()
+    await refresh()
+    notifySuccess(`${deletable.length} modèle${deletable.length > 1 ? 's supprimés' : ' supprimé'}`)
+  } catch { notifyError('Échec de la suppression en masse') }
+  finally { bulkBusy.value = false }
+}
+async function bulkClone() {
+  if (!bulkSel.size.value) return
+  bulkBusy.value = true
+  try {
+    await Promise.all([...bulkSel.selected.value].map(id => cloneEquipmentTemplate(id).catch(() => null)))
+    bulkSel.clear()
+    await refresh()
+    notifySuccess('Modèles dupliqués')
+  } catch { notifyError('Échec de la duplication en masse') }
+  finally { bulkBusy.value = false }
 }
 
 const { confirm } = useConfirm()
@@ -570,6 +616,11 @@ onMounted(async () => {
         <table class="w-full text-sm" style="table-layout: auto">
           <thead class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wider">
             <tr>
+              <th class="text-center px-3 py-2.5 w-9">
+                <input type="checkbox" :checked="bulkSel.allChecked.value" @change="bulkSel.toggleAll()"
+                       v-tooltip="'Tout cocher / décocher'"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap w-10"></th>
               <th class="text-left px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('name')">
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
@@ -603,6 +654,7 @@ onMounted(async () => {
             <template v-for="grp in groupedForTable" :key="`grp-${grp.cat}`">
               <tbody>
                 <tr class="border-t border-gray-100 bg-gray-50/40">
+                  <td class="px-3 py-1.5"></td>
                   <td class="px-4 py-1.5"></td>
                   <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
                     {{ grp.label }}
@@ -613,11 +665,16 @@ onMounted(async () => {
               <tbody :data-cat="grp.cat" :ref="el => setTbodyRef(grp.cat, el)">
                 <tr v-for="t in grp.items" :key="`tpl-${t.id}`" :data-id="t.id" :data-cat="grp.cat"
                     :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
-                             dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                             dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '',
+                             bulkSel.has(t.id) ? 'bg-indigo-50/40' : '']"
                     @click="openTemplate(t)"
                     @dragover="onRowDragOver($event, t)"
                     @dragleave="onRowDragLeave"
                     @drop="onRowDrop($event, t)">
+                  <td class="px-3 py-2 text-center whitespace-nowrap" @click.stop>
+                    <input type="checkbox" :checked="bulkSel.has(t.id)" @change="bulkSel.toggle(t.id)"
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+                  </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
                     <div class="inline-flex items-center gap-1.5">
                       <span class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop title="Glisser pour réorganiser dans la catégorie">
@@ -691,11 +748,16 @@ onMounted(async () => {
           <tbody v-else>
             <tr v-for="t in filteredSorted" :key="`flat-${t.id}`" :data-id="t.id"
                 :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
-                         dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                         dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '',
+                         bulkSel.has(t.id) ? 'bg-indigo-50/40' : '']"
                 @click="openTemplate(t)"
                 @dragover="onRowDragOver($event, t)"
                 @dragleave="onRowDragLeave"
                 @drop="onRowDrop($event, t)">
+              <td class="px-3 py-2 text-center whitespace-nowrap" @click.stop>
+                <input type="checkbox" :checked="bulkSel.has(t.id)" @change="bulkSel.toggle(t.id)"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </td>
               <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="t" size="sm" /></td>
               <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">
                 <ContentValidationDot :status="getValidationStatus(t, 'description_html')" :validated-at="t.content_validated_at" :validated-by="t.content_validated_by_name" class="mr-2 align-middle" />
@@ -749,12 +811,25 @@ onMounted(async () => {
               </td>
             </tr>
             <tr v-if="!filteredSorted.length">
-              <td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="12" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
             </tr>
           </tbody>
         </table>
+
+        <BulkActionBar :count="bulkSel.size.value" noun="modèle" @clear="bulkSel.clear()">
+          <button @click="bulkClone" :disabled="bulkBusy"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+            <DocumentDuplicateIcon class="w-4 h-4" />
+            Dupliquer
+          </button>
+          <button @click="bulkDelete" :disabled="bulkBusy"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+            <TrashIcon class="w-4 h-4" />
+            Supprimer
+          </button>
+        </BulkActionBar>
       </div>
 
       <div v-else v-for="(items, cat) in grouped" :key="cat" class="mb-8">

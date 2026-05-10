@@ -114,6 +114,44 @@ const { sortKey, sortDir, columnFilters, processed: visibleZones, toggleSort, se
 
 watch(() => props.sectionId, refresh)
 onMounted(refresh)
+
+// ── Bulk ─────────────────────────────────────────────────────────────
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+
+const visibleIds = computed(() => visibleZones.value.map(z => z.id))
+const sel = useBulkSelection(() => visibleIds.value)
+const bulkBusy = ref(false)
+
+async function bulkDelete() {
+  if (!sel.size.value) return
+  const ok = await confirm({
+    title: `Supprimer ${sel.size.value} zone${sel.size.value > 1 ? 's' : ''} ?`,
+    message: 'Les liens avec les instances d\'équipements seront aussi supprimés. Action irréversible.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  bulkBusy.value = true
+  try {
+    await Promise.all([...sel.selected.value].map(id => api.delete(`/zones/${id}`).catch(() => null)))
+    sel.clear()
+    await refresh()
+    notifySuccess('Zones supprimées')
+  } catch { notifyError('Échec de la suppression en masse') }
+  finally { bulkBusy.value = false }
+}
+async function bulkDuplicate() {
+  if (!sel.size.value) return
+  bulkBusy.value = true
+  try {
+    await Promise.all([...sel.selected.value].map(id => duplicateAfZone(id).catch(() => null)))
+    sel.clear()
+    await refresh()
+    notifySuccess('Zones dupliquées')
+  } catch { notifyError('Échec de la duplication en masse') }
+  finally { bulkBusy.value = false }
+}
 </script>
 
 <template>
@@ -210,6 +248,11 @@ onMounted(refresh)
       <table v-else-if="zones.length" class="w-full text-sm">
         <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
           <tr>
+            <th class="px-3 py-2 text-center w-9">
+              <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                     v-tooltip="'Tout cocher / décocher'"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+            </th>
             <th class="text-left px-5 py-2 font-semibold select-none">
               <button @click="toggleSort('name')" class="inline-flex items-center gap-1 hover:text-indigo-700">
                 Zone
@@ -237,6 +280,7 @@ onMounted(refresh)
             <th class="px-4 py-2 w-32"></th>
           </tr>
           <tr class="bg-white border-t border-gray-100">
+            <th class="px-2 py-1.5"></th>
             <th class="px-5 py-1.5"><input :value="columnFilters.name || ''" @input="setFilter('name', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
             <th class="px-2 py-1.5"><input :value="columnFilters.surface_m2 || ''" @input="setFilter('surface_m2', $event.target.value)" type="text" placeholder="…" class="w-full px-1 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
             <th class="px-4 py-1.5"><input :value="columnFilters.occupation_type || ''" @input="setFilter('occupation_type', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
@@ -244,7 +288,11 @@ onMounted(refresh)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="z in visibleZones" :key="z.id" class="border-t border-gray-100 group hover:bg-indigo-50/40 transition-colors">
+          <tr v-for="z in visibleZones" :key="z.id" :class="['border-t border-gray-100 group hover:bg-indigo-50/40 transition-colors', sel.has(z.id) ? 'bg-indigo-50/40' : '']">
+            <td class="px-3 py-2 text-center" @click.stop>
+              <input type="checkbox" :checked="sel.has(z.id)" @change="sel.toggle(z.id)"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+            </td>
             <td class="px-5 py-2.5 font-semibold text-gray-800">{{ z.name }}</td>
             <td class="px-4 py-2.5 text-right tabular-nums text-gray-600">
               <span v-if="z.surface_m2">{{ z.surface_m2 }} <span class="text-gray-400">m²</span></span>
@@ -271,6 +319,19 @@ onMounted(refresh)
           </tr>
         </tbody>
       </table>
+
+      <BulkActionBar :count="sel.size.value" noun="zone" @clear="sel.clear()">
+        <button @click="bulkDuplicate" :disabled="bulkBusy"
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+          <DocumentDuplicateIcon class="w-4 h-4" />
+          Dupliquer
+        </button>
+        <button @click="bulkDelete" :disabled="bulkBusy"
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+          <TrashIcon class="w-4 h-4" />
+          Supprimer
+        </button>
+      </BulkActionBar>
     </div>
 
     <!-- Bloc 2 : Synthèse zones × catégories de systèmes (live) -->

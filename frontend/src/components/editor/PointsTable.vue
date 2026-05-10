@@ -170,6 +170,68 @@ onMounted(() => { refresh(); loadProtocols(); })
 function tableFor(direction) {
   return direction === 'read' ? readPoints.value : writePoints.value
 }
+
+// ── Selection multi-lignes (bulk) ────────────────────────────────────
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import { TrashIcon as TrashIconBulk } from '@heroicons/vue/24/outline'
+
+// Cle unique pour identifier une ligne (override_id si present, sinon
+// base_point_id pour les points template purs).
+function pointKey(p) { return p.override_id ? `o${p.override_id}` : `t${p.base_point_id || p.id}` }
+const visibleKeys = computed(() => [...readPoints.value, ...writePoints.value].map(pointKey))
+const sel = useBulkSelection(() => visibleKeys.value)
+
+const bulkBusy = ref(false)
+async function bulkDelete() {
+  if (!sel.size.value) return
+  const keys = new Set(sel.selected.value)
+  const targets = [...readPoints.value, ...writePoints.value].filter(p => keys.has(pointKey(p)))
+  if (!targets.length) return
+  const ok = await confirm({
+    title: `Retirer ${targets.length} point${targets.length > 1 ? 's' : ''} ?`,
+    message: 'Les points template seront masqués (override remove). Les points locaux seront supprimés.',
+    confirmLabel: 'Retirer',
+    danger: true,
+  })
+  if (!ok) return
+  bulkBusy.value = true
+  try {
+    await Promise.all(targets.map(async (p) => {
+      try {
+        if (p.source === 'template') {
+          await addSectionOverride(props.sectionId, { action: 'remove', base_point_id: p.base_point_id })
+        } else {
+          await deleteSectionOverride(props.sectionId, p.override_id)
+        }
+      } catch { /* ignorer 1 echec, continuer les autres */ }
+    }))
+    sel.clear()
+    await refresh()
+  } catch (e) {
+    notifyError('Échec de la suppression en masse')
+  } finally { bulkBusy.value = false }
+}
+async function bulkSetOptional(value) {
+  if (!sel.size.value) return
+  const keys = new Set(sel.selected.value)
+  const targets = [...readPoints.value, ...writePoints.value].filter(p => keys.has(pointKey(p)))
+  // local-add : pas de base_point_id, l'override edit ne peut pas etre cree.
+  // On les skip silencieusement (l'utilisateur peut les editer individuellement).
+  const eligible = targets.filter(p => p.source !== 'local-add')
+  bulkBusy.value = true
+  try {
+    await Promise.all(eligible.map(p =>
+      addSectionOverride(props.sectionId, {
+        action: 'edit', base_point_id: p.base_point_id, is_optional: value,
+      }).catch(() => null)
+    ))
+    sel.clear()
+    await refresh()
+  } catch (e) {
+    notifyError('Échec de la modification en masse')
+  } finally { bulkBusy.value = false }
+}
 </script>
 
 <template>
@@ -267,6 +329,11 @@ function tableFor(direction) {
         <table v-else class="w-full text-sm">
           <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
             <tr>
+              <th class="py-1.5 px-2 text-center w-9">
+                <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                       v-tooltip="'Tout cocher / décocher'"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </th>
               <th class="py-1.5 px-2 text-center">Donnée</th>
               <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
               <th class="py-1.5 px-2 text-center w-28">Type</th>
@@ -277,7 +344,11 @@ function tableFor(direction) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in readPoints" :key="p.override_id || p.id" class="border-t border-gray-100 group">
+            <tr v-for="p in readPoints" :key="p.override_id || p.id" :class="['border-t border-gray-100 group', sel.has(pointKey(p)) ? 'bg-indigo-50/40' : '']">
+              <td class="py-1.5 px-2 text-center" @click.stop>
+                <input type="checkbox" :checked="sel.has(pointKey(p))" @change="sel.toggle(pointKey(p))"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </td>
               <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
                 <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
@@ -327,6 +398,11 @@ function tableFor(direction) {
         <table v-else class="w-full text-sm">
           <thead class="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500">
             <tr>
+              <th class="py-1.5 px-2 text-center w-9">
+                <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                       v-tooltip="'Tout cocher / décocher'"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </th>
               <th class="py-1.5 px-2 text-center">Donnée</th>
               <th class="py-1.5 px-2 text-center w-40">Nom technique</th>
               <th class="py-1.5 px-2 text-center w-28">Type</th>
@@ -337,7 +413,11 @@ function tableFor(direction) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in writePoints" :key="p.override_id || p.id" class="border-t border-gray-100 group">
+            <tr v-for="p in writePoints" :key="p.override_id || p.id" :class="['border-t border-gray-100 group', sel.has(pointKey(p)) ? 'bg-indigo-50/40' : '']">
+              <td class="py-1.5 px-2 text-center" @click.stop>
+                <input type="checkbox" :checked="sel.has(pointKey(p))" @change="sel.toggle(pointKey(p))"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </td>
               <td class="py-1.5 px-2 text-center text-gray-800">
                 {{ p.label }}
                 <span v-if="SOURCE_BADGE[p.source]?.label" :class="['ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded', SOURCE_BADGE[p.source].classes]">
@@ -378,5 +458,21 @@ function tableFor(direction) {
         </table>
       </div>
     </template>
+
+    <BulkActionBar :count="sel.size.value" noun="point" @clear="sel.clear()">
+      <button @click="bulkSetOptional(true)" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+        Marquer optionnels
+      </button>
+      <button @click="bulkSetOptional(false)" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+        Marquer obligatoires
+      </button>
+      <button @click="bulkDelete" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+        <TrashIconBulk class="w-4 h-4" />
+        Retirer
+      </button>
+    </BulkActionBar>
   </div>
 </template>
