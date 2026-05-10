@@ -46,11 +46,13 @@ function showTooltip(label, event) {
 function hideTooltip() { tooltip.value = null }
 
 const appVersion = ref('')
+const buildSha = ref('')
 
 onMounted(async () => {
   try {
     const { data } = await api.get('/health')
     appVersion.value = data.version
+    buildSha.value = data.build_sha || ''
   } catch { /* offline */ }
 })
 
@@ -205,7 +207,19 @@ async function logout() {
             <ArrowRightStartOnRectangleIcon class="w-4 h-4 shrink-0" />
             <span v-if="!sidebarCollapsed">Déconnexion</span>
           </button>
-          <p v-if="!sidebarCollapsed" class="text-[10px] text-white/40 px-2.5">Buildy Docs v{{ appVersion || '0.1.0' }}</p>
+          <!-- Numéro de version visible étendu ET collapsé (icône ⓘ avec
+               tooltip en collapsed) — repère pour le support quand Kévin
+               teste un déploiement. -->
+          <p v-if="!sidebarCollapsed" class="text-[10px] text-white/40 px-2.5">
+            Buildy Docs v{{ appVersion || '0.1.0' }}<span v-if="buildSha"> · {{ buildSha }}</span>
+          </p>
+          <p
+            v-else
+            class="text-[9px] text-white/40 text-center font-mono"
+            v-tooltip="`Buildy Docs v${appVersion || '0.1.0'}${buildSha ? ' · ' + buildSha : ''}`"
+          >
+            {{ buildSha || ('v' + (appVersion || '0.1.0')) }}
+          </p>
         </div>
       </aside>
 

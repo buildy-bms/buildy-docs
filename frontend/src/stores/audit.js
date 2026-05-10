@@ -34,7 +34,7 @@ export const useAuditStore = defineStore('audit', {
     auditProgress: {},
     synthesisHtml: '',
     // Counts photos par entité (alimente badges « 📷 N »).
-    photoCounts: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 },
+    photoCounts: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0, site: 0 },
     // Notes par sujet de la carte GTB (mig 109). Tableau de
     // { topic_key, label, observation_html, ... } chargé en parallèle.
     gtbTopicNotes: [],
@@ -113,7 +113,7 @@ export const useAuditStore = defineStore('audit', {
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
           getBacsInspections(docId),
-          getBacsPhotoCounts(docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 } })),
+          getBacsPhotoCounts(docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0, site: 0 } })),
           getBacsGtbObservations(docId).catch(() => ({ data: [] })),
         ])
         this.devices = dev.data
@@ -152,7 +152,7 @@ export const useAuditStore = defineStore('audit', {
         getBacsSystems(this.docId), getBacsThermal(this.docId),
         getBacsActionItems(this.docId), getBacsDevices(this.docId),
         getBacsPowerSummary(this.docId), getBacsMeters(this.docId),
-        getBacsPhotoCounts(this.docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0 } })),
+        getBacsPhotoCounts(this.docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0, site: 0 } })),
       ])
       this.systems = s.data
       this.thermal = t.data
