@@ -251,29 +251,40 @@ async function routes(fastify) {
       walk('root', '');
       return map;
     })();
+    // Liste a plat des points par INSTANCE : un point n'apparait que s'il
+    // existe au moins une instance reelle dans la section. C'est l'unite
+    // contractuelle (chaque ligne = un point a remonter sur un equipement
+    // physique) — coherent avec le PDF "Liste de points contractuelle".
     const equipmentSections = allSections.filter(s => s.kind === 'equipment');
     const out = [];
     for (const sec of equipmentSections) {
+      const instances = db.equipmentInstances.listBySection(sec.id);
+      if (!instances.length) continue; // section sans instance : on skip
       const points = resolveSectionPoints(sec.id);
       const tplName = sec.equipment_template_id
         ? db.equipmentTemplates.getById(sec.equipment_template_id)?.name || sec.title
         : sec.title;
-      for (const p of points) {
-        out.push({
-          point_id: p.id,
-          section_id: sec.id,
-          section_number: liveNum.get(sec.id) || sec.number || '',
-          section_title: sec.title,
-          equipment_template_id: sec.equipment_template_id,
-          equipment_template_name: tplName,
-          label: p.label,
-          tech_name: p.tech_name || '',
-          data_type: p.data_type,
-          direction: p.direction,
-          unit: p.unit || '',
-          nature: p.nature || '',
-          is_optional: !!p.is_optional,
-        });
+      for (const inst of instances) {
+        for (const p of points) {
+          out.push({
+            point_id: p.id,
+            section_id: sec.id,
+            section_number: liveNum.get(sec.id) || sec.number || '',
+            section_title: sec.title,
+            equipment_template_id: sec.equipment_template_id,
+            equipment_template_name: tplName,
+            instance_id: inst.id,
+            instance_reference: inst.reference,
+            instance_location: inst.location || '',
+            label: p.label,
+            tech_name: p.tech_name || '',
+            data_type: p.data_type,
+            direction: p.direction,
+            unit: p.unit || '',
+            nature: p.nature || '',
+            is_optional: !!p.is_optional,
+          });
+        }
       }
     }
     return out;
