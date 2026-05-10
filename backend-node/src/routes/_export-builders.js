@@ -113,7 +113,6 @@ async function buildAfExportData(af, opts = {}) {
     motif = 'Apercu',
     excludedSectionIds = [],
     includeBacsAnnex = false,
-    includeOfferingsAnnex = false,
     previewMode = false,
   } = opts;
   const authorName = user?.display_name || user?.email || 'Inconnu';
@@ -247,8 +246,12 @@ async function buildAfExportData(af, opts = {}) {
       const protocols = tpl?.preferred_protocols
         ? tpl.preferred_protocols.split(',').map(s => s.trim()).filter(Boolean)
         : [];
+      // Override AF a la priorite sur la description biblio (mig 111).
+      const description_html = (sec.description_html_override != null && sec.description_html_override !== '')
+        ? sec.description_html_override
+        : (tpl?.description_html || null);
       equipment = {
-        description_html: tpl?.description_html || null,
+        description_html,
         points_read: points.filter(p => p.direction === 'read'),
         points_write: points.filter(p => p.direction === 'write'),
         preferred_protocols: protocols,
@@ -439,13 +442,11 @@ async function buildAfExportData(af, opts = {}) {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
-  // Annexe "Tableau des offres Buildy" optionnelle. Filtre les
-  // fonctionnalites refusees par le MOA (sections opt_out_by_moa) et
-  // met en avant le niveau cible de l'AF (af.service_level) plutot
-  // que le decoy admin global.
-  const offeringsAnnex = includeOfferingsAnnex
-    ? buildOfferingsAnnexForAf(af)
-    : null;
+  // L'annexe "Tableau des offres" en fin de document a ete retiree : la
+  // section kind='synthesis' deja presente dans l'arborescence rend le meme
+  // tableau (cf. synthesisOfferingsHtml ci-dessus). On evitait un doublon en
+  // gardant l'option, c'etait une regression UX confuse.
+  const offeringsAnnex = null;
 
   // contractualSummary deja calcule plus haut (utilise dans le tree pour
   // le chapitre 13). Reutilise-le tel quel pour le bundle data.
@@ -756,6 +757,7 @@ function buildPointsListExportData(af, opts = {}) {
         unit: p.unit,
         tech_name: p.tech_name,
         nature: p.nature,
+        is_optional: !!p.is_optional,
         dirLabel: p.direction === 'read' ? 'R' : 'W',
       })),
     }));
@@ -773,6 +775,7 @@ function buildPointsListExportData(af, opts = {}) {
           unit: p.unit,
           tech_name: p.tech_name,
           nature: p.nature,
+          is_optional: p.is_optional,
           dirLabel: p.dirLabel,
         });
         first = false;

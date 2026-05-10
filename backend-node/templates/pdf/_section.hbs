@@ -138,7 +138,7 @@
         <tbody>
           {{#each equipment.points_read}}
           <tr>
-            <td>{{label}}</td>
+            <td>{{label}}{{#if is_optional}} <span class="point-optional-tag">(optionnel)</span>{{/if}}</td>
             <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
             <td class="nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>
@@ -157,7 +157,7 @@
         <tbody>
           {{#each equipment.points_write}}
           <tr>
-            <td>{{label}}</td>
+            <td>{{label}}{{#if is_optional}} <span class="point-optional-tag">(optionnel)</span>{{/if}}</td>
             <td class="tech-name">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
             <td><span class="badge-type type-{{data_type}}">{{data_type}}</span></td>
             <td class="nature">{{#if nature}}<span class="badge-nature" data-nature="{{nature}}">{{nature}}</span>{{else}}—{{/if}}</td>

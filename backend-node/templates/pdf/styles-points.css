@@ -946,3 +946,12 @@ table.summary-table tfoot td {
   font-size: 11pt;
   color: #1b2842;
 }
+
+/* Point optionnel — tag discret apres le libelle */
+.point-optional-tag {
+  font-size: 7pt;
+  color: #9ca3af;
+  font-style: italic;
+  font-weight: 400;
+  margin-left: 0.8mm;
+}
