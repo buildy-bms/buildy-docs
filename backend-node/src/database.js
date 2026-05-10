@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 123;
+const TARGET_VERSION = 124;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -4949,6 +4949,18 @@ function runMigrations() {
     db.pragma('user_version = 123');
   }
 
+  if (current < 124) {
+    // Soft-delete uniformise (Lot 2). On ajoute deleted_at sur users
+    // pour preserver l'audit trail (FK created_by/updated_by/uploaded_by
+    // pointent vers users, on ne peut pas hard-delete sans casser).
+    db.exec(`
+      ALTER TABLE users ADD COLUMN deleted_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_users_active ON users(deleted_at) WHERE deleted_at IS NULL;
+    `);
+    log.info('Migration 124 appliquee : users.deleted_at ajoute (soft-delete uniformise)');
+    db.pragma('user_version = 124');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -4969,11 +4981,14 @@ function init() {
 
 // ── Users ────────────────────────────────────────────────────────────
 const users = {
+  // getById renvoie aussi les soft-deleted (utile pour l'audit trail :
+  // les FK created_by / updated_by / uploaded_by doivent toujours
+  // resoudre un nom). Pour la liste des users actifs, utiliser listActive().
   getById(id) {
     return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
   },
   // Batche les lookups (evite le N+1 sur les listings).
-  // Renvoie une Map<id, user>.
+  // Renvoie une Map<id, user>. Inclut les soft-deleted (cf. getById).
   getByIds(ids) {
     if (!ids || !ids.length) return new Map();
     const unique = [...new Set(ids.filter(Boolean))];
@@ -4982,8 +4997,13 @@ const users = {
     const rows = db.prepare(`SELECT * FROM users WHERE id IN (${placeholders})`).all(...unique);
     return new Map(rows.map(r => [r.id, r]));
   },
+  // Liste des users actifs (pour les pickers de partage / liste admin).
+  listActive() {
+    return db.prepare('SELECT * FROM users WHERE deleted_at IS NULL ORDER BY display_name').all();
+  },
   getByOidcSub(sub, issuer) {
-    return db.prepare('SELECT * FROM users WHERE oidc_sub = ? AND oidc_issuer = ?').get(sub, issuer);
+    // Un user soft-deleted ne peut plus se reconnecter (filtre deleted_at).
+    return db.prepare('SELECT * FROM users WHERE oidc_sub = ? AND oidc_issuer = ? AND deleted_at IS NULL').get(sub, issuer);
   },
   createFromOidc({ sub, issuer, email, displayName, firstName, lastName }) {
     return db.prepare(`
@@ -5022,6 +5042,15 @@ const users = {
       VALUES (?, 'local-dev', ?, ?)
     `).run(oidcSub, email, displayName);
     return this.getById(result.lastInsertRowid);
+  },
+  softDelete(id) {
+    // Hard-delete impossible : created_by/updated_by/uploaded_by referencent
+    // l'user. Soft-delete coupe l'acces (getByOidcSub filtre deleted_at)
+    // sans casser l'audit trail.
+    db.prepare('UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  },
+  restore(id) {
+    db.prepare('UPDATE users SET deleted_at = NULL WHERE id = ?').run(id);
   },
 };
 
@@ -6787,11 +6816,36 @@ const sites = {
     db.prepare(`UPDATE sites SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
+  // Cascade : la suppression d'un site marque le site + toutes ses zones
+  // + tous les equipements de ces zones avec le MEME timestamp. Ca permet
+  // a `restore()` de ne reanimer que les enfants supprimes par CETTE
+  // cascade (pas ceux supprimes manuellement avant).
   softDelete(id) {
-    db.prepare('UPDATE sites SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const ts = db.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS ts").get().ts;
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE sites SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(ts, ts, id);
+      db.prepare('UPDATE zones SET deleted_at = ?, updated_at = ? WHERE site_id = ? AND deleted_at IS NULL').run(ts, ts, id);
+      db.prepare(`
+        UPDATE equipments SET deleted_at = ?, updated_at = ?
+        WHERE deleted_at IS NULL
+          AND zone_id IN (SELECT id FROM zones WHERE site_id = ? AND deleted_at = ?)
+      `).run(ts, ts, id, ts);
+    });
+    tx();
   },
   restore(id) {
-    db.prepare('UPDATE sites SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const site = this.getById(id);
+    if (!site || !site.deleted_at) return;
+    const ts = site.deleted_at;
+    const tx = db.transaction(() => {
+      db.prepare(`
+        UPDATE equipments SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE deleted_at = ? AND zone_id IN (SELECT id FROM zones WHERE site_id = ?)
+      `).run(ts, id);
+      db.prepare('UPDATE zones SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE site_id = ? AND deleted_at = ?').run(id, ts);
+      db.prepare('UPDATE sites SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    });
+    tx();
   },
 };
 
@@ -6828,8 +6882,25 @@ const zones = {
     db.prepare(`UPDATE zones SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
+  // Cascade : suppression d'une zone -> equipements de la zone marques
+  // avec le meme timestamp (cf. sites.softDelete pour la rationale).
   softDelete(id) {
-    db.prepare('UPDATE zones SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    const ts = db.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS ts").get().ts;
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE zones SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(ts, ts, id);
+      db.prepare('UPDATE equipments SET deleted_at = ?, updated_at = ? WHERE zone_id = ? AND deleted_at IS NULL').run(ts, ts, id);
+    });
+    tx();
+  },
+  restore(id) {
+    const zone = this.getById(id);
+    if (!zone || !zone.deleted_at) return;
+    const ts = zone.deleted_at;
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE equipments SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE zone_id = ? AND deleted_at = ?').run(id, ts);
+      db.prepare('UPDATE zones SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    });
+    tx();
   },
 };
 
@@ -6893,7 +6964,10 @@ const equipments = {
     return this.getById(id);
   },
   softDelete(id) {
-    db.prepare('UPDATE equipments SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    db.prepare('UPDATE equipments SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  },
+  restore(id) {
+    db.prepare('UPDATE equipments SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
   },
   // Cumul puissance chauffage + climatisation pour le seuil R175-2
   sumBacsPowerForSite(siteId) {
