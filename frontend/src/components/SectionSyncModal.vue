@@ -14,6 +14,7 @@ import { ArrowPathIcon, BookOpenIcon, DocumentTextIcon, TableCellsIcon } from '@
 import BaseModal from './BaseModal.vue'
 import { getEquipmentTemplate, getSectionTemplate, applySectionTemplateUpdate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useAfStore } from '@/stores/af'
 
 const props = defineProps({
   section: { type: Object, required: true },
@@ -21,6 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'updated'])
 
 const { error: notifyError, success } = useNotification()
+const afStore = useAfStore()
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -73,6 +75,11 @@ async function submit() {
       p === 'bacs' ? 'décret BACS' : p === 'fonctionnel' ? 'descriptif fonctionnel' : 'table de points'
     ).join(', ')
     success(`Section synchronisée : ${labels}`)
+    // Force un re-fetch complet de la section depuis le serveur pour
+    // que tous les composants enfants (Description / BACS / Points)
+    // re-rendent avec les nouvelles valeurs. Sans ca, certaines vues
+    // restent sur leur cache local et imposent un refresh manuel.
+    await afStore.selectSection(props.section.id)
     emit('updated', data)
     emit('close')
   } catch (e) {
