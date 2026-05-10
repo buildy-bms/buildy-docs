@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 129;
+const TARGET_VERSION = 130;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5352,6 +5352,38 @@ function runMigrations() {
     db.pragma('user_version = 129');
   }
 
+  if (current < 130) {
+    // Cleanup des rows BACS audit orphelines : systems / meters /
+    // thermal_regulation qui pointent vers une zone soft-delete (mig 124
+    // a introduit `zones.deleted_at` mais les FK ON DELETE CASCADE ne
+    // s'appliquent pas au soft-delete UPDATE). Ces rows orphelines etaient
+    // reconstituees en "zones fantomes" par le fallback frontend
+    // (audit.js loadAudit) et empechaient la suppression de zone (la route
+    // DELETE no-op sur zone deja soft-delete).
+    //
+    // Le hard-delete est correct : ces tables n'ont pas de colonne
+    // deleted_at et sont entierement regenerables a la volee depuis le
+    // seeder (resyncBacsAuditWithSiteZones). Les bacs_audit_system_devices
+    // sont auto-supprimes par FK ON DELETE CASCADE sur leur system parent.
+    const cleanup = db.transaction(() => {
+      const orphanSys = db.prepare(`
+        DELETE FROM bacs_audit_systems
+         WHERE zone_id IN (SELECT id FROM zones WHERE deleted_at IS NOT NULL)
+      `).run();
+      const orphanMeter = db.prepare(`
+        DELETE FROM bacs_audit_meters
+         WHERE zone_id IN (SELECT id FROM zones WHERE deleted_at IS NOT NULL)
+      `).run();
+      const orphanThermal = db.prepare(`
+        DELETE FROM bacs_audit_thermal_regulation
+         WHERE zone_id IN (SELECT id FROM zones WHERE deleted_at IS NOT NULL)
+      `).run();
+      log.info(`Migration 130 cleanup : ${orphanSys.changes} systems + ${orphanMeter.changes} meters + ${orphanThermal.changes} thermal_regulation rows orphelines droppees`);
+    });
+    cleanup();
+    db.pragma('user_version = 130');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7273,13 +7305,24 @@ const zones = {
     db.prepare(`UPDATE zones SET ${sets.join(', ')} WHERE id = ?`).run(...params);
     return this.getById(id);
   },
-  // Cascade : suppression d'une zone -> equipements de la zone marques
-  // avec le meme timestamp (cf. sites.softDelete pour la rationale).
+  // Cascade : suppression d'une zone ->
+  //   - equipements de la zone : soft-delete (avec restore possible).
+  //   - rows BACS audit (systems/meters/thermal_regulation) : hard-delete.
+  //     Pourquoi hard ? Ces tables n'ont pas de colonne deleted_at et sont
+  //     deja regenerables a la volee depuis le seeder. Les laisser orphelines
+  //     creerait des "zones fantomes" reconstituees par le fallback frontend
+  //     (audit.js loadAudit) et empecherait l'utilisateur de supprimer la
+  //     zone (DELETE no-op sur zone deja soft-delete).
+  //   - bacs_audit_system_devices : auto-cascade par FK ON DELETE CASCADE
+  //     declenchee par la suppression des bacs_audit_systems parents.
   softDelete(id) {
     const ts = db.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS ts").get().ts;
     const tx = db.transaction(() => {
       db.prepare('UPDATE zones SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(ts, ts, id);
       db.prepare('UPDATE equipments SET deleted_at = ?, updated_at = ? WHERE zone_id = ? AND deleted_at IS NULL').run(ts, ts, id);
+      db.prepare('DELETE FROM bacs_audit_systems WHERE zone_id = ?').run(id);
+      db.prepare('DELETE FROM bacs_audit_meters WHERE zone_id = ?').run(id);
+      db.prepare('DELETE FROM bacs_audit_thermal_regulation WHERE zone_id = ?').run(id);
     });
     tx();
   },
