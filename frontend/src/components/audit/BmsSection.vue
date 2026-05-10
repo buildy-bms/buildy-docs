@@ -140,13 +140,12 @@ function hasNotes(html) {
           <button
             type="button"
             @click="emit('open-notes', { title: 'Notes GTB', contextLabel: 'Solution GTB / GTC : ' + (bms.existing_solution || 'a renseigner'), entityType: 'bms', entityRef: bms, currentHtml: bms.notes_html || '' })"
-            :class="['inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition',
+            :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
               hasNotes(bms.notes_html)
-                ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-            v-tooltip="'Editer les notes GTB'">
+                ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+            v-tooltip="hasNotes(bms.notes_html) ? 'Modifier les notes GTB' : 'Ajouter une note GTB'">
             <PencilSquareIcon class="w-4 h-4" />
-            {{ hasNotes(bms.notes_html) ? 'Notes' : '+ Notes' }}
           </button>
           <BacsPhotoButton
             v-if="document?.site_uuid && bms.document_id"

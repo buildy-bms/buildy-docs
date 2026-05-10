@@ -132,18 +132,20 @@ onBeforeUnmount(() => {
       type="button"
       @click="toggleOpen"
       :class="[
-        'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition whitespace-nowrap',
+        'relative p-1.5 rounded-md transition',
         sharedCount > 0
-          ? 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-          : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300 hover:text-gray-700',
+          ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+          : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100',
       ]"
       v-tooltip="sharedCount > 0
         ? `Équipement partagé avec ${sharedCount} autre zone${sharedCount > 1 ? 's' : ''}`
         : 'Partager cet équipement avec d\'autres zones'"
     >
-      <ShareIcon class="w-3.5 h-3.5 shrink-0" />
-      <span v-if="sharedCount > 0">Partagé · +{{ sharedCount }}</span>
-      <span v-else>+ Partager</span>
+      <ShareIcon class="w-4 h-4 shrink-0" />
+      <span v-if="sharedCount > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[9px] font-semibold bg-emerald-600 text-white rounded-full">
+        +{{ sharedCount }}
+      </span>
     </button>
 
   </div>
