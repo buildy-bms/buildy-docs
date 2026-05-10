@@ -475,6 +475,19 @@ async function removeDevice(d) {
           {{ editingDevice.system.zone_name }}
         </p>
 
+        <!-- Photos terrain en TÊTE (mode édition uniquement : un device en
+             cours de création n'a pas encore d'id pour rattacher les photos). -->
+        <div v-if="editingDevice?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
+          <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ device_id: editingDevice.device.id }"
+            :label="editingDevice.device.name || editingDevice.device.brand || `Équipement #${editingDevice.device.id}`"
+            size="md"
+          />
+        </div>
+
         <MobileField label="Nom">
           <input
             v-model="deviceForm.name"
@@ -702,16 +715,6 @@ async function removeDevice(d) {
                 Aucune autre zone disponible.
               </p>
             </div>
-          </div>
-
-          <div v-if="document?.site_uuid" class="pt-2">
-            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
-            <BacsPhotoButton
-              :site-uuid="document.site_uuid"
-              :attach-to="{ device_id: editingDevice.device.id }"
-              :label="editingDevice.device.name || editingDevice.device.brand || `Équipement #${editingDevice.device.id}`"
-              size="md"
-            />
           </div>
 
           <div class="pt-4 border-t border-gray-200">

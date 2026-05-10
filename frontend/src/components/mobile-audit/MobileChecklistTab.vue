@@ -32,10 +32,27 @@ const { error, success } = useNotification()
 
 const items = ref([])
 const coverage = ref({
-  zones: { total: 0, covered: 0 }, systems: { total: 0, covered: 0 },
-  meters: { total: 0, covered: 0 }, bms: { total: 0, covered: 0 },
+  site: { total: 0, covered: 0 },
+  zones: { total: 0, covered: 0, missing: [] }, systems: { total: 0, covered: 0, missing: [] },
+  meters: { total: 0, covered: 0, missing: [] }, bms: { total: 0, covered: 0 },
 })
 const loading = ref(true)
+
+// KPI cliquable : ouvre un sheet avec la liste des entités manquantes
+// (sans photo) ou un message « ✓ Couvert » si tout est en règle.
+const coverageDetail = ref(null) // { kind, label, items }
+function openCoverage(kind) {
+  const labels = { site: 'Site', zones: 'Zones', systems: 'Systèmes', meters: 'Compteurs', bms: 'GTB' }
+  const cov = coverage.value[kind]
+  coverageDetail.value = {
+    kind,
+    label: labels[kind],
+    total: cov.total,
+    covered: cov.covered,
+    missing: cov.missing || [],
+  }
+}
+function closeCoverage() { coverageDetail.value = null }
 
 async function load() {
   loading.value = true
@@ -53,9 +70,11 @@ onMounted(load)
 watch(() => audit.docId, load)
 
 const totalCovered = computed(() =>
+  (coverage.value.site?.covered || 0) +
   coverage.value.zones.covered + coverage.value.systems.covered + coverage.value.meters.covered + coverage.value.bms.covered,
 )
 const totalEntities = computed(() =>
+  (coverage.value.site?.total || 0) +
   coverage.value.zones.total + coverage.value.systems.total + coverage.value.meters.total + coverage.value.bms.total,
 )
 const itemsHandled = computed(() => items.value.filter(i => i.status !== 'pending').length)
@@ -192,16 +211,22 @@ async function quickToggleNotAvailable(it) {
       </div>
     </div>
 
-    <!-- Couverture photo -->
+    <!-- Couverture photo : KPIs cliquables → ouvre un sheet listant les
+         entités sans photo (ou un message « tout couvert » si OK). -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
         <CameraIcon class="w-5 h-5 text-emerald-600" />
         <h3 class="text-base font-medium text-gray-900">Couverture photo des entités</h3>
       </div>
       <div class="grid grid-cols-2 divide-x divide-y divide-gray-100">
-        <div v-for="kind in ['zones', 'systems', 'meters', 'bms']" :key="kind" class="p-4">
+        <button
+          v-for="kind in ['site', 'zones', 'systems', 'meters', 'bms']" :key="kind"
+          type="button"
+          @click="openCoverage(kind)"
+          class="p-4 text-left tap-target active:bg-gray-50 transition"
+        >
           <p class="text-xs uppercase tracking-wider text-gray-500">
-            {{ { zones: 'Zones', systems: 'Systèmes', meters: 'Compteurs', bms: 'GTB' }[kind] }}
+            {{ { site: 'Site', zones: 'Zones', systems: 'Systèmes', meters: 'Compteurs', bms: 'GTB' }[kind] }}
           </p>
           <p class="text-2xl font-medium text-gray-900 mt-1 leading-none">
             {{ coverage[kind].covered }}<span class="text-base text-gray-400 font-normal"> / {{ coverage[kind].total }}</span>
@@ -209,9 +234,46 @@ async function quickToggleNotAvailable(it) {
           <p v-if="coverage[kind].total === 0" class="text-[11px] text-gray-400 italic mt-1">Aucun</p>
           <p v-else-if="coverage[kind].covered === coverage[kind].total" class="text-[11px] text-emerald-700 mt-1">✓ Couvert</p>
           <p v-else class="text-[11px] text-amber-700 mt-1">⚠ {{ coverage[kind].total - coverage[kind].covered }} sans photo</p>
-        </div>
+        </button>
       </div>
     </div>
+
+    <!-- Sheet détail couverture : liste des entités d'un KPI -->
+    <MobileSheet
+      :open="!!coverageDetail"
+      :title="coverageDetail ? `${coverageDetail.label} · couverture photo` : ''"
+      hide-save
+      @close="closeCoverage"
+    >
+      <div v-if="coverageDetail" class="p-4 space-y-3">
+        <div class="bg-gray-50 rounded-xl px-4 py-3">
+          <p class="text-xs uppercase tracking-wider text-gray-500">Couverture</p>
+          <p class="text-2xl font-medium text-gray-900 mt-1">
+            {{ coverageDetail.covered }} <span class="text-gray-400 text-base font-normal">/ {{ coverageDetail.total }}</span>
+          </p>
+        </div>
+        <p v-if="coverageDetail.total === 0" class="text-sm text-gray-500 text-center py-6">
+          Aucune entité de ce type dans l'audit.
+        </p>
+        <p v-else-if="coverageDetail.covered === coverageDetail.total" class="text-sm text-emerald-700 text-center py-6">
+          ✓ Toutes les entités ont au moins une photo.
+        </p>
+        <template v-else-if="coverageDetail.missing.length">
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            {{ coverageDetail.missing.length }} sans photo
+          </p>
+          <ul class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+            <li v-for="m in coverageDetail.missing" :key="m.id"
+                class="px-4 py-3 text-base text-gray-800">
+              {{ m.name }}
+            </li>
+          </ul>
+        </template>
+        <p v-else class="text-sm text-gray-500 text-center py-4">
+          {{ coverageDetail.total - coverageDetail.covered }} sans photo. Détail non disponible.
+        </p>
+      </div>
+    </MobileSheet>
 
     <!-- Pièces jointes -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">

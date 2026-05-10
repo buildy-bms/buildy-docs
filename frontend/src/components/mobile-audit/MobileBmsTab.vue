@@ -110,6 +110,18 @@ const USAGES = [
 
 <template>
   <div class="p-3 space-y-3">
+    <!-- Photos GTB en TÊTE : reflexe terrain, geste #1 sur l'écran. -->
+    <div v-if="document?.site_uuid && bms.document_id"
+         class="bg-white rounded-2xl border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos GTB</p>
+      <BacsPhotoButton
+        :site-uuid="document.site_uuid"
+        :attach-to="{ bms_document_id: bms.document_id }"
+        label="GTB"
+        size="md"
+      />
+    </div>
+
     <!-- Header card -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4">
       <div class="flex items-center gap-3">
@@ -125,18 +137,6 @@ const USAGES = [
           </p>
         </div>
       </div>
-    </div>
-
-    <!-- Photos GTB -->
-    <div v-if="document?.site_uuid && bms.document_id"
-         class="bg-white rounded-2xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos GTB</p>
-      <BacsPhotoButton
-        :site-uuid="document.site_uuid"
-        :attach-to="{ bms_document_id: bms.document_id }"
-        label="GTB"
-        size="md"
-      />
     </div>
 
     <!-- Hors-service toggle -->

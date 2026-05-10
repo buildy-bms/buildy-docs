@@ -8198,7 +8198,26 @@ const bacsAuditChecklist = {
       ).get(documentId).n;
     }
 
+    // Site : 1 entité unique. "Couvert" = au moins 1 photo du site sans
+    // rattachement à une entité (zone / system / etc.) — typiquement
+    // façade, toiture, vue d'ensemble.
+    const af = db.prepare('SELECT site_id FROM afs WHERE id = ?').get(documentId);
+    let sitePhotos = 0;
+    if (af?.site_id) {
+      sitePhotos = db.prepare(`
+        SELECT COUNT(*) AS n FROM site_documents
+        WHERE site_id = ? AND category = 'photo'
+          AND bacs_audit_zone_id IS NULL
+          AND bacs_audit_system_id IS NULL
+          AND bacs_audit_meter_id IS NULL
+          AND bacs_audit_device_id IS NULL
+          AND bacs_audit_bms_document_id IS NULL
+          AND bacs_audit_action_item_id IS NULL
+      `).get(af.site_id).n;
+    }
+
     return {
+      site: { total: 1, covered: sitePhotos > 0 ? 1 : 0, files_count: sitePhotos },
       zones: { total: zoneIds.length, covered: zonesCovered.size, missing: zonesMissing },
       systems: { total: sysAll.length, covered: sysCovered.size, missing: sysMissing },
       meters: { total: metersAll.length, covered: metersCovered.size, missing: metersMissing },

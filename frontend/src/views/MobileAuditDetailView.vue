@@ -163,8 +163,11 @@ onMounted(async () => {
 })
 
 function goBack() {
-  if (window.history.length > 1) router.back()
-  else router.push('/')
+  // Sur PWA standalone iOS, window.history.length n'est pas fiable (le
+  // SW peut reset l'historique au cold-start). On force le retour à la
+  // liste d'accueil pour éviter les cas où router.back() sortait de
+  // l'app sans donner accès à la liste des audits.
+  router.push('/')
 }
 
 // Sheet paramètres audit (kind, livrer, supprimer)

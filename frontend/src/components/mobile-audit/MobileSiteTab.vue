@@ -89,6 +89,19 @@ const generatorWorksDone = computed({
 
 <template>
   <div class="p-3 space-y-3">
+    <!-- Photos du site en TÊTE : reflexe terrain de l'auditeur, geste #1
+         à l'arrivée sur site (façade, toiture, vue d'ensemble). -->
+    <div v-if="document?.site_uuid"
+         class="bg-white rounded-2xl border border-gray-200 px-4 py-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos du site</p>
+      <BacsPhotoButton
+        :site-uuid="document.site_uuid"
+        :attach-to="{}"
+        :label="site?.name || document?.client_name || 'Site'"
+        size="md"
+      />
+    </div>
+
     <!-- Hero : applicabilité R175-2 -->
     <div v-if="isBacs && document?.bacs_applicability_status"
          :class="['rounded-2xl border p-4 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status]?.cls]">
@@ -152,17 +165,6 @@ const generatorWorksDone = computed({
             {{ site.customer_name }}
           </div>
         </MobileField>
-
-        <!-- Photos générales du site (façade, toiture, vue d'ensemble…) -->
-        <div v-if="document?.site_uuid" class="pt-1">
-          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos du site</p>
-          <BacsPhotoButton
-            :site-uuid="document.site_uuid"
-            :attach-to="{}"
-            :label="site?.name || document?.client_name || 'Site'"
-            size="md"
-          />
-        </div>
       </div>
     </div>
 

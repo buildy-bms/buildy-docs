@@ -224,6 +224,18 @@ function toggleProtocol(p) {
       @save="save"
     >
       <div class="p-4 space-y-4">
+        <!-- Photos terrain en TÊTE (mode édition uniquement). -->
+        <div v-if="editing?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
+          <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ meter_id: editing.meter.id }"
+            :label="(editing.meter.zone_name || 'Général') + ' / ' + usageLabel(editing.meter.usage)"
+            size="md"
+          />
+        </div>
+
         <MobileField label="Zone" hint="Le local fonctionnel où se trouve ce compteur. « Compteur général » = compteur principal du site, pas attaché à une zone précise.">
           <select
             v-model="editForm.zone_id"
@@ -316,16 +328,6 @@ function toggleProtocol(p) {
         </MobileField>
 
         <template v-if="editing?.mode === 'edit' && document?.site_uuid">
-          <div class="pt-2">
-            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
-            <BacsPhotoButton
-              :site-uuid="document.site_uuid"
-              :attach-to="{ meter_id: editing.meter.id }"
-              :label="(editing.meter.zone_name || 'Général') + ' / ' + usageLabel(editing.meter.usage)"
-              size="md"
-            />
-          </div>
-
           <div class="pt-4 border-t border-gray-200">
             <button
               @click="remove(editing.meter)"
