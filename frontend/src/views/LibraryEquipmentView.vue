@@ -38,14 +38,9 @@ function roleLabel(value) {
 const { error: notifyError, success: notifySuccess } = useNotification()
 
 // Catalogue dynamique : alimenté par le composable useSystemCategories
-// (table `system_categories_db`). Plus de liste hardcodée — toute catégorie
-// créée par l'admin apparaît automatiquement dans les groupements et la
-// vue détail. Le tri suit `position` du catalogue DB.
-//
-// IMPORTANT : déclaration en tête du setup car référencé par les computed
-// `flatEquipmentItems` plus bas. Si on déclarait après, le watch sur ce
-// computed tenterait de l'évaluer au setup et lèverait un ReferenceError
-// (TDZ) sur dbCategories.
+// (table `system_categories_db`). Source de vérité pour les libellés des
+// catégories. Déclaré en tête du setup car référencé par les computed plus
+// bas (groupedForTable, watch sur celui-ci, etc.) — sinon TDZ au setup.
 const { categories: dbCategories, labelOf: categoryLabel } = useSystemCategories()
 
 const router = useRouter()
@@ -220,44 +215,9 @@ const filteredSorted = computed(() => {
   return list
 })
 
-// Liste plate hierarchique par categorie (alignee sur la presentation
-// hierarchique de la bibliotheque des fonctionnalites). Chaque categorie
-// devient une "ligne parente" synthetique suivie des equipements qui en
-// relevent (depth=1, indentation + ↳).
-//
-// En mode recherche : on garde l'ordre de tri choisi (plat), sans titres
-// de categorie, parce que les regroupements n'ont plus de sens.
-const flatEquipmentItems = computed(() => {
-  const list = filteredSorted.value
-  if (normalize(searchQuery.value).length >= 2) {
-    return list.map(t => ({ kind: 'template', t, visual_depth: 0 }))
-  }
-  // Groupage par categorie en preservant l'ordre du tri courant
-  const byCat = new Map()
-  for (const t of list) {
-    const k = t.category || 'autres'
-    if (!byCat.has(k)) byCat.set(k, [])
-    byCat.get(k).push(t)
-  }
-  // Tri des categories : ordre `position` du catalogue DB sinon alphabetique.
-  // Les categories presentes en DB sont prioritaires (ordre stable defini par
-  // l'admin), les valeurs legacy ('eclairage', 'electricite') tombent en fin.
-  const labelOrder = dbCategories.value.map(c => c.key)
-  const cats = [...byCat.keys()].sort((a, b) => {
-    const ia = labelOrder.indexOf(a), ib = labelOrder.indexOf(b)
-    if (ia !== -1 && ib !== -1) return ia - ib
-    if (ia !== -1) return -1
-    if (ib !== -1) return 1
-    return categoryLabel(a).localeCompare(categoryLabel(b), 'fr')
-  })
-  const out = []
-  for (const cat of cats) {
-    const items = byCat.get(cat)
-    out.push({ kind: 'category', cat, label: categoryLabel(cat), count: items.length })
-    for (const t of items) out.push({ kind: 'template', t, visual_depth: 1 })
-  }
-  return out
-})
+// (flatEquipmentItems et grouped retirés : le tableau est maintenant rendu
+// soit en mode canonique via groupedForTable + N tbody, soit en mode plat
+// via filteredSorted directement. Cf. setupSortables / template.)
 
 // Modal Captures + drag-drop d'images sur les lignes equipements
 const photosModalTemplate = ref(null)
@@ -316,39 +276,62 @@ const grouped = computed(() => {
   return groups
 })
 
-// Reorder : drag-drop SortableJS + boutons up/down. Activé uniquement quand
-// on est en tri 'position' et hors recherche (sinon le réordonnancement
-// serait écrasé par le tri courant et invisible).
+// Reorder : drag-drop SortableJS + boutons up/down. Activé uniquement
+// quand `sortBy === null` (ordre canonique du backend) et hors recherche
+// (sinon le réordonnancement serait écrasé par le tri courant).
 const reordering = ref(false)
 const canDrag = computed(() =>
   sortBy.value === null && normalize(searchQuery.value).length < 2
 )
-const tbodyRef = ref(null)
-let sortableInstance = null
 
-async function applyReorderFromDom() {
-  if (!tbodyRef.value || reordering.value) return
-  // Lit l'ordre courant des tr items (data-id + data-cat) dans le tbody.
-  const rows = Array.from(tbodyRef.value.querySelectorAll('tr[data-id][data-cat]'))
-  const idsByCat = new Map()
-  for (const tr of rows) {
-    const id = parseInt(tr.dataset.id, 10)
-    const cat = tr.dataset.cat
-    if (!idsByCat.has(cat)) idsByCat.set(cat, [])
-    idsByCat.get(cat).push(id)
+// 1 tbody par catégorie en mode canonique. Refs collectées via setTbodyRef.
+// Cette structure rend impossible un drop cross-cat (chaque tbody ne contient
+// qu'une seule cat) -- pas de filter ni onMove à gérer.
+const tbodyRefsByCat = new Map() // cat -> HTMLTableSectionElement
+const sortablesByCat = new Map() // cat -> Sortable instance
+
+function setTbodyRef(cat, el) {
+  if (el) tbodyRefsByCat.set(cat, el)
+  else tbodyRefsByCat.delete(cat)
+}
+
+// Groupage pour le mode canonique : groupes ordonnés selon l'ordre serveur
+// (templates est déjà retourné ORDER BY system_categories_db.position,
+// equipment_templates.position, name). Filtres recherche / validation
+// continuent de s'appliquer en amont via filteredSorted.
+const groupedForTable = computed(() => {
+  if (!canDrag.value) return []
+  const groups = []
+  const seen = new Map()
+  for (const t of filteredSorted.value) {
+    const cat = t.category || 'autres'
+    if (!seen.has(cat)) {
+      const grp = { cat, label: categoryLabel(cat), items: [] }
+      seen.set(cat, grp)
+      groups.push(grp)
+    }
+    seen.get(cat).items.push(t)
   }
+  return groups
+})
+
+async function applyReorderFromDom(category) {
+  if (reordering.value) return
+  const tbody = tbodyRefsByCat.get(category)
+  if (!tbody) return
+  const ids = Array.from(tbody.querySelectorAll('tr[data-id]'))
+    .map(tr => parseInt(tr.dataset.id, 10))
+    .filter(Boolean)
+  if (!ids.length) return
+  // Skip si pas de changement
+  const currentOrder = templates.value
+    .filter(t => (t.category || 'autres') === category)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map(t => t.id)
+  if (currentOrder.length === ids.length && currentOrder.every((v, i) => v === ids[i])) return
   reordering.value = true
   try {
-    for (const [cat, ids] of idsByCat) {
-      // Skip si l'ordre n'a pas change pour cette categorie (compare avec
-      // l'ordre courant en memoire, par position).
-      const currentOrder = templates.value
-        .filter(t => (t.category || 'autres') === cat)
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-        .map(t => t.id)
-      if (currentOrder.length === ids.length && currentOrder.every((v, i) => v === ids[i])) continue
-      await reorderEquipmentTemplates(cat, ids)
-    }
+    await reorderEquipmentTemplates(category, ids)
     await refresh()
   } catch (e) {
     notifyError(e?.response?.data?.detail || 'Échec du réordonnancement')
@@ -358,34 +341,35 @@ async function applyReorderFromDom() {
   }
 }
 
-function setupSortable() {
-  if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null }
-  if (!tbodyRef.value || !canDrag.value) return
-  sortableInstance = Sortable.create(tbodyRef.value, {
-    handle: '.drag-handle',
-    draggable: 'tr[data-id]',
-    filter: 'tr.cat-header',
-    preventOnFilter: true,
-    animation: 150,
-    ghostClass: 'opacity-40',
-    chosenClass: 'bg-indigo-50',
-    // Empêche le drop dans une autre catégorie : si la ligne cible n'a pas
-    // le même data-cat (ou est un cat-header), on bloque le mouvement.
-    onMove: (evt) => {
-      const draggedCat = evt.dragged?.dataset?.cat
-      const relatedCat = evt.related?.dataset?.cat
-      if (!draggedCat || !relatedCat) return false
-      return draggedCat === relatedCat
-    },
-    onEnd: () => { applyReorderFromDom() },
-  })
+function destroySortables() {
+  for (const s of sortablesByCat.values()) {
+    try { s.destroy() } catch { /* ignore */ }
+  }
+  sortablesByCat.clear()
 }
 
-watch([canDrag, flatEquipmentItems], () => {
-  nextTick(() => setupSortable())
-})
-onMounted(() => nextTick(() => setupSortable()))
-onBeforeUnmount(() => { if (sortableInstance) sortableInstance.destroy() })
+function setupSortables() {
+  destroySortables()
+  if (!canDrag.value) return
+  for (const [cat, tbody] of tbodyRefsByCat) {
+    if (!tbody) continue
+    const inst = Sortable.create(tbody, {
+      handle: '.drag-handle',
+      draggable: 'tr[data-id]',
+      animation: 150,
+      ghostClass: 'opacity-40',
+      chosenClass: 'bg-indigo-50',
+      onEnd: () => { applyReorderFromDom(cat) },
+    })
+    sortablesByCat.set(cat, inst)
+  }
+}
+
+watch([canDrag, groupedForTable], () => {
+  nextTick(() => setupSortables())
+}, { flush: 'post' })
+onMounted(() => nextTick(() => setupSortables()))
+onBeforeUnmount(() => destroySortables())
 async function moveInCategory(template, direction) {
   if (reordering.value) return
   // Liste des templates de la meme categorie dans l'ordre canonique courant
@@ -572,112 +556,140 @@ onMounted(async () => {
               <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
             </tr>
           </thead>
-          <tbody ref="tbodyRef">
-            <template v-for="(it, idx) in flatEquipmentItems" :key="it.kind === 'category' ? `cat-${it.cat}` : `tpl-${it.t.id}`">
-              <!-- Ligne parente synthetique : un en-tete de categorie. Pas
-                   d'action, juste un libelle aligne sur la cellule Titre. -->
-              <tr v-if="it.kind === 'category'"
-                  class="border-t border-gray-100 bg-gray-50/40 cat-header">
-                <td class="px-4 py-1.5"></td>
-                <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
-                  {{ it.label }}
-                  <span class="text-gray-400 normal-case font-normal ml-2">· {{ it.count }}</span>
-                </td>
-              </tr>
-              <!-- Ligne equipement : depth=1, ↳, drag-drop d'image -->
-              <tr v-else :data-id="it.t.id" :data-cat="it.t.category || 'autres'"
-                  :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
-                           dragOverRowId === it.t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
-                  @click="openTemplate(it.t)"
-                  @dragover="onRowDragOver($event, it.t)"
-                  @dragleave="onRowDragLeave"
-                  @drop="onRowDrop($event, it.t)">
-                <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <div class="inline-flex items-center gap-1.5">
-                    <span v-if="canDrag" class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop title="Glisser pour réorganiser dans la catégorie">
-                      <Bars3Icon class="w-3.5 h-3.5" />
+          <!-- Mode recherche : tbody plat sans drag (tri courant ou recherche).
+               Mode canonique (canDrag=true) : N tbody, un par catégorie, avec
+               Sortable.create sur chacun. Pas de filter ni onMove cross-cat
+               à gérer — chaque tbody = 1 catégorie, structurellement clean. -->
+          <template v-if="canDrag">
+            <template v-for="grp in groupedForTable" :key="`grp-${grp.cat}`">
+              <tbody>
+                <tr class="border-t border-gray-100 bg-gray-50/40">
+                  <td class="px-4 py-1.5"></td>
+                  <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
+                    {{ grp.label }}
+                    <span class="text-gray-400 normal-case font-normal ml-2">· {{ grp.items.length }}</span>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody :data-cat="grp.cat" :ref="el => setTbodyRef(grp.cat, el)">
+                <tr v-for="t in grp.items" :key="`tpl-${t.id}`" :data-id="t.id" :data-cat="grp.cat"
+                    :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                             dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                    @click="openTemplate(t)"
+                    @dragover="onRowDragOver($event, t)"
+                    @dragleave="onRowDragLeave"
+                    @drop="onRowDrop($event, t)">
+                  <td class="px-4 py-2 text-center whitespace-nowrap">
+                    <div class="inline-flex items-center gap-1.5">
+                      <span class="drag-handle cursor-move text-gray-300 hover:text-gray-500" @click.stop title="Glisser pour réorganiser dans la catégorie">
+                        <Bars3Icon class="w-3.5 h-3.5" />
+                      </span>
+                      <EquipmentIcon :template="t" size="sm" />
+                    </div>
+                  </td>
+                  <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap pl-8">
+                    <span class="text-gray-400 mr-1.5">↳</span>
+                    <ContentValidationDot :status="getValidationStatus(t, 'description_html')" :validated-at="t.content_validated_at" :validated-by="t.content_validated_by_name" class="mr-2 align-middle" />
+                    {{ t.name }}
+                  </td>
+                  <td class="px-2 py-2 text-center align-middle" @click.stop>
+                    <button type="button" @click="openPhotos(t)"
+                      :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition', t.attachments_count > 0 ? 'text-emerald-600 hover:bg-emerald-100' : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
+                      :title="t.attachments_count > 0 ? `${t.attachments_count} capture${t.attachments_count > 1 ? 's' : ''}` : 'Aucune capture'">
+                      <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
+                      <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
+                    </button>
+                  </td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap">
+                    <span v-if="t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">{{ energyLabel(t.default_energy_source) }}</span>
+                    <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                  </td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap">
+                    <span v-if="t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
+                    <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                  </td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
+                  </td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap">
+                    <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${t.sections_using_count} section(s) AF`">
+                      <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
                     </span>
-                    <EquipmentIcon :template="it.t" size="sm" />
-                  </div>
-                </td>
-                <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap"
-                    :style="it.visual_depth ? `padding-left: ${16 + it.visual_depth * 18}px` : ''">
-                  <span v-if="it.visual_depth" class="text-gray-400 mr-1.5">↳</span>
-                  <ContentValidationDot :status="getValidationStatus(it.t, 'description_html')"
-                                        :validated-at="it.t.content_validated_at"
-                                        :validated-by="it.t.content_validated_by_name"
-                                        class="mr-2 align-middle" />
-                  {{ it.t.name }}
-                </td>
-                <td class="px-2 py-2 text-center align-middle" @click.stop>
-                  <button
-                    type="button"
-                    @click="openPhotos(it.t)"
-                    :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition',
-                             it.t.attachments_count > 0
-                               ? 'text-emerald-600 hover:bg-emerald-100'
-                               : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']"
-                    :title="it.t.attachments_count > 0
-                      ? `${it.t.attachments_count} capture${it.t.attachments_count > 1 ? 's' : ''} — cliquer pour gérer`
-                      : 'Aucune capture — cliquer pour en ajouter ou glisser une image sur la ligne'"
-                  >
-                    <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
-                    <span v-if="it.t.attachments_count > 0" class="text-[11px] font-semibold">{{ it.t.attachments_count }}</span>
-                  </button>
-                </td>
-                <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ it.t.slug }}</code></td>
-                <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <span v-if="it.t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                    {{ energyLabel(it.t.default_energy_source) }}
-                  </span>
-                  <span v-else class="text-[11px] text-gray-300 italic">—</span>
-                </td>
-                <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <span v-if="it.t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
-                    {{ roleLabel(it.t.default_device_role) }}
-                  </span>
-                  <span v-else class="text-[11px] text-gray-300 italic">—</span>
-                </td>
-                <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ it.t.points_count }}</span>
-                </td>
-                <td class="px-4 py-2 text-center whitespace-nowrap">
-                  <span v-if="it.t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${it.t.sections_using_count} section(s) AF`">
-                    <BookmarkIcon class="w-3 h-3" /> {{ it.t.sections_using_count }}
-                  </span>
-                  <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé — candidat au nettoyage'">∅ inutilisé</span>
-                </td>
-                <td class="px-4 py-2 whitespace-nowrap">
-                  <ProtocolPills v-if="it.t.preferred_protocols" :protocols="it.t.preferred_protocols" :show-label="false" :max="2" />
-                  <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
-                </td>
-                <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ it.t.current_version }}</td>
-                <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
-                  <div class="inline-flex items-center gap-0.5">
-                    <button type="button"
-                            @click="moveInCategory(it.t, 'up')"
-                            :disabled="reordering || isFirstInCategory(it.t) || normalize(searchQuery).length >= 2"
-                            class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
-                            v-tooltip="'Monter dans la catégorie'">
-                      <ArrowUpIcon class="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button"
-                            @click="moveInCategory(it.t, 'down')"
-                            :disabled="reordering || isLastInCategory(it.t) || normalize(searchQuery).length >= 2"
-                            class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 disabled:cursor-not-allowed"
-                            v-tooltip="'Descendre dans la catégorie'">
-                      <ArrowDownIcon class="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" @click="openClone(it.t)"
-                            class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
-                            v-tooltip="'Dupliquer ce système technique (avec ses points et captures)'">
-                      <DocumentDuplicateIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                    <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé'">∅ inutilisé</span>
+                  </td>
+                  <td class="px-4 py-2 whitespace-nowrap">
+                    <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
+                    <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
+                  </td>
+                  <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
+                  <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
+                    <div class="inline-flex items-center gap-0.5">
+                      <button type="button" @click="moveInCategory(t, 'up')" :disabled="reordering || isFirstInCategory(t)"
+                              class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                              v-tooltip="'Monter dans la catégorie'"><ArrowUpIcon class="w-3.5 h-3.5" /></button>
+                      <button type="button" @click="moveInCategory(t, 'down')" :disabled="reordering || isLastInCategory(t)"
+                              class="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                              v-tooltip="'Descendre dans la catégorie'"><ArrowDownIcon class="w-3.5 h-3.5" /></button>
+                      <button type="button" @click="openClone(t)"
+                              class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                              v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
             </template>
-            <tr v-if="!flatEquipmentItems.length">
+          </template>
+          <tbody v-else>
+            <tr v-for="t in filteredSorted" :key="`flat-${t.id}`" :data-id="t.id"
+                :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer transition-colors',
+                         dragOverRowId === t.id ? 'bg-indigo-100 ring-2 ring-indigo-400 ring-inset' : '']"
+                @click="openTemplate(t)"
+                @dragover="onRowDragOver($event, t)"
+                @dragleave="onRowDragLeave"
+                @drop="onRowDrop($event, t)">
+              <td class="px-4 py-2 text-center whitespace-nowrap"><EquipmentIcon :template="t" size="sm" /></td>
+              <td class="px-4 py-2 font-semibold text-gray-800 whitespace-nowrap">
+                <ContentValidationDot :status="getValidationStatus(t, 'description_html')" :validated-at="t.content_validated_at" :validated-by="t.content_validated_by_name" class="mr-2 align-middle" />
+                {{ t.name }}
+              </td>
+              <td class="px-2 py-2 text-center align-middle" @click.stop>
+                <button type="button" @click="openPhotos(t)"
+                  :class="['inline-flex items-center gap-1 px-1.5 py-1 rounded-md transition', t.attachments_count > 0 ? 'text-emerald-600 hover:bg-emerald-100' : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500']">
+                  <FontAwesomeIcon :icon="['fas', 'camera']" class="w-4 h-4" />
+                  <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
+                </button>
+              </td>
+              <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <span v-if="t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">{{ energyLabel(t.default_energy_source) }}</span>
+                <span v-else class="text-[11px] text-gray-300 italic">—</span>
+              </td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <span v-if="t.default_device_role" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
+                <span v-else class="text-[11px] text-gray-300 italic">—</span>
+              </td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
+              </td>
+              <td class="px-4 py-2 text-center whitespace-nowrap">
+                <span v-if="t.sections_using_count > 0" class="inline-flex items-center gap-1 text-xs text-gray-500" v-tooltip="`Utilisé dans ${t.sections_using_count} section(s) AF`">
+                  <BookmarkIcon class="w-3 h-3" /> {{ t.sections_using_count }}
+                </span>
+                <span v-else class="text-[11px] text-gray-300 italic" v-tooltip="'Jamais utilisé'">∅ inutilisé</span>
+              </td>
+              <td class="px-4 py-2 whitespace-nowrap">
+                <ProtocolPills v-if="t.preferred_protocols" :protocols="t.preferred_protocols" :show-label="false" :max="2" />
+                <span v-else class="text-[11px] text-gray-300 italic block text-center">—</span>
+              </td>
+              <td class="px-4 py-2 text-center text-[11px] text-gray-400 font-mono whitespace-nowrap">v{{ t.current_version }}</td>
+              <td class="px-4 py-2 text-center whitespace-nowrap" @click.stop>
+                <button type="button" @click="openClone(t)"
+                        class="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition"
+                        v-tooltip="'Dupliquer ce système technique'"><DocumentDuplicateIcon class="w-4 h-4" /></button>
+              </td>
+            </tr>
+            <tr v-if="!filteredSorted.length">
               <td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
