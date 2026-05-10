@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 127;
+const TARGET_VERSION = 128;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5262,6 +5262,50 @@ function runMigrations() {
 
     log.info('Migration 127 appliquee : timestamps uniformes (created_at + updated_at sur 8 tables, 8 triggers AFTER INSERT)');
     db.pragma('user_version = 127');
+  }
+
+  if (current < 128) {
+    // Drop colonnes mortes (Lot 6) : champs notes_pX qui n'ont jamais ete
+    // utilises (0 lignes en prod) et qui flottent dans le schema.
+    //
+    // bacs_audit_systems : notes_p3, notes_p4, notes_p4_autonomous
+    //   -> doublons de la note generale `notes` / `notes_html`. Les
+    //      compliance par device sont desormais sur bacs_audit_system_devices.
+    //
+    // bacs_audit_bms : notes_p1, notes_p2, notes_maintenance, notes_training
+    //   -> meme logique : notes globales BMS sont sur `notes_html`,
+    //      l'argumentaire P1/P2/maintenance/training est porte par les
+    //      champs structures r175_3_p1_archival_format, maintenance_*,
+    //      operator_training_*, etc. ajoutes recemment.
+    //
+    // Verification automatique : si l'une de ces colonnes contient des
+    // donnees, on AVORTE la migration plutot que de les perdre.
+    const checks = [
+      ['bacs_audit_systems', 'notes_p3'],
+      ['bacs_audit_systems', 'notes_p4'],
+      ['bacs_audit_systems', 'notes_p4_autonomous'],
+      ['bacs_audit_bms',     'notes_p1'],
+      ['bacs_audit_bms',     'notes_p2'],
+      ['bacs_audit_bms',     'notes_maintenance'],
+      ['bacs_audit_bms',     'notes_training'],
+    ];
+    for (const [tbl, col] of checks) {
+      const n = db.prepare(`SELECT COUNT(*) AS n FROM ${tbl} WHERE ${col} IS NOT NULL AND ${col} != ''`).get().n;
+      if (n > 0) {
+        throw new Error(`Migration 128 abandonnee : ${tbl}.${col} contient ${n} ligne(s) non vide(s). Examiner avant de drop.`);
+      }
+    }
+    db.exec(`
+      ALTER TABLE bacs_audit_systems DROP COLUMN notes_p3;
+      ALTER TABLE bacs_audit_systems DROP COLUMN notes_p4;
+      ALTER TABLE bacs_audit_systems DROP COLUMN notes_p4_autonomous;
+      ALTER TABLE bacs_audit_bms     DROP COLUMN notes_p1;
+      ALTER TABLE bacs_audit_bms     DROP COLUMN notes_p2;
+      ALTER TABLE bacs_audit_bms     DROP COLUMN notes_maintenance;
+      ALTER TABLE bacs_audit_bms     DROP COLUMN notes_training;
+    `);
+    log.info('Migration 128 appliquee : 7 colonnes mortes droppees (notes_p1/p2/p3/p4/p4_autonomous/maintenance/training, 0 records)');
+    db.pragma('user_version = 128');
   }
 
   if (current > TARGET_VERSION) {
