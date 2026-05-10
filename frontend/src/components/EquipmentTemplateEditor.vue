@@ -459,8 +459,8 @@ async function destroy() {
         <input v-model="form.slug" type="text" autocomplete="off" data-1p-ignore="true"
                placeholder="pac-air-eau"
                class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 font-mono placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
-        <p v-if="isEdit" class="mt-1 text-[10px] text-amber-700">
-          ⚠️ Le slug est référencé par le seed ; modifier en connaissance de cause. Préférer renommer le nom.
+        <p v-if="isEdit" class="mt-1 text-[10px] text-gray-500">
+          L'ancien slug est tombstoned automatiquement après renommage — pas de doublon recréé au prochain boot.
         </p>
       </div>
       </fieldset>

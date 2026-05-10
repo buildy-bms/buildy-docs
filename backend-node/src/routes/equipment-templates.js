@@ -163,7 +163,10 @@ async function routes(fastify) {
     catch (err) { return reply.code(400).send({ detail: err.errors?.[0]?.message || 'Validation' }); }
 
     const userId = request.authUser?.id;
-    // Slug editable : valide unicite + tombstone (resurrection refusee).
+    // Slug editable : valide unicite. Le tombstone n'est PAS bloquant ici
+    // (PATCH = renommer un row existant) ; on lève la pierre tombale au
+    // moment de l'UPDATE pour permettre la "resurrection controlee" d'un
+    // slug, typiquement un revert apres un rename.
     let nextSlug = undefined;
     if (typeof body.slug === 'string' && body.slug.trim() && body.slug !== tpl.slug) {
       const candidate = slugify(body.slug);
@@ -171,10 +174,6 @@ async function routes(fastify) {
       const conflict = db.equipmentTemplates.getBySlug(candidate);
       if (conflict && conflict.id !== id) {
         return reply.code(409).send({ detail: 'Un template avec ce slug existe déjà' });
-      }
-      const tombstoned = db.db.prepare('SELECT 1 FROM deleted_equipment_template_slugs WHERE slug = ?').get(candidate);
-      if (tombstoned) {
-        return reply.code(409).send({ detail: 'Ce slug est marqué comme supprimé. Recréer un template avec ce slug si besoin.' });
       }
       nextSlug = candidate;
     }
@@ -190,23 +189,39 @@ async function routes(fastify) {
       const roles = parseRoles(body.default_device_role);
       defaultDeviceRole = roles.length ? serializeRoles(roles) : '__clear__';
     }
-    const updated = db.equipmentTemplates.update(id, {
-      slug: nextSlug,
-      name: body.name,
-      category: body.category,
-      // bacs_articles : herite de la categorie depuis le Lot 35 (jamais ecrit ici)
-      bacsJustification: body.bacs_justification,
-      descriptionHtml: body.description_html,
-      iconKind: body.icon_kind,
-      iconValue: body.icon_value,
-      iconColor: body.icon_color,
-      preferredProtocols: body.preferred_protocols,
-      defaultEnergySource,
-      defaultDeviceRole,
-      updatedBy: userId,
+    // Update + tombstone de l'ancien slug en transaction. Le tombstone
+    // empeche le seeder de recreer un row a partir du fichier seed
+    // (seeds/equipment-templates/<oldSlug>.js) au prochain boot, ce qui
+    // produirait sinon un doublon en bibliotheque.
+    let updated;
+    const updateTx = db.db.transaction(() => {
+      updated = db.equipmentTemplates.update(id, {
+        slug: nextSlug,
+        name: body.name,
+        category: body.category,
+        // bacs_articles : herite de la categorie depuis le Lot 35 (jamais ecrit ici)
+        bacsJustification: body.bacs_justification,
+        descriptionHtml: body.description_html,
+        iconKind: body.icon_kind,
+        iconValue: body.icon_value,
+        iconColor: body.icon_color,
+        preferredProtocols: body.preferred_protocols,
+        defaultEnergySource,
+        defaultDeviceRole,
+        updatedBy: userId,
+      });
+      if (nextSlug) {
+        // Tombstone l'ancien slug (anti-reseed) + leve l'eventuel
+        // tombstone du nouveau slug (resurrection controlee, ex: revert).
+        db.db.prepare('DELETE FROM deleted_equipment_template_slugs WHERE slug = ?').run(nextSlug);
+        db.db.prepare('INSERT OR IGNORE INTO deleted_equipment_template_slugs (slug) VALUES (?)').run(tpl.slug);
+      }
     });
+    updateTx();
     if (nextSlug) {
-      log.warn(`Equipment template slug changed: ${tpl.slug} → ${nextSlug} (id #${id}, user #${userId}). References hardcodees (system-categories.js, plan-af.js) potentiellement a verifier.`);
+      log.info(`Equipment template slug renamed : ${tpl.slug} -> ${nextSlug} (id #${id}, user #${userId}) — ancien slug tombstoned (anti-reseed).`);
+      db.auditLog.add({ templateId: id, userId, action: 'template.slug_rename',
+        payload: { old_slug: tpl.slug, new_slug: nextSlug } });
     }
     // Si la description ou les protocoles changent, on cree une nouvelle version
     if ('preferred_protocols' in body && body.preferred_protocols !== tpl.preferred_protocols) {
