@@ -172,6 +172,44 @@ const { sortKey, sortDir, columnFilters, processed: visibleInstances, toggleSort
 
 watch(() => props.sectionId, refresh)
 onMounted(refresh)
+
+// ── Bulk ─────────────────────────────────────────────────────────────
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+
+const visibleIds = computed(() => visibleInstances.value.map(i => i.id))
+const sel = useBulkSelection(() => visibleIds.value)
+const bulkBusy = ref(false)
+
+async function bulkDelete() {
+  if (!sel.size.value) return
+  const ok = await confirm({
+    title: `Supprimer ${sel.size.value} instance${sel.size.value > 1 ? 's' : ''} ?`,
+    message: 'Cette action est irréversible.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  bulkBusy.value = true
+  try {
+    await Promise.all([...sel.selected.value].map(id => deleteInstance(id).catch(() => null)))
+    sel.clear()
+    await refresh()
+    notifySuccess('Instances supprimées')
+  } catch { notifyError('Échec de la suppression en masse') }
+  finally { bulkBusy.value = false }
+}
+async function bulkDuplicate() {
+  if (!sel.size.value) return
+  bulkBusy.value = true
+  try {
+    await Promise.all([...sel.selected.value].map(id => duplicateInstance(id).catch(() => null)))
+    sel.clear()
+    await refresh()
+    notifySuccess('Instances dupliquées')
+  } catch { notifyError('Échec de la duplication en masse') }
+  finally { bulkBusy.value = false }
+}
 </script>
 
 <template>
@@ -204,6 +242,11 @@ onMounted(refresh)
     <table v-else class="w-full text-sm">
       <thead class="bg-gray-50 text-[11px] text-gray-500 uppercase">
         <tr>
+          <th class="px-3 py-2 text-center w-9">
+            <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                   v-tooltip="'Tout cocher / décocher'"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+          </th>
           <th class="text-left px-5 py-2 font-medium select-none">
             <button @click="toggleSort('reference')" class="inline-flex items-center gap-1 hover:text-indigo-700">
               Référence
@@ -233,6 +276,7 @@ onMounted(refresh)
           <th class="px-5 py-2 w-24"></th>
         </tr>
         <tr class="bg-white border-t border-gray-100">
+          <th class="px-2 py-1.5"></th>
           <th class="px-5 py-1.5"><input :value="columnFilters.reference || ''" @input="setFilter('reference', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
           <th class="px-2 py-1.5"><input :value="columnFilters.location || ''" @input="setFilter('location', $event.target.value)" type="text" placeholder="Filtrer…" class="w-full px-2 py-1 rounded-md border border-gray-200 text-[11px] text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" /></th>
           <th class="px-2 py-1.5"></th>
@@ -242,7 +286,11 @@ onMounted(refresh)
         </tr>
       </thead>
       <tbody>
-        <tr v-for="inst in visibleInstances" :key="inst.id" class="border-t border-gray-100 group hover:bg-indigo-50/30">
+        <tr v-for="inst in visibleInstances" :key="inst.id" :class="['border-t border-gray-100 group hover:bg-indigo-50/30', sel.has(inst.id) ? 'bg-indigo-50/40' : '']">
+          <td class="px-3 py-2 text-center" @click.stop>
+            <input type="checkbox" :checked="sel.has(inst.id)" @change="sel.toggle(inst.id)"
+                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+          </td>
           <td class="px-5 py-2 font-medium text-gray-800">{{ inst.reference }}</td>
           <td class="px-2 py-2 text-gray-600">
             <span v-if="inst.location" class="inline-flex items-center gap-1">
@@ -287,6 +335,19 @@ onMounted(refresh)
         </tr>
       </tbody>
     </table>
+
+    <BulkActionBar :count="sel.size.value" noun="instance" @clear="sel.clear()">
+      <button @click="bulkDuplicate" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap">
+        <DocumentDuplicateIcon class="w-4 h-4" />
+        Dupliquer
+      </button>
+      <button @click="bulkDelete" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap">
+        <TrashIcon class="w-4 h-4" />
+        Supprimer
+      </button>
+    </BulkActionBar>
 
     <BaseModal v-if="editing" :title="editing._isCreating ? 'Nouvelle instance' : `Éditer l'instance ${editing.reference}`" size="lg" @close="editing = null">
       <form @submit.prevent="submitEdit" class="space-y-3">
