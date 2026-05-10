@@ -296,7 +296,8 @@ async function routes(fastify) {
     const tpl = db.equipmentTemplates.getById(id);
     if (!tpl) return reply.code(404).send({ detail: 'Template non trouvé' });
 
-    // Verifier qu'aucune section active ne reference le template
+    // Verifier qu'aucune section ACTIVE ne reference le template (refus 409
+    // explicite pour informer l'utilisateur qu'il y a un usage en prod).
     const inUse = db.db.prepare(`
       SELECT COUNT(*) AS c FROM sections
       WHERE equipment_template_id = ?
@@ -306,12 +307,28 @@ async function routes(fastify) {
       return reply.code(409).send({ detail: `${inUse} section(s) utilisent encore ce template — détacher d'abord.` });
     }
 
-    db.equipmentTemplates.delete(id);
-    // Tombstone : empeche la recreation au prochain boot via seedLibraryOnBoot
-    // (parite avec deleted_section_template_slugs). Toujours pose, meme si le
-    // slug n'est pas dans le seed (idempotent via INSERT OR IGNORE).
-    db.db.prepare('INSERT OR IGNORE INTO deleted_equipment_template_slugs (slug) VALUES (?)').run(tpl.slug);
+    // Detacher les references orphelines avant DELETE :
+    // - sections d'AFs SOFT-DELETED (deleted_at NOT NULL) qui peuvent
+    //   encore pointer vers ce template (FK sans ON DELETE clause -> RESTRICT
+    //   bloquerait sinon).
+    // - audit_log: log d'abord (avec templateId encore valide, FK SET NULL
+    //   convertirait template_id en NULL apres DELETE de toute façon, mais
+    //   on prefere l'INSERT explicit avant le DELETE).
+    // Les autres FK ont leur cascade declare en schema (CASCADE / SET NULL).
     db.auditLog.add({ templateId: id, userId: request.authUser?.id, action: 'template.delete' });
+    const tx = db.db.transaction(() => {
+      db.db.prepare('UPDATE sections SET equipment_template_id = NULL, equipment_template_version = NULL WHERE equipment_template_id = ?').run(id);
+      db.equipmentTemplates.delete(id);
+      // Tombstone : empeche la recreation au prochain boot via seedLibraryOnBoot
+      // (parite avec deleted_section_template_slugs). Toujours pose, meme si le
+      // slug n'est pas dans le seed (idempotent via INSERT OR IGNORE).
+      db.db.prepare('INSERT OR IGNORE INTO deleted_equipment_template_slugs (slug) VALUES (?)').run(tpl.slug);
+    });
+    try { tx(); }
+    catch (err) {
+      log.error({ err, templateId: id, slug: tpl.slug }, 'Suppression equipment_template echec');
+      return reply.code(500).send({ detail: `Suppression impossible : ${err.message || 'erreur DB'}` });
+    }
     return { ok: true };
   });
 
