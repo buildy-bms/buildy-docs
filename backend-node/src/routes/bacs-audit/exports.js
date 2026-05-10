@@ -122,8 +122,8 @@ async function routes(fastify) {
     const items = db.db.prepare(`
       SELECT a.*, z.name AS zone_name, e.name AS equipment_name
       FROM bacs_audit_action_items a
-      LEFT JOIN zones z ON z.zone_id = a.zone_id
-      LEFT JOIN equipments e ON e.equipment_id = a.equipment_id
+      LEFT JOIN zones z ON z.id = a.zone_id
+      LEFT JOIN equipments e ON e.id = a.equipment_id
       WHERE a.document_id = ?
       ORDER BY CASE a.severity WHEN 'blocking' THEN 0 WHEN 'major' THEN 1 ELSE 2 END, a.position
     `).all(id);

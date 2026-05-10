@@ -72,7 +72,7 @@ function computeTargetActions(documentId) {
   // Systems (R175-1 §4 + R175-3 §3 + §4)
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name FROM bacs_audit_systems s
-    LEFT JOIN zones z ON z.zone_id = s.zone_id
+    LEFT JOIN zones z ON z.id = s.zone_id
     WHERE s.document_id = ?
   `).all(documentId);
   for (const s of systems) {
@@ -174,7 +174,7 @@ function computeTargetActions(documentId) {
   // Meters (R175-3 §1)
   const meters = db.db.prepare(`
     SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
-    LEFT JOIN zones z ON z.zone_id = m.zone_id
+    LEFT JOIN zones z ON z.id = m.zone_id
     WHERE m.document_id = ?
   `).all(documentId);
   for (const m of meters) {
@@ -289,7 +289,7 @@ function computeTargetActions(documentId) {
   if (r175_6_applicable) {
     const thermal = db.db.prepare(`
       SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
-      LEFT JOIN zones z ON z.zone_id = t.zone_id
+      LEFT JOIN zones z ON z.id = t.zone_id
       WHERE t.document_id = ?
     `).all(documentId);
     for (const t of thermal) {

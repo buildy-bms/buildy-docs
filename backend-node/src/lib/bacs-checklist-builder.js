@@ -35,8 +35,8 @@ function buildChecklistData(documentId) {
   if (!af) return null;
   const site = af.site_id ? db.sites.getById(af.site_id) : null;
   const zones = site ? db.db.prepare(
-    'SELECT * FROM zones WHERE site_id = ? AND deleted_at IS NULL ORDER BY position, zone_id'
-  ).all(site.site_id) : [];
+    'SELECT *, id AS zone_id FROM zones WHERE site_id = ? AND deleted_at IS NULL ORDER BY position, id'
+  ).all(site.id) : [];
   const systems = db.db.prepare(
     'SELECT * FROM bacs_audit_systems WHERE document_id = ?'
   ).all(documentId);
@@ -46,10 +46,10 @@ function buildChecklistData(documentId) {
     WHERE s.document_id = ?
   `).all(documentId);
   const meters = db.db.prepare(
-    'SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m LEFT JOIN zones z ON z.zone_id = m.zone_id WHERE m.document_id = ? ORDER BY z.position NULLS LAST, m.usage'
+    'SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m LEFT JOIN zones z ON z.id = m.zone_id WHERE m.document_id = ? ORDER BY z.position NULLS LAST, m.usage'
   ).all(documentId);
   const thermal = db.db.prepare(
-    'SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t LEFT JOIN zones z ON z.zone_id = t.zone_id WHERE t.document_id = ? ORDER BY z.position, z.name'
+    'SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t LEFT JOIN zones z ON z.id = t.zone_id WHERE t.document_id = ? ORDER BY z.position, z.name'
   ).all(documentId);
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
   const inspections = db.db.prepare(

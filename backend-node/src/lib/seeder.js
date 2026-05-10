@@ -877,7 +877,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     SELECT d.id, d.energy_source, s.zone_id, s.system_category, z.name AS zone_name
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
-    LEFT JOIN zones z ON z.zone_id = s.zone_id
+    LEFT JOIN zones z ON z.id = s.zone_id
     WHERE s.document_id = ? AND d.energy_source IS NOT NULL
   `).all(documentId);
 

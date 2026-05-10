@@ -272,7 +272,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const doc = db.db.prepare(`
       SELECT d.*, s.site_uuid FROM site_documents d
-      JOIN sites s ON s.site_id = d.site_id WHERE d.id = ?
+      JOIN sites s ON s.id = d.site_id WHERE d.id = ?
     `).get(id);
     if (!doc) return reply.code(404).send({ detail: 'Document non trouve' });
     const fullPath = path.join(siteDocsDir(doc.site_uuid), doc.filename);
@@ -317,7 +317,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const doc = db.db.prepare(`
       SELECT d.*, s.site_uuid FROM site_documents d
-      JOIN sites s ON s.site_id = d.site_id WHERE d.id = ?
+      JOIN sites s ON s.id = d.site_id WHERE d.id = ?
     `).get(id);
     if (!doc) return reply.code(404).send({ detail: 'Document non trouve' });
     const fullPath = path.join(siteDocsDir(doc.site_uuid), doc.filename);

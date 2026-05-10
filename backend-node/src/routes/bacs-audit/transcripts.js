@@ -20,11 +20,11 @@ function loadAuditEntities(documentId) {
   if (!af) return null;
   const site = af.site_id ? db.sites.getById(af.site_id) : null;
   const zones = site ? db.db.prepare(
-    'SELECT zone_id, name, nature FROM zones WHERE site_id = ? AND deleted_at IS NULL'
-  ).all(site.site_id) : [];
+    'SELECT id AS zone_id, name, nature FROM zones WHERE site_id = ? AND deleted_at IS NULL'
+  ).all(site.id) : [];
   const systems = db.db.prepare(`
     SELECT s.id, s.system_category, s.zone_id, z.name AS zone_name
-    FROM bacs_audit_systems s LEFT JOIN zones z ON z.zone_id = s.zone_id
+    FROM bacs_audit_systems s LEFT JOIN zones z ON z.id = s.zone_id
     WHERE s.document_id = ?`).all(documentId);
   const devices = db.db.prepare(`
     SELECT d.id, d.name, d.brand, d.model_reference, d.system_id
@@ -33,11 +33,11 @@ function loadAuditEntities(documentId) {
     WHERE s.document_id = ?`).all(documentId);
   const meters = db.db.prepare(`
     SELECT m.id, m.usage, m.meter_type, m.zone_id, z.name AS zone_name
-    FROM bacs_audit_meters m LEFT JOIN zones z ON z.zone_id = m.zone_id
+    FROM bacs_audit_meters m LEFT JOIN zones z ON z.id = m.zone_id
     WHERE m.document_id = ?`).all(documentId);
   const thermal = db.db.prepare(`
     SELECT t.id, t.zone_id, z.name AS zone_name
-    FROM bacs_audit_thermal_regulation t LEFT JOIN zones z ON z.zone_id = t.zone_id
+    FROM bacs_audit_thermal_regulation t LEFT JOIN zones z ON z.id = t.zone_id
     WHERE t.document_id = ?`).all(documentId);
   return { zones, systems, devices, meters, thermal };
 }
