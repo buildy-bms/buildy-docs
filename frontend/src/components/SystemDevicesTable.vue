@@ -77,7 +77,38 @@ const sharedDevices = computed(() => {
   })
 })
 
-const displayDevices = computed(() => [...props.devices, ...sharedDevices.value])
+// Tri : clic sur en-tête. Reclic inverse, 3e clic remet l'ordre d'origine.
+const sortKey = ref(null)
+const sortDir = ref('asc')
+function toggleSort(key) {
+  if (sortKey.value !== key) { sortKey.value = key; sortDir.value = 'asc'; return }
+  if (sortDir.value === 'asc') { sortDir.value = 'desc'; return }
+  sortKey.value = null; sortDir.value = 'asc'
+}
+function sortValue(d, key) {
+  switch (key) {
+    case 'name': return (d.name || '').toLowerCase()
+    case 'brand': return (d.brand || '').toLowerCase()
+    case 'model_reference': return (d.model_reference || '').toLowerCase()
+    case 'power_kw': return Number(d.power_kw) || 0
+    case 'energy_source': return (d.energy_source || '').toLowerCase()
+    case 'location': return (d.location || '').toLowerCase()
+    default: return ''
+  }
+}
+
+const displayDevices = computed(() => {
+  const all = [...props.devices, ...sharedDevices.value]
+  if (!sortKey.value) return all
+  const dir = sortDir.value === 'desc' ? -1 : 1
+  return [...all].sort((a, b) => {
+    const av = sortValue(a, sortKey.value)
+    const bv = sortValue(b, sortKey.value)
+    if (av < bv) return -1 * dir
+    if (av > bv) return 1 * dir
+    return 0
+  })
+})
 
 function isSharedFromOtherZone(d) {
   return d.system_id !== props.system.id
@@ -314,23 +345,34 @@ async function removeDevice(d) {
       </div>
     </div>
 
-    <!-- Tableau aligné : 1 ligne = 1 système (device). Auto-largeur des
-         colonnes au contenu, whitespace-nowrap pour éviter les wraps,
-         scroll horizontal seulement si vraiment nécessaire. -->
+    <!-- Vrai data-table : en-têtes triables, bordures, lignes alternées,
+         look table standard. Auto-largeur des colonnes au contenu. -->
     <div v-if="displayDevices.length" class="overflow-x-auto -mx-3 px-3">
-      <table class="w-full text-sm border-separate border-spacing-0">
-        <thead class="text-[10px] text-gray-400 uppercase tracking-wide">
+      <table class="systems-data-table w-full text-sm">
+        <thead>
           <tr>
-            <th class="text-left font-medium px-2 py-1.5">Nom</th>
-            <th class="text-left font-medium px-2 py-1.5">Marque</th>
-            <th class="text-left font-medium px-2 py-1.5">Référence</th>
-            <th class="text-right font-medium px-2 py-1.5">Puiss.</th>
-            <th class="text-left font-medium px-2 py-1.5">Énergie</th>
-            <th class="text-left font-medium px-2 py-1.5">Rôle</th>
-            <th class="text-left font-medium px-2 py-1.5">Localisation</th>
-            <th class="text-left font-medium px-2 py-1.5">Communication</th>
-            <th class="text-left font-medium px-2 py-1.5">État</th>
-            <th class="text-right font-medium px-2 py-1.5">Actions</th>
+            <th @click="toggleSort('name')" class="sortable text-left">
+              <span>Nom</span><span class="sort-ico">{{ sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th @click="toggleSort('brand')" class="sortable text-left">
+              <span>Marque</span><span class="sort-ico">{{ sortKey === 'brand' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th @click="toggleSort('model_reference')" class="sortable text-left">
+              <span>Référence</span><span class="sort-ico">{{ sortKey === 'model_reference' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th @click="toggleSort('power_kw')" class="sortable text-right">
+              <span>Puiss.</span><span class="sort-ico">{{ sortKey === 'power_kw' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th @click="toggleSort('energy_source')" class="sortable text-left">
+              <span>Énergie</span><span class="sort-ico">{{ sortKey === 'energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th class="text-left">Rôle</th>
+            <th @click="toggleSort('location')" class="sortable text-left">
+              <span>Localisation</span><span class="sort-ico">{{ sortKey === 'location' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+            </th>
+            <th class="text-left">Communication</th>
+            <th class="text-left">État</th>
+            <th class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -340,8 +382,7 @@ async function removeDevice(d) {
             :site-uuid="siteUuid || ''"
             :attach-to="{ device_id: d.id }"
             :enabled="!!siteUuid"
-            :row-class="['group bg-white border-t border-gray-100 hover:bg-gray-50/40 transition',
-                         d.out_of_service ? 'opacity-60 bg-gray-50' : '',
+            :row-class="[d.out_of_service ? 'opacity-60' : '',
                          isSharedFromOtherZone(d) ? 'bg-emerald-50/30' : ''].join(' ')"
             @changed="refreshPhotos">
             <!-- Nom + badge partage -->
@@ -497,3 +538,67 @@ async function removeDevice(d) {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Look data-table standard : bordures fines partout, en-tête fond gris,
+   lignes alternées, séparateurs verticaux pour bien lire les colonnes. */
+.systems-data-table {
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.systems-data-table thead th {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #f3f4f6;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #6b7280;
+  white-space: nowrap;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.systems-data-table thead th:last-child {
+  border-right: none;
+}
+.systems-data-table thead th.sortable {
+  cursor: pointer;
+}
+.systems-data-table thead th.sortable:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+.systems-data-table thead th .sort-ico {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.systems-data-table thead th.sortable:hover .sort-ico {
+  opacity: 1;
+}
+.systems-data-table tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #f9fafb;
+  vertical-align: middle;
+}
+.systems-data-table tbody td:last-child {
+  border-right: none;
+}
+.systems-data-table tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+.systems-data-table tbody tr:hover td {
+  background: #f3f4f6;
+}
+.systems-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+</style>
