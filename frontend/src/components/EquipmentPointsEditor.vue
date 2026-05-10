@@ -21,6 +21,8 @@ import {
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 
 const props = defineProps({
   templateId: { type: Number, required: true },
@@ -120,6 +122,52 @@ function applyFilterSort(list, direction) {
 
 const reads = computed(() => applyFilterSort(points.value.filter(p => p.direction === 'read'), 'read'))
 const writes = computed(() => applyFilterSort(points.value.filter(p => p.direction === 'write'), 'write'))
+
+// ── Selection multi-lignes (Lot bulk) ────────────────────────────────
+// Une seule selection couvrant les 2 tableaux (lecture + ecriture).
+const visibleIds = computed(() => [...reads.value, ...writes.value].map(p => p.id))
+const sel = useBulkSelection(() => visibleIds.value)
+
+const bulkBusy = ref(false)
+async function bulkDelete() {
+  if (!sel.size.value) return
+  const ok = await confirm({
+    title: `Supprimer ${sel.size.value} point${sel.size.value > 1 ? 's' : ''} ?`,
+    message: 'Cette action est irréversible. Les points seront retirés du modèle.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  })
+  if (!ok) return
+  bulkBusy.value = true
+  try {
+    const ids = [...sel.selected.value]
+    await Promise.all(ids.map(id => deleteTemplatePoint(props.templateId, id).catch(() => null)))
+    sel.clear()
+    await refresh()
+    emit('updated')
+    success(`${ids.length} point${ids.length > 1 ? 's supprimés' : ' supprimé'}`)
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la suppression en masse')
+  } finally {
+    bulkBusy.value = false
+  }
+}
+async function bulkSetOptional(value) {
+  if (!sel.size.value) return
+  bulkBusy.value = true
+  try {
+    const ids = [...sel.selected.value]
+    await Promise.all(ids.map(id => updateTemplatePoint(props.templateId, id, { is_optional: value }).catch(() => null)))
+    sel.clear()
+    await refresh()
+    emit('updated')
+    success(`${ids.length} point${ids.length > 1 ? 's marqués' : ' marqué'} ${value ? 'optionnel' : 'obligatoire'}${ids.length > 1 ? (value ? 's' : 's') : ''}`)
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la modification en masse')
+  } finally {
+    bulkBusy.value = false
+  }
+}
 
 // Drag-drop disponible uniquement quand on n'est pas en train de filtrer/trier
 const dragEnabled = computed(() => !filterText.value.trim() && sortBy.value.read === 'position' && sortBy.value.write === 'position')
@@ -299,6 +347,11 @@ onBeforeUnmount(teardownSortables)
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
+              <th class="w-9 px-2 py-2 text-center" @click.stop>
+                <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                       v-tooltip="'Tout cocher / décocher'"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </th>
               <th class="w-8"></th>
               <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('read', 'slug')">
                 Identifiant {{ sortBy['read'] === 'slug' ? (sortDir['read'] === 'asc' ? '↑' : '↓') : '' }}
@@ -328,8 +381,12 @@ onBeforeUnmount(teardownSortables)
             <template v-for="p in reads" :key="p.id">
               <!-- Ligne lecture/affichage -->
               <tr v-if="!editing[p.id]" :data-id="p.id"
-                  class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
+                  :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer', sel.has(p.id) ? 'bg-indigo-50/60' : '']"
                   @click="startEdit(p)">
+                <td class="px-2 text-center align-middle" @click.stop>
+                  <input type="checkbox" :checked="sel.has(p.id)" @change="sel.toggle(p.id)"
+                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+                </td>
                 <td class="px-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
                     @click.stop>
                   <Bars3Icon class="w-4 h-4 inline-block" />
@@ -366,6 +423,7 @@ onBeforeUnmount(teardownSortables)
               </tr>
               <!-- Ligne edition -->
               <tr v-else :data-id="p.id" class="border-t border-gray-100 bg-indigo-50/40">
+                <td class="px-2"></td>
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
                 <td class="px-2 py-1.5">
                   <input v-model="editing[p.id].slug" type="text"
@@ -411,6 +469,7 @@ onBeforeUnmount(teardownSortables)
             </template>
             <!-- Ligne ajout -->
             <tr v-if="adding === 'read'" class="border-t border-gray-100 bg-emerald-50/40">
+              <td class="px-2"></td>
               <td class="px-2 text-center text-emerald-400"><PlusIcon class="w-4 h-4 inline-block" /></td>
               <td class="px-2 py-1.5">
                 <input v-model="addDraft.slug" type="text" placeholder="ex: temp.depart_eau"
@@ -454,7 +513,7 @@ onBeforeUnmount(teardownSortables)
               </td>
             </tr>
             <tr v-if="!reads.length && adding !== 'read'">
-              <td colspan="9" class="px-3 py-4 text-center text-xs text-gray-400 italic">
+              <td colspan="10" class="px-3 py-4 text-center text-xs text-gray-400 italic">
                 Aucune donnée lue.
               </td>
             </tr>
@@ -480,6 +539,11 @@ onBeforeUnmount(teardownSortables)
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-[10px] uppercase text-gray-500 tracking-wider">
             <tr>
+              <th class="w-9 px-2 py-2 text-center" @click.stop>
+                <input type="checkbox" :checked="sel.allChecked.value" @change="sel.toggleAll()"
+                       v-tooltip="'Tout cocher / décocher'"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              </th>
               <th class="w-8"></th>
               <th class="text-left px-3 py-2 font-medium cursor-pointer hover:text-gray-700" @click="toggleSort('write', 'slug')">
                 Identifiant {{ sortBy['write'] === 'slug' ? (sortDir['write'] === 'asc' ? '↑' : '↓') : '' }}
@@ -508,8 +572,12 @@ onBeforeUnmount(teardownSortables)
           <tbody ref="writesBodyRef">
             <template v-for="p in writes" :key="p.id">
               <tr v-if="!editing[p.id]" :data-id="p.id"
-                  class="border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer"
+                  :class="['border-t border-gray-100 hover:bg-indigo-50/40 cursor-pointer', sel.has(p.id) ? 'bg-indigo-50/60' : '']"
                   @click="startEdit(p)">
+                <td class="px-2 text-center align-middle" @click.stop>
+                  <input type="checkbox" :checked="sel.has(p.id)" @change="sel.toggle(p.id)"
+                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+                </td>
                 <td class="px-2 text-center align-middle drag-handle cursor-grab text-gray-300 hover:text-gray-500"
                     @click.stop>
                   <Bars3Icon class="w-4 h-4 inline-block" />
@@ -545,6 +613,7 @@ onBeforeUnmount(teardownSortables)
                 </td>
               </tr>
               <tr v-else :data-id="p.id" class="border-t border-gray-100 bg-indigo-50/40">
+                <td class="px-2"></td>
                 <td class="px-2 text-center text-gray-300"><Bars3Icon class="w-4 h-4 inline-block" /></td>
                 <td class="px-2 py-1.5">
                   <input v-model="editing[p.id].slug" type="text"
@@ -589,6 +658,7 @@ onBeforeUnmount(teardownSortables)
               </tr>
             </template>
             <tr v-if="adding === 'write'" class="border-t border-gray-100 bg-emerald-50/40">
+              <td class="px-2"></td>
               <td class="px-2 text-center text-emerald-400"><PlusIcon class="w-4 h-4 inline-block" /></td>
               <td class="px-2 py-1.5">
                 <input v-model="addDraft.slug" type="text" placeholder="ex: cmd.marche_arret"
@@ -628,7 +698,7 @@ onBeforeUnmount(teardownSortables)
               </td>
             </tr>
             <tr v-if="!writes.length && adding !== 'write'">
-              <td colspan="9" class="px-3 py-4 text-center text-xs text-gray-400 italic">
+              <td colspan="10" class="px-3 py-4 text-center text-xs text-gray-400 italic">
                 Aucune donnée écrite.
               </td>
             </tr>
@@ -636,6 +706,26 @@ onBeforeUnmount(teardownSortables)
         </table>
       </div>
     </section>
+
+    <!-- Barre d'actions bulk : visible quand >=1 ligne cochee. -->
+    <BulkActionBar :count="sel.size.value" noun="point" @clear="sel.clear()">
+      <button @click="bulkSetOptional(true)" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
+              v-tooltip="'Marquer la sélection comme optionnels'">
+        Marquer optionnels
+      </button>
+      <button @click="bulkSetOptional(false)" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 whitespace-nowrap"
+              v-tooltip="'Marquer la sélection comme obligatoires'">
+        Marquer obligatoires
+      </button>
+      <button @click="bulkDelete" :disabled="bulkBusy"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 rounded-md disabled:opacity-50 whitespace-nowrap"
+              v-tooltip="'Supprimer la sélection'">
+        <TrashIcon class="w-4 h-4" />
+        Supprimer
+      </button>
+    </BulkActionBar>
   </div>
 </template>
 
