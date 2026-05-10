@@ -203,10 +203,10 @@ onBeforeUnmount(teardownZonesSortable)
                 :label="z.name" />
             </td>
             <td class="px-5 py-1 text-right whitespace-nowrap">
-              <button @click="dupZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
+              <button @click="dupZone(z)" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
-              <button @click="removeZone(z)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
+              <button @click="removeZone(z)" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>
