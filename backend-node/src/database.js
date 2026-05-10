@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 130;
+const TARGET_VERSION = 131;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5382,6 +5382,49 @@ function runMigrations() {
     });
     cleanup();
     db.pragma('user_version = 130');
+  }
+
+  if (current < 131) {
+    // Cleanup des rows BACS qui referencent une zone d'un AUTRE site que
+    // celui de l'audit. Ces incoherences se produisent quand le site_id
+    // d'un audit change apres creation, sans cleanup des rows BACS.
+    // Symptome utilisateur : le fallback frontend (audit.js loadAudit)
+    // reconstitue des "zones fantomes" depuis les rows orphelines, et
+    // toute suppression d'une zone "fantome" donne l'impression que
+    // toutes les zones disparaissent (listZones du bon site retourne []
+    // qui est ecrase a chaque load par le fallback).
+    const cleanup131 = db.transaction(() => {
+      const sysRes = db.prepare(`
+        DELETE FROM bacs_audit_systems
+         WHERE id IN (
+           SELECT s.id FROM bacs_audit_systems s
+             JOIN afs a ON a.id = s.document_id
+             JOIN zones z ON z.id = s.zone_id
+            WHERE z.site_id != a.site_id
+         )
+      `).run();
+      const meterRes = db.prepare(`
+        DELETE FROM bacs_audit_meters
+         WHERE id IN (
+           SELECT m.id FROM bacs_audit_meters m
+             JOIN afs a ON a.id = m.document_id
+             JOIN zones z ON z.id = m.zone_id
+            WHERE z.site_id != a.site_id
+         )
+      `).run();
+      const thermalRes = db.prepare(`
+        DELETE FROM bacs_audit_thermal_regulation
+         WHERE id IN (
+           SELECT t.id FROM bacs_audit_thermal_regulation t
+             JOIN afs a ON a.id = t.document_id
+             JOIN zones z ON z.id = t.zone_id
+            WHERE z.site_id != a.site_id
+         )
+      `).run();
+      log.info(`Migration 131 cleanup cross-site : ${sysRes.changes} systems + ${meterRes.changes} meters + ${thermalRes.changes} thermal_regulation rows incoherentes droppees`);
+    });
+    cleanup131();
+    db.pragma('user_version = 131');
   }
 
   if (current > TARGET_VERSION) {
