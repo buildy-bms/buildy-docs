@@ -97,6 +97,21 @@ watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 // standalone n'a pas (encore) tiré le rafraîchissement.
 watch(activeTab, () => auditStore.softRefresh())
 
+// Navigation depuis les KPIs de couverture photo (onglet Docs) → bascule
+// l'onglet et permet d'ouvrir directement l'entité ciblée (TODO: ouvrir
+// le sheet d'édition correspondant en passant entityId via un store).
+function onNavigateFromDocs({ kind /* , entityId */ }) {
+  const tabByKind = {
+    site: 'site',
+    zones: 'zones',
+    systems: 'systems',
+    meters: 'meters',
+    bms: 'bms',
+  }
+  const target = tabByKind[kind]
+  if (target) activeTab.value = target
+}
+
 
 // Tous les onglets visibles dans les deux modes (BACS + site_audit).
 // La logique R175-spécifique (régulation thermique, capacités GTB R175-3/4/5)
@@ -362,7 +377,7 @@ async function removeAudit() {
         <MobileMetersTab  v-show="activeTab === 'meters'" />
         <MobileSystemsTab v-show="activeTab === 'systems'" />
         <MobileBmsTab     v-show="activeTab === 'bms'" />
-        <MobileChecklistTab v-show="activeTab === 'docs'" />
+        <MobileChecklistTab v-show="activeTab === 'docs'" @navigate="onNavigateFromDocs" />
         <MobilePlanTab    v-show="activeTab === 'plan'" />
       </template>
     </main>

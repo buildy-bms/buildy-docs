@@ -182,6 +182,18 @@ const totalSurface = computed(() =>
       @save="save"
     >
       <div class="p-4 space-y-4">
+        <!-- Photos terrain en TÊTE (mode édition uniquement). -->
+        <div v-if="editing?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
+          <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ zone_id: editing.zone.zone_id }"
+            :label="editing.zone.name"
+            size="md"
+          />
+        </div>
+
         <MobileField label="Nom" hint="Nom court qui identifie la zone dans tout l'audit. Reste cohérent avec les plans du bâtiment si possible." required>
           <input
             v-model="editForm.name"
@@ -215,18 +227,8 @@ const totalSurface = computed(() =>
           />
         </MobileField>
 
-        <!-- Photos (édition uniquement) -->
+        <!-- Suppression (édition uniquement) -->
         <template v-if="editing?.mode === 'edit' && document?.site_uuid">
-          <div class="pt-2">
-            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
-            <BacsPhotoButton
-              :site-uuid="document.site_uuid"
-              :attach-to="{ zone_id: editing.zone.zone_id }"
-              :label="editing.zone.name"
-              size="md"
-            />
-          </div>
-
           <div class="pt-4 border-t border-gray-200">
             <button
               @click="remove(editing.zone)"
