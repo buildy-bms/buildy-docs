@@ -87,6 +87,11 @@ const STORAGE_KEY = `mobile-audit-tab:${docId}`
 const activeTab = ref(localStorage.getItem(STORAGE_KEY) || 'site')
 watch(activeTab, v => localStorage.setItem(STORAGE_KEY, v))
 
+// Resync à chaque changement d'onglet : rattrape les modifications faites
+// côté desktop quand le polling 30s ou le visibilitychange iOS PWA
+// standalone n'a pas (encore) tiré le rafraîchissement.
+watch(activeTab, () => auditStore.softRefresh())
+
 
 // Tous les onglets visibles dans les deux modes (BACS + site_audit).
 // La logique R175-spécifique (régulation thermique, capacités GTB R175-3/4/5)

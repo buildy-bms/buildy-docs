@@ -49,10 +49,19 @@ export function useAuditAutoSync({ intervalMs = 30000, focusGraceMs = 2000 } = {
     else onBlur()
   }
 
+  // pageshow couvre le cas iOS PWA standalone ou Safari mobile : visibility/
+  // focus ne se déclenchent pas toujours quand l'utilisateur revient depuis
+  // l'app switcher ou un swipe back. pageshow est plus fiable, en
+  // particulier avec `event.persisted` qui distingue le bfcache.
+  function onPageShow(e) {
+    if (e.persisted || document.visibilityState === 'visible') tick()
+  }
+
   onMounted(() => {
     if (typeof window === 'undefined') return
     window.addEventListener('focus', onFocus)
     window.addEventListener('blur', onBlur)
+    window.addEventListener('pageshow', onPageShow)
     document.addEventListener('visibilitychange', onVisibilityChange)
     pollHandle = setInterval(tick, intervalMs)
   })
@@ -61,6 +70,7 @@ export function useAuditAutoSync({ intervalMs = 30000, focusGraceMs = 2000 } = {
     if (typeof window === 'undefined') return
     window.removeEventListener('focus', onFocus)
     window.removeEventListener('blur', onBlur)
+    window.removeEventListener('pageshow', onPageShow)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     if (pollHandle) clearInterval(pollHandle)
     pollHandle = null
