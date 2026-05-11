@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.26",
+      "date": "2026-05-11",
+      "title": "Correctif : faux « Conflit de version » via le bouton IA de la toolbar",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de modale « Conflit de version » après le bouton IA de la toolbar de l'éditeur",
+          "what": "Le correctif 0.1.23 ciblait le bouton « Réécrire avec IA » du top-bar. Il en manquait un deuxième dans la toolbar Tiptap de l'éditeur de contenu : ce chemin émettait bien la nouvelle date de modification au parent, mais le parent ne la captait pas. Le save ou la publication qui suivaient déclenchaient une fausse alerte de conflit. C'est aligné maintenant.",
+          "where": "FAQ Buildy → éditeur d'un article → bouton « Réécrire avec IA » à droite de la toolbar de mise en forme.",
+          "how_to_test": "Ouvre un article, clique « Réécrire avec IA » dans la toolbar Tiptap (pas le top-bar), attends le résultat, puis clique « Enregistrer » ou « Publier vers Crisp » : la sauvegarde doit passer sans modale rouge."
+        }
+      ]
+    },
+    {
       "version": "0.1.25",
       "date": "2026-05-11",
       "title": "Liste FAQ triable + filtre par tranche de score SEO",
