@@ -426,3 +426,57 @@ Tous les 3 héritent du même `SYSTEM_PROMPT_FAQ_BASE` (`lib/claude.js`) qui :
 5. *Voir en ligne* pour vérifier le rendu sur help.buildy.fr.
 6. Re-pull périodique pour récupérer les éditions faites côté Crisp directement (les conflits avec `dirty=1` local sont signalés sans écraser).
 
+### Synchronisation bibliothèque de fonctionnalités → FAQ (Lot 138, mig 138)
+
+Une fonctionnalité de la biblio (`section_templates.is_functionality=1`) peut générer un article FAQ publiable Crisp via le bouton « Article FAQ » de `LibraryFunctionalitiesView`.
+
+- **Direction unique** biblio → FAQ. Une édition côté FAQ ne remonte JAMAIS dans la biblio (sinon les PDF audits BACS hériteraient d'un texte SEO Google, hors-charte).
+- **Flag confidentiel** : `section_templates.faq_publishable` (0/1). À 0 → bouton FAQ grisé en biblio + 403 backend. Cocher si la fonctionnalité décrit un algo propriétaire à ne pas exposer aux concurrents.
+- **Lien article ↔ fonctionnalité** : colonne `faq_articles.source_section_template_id` (FK SET NULL si la fonctionnalité est supprimée). `source_synced_version` mémorise la version au moment de la génération, `source_overridden=1` dès qu'un PATCH article touche au content/title/description.
+- **Divergence** : `section_templates.current_version > faq_articles.source_synced_version` → badge orange dans la biblio + bandeau jaune dans l'éditeur FAQ avec bouton « Regénérer » (snapshot `before_library_resync` avant écrasement).
+- **Captures** : `lib/library-faq-sync.js` publie les attachements `section_template` vers le FTP OVH via `faq-image-upload.js` (sharp resize ≤1600px, WebP). Cache de mapping local → FTP dans `library_attachment_publications` (clé `attachment_id`, comparaison `file_hash` sha256 pour éviter les re-uploads). CASCADE FK sur suppression de l'attachment.
+- **Prompt IA dédié** : `faq.generate_from_functionality` (éditable via `/ai-prompts`), distinct de `faq.generate`. Le prompt reçoit en contexte le `body_html` de la fonctionnalité + la liste structurée des captures FTP + les articles BACS à linker (cf. ci-dessous).
+- **Maillage SEO interne BACS** : `faq_articles.bacs_articles` (TEXT, ex `'R175-3 1°, R175-6'`). L'admin tagge ses articles « décret BACS » avec les codes couverts. À la génération d'un article fonctionnalité dont la `bacs_articles` matche, l'IA reçoit en contexte la liste `{title, crisp_url}` des articles BACS publiés et insère des liens internes naturels. Si aucun article BACS publié, pas de maillage (sans erreur). Lookup via `db.faqArticles.listBacsCoverage(codes)` — match `LIKE %code%`, articles `status='published' AND crisp_url IS NOT NULL` uniquement.
+
+### Stratégie SEO (audit concurrentiel mai 2026)
+
+**Cible search Google** : property managers, asset managers, gestionnaires de parc immobilier, foncières. Pas les intégrateurs GTB ni les BETs (autre canal). Pas les techniciens automaticiens.
+
+**Acteurs dominants à concurrencer** :
+- **Citron.io** (★★★★★) — décret BACS, décret tertiaire, clients BNP/Lagardère
+- **GTB-Ingénierie.fr** (★★★★) — décret BACS GTB, audit BACS, BAT-TH-116
+- **Sensinov** (★★★★) — SaaS GTB, concurrence Hyperveez directement
+- Advizeo/Deepki, Lowit, Hellio
+
+**Termes prioritaires** (à viser dans le scoring SEO + prompts IA + whitelist `/faq/settings`) :
+
+| Priorité | Terme | Pourquoi |
+|---|---|---|
+| 🔥 Attaque rapide | `audit BACS` | Meilleur ratio pertinence/compétition, module audit déjà dans Hyperveez |
+| 🔥 Attaque rapide | `logiciel GTB` | Intent transactionnel fort, SERP peu consolidé (SpinalCom = enterprise, Wattsense = IoT) |
+| 🔥 Attaque rapide | `gestion technique bâtiment multi-sites` | Longue traîne, quasi 0 concurrence, cible exacte (asset manager 50+ sites) |
+| 🟠 Moyen terme | `supervision GTB` | SERP désorganisé, contenu qualité peut s'imposer |
+| 🟠 Moyen terme | `intégrateur GTB` | Mot clé sous-estimé, qualité d'intent maximale (appels d'offres BET) |
+| 🟠 Moyen terme | `prime CEE GTB`, `BAT-TH-116` | Point d'entrée funnel : le gestionnaire cherche le financement avant la solution |
+| 🟡 Long terme | `décret BACS` | Volume max mais dominé par Citron — viser les sous-angles : property manager, parc immobilier multi-sites, asset manager |
+| 🟡 Long terme | `GTB bâtiment tertiaire` | SERP dominé par installateurs (Veolia, Idex). Angle SaaS multi-sites sous-exploité |
+| 🟡 Long terme | `décret tertiaire` | Citron quasi-indélogeable. Longue traîne uniquement |
+| 🟡 Long terme | `smart building` | Top of funnel, intent dispersé. Notoriété de marque uniquement |
+
+**Termes à éviter ou retirer** :
+- **`hypervision`** : très peu recherché tel quel sur Google, malgré l'usage produit. Préférer `supervision` partout dans les articles SEO.
+- **`BACnet / Modbus / M-Bus / KNX / LoRaWAN`** : trop technique, capte des intégrateurs concurrents (jamais des acheteurs property/asset manager).
+- **`R175`, `R175-3`, etc.** : jargon réglementaire, pas une vraie recherche utilisateur. Garder uniquement dans `faq_articles.bacs_articles` (mapping interne pour maillage SEO, pas dans le contenu visible).
+- **`BREEAM / HQE`** : certifications amont, intent complètement différent de l'achat GTB.
+
+**Sous-angles différenciants Buildy à exploiter** :
+- `property manager`, `asset manager`, `gestion de parc immobilier`, `foncière`
+- `multi-sites`, `parc immobilier`
+- `mise en conformité`, `économies d'énergie`
+
+**Modification opérationnelle** : la whitelist effective vit dans `faq_settings.seo_keywords_json`, éditée via `/faq/settings`. Le `DEFAULT_KEYWORDS` de `seo-scorer.js` est juste un fallback minimal au démarrage avant override admin. Les **prompts IA** (`faq.generate`, `faq.rewrite`, `faq.generate_from_functionality`) qui contiennent des suggestions de mots-clés sont éditables via `/ai-prompts` — c'est là qu'on ajuste la stratégie sans toucher au code.
+
+### Articles BACS de référence sur Crisp
+
+Approche retenue : **1 seul article consolidé** « Décret BACS R175-1 à R175-6 : texte officiel » plutôt que 6 articles séparés (analyse search : personne ne cherche `R175-3` ; les recherches sont sur `décret BACS`, `GTB`, etc.). L'article unique doit avoir son champ `bacs_articles` rempli avec tous les codes couverts : `R175-1, R175-2, R175-3, R175-4, R175-5, R175-6`. Le maillage interne pointera alors vers cet article unique depuis tous les articles fonctionnalité.
+

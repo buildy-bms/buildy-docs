@@ -20,6 +20,10 @@
 
 // ── Whitelist par défaut des mots-clés métier Buildy ─────────────────
 // Surchargeable depuis l'UI (/faq/settings) — persisté dans faq_settings.
+// La stratégie SEO recommandée (analyse concurrentielle mai 2026) est
+// documentée dans CLAUDE.md (section FAQ Buildy / Stratégie SEO). Cette liste
+// est juste un fallback raisonnable au démarrage avant que l'admin n'aille
+// la personnaliser dans /faq/settings.
 const DEFAULT_KEYWORDS = [
   // Produits / fonctions Buildy
   'GTB', 'gestion technique du bâtiment',
