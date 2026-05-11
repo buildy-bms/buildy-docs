@@ -136,11 +136,25 @@ describe('htmlToCrispMarkdown — placeholders ignorés', () => {
   });
 
   it('image normale dans un <p> → conservée avec syntaxe MD', () => {
-    // Tiptap wrappe toujours les images en <p><img></p>, le converter
-    // n'extrait l'image que si elle est dans un block (paragraphe ou heading).
     const html = '<p><img src="https://x.com/i.png" alt="x" width="500"></p>';
     const md = htmlToCrispMarkdown(html);
     expect(md).toContain('![x](https://x.com/i.png =500xauto)');
+  });
+
+  it('image block-level (Tiptap inline:false, hors <p>) → conservée', () => {
+    // Reproduit le bug observé sur article 39 : Tiptap rend l'extension Image
+    // en inline:false donc <img> est un sibling des <p>, pas un enfant.
+    // Sans handler block-level, le strip général dégageait l'image.
+    const html = '<p>Avant</p><img src="https://x.com/i.png" alt="x" width="320"><p>Après</p>';
+    const md = htmlToCrispMarkdown(html);
+    expect(md).toContain('![x](https://x.com/i.png =320xauto)');
+  });
+
+  it('image block-level sans width → markdown sans dimension', () => {
+    const html = '<p>Avant</p><img src="https://x.com/i.png" alt="x"><p>Après</p>';
+    const md = htmlToCrispMarkdown(html);
+    expect(md).toContain('![x](https://x.com/i.png)');
+    expect(md).not.toContain('=xauto');
   });
 });
 
