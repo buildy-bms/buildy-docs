@@ -1,7 +1,7 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { onBeforeUnmount, watch } from 'vue'
-import { XMarkIcon } from '@heroicons/vue/24/outline'
-
 const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, required: true },
@@ -39,7 +39,7 @@ onBeforeUnmount(() => {
               class="tap-target inline-flex items-center justify-center text-base text-gray-600 -ml-1"
               aria-label="Fermer"
             >
-              <XMarkIcon class="w-7 h-7" />
+              <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-7 h-7" />
             </button>
             <h2 class="flex-1 min-w-0 text-center text-base font-medium truncate text-gray-900">{{ title }}</h2>
             <button

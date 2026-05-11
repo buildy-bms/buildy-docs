@@ -17,9 +17,6 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { Teleport } from 'vue'
-import {
-  ChevronDownIcon, XMarkIcon, CheckIcon, MagnifyingGlassIcon, PlusIcon,
-} from '@heroicons/vue/24/outline'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { resolveFaIconName } from '@/lib/equipment-icons'
 
@@ -182,7 +179,7 @@ watch(() => props.modelValue, (v) => {
         :class="triggerLabel ? 'text-gray-900' : 'text-gray-400 italic'"
       >{{ triggerLabel || placeholder }}</span>
 
-      <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0" />
+      <FontAwesomeIcon :icon="['fas', 'chevron-down']" class="w-4 h-4 text-gray-400 shrink-0" />
     </button>
 
     <!-- Bottom sheet -->
@@ -211,7 +208,7 @@ watch(() => props.modelValue, (v) => {
               class="tap-target inline-flex items-center justify-center text-gray-600 -ml-1"
               aria-label="Fermer"
             >
-              <XMarkIcon class="w-7 h-7" />
+              <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-6 h-6" />
             </button>
             <h3 class="flex-1 min-w-0 text-center text-base font-medium text-gray-900 truncate">{{ title }}</h3>
             <button
@@ -253,7 +250,7 @@ watch(() => props.modelValue, (v) => {
           <template v-else>
             <div v-if="showSearch" class="shrink-0 px-3 pt-3">
               <div class="relative">
-                <MagnifyingGlassIcon class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                   ref="searchInput"
                   v-model="search"
@@ -293,8 +290,9 @@ watch(() => props.modelValue, (v) => {
                   <span v-if="o.hint" class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
                 </span>
 
-                <CheckIcon
+                <FontAwesomeIcon
                   v-if="String(o.value) === String(modelValue)"
+                  :icon="['fas', 'check']"
                   class="w-5 h-5 text-indigo-600 shrink-0"
                 />
               </button>
@@ -309,7 +307,7 @@ watch(() => props.modelValue, (v) => {
                 @click="startCustom"
                 class="w-full min-h-12 mt-1 px-3 py-3 flex items-center gap-3 text-left rounded-lg text-amber-700 border border-dashed border-amber-300 bg-amber-50/40 active:bg-amber-50"
               >
-                <PlusIcon class="w-5 h-5 shrink-0" />
+                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
                 <span class="flex-1 text-base">Saisir une autre valeur…</span>
               </button>
             </div>

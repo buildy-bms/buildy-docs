@@ -1,4 +1,6 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 /**
  * Sous-page tactile (drill-down) qui regroupe la saisie de la régulation
  * thermique R175-6 d'un système heating/cooling, sortie de la liste des
@@ -21,7 +23,6 @@
  */
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal } from '@/api'
@@ -292,7 +293,7 @@ async function saveLevelNote() {
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
                   : 'border-gray-200 text-gray-600 bg-white']"
             >
-              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-4 h-4 shrink-0" />
               {{ hasLevelNote('production') ? 'Note production' : '+ Note production' }}
             </button>
           </div>
@@ -328,7 +329,7 @@ async function saveLevelNote() {
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
                   : 'border-gray-200 text-gray-600 bg-white']"
             >
-              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-4 h-4 shrink-0" />
               {{ hasLevelNote('distribution') ? 'Note distribution' : '+ Note distribution' }}
             </button>
           </div>
@@ -364,7 +365,7 @@ async function saveLevelNote() {
                   ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
                   : 'border-gray-200 text-gray-600 bg-white']"
             >
-              <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-4 h-4 shrink-0" />
               {{ hasLevelNote('emission') ? 'Note émission' : '+ Note émission' }}
             </button>
           </div>

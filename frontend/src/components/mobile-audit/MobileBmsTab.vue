@@ -1,13 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  WrenchScrewdriverIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-  ChevronRightIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter } from '@/api'
@@ -126,7 +121,7 @@ const USAGES = [
     <div class="bg-white rounded-2xl border border-gray-200 p-4">
       <div class="flex items-center gap-3">
         <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 inline-flex items-center justify-center">
-          <WrenchScrewdriverIcon class="w-6 h-6" />
+          <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-base font-medium text-gray-900 truncate">
@@ -595,7 +590,7 @@ const USAGES = [
       class="mt-3 w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
     >
       <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center shrink-0">
-        <ClockIcon class="w-5 h-5" />
+        <FontAwesomeIcon :icon="['fas', 'clock']" class="w-5 h-5" />
       </span>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-semibold text-amber-900 truncate">
@@ -606,7 +601,7 @@ const USAGES = [
           {{ inspectionStatus.label }}
         </p>
       </div>
-      <ChevronRightIcon class="w-5 h-5 text-amber-400 shrink-0" />
+      <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
     </button>
 
     <MobileInspectionsSheet

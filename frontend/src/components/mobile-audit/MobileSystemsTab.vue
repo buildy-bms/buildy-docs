@@ -1,16 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  WrenchScrewdriverIcon,
-  ChevronRightIcon,
-  ChevronDownIcon,
-  TrashIcon,
-  PlusIcon,
-  BookOpenIcon,
-  ShareIcon,
-  CheckIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -317,7 +309,7 @@ async function removeDevice(d) {
     <!-- Stat puissance -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
       <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
-        <WrenchScrewdriverIcon class="w-6 h-6" />
+        <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-2xl font-medium text-gray-900 leading-none">
@@ -340,7 +332,7 @@ async function removeDevice(d) {
           @click="toggleZone(g.zone_id)"
           class="w-full flex items-center gap-2 px-4 py-3 border-b border-gray-100 active:bg-gray-50"
         >
-          <ChevronDownIcon
+          <FontAwesomeIcon :icon="['fas', 'chevron-down']"
             :class="['w-4 h-4 text-gray-400 transition-transform shrink-0',
                      collapsedZones.has(g.zone_id) ? '-rotate-90' : '']"
           />
@@ -422,20 +414,20 @@ async function removeDevice(d) {
                     <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
                   </p>
                 </div>
-                <ChevronRightIcon class="w-5 h-5 text-gray-300" />
+                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300" />
               </button>
               <div class="flex items-stretch gap-1.5">
                 <button
                   @click="openCreateDevice(s)"
                   class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
                 >
-                  <PlusIcon class="w-5 h-5 shrink-0" /> Ajouter
+                  <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter
                 </button>
                 <button
                   @click="openLibraryDevicePicker(s)"
                   class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
                 >
-                  <BookOpenIcon class="w-5 h-5 shrink-0" /> Bibliothèque
+                  <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-5 h-5 shrink-0" /> Bibliothèque
                 </button>
               </div>
             </div>
@@ -458,14 +450,14 @@ async function removeDevice(d) {
                   {{ thermalStatus(s.zone_id, s.system_category).label }}
                 </p>
               </div>
-              <ChevronRightIcon class="w-5 h-5 text-amber-400 shrink-0" />
+              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
             </button>
           </div>
         </div>
       </div>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
-      <WrenchScrewdriverIcon class="w-10 h-10 text-gray-300 mx-auto" />
+      <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-3">Pas encore de systèmes</p>
       <p class="text-xs text-gray-400 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
     </div>
@@ -682,7 +674,7 @@ async function removeDevice(d) {
           <div class="pt-2">
             <div class="flex items-center justify-between mb-2">
               <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">
-                <ShareIcon class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+                <FontAwesomeIcon :icon="['fas', 'share-nodes']" class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
                 Zones desservies
               </p>
               <button
@@ -697,7 +689,7 @@ async function removeDevice(d) {
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
               <div class="px-4 py-3 flex items-center gap-2 bg-gray-50">
-                <CheckIcon class="w-5 h-5 text-gray-400 shrink-0" />
+                <FontAwesomeIcon :icon="['fas', 'check']" class="w-5 h-5 text-gray-400 shrink-0" />
                 <span class="flex-1 text-base text-gray-700 truncate">
                   {{ zones.find(z => z.zone_id === editingDevice.system.zone_id)?.name || 'Zone d\'origine' }}
                 </span>
@@ -731,7 +723,7 @@ async function removeDevice(d) {
               @click="removeDevice(editingDevice.device)"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
             >
-              <TrashIcon class="w-5 h-5" />
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer l'équipement
             </button>
           </div>

@@ -9,7 +9,8 @@
  * Reste ouverte après chaque ajout pour enchaîner plusieurs équipements.
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { CheckIcon, MagnifyingGlassIcon, BookOpenIcon } from '@heroicons/vue/24/outline'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
@@ -163,7 +164,7 @@ const title = computed(() =>
 
       <!-- Recherche -->
       <div class="relative">
-        <MagnifyingGlassIcon class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         <input
           v-model="search"
           type="search"
@@ -201,7 +202,7 @@ const title = computed(() =>
         v-else-if="!templates.length"
         class="py-12 px-4 text-center text-sm text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200"
       >
-        <BookOpenIcon class="w-8 h-8 mx-auto mb-2 text-gray-300" />
+        <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-8 h-8 mx-auto mb-2 text-gray-300" />
         Aucun modèle dans la bibliothèque pour « {{ systemLabel }} » pour le moment.
       </div>
       <div
@@ -253,7 +254,7 @@ const title = computed(() =>
                   : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50',
               ]"
             >
-              <CheckIcon v-if="recentlyAdded.has(t.id)" class="w-4 h-4 shrink-0" />
+              <FontAwesomeIcon v-if="recentlyAdded.has(t.id)" :icon="['fas', 'check']" class="w-4 h-4 shrink-0" />
               {{ adding[t.id] ? 'Ajout…' : recentlyAdded.has(t.id) ? 'Ajouté · Encore ?' : 'Ajouter' }}
             </button>
           </div>

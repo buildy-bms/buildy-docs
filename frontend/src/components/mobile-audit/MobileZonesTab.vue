@@ -1,14 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  Squares2X2Icon,
-  ChevronRightIcon,
-  TrashIcon,
-  CameraIcon,
-  PencilSquareIcon,
-  PlusIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -124,7 +118,7 @@ const totalSurface = computed(() =>
     <!-- Stats résumé -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
       <div class="w-14 h-14 rounded-xl bg-indigo-50 text-indigo-600 inline-flex items-center justify-center">
-        <Squares2X2Icon class="w-7 h-7" />
+        <FontAwesomeIcon :icon="['fas', 'table-cells-large']" class="w-7 h-7" />
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-3xl font-medium text-gray-900 leading-none">{{ zones.length }}</p>
@@ -141,7 +135,7 @@ const totalSurface = computed(() =>
       @click="openCreate"
       class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
     >
-      <PlusIcon class="w-5 h-5" />
+      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5" />
       Ajouter une zone
     </button>
 
@@ -161,11 +155,11 @@ const totalSurface = computed(() =>
             <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
           </p>
         </div>
-        <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
+        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
     </div>
     <div v-else class="text-center py-6">
-      <Squares2X2Icon class="w-10 h-10 text-gray-300 mx-auto" />
+      <FontAwesomeIcon :icon="['fas', 'table-cells-large']" class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-2">Aucune zone définie pour l'instant</p>
     </div>
 
@@ -229,7 +223,7 @@ const totalSurface = computed(() =>
               @click="remove(editing.zone)"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
             >
-              <TrashIcon class="w-5 h-5" />
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer la zone
             </button>
           </div>

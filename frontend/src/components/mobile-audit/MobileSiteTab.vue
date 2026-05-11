@@ -1,12 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  BuildingOffice2Icon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ArrowPathIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateAf, getBacsPowerSummary } from '@/api'
@@ -117,7 +113,7 @@ const generatorWorksDone = computed({
     <!-- Card : Audit -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-        <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
+        <FontAwesomeIcon :icon="['fas', 'building']" class="w-5 h-5 text-indigo-600" />
         <h3 class="text-base font-medium text-gray-900">Audit</h3>
       </div>
       <div class="p-4 space-y-4">
@@ -136,7 +132,7 @@ const generatorWorksDone = computed({
     <!-- Card : Site (source de vérité = table sites, propagée à FM via sync) -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-        <BuildingOffice2Icon class="w-5 h-5 text-indigo-600" />
+        <FontAwesomeIcon :icon="['fas', 'building']" class="w-5 h-5 text-indigo-600" />
         <h3 class="text-base font-medium text-gray-900">Site</h3>
       </div>
       <div class="p-4 space-y-4">
@@ -196,7 +192,7 @@ const generatorWorksDone = computed({
                 :disabled="recomputing"
                 class="tap-target px-3 py-3 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl disabled:opacity-50"
               >
-                <ArrowPathIcon :class="['w-5 h-5', recomputing ? 'animate-spin' : '']" />
+                <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-5 h-5', recomputing ? 'animate-spin' : '']" />
               </button>
             </div>
             <p v-if="document?.bacs_total_power_source === 'manual_override'" class="text-xs text-amber-700 mt-1">
