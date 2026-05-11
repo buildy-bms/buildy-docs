@@ -19,19 +19,35 @@ const ICONS = {
   electricity_production: { name: 'solar-panel',  color: '#16a34a' },
 }
 
+const LABELS = {
+  heating: 'Chauffage',
+  cooling: 'Climatisation',
+  ventilation: 'Ventilation',
+  dhw: 'Eau chaude sanitaire',
+  lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur',
+  electricity_production: 'Production électrique',
+}
+
 const props = defineProps({
   category: { type: String, required: true },
   size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg'
+  withTooltip: { type: Boolean, default: true },
 })
 
 const cfg = computed(() => ICONS[props.category] || { name: 'cube', color: '#6b7280' })
+const label = computed(() => LABELS[props.category] || props.category)
 const sizeClass = computed(() => ({
   xs: 'w-3.5 h-3.5', sm: 'w-4 h-4', md: 'w-5 h-5', lg: 'w-6 h-6',
 }[props.size] || 'w-5 h-5'))
 </script>
 
 <template>
-  <span :class="['inline-flex items-center justify-center shrink-0', sizeClass]" :style="{ color: cfg.color }">
+  <span
+    v-tooltip="withTooltip ? label : ''"
+    :class="['inline-flex items-center justify-center shrink-0', sizeClass]"
+    :style="{ color: cfg.color }"
+  >
     <FontAwesomeIcon :icon="['fas', cfg.name]" />
   </span>
 </template>

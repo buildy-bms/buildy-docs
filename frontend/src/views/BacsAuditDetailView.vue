@@ -1189,12 +1189,12 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
         <!-- Exports PDF principaux (style cohérent avec AF : indigo solide) -->
         <Button variant="primary" size="md" :loading="exporting" @click="exportPdf"
-          title="Génère le rapport d'audit complet en PDF A4">
+          v-tooltip="'Génère le rapport d\'audit complet en PDF A4'">
           <template #icon-left><DocumentArrowDownIcon class="w-4 h-4" /></template>
           {{ exporting ? 'Génération…' : 'Rapport' }}
         </Button>
         <Button variant="primary" size="md" :loading="exportingTables" @click="exportTablesPdf"
-          title="Génère les tableaux de synthèse (A3 paysage) destinés à l'intégrateur">
+          v-tooltip="'Génère les tableaux de synthèse (A3 paysage) destinés à l\'intégrateur'">
           <template #icon-left><TableCellsIcon class="w-4 h-4" /></template>
           {{ exportingTables ? 'Génération…' : 'Synthèse' }}
         </Button>
@@ -1209,7 +1209,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         <!-- Menu Plus (cohérent avec AF) -->
         <div ref="settingsMenuRef" class="relative inline-flex">
           <Button variant="secondary" size="md" @click="showSettingsMenu = !showSettingsMenu"
-            title="Plus d'actions">
+            v-tooltip="'Plus d\'actions'">
             <template #icon-left><EllipsisHorizontalIcon class="w-4 h-4 shrink-0" /></template>
             Plus
           </Button>

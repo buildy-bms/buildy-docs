@@ -304,16 +304,23 @@ function computeTargetActions(documentId) {
     (af?.bacs_generator_works_date && af.bacs_generator_works_date > TRIGGER);
 
   if (r175_6_applicable) {
+    // Lit aussi l'energie du device pointe en generator_device_id pour
+    // l'auto-detection de l'exemption R175-6 II.
     const thermal = db.db.prepare(`
-      SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
+      SELECT t.*, z.name AS zone_name, d.energy_source AS prod_energy_source
+      FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
+      LEFT JOIN bacs_audit_system_devices d ON d.id = t.generator_device_id
       WHERE t.document_id = ?
     `).all(documentId);
     for (const t of thermal) {
-      // Exemption R175-6 II : appareil independant de chauffage au bois
-      // (via le flag explicite uniquement depuis mig 135 ; generator_type
-      // a ete supprime, l'energie est une propriete du device pointe).
-      const exempt = !!t.generator_exempt_wood;
+      // Exemption R175-6 II : appareil independant de chauffage au bois.
+      // Auto-detectee si l'energie du device en Production est 'wood'
+      // (l'auditeur n'a pas besoin de cocher manuellement). Le flag
+      // generator_exempt_wood reste un override pour les cas particuliers
+      // (biomasse autre que bois, ou exemption forcee).
+      const prodWood = t.prod_energy_source === 'wood';
+      const exempt = !!t.generator_exempt_wood || prodWood;
       if (exempt) continue;
       if (!t.has_automatic_regulation) {
         addTarget({

@@ -15,7 +15,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
-import { tooltipDirective } from './lib/tooltip-directive'
+import { tooltipDirective, truncateTooltipDirective } from './lib/tooltip-directive'
 
 // Apres un deploy, l'index.html charge en cache pointe vers des chunks
 // dont les hashs ont change cote serveur. L'import dynamique echoue
@@ -46,6 +46,7 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.directive('tooltip', tooltipDirective)
+app.directive('truncate-tooltip', truncateTooltipDirective)
 app.mount('#app')
 
 // Service worker : PWA install standalone iOS / Android.

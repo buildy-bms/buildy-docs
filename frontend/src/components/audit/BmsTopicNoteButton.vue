@@ -48,7 +48,7 @@ function open() {
       hasNote
         ? 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
         : 'border-gray-300 text-gray-600 hover:bg-gray-50']"
-    :title="hasNote ? 'Voir / éditer la note' : 'Ajouter une note libre'"
+    v-tooltip="hasNote ? 'Voir / éditer la note' : 'Ajouter une note libre'"
   >
     <PencilSquareIcon class="w-3 h-3" />
     {{ hasNote ? 'Note' : '+ Note' }}

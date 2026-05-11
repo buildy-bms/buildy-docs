@@ -150,11 +150,11 @@ onBeforeUnmount(teardownMetersSortable)
           <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
           <DataTableSortHeader sort-key="meter_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
           <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <th>Req.</th>
-          <th>Prés.</th>
-          <th>Comm.</th>
-          <th>Câbl.</th>
-          <th>HS</th>
+          <th>Requis</th>
+          <th>Présent</th>
+          <th>Communicant</th>
+          <th>Câblé</th>
+          <th>Hors service</th>
           <th>Protocoles</th>
           <th>Notes</th>
           <th>Photos</th>
@@ -300,7 +300,7 @@ onBeforeUnmount(teardownMetersSortable)
             <div class="flex items-center gap-1.5 flex-wrap">
               <span v-if="m.required && !m.present_actual && !m.out_of_service"
                     class="text-red-600" v-tooltip="'Compteur requis non présent'">⚠</span>
-              <span class="font-medium text-sm text-gray-800 truncate">
+              <span v-truncate-tooltip class="font-medium text-sm text-gray-800 truncate">
                 {{ m.zone_name || 'Compteur général' }}
               </span>
             </div>
