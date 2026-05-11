@@ -97,7 +97,7 @@ async function submit() {
           autocapitalize="words"
           data-1p-ignore="true"
           placeholder="ex : Atlas Logistics SAS"
-          class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+          class="touch-control w-full"
         />
       </MobileField>
 
@@ -109,7 +109,7 @@ async function submit() {
           autocapitalize="sentences"
           data-1p-ignore="true"
           placeholder="ex : Mise en conformité BACS Atlas Sud"
-          class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+          class="touch-control w-full"
         />
       </MobileField>
     </form>

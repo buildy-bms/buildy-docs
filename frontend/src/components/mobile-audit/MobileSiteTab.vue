@@ -224,7 +224,7 @@ const generatorWorksDone = computed({
           <input
             type="checkbox"
             v-model="generatorWorksDone"
-            class="w-6 h-6 mt-1 shrink-0"
+            class="w-7 h-7 mt-1 shrink-0"
           />
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-gray-900">Travaux générateur réalisés</p>
@@ -253,7 +253,7 @@ const generatorWorksDone = computed({
           <input
             type="checkbox"
             v-model="districtConnected"
-            class="w-6 h-6 mt-1 shrink-0"
+            class="w-7 h-7 mt-1 shrink-0"
           />
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-gray-900">Raccordé à un réseau urbain</p>

@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.19",
+      "date": "2026-05-11",
+      "title": "Audit PWA : bibliothèque plein écran + listes déroulantes uniformisées et tactiles",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Ajout d'un équipement depuis la bibliothèque : page plein écran sur smartphone",
+          "what": "Avant : sur mobile, ouvrir la bibliothèque d'équipements depuis un système d'audit affichait une petite modale flottante au-dessus de la liste — pas pratique au pouce, difficile à lire. Désormais la bibliothèque s'ouvre en page plein écran (slide-up depuis le bas), comme l'ajout manuel d'équipement. On y retrouve la recherche, les filtres Énergie et Niveau avec leurs pilules colorées, et chaque modèle peut être ajouté d'un seul tap sur la card. La page reste ouverte après chaque ajout pour enchaîner plusieurs équipements à la suite.",
+          "where": "PWA audit BACS → onglet « Systèmes » → sur un système (Chauffage, Refroidissement, etc.) marqué Présent → bouton « Bibliothèque ».",
+          "how_to_test": "Sur iPhone, ouvre un audit, va dans Systèmes, marque un système comme Présent puis tape Bibliothèque. La page doit prendre tout l'écran, glisser depuis le bas, et permettre d'ajouter plusieurs équipements sans la refermer."
+        },
+        {
+          "kind": "ux",
+          "title": "Toutes les listes déroulantes de l'audit mobile en sheet iOS-natif avec icônes colorées",
+          "what": "Avant : selon les écrans, les listes utilisaient soit la roue iOS native (pas assez visuelle), soit un popover desktop mal adapté au pouce. Désormais un seul style partout : on tape un select et un panneau slide-up depuis le bas affiche les options en grand, avec icônes colorées (énergies, types de compteur, natures de zone…) ou pilules pour les niveaux. La recherche apparaît automatiquement quand la liste est longue. Le mode « + Saisir une autre valeur » reste disponible pour les champs libres.",
+          "where": "PWA audit, partout : onglet Systèmes (énergie d'un équipement), Compteurs (zone, type d'énergie, catégorie d'usage), Zones (nature de la zone), Régulation thermique R175-6 (granularité, type de production, équipements aux 3 niveaux Production / Distribution / Émission).",
+          "how_to_test": "Sur iPhone, dans n'importe quel formulaire d'audit, tape une liste déroulante : un panneau doit glisser depuis le bas avec les options en cartes hautes, icônes ou pilules colorées à gauche, et un check à droite sur la valeur courante."
+        },
+        {
+          "kind": "ux",
+          "title": "Cibles tactiles ≥ 44pt et cases à cocher plus grosses dans toute la PWA audit",
+          "what": "Avant : certains boutons (Présent / Absent, segmented protocoles), inputs (métadonnées de l'audit, dates d'inspection R175-5-1) et cases à cocher (GTB, compteurs, état R175-3) étaient sous 44pt — donc imprécis au pouce. Désormais tous les contrôles de la PWA audit respectent la cible Apple (44pt), avec un style harmonisé (champs blancs, bord gris clair, focus indigo doux). Les cases à cocher passent de 24 à 28 pixels.",
+          "where": "PWA audit BACS / GTB, tous les onglets — Site, Zones, Compteurs, Systèmes, GTB — et les sheets associées (métadonnées, inspections périodiques, régulation thermique).",
+          "how_to_test": "Sur iPhone, parcours rapide des 5 onglets : aucun bouton ni case à cocher ne doit paraître trop petit ou difficile à taper. Tester aussi le panneau « ⚙ Modifier l'audit » et la sous-page Régulation thermique."
+        }
+      ]
+    },
+    {
       "version": "0.1.18",
       "date": "2026-05-11",
       "title": "Bibliothèque : suppressions définitives + assistant IA recentré sur la description fonctionnelle",

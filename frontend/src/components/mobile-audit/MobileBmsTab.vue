@@ -153,7 +153,7 @@ const USAGES = [
           type="checkbox"
           :checked="!!bms.out_of_service"
           @change="e => { bms.out_of_service = e.target.checked ? 1 : 0; saveDebounced() }"
-          class="w-6 h-6 mt-1 shrink-0"
+          class="w-7 h-7 mt-1 shrink-0"
         />
       </label>
     </div>
@@ -236,7 +236,7 @@ const USAGES = [
               type="checkbox"
               :checked="!!bms[u.key]"
               @change="e => { bms[u.key] = e.target.checked ? 1 : 0; saveDebounced() }"
-              class="w-6 h-6 shrink-0"
+              class="w-7 h-7 shrink-0"
             />
           </label>
         </div>
@@ -263,7 +263,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.meets_r175_3_p1"
                 @change="e => { bms.meets_r175_3_p1 = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <div v-if="bms.meets_r175_3_p1" class="ml-2 pl-3 border-l-2 border-gray-100 space-y-2">
@@ -272,7 +272,7 @@ const USAGES = [
                 type="text"
                 placeholder="Format d'archivage : CSV, SQL, API…"
                 @input="saveDebounced"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               />
               <label class="flex items-center justify-between gap-3 cursor-pointer text-xs text-gray-700">
                 <span>Rétention 5 ans vérifiée sur place</span>
@@ -280,7 +280,7 @@ const USAGES = [
                   type="checkbox"
                   :checked="!!bms.r175_3_p1_retention_verified"
                   @change="e => { bms.r175_3_p1_retention_verified = e.target.checked ? 1 : 0; saveDebounced() }"
-                  class="w-5 h-5"
+                  class="w-7 h-7"
                 />
               </label>
             </div>
@@ -299,7 +299,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.meets_r175_3_p2"
                 @change="e => { bms.meets_r175_3_p2 = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <div v-if="bms.meets_r175_3_p2" class="ml-2 pl-3 border-l-2 border-gray-100">
@@ -308,7 +308,7 @@ const USAGES = [
                 @input="saveDebounced"
                 rows="2"
                 placeholder="Règles / seuils / alertes actives…"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               ></textarea>
             </div>
           </div>
@@ -338,7 +338,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.data_provision_to_manager"
                 @change="e => { bms.data_provision_to_manager = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <label class="flex items-start justify-between gap-3 cursor-pointer">
@@ -350,7 +350,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.data_provision_to_operators"
                 @change="e => { bms.data_provision_to_operators = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
@@ -359,14 +359,14 @@ const USAGES = [
                 type="text"
                 placeholder="Fréquence : temps réel, quotidien…"
                 @input="saveDebounced"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               />
               <input
                 v-model="bms.data_provision_format"
                 type="text"
                 placeholder="Format : CSV, dashboard, API…"
                 @input="saveDebounced"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               />
             </template>
           </div>
@@ -393,7 +393,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.has_maintenance_procedures"
                 @change="e => { bms.has_maintenance_procedures = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <template v-if="bms.has_maintenance_procedures">
@@ -402,14 +402,14 @@ const USAGES = [
                 type="text"
                 placeholder="Périodicité : trimestrielle, annuelle…"
                 @input="saveDebounced"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               />
               <input
                 v-model="bms.maintenance_responsible"
                 type="text"
                 placeholder="Responsable : prestataire, équipe interne…"
                 @input="saveDebounced"
-                class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white text-sm"
+                class="touch-control w-full"
               />
             </template>
           </div>
@@ -437,7 +437,7 @@ const USAGES = [
                 type="checkbox"
                 :checked="!!bms.operator_trained"
                 @change="e => { bms.operator_trained = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-6 h-6 mt-1 shrink-0"
+                class="w-7 h-7 mt-1 shrink-0"
               />
             </label>
             <template v-if="bms.operator_trained">

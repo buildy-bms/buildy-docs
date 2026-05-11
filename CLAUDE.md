@@ -317,7 +317,7 @@ Le drag-drop SortableJS reste disponible en parallele pour les deplacements rapi
 - Inputs forcés à `font-size: 16px` en mobile (anti-zoom Safari focus). Placeholders réduits à 14px opacity 0.7 pour hiérarchie label/valeur
 - Champs nombre : `inputmode="decimal"` + `pattern="[0-9.,]*"` (jamais `type="number"` qui sort double clavier)
 - Date : `<input type="date">` natif (picker iOS)
-- Selects courts (≤ 6 options) : `<select>` natif. Plus longs : modal plein écran avec recherche
+- Selects audit mobile : tous via `components/mobile-audit/MobileSelectSheet.vue` (bottom sheet custom slide-up iOS, items 48pt min, icônes colorées / pilules, recherche auto ≥8 options, mode creatable). Plus de `<select>` natif iOS dans le périmètre audit PWA — l'expérience native est jugée insuffisamment visuelle. Pour les inputs/boutons, classe utilitaire `.touch-control` (44pt + style cohérent gray-200/indigo-500/30) dans `assets/main.css`. Biblio d'équipements en plein écran (`MobileLibraryPicker.vue`), jamais en BaseModal mobile
 - Bottom safe-area : tous les conteneurs sticky/fixed bas utilisent `env(safe-area-inset-bottom)` pour ne pas être cachés par la home indicator iPhone X+
 - Bottom nav : h-14 (56px) + safe-area = ~90px (proche du standard Apple ~83px)
 - Body bg #ffffff explicite dans `main.css` pour éviter tout bleed gris dans la zone safe-area en PWA standalone

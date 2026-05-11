@@ -17,13 +17,14 @@ import { useConfirm } from '@/composables/useConfirm'
 import { updateBacsSystem, updateBacsDeviceZones, createBacsDevice, updateBacsDevice, deleteBacsDevice } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
+import MobileSelectSheet from './MobileSelectSheet.vue'
 import MobileThermalRegulationSheet from './MobileThermalRegulationSheet.vue'
-import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
+import MobileLibraryPicker from './MobileLibraryPicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
-import { COMM_OPTIONS } from '@/lib/audit-options'
+import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED } from '@/lib/audit-options'
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -83,26 +84,11 @@ const SYSTEM_NEGATIVE_LABEL = {
   lighting_outdoor: 'Pas d\'éclairage extérieur',
   electricity_production: 'Pas de production photovoltaïque',
 }
-const ENERGY_OPTIONS = [
-  { value: null, label: '—' },
-  { value: 'gas', label: 'Gaz' },
-  { value: 'electric', label: 'Électrique' },
-  { value: 'wood', label: 'Bois' },
-  { value: 'heat_pump', label: 'PAC' },
-  { value: 'district_heating', label: 'Réseau de chaleur' },
-  { value: 'fuel_oil', label: 'Fioul' },
-  { value: 'solar', label: 'Solaire' },
-  { value: 'biomass', label: 'Biomasse' },
-  { value: 'autre', label: 'Autre' },
-]
-const ROLE_OPTIONS = [
-  { value: null, label: '—' },
-  { value: 'production', label: 'Production' },
-  { value: 'distribution', label: 'Distribution' },
-  { value: 'emission', label: 'Émission' },
-  { value: 'regulation', label: 'Régulation' },
-  { value: 'autre', label: 'Autre' },
-]
+// Options décorées (icônes + couleurs) depuis lib/audit-options pour un
+// rendu visuel cohérent dans le MobileSelectSheet (énergie) et le
+// SearchableSelect (niveaux multi-select).
+const ENERGY_OPTIONS = ENERGY_OPTIONS_DECORATED
+const ROLE_OPTIONS = ROLE_OPTIONS_DECORATED
 
 const collapsedZones = ref(new Set())
 
@@ -394,7 +380,7 @@ async function removeDevice(d) {
             <div class="mt-3 grid grid-cols-2 gap-2">
               <button type="button"
                       @click="patchSystem(s, { present: true, not_concerned: false })"
-                      :class="['py-3 px-3 text-sm font-medium rounded-xl border-2 transition',
+                      :class="['min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 transition',
                                s.present && !s.not_concerned
                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                                  : 'border-gray-200 bg-white text-gray-600']">
@@ -402,7 +388,7 @@ async function removeDevice(d) {
               </button>
               <button type="button"
                       @click="patchSystem(s, { present: false, not_concerned: true })"
-                      :class="['py-3 px-3 text-sm font-medium rounded-xl border-2 transition',
+                      :class="['min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 transition',
                                s.not_concerned
                                  ? 'border-gray-400 bg-gray-100 text-gray-700'
                                  : 'border-gray-200 bg-white text-gray-600']">
@@ -555,12 +541,12 @@ async function removeDevice(d) {
         </MobileField>
 
         <MobileField label="Énergie">
-          <select
+          <MobileSelectSheet
             v-model="deviceForm.energy_source"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
-          >
-            <option v-for="o in ENERGY_OPTIONS" :key="o.value || 'null'" :value="o.value">{{ o.label }}</option>
-          </select>
+            :options="ENERGY_OPTIONS"
+            title="Choisir une énergie"
+            placeholder="— Sélectionner —"
+          />
         </MobileField>
 
         <MobileField label="Niveau(x)">
@@ -753,8 +739,8 @@ async function removeDevice(d) {
       </div>
     </MobileSheet>
 
-    <!-- Modale bibliothèque (BaseModal s'adapte mobile via max-w-[92vw]) -->
-    <LibraryDevicePicker
+    <!-- Bibliothèque en page plein écran iOS-natif (MobileSheet) -->
+    <MobileLibraryPicker
       v-if="libraryDevicePickerSystem"
       :system="libraryDevicePickerSystem"
       :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"

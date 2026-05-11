@@ -121,7 +121,7 @@ async function removeInspection(ins) {
               :value="ins.last_inspection_date || ''"
               type="date"
               @input="e => patchDebounced(ins, { last_inspection_date: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+              class="touch-control w-full"
             />
           </MobileField>
 
@@ -132,7 +132,7 @@ async function removeInspection(ins) {
               autocapitalize="words"
               placeholder="ex : APAVE, SOCOTEC, Bureau Veritas…"
               @input="e => patchDebounced(ins, { last_inspection_inspector: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+              class="touch-control w-full"
             />
           </MobileField>
 
@@ -142,7 +142,7 @@ async function removeInspection(ins) {
                 :value="ins.next_inspection_due_date || ''"
                 type="date"
                 @input="e => patchDebounced(ins, { next_inspection_due_date: e.target.value || null })"
-                class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                class="touch-control w-full"
               />
             </MobileField>
             <MobileField label="Conserver jusqu'au">
@@ -150,7 +150,7 @@ async function removeInspection(ins) {
                 :value="ins.retained_until_date || ''"
                 type="date"
                 @input="e => patchDebounced(ins, { retained_until_date: e.target.value || null })"
-                class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                class="touch-control w-full"
               />
             </MobileField>
           </div>
@@ -161,7 +161,7 @@ async function removeInspection(ins) {
               rows="3"
               placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
               @input="e => patchDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 resize-y"
+              class="touch-control w-full resize-y"
             ></textarea>
           </MobileField>
 
@@ -171,7 +171,7 @@ async function removeInspection(ins) {
               rows="3"
               placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
               @input="e => patchDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 resize-y"
+              class="touch-control w-full resize-y"
             ></textarea>
           </MobileField>
 
@@ -181,7 +181,7 @@ async function removeInspection(ins) {
               type="text"
               placeholder="ex : N° de rapport, contact référent…"
               @input="e => patchDebounced(ins, { notes: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+              class="touch-control w-full"
             />
           </MobileField>
 
