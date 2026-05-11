@@ -12,6 +12,8 @@ import PhotoDropTr from './PhotoDropTr.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import DeviceZoneSharing from './DeviceZoneSharing.vue'
+import DataTableSortHeader from './DataTableSortHeader.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 
 /**
@@ -77,20 +79,15 @@ const sharedDevices = computed(() => {
   })
 })
 
-// Tri : clic sur en-tête. Reclic inverse, 3e clic remet l'ordre d'origine.
-const sortKey = ref(null)
-const sortDir = ref('asc')
-function toggleSort(key) {
-  if (sortKey.value !== key) { sortKey.value = key; sortDir.value = 'asc'; return }
-  if (sortDir.value === 'asc') { sortDir.value = 'desc'; return }
-  sortKey.value = null; sortDir.value = 'asc'
-}
+// Tri : factorisé via composable. 3 clics : asc → desc → désactivé.
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
 function sortValue(d, key) {
   switch (key) {
     case 'name': return (d.name || '').toLowerCase()
     case 'brand': return (d.brand || '').toLowerCase()
     case 'model_reference': return (d.model_reference || '').toLowerCase()
     case 'quantity': return Number(d.quantity) || 1
+    case 'age_years': return Number(d.age_years) || 0
     case 'power_kw': return Number(d.power_kw) || 0
     case 'energy_source': return (d.energy_source || '').toLowerCase()
     case 'location': return (d.location || '').toLowerCase()
@@ -98,18 +95,9 @@ function sortValue(d, key) {
   }
 }
 
-const displayDevices = computed(() => {
-  const all = [...props.devices, ...sharedDevices.value]
-  if (!sortKey.value) return all
-  const dir = sortDir.value === 'desc' ? -1 : 1
-  return [...all].sort((a, b) => {
-    const av = sortValue(a, sortKey.value)
-    const bv = sortValue(b, sortKey.value)
-    if (av < bv) return -1 * dir
-    if (av > bv) return 1 * dir
-    return 0
-  })
-})
+const displayDevices = computed(() =>
+  sortedRows([...props.devices, ...sharedDevices.value], sortValue)
+)
 
 function isSharedFromOtherZone(d) {
   return d.system_id !== props.system.id
@@ -349,31 +337,18 @@ async function removeDevice(d) {
     <!-- Vrai data-table : en-têtes triables, bordures, lignes alternées,
          look table standard. Auto-largeur des colonnes au contenu. -->
     <div v-if="displayDevices.length" class="overflow-x-auto -mx-3 px-3">
-      <table class="systems-data-table w-full text-sm">
+      <table class="data-table w-full text-sm">
         <thead>
           <tr>
-            <th @click="toggleSort('name')" class="sortable">
-              <span>Nom</span><span class="sort-ico">{{ sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th @click="toggleSort('brand')" class="sortable">
-              <span>Marque</span><span class="sort-ico">{{ sortKey === 'brand' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th @click="toggleSort('model_reference')" class="sortable">
-              <span>Référence</span><span class="sort-ico">{{ sortKey === 'model_reference' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th @click="toggleSort('quantity')" class="sortable">
-              <span>Qté</span><span class="sort-ico">{{ sortKey === 'quantity' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th @click="toggleSort('power_kw')" class="sortable">
-              <span>Puiss.</span><span class="sort-ico">{{ sortKey === 'power_kw' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th @click="toggleSort('energy_source')" class="sortable">
-              <span>Énergie</span><span class="sort-ico">{{ sortKey === 'energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
+            <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
+            <DataTableSortHeader sort-key="brand" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Marque</DataTableSortHeader>
+            <DataTableSortHeader sort-key="model_reference" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Référence</DataTableSortHeader>
+            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Qté</DataTableSortHeader>
+            <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
+            <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puiss.</DataTableSortHeader>
+            <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
             <th>Rôle</th>
-            <th @click="toggleSort('location')" class="sortable">
-              <span>Localisation</span><span class="sort-ico">{{ sortKey === 'location' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
+            <DataTableSortHeader sort-key="location" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Localisation</DataTableSortHeader>
             <th>Communication</th>
             <th>État</th>
             <th>Actions</th>
@@ -416,6 +391,14 @@ async function removeDevice(d) {
                 <input type="number" min="1" step="1" :value="d.quantity ?? 1"
                        @blur="e => patchDevice(d, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })"
                        :class="inputCls" class="text-center" />
+              </div>
+            </td>
+            <!-- Âge en années (mig 135, propriété du device) -->
+            <td class="px-2 py-2 align-middle whitespace-nowrap">
+              <div class="w-16 mx-auto">
+                <input type="number" min="0" step="1" :value="d.age_years ?? ''" placeholder="—"
+                       @blur="e => patchDevice(d, { age_years: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0) })"
+                       :class="inputCls" class="text-center placeholder:text-gray-300" />
               </div>
             </td>
             <!-- Puissance -->
@@ -553,78 +536,13 @@ async function removeDevice(d) {
   </div>
 </template>
 
+<!-- Styles factorisés dans frontend/src/assets/main.css → classe .data-table -->
 <style scoped>
-/* Look data-table standard : bordures fines partout, en-tête fond gris,
-   lignes alternées, séparateurs verticaux pour bien lire les colonnes. */
-.systems-data-table {
-  border-collapse: collapse;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #fff;
-}
-.systems-data-table thead th {
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  border-right: 1px solid #f3f4f6;
-  padding: 8px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: #6b7280;
-  white-space: nowrap;
-  user-select: none;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  text-align: center;
-}
-.systems-data-table thead th:last-child {
-  border-right: none;
-}
-.systems-data-table thead th.sortable {
-  cursor: pointer;
-}
-.systems-data-table thead th.sortable:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-.systems-data-table thead th .sort-ico {
-  margin-left: 4px;
-  font-size: 10px;
-  opacity: 0.5;
-}
-.systems-data-table thead th.sortable:hover .sort-ico {
-  opacity: 1;
-}
-.systems-data-table tbody td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #f3f4f6;
-  border-right: 1px solid #f9fafb;
-  vertical-align: middle;
-  text-align: center;
-}
-/* Centre les contenus internes (input/SearchableSelect/divs) sans casser
-   leur layout. text-align cible inputs ; les flex internes (Communication,
-   État, Actions) restent OK car ils ont déjà justify-* explicites. */
-.systems-data-table tbody td input[type="text"],
-.systems-data-table tbody td input[type="number"] {
-  text-align: center;
-}
-.systems-data-table tbody td > div.flex {
+/* Petits ajustements scoped : forcer le justify-content center sur les
+   flex internes d'une cellule (groupes de pills, actions). Le main.css
+   ne peut pas cibler les enfants directs sans tomber dans des sélecteurs
+   trop génériques. */
+.data-table tbody td > div.flex {
   justify-content: center;
-}
-.systems-data-table tbody td:last-child {
-  border-right: none;
-}
-.systems-data-table tbody tr:nth-child(even) td {
-  background: #fafbfc;
-}
-.systems-data-table tbody tr:hover td {
-  background: #f3f4f6;
-}
-.systems-data-table tbody tr:last-child td {
-  border-bottom: none;
 }
 </style>

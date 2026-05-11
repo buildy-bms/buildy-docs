@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 134;
+const TARGET_VERSION = 135;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5552,6 +5552,42 @@ function runMigrations() {
     `);
     log.info('Migration 134 appliquee : bacs_audit_system_devices.quantity (defaut 1)');
     db.pragma('user_version = 134');
+  }
+
+  if (current < 135) {
+    // Age du systeme : propriete du device (Card 03), pas de la regulation
+    // thermique (Card 05). Avant : `bacs_audit_thermal_regulation.generator_age_years`
+    // -> duplique par couple zone x categorie. Maintenant : `age_years` sur
+    // le device pointe via generator_device_id.
+    // Idem : `generator_type` etait redondant avec `device.energy_source`
+    // -> drop apres migration.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN age_years INTEGER;
+    `);
+    // Copie : pour chaque thermal pointant un device en generator_device_id,
+    // remonter l'age sur le device. En cas de conflit (meme device cible
+    // par plusieurs thermals), MIN garde la premiere valeur non-nulle
+    // rencontree (en pratique, peu de doublons).
+    db.exec(`
+      UPDATE bacs_audit_system_devices
+         SET age_years = (
+           SELECT MIN(t.generator_age_years)
+             FROM bacs_audit_thermal_regulation t
+            WHERE t.generator_device_id = bacs_audit_system_devices.id
+              AND t.generator_age_years IS NOT NULL
+         )
+       WHERE id IN (
+         SELECT generator_device_id FROM bacs_audit_thermal_regulation
+          WHERE generator_device_id IS NOT NULL
+            AND generator_age_years IS NOT NULL
+       );
+    `);
+    db.exec(`
+      ALTER TABLE bacs_audit_thermal_regulation DROP COLUMN generator_age_years;
+      ALTER TABLE bacs_audit_thermal_regulation DROP COLUMN generator_type;
+    `);
+    log.info('Migration 135 appliquee : bacs_audit_system_devices.age_years (copie depuis thermal.generator_age_years) + drop generator_type/age sur thermal');
+    db.pragma('user_version = 135');
   }
 
   if (current > TARGET_VERSION) {

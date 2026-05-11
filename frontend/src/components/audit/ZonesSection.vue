@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
 import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
@@ -9,6 +9,8 @@ import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -66,6 +68,15 @@ function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
+
+// Tri data-table (clic en-tête, asc → desc → off).
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
+function sortZoneValue(z, key) {
+  if (key === 'name') return (z.name || '').toLowerCase()
+  if (key === 'surface_m2') return Number(z.surface_m2) || 0
+  return ''
+}
+const sortedZones = computed(() => sortedRows(zones.value, sortZoneValue))
 
 // Drag & drop des zones (desktop uniquement). Sortable sur le <tbody>,
 // la ligne « + Ajouter une zone » est filtrée. L'API persiste via
@@ -135,41 +146,41 @@ onBeforeUnmount(teardownZonesSortable)
       </span>
       <span v-else class="italic">Aucune zone définie</span>
     </template>
-    <!-- Desktop : tableau (>=768px) -->
-    <div class="hidden md:block">
-      <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 font-medium bg-gray-50">
+    <!-- Desktop : data-table aligné (>=768px) -->
+    <div class="hidden md:block overflow-x-auto">
+      <table class="data-table w-full text-sm">
+        <thead>
           <tr>
             <th class="w-8"></th>
-            <th class="text-center px-5 py-1">Nom</th>
-            <th class="text-center py-1 w-48">Nature</th>
-            <th class="text-center py-1 w-24">Surface (m²)</th>
-            <th class="text-center py-1 w-32">Notes</th>
-            <th class="text-center py-1 w-24">Photos</th>
-            <th class="text-center px-5 py-1 w-12"></th>
+            <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
+            <th>Nature</th>
+            <DataTableSortHeader sort-key="surface_m2" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Surface (m²)</DataTableSortHeader>
+            <th>Notes</th>
+            <th>Photos</th>
+            <th>Actions</th>
           </tr>
         </thead>
-        <tbody ref="zonesBodyRef" class="divide-y divide-gray-100">
-          <PhotoDropTr v-for="z in zones" :key="z.zone_id"
-                       :row-class="'group zone-row'"
+        <tbody ref="zonesBodyRef">
+          <PhotoDropTr v-for="z in sortedZones" :key="z.zone_id"
+                       :row-class="'zone-row'"
                        :data-id="z.zone_id"
                        :site-uuid="document?.site_uuid || ''"
                        :attach-to="{ zone_id: z.zone_id }"
                        :enabled="!!document?.site_uuid"
                        @changed="refreshAuditData">
-            <td class="text-center align-middle">
+            <td class="align-middle">
               <button type="button"
                       class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                       v-tooltip="'Glisser pour réordonner'">
                 <Bars3Icon class="w-4 h-4" />
               </button>
             </td>
-            <td class="px-5 py-1">
+            <td>
               <input type="text" :value="z.name"
                      @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                     class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+                     class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded bg-transparent" />
             </td>
-            <td class="py-1 min-w-44">
+            <td class="min-w-44">
               <SearchableSelect
                 :model-value="z.nature"
                 @update:model-value="v => patchZone(z, { nature: v || null })"
@@ -177,12 +188,14 @@ onBeforeUnmount(teardownZonesSortable)
                 placeholder="Nature de la zone"
               />
             </td>
-            <td class="py-1">
-              <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
-                     @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                     class="w-full text-xs px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded" />
+            <td class="whitespace-nowrap">
+              <div class="w-24 mx-auto">
+                <input type="number" min="0" step="1" :value="z.surface_m2" placeholder="—"
+                       @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded bg-transparent" />
+              </div>
             </td>
-            <td class="py-1 text-center">
+            <td>
               <button
                 type="button"
                 @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
@@ -194,18 +207,18 @@ onBeforeUnmount(teardownZonesSortable)
                 <PencilSquareIcon class="w-4 h-4" />
               </button>
             </td>
-            <td class="py-1 text-center">
+            <td>
               <BacsPhotoButton
                 v-if="document?.site_uuid"
                 :site-uuid="document.site_uuid"
                 :attach-to="{ zone_id: z.zone_id }"
                 :label="z.name" />
             </td>
-            <td class="px-5 py-1 text-right whitespace-nowrap">
-              <button @click="dupZone(z)" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
+            <td class="whitespace-nowrap">
+              <button @click="dupZone(z)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
-              <button @click="removeZone(z)" class="opacity-40 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
+              <button @click="removeZone(z)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
                 <TrashIcon class="w-4 h-4" />
               </button>
             </td>

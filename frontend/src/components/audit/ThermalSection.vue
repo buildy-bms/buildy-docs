@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
 import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -8,6 +8,8 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal, reorderBacsThermal } from '@/api'
@@ -59,6 +61,16 @@ function hasNotes(html) {
 
 const audit = useAuditStore()
 const { error } = useNotification()
+
+// Tri data-table : Zone, Usage, Type de régul.
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
+function sortThermalValue(t, key) {
+  if (key === 'zone') return (t.zone_name || '').toLowerCase()
+  if (key === 'usage') return (t.category || 'heating')
+  if (key === 'regulation_type') return (t.regulation_type || '').toLowerCase()
+  return ''
+}
+const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortThermalValue))
 
 async function patchThermal(t, patch) {
   Object.assign(t, patch)
@@ -161,62 +173,60 @@ onBeforeUnmount(teardownSortable)
     </div>
 
     <div class="overflow-x-auto">
-    <table ref="tableRef" class="w-full text-sm min-w-225">
-      <thead class="text-xs text-gray-500 font-medium bg-gray-50">
+    <table ref="tableRef" class="data-table w-full text-sm">
+      <thead>
         <tr>
           <th class="w-8"></th>
-          <th class="text-center px-3 py-2 w-32">Zone</th>
-          <th class="text-center py-2 w-32">
-            <Tooltip text="Chauffage ou refroidissement — chaque bloc = 1 usage thermique sur 1 zone. Une zone peut apparaître 2 fois (1 bloc chaud + 1 bloc froid)."><span>Usage</span></Tooltip>
-          </th>
-          <th class="text-center py-2 w-28">
-            <Tooltip text="La zone dispose-t-elle d'une régulation automatique en fonction de la température intérieure ? Cocher uniquement si une boucle de régulation est effectivement en place."><span>Régul auto ?</span></Tooltip>
-          </th>
-          <th class="text-center py-2 w-40">
-            <Tooltip text="Granularité de la régulation : zone unique, par pièce, par étage… Plus la granularité est fine, plus le confort et l'économie d'énergie sont optimisés (R175-6 II §2)."><span>Granularité</span></Tooltip>
-          </th>
-          <th class="text-center py-2 w-32">
-            <Tooltip text="Appareil indépendant de chauffage au bois (poêle, insert, cheminée fermée) → exempté de R175-6 (II du décret). Non applicable au refroidissement."><span>Exempté bois</span></Tooltip>
-          </th>
-          <th class="text-center px-3 py-2 w-24">Notes globales</th>
+          <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
+          <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
+          <th>Auto ?</th>
+          <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régul</DataTableSortHeader>
+          <th>Exempt</th>
+          <th>Production</th>
+          <th>Régul. prod</th>
+          <th>Distribution</th>
+          <th>Régul. distrib</th>
+          <th>Émission</th>
+          <th>Régul. émis</th>
+          <th>Notes</th>
         </tr>
       </thead>
-      <tbody v-for="t in thermalFiltered" :key="t.id"
+      <tbody v-for="t in sortedThermal" :key="t.id"
              :data-id="t.id"
-             class="thermal-row divide-y divide-gray-100 border-b-2 border-gray-200">
-        <!-- Ligne d'en-tête : champs communs au couple (zone × catégorie) -->
-        <tr class="bg-gray-50/40">
-          <td class="text-center align-middle">
+             class="thermal-row">
+        <!-- Ligne principale : 12 colonnes alignées + drag handle -->
+        <tr>
+          <td class="align-middle">
             <button type="button"
                     class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                     v-tooltip="'Glisser pour réordonner'">
               <Bars3Icon class="w-4 h-4" />
             </button>
           </td>
-          <td class="px-3 py-2 text-gray-700 text-center align-middle font-medium">{{ t.zone_name }}</td>
-          <td class="py-2 text-center align-middle">
+          <td class="text-gray-700 font-medium whitespace-nowrap">{{ t.zone_name }}</td>
+          <td class="whitespace-nowrap">
             <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
                   :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
               <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
               {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
             </span>
           </td>
-          <td class="py-2 text-center align-middle">
+          <td class="align-middle">
             <input type="checkbox" :checked="!!t.has_automatic_regulation"
                    @change="e => patchThermal(t, { has_automatic_regulation: e.target.checked })"
                    class="rounded border-gray-300" />
           </td>
-          <td class="py-2 px-1 align-middle">
-            <SearchableSelect
-              :model-value="t.regulation_type"
-              @update:modelValue="v => patchThermal(t, { regulation_type: v || null })"
-              :options="(regulationOptions || []).filter(o => o.value)"
-              size="sm" placeholder="— granularité"
-              search-placeholder="Filtrer ou ajouter…" />
+          <td class="align-middle">
+            <div class="min-w-32">
+              <SearchableSelect
+                :model-value="t.regulation_type"
+                @update:modelValue="v => patchThermal(t, { regulation_type: v || null })"
+                :options="(regulationOptions || []).filter(o => o.value)"
+                size="sm" placeholder="—"
+                search-placeholder="Filtrer ou ajouter…" />
+            </div>
           </td>
-          <td class="py-2 text-center align-middle">
-            <!-- Exempté bois : applicable uniquement au chauffage (R175-6 II
-                 ne traite que les appareils de chauffage au bois). -->
+          <td class="align-middle">
             <Tooltip v-if="(t.category || 'heating') === 'heating'"
                      text="Si coché : production = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
               <input type="checkbox" :checked="!!t.generator_exempt_wood"
@@ -225,7 +235,107 @@ onBeforeUnmount(teardownSortable)
             </Tooltip>
             <span v-else class="text-gray-300 text-xs">—</span>
           </td>
-          <td class="px-3 py-2 text-center align-middle">
+          <!-- Production : équipement (sans type/âge, ils sont sur le device Card 03) -->
+          <td class="align-middle">
+            <div class="min-w-40">
+              <SearchableSelect
+                :model-value="t.generator_device_id"
+                @update:modelValue="v => patchThermal(t, { generator_device_id: v != null ? parseInt(v, 10) : null })"
+                :options="deviceOptionsForLevel(t, 'production')"
+                size="sm" placeholder="—"
+                search-placeholder="Rechercher…" />
+            </div>
+          </td>
+          <!-- Équipement de régulation Production + icône notes Production -->
+          <td class="align-middle">
+            <div class="flex items-center gap-1 min-w-40">
+              <div class="flex-1 min-w-0">
+                <SearchableSelect
+                  :model-value="t.production_regulation_device_id"
+                  @update:modelValue="v => patchThermal(t, { production_regulation_device_id: v != null ? parseInt(v, 10) : null })"
+                  :options="deviceOptionsForLevel(t, 'regulation')"
+                  size="sm" placeholder="—"
+                  search-placeholder="Sonde, thermo…" />
+              </div>
+              <button type="button"
+                      @click="emit('open-notes', { title: 'Notes Production — ' + t.zone_name, contextLabel: t.zone_name + ' · Production', entityType: 'thermal', entityRef: t, currentHtml: t.production_notes_html || '', noteField: 'production_notes_html' })"
+                      :class="['shrink-0 p-1 rounded-md',
+                        hasNotes(t.production_notes_html)
+                          ? 'text-indigo-700 bg-indigo-50'
+                          : 'text-gray-300 hover:text-gray-600']"
+                      v-tooltip="hasNotes(t.production_notes_html) ? 'Note production' : 'Ajouter une note production'">
+                <PencilSquareIcon class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </td>
+          <!-- Distribution : équipement -->
+          <td class="align-middle">
+            <div class="min-w-40">
+              <SearchableSelect
+                :model-value="t.distribution_device_id"
+                @update:modelValue="v => patchThermal(t, { distribution_device_id: v != null ? parseInt(v, 10) : null })"
+                :options="deviceOptionsForLevel(t, 'distribution')"
+                size="sm" placeholder="—"
+                search-placeholder="Rechercher…" />
+            </div>
+          </td>
+          <!-- Équipement de régulation Distribution + icône notes -->
+          <td class="align-middle">
+            <div class="flex items-center gap-1 min-w-40">
+              <div class="flex-1 min-w-0">
+                <SearchableSelect
+                  :model-value="t.distribution_regulation_device_id"
+                  @update:modelValue="v => patchThermal(t, { distribution_regulation_device_id: v != null ? parseInt(v, 10) : null })"
+                  :options="deviceOptionsForLevel(t, 'regulation')"
+                  size="sm" placeholder="—"
+                  search-placeholder="Sonde, thermo…" />
+              </div>
+              <button type="button"
+                      @click="emit('open-notes', { title: 'Notes Distribution — ' + t.zone_name, contextLabel: t.zone_name + ' · Distribution', entityType: 'thermal', entityRef: t, currentHtml: t.distribution_notes_html || '', noteField: 'distribution_notes_html' })"
+                      :class="['shrink-0 p-1 rounded-md',
+                        hasNotes(t.distribution_notes_html)
+                          ? 'text-indigo-700 bg-indigo-50'
+                          : 'text-gray-300 hover:text-gray-600']"
+                      v-tooltip="hasNotes(t.distribution_notes_html) ? 'Note distribution' : 'Ajouter une note distribution'">
+                <PencilSquareIcon class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </td>
+          <!-- Émission : équipement -->
+          <td class="align-middle">
+            <div class="min-w-40">
+              <SearchableSelect
+                :model-value="t.emission_device_id"
+                @update:modelValue="v => patchThermal(t, { emission_device_id: v != null ? parseInt(v, 10) : null })"
+                :options="deviceOptionsForLevel(t, 'emission')"
+                size="sm" placeholder="—"
+                search-placeholder="Rechercher…" />
+            </div>
+          </td>
+          <!-- Équipement de régulation Émission + icône notes -->
+          <td class="align-middle">
+            <div class="flex items-center gap-1 min-w-40">
+              <div class="flex-1 min-w-0">
+                <SearchableSelect
+                  :model-value="t.emission_regulation_device_id"
+                  @update:modelValue="v => patchThermal(t, { emission_regulation_device_id: v != null ? parseInt(v, 10) : null })"
+                  :options="deviceOptionsForLevel(t, 'regulation')"
+                  size="sm" placeholder="—"
+                  search-placeholder="Sonde, thermo…" />
+              </div>
+              <button type="button"
+                      @click="emit('open-notes', { title: 'Notes Émission — ' + t.zone_name, contextLabel: t.zone_name + ' · Émission', entityType: 'thermal', entityRef: t, currentHtml: t.emission_notes_html || '', noteField: 'emission_notes_html' })"
+                      :class="['shrink-0 p-1 rounded-md',
+                        hasNotes(t.emission_notes_html)
+                          ? 'text-indigo-700 bg-indigo-50'
+                          : 'text-gray-300 hover:text-gray-600']"
+                      v-tooltip="hasNotes(t.emission_notes_html) ? 'Note émission' : 'Ajouter une note émission'">
+                <PencilSquareIcon class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </td>
+          <!-- Notes globales du couple -->
+          <td class="align-middle">
             <button type="button"
                     @click="emit('open-notes', {
                       title: 'Notes régulation thermique',
@@ -244,83 +354,9 @@ onBeforeUnmount(teardownSortable)
             </button>
           </td>
         </tr>
-        <!-- 3 sous-lignes : une par niveau R175-6 (Production / Distribution
-             / Émission). Chaque sous-ligne occupe toute la largeur via
-             colspan, avec une grille interne 4 colonnes : libellé · équipement
-             du niveau · équipement de régulation · bouton notes. -->
-        <tr v-for="lvl in LEVELS" :key="lvl.key"
-            class="thermal-level-row hover:bg-amber-50/20">
-          <td colspan="7" class="px-3 py-2">
-            <div class="grid grid-cols-12 gap-3 items-start">
-              <!-- 1) Libellé du niveau (col 1-2) -->
-              <div class="col-span-2 flex items-center gap-1.5 pt-1.5">
-                <span class="text-base">{{ lvl.icon }}</span>
-                <span class="text-xs font-semibold text-gray-700">{{ lvl.label }}</span>
-              </div>
-              <!-- 2) Équipement du niveau (col 3-6) -->
-              <div class="col-span-4 space-y-1.5">
-                <span class="block text-[10px] uppercase tracking-wider text-gray-400">Équipement</span>
-                <SearchableSelect
-                  :model-value="t[LEVEL_DEVICE_FIELD[lvl.key]]"
-                  @update:modelValue="v => patchThermal(t, { [LEVEL_DEVICE_FIELD[lvl.key]]: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, lvl.key)"
-                  size="sm" placeholder="— aucun"
-                  search-placeholder="Rechercher un équipement…" />
-                <!-- Type + âge spécifiques au niveau Production -->
-                <template v-if="lvl.key === 'production' && t.generator_device_id">
-                  <SearchableSelect
-                    :model-value="t.generator_type"
-                    @update:modelValue="v => patchThermal(t, { generator_type: v || null })"
-                    :options="(generatorOptions || []).filter(o => o.value)"
-                    creatable size="sm" placeholder="Type production…"
-                    search-placeholder="Filtrer ou ajouter…" />
-                  <div class="flex items-center gap-1.5">
-                    <label class="text-[10px] text-gray-500 shrink-0">Âge</label>
-                    <input type="number" :value="t.generator_age_years" min="0" placeholder="ans"
-                           @blur="e => patchThermal(t, { generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
-                           class="w-16 text-xs px-2 py-1 border border-gray-200 rounded" />
-                  </div>
-                </template>
-              </div>
-              <!-- 3) Équipement de régulation (col 7-10) -->
-              <div class="col-span-4 space-y-1.5">
-                <span class="block text-[10px] uppercase tracking-wider text-gray-400">Équipement de régulation</span>
-                <SearchableSelect
-                  :model-value="t[LEVEL_REGULATION_FIELD[lvl.key]]"
-                  @update:modelValue="v => patchThermal(t, { [LEVEL_REGULATION_FIELD[lvl.key]]: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  size="sm" placeholder="— aucun"
-                  search-placeholder="Sonde, thermostat, GTB…" />
-              </div>
-              <!-- 4) Bouton notes par niveau (col 11-12) -->
-              <div class="col-span-2 flex justify-end pt-5">
-                <button type="button"
-                        @click="emit('open-notes', {
-                          title: 'Notes ' + lvl.label.toLowerCase() + ' — ' + t.zone_name,
-                          contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement') + ' · ' + lvl.label,
-                          entityType: 'thermal',
-                          entityRef: t,
-                          currentHtml: t[LEVEL_NOTES_FIELD[lvl.key]] || '',
-                          noteField: LEVEL_NOTES_FIELD[lvl.key],
-                        })"
-                        :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
-                          hasNotes(t[LEVEL_NOTES_FIELD[lvl.key]])
-                            ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                            : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
-                        v-tooltip="hasNotes(t[LEVEL_NOTES_FIELD[lvl.key]]) ? 'Modifier la note ' + lvl.label.toLowerCase() : 'Ajouter une note ' + lvl.label.toLowerCase()">
-                  <PencilSquareIcon class="w-4 h-4 shrink-0" />
-                </button>
-              </div>
-            </div>
-          </td>
-        </tr>
-        <!-- Détail R175-6 — placé directement sous sa ligne parent pour
-             que l'utilisateur sache à quelle zone/usage ça se rapporte.
-             Affiché uniquement si la régulation auto est cochée. Layout
-             en flex compact avec labels inline (vs grid 3 cols qui faisait
-             des champs trop larges et illisibles). -->
-        <tr v-if="t.has_automatic_regulation" class="bg-amber-50/30 text-xs">
-          <td colspan="7" class="px-5 py-2.5">
+        <!-- Détail R175-6 : toujours visible, plein-largeur sous le couple -->
+        <tr class="bg-amber-50/30 text-xs">
+          <td colspan="13" class="px-5 py-2.5">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span class="text-[11px] text-gray-400 italic shrink-0">
                 ↳ détail R175-6 · {{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}

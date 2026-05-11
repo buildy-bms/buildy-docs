@@ -423,11 +423,12 @@ async function routes(fastify) {
     const schema = z.object({
       has_automatic_regulation: z.boolean().optional(),
       regulation_type: z.enum(REGULATION_TYPES).nullable().optional(),
-      generator_type: z.enum(GENERATOR_TYPES).nullable().optional(),
+      // Mig 135 : generator_type (= energy_source du device) et
+      // generator_age_years (= age_years du device) ont migré sur le
+      // device. Ne plus accepter ces champs ici.
       // generator_device_id = niveau "Production" (chaudière, PAC, unité
       // extérieure DRV…). Le nom DB historique reste, le label UI évolue.
       generator_device_id: z.number().int().nullable().optional(),
-      generator_age_years: z.number().int().nullable().optional(),
       generator_exempt_wood: z.boolean().nullable().optional(),
       // Migration 87 : niveaux Distribution (pompes, AHU…) et Émission
       // (radiateurs, ventilo-conv, unités intérieures DRV…). Tous deux
@@ -842,6 +843,9 @@ async function routes(fastify) {
       bms_integration_out_of_service: z.boolean().nullable().optional(),
       // Mig 134 : nombre d'exemplaires identiques de ce device sur la zone.
       quantity: z.number().int().min(1).optional(),
+      // Mig 135 : age en annees du systeme (etait sur thermal_regulation,
+      // remonte sur le device).
+      age_years: z.number().int().min(0).nullable().optional(),
     });
     const schema = schemaPatch;
     let body;

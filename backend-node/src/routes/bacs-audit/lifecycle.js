@@ -345,7 +345,8 @@ async function routes(fastify) {
       } : null,
       thermal_regulation: thermal.map(t => ({
         zone: t.zone_name, regulation_type: t.regulation_type,
-        generator_type: t.generator_type, age_years: t.age_years,
+        // Mig 135 : energie/age sont des proprietes du device pointe
+        // (production). On les expose via l'enrichissement amont si dispo.
         notes: t.notes,
       })),
       action_items_open: actionItems.map(a => ({
@@ -599,7 +600,6 @@ async function routes(fastify) {
     db.db.prepare(`
       UPDATE bacs_audit_thermal_regulation
       SET has_automatic_regulation = 1, regulation_type = 'per_room',
-          generator_type = 'gas', generator_age_years = 12,
           sensor_position = 'murale', thermostat_type = 'programmable',
           has_thermostatic_valves = 1
       WHERE document_id = ? AND zone_id = ?
