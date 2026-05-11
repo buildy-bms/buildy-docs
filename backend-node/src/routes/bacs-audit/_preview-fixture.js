@@ -285,25 +285,27 @@ const METERS_RAW = [
 // 6. REGULATION THERMIQUE (R175-6)
 // ═══════════════════════════════════════════════════════════════════
 
+// Mig 135 : generator_type et generator_age_years ont migré sur le
+// device pointé via generator_device_id. La fixture ne les set plus ici.
 const THERMAL_RAW = [
   { id: 8001, ref: 'T-001', zone_id: 1, category: 'heating',
-    has_automatic_regulation: 1, regulation_type: 'per_zone', generator_type: 'gas',
-    generator_age_years: 5, generator_exempt_wood: 0, sensor_position: 'Mural cellule',
+    has_automatic_regulation: 1, regulation_type: 'per_zone',
+    generator_exempt_wood: 0, sensor_position: 'Mural cellule',
     thermostat_type: 'programmable', has_thermostatic_valves: 0,
     notes: 'Régulation par thermostat d\'ambiance par cellule. Programmation horaire mécanique.' },
   { id: 8002, ref: 'T-002', zone_id: 2, category: 'heating',
-    has_automatic_regulation: 1, regulation_type: 'central_only', generator_type: 'heat_pump',
-    generator_age_years: 5, generator_exempt_wood: 0, sensor_position: 'Reprise plafonnier UI',
+    has_automatic_regulation: 1, regulation_type: 'central_only',
+    generator_exempt_wood: 0, sensor_position: 'Reprise plafonnier UI',
     thermostat_type: 'connected', has_thermostatic_valves: 0,
     notes: 'Régulation centrale via UI Daikin BRC1H. Pas de zonage R175-6 (1 seule consigne pour les 12 UI).' },
   { id: 8003, ref: 'T-003', zone_id: 2, category: 'cooling',
-    has_automatic_regulation: 1, regulation_type: 'central_only', generator_type: 'heat_pump',
-    generator_age_years: 5, generator_exempt_wood: 0, sensor_position: 'Reprise plafonnier UI',
+    has_automatic_regulation: 1, regulation_type: 'central_only',
+    generator_exempt_wood: 0, sensor_position: 'Reprise plafonnier UI',
     thermostat_type: 'connected', has_thermostatic_valves: 0,
     notes: 'Idem chauffage : 1 seule consigne pour le bloc bureaux. Zonage R175-6 attendu en open-space.' },
   { id: 8004, ref: 'T-004', zone_id: 3, category: 'heating',
-    has_automatic_regulation: 0, regulation_type: 'none', generator_type: 'electric',
-    generator_age_years: null, generator_exempt_wood: 0, sensor_position: null,
+    has_automatic_regulation: 0, regulation_type: 'none',
+    generator_exempt_wood: 0, sensor_position: null,
     thermostat_type: null, has_thermostatic_valves: 0,
     notes: 'Locaux sociaux chauffés par diffusion bureaux, pas de régulation propre.' },
 ];
@@ -632,7 +634,9 @@ async function buildFixturePreviewData({ user = null } = {}) {
       category: t.category || 'heating',
       categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
       regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
-      generatorLabel: t.generator_type ? (GENERATOR_LABEL[t.generator_type] || t.generator_type) : '—',
+      // Mig 135 : generator_type a migré sur device.energy_source.
+      // Pour la fixture, on garde un placeholder "—".
+      generatorLabel: '—',
     };
   });
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
 import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
@@ -12,6 +12,8 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
+import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
+import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -63,6 +65,17 @@ async function dupMeter(m) {
 }
 
 function refreshAuditData() { return audit.refreshAuditCore() }
+
+// Tri data-table (clic en-tête, asc → desc → off).
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
+function sortMeterValue(m, key) {
+  if (key === 'zone') return (m.zone_name || '').toLowerCase()
+  if (key === 'meter_type') return (m.meter_type || '').toLowerCase()
+  if (key === 'usage') return (m.usage || '').toLowerCase()
+  return ''
+}
+const sortedMeters = computed(() => sortedRows(meters.value, sortMeterValue))
+
 function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
@@ -126,91 +139,109 @@ onBeforeUnmount(teardownMetersSortable)
       </span>
       <span v-else class="italic">Aucun compteur listé</span>
     </template>
-    <!-- Desktop : tableau (>=768px) -->
-    <table class="hidden md:table w-full text-sm">
-      <thead class="text-xs text-gray-500 font-medium bg-gray-50">
+    <!-- Desktop : data-table aligné (>=768px). Flags split en 5 colonnes
+         (Req. / Prés. / Comm. / Câbl. / HS), chacune triable visuellement
+         et cliquable individuellement. -->
+    <div class="hidden md:block overflow-x-auto">
+    <table class="data-table w-full text-sm">
+      <thead>
         <tr>
           <th class="w-8"></th>
-          <th class="text-center px-5 py-2.5 w-44">Zone</th>
-          <th class="text-center py-2.5 w-40">Énergie</th>
-          <th class="text-center py-2.5 w-32">Usage</th>
-          <th class="text-left py-2.5 w-72">État compteur</th>
-          <th class="text-center py-2.5 w-44">Protocole(s)</th>
-          <th class="text-center py-2.5 w-24">Notes</th>
-          <th class="text-center py-2.5 w-24">Photos</th>
-          <th class="text-center px-5 py-2.5 w-12"></th>
+          <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
+          <DataTableSortHeader sort-key="meter_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
+          <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
+          <th>Req.</th>
+          <th>Prés.</th>
+          <th>Comm.</th>
+          <th>Câbl.</th>
+          <th>HS</th>
+          <th>Protocoles</th>
+          <th>Notes</th>
+          <th>Photos</th>
+          <th>Actions</th>
         </tr>
       </thead>
-      <tbody ref="metersBodyRef" class="divide-y divide-gray-100">
-        <PhotoDropTr v-for="m in meters" :key="m.id"
-                     :row-class="['group meter-row',
+      <tbody ref="metersBodyRef">
+        <PhotoDropTr v-for="m in sortedMeters" :key="m.id"
+                     :row-class="['meter-row',
                        m.out_of_service ? 'opacity-50' : '',
-                       m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40 border-l-2 border-l-red-300' : ''
+                       m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : ''
                      ].join(' ')"
                      :data-id="m.id"
                      :site-uuid="document?.site_uuid || ''"
                      :attach-to="{ meter_id: m.id }"
                      :enabled="!!document?.site_uuid"
                      @changed="refreshAuditData">
-          <td class="text-center align-middle">
+          <td class="align-middle">
             <button type="button"
                     class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                     v-tooltip="'Glisser pour réordonner'">
               <Bars3Icon class="w-4 h-4" />
             </button>
           </td>
-          <td class="px-5 py-2 text-gray-700 text-center">
+          <td class="text-gray-700 whitespace-nowrap">
             <span v-if="m.required && !m.present_actual && !m.out_of_service"
                   class="text-red-600 mr-1" v-tooltip="'Compteur requis non présent'">⚠</span>
             {{ m.zone_name || 'Compteur général' }}
           </td>
-          <td class="py-2.5 text-center"><MeterTypePill :type="m.meter_type" /></td>
-          <td class="py-2.5 text-center"><MeterUsagePill :usage="m.usage" /></td>
-          <td class="py-2.5 px-2">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <button type="button"
-                      @click="patchMeter(m, { required: !m.required })"
-                      :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']"
-                      v-tooltip="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
-                <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span> Requis
-              </button>
-              <button type="button"
-                      @click="patchMeter(m, { present_actual: !m.present_actual })"
-                      :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']"
-                      v-tooltip="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
-                <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span> Présent
-              </button>
-              <button v-if="m.present_actual" type="button"
-                      @click="patchMeter(m, m.communicating
-                        ? { communicating: false, communication_protocols: null, communication_protocol: null }
-                        : { communicating: true })"
-                      :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']">
-                <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span> Comm.
-              </button>
-              <button v-if="m.present_actual" type="button"
-                      @click="patchMeter(m, { wired: !m.wired })"
-                      :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']"
-                      v-tooltip="'Communication câblée vers la GTB'">
-                <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
-              </button>
-              <button type="button"
-                      @click="patchMeter(m, { out_of_service: !m.out_of_service })"
-                      :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']"
-                      v-tooltip="m.out_of_service ? 'Compteur hors service — ignoré dans le plan d\'action (cliquer pour réactiver)' : 'Marquer le compteur comme hors service'">
-                <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span> HS
-              </button>
+          <td><MeterTypePill :type="m.meter_type" /></td>
+          <td><MeterUsagePill :usage="m.usage" /></td>
+          <td class="whitespace-nowrap">
+            <button type="button"
+                    @click="patchMeter(m, { required: !m.required })"
+                    :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']"
+                    v-tooltip="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
+              <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span>
+            </button>
+          </td>
+          <td class="whitespace-nowrap">
+            <button type="button"
+                    @click="patchMeter(m, { present_actual: !m.present_actual })"
+                    :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']"
+                    v-tooltip="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
+              <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span>
+            </button>
+          </td>
+          <td class="whitespace-nowrap">
+            <button v-if="m.present_actual" type="button"
+                    @click="patchMeter(m, m.communicating
+                      ? { communicating: false, communication_protocols: null, communication_protocol: null }
+                      : { communicating: true })"
+                    :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']"
+                    v-tooltip="m.communicating ? 'Communicant (cliquer pour décocher)' : 'Non communicant'">
+              <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span>
+            </button>
+            <span v-else class="text-gray-300">—</span>
+          </td>
+          <td class="whitespace-nowrap">
+            <button v-if="m.present_actual" type="button"
+                    @click="patchMeter(m, { wired: !m.wired })"
+                    :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']"
+                    v-tooltip="'Communication câblée vers la GTB'">
+              <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span>
+            </button>
+            <span v-else class="text-gray-300">—</span>
+          </td>
+          <td class="whitespace-nowrap">
+            <button type="button"
+                    @click="patchMeter(m, { out_of_service: !m.out_of_service })"
+                    :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']"
+                    v-tooltip="m.out_of_service ? 'Compteur hors service — ignoré dans le plan d\'action (cliquer pour réactiver)' : 'Marquer le compteur comme hors service'">
+              <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span>
+            </button>
+          </td>
+          <td>
+            <div class="min-w-32">
+              <ProtocolMultiPicker
+                :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
+                :disabled="!m.communicating"
+                :options="protocolOptions"
+                size="xs"
+                @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
+              />
             </div>
           </td>
-          <td class="py-2.5 px-2">
-            <ProtocolMultiPicker
-              :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
-              :disabled="!m.communicating"
-              :options="protocolOptions"
-              size="xs"
-              @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
-            />
-          </td>
-          <td class="py-2.5 text-center">
+          <td>
             <button
               type="button"
               @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
@@ -222,7 +253,7 @@ onBeforeUnmount(teardownMetersSortable)
               <PencilSquareIcon class="w-4 h-4" />
             </button>
           </td>
-          <td class="py-2.5 text-center">
+          <td>
             <BacsPhotoButton
               v-if="document?.site_uuid"
               :site-uuid="document.site_uuid"
@@ -230,17 +261,17 @@ onBeforeUnmount(teardownMetersSortable)
               :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
             />
           </td>
-          <td class="px-5 py-2.5 text-right whitespace-nowrap">
-            <button @click="dupMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 transition" v-tooltip="'Dupliquer'">
+          <td class="whitespace-nowrap">
+            <button @click="dupMeter(m)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
               <DocumentDuplicateIcon class="w-4 h-4" />
             </button>
-            <button @click="removeMeter(m)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 p-1 transition" v-tooltip="'Supprimer'">
+            <button @click="removeMeter(m)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
               <TrashIcon class="w-4 h-4" />
             </button>
           </td>
         </PhotoDropTr>
         <tr class="bg-emerald-50/30">
-          <td colspan="9" class="px-5 py-3 text-center">
+          <td colspan="13" class="px-5 py-3 text-center">
             <button @click="emit('add-meter')" class="btn-success">
               <PlusIcon class="w-4 h-4" /> Ajouter un compteur
             </button>
@@ -249,12 +280,13 @@ onBeforeUnmount(teardownMetersSortable)
       </tbody>
       <tfoot v-if="!meters.length">
         <tr>
-          <td colspan="8" class="px-5 py-6 text-center text-xs text-gray-500">
+          <td colspan="13" class="px-5 py-6 text-center text-xs text-gray-500">
             Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
           </td>
         </tr>
       </tfoot>
     </table>
+    </div>
 
     <!-- Mobile : cards empilées (<768px) -->
     <div class="md:hidden divide-y divide-gray-100">

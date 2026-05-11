@@ -242,12 +242,23 @@ async function buildBacsAuditExportData(af, opts = {}) {
     return d.name || d.brand || d.model_reference || `Équipement #${d.id}`;
   };
 
-  const thermal = thermalRaw.map(t => ({
+  const thermal = thermalRaw.map(t => {
+    // Mig 135 : generator_type et generator_age_years ont migré sur le
+    // device pointé via generator_device_id. On les remonte ici pour le
+    // PDF / export (labels énergie + âge) en lisant le device source.
+    const prodDevice = t.generator_device_id ? devicesById.get(t.generator_device_id) : null;
+    const generatorEnergy = prodDevice?.energy_source || null;
+    const generatorAgeYears = prodDevice?.age_years ?? null;
+    return {
     ...t,
     category: t.category || 'heating',
     categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
     regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
-    generatorLabel: t.generator_type ? (GENERATOR_LABEL[t.generator_type] || t.generator_type) : '—',
+    // Compat ascendante : `generatorLabel` et `generator_age_years` exposés
+    // ici à partir du device pointé pour ne pas casser les templates PDF
+    // qui les référencent (bacs-audit-tables.hbs).
+    generatorLabel: generatorEnergy ? (GENERATOR_LABEL[generatorEnergy] || generatorEnergy) : '—',
+    generator_age_years: generatorAgeYears,
     // Mig 129 : décomposition par niveau Production / Distribution / Émission.
     // Chaque niveau expose nom de l'équipement-process + nom de l'équipement
     // de régulation + notes HTML.
@@ -274,7 +285,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
         notes_html: t.emission_notes_html || '',
       },
     ],
-  }));
+    };
+  });
 
   // Plan de mise en conformite groupe par severite
   const numberedItems = [

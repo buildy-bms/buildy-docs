@@ -311,8 +311,9 @@ function computeTargetActions(documentId) {
     `).all(documentId);
     for (const t of thermal) {
       // Exemption R175-6 II : appareil independant de chauffage au bois
-      // (soit via le flag explicite, soit via generator_type='wood_appliance').
-      const exempt = t.generator_exempt_wood || t.generator_type === 'wood_appliance';
+      // (via le flag explicite uniquement depuis mig 135 ; generator_type
+      // a ete supprime, l'energie est une propriete du device pointe).
+      const exempt = !!t.generator_exempt_wood;
       if (exempt) continue;
       if (!t.has_automatic_regulation) {
         addTarget({

@@ -226,6 +226,78 @@ strong, b { font-weight: 500; }
    * À appliquer sur les boutons mobiles, items de bottom nav, FAB, etc.
    */
   .tap-target { min-height: 44px; min-width: 44px; }
+
+  /**
+   * Data-table : look standard pour tous les tableaux d'audit desktop
+   * (systèmes, zones, compteurs, régulation thermique). En-tête fond
+   * gris, valeurs centrées, bordures fines, lignes alternées (zebra),
+   * hover qui surligne. En-têtes triables (.sortable) avec ↑↓↕.
+   */
+  .data-table {
+    border-collapse: collapse;
+    border: 1px solid theme('colors.gray.200');
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .data-table thead th {
+    background: theme('colors.gray.50');
+    border-bottom: 1px solid theme('colors.gray.200');
+    border-right: 1px solid theme('colors.gray.100');
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: theme('colors.gray.500');
+    white-space: nowrap;
+    user-select: none;
+    text-align: center;
+  }
+  .data-table thead th:last-child {
+    border-right: none;
+  }
+  .data-table thead th.sortable {
+    cursor: pointer;
+  }
+  .data-table thead th.sortable:hover {
+    background: theme('colors.gray.100');
+    color: theme('colors.gray.700');
+  }
+  .data-table thead th .sort-ico {
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.5;
+  }
+  .data-table thead th.sortable:hover .sort-ico {
+    opacity: 1;
+  }
+  .data-table tbody td {
+    padding: 6px 10px;
+    border-bottom: 1px solid theme('colors.gray.100');
+    border-right: 1px solid theme('colors.gray.50');
+    vertical-align: middle;
+    text-align: center;
+  }
+  .data-table tbody td:last-child {
+    border-right: none;
+  }
+  .data-table tbody tr:nth-child(even) td {
+    background: #fafbfc;
+  }
+  .data-table tbody tr:hover td {
+    background: theme('colors.gray.100');
+  }
+  .data-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  /* Centre les inputs textes/nombres dans les cellules. Les flex internes
+     (groupes de pills, actions) doivent déjà être justify-center via leur
+     propre classe. */
+  .data-table tbody td input[type="text"],
+  .data-table tbody td input[type="number"] {
+    text-align: center;
+  }
 }
 
 /**
