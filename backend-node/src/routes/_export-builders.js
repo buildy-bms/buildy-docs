@@ -597,21 +597,24 @@ function buildOfferingsAnnexForAf(af) {
 
   // Niveaux d'offre :
   //  - is_target  → niveau cible AF (engagement contractuel choisi par MOA)
-  //  - is_required → niveau Buildy requis :
-  //      Lot 92 : af.service_level fait foi quand renseigne (input MOA).
-  //      Fallback resolveAfLevel pour anciennes AFs sans niveau choisi.
+  //  - is_required → niveau Buildy requis (calcul depuis le contenu de l'AF) :
+  //      Toujours calcule via resolveAfLevel (peut etre superieur, egal ou
+  //      inferieur au target). Quand target < required, le tableau de
+  //      synthese met en avant la colonne required pour que le MOA voit
+  //      clairement qu'un upgrade est necessaire.
   //  Le template masque le badge required quand target == required.
   const allLevels = db.offeringLevels.list();
   const targetSlug = (af.service_level || '').toUpperCase();
   const summary = buildContractualSummaryForAf(af);
   const sectionsForLevel = db.sections.listByAf(af.id);
-  let requiredSlug;
-  if (af.service_level) {
-    requiredSlug = af.service_level.toUpperCase();
-  } else {
-    const requiredAfLevel = resolveAfLevel(sectionsForLevel.filter(s => !s.opted_out_by_moa));
-    requiredSlug = requiredAfLevel?.level || null;
-  }
+  // Exclut les sections refusees MOA (opted_out) ET celles en option payante
+  // souscrite (optin_paid_option) : un paid option pris ne force pas
+  // d'upgrade du niveau, c'est un add-on facture en sus.
+  const sectionsForCalc = sectionsForLevel.filter(s =>
+    !s.opted_out_by_moa && !s.optin_paid_option
+  );
+  const requiredAfLevel = resolveAfLevel(sectionsForCalc);
+  const requiredSlug = requiredAfLevel?.level || null;
   const levels = allLevels.map(l => ({
     ...l,
     is_target: l.slug === targetSlug,
