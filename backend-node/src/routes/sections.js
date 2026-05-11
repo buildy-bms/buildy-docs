@@ -616,6 +616,8 @@ async function routes(fastify) {
       key: b.key, label: b.label, bacs: b.bacs,
       iconValue: b.icon_value, iconColor: b.icon_color, position: b.position,
     });
+    // Resurrection explicite : on retire le tombstone si la key revient.
+    db.db.prepare('DELETE FROM deleted_system_category_keys WHERE key = ?').run(b.key);
     // Si l'admin a coche des slugs (templates) a la creation, on synchronise
     // equipment_templates.category vers cette nouvelle key.
     if (Array.isArray(b.slugs) && b.slugs.length) {
@@ -734,6 +736,9 @@ async function routes(fastify) {
       });
     }
     db.systemCategoriesDb.delete(id);
+    // Tombstone (mig 137) : empeche seedSystemCategoriesOnBoot de recreer
+    // la categorie au prochain restart.
+    db.db.prepare('INSERT OR IGNORE INTO deleted_system_category_keys (key) VALUES (?)').run(cur.key);
     db.auditLog.add({ userId: request.authUser?.id, action: 'system_category.delete',
       payload: { id, key: cur.key, label: cur.label } });
     return { ok: true };

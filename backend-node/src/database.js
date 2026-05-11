@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 136;
+const TARGET_VERSION = 137;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5609,6 +5609,20 @@ function runMigrations() {
     `);
     log.info('Migration 136 appliquee : table tombstones par point biblio (deleted_equipment_template_point_slugs)');
     db.pragma('user_version = 136');
+  }
+
+  if (current < 137) {
+    // Tombstones par cle de categorie systeme : meme bug pattern que les
+    // points biblio (mig 136). Une categorie supprimee via l'UI revenait
+    // au prochain boot car seedSystemCategoriesOnBoot la re-creait.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS deleted_system_category_keys (
+        key TEXT PRIMARY KEY,
+        deleted_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    log.info('Migration 137 appliquee : table tombstones categories systeme (deleted_system_category_keys)');
+    db.pragma('user_version = 137');
   }
 
   if (current > TARGET_VERSION) {
