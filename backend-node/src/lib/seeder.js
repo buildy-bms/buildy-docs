@@ -618,9 +618,15 @@ function seedSystemCategoriesOnBoot() {
     process:       { icon: 'fa-industry',      color: '#475569' },
     autres:        { icon: 'fa-cube',          color: '#6b7280' },
   };
+  // Tombstones (mig 137) : si l'utilisateur a explicitement supprime une
+  // categorie via l'UI biblio, on ne la recree pas au boot suivant.
+  const tombstonedKeys = new Set(
+    db.db.prepare('SELECT key FROM deleted_system_category_keys').all().map(r => r.key)
+  );
   let created = 0;
   for (let i = 0; i < SYSTEM_CATEGORIES.length; i++) {
     const c = SYSTEM_CATEGORIES[i];
+    if (tombstonedKeys.has(c.key)) continue;
     if (db.systemCategoriesDb.getByKey(c.key)) continue;
     const icon = ICONS[c.key] || { icon: 'fa-cube', color: '#6b7280' };
     // Mig 121 : `slugs` n'existe plus en colonne. Le rattachement
