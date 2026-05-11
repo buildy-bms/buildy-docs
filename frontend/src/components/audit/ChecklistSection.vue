@@ -114,8 +114,10 @@ function closePopover(e) {
   if (popoverRef.value.contains(e.target)) return
   popoverOpen.value = null
 }
-onMounted(() => document.addEventListener('mousedown', closePopover))
-onBeforeUnmount(() => document.removeEventListener('mousedown', closePopover))
+// NB : `document` est shadowed par le ref destructuré ligne 47 — on passe
+// par `window.document` pour pointer le DOM global.
+onMounted(() => window.document.addEventListener('mousedown', closePopover))
+onBeforeUnmount(() => window.document.removeEventListener('mousedown', closePopover))
 
 function gotoEntity(kind, entityId) {
   popoverOpen.value = null

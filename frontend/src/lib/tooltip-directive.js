@@ -102,6 +102,7 @@ function position(target, placement) {
 }
 
 function show(target, opts) {
+  if (!target) return
   clearTimeout(hideTimer)
   hideTimer = null
   const text = typeof opts === 'string' ? opts : (opts?.text || '')
@@ -138,10 +139,13 @@ function getOpts(binding) {
 }
 
 function onEnter(e) {
-  const opts = e.currentTarget.__tooltipOpts
+  // Capture synchrone : e.currentTarget est nullé après le retour du handler
+  // (spec DOM), donc on ne peut PAS y accéder depuis le setTimeout.
+  const target = e.currentTarget
+  const opts = target.__tooltipOpts
   if (!opts) return
   clearTimeout(showTimer)
-  showTimer = setTimeout(() => show(e.currentTarget, opts), SHOW_DELAY)
+  showTimer = setTimeout(() => show(target, opts), SHOW_DELAY)
 }
 
 function onLeave() {
