@@ -407,8 +407,13 @@ async function routes(fastify) {
       !s.optin_paid_option && _availAtTarget(s) !== 'paid_option'
     );
     const required = resolveAfLevel(liveSectionsForLevelCalc);
-    const requiredLevel = contractLevel || required.level || null;
-    const levelVerdict = buildLevelVerdict({ requiredLevel: required.level || null, contractLevel });
+    // Niveau Buildy requis = ce que les sections de l'AF imposent reellement,
+    // independamment du contrat choisi par la MOA. Si le contrat (visé) est
+    // inferieur, le verdict signale "Dépasse le contrat" — c'est le rôle de
+    // cette page de garde. Avant : fallback vers contractLevel masquait le
+    // dépassement (bug isolé 2026-05-11).
+    const requiredLevel = required.level || null;
+    const levelVerdict = buildLevelVerdict({ requiredLevel, contractLevel });
 
     // Compteur d'options payantes a la carte choisies par le MOA (mig 91).
     const optinPaidOptionCount = liveSections.filter(s => !!s.optin_paid_option).length;
