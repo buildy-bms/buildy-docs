@@ -383,8 +383,12 @@ async function pushToCrisp() {
 }
 
 function onRewritten(payload) {
-  // Émis par FaqRichTextEditor après /api/faq/ai/rewrite
+  // Émis par FaqRichTextEditor après /api/faq/ai/rewrite. Cet endpoint bumpe
+  // `updated_at` server-side (via lastAiAssistAt) ; sans refresh ici, le save
+  // suivant déclencherait un faux 409 "Conflit de version".
   if (payload?.html) draft.value.content_html = payload.html
+  if (payload?.suggested_title) suggestedTitle.value = payload.suggested_title
+  if (payload?.updated_at && original.value) original.value.updated_at = payload.updated_at
 }
 function onSuggestedTitle(title) {
   suggestedTitle.value = title
