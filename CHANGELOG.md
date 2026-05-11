@@ -6,6 +6,44 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Le 
 
 Sprint d'amélioration en cours. Plan complet dans [`docs/improvements-sprint.md`](docs/improvements-sprint.md). 10 lots planifiés, ~10-12 jours de travail.
 
+### Refonte data-tables desktop audit BACS (v0.1.4 → v0.1.9) ✅
+
+Refonte du rendu desktop des 4 listes principales d'un audit en **vrais data-tables alignés** avec entêtes triables, bordures fines, lignes alternées, hover, actions icon-only, drag-drop conservé.
+
+- **CSS factorisé** [`frontend/src/assets/main.css`](frontend/src/assets/main.css) `@layer components` — classe `.data-table` partagée, fond gris des thead, indicateurs de tri ↑↓↕, pills de flags `.flag-pill` / `.flag-on` / `.flag-off`.
+- **Composable [`useTableSort`](frontend/src/composables/useTableSort.js)** (asc → desc → off) + **[`DataTableSortHeader.vue`](frontend/src/components/DataTableSortHeader.vue)** — pattern unifié pour tous les tableaux.
+- **Card 02 Zones** [`ZonesSection.vue`](frontend/src/components/audit/ZonesSection.vue) — 7 colonnes alignées, tri Nom + Surface, actions Dup/Suppr toujours visibles.
+- **Card 03 Systèmes** [`SystemDevicesTable.vue`](frontend/src/components/SystemDevicesTable.vue) — colonnes Quantité, Puissance, **Âge** (déplacé depuis Card 05), Protocoles 1er+badge `+N`, actions Notes/Photo/Partage/Dup/Suppr icon-only, stepper desktop repliable.
+- **Card 04 Compteurs** [`MetersSection.vue`](frontend/src/components/audit/MetersSection.vue) — 13 colonnes alignées dont 5 colonnes flags séparées (Requis / Présent / Communicant / Câblé / Hors service).
+- **Card 05 Régulation thermique** [`ThermalSection.vue`](frontend/src/components/audit/ThermalSection.vue) — 12 colonnes alignées, **1 ligne par couple zone × usage** (plus de dépliage), ligne détail R175-6 toujours visible sous chaque couple, tri Zone + Usage + Type de régul. `Granularité` renommé en `Type de régul`.
+
+**Migration 135** : `bacs_audit_system_devices.age_years` (déplacé depuis `bacs_audit_thermal_regulation.generator_age_years`). Drop `generator_type` (redondant avec `device.energy_source`).
+
+### Régulation thermique R175-6 — 3 niveaux + exemption bois auto (v0.1.10) ✅
+
+- **3 niveaux d'équipement par couple zone × usage** : Production / Distribution / Émission, avec un sélecteur d'équipement de régulation par niveau (TEXT libres `creatable`). Icône notes 📝 à côté du sélecteur de régulation, point bleu si la note existe (`<level>_notes_html`).
+- **Exemption R175-6 II (générateurs bois)** : détection automatique via `device.energy_source = 'wood'` du générateur de production pointé. Checkbox « Exempté bois » pré-cochée et grisée. Le générateur d'actions correctives [`bacs-audit-action-generator.js`](backend-node/src/lib/bacs-audit-action-generator.js) skip l'action R175-6 II quand l'exemption est détectée.
+- **En-têtes desktop lisibles** : libellés complets (Quantité, Puissance, Requis/Présent/Communicant/Câblé/Hors service, Type de régulation, Régulation auto, Régulation production/distribution/émission). Plus de troncatures cryptiques.
+
+### Tooltips Buildy v-tooltip (v0.1.10 → v0.1.12) ✅
+
+- **Délai 30 ms** (vs 120 ms) — perception quasi-instantanée, indispensable sur les data-tables denses où plusieurs icônes s'enchaînent (Notes / Photo / Partage / Dup / Suppr).
+- **Nouvelle directive [`v-truncate-tooltip`](frontend/src/lib/tooltip-directive.js)** — affiche automatiquement le texte complet quand une cellule déborde (`scrollWidth > clientWidth`). Aucun argument requis, lit `textContent` au survol.
+- **Tooltip sur SystemCategoryIcon** — l'icône seule ne portait pas de libellé, ajout du nom de catégorie en tooltip.
+- **Migration des derniers `title=` HTML natifs vers `v-tooltip`** — exports PDF, bouton HS, BmsTopicNoteButton, régénération du plan.
+- **Fix [`tooltip-directive.js`](frontend/src/lib/tooltip-directive.js) (v0.1.11+12)** : capture de `el` via closure dans le mount au lieu de lire `e.currentTarget` dans le setTimeout (la spec DOM résette `currentTarget` à null après le retour du handler, le tooltip ne s'affichait plus du tout sur certains navigateurs).
+- **Fix shadowing `document`** dans [`ChecklistSection.vue`](frontend/src/components/audit/ChecklistSection.vue) — `const { document } = storeToRefs(audit)` masquait le DOM global, `document.addEventListener` ciblait la Ref Pinia. Forcé `window.document.addEventListener(...)`.
+- **Bump SW v4 → v5** [`frontend/public/sw.js`](frontend/public/sw.js) — force purge des caches StaleWhileRevalidate qui pouvaient continuer à servir les anciens chunks après deploy.
+
+### PWA tactile audit BACS (v0.1.0 → v0.1.3) ✅
+
+- **Modale d'ajout de systèmes tactile** — taille auto, items ≥ 44 px, plus de troncature, stack vertical sur les listes (mémoire `feedback_pwa_all_touch.md`).
+- **Sous-section « Communication » par device** — Protocoles puis Câblé regroupés desktop + PWA pour cohérence.
+- **Sync desktop → PWA** : polling 5 s + listener `pageshow` à chaque navigation d'onglet — éditions desktop visibles côté PWA quasi-immédiatement.
+- **KPI cliquables → entité ciblée** : taper un KPI (Zones / Systèmes / Compteurs / GTB) ouvre directement la fiche correspondante (et non la liste). Card de site dans les KPIs Docs.
+- **Photos terrain par action** du plan de mise en conformité — `BacsPhotoButton` attaché aux items du plan.
+- **Bouton Photos zones en haut** + bandeau « Nouvelle version disponible » desktop + PWA.
+
 ### Lot B1 — Aperçu HTML/PDF avant export ✅
 
 **Audit BACS** :
