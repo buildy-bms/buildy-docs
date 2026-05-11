@@ -7794,7 +7794,7 @@ const auditSync = {
   fetchBatch(cursor, limit = 500) {
     return db.prepare(`
       SELECT a.id, a.created_at, a.action, a.af_id, a.section_id, a.template_id,
-             a.payload, COALESCE(u.email, u.display_name) AS username,
+             a.payload, COALESCE(u.display_name, u.email) AS username,
              s.site_uuid
       FROM audit_log a
       LEFT JOIN users u ON u.id = a.user_id

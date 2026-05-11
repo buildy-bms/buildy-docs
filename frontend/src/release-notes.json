@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.31",
+      "date": "2026-05-11",
+      "title": "Audit trail FM : nom d'utilisateur Docs (au lieu de l'email)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les events Docs affichent le nom complet de l'utilisateur dans Fleet Manager",
+          "what": "Le worker de consolidation poussait l'email en valeur d'utilisateur. Désormais il pousse le nom complet (`display_name` PocketID) avec fallback sur l'email. Aligné avec les autres sources (FM, passerelles).",
+          "where": "Fleet Manager → Audit → filtre source « Buildy Docs » → colonne Utilisateur.",
+          "how_to_test": "Fais une action côté Docs, attends ~1 minute, ouvre l'audit FM filtré sur Buildy Docs : le nom (ex. « Kevin Brocard ») apparaît au lieu de l'email."
+        }
+      ]
+    },
+    {
       "version": "0.1.30",
       "date": "2026-05-11",
       "title": "Correctif : worker de consolidation audit trail réparé",
