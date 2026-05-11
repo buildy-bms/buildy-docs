@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.38",
+      "date": "2026-05-11",
+      "title": "Fix : description IA ne contient plus le décompte de caractères en fin",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de « Comptage : 144 caractères. » à la fin des descriptions générées",
+          "what": "La règle « compte les caractères avant de répondre » du prompt v0.1.37 était mal interprétée par l'IA : elle ajoutait son comptage en fin de sortie (« Comptage : 144 caractères. », « ✓ »). Reformulation du prompt + garde-fou postprocessing qui strip ces résidus.",
+          "where": "Baguette description dans l'éditeur FAQ + génération automatique d'articles.",
+          "how_to_test": "Reclique la baguette description plusieurs fois : aucune sortie ne doit contenir « Comptage », « caractères », « ✓ » ni de décompte chiffré en fin."
+        }
+      ]
+    },
+    {
       "version": "0.1.37",
       "date": "2026-05-11",
       "title": "Refonte profonde des prompts IA FAQ : titres + descriptions + corps « parfaits »",
