@@ -5,9 +5,12 @@ import {
   PencilSquareIcon, TrashIcon, PlusIcon,
 } from '@heroicons/vue/24/outline'
 
-defineProps({
+const props = defineProps({
   category: { type: Object, required: true },
   selected: { type: [Number, null], default: null },
+  // Si true, rend une pill horizontale (barre catégorie en haut de la FAQ).
+  // Sinon, rend l'arbre vertical classique (avec children imbriqués).
+  pill: { type: Boolean, default: false },
 })
 const emit = defineEmits(['select', 'edit', 'push', 'delete', 'new-child'])
 
@@ -20,7 +23,44 @@ function onClickAway(e) {
 </script>
 
 <template>
-  <div>
+  <!-- Variante pill : utilisée dans la barre catégorie horizontale en haut de
+       la FAQ. Pas d'arbre, pas d'icône dossier ; menu actions au hover. -->
+  <div v-if="pill" class="relative group inline-flex" data-faq-cat-menu>
+    <button @click="emit('select', category.id)"
+            :class="['inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition whitespace-nowrap',
+                     selected === category.id
+                       ? 'bg-indigo-600 text-white font-medium'
+                       : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200']">
+      {{ category.name }}
+      <span v-if="category.dirty" class="w-1.5 h-1.5 rounded-full bg-orange-400" v-tooltip="'Modifiée localement'" />
+    </button>
+    <button @click.stop="menuOpen = !menuOpen"
+            class="opacity-0 group-hover:opacity-100 absolute -right-1 -top-1 p-0.5 rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition">
+      <EllipsisHorizontalIcon class="w-3 h-3 text-gray-500" />
+    </button>
+    <Teleport to="body">
+      <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false" />
+    </Teleport>
+    <div v-if="menuOpen"
+         class="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg w-48 py-1">
+      <button @click="emit('edit', category); menuOpen = false"
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 inline-flex items-center gap-2 whitespace-nowrap">
+        <PencilSquareIcon class="w-3.5 h-3.5 shrink-0" /> Renommer
+      </button>
+      <button @click="emit('push', category); menuOpen = false"
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 inline-flex items-center gap-2 whitespace-nowrap">
+        <ArrowUpOnSquareIcon class="w-3.5 h-3.5 shrink-0" /> Publier vers Crisp
+      </button>
+      <div class="border-t border-gray-100 my-1" />
+      <button @click="emit('delete', category); menuOpen = false"
+              class="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 inline-flex items-center gap-2 whitespace-nowrap">
+        <TrashIcon class="w-3.5 h-3.5 shrink-0" /> Supprimer
+      </button>
+    </div>
+  </div>
+
+  <!-- Variante par défaut : arbre vertical avec children imbriqués. -->
+  <div v-else>
     <div class="group flex items-center gap-1 hover:bg-gray-50 rounded">
       <button v-if="category.children?.length" @click="expanded = !expanded" class="p-0.5 shrink-0">
         <FolderOpenIcon v-if="expanded" class="w-3.5 h-3.5 text-gray-400" />

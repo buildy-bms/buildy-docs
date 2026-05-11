@@ -36,11 +36,14 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: 'Rédigez l\'article…' },
   minHeight: { type: String, default: '320px' },
-  // Si fourni, le bouton "Réécrire avec IA" est actif et appelle /api/faq/ai/rewrite
-  // avec cet articleId. Si null, le bouton est masqué.
+  // Si fourni, le bouton "Réécrire avec IA" est actif et émet
+  // `request-rewrite-full` pour que le parent ouvre la modale d'instructions.
+  // Si null, le bouton est masqué.
   articleId: { type: [Number, String, null], default: null },
+  // Reflète l'état "réécriture en cours" géré par le parent (modale ouverte).
+  rewriting: { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:modelValue', 'suggested-title', 'rewritten'])
+const emit = defineEmits(['update:modelValue', 'suggested-title', 'rewritten', 'request-rewrite-full'])
 const { success, error: notifyError } = useNotification()
 
 // ── Extension Image custom : ajoute data-placeholder + width ────────
@@ -343,24 +346,14 @@ function applyRewrittenSelection(data) {
 }
 
 // ── Bouton IA "Réécrire avec IA" ──────────────────────────────────
-const aiRunning = ref(false)
-async function rewriteWithAi() {
+// Le bouton émet `request-rewrite-full` au parent qui ouvre la modale
+// d'instructions custom (anti-hallucination, angle éditorial…). C'est le
+// parent qui appelle l'API ; on reflète juste son état de chargement via
+// la prop `rewriting`.
+const aiRunning = computed(() => props.rewriting)
+function rewriteWithAi() {
   if (!props.articleId) return
-  aiRunning.value = true
-  try {
-    const { data } = await api.post('/faq/ai/rewrite', { article_id: props.articleId })
-    if (data.html) {
-      editor.value?.commands.setContent(data.html, true)
-      emit('update:modelValue', data.html)
-    }
-    if (data.suggested_title) emit('suggested-title', data.suggested_title)
-    emit('rewritten', data)
-    success('Article réécrit par l\'IA')
-  } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec de la réécriture IA')
-  } finally {
-    aiRunning.value = false
-  }
+  emit('request-rewrite-full')
 }
 
 const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none px-4 py-3')

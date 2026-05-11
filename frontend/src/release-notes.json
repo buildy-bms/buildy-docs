@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.34",
+      "date": "2026-05-11",
+      "title": "Réécriture IA avec instructions custom + page FAQ pleine largeur",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Tu peux désormais donner des instructions précises à l'IA pour réécrire un article",
+          "what": "Le bouton « Réécrire avec IA » (top-bar de l'éditeur ET toolbar de mise en forme) ouvre maintenant une modale avec un champ instructions optionnel. Vide → réécriture standard (clarté, structure, SEO). Renseigné → tes instructions deviennent prioritaires (utile contre les hallucinations, pour imposer un angle, restreindre la longueur, exclure du jargon technique, etc.). Un snapshot est créé avant comme avant.",
+          "where": "FAQ Buildy → éditeur d'un article → bouton « Réécrire avec IA » (les deux : top-bar à droite + toolbar de l'éditeur).",
+          "how_to_test": "Ouvre un article, clique « Réécrire avec IA ». La modale s'ouvre. Saisis par exemple « Ne mentionne pas les protocoles techniques (Modbus, BACnet). Garde 3 sections H2 max. N'invente aucun chiffre ». Clique « Réécrire ». L'article est régénéré selon tes consignes."
+        },
+        {
+          "kind": "ux",
+          "title": "Page FAQ Buildy : catégories en barre horizontale, tableau d'articles pleine largeur",
+          "what": "L'arbre de catégories à gauche est remplacé par une barre de pills horizontale au-dessus du tableau. Le tableau prend toute la largeur (~30% plus large). Les boutons « Suggestions IA » et « Générer depuis une question » sont remontés dans le header de la page. Édition/publication/suppression d'une catégorie restent accessibles via le menu d'actions au survol de chaque pill.",
+          "where": "Sidebar → FAQ Buildy (/faq).",
+          "how_to_test": "Ouvre /faq : les catégories apparaissent comme pills en haut, le tableau d'articles est pleine largeur, plus de vide vertical à gauche."
+        }
+      ]
+    },
+    {
       "version": "0.1.33",
       "date": "2026-05-11",
       "title": "Correctif : images d'article disparues à la publication Crisp",

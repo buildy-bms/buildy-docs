@@ -399,6 +399,16 @@ function selectCategory(id) {
         </p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
+        <button @click="runSuggestMissing"
+                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap">
+          <SparklesIcon class="w-4 h-4 shrink-0" />
+          Suggestions IA
+        </button>
+        <button @click="generateModalOpen = true"
+                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap">
+          <SparklesIcon class="w-4 h-4 shrink-0" />
+          Générer depuis une question
+        </button>
         <button v-if="credentialsConfigured" @click="pull" :disabled="store.loadingPull"
                 class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
           <ArrowDownTrayIcon class="w-4 h-4 shrink-0" :class="store.loadingPull ? 'animate-pulse' : ''" />
@@ -469,51 +479,33 @@ function selectCategory(id) {
       </div>
     </div>
 
-    <!-- Layout 2 colonnes : arbre + table -->
+    <!-- Barre catégories horizontale (filtres rapides) -->
+    <div class="mb-4 bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-2 flex-wrap">
+      <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide mr-1">Catégories</span>
+      <button @click="selectCategory(null)"
+              :class="['inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition whitespace-nowrap',
+                       store.selectedCategoryId === null
+                         ? 'bg-indigo-600 text-white font-medium'
+                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200']">
+        Tous les articles
+        <span :class="['text-xs tabular-nums', store.selectedCategoryId === null ? 'text-indigo-100' : 'text-gray-400']">{{ store.articles.length }}</span>
+      </button>
+      <FaqCategoryNode v-for="cat in categoryTree" :key="cat.id"
+                       :category="cat" :selected="store.selectedCategoryId" pill
+                       @select="selectCategory" @edit="(c) => openCategoryModal(null, c)"
+                       @push="pushCategory" @delete="deleteCategory"
+                       @new-child="(parentId) => openCategoryModal(parentId, null)" />
+      <button @click="openCategoryModal()"
+              class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-full border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition whitespace-nowrap"
+              v-tooltip="'Nouvelle catégorie'">
+        <PlusIcon class="w-3.5 h-3.5 shrink-0" />
+        Nouvelle catégorie
+      </button>
+    </div>
+
+    <!-- Liste articles (pleine largeur) -->
     <div class="grid grid-cols-12 gap-6">
-      <!-- Sidebar arbre catégories -->
-      <aside class="col-span-12 md:col-span-3">
-        <div class="bg-white border border-gray-200 rounded-lg p-4 sticky top-4">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-semibold text-gray-700">Catégories</h3>
-            <button @click="openCategoryModal()" class="p-1 hover:bg-gray-100 rounded shrink-0" v-tooltip="'Nouvelle catégorie'">
-              <PlusIcon class="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-
-          <button @click="selectCategory(null)"
-                  :class="['w-full text-left px-2 py-1.5 rounded text-sm transition',
-                           store.selectedCategoryId === null ? 'bg-indigo-50 text-indigo-700 font-medium' : 'hover:bg-gray-50 text-gray-700']">
-            Tous les articles
-            <span class="text-xs text-gray-400 ml-1">({{ store.articles.length }})</span>
-          </button>
-
-          <ul class="mt-2 space-y-0.5">
-            <li v-for="cat in categoryTree" :key="cat.id">
-              <FaqCategoryNode :category="cat" :selected="store.selectedCategoryId"
-                               @select="selectCategory" @edit="(c) => openCategoryModal(null, c)"
-                               @push="pushCategory" @delete="deleteCategory"
-                               @new-child="(parentId) => openCategoryModal(parentId, null)" />
-            </li>
-          </ul>
-
-          <div class="mt-4 pt-4 border-t border-gray-100 space-y-2">
-            <button @click="runSuggestMissing"
-                    class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap">
-              <SparklesIcon class="w-4 h-4 shrink-0" />
-              Suggestions IA
-            </button>
-            <button @click="generateModalOpen = true"
-                    class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap">
-              <SparklesIcon class="w-4 h-4 shrink-0" />
-              Générer depuis une question
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Liste articles -->
-      <main class="col-span-12 md:col-span-9">
+      <main class="col-span-12">
         <div class="bg-white border border-gray-200 rounded-lg">
           <div class="p-4 border-b border-gray-100 flex items-center gap-3 flex-wrap">
             <div class="relative flex-1 min-w-50">

@@ -1457,7 +1457,7 @@ async function assistFaqRewriteDescription({ article }) {
   return { description, usage: resp.usage };
 }
 
-async function assistFaqRewrite({ article }) {
+async function assistFaqRewrite({ article, instructions = null }) {
   if (!article) throw new Error('Article manquant');
   const corpus = buildBuildyCorpusContext({ mode: 'full' });
   const fewShot = _buildFewShotBlock({ excludeId: article.id });
@@ -1491,6 +1491,18 @@ async function assistFaqRewrite({ article }) {
     if (retryContext?.feedback) {
       userParts.push(retryContext.feedback);
     } else {
+      // Instructions custom de l'utilisateur (saisies dans la modale frontend) :
+      // priorité absolue, en plus des règles du prompt système. Utile pour
+      // corriger une hallucination ou imposer un angle (audience, longueur,
+      // termes à éviter).
+      if (instructions && String(instructions).trim()) {
+        userParts.push(
+          `=== INSTRUCTIONS PRIORITAIRES DE L'UTILISATEUR ===`,
+          String(instructions).trim(),
+          `Applique ces instructions EN PRIORITÉ sur les règles standard. Si une instruction contredit le prompt système, l'instruction utilisateur l'emporte sauf pour la syntaxe Crisp Markdown et la sécurité (URLs réelles uniquement, pas d'invention factuelle).`,
+          ``,
+        );
+      }
       userParts.push(`Réécris l'article en améliorant clarté et structure. Réponds par le HTML uniquement (avec marker TITLE en tête si tu changes le titre).`);
     }
     const resp = await client().messages.create({

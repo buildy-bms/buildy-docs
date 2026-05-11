@@ -576,7 +576,13 @@ export const deleteFaqArticle = (id) => api.delete(`/faq/articles/${id}`)
 export const pushFaqArticle = (id) => api.post(`/faq/articles/${id}/push`)
 export const pullFaqArticleFromCrisp = (id) => api.post(`/faq/articles/${id}/pull`)
 
-export const faqAiRewrite = (article_id) => api.post('/faq/ai/rewrite', { article_id })
+export const faqAiRewrite = (payload) => {
+  // Accepte un id (legacy) ou un objet { article_id, instructions }.
+  const body = (payload && typeof payload === 'object')
+    ? { article_id: payload.article_id, instructions: payload.instructions || null }
+    : { article_id: payload }
+  return api.post('/faq/ai/rewrite', body)
+}
 export const faqAiRewriteTitle = (article_id) => api.post('/faq/ai/rewrite-title', { article_id })
 export const faqAiRewriteDescription = (article_id) => api.post('/faq/ai/rewrite-description', { article_id })
 // Génération article FAQ — accepte un objet riche.
