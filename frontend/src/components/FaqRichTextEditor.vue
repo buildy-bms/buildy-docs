@@ -292,6 +292,29 @@ function onPaste(e) {
   }
 }
 
+// ── Taille d'affichage des images ─────────────────────────────────
+// 3 presets + pleine largeur. La valeur est l'attribut width (px) appliqué à
+// l'<img>. Le converter crisp-markdown.js sérialise width="W" en `=Wxauto`,
+// que Crisp affiche tel quel côté help.buildy.fr. `null` = pas d'attribut
+// width = image en pleine largeur du container (max 100%).
+const IMAGE_SIZE_PRESETS = [
+  { id: 'small', label: 'Petite', width: 320 },
+  { id: 'medium', label: 'Moyenne', width: 560 },
+  { id: 'large', label: 'Grande', width: 900 },
+  { id: 'full', label: 'Pleine largeur', width: null },
+]
+
+function setImageWidth(width) {
+  if (!editor.value) return
+  editor.value.chain().focus().updateAttributes('image', { width }).run()
+}
+
+function currentImageWidth() {
+  if (!editor.value) return null
+  const w = editor.value.getAttributes('image')?.width
+  return w ? Number(w) : null
+}
+
 // ── BubbleMenu : réécrire la sélection avec l'IA ──────────────────
 const rewriteSelectionModalOpen = ref(false)
 const rewriteSelectionHtml = ref('')
@@ -462,6 +485,28 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
         </div>
       </BubbleMenu>
 
+      <!-- BubbleMenu image : apparaît quand une image est sélectionnée.
+           Permet de régler la taille d'affichage (4 presets). Sans ça, les
+           images partent en pleine résolution sur help.buildy.fr (jusqu'à
+           1600px de large) et débordent. -->
+      <BubbleMenu v-if="editor" :editor="editor"
+                  :should-show="({ editor: ed }) => ed.isActive('image')">
+        <div class="inline-flex items-center gap-1 px-1.5 py-1 bg-white border border-gray-200 rounded-lg shadow-md text-xs">
+          <span class="px-1.5 text-gray-500 font-medium whitespace-nowrap">Taille :</span>
+          <button v-for="p in IMAGE_SIZE_PRESETS" :key="p.id" type="button"
+                  @click="setImageWidth(p.width)"
+                  :class="[
+                    'px-2 py-1 rounded font-medium whitespace-nowrap transition',
+                    currentImageWidth() === p.width
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  ]"
+                  :title="p.width ? `Largeur ${p.width}px` : 'Pleine largeur du container'">
+            {{ p.label }}
+          </button>
+        </div>
+      </BubbleMenu>
+
       <EditorContent :editor="editor" :class="editorClass" />
     </div>
 
@@ -494,6 +539,19 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
 :deep(.ProseMirror ol) { list-style: decimal; padding-left: 1.5rem; margin: 0.5em 0; }
 :deep(.ProseMirror li) { margin: 0.25em 0; }
 :deep(.ProseMirror li > p) { margin: 0.1em 0; }
+/* Images : respectent l'attribut width (px) sans déborder du container */
+:deep(.ProseMirror img) {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.7em auto;
+  border-radius: 0.375rem;
+  border: 1px solid #e5e7eb;
+}
+:deep(.ProseMirror img.ProseMirror-selectednode) {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
 /* Citation neutre (sans variante) */
 :deep(.ProseMirror blockquote) {
   border-left: 3px solid #d1d5db;
