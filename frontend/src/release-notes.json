@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.32",
+      "date": "2026-05-11",
+      "title": "FAQ Buildy : régler la taille des images d'article",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Nouvelle barre flottante sur les images : 4 tailles d'affichage",
+          "what": "Clique sur une image dans l'éditeur FAQ : une petite barre apparaît au-dessus avec 4 boutons « Petite (320px) / Moyenne (560px) / Grande (900px) / Pleine largeur ». Le réglage est appliqué dans l'éditeur ET côté help.buildy.fr (la syntaxe Crisp `=Wxauto` est sérialisée automatiquement à la publication). Sans réglage, l'image part en pleine résolution (jusqu'à 1600px) et déborde du conteneur d'article.",
+          "where": "FAQ Buildy → éditeur d'un article → clique sur une image existante (ou insère-en une nouvelle puis re-clique). La bulle « Taille : Petite / Moyenne / Grande / Pleine largeur » apparaît juste au-dessus.",
+          "how_to_test": "1) Ouvre un article qui a une image trop grande. 2) Clique sur l'image → la bulle apparaît. 3) Choisis « Moyenne ». 4) Enregistre, publie vers Crisp, ouvre l'article sur help.buildy.fr : l'image doit faire ~560px (sans déborder même sur les images plus grandes en natif)."
+        },
+        {
+          "kind": "fix",
+          "title": "Toutes les images d'article sont désormais bornées en largeur sur help.buildy.fr",
+          "what": "Le CSS du helpdesk Crisp public n'avait aucune contrainte sur les images d'article. Une capture en 1600px partait pleine résolution et débordait du container 920px. C'est corrigé : `max-width: 100%`, marge + bord + ombre légère, centrées. Effet immédiat sur tous les articles existants (pas besoin de les régénérer).",
+          "where": "https://help.buildy.fr/fr/article/* — tous les articles publiés.",
+          "how_to_test": "Ouvre un article qui contient une grosse capture (ex : `supervision-gtb-sur-app-mobile-alertes-en-temps-reel-et-historique-duryyo`) : l'image doit être centrée, ne plus déborder, et avoir un bord arrondi gris discret."
+        }
+      ]
+    },
+    {
       "version": "0.1.31",
       "date": "2026-05-11",
       "title": "Audit trail FM : nom d'utilisateur Docs (au lieu de l'email)",

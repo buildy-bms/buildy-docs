@@ -69,32 +69,84 @@
     h1.insertAdjacentElement('afterend', p);
   }
 
-  // ── Compteur d'articles par catégorie sur la home ────────────────
-  function injectCategoryCounts() {
-    var cards = document.querySelectorAll('.csh-home-list.csh-home-list-large li a, .csh-home-list-large li a.csh-box-link');
-    if (!cards.length) return;
-    cards.forEach(function(card) {
+  // ── Compteur d'articles par catégorie + tag catégorie sur les articles vedette ─
+  // On parcourt une seule fois chaque page catégorie (4G/économie de fetch) pour :
+  //   1) compter les articles (badge "X articles" à droite de la carte catégorie)
+  //   2) construire une map href→nom-catégorie utilisée ensuite pour tagger les
+  //      articles de la section "01 Articles en vedette"
+  function injectCategoryCountsAndTags() {
+    var catCards = document.querySelectorAll('.csh-home-list.csh-home-list-large li a.csh-box-link');
+    if (!catCards.length) return;
+    var hrefToCat = {};
+    var pending = 0;
+    var done = function() {
+      pending--;
+      if (pending === 0) applyArticleCategoryTags(hrefToCat);
+    };
+    catCards.forEach(function(card) {
       if (card.dataset.countInjected) return;
       card.dataset.countInjected = '1';
       var href = card.getAttribute('href');
       if (!href || !/\/category\//.test(href)) return;
+      var badgeEl = card.querySelector('.csh-category-badge');
+      var catName = badgeEl ? (badgeEl.textContent || '').trim() : '';
+      pending++;
       fetch(href, { credentials: 'same-origin' })
         .then(function(r) { return r.text(); })
         .then(function(html) {
           var doc = new DOMParser().parseFromString(html, 'text/html');
           var items = doc.querySelectorAll('li.csh-category-item');
           var count = items.length;
+          // Map article href → catégorie
+          if (catName) {
+            items.forEach(function(item) {
+              var a = item.querySelector('a[href]');
+              if (a) {
+                var aHref = a.getAttribute('href');
+                if (aHref) hrefToCat[aHref] = catName;
+              }
+            });
+          }
+          // Badge compteur
           var label = count === 0 ? 'Aucun article'
                     : count === 1 ? '1 article'
                     : count + ' articles';
           var aside = card.querySelector('[class*="csh-home-list-aside"]');
-          if (!aside) return;
-          var badge = document.createElement('span');
-          badge.className = 'buildy-cat-count';
-          badge.textContent = label;
-          aside.appendChild(badge);
+          if (aside) {
+            var badge = document.createElement('span');
+            badge.className = 'buildy-cat-count';
+            badge.textContent = label;
+            aside.appendChild(badge);
+          }
         })
-        .catch(function() { /* silently fail */ });
+        .catch(function() { /* silently fail */ })
+        .then(done);
+    });
+    if (pending === 0) applyArticleCategoryTags(hrefToCat);
+  }
+
+  // Injecte un tag avec le nom de la catégorie sur chaque article vedette.
+  function applyArticleCategoryTags(hrefToCat) {
+    var articleCards = document.querySelectorAll('.csh-home-list:not(.csh-home-list-large) li a.csh-box-link');
+    articleCards.forEach(function(card) {
+      if (card.dataset.catTagInjected) return;
+      var href = card.getAttribute('href');
+      var catName = href ? hrefToCat[href] : null;
+      // Fallback : essaie sans query string ni hash
+      if (!catName && href) {
+        var stripped = href.split('?')[0].split('#')[0];
+        Object.keys(hrefToCat).some(function(k) {
+          if (k.split('?')[0].split('#')[0] === stripped) { catName = hrefToCat[k]; return true; }
+          return false;
+        });
+      }
+      if (!catName) return;
+      card.dataset.catTagInjected = '1';
+      var tag = document.createElement('span');
+      tag.className = 'buildy-article-cat';
+      tag.textContent = catName;
+      var wrap = card.querySelector('.csh-home-list-wrap') || card;
+      wrap.appendChild(tag);
     });
   }
 
@@ -102,7 +154,7 @@
     cleanEmptyParagraphs();
     startObserver();
     bindSearchShortcut();
-    injectCategoryCounts();
+    injectCategoryCountsAndTags();
     injectArticleExcerpt();
   }
   if (document.readyState === 'loading') {
@@ -684,20 +736,9 @@ section[data-type="categories"] .csh-home-title::after {
   font-size: 1rem !important;
 }
 .csh-home-list:not(.csh-home-list-large) > li:first-child .csh-box.csh-box-link .csh-home-list-wrap::after {
-  content: 'Le plus consulté' !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  background: rgba(0, 205, 146, 0.1) !important;
-  color: #00876b !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 0.7rem !important;
-  font-weight: 600 !important;
-  padding: 3px 8px !important;
-  border-radius: 100px !important;
-  margin-left: 10px !important;
-  letter-spacing: 0.01em !important;
-  white-space: nowrap !important;
-  flex-shrink: 0 !important;
+  /* Masqué : le numéro 1 + le fond mis en valeur suffisent. La pilule
+     catégorie (injectée par JS) prend cette place. */
+  display: none !important;
 }
 .csh-home-list:not(.csh-home-list-large) > li:first-child .csh-home-list-wrap {
   display: flex !important;
@@ -712,6 +753,50 @@ section[data-type="categories"] .csh-home-title::after {
   font-size: 0.92rem !important;
   line-height: 1.45 !important;
   letter-spacing: -0.01em !important;
+}
+
+/* Tag "Nom de la catégorie" injecté par JS sur chaque article vedette.
+   Placé à droite du libellé, avant le chevron (qui occupe right: 18px). */
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link .csh-home-list-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link .csh-home-list-wrap > .csh-home-list-label,
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link .csh-home-list-wrap > .csh-home-list-category {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.buildy-article-cat {
+  display: inline-flex !important;
+  align-items: center !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  color: #00876b !important;
+  background: rgba(0, 205, 146, 0.1) !important;
+  padding: 3px 9px !important;
+  border-radius: 100px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+  margin-right: 16px !important; /* laisse la place au chevron */
+  transition: all 0.15s ease !important;
+}
+.csh-home-list:not(.csh-home-list-large) li .csh-box.csh-box-link:hover .buildy-article-cat {
+  background: rgba(0, 205, 146, 0.18) !important;
+}
+/* Sur le premier article (mis en valeur avec fond vert clair), tag plus contrasté */
+.csh-home-list:not(.csh-home-list-large) > li:first-child .csh-box.csh-box-link .buildy-article-cat {
+  background: #fff !important;
+  color: #00876b !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
 }
 
 /* ============================================================================
@@ -1002,6 +1087,21 @@ html body .csh-home-list.csh-home-list-large .csh-home-list-wrap .csh-home-list-
 .csh-article .csh-article-content article a:hover {
   color: #009166 !important;
   text-decoration-thickness: 2px !important;
+}
+
+/* Images d'article : respectent l'attribut width=Wpx posé dans Tiptap
+   (BubbleMenu image : Petite 320 / Moyenne 560 / Grande 900 / Pleine).
+   Crisp rend `![alt](url =Wxauto)` en <img width="W">. Sans contrainte CSS,
+   ces images partaient en 100% width et débordaient sur les screenshots
+   1600px. On cap au container + centre + bord et marge respiratoires. */
+.csh-article .csh-article-content article img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 1.5em auto !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
 /* Crisp insère <p><br></p> entre chaque bloc — masquer */
