@@ -93,6 +93,10 @@ async function rewriteWithAI() {
     const data = await store.aiRewrite(parseInt(props.id, 10))
     if (data.html) draft.value.content_html = data.html
     if (data.suggested_title) suggestedTitle.value = data.suggested_title
+    // L'appel IA a bumpé updated_at server-side (lastAiAssistAt). Sans ce
+    // rafraichissement, le prochain save renverrait l'ancien expected_updated_at
+    // et déclencherait un faux "Conflit de version".
+    if (data.updated_at && original.value) original.value.updated_at = data.updated_at
     success('Article réécrit par l\'IA. Vérifie et enregistre si ça te convient.')
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de la réécriture IA')
