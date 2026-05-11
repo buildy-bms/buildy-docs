@@ -9,6 +9,7 @@ import {
 import { useFaqStore } from '@/stores/faq'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useTableSort } from '@/composables/useTableSort'
 import BaseModal from '@/components/BaseModal.vue'
 import FaqCategoryNode from '@/components/FaqCategoryNode.vue'
 
@@ -20,9 +21,14 @@ const { confirm } = useConfirm()
 const settingsOpen = ref(false)
 const searchQuery = ref('')
 const statusFilter = ref('')
+// Filtre par niveau de score SEO. Permet de filtrer rapidement les articles
+// à retravailler (< 60) ou les bons exemples (>= 80) sans regarder chaque ligne.
+const seoFilter = ref('') // '' | 'low' (<60) | 'mid' (60-79) | 'high' (>=80) | 'none' (jamais score)
 // Sync biblio -> FAQ (Lot 138) : filtre rapide pour ne voir que les articles
 // générés depuis la bibliothèque de fonctionnalités.
 const onlyLibrarySource = ref(false)
+// Tri par colonne (Titre / Catégorie / Statut / SEO / Sync) — sticky 3-state.
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort('updated_at', 'desc')
 const showSuggestions = ref(false)
 const suggestions = ref([])
 const loadingSuggestions = ref(false)
@@ -63,12 +69,45 @@ const categoryTree = computed(() => {
   return roots
 })
 
+function sortValueForArticle(a, key) {
+  if (key === 'title') return (a.title || '').toLowerCase()
+  if (key === 'category_name') return (a.category_name || '').toLowerCase()
+  if (key === 'status') return a.status || ''
+  if (key === 'seo_score') return a.seo_score == null ? -1 : a.seo_score
+  // Sync : on prend la date la plus pertinente (pushed_at sinon updated_at).
+  if (key === 'sync') return a.pushed_at || a.updated_at || ''
+  if (key === 'updated_at') return a.updated_at || ''
+  return ''
+}
+
 const filteredArticles = computed(() => {
   let arr = store.articles
   if (statusFilter.value) arr = arr.filter((a) => a.status === statusFilter.value)
   if (onlyLibrarySource.value) arr = arr.filter((a) => !!a.source_section_template_id)
-  return arr
+  if (seoFilter.value === 'low') arr = arr.filter((a) => a.seo_score != null && a.seo_score < 60)
+  else if (seoFilter.value === 'mid') arr = arr.filter((a) => a.seo_score != null && a.seo_score >= 60 && a.seo_score < 80)
+  else if (seoFilter.value === 'high') arr = arr.filter((a) => a.seo_score != null && a.seo_score >= 80)
+  else if (seoFilter.value === 'none') arr = arr.filter((a) => a.seo_score == null)
+  return sortedRows(arr, sortValueForArticle)
 })
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (statusFilter.value) n++
+  if (seoFilter.value) n++
+  if (onlyLibrarySource.value) n++
+  if (searchQuery.value) n++
+  if (store.selectedCategoryId) n++
+  return n
+})
+
+function clearAllFilters() {
+  searchQuery.value = ''
+  statusFilter.value = ''
+  seoFilter.value = ''
+  onlyLibrarySource.value = false
+  store.selectedCategoryId = null
+}
 
 const credentialsConfigured = computed(() => store.settings?.has_credentials || false)
 const lastPullLabel = computed(() => {
@@ -488,12 +527,27 @@ function selectCategory(id) {
               <option value="draft">Brouillons</option>
               <option value="published">Publiés</option>
             </select>
+            <select v-model="seoFilter"
+                    class="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition text-sm"
+                    title="Filtrer par tranche de score SEO">
+              <option value="">Tous les scores SEO</option>
+              <option value="low">À améliorer (&lt; 60)</option>
+              <option value="mid">Moyen (60-79)</option>
+              <option value="high">Bons (≥ 80)</option>
+              <option value="none">Non scorés</option>
+            </select>
             <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer whitespace-nowrap"
                    title="Filtrer pour ne voir que les articles générés depuis la bibliothèque de fonctionnalités">
               <input v-model="onlyLibrarySource" type="checkbox"
                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
               Depuis biblio
             </label>
+            <button v-if="activeFilterCount > 0" @click="clearAllFilters"
+                    class="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition whitespace-nowrap"
+                    title="Effacer tous les filtres">
+              <XMarkIcon class="w-3.5 h-3.5 shrink-0" />
+              Effacer ({{ activeFilterCount }})
+            </button>
             <button @click="newArticle"
                     class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap">
               <PlusIcon class="w-4 h-4 shrink-0" />
@@ -504,14 +558,27 @@ function selectCategory(id) {
           <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
               <tr>
-                <th class="text-left px-4 py-2 font-medium">Titre</th>
-                <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Catégorie</th>
-                <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Statut</th>
-                <th class="text-left px-4 py-2 font-medium whitespace-nowrap"
-                    v-tooltip="'Score SEO recalculé à chaque enregistrement, génération ou pull. ≥ 80 vert · 60-79 ambre · < 60 rouge.'">
-                  SEO
+                <th @click="toggleSort('title')"
+                    class="text-left px-4 py-2 font-medium cursor-pointer hover:bg-gray-100 transition select-none">
+                  Titre <span class="ml-1 opacity-60">{{ sortKey === 'title' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </th>
-                <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Sync</th>
+                <th @click="toggleSort('category_name')"
+                    class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
+                  Catégorie <span class="ml-1 opacity-60">{{ sortKey === 'category_name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </th>
+                <th @click="toggleSort('status')"
+                    class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
+                  Statut <span class="ml-1 opacity-60">{{ sortKey === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </th>
+                <th @click="toggleSort('seo_score')"
+                    v-tooltip="'Score SEO recalculé à chaque enregistrement, génération ou pull. ≥ 80 vert · 60-79 ambre · < 60 rouge.'"
+                    class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
+                  SEO <span class="ml-1 opacity-60">{{ sortKey === 'seo_score' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </th>
+                <th @click="toggleSort('sync')"
+                    class="text-left px-4 py-2 font-medium whitespace-nowrap cursor-pointer hover:bg-gray-100 transition select-none">
+                  Sync <span class="ml-1 opacity-60">{{ sortKey === 'sync' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </th>
                 <th class="text-right px-4 py-2 font-medium whitespace-nowrap">Actions</th>
               </tr>
             </thead>
