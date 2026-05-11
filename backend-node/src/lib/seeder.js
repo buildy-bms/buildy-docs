@@ -100,14 +100,20 @@ function seedLibraryOnBoot() {
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });
 
-      // Points : on n'ajoute QUE ceux dont le slug n'existe pas déjà.
-      // Pour les points existants, on enrichit uniquement les meta absentes
-      // (tech_name, nature) sans toucher au reste : preserve les modifs user
-      // tout en remontant les valeurs canoniques absentes (cas typique :
-      // points seedes avant l'introduction de tech_name/nature).
+      // Points : on n'ajoute QUE ceux dont le slug n'existe pas déjà
+      // ET dont le slug n'a pas été tombstone par l'utilisateur (mig 136).
+      // Sinon : un point supprime depuis l'UI revenait au prochain
+      // boot/restart, ce qui annulait silencieusement l'action user
+      // (bug isole 2026-05-11).
       const existingPoints = db.equipmentTemplatePoints.listByTemplate(existing.id);
       const existingBySlug = new Map(existingPoints.map(p => [p.slug, p]));
+      const tombstonedPointSlugs = new Set(
+        db.db.prepare(
+          'SELECT slug FROM deleted_equipment_template_point_slugs WHERE template_id = ?'
+        ).all(existing.id).map(r => r.slug)
+      );
       for (const p of (tpl.points || [])) {
+        if (tombstonedPointSlugs.has(p.slug)) continue; // user a supprime, on respecte
         const existingPt = existingBySlug.get(p.slug);
         if (!existingPt) {
           try {

@@ -360,6 +360,12 @@ async function routes(fastify) {
         notes: body.notes, isOptional: body.is_optional,
         techName: body.tech_name, nature: body.nature,
       });
+      // Resurrection : si le slug etait tombstone (supprime via UI puis
+      // recree), on retire le tombstone pour autoriser le seeder a le
+      // recreer si jamais on reseed (idempotent).
+      db.db.prepare(
+        'DELETE FROM deleted_equipment_template_point_slugs WHERE template_id = ? AND slug = ?'
+      ).run(templateId, body.slug);
       snapshotAndBump(templateId, { changelog: `Ajout point "${body.label}"`, authorId: request.authUser?.id });
       db.auditLog.add({ templateId, userId: request.authUser?.id, action: 'template.point.add', payload: body });
       return point;
@@ -375,10 +381,19 @@ async function routes(fastify) {
   fastify.delete('/equipment-templates/:id/points/:pointId', async (request) => {
     const pointId = parseInt(request.params.pointId, 10);
     const templateId = parseInt(request.params.id, 10);
-    const old = db.db.prepare('SELECT label FROM equipment_template_points WHERE id = ?').get(pointId);
+    // Recupere le slug AVANT delete pour poser le tombstone.
+    const old = db.db.prepare('SELECT label, slug FROM equipment_template_points WHERE id = ? AND template_id = ?').get(pointId, templateId);
     db.db.prepare('DELETE FROM equipment_template_points WHERE id = ? AND template_id = ?').run(pointId, templateId);
+    // Tombstone : empeche le seeder de recreer ce point au prochain
+    // boot/restart pm2 (seedLibraryOnBoot branche enrichissement).
+    // Bug isole 2026-05-11 : la donnee revenait apres quelques minutes.
+    if (old?.slug) {
+      db.db.prepare(
+        'INSERT OR IGNORE INTO deleted_equipment_template_point_slugs (template_id, slug) VALUES (?, ?)'
+      ).run(templateId, old.slug);
+    }
     snapshotAndBump(templateId, { changelog: `Retrait point "${old?.label || pointId}"`, authorId: request.authUser?.id });
-    db.auditLog.add({ templateId, userId: request.authUser?.id, action: 'template.point.remove', payload: { pointId } });
+    db.auditLog.add({ templateId, userId: request.authUser?.id, action: 'template.point.remove', payload: { pointId, slug: old?.slug } });
     return { ok: true };
   });
 

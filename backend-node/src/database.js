@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 135;
+const TARGET_VERSION = 136;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5588,6 +5588,27 @@ function runMigrations() {
     `);
     log.info('Migration 135 appliquee : bacs_audit_system_devices.age_years (copie depuis thermal.generator_age_years) + drop generator_type/age sur thermal');
     db.pragma('user_version = 135');
+  }
+
+  if (current < 136) {
+    // Tombstones par point d'equipement : quand un point est supprime de
+    // l'UI biblio, on memorise (template_id, slug) pour que le seeder
+    // (seedLibraryOnBoot, branche enrichissement) ne le recree pas au
+    // prochain boot. Pattern symetrique a deleted_equipment_template_slugs
+    // pour les templates entiers, et deleted_section_template_slugs pour
+    // les sections types.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS deleted_equipment_template_point_slugs (
+        template_id INTEGER NOT NULL REFERENCES equipment_templates(id) ON DELETE CASCADE,
+        slug TEXT NOT NULL,
+        deleted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (template_id, slug)
+      );
+      CREATE INDEX IF NOT EXISTS idx_deleted_eq_tpl_point_slugs_tpl
+        ON deleted_equipment_template_point_slugs(template_id);
+    `);
+    log.info('Migration 136 appliquee : table tombstones par point biblio (deleted_equipment_template_point_slugs)');
+    db.pragma('user_version = 136');
   }
 
   if (current > TARGET_VERSION) {
