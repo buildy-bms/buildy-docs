@@ -1222,18 +1222,27 @@ function _buildSeoFeedbackPrompt(html, scoreResult) {
   ].join('\n');
 }
 
-// Wrapper auto-rewrite : génère, score, retry une fois si < 70.
-// Coupe la boucle si Claude n'arrive pas à progresser (cas pathologique :
-// contenu structurellement bas-score, ex. article très court). Économise
-// une 2e passe Claude inutile.
+// Wrapper auto-rewrite : génère, score, retry jusqu'à `maxRetries` fois si
+// score < targetScore. Coupe la boucle si Claude n'arrive pas à progresser
+// (cas pathologique : contenu structurellement bas-score, ex. article très
+// court). Évalue title + description + content HTML pour matcher la stratégie
+// SEO complète (cf. seo-scorer.js scoreArticle).
 async function _withSeoLoop(genFn, { targetScore = 70, maxRetries = 1 } = {}) {
   let result = await genFn(null);
-  let evaluation = scoreArticle({ title: result.suggested_title || '', contentHtml: result.html });
+  let evaluation = scoreArticle({
+    title: result.suggested_title || '',
+    description: result.suggested_description || '',
+    contentHtml: result.html,
+  });
   let attempts = 1;
   while (evaluation.score < targetScore && attempts <= maxRetries) {
     const feedback = _buildSeoFeedbackPrompt(result.html, evaluation);
     const next = await genFn({ previousHtml: result.html, feedback });
-    const nextEval = scoreArticle({ title: next.suggested_title || result.suggested_title || '', contentHtml: next.html });
+    const nextEval = scoreArticle({
+      title: next.suggested_title || result.suggested_title || '',
+      description: next.suggested_description || result.suggested_description || '',
+      contentHtml: next.html,
+    });
     // On garde la meilleure des 2 passes.
     if (nextEval.score > evaluation.score) {
       result = next;
@@ -1642,7 +1651,10 @@ async function assistFaqGenerateFromFunctionality({ functionality, attachments =
     return { html, suggested_title, suggested_description, usage: resp.usage, truncated };
   };
 
-  const result = await _withSeoLoop(callClaude);
+  // Génération depuis biblio : on vise un score SEO plus élevé que pour les
+  // autres générations (article public Google, l'investissement IA en vaut
+  // la peine). 80 = cible "très bon". Jusqu'à 2 retries pour pousser le SEO.
+  const result = await _withSeoLoop(callClaude, { targetScore: 80, maxRetries: 2 });
   return {
     title: result.suggested_title || functionality.title || 'Article FAQ',
     description: result.suggested_description || null,

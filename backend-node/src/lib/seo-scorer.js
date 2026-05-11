@@ -148,7 +148,7 @@ function isAcronymExpanded(text, acronym, expansions) {
 
 // ── Function principale ──────────────────────────────────────────────
 
-function scoreArticle({ title = '', contentHtml = '', targetKeywords = [] } = {}) {
+function scoreArticle({ title = '', description = '', contentHtml = '', targetKeywords = [] } = {}) {
   const text = stripHtml(contentHtml);
   const wordCount = countWords(text);
   const headings = extractHeadings(contentHtml);
@@ -177,6 +177,29 @@ function scoreArticle({ title = '', contentHtml = '', targetKeywords = [] } = {}
       : titleLen > 70
       ? `Titre trop long (${titleLen} chars, idéal 40-60, max 70)`
       : `Titre ${titleLen} chars (idéal 40-60)`,
+  });
+
+  // 1bis. Meta-description SEO : longueur 130-155 + contient mot-clé métier (10 pts).
+  // C'est la phrase que Google met sous le titre dans les SERPs (snippet) et que
+  // Crisp tronque à 160 chars. Critique pour le CTR.
+  const desc = String(description || '').trim();
+  const descLen = desc.length;
+  const descFoundKw = findKeywordsInText(desc, allKeywords);
+  const descLengthOk = descLen >= 120 && descLen <= 160;
+  const descKeywordOk = descFoundKw.length > 0;
+  const descCheckPassed = descLengthOk && descKeywordOk;
+  checks.push({
+    id: 'description-quality',
+    label: 'Meta-description SEO',
+    weight: 10,
+    passed: descCheckPassed,
+    message: !desc
+      ? `Aucune meta-description. Cible : 130-155 chars + 1 mot-clé métier (snippet Google).`
+      : !descLengthOk
+        ? `Description ${descLen} chars (idéal 130-155, max 160). Snippet Google optimal autour de 150.`
+        : !descKeywordOk
+          ? `Description sans mot-clé métier. Ajoute "audit BACS", "logiciel GTB", "supervision GTB" ou un autre terme prioritaire.`
+          : `Description ${descLen} chars avec ${descFoundKw.length} mot-clé(s) métier (${descFoundKw.slice(0, 2).join(', ')}).`,
   });
 
   // 2. Mot-clé en tête de titre (10 pts)

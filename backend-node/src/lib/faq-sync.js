@@ -45,7 +45,11 @@ function _recomputeSeoScoreById(articleId) {
   if (!articleId) return null;
   const a = db.faqArticles.getById(articleId);
   if (!a) return null;
-  const r = scoreArticle({ title: a.title || '', contentHtml: a.content_html || '' });
+  const r = scoreArticle({
+    title: a.title || '',
+    description: a.description || '',
+    contentHtml: a.content_html || '',
+  });
   db.faqArticles.setSeoScore(articleId, { score: r.score, checks: r.checks });
   return r;
 }

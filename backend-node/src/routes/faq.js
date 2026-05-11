@@ -35,6 +35,7 @@ function recomputeSeoScore(article) {
   if (!article || !article.id) return null;
   const result = scoreArticle({
     title: article.title || '',
+    description: article.description || '',
     contentHtml: article.content_html || '',
   });
   db.faqArticles.setSeoScore(article.id, { score: result.score, checks: result.checks });
@@ -473,6 +474,7 @@ async function routes(fastify) {
     // Recalcul live à chaque appel (pas de cache, c'est rapide)
     const result = scoreArticle({
       title: article.title || '',
+      description: article.description || '',
       contentHtml: article.content_html || '',
     });
     // Persiste pour les requêtes futures (few-shot examples picker)

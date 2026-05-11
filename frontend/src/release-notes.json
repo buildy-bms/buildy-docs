@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.28",
+      "date": "2026-05-11",
+      "title": "Articles FAQ générés depuis une fonctionnalité : score SEO plus élevé d'entrée",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le score SEO note désormais la meta-description (120-160 chars + mot-clé métier)",
+          "what": "Le scorer SEO prend en compte un nouveau critère « Meta-description SEO » (poids 10 pts) qui vérifie la longueur (120-160 chars) et la présence d'au moins un mot-clé métier. Sans description renseignée, c'est 0 sur ce critère. La meta-description est ce que Google affiche sous le titre dans la SERP — un bon score ici = plus de clics.",
+          "where": "FAQ Buildy → éditeur d'un article → bouton « Score SEO » dans la top-bar (détail des critères). Visible aussi dans la liste FAQ (colonne score) après le prochain re-calcul.",
+          "how_to_test": "Ouvre un article qui n'a pas de meta-description, ouvre « Score SEO » : le nouveau critère « Meta-description SEO » apparaît en rouge. Renseigne une description de 130-155 chars contenant un mot-clé (« audit BACS », « logiciel GTB »), enregistre, ré-ouvre le score : le critère doit passer au vert et le score total augmenter de ~10 pts."
+        },
+        {
+          "kind": "ux",
+          "title": "La génération « Article FAQ depuis une fonctionnalité » vise désormais 80 (au lieu de 70) avec 2 retries",
+          "what": "Le pipeline IA qui transforme une fonctionnalité biblio en article FAQ relance maintenant le modèle jusqu'à 2 fois s'il n'atteint pas 80 pts (au lieu de 70 avec 1 retry). La description proposée par l'IA est également scorée dans la boucle, donc l'IA optimise en même temps titre + description + corps. Premier article généré = qualité SEO supérieure dès la sortie, moins de retouches manuelles.",
+          "where": "Page biblio « Fonctionnalités » → colonne « Article FAQ » → bouton « Générer » sur une fonctionnalité sans article. Bascule ensuite vers l'éditeur FAQ avec l'article en brouillon.",
+          "how_to_test": "Sur une fonctionnalité riche (avec contenu HTML détaillé), clique « Article FAQ » → « Générer ». Le bouton mouline plus longtemps qu'avant (jusqu'à 2 retries IA si nécessaire). Ouvre le score SEO de l'article créé : il doit afficher ≥ 80 dans la majorité des cas, et la meta-description doit être renseignée."
+        }
+      ]
+    },
+    {
       "version": "0.1.26",
       "date": "2026-05-11",
       "title": "Correctif : faux « Conflit de version » via le bouton IA de la toolbar",
