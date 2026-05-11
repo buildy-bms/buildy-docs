@@ -231,7 +231,7 @@ const titleHtml = computed(() => {
       ref="btnRef"
       :style="indentStyle"
       :class="[
-        'group w-full text-left flex items-center gap-1.5 py-1 pr-2 rounded-md transition-colors',
+        'group w-full text-left flex items-center gap-1.5 h-6 pr-2 rounded-md transition-colors leading-tight',
         isSelected ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-gray-100 text-gray-700',
         dragOver ? 'ring-2 ring-emerald-400 bg-emerald-50' : '',
         excluded && !optedOut ? 'opacity-50' : '',
