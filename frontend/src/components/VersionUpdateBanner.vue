@@ -1,20 +1,16 @@
 <script setup>
 /**
- * Bandeau « Nouvelle version disponible · Recharger » — affiché sur le
- * dessus de l'app dès qu'un nouveau SHA git est détecté côté serveur.
- *
- * Visible desktop ET PWA. Pattern aligné sur Buildy Tools / Edge Fleet
- * Manager — l'utilisateur sait qu'il faut recharger pour voir le fix
- * qu'on vient de pousser, sans avoir à F5 manuellement.
- *
- * Mounted une seule fois dans App.vue (singleton).
+ * Bandeau « Nouvelle version disponible · Recharger » — fixe en haut de
+ * l'app, sur toute la largeur. Pattern et couleur alignes sur Buildy Tools
+ * (cf. buildy-tools/frontend/src/components/VersionBanner.vue). On
+ * utilise la couleur indigo NATIVE Tailwind (#4f46e5) en hex explicite
+ * car Docs remappe `indigo-600` -> navy `#1b2842` dans son theme @layer.
  */
-import { ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { ref } from 'vue'
 import { useVersionCheck } from '@/composables/useVersionCheck'
 
 const { updateAvailable, newVersion, newBuildSha, reload } = useVersionCheck()
-const dismissed = ref(false)
 const reloading = ref(false)
 
 async function onReload() {
@@ -26,44 +22,23 @@ async function onReload() {
 <template>
   <Teleport to="body">
     <div
-      v-if="updateAvailable && !dismissed"
-      class="fixed inset-x-0 bottom-0 z-[200] px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 sm:bottom-3 sm:right-3 sm:left-auto sm:px-0 sm:pb-3 pointer-events-none"
+      v-if="updateAvailable"
+      class="fixed top-0 inset-x-0 z-150 bg-[#4f46e5] text-white text-sm shadow-md"
     >
-      <div class="pointer-events-auto bg-indigo-600 text-white rounded-2xl shadow-2xl px-4 py-3 sm:max-w-sm flex items-start gap-3">
-        <span class="w-9 h-9 rounded-lg bg-white/15 inline-flex items-center justify-center shrink-0">
-          <ArrowPathIcon class="w-5 h-5" />
+      <div class="px-4 py-2 flex items-center gap-3">
+        <ArrowPathIcon class="w-4 h-4 shrink-0" />
+        <span class="flex-1">
+          Une nouvelle version de Buildy Docs<span v-if="newVersion"> (v{{ newVersion }}<span v-if="newBuildSha"> · {{ newBuildSha }}</span>)</span>
+          est disponible. Rechargez pour éviter les erreurs.
         </span>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold leading-tight">Nouvelle version disponible</p>
-          <p class="text-xs text-white/80 mt-0.5 leading-relaxed">
-            Recharge pour profiter des dernières mises à jour.<span v-if="newVersion"> v{{ newVersion }}<span v-if="newBuildSha"> · {{ newBuildSha }}</span>.</span>
-          </p>
-          <div class="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              @click="onReload"
-              :disabled="reloading"
-              class="inline-flex items-center gap-1.5 px-3 py-2 min-h-9 text-sm font-semibold bg-white text-indigo-700 rounded-lg active:bg-indigo-50 disabled:opacity-50"
-            >
-              <ArrowPathIcon :class="['w-4 h-4', reloading ? 'animate-spin' : '']" />
-              {{ reloading ? 'Rechargement…' : 'Recharger' }}
-            </button>
-            <button
-              type="button"
-              @click="dismissed = true"
-              class="px-3 py-2 min-h-9 text-sm text-white/80 active:text-white"
-            >
-              Plus tard
-            </button>
-          </div>
-        </div>
         <button
           type="button"
-          aria-label="Fermer"
-          @click="dismissed = true"
-          class="text-white/60 active:text-white p-1 -mr-1 -mt-1 shrink-0"
+          @click="onReload"
+          :disabled="reloading"
+          class="px-3 py-1 bg-white text-[#4f46e5] rounded font-medium hover:bg-indigo-50 disabled:opacity-50 inline-flex items-center gap-1.5"
         >
-          <XMarkIcon class="w-5 h-5" />
+          <ArrowPathIcon :class="['w-4 h-4', reloading ? 'animate-spin' : '']" />
+          {{ reloading ? 'Rechargement…' : 'Recharger' }}
         </button>
       </div>
     </div>
