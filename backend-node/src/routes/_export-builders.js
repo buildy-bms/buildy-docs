@@ -414,21 +414,33 @@ async function buildAfExportData(af, opts = {}) {
   }
   const tocFlat = flattenForToc(tree);
 
-  // Niveau de service AF : priorise le choix MOA (af.service_level renseigne).
-  // Le calcul auto resolveAfLevel ne sert que de fallback pour les anciennes
-  // AFs sans niveau choisi — sinon il ecrasait le choix MOA en remontant le
-  // niveau a chaque feature avail_p-only meme non demandee.
-  let serviceLevel;
-  if (af.service_level) {
-    const slug = af.service_level.toUpperCase();
-    serviceLevel = {
-      level: slug,
-      label: formatLevelFull(slug),
-      justifications: [],
-    };
-  } else {
-    serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+  // Niveau de service AF : on calcule TOUJOURS le niveau requis via
+  // resolveAfLevel sur les sections incluses, jamais juste af.service_level
+  // (qui est le niveau VISÉ, pas le niveau requis). Bug isole 2026-05-11 :
+  // sans ce calcul, la cover AF affichait "requis: Essentials" meme quand
+  // l'AF contenait des fonctions Smart obligatoires (cf. bandeau UI qui
+  // signale "Dépasse le contrat").
+  //
+  // Filtres exclusifs (alignés sur le calcul de la Synthèse) :
+  //   - opted_out_by_moa : refusee MOA, hors perimetre
+  //   - optin_paid_option : option payante deja souscrite, n'impose pas
+  //     d'upgrade global (c'est un add-on facture en sus)
+  //   - paid_option au niveau cible : meme logique, dispo en option sans
+  //     forcer d'upgrade du contrat
+  const contractTargetSlug = (af.service_level || '').toUpperCase();
+  function _availAtContractTarget(s) {
+    if (!contractTargetSlug) return null;
+    if (contractTargetSlug === 'E') return s.tpl_avail_e;
+    if (contractTargetSlug === 'S') return s.tpl_avail_s;
+    if (contractTargetSlug === 'P') return s.tpl_avail_p;
+    return null;
   }
+  const sectionsForLevelCalc = allSections.filter(s =>
+    !s.opted_out_by_moa
+    && !s.optin_paid_option
+    && _availAtContractTarget(s) !== 'paid_option'
+  );
+  const serviceLevel = resolveAfLevel(sectionsForLevelCalc);
   // Compteur d'options payantes a la carte (mig 92) pour affichage cover :
   // "Niveau cible : Essentials + 3 options payantes".
   const optinPaidOptionCount = allSections.filter(s => !!s.optin_paid_option).length;
@@ -821,14 +833,22 @@ function buildPointsListExportData(af, opts = {}) {
 
   // KPIs niveau requis vs niveau visé — pour piloter la couleur de la
   // barre à gauche de l'encart cover (cohérence avec Synthèse + AF).
-  // Lot 91 : af.service_level fait foi quand renseigne (input MOA).
-  let serviceLevel;
-  if (af.service_level) {
-    const slug = af.service_level.toUpperCase();
-    serviceLevel = { level: slug, label: formatLevelFull(slug), justifications: [] };
-  } else {
-    serviceLevel = resolveAfLevel(allSections.filter(s => !s.opted_out_by_moa));
+  // Le niveau "requis" est TOUJOURS calculé via resolveAfLevel (jamais
+  // forcé à af.service_level qui est le niveau VISÉ). Filtres identiques
+  // au builder AF.
+  const _contractTargetSlug = (af.service_level || '').toUpperCase();
+  function _availAtTarget(s) {
+    if (!_contractTargetSlug) return null;
+    if (_contractTargetSlug === 'E') return s.tpl_avail_e;
+    if (_contractTargetSlug === 'S') return s.tpl_avail_s;
+    if (_contractTargetSlug === 'P') return s.tpl_avail_p;
+    return null;
   }
+  const serviceLevel = resolveAfLevel(allSections.filter(s =>
+    !s.opted_out_by_moa
+    && !s.optin_paid_option
+    && _availAtTarget(s) !== 'paid_option'
+  ));
   const requiredLevel = serviceLevel?.level || null;
   const contractLevel = af.service_level || null;
   const kpis = {
