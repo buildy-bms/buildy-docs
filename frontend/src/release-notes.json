@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.30",
+      "date": "2026-05-11",
+      "title": "Correctif : worker de consolidation audit trail réparé",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le worker push vers Fleet Manager démarre maintenant correctement",
+          "what": "Le JOIN sur la table sites utilisait l'ancien nom de colonne (site_id) renommé depuis en id. Le worker loggait `no such column: s.site_id` et n'envoyait aucun batch. C'est corrigé.",
+          "where": "Boot Buildy Docs → logs PM2 → `[audit-sync]` doit afficher `pushed N events` sans erreur.",
+          "how_to_test": "`pm2 logs buildy-docs --lines 50 | grep audit-sync` après une action côté Docs : doit lister un push vers FM dans la minute."
+        }
+      ]
+    },
+    {
       "version": "0.1.29",
       "date": "2026-05-11",
       "title": "Audit trail Buildy Docs consolidé dans Fleet Manager",

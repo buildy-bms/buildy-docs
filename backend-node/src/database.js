@@ -7799,7 +7799,7 @@ const auditSync = {
       FROM audit_log a
       LEFT JOIN users u ON u.id = a.user_id
       LEFT JOIN afs af ON af.id = a.af_id
-      LEFT JOIN sites s ON s.site_id = af.site_id
+      LEFT JOIN sites s ON s.id = af.site_id
       WHERE a.id > ?
       ORDER BY a.id ASC
       LIMIT ?
