@@ -207,6 +207,9 @@ async function main() {
   // Worker de synchro sites avec Fleet Manager (no-op si non configure)
   require('./lib/sites-sync').startSyncWorker();
 
+  // Worker de consolidation audit trail vers Fleet Manager (no-op si non configure)
+  require('./lib/audit-sync').startSyncWorker();
+
   // Checkpoint Git auto toutes les 10 min pour les AFs ayant eu de l'activite
   // depuis le dernier commit (compare audit_log.created_at au dernier commit Git).
   const gitLib = require('./lib/git');
