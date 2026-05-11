@@ -185,7 +185,11 @@ async function generateFaqFromFunctionality({ sectionTemplateId, categoryId = nu
   // Score SEO recalculé après création (boucle déjà incluse côté assistFaqGen)
   try {
     const { scoreArticle } = require('./seo-scorer');
-    const s = scoreArticle({ title: article.title, contentHtml: article.content_html });
+    const s = scoreArticle({
+      title: article.title,
+      description: article.description,
+      contentHtml: article.content_html,
+    });
     db.faqArticles.setSeoScore(article.id, { score: s.score, checks: s.checks });
   } catch (e) { log.warn(`SEO score recompute échec : ${e.message}`); }
 
@@ -250,7 +254,11 @@ async function regenerateFaqFromFunctionality({ articleId, force = false, userId
 
   try {
     const { scoreArticle } = require('./seo-scorer');
-    const s = scoreArticle({ title: result.title || article.title, contentHtml: result.html || '' });
+    const s = scoreArticle({
+      title: result.title || article.title,
+      description: result.description || null,
+      contentHtml: result.html || '',
+    });
     db.faqArticles.setSeoScore(articleId, { score: s.score, checks: s.checks });
   } catch (e) { log.warn(`SEO score recompute échec : ${e.message}`); }
 
