@@ -1,13 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  BoltIcon,
-  ChevronRightIcon,
-  TrashIcon,
-  ExclamationTriangleIcon,
-  PlusIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -197,7 +192,7 @@ function toggleProtocol(p) {
       @click="openCreate"
       class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
     >
-      <PlusIcon class="w-5 h-5" />
+      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5" />
       Ajouter un compteur
     </button>
 
@@ -212,7 +207,7 @@ function toggleProtocol(p) {
                  m.out_of_service ? 'opacity-50' : '',
                  m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '']"
       >
-        <ExclamationTriangleIcon
+        <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']"
           v-if="m.required && !m.present_actual && !m.out_of_service"
           class="w-6 h-6 text-red-500 shrink-0"
         />
@@ -226,11 +221,11 @@ function toggleProtocol(p) {
             <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
           </div>
         </div>
-        <ChevronRightIcon class="w-6 h-6 text-gray-300 shrink-0" />
+        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
       </button>
     </div>
     <div v-else class="text-center py-6">
-      <BoltIcon class="w-10 h-10 text-gray-300 mx-auto" />
+      <FontAwesomeIcon :icon="['fas', 'bolt']" class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-2">Aucun compteur listé pour l'instant</p>
     </div>
 
@@ -350,7 +345,7 @@ function toggleProtocol(p) {
               @click="remove(editing.meter)"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
             >
-              <TrashIcon class="w-5 h-5" />
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer le compteur
             </button>
           </div>

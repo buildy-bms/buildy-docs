@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.20",
+      "date": "2026-05-11",
+      "title": "Navigation PWA audit : barre indicatrice glissante, badges chiffrés, transitions fluides",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Bottom nav repensée façon app native iOS",
+          "what": "Avant : la navigation par onglets en bas de l'écran d'audit signalait l'onglet actif uniquement par un changement de couleur — peu visible au premier coup d'œil. Désormais une fine barre indigo glisse sous l'onglet sélectionné (transition de 300 ms quand on change d'onglet), l'icône de l'onglet actif est légèrement agrandie (zoom 110 %), et le libellé passe en gras. Le fond de la barre devient légèrement translucide avec un effet blur subtil quand le contenu défile derrière — comme dans les apps iOS modernes.",
+          "where": "PWA audit BACS / GTB — bottom nav présente sur tous les onglets (Site, Zones, Compteurs, Systèmes, GTB, Docs, Plan).",
+          "how_to_test": "Sur iPhone, ouvre un audit et tape successivement chaque onglet. La barre indigo doit glisser de gauche à droite (ou inversement) entre les positions, l'icône active doit légèrement grossir, le titre du contenu doit faire un léger fondu / lift de 4 pixels."
+        },
+        {
+          "kind": "ux",
+          "title": "Badges chiffrés sur les onglets : nombre exact d'éléments qui réclament l'attention",
+          "what": "Avant : un simple point rouge ou orange indiquait qu'un onglet contenait au moins un élément à traiter (système non saisi, compteur manquant, action bloquante…) sans préciser combien. Désormais un badge rond rouge ou orange affiche directement le compteur — comme les notifications dans Mail iOS. Tu vois d'un coup d'œil que l'onglet Compteurs a 3 manquants, ou que Plan a 5 actions bloquantes, sans devoir y entrer.",
+          "where": "PWA audit — onglets « Systèmes » (systèmes à renseigner), « Comp. » (compteurs requis absents), « Plan » (actions bloquantes ou majeures). Zones et GTB conservent un simple point quand le critère est binaire (zone vide / GTB vide).",
+          "how_to_test": "Sur un audit avec plusieurs systèmes non renseignés, vérifie que l'onglet « Systèmes » affiche un badge orange avec le nombre exact. Idem pour « Comp. » si des compteurs requis sont absents."
+        },
+        {
+          "kind": "fix",
+          "title": "Toutes les icônes de la PWA audit passent à FontAwesome",
+          "what": "Avant : la PWA audit mélangeait deux familles d'icônes (Heroicons sur l'historique mobile + FontAwesome sur la biblio et certains contrôles), ce qui créait des incohérences visuelles fines (largeur de trait, géométrie). Désormais tout est uniformisé en FontAwesome Pro Solid — même style partout, plus de différence visible entre les écrans, et un seul registre tree-shaké côté bundle (pas d'embarquement double).",
+          "where": "Tout l'audit PWA : top bar, bottom nav, sheets (paramètres, partage, synthèse Claude, métadonnées, régulation thermique, inspections, biblio, sélection), onglets, formulaires.",
+          "how_to_test": "Aucune action particulière — l'app garde le même comportement, juste un rendu plus homogène. Si tu veux vérifier : compare une icône « Trash », « Plus » ou « Chevron » entre 2 écrans différents — elles doivent être identiques au pixel près."
+        }
+      ]
+    },
+    {
       "version": "0.1.19",
       "date": "2026-05-11",
       "title": "Audit PWA : bibliothèque plein écran + listes déroulantes uniformisées et tactiles",

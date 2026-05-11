@@ -1,6 +1,7 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, UserCircleIcon, EyeIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import { listAfPermissions, grantAfPermission, revokeAfPermission, listUsers, ensureUserFromPocketId } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -122,7 +123,7 @@ onMounted(() => { if (props.open) refresh() })
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
           <!-- Owner -->
           <div class="flex items-center gap-3 px-4 py-3 bg-emerald-50">
-            <UserCircleIcon class="w-6 h-6 text-emerald-700 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-emerald-700 shrink-0" />
             <div class="flex-1 min-w-0">
               <p class="text-base font-medium text-gray-800">Créateur de l'audit</p>
               <p class="text-xs text-gray-500">user #{{ data.owner_id }} — owner non-révocable</p>
@@ -131,7 +132,7 @@ onMounted(() => { if (props.open) refresh() })
           </div>
           <!-- Grants -->
           <div v-for="g in data.grants" :key="g.user_id" class="flex items-center gap-3 px-4 py-3">
-            <UserCircleIcon class="w-6 h-6 text-gray-400 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-gray-400 shrink-0" />
             <div class="flex-1 min-w-0">
               <p class="text-base font-medium text-gray-800 truncate">{{ g.user_display_name || g.user_email }}</p>
               <p class="text-xs text-gray-500 truncate">{{ g.user_email }}</p>
@@ -142,12 +143,12 @@ onMounted(() => { if (props.open) refresh() })
                        g.role === 'write' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800']"
               v-tooltip="`Cliquer pour passer en ${g.role === 'write' ? 'lecture' : 'écriture'}`"
             >
-              <PencilIcon v-if="g.role === 'write'" class="w-3 h-3" />
-              <EyeIcon v-else class="w-3 h-3" />
+              <FontAwesomeIcon :icon="['fas', 'pencil']" v-if="g.role === 'write'" class="w-3 h-3" />
+              <FontAwesomeIcon :icon="['fas', 'eye']" v-else class="w-3 h-3" />
               {{ g.role === 'write' ? 'Écriture' : 'Lecture' }}
             </button>
             <button @click="revoke(g)" class="tap-target text-gray-400 hover:text-red-600 inline-flex items-center justify-center" v-tooltip="`Retirer`">
-              <TrashIcon class="w-5 h-5" />
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
             </button>
           </div>
           <p v-if="!loading && !data.grants.length" class="text-sm text-gray-500 italic px-4 py-4 text-center">
@@ -162,7 +163,7 @@ onMounted(() => { if (props.open) refresh() })
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Ajouter un utilisateur</p>
         <div class="space-y-2">
           <div class="relative">
-            <MagnifyingGlassIcon class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               v-model="search"
               type="text"
@@ -180,7 +181,7 @@ onMounted(() => { if (props.open) refresh() })
               :class="['px-3 py-1.5 text-sm font-medium rounded-full transition',
                        newRole === 'read' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600']"
             >
-              <EyeIcon class="w-3.5 h-3.5 inline-block -mt-0.5 mr-1" />Lecture
+              <FontAwesomeIcon :icon="['fas', 'eye']" class="w-3.5 h-3.5 inline-block -mt-0.5 mr-1" />Lecture
             </button>
             <button
               type="button"
@@ -188,7 +189,7 @@ onMounted(() => { if (props.open) refresh() })
               :class="['px-3 py-1.5 text-sm font-medium rounded-full transition',
                        newRole === 'write' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600']"
             >
-              <PencilIcon class="w-3.5 h-3.5 inline-block -mt-0.5 mr-1" />Écriture
+              <FontAwesomeIcon :icon="['fas', 'pencil']" class="w-3.5 h-3.5 inline-block -mt-0.5 mr-1" />Écriture
             </button>
           </div>
         </div>
@@ -200,7 +201,7 @@ onMounted(() => { if (props.open) refresh() })
             :disabled="submitting"
             class="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-indigo-50 disabled:opacity-50"
           >
-            <UserCircleIcon class="w-6 h-6 text-gray-400 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'circle-user']" class="w-6 h-6 text-gray-400 shrink-0" />
             <div class="flex-1 min-w-0">
               <p class="text-base text-gray-800 truncate">{{ u.display_name || u.email }}</p>
               <p class="text-xs text-gray-500 truncate">{{ u.email }}</p>

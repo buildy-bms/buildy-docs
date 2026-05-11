@@ -33,6 +33,14 @@ import {
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,
   faServer, faTreeCity, faNetworkWired, faCloud, faPlugCircleXmark,
+  // PWA audit UI (MobileAuditDetailView, MobileSelectSheet, MobileLibraryPicker,
+  // tous les Mobile*Tab et sheets après migration Heroicons → FA)
+  faChevronLeft, faChevronRight, faChevronDown, faXmark, faMagnifyingGlass,
+  faPlus, faCheck, faCircleXmark, faCircleExclamation,
+  faTriangleExclamation, faCircleUser, faPencil, faPenToSquare, faShareNodes,
+  faBookOpen, faClock, faSignalSlash, faIdCard, faClipboardList, faClipboardCheck,
+  faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
+  faMapPin, faShare, faEllipsis,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -50,6 +58,12 @@ const ICONS = [
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,
   faServer, faTreeCity, faNetworkWired, faCloud, faPlugCircleXmark,
+  faChevronLeft, faChevronRight, faChevronDown, faXmark, faMagnifyingGlass,
+  faPlus, faCheck, faCircleXmark, faCircleExclamation,
+  faTriangleExclamation, faCircleUser, faPencil, faPenToSquare, faShareNodes,
+  faBookOpen, faClock, faSignalSlash, faIdCard, faClipboardList, faClipboardCheck,
+  faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
+  faMapPin, faShare, faEllipsis,
 ]
 
 library.add(...ICONS)

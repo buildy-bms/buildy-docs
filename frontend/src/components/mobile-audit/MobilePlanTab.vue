@@ -1,11 +1,8 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  CheckCircleIcon,
-  ArrowPathIcon,
-  PencilSquareIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { regenerateBacsActionItems, updateBacsActionItem } from '@/api'
@@ -140,7 +137,7 @@ async function saveEdit() {
       :disabled="regenerating"
       class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl active:bg-gray-50"
     >
-      <ArrowPathIcon :class="['w-4 h-4', regenerating ? 'animate-spin' : '']" />
+      <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-4 h-4', regenerating ? 'animate-spin' : '']" />
       {{ regenerating ? 'Régénération…' : 'Régénérer le plan' }}
     </button>
 
@@ -164,7 +161,7 @@ async function saveEdit() {
           </span>
           <span class="text-[10px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</span>
           <span class="ml-auto inline-flex items-center gap-1 text-[10px] text-gray-500">
-            <PencilSquareIcon class="w-3 h-3" />
+            <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3 h-3" />
             {{ STATUS_LABEL[it.status] || it.status }}
           </span>
         </div>
@@ -175,7 +172,7 @@ async function saveEdit() {
       </button>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
-      <CheckCircleIcon class="w-12 h-12 text-emerald-500 mx-auto" />
+      <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-12 h-12 text-emerald-500 mx-auto" />
       <p class="text-base font-medium text-emerald-700 mt-3">
         {{ filter === 'open' ? 'Aucune action ouverte' : filter === 'done' ? 'Aucune action terminée' : 'Aucune action' }}
       </p>

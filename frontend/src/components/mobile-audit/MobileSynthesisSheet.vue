@@ -1,4 +1,6 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 /**
  * Synthese Claude — sheet mobile (PR-V Vague 3 item 12).
  * Permet a l'auditeur de declencher la generation Claude depuis le terrain
@@ -9,7 +11,6 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { SparklesIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { generateBacsAuditSynthesis, updateBacsAuditSynthesis } from '@/api'
@@ -72,7 +73,7 @@ async function clearSynthesis() {
   <MobileSheet :open="open" title="Synthèse Claude" hide-save @close="$emit('close')">
     <div class="p-4 space-y-4">
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-start gap-3">
-        <SparklesIcon class="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
+        <FontAwesomeIcon :icon="['fas', 'sparkles']" class="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
         <div class="flex-1 text-sm text-violet-900">
           <p class="font-medium">Note de synthèse client</p>
           <p class="text-xs text-violet-700 mt-1 leading-relaxed">
@@ -86,7 +87,7 @@ async function clearSynthesis() {
         :disabled="generating"
         class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-violet-600 active:bg-violet-700 rounded-xl disabled:opacity-50"
       >
-        <SparklesIcon :class="['w-5 h-5', generating ? 'animate-pulse' : '']" />
+        <FontAwesomeIcon :icon="['fas', 'sparkles']" :class="['w-5 h-5', generating ? 'animate-pulse' : '']" />
         {{ generating
             ? 'Génération en cours…'
             : (synthesisHtml ? 'Régénérer avec Claude' : 'Rédiger avec Claude') }}

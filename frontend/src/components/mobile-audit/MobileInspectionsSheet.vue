@@ -1,4 +1,6 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 /**
  * Sous-page mobile pour les inspections périodiques R175-5-1 (rapport
  * conservé 10 ans). Vague 3 item 11 de l'audit BACS.
@@ -15,7 +17,6 @@
  */
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { TrashIcon, PlusIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -92,7 +93,7 @@ async function removeInspection(ins) {
         :disabled="adding"
         class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-xl disabled:opacity-50"
       >
-        <PlusIcon class="w-5 h-5 shrink-0" />
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         {{ adding ? 'Ajout…' : 'Ajouter une inspection' }}
       </button>
 
@@ -105,7 +106,7 @@ async function removeInspection(ins) {
         >
           <div class="flex items-center gap-2 justify-between">
             <span class="inline-flex items-center gap-1 text-xs text-gray-500">
-              <ClockIcon class="w-3.5 h-3.5" />
+              <FontAwesomeIcon :icon="['fas', 'clock']" class="w-3.5 h-3.5" />
               Inspection #{{ ins.id }}
             </span>
             <span
@@ -190,13 +191,13 @@ async function removeInspection(ins) {
             @click="removeInspection(ins)"
             class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-red-700 bg-red-50 active:bg-red-100 rounded-xl"
           >
-            <TrashIcon class="w-4 h-4 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4 shrink-0" />
             Supprimer cette inspection
           </button>
         </div>
       </div>
       <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center">
-        <ClockIcon class="w-10 h-10 text-gray-300 mx-auto" />
+        <FontAwesomeIcon :icon="['fas', 'clock']" class="w-10 h-10 text-gray-300 mx-auto" />
         <p class="text-sm font-medium text-gray-700 mt-3">Aucune inspection tracée</p>
         <p class="text-xs text-gray-500 mt-1">Une action corrective est générée automatiquement tant qu'aucune inspection R175-5-1 n'est documentée.</p>
       </div>

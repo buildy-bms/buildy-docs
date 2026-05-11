@@ -2,22 +2,11 @@
 import { ref, computed, onMounted, watch, inject } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
-import {
-  ChevronLeftIcon,
-  IdentificationIcon,
-  Squares2X2Icon,
-  BoltIcon,
-  WrenchScrewdriverIcon,
-  ClipboardDocumentListIcon,
-  ClipboardDocumentCheckIcon,
-  ListBulletIcon,
-  EllipsisHorizontalIcon,
-  SignalSlashIcon,
-  Cog6ToothIcon,
-  TrashIcon,
-  CheckCircleIcon,
-  ArrowPathIcon,
-} from '@heroicons/vue/24/outline'
+// Toutes les icônes via FontAwesome Pro Solid (charte Buildy Docs).
+// Le registre `lib/equipment-icons.js` enregistre déjà les icônes
+// utilisées ici dans la library FA (tree-shake garanti).
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import { useAuditStore } from '@/stores/audit'
 import { useAuditAutoSync } from '@/composables/useAuditAutoSync'
 import { useNotification } from '@/composables/useNotification'
@@ -29,7 +18,6 @@ import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
 import MobileSynthesisSheet from '@/components/mobile-audit/MobileSynthesisSheet.vue'
-import { UserPlusIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
 import MobileZonesTab from '@/components/mobile-audit/MobileZonesTab.vue'
@@ -78,14 +66,18 @@ const docId = parseInt(route.params.id, 10)
 // Ordre aligné sur le stepper desktop (BacsAuditDetailView STEP_DEFINITIONS) :
 // Site → Zones → Systèmes → Compteurs → GTB. La régulation thermique R175-6
 // est nichée dans l'onglet Systèmes côté mobile.
+// Onglets PWA — icônes FontAwesome Pro Solid (registre dans lib/equipment-icons.js).
+// Pas de variante "outline" en FA solid : l'onglet actif est distingué par
+// la couleur indigo + l'indicateur de top-bar qui glisse, pas par un
+// changement d'icône.
 const TABS = [
-  { key: 'site',     label: 'Site',     icon: IdentificationIcon },
-  { key: 'zones',    label: 'Zones',    icon: Squares2X2Icon },
-  { key: 'systems',  label: 'Systèmes', icon: WrenchScrewdriverIcon },
-  { key: 'meters',   label: 'Comp.',    icon: BoltIcon },
-  { key: 'bms',      label: 'GTB',      icon: ClipboardDocumentListIcon },
-  { key: 'docs',     label: 'Docs',     icon: ClipboardDocumentCheckIcon },
-  { key: 'plan',     label: 'Plan',     icon: ListBulletIcon },
+  { key: 'site',    label: 'Site',     icon: 'id-card' },
+  { key: 'zones',   label: 'Zones',    icon: 'table-cells-large' },
+  { key: 'systems', label: 'Systèmes', icon: 'screwdriver-wrench' },
+  { key: 'meters',  label: 'Comp.',    icon: 'bolt' },
+  { key: 'bms',     label: 'GTB',      icon: 'clipboard-list' },
+  { key: 'docs',    label: 'Docs',     icon: 'clipboard-check' },
+  { key: 'plan',    label: 'Plan',     icon: 'list' },
 ]
 
 const STORAGE_KEY = `mobile-audit-tab:${docId}`
@@ -122,42 +114,50 @@ function onNavigateFromDocs({ kind, entityId }) {
 // se masque à l'intérieur des onglets concernés selon le kind.
 const visibleTabs = computed(() => TABS)
 
-// Pastilles de complétude par onglet (Vague 3 item 13). Couleur :
-//  - 'red'  : un point d'attention bloque (action requise immédiate)
-//  - 'amber': commencé mais incomplet (peut continuer)
-//  - null   : rien à signaler (pas commencé OU complet)
+// Pastilles de complétude par onglet (Vague 3 item 13). Format :
+//   { tone: 'red'|'amber', count?: number }   (null = rien à signaler)
+//
+// Quand `count` est fourni, on affiche un badge chiffré façon iOS Mail
+// (cercle de couleur avec le compteur). Sinon un simple dot. Permet à
+// l'auditeur de voir d'un coup d'œil combien d'éléments réclament son
+// attention dans chaque onglet, sans devoir y entrer.
 //
 // Volontairement permissif : on n'affiche pas un dot vert sur tout
-// (pollution visuelle), juste un dot rouge/jaune si l'auditeur doit
+// (pollution visuelle), juste un signal rouge/jaune si l'auditeur doit
 // y revenir.
 const tabDot = computed(() => {
   const out = {}
-  // Site : pas de dot (pas de critère bloquant simple)
   out.site = null
-  // Zones : aucune zone → red, sinon null
-  out.zones = (zones.value?.length || 0) === 0 ? 'red' : null
-  // Systèmes : si au moins 1 système ni present ni not_concerned (à renseigner)
+  // Zones : aucune zone → red (count omis : c'est binaire)
+  out.zones = (zones.value?.length || 0) === 0 ? { tone: 'red' } : null
+  // Systèmes : nombre de systèmes ni present ni not_concerned
   const sys = systems.value || []
   const sysToFill = sys.filter(s => !s.present && !s.not_concerned).length
-  out.systems = sysToFill > 0 ? 'amber' : null
-  // Compteurs : si au moins 1 required absent → red
+  out.systems = sysToFill > 0 ? { tone: 'amber', count: sysToFill } : null
+  // Compteurs : nombre de compteurs required absents (pas HS)
   const m = meters.value || []
   const missingMeters = m.filter(x => x.required && !x.present_actual && !x.out_of_service).length
-  out.meters = missingMeters > 0 ? 'red' : null
-  // GTB : si BMS vide (aucun champ rempli) → amber
+  out.meters = missingMeters > 0 ? { tone: 'red', count: missingMeters } : null
+  // GTB : si BMS vide → amber (pas de compteur, juste un dot)
   const b = bms.value || {}
   const bmsHasContent = !!(b.existing_solution || b.existing_solution_brand || b.location || b.overall_compliance)
-  out.bms = !bmsHasContent ? 'amber' : null
-  // Docs : on n'a pas l'état de la check-list dans le store (chargée par
-  // l'onglet à l'ouverture), pas de dot pour V1.
+  out.bms = !bmsHasContent ? { tone: 'amber' } : null
   out.docs = null
-  // Plan : si actions blocking ouvertes → red, major → amber, sinon null
+  // Plan : nombre d'actions blocking ouvertes (priorité) ou major
   const actions = actionItems.value || []
   const blocking = actions.filter(a => a.severity === 'blocking' && a.status !== 'done' && a.status !== 'declined').length
   const major = actions.filter(a => a.severity === 'major' && a.status !== 'done' && a.status !== 'declined').length
-  out.plan = blocking > 0 ? 'red' : (major > 0 ? 'amber' : null)
+  out.plan = blocking > 0
+    ? { tone: 'red', count: blocking }
+    : (major > 0 ? { tone: 'amber', count: major } : null)
   return out
 })
+
+// Index de l'onglet actif dans visibleTabs : alimente l'indicateur top-bar
+// qui glisse sous chaque onglet sélectionné.
+const activeTabIndex = computed(() =>
+  Math.max(0, visibleTabs.value.findIndex(t => t.key === activeTab.value)),
+)
 
 async function refresh() {
   try {
@@ -293,7 +293,7 @@ async function removeAudit() {
           class="tap-target inline-flex items-center justify-center text-white/90 hover:text-white"
           aria-label="Retour"
         >
-          <ChevronLeftIcon class="w-6 h-6" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
         </button>
         <div class="flex-1 min-w-0">
           <h1 class="text-base font-medium truncate leading-tight">
@@ -313,7 +313,7 @@ async function removeAudit() {
           v-tooltip="`Hors-ligne — ${offlineQueue.pendingCount.value || 0} modif(s) en attente de sync`"
           aria-label="Hors-ligne"
         >
-          <SignalSlashIcon class="w-5 h-5" />
+          <FontAwesomeIcon :icon="['fas', 'signal-slash']" class="w-5 h-5" />
         </div>
         <div
           v-else-if="offlineQueue.pendingCount.value > 0"
@@ -328,10 +328,10 @@ async function removeAudit() {
         </div>
         <button
           @click="showSettings = true"
-          class="tap-target inline-flex items-center justify-center text-white/90 hover:text-white"
+          class="tap-target inline-flex items-center justify-center text-white/90 hover:text-white active:scale-90 transition-transform"
           aria-label="Paramètres de l'audit"
         >
-          <Cog6ToothIcon class="w-6 h-6" />
+          <FontAwesomeIcon :icon="['fas', 'gear']" class="w-5 h-5" />
         </button>
       </div>
 
@@ -345,7 +345,7 @@ async function removeAudit() {
           v-if="!isOnline"
           class="px-3 py-2 bg-amber-500 text-white text-xs flex items-center gap-2 leading-tight"
         >
-          <SignalSlashIcon class="w-4 h-4 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'signal-slash']" class="w-4 h-4 shrink-0" />
           <span class="flex-1">
             <strong>Hors-ligne.</strong> Tes modifications sont mises en attente
             <span v-if="offlineQueue.pendingCount.value > 0">({{ offlineQueue.pendingCount.value }} en queue)</span>
@@ -369,52 +369,92 @@ async function removeAudit() {
       </transition>
     </header>
 
-    <!-- Contenu de l'onglet actif (scroll vertical, un seul visible) -->
+    <!-- Contenu de l'onglet actif (scroll vertical, un seul visible). Cross-fade
+         + léger lift au switch d'onglet pour une transition iOS-like sans
+         défaire la position de scroll (chaque tab reste monté via v-show). -->
     <main
-      class="flex-1 overflow-y-auto overscroll-contain"
+      class="flex-1 overflow-y-auto overscroll-contain relative"
       :style="{ paddingBottom: 'calc(56px + max(4px, env(safe-area-inset-bottom)))' }"
     >
       <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
       <template v-else-if="document">
-        <MobileSiteTab    v-show="activeTab === 'site'" />
-        <MobileZonesTab   v-show="activeTab === 'zones'" />
-        <MobileMetersTab  v-show="activeTab === 'meters'" />
-        <MobileSystemsTab v-show="activeTab === 'systems'" />
-        <MobileBmsTab     v-show="activeTab === 'bms'" />
-        <MobileChecklistTab v-show="activeTab === 'docs'" @navigate="onNavigateFromDocs" />
-        <MobilePlanTab    v-show="activeTab === 'plan'" />
+        <div :class="['tab-pane', activeTab === 'site' ? 'tab-pane-active' : '']">
+          <MobileSiteTab v-show="activeTab === 'site'" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'zones' ? 'tab-pane-active' : '']">
+          <MobileZonesTab v-show="activeTab === 'zones'" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'meters' ? 'tab-pane-active' : '']">
+          <MobileMetersTab v-show="activeTab === 'meters'" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'systems' ? 'tab-pane-active' : '']">
+          <MobileSystemsTab v-show="activeTab === 'systems'" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'bms' ? 'tab-pane-active' : '']">
+          <MobileBmsTab v-show="activeTab === 'bms'" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'docs' ? 'tab-pane-active' : '']">
+          <MobileChecklistTab v-show="activeTab === 'docs'" @navigate="onNavigateFromDocs" />
+        </div>
+        <div :class="['tab-pane', activeTab === 'plan' ? 'tab-pane-active' : '']">
+          <MobilePlanTab v-show="activeTab === 'plan'" />
+        </div>
       </template>
     </main>
 
     <!-- Bottom tab bar : sticky, safe-area bottom -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-30 bg-white border-t border-gray-200 flex flex-col"
+      class="fixed inset-x-0 bottom-0 z-30 bg-white/95 backdrop-blur-sm border-t border-gray-200 flex flex-col"
       role="navigation"
       aria-label="Navigation audit"
     >
-      <ul class="flex items-stretch h-14">
+      <ul class="relative flex items-stretch h-14">
+        <!-- Indicateur top-bar qui glisse sous l'onglet actif (largeur = 1/N
+             du nav). Position via transform translateX(activeIndex * 100%)
+             pour une transition fluide et performante. -->
+        <span
+          aria-hidden="true"
+          class="pointer-events-none absolute top-0 left-0 h-0.5 bg-indigo-600 rounded-full transition-transform duration-300 ease-out"
+          :style="{
+            width: `${100 / visibleTabs.length}%`,
+            transform: `translateX(${activeTabIndex * 100}%)`,
+          }"
+        ></span>
         <li v-for="tab in visibleTabs" :key="tab.key" class="flex-1">
           <button
             type="button"
             @click="activeTab = tab.key"
             :class="[
-              'w-full h-full flex flex-col items-center justify-center gap-1 transition-colors select-none relative',
+              'w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors select-none relative',
               activeTab === tab.key
                 ? 'text-indigo-600'
-                : 'text-gray-500 active:text-gray-700'
+                : 'text-gray-500 active:text-gray-700',
             ]"
           >
             <span class="relative inline-flex">
-              <component :is="tab.icon" class="w-7 h-7 shrink-0" />
-              <!-- Dot complétude : rouge = action requise, amber = incomplet -->
+              <FontAwesomeIcon
+                :icon="['fas', tab.icon]"
+                :class="[
+                  'w-6 h-6 shrink-0 transition-transform duration-200',
+                  activeTab === tab.key ? 'scale-110' : 'scale-100',
+                ]"
+              />
+              <!-- Badge complétude : chiffré façon iOS Mail si tabDot fournit
+                   un count, sinon simple dot. Rouge = action requise, amber
+                   = à compléter. Ring blanc pour bien détacher de l'icône. -->
               <span
                 v-if="tabDot[tab.key]"
-                :class="['absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white',
-                  tabDot[tab.key] === 'red' ? 'bg-red-500' : 'bg-amber-400']"
-                :aria-label="tabDot[tab.key] === 'red' ? 'Action requise' : 'À compléter'"
-              ></span>
+                :class="[
+                  'absolute inline-flex items-center justify-center ring-2 ring-white rounded-full font-semibold',
+                  tabDot[tab.key].count
+                    ? '-top-1 -right-2 min-w-4 h-4 px-1 text-[10px] text-white leading-none'
+                    : '-top-0.5 -right-0.5 w-2.5 h-2.5',
+                  tabDot[tab.key].tone === 'red' ? 'bg-red-500' : 'bg-amber-400',
+                ]"
+                :aria-label="tabDot[tab.key].tone === 'red' ? 'Action requise' : 'À compléter'"
+              >{{ tabDot[tab.key].count || '' }}</span>
             </span>
-            <span class="text-[11px] font-medium leading-none">{{ tab.label }}</span>
+            <span :class="['text-[11px] leading-none transition-all', activeTab === tab.key ? 'font-semibold' : 'font-medium']">{{ tab.label }}</span>
           </button>
         </li>
       </ul>
@@ -436,13 +476,13 @@ async function removeAudit() {
           @click="openEditMetadata"
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl"
         >
-          <PencilSquareIcon class="w-5 h-5" />
+          <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-5 h-5" />
           Modifier les paramètres
         </button>
 
         <!-- Statut audit -->
         <div v-if="document?.delivered_at" class="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
-          <CheckCircleIcon class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <div class="flex-1 min-w-0 text-sm">
             <p class="font-medium text-emerald-800">Audit déjà livré</p>
             <p class="text-xs text-emerald-700 mt-0.5">
@@ -456,7 +496,7 @@ async function removeAudit() {
           @click="openShare"
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl"
         >
-          <UserPlusIcon class="w-5 h-5" />
+          <FontAwesomeIcon :icon="['fas', 'user-plus']" class="w-5 h-5" />
           Partager l'audit
         </button>
 
@@ -465,7 +505,7 @@ async function removeAudit() {
           @click="openSynthesis"
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-violet-700 bg-violet-50 border border-violet-200 active:bg-violet-100 rounded-xl"
         >
-          <SparklesIcon class="w-5 h-5" />
+          <FontAwesomeIcon :icon="['fas', 'sparkles']" class="w-5 h-5" />
           Synthèse Claude
         </button>
 
@@ -476,7 +516,7 @@ async function removeAudit() {
           :disabled="delivering"
           class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-xl disabled:opacity-50"
         >
-          <CheckCircleIcon class="w-5 h-5" />
+          <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-5 h-5" />
           {{ delivering ? 'Livraison…' : (document?.delivered_at ? 'Re-livrer (nouvelle version)' : 'Livrer cet audit') }}
         </button>
 
@@ -487,7 +527,7 @@ async function removeAudit() {
             :disabled="forcing"
             class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-xl active:bg-gray-50 disabled:opacity-50"
           >
-            <ArrowPathIcon :class="['w-5 h-5', forcing ? 'animate-spin' : '']" />
+            <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-5 h-5', forcing ? 'animate-spin' : '']" />
             Forcer l'actualisation
           </button>
           <p class="text-xs text-gray-500 mt-2 leading-relaxed">
@@ -501,7 +541,7 @@ async function removeAudit() {
             @click="removeAudit"
             class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl"
           >
-            <TrashIcon class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
             Supprimer l'audit
           </button>
           <p class="text-xs text-gray-500 mt-2 leading-relaxed">
@@ -551,5 +591,19 @@ async function removeAudit() {
 .slide-down-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+/* Cross-fade subtle + lift léger à chaque changement d'onglet.
+   Les onglets restent montés (v-show) donc le scroll position de chacun
+   est conservé. La transition n'agit que sur l'enveloppe `.tab-pane`
+   active : opacity 0 → 1 + translateY(4px → 0) en 220 ms. */
+.tab-pane {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 220ms ease-out, transform 220ms ease-out;
+}
+.tab-pane-active {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

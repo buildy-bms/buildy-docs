@@ -1,4 +1,6 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 /**
  * Onglet « Docs » mobile (6e tab) — check-list de collecte.
  * Couverture photo des entités + pièces jointes du dossier.
@@ -12,10 +14,6 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  CheckIcon, NoSymbolIcon, ExclamationCircleIcon,
-  CameraIcon, DocumentIcon, TrashIcon, ChevronRightIcon,
-} from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import {
@@ -28,8 +26,6 @@ import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
-import { BuildingOffice2Icon, MapPinIcon, BoltIcon, ClipboardDocumentListIcon } from '@heroicons/vue/24/outline'
-
 const emit = defineEmits(['navigate'])
 
 // Labels FR des natures de zone (pour le sheet KPI). Reste minimaliste :
@@ -240,7 +236,7 @@ async function quickToggleNotAvailable(it) {
     <!-- Stat globale -->
     <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
       <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 inline-flex items-center justify-center">
-        <CheckIcon class="w-6 h-6" />
+        <FontAwesomeIcon :icon="['fas', 'check']" class="w-6 h-6" />
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-2xl font-medium text-gray-900 leading-none">
@@ -254,7 +250,7 @@ async function quickToggleNotAvailable(it) {
          entités sans photo (ou un message « tout couvert » si OK). -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-        <CameraIcon class="w-5 h-5 text-emerald-600" />
+        <FontAwesomeIcon :icon="['fas', 'camera']" class="w-5 h-5 text-emerald-600" />
         <h3 class="text-base font-medium text-gray-900">Couverture photo des entités</h3>
       </div>
       <div class="grid grid-cols-2 divide-x divide-y divide-gray-100">
@@ -301,8 +297,8 @@ async function quickToggleNotAvailable(it) {
           class="w-full flex items-center gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
         >
           <span class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 inline-flex items-center justify-center shrink-0">
-            <BuildingOffice2Icon v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
-            <ClipboardDocumentListIcon v-else class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'building']" v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'clipboard-list']" v-else class="w-5 h-5" />
           </span>
           <span class="flex-1 text-left">
             <span class="block text-base text-gray-900 font-medium">
@@ -310,7 +306,7 @@ async function quickToggleNotAvailable(it) {
             </span>
             <span class="block text-xs text-amber-700 mt-0.5">Aucune photo · à prendre</span>
           </span>
-          <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
         </button>
         <button
           v-else-if="(coverageDetail.kind === 'site' || coverageDetail.kind === 'bms') && coverageDetail.covered > 0"
@@ -319,8 +315,8 @@ async function quickToggleNotAvailable(it) {
           class="w-full flex items-center gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
         >
           <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 inline-flex items-center justify-center shrink-0">
-            <BuildingOffice2Icon v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
-            <ClipboardDocumentListIcon v-else class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'building']" v-if="coverageDetail.kind === 'site'" class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'clipboard-list']" v-else class="w-5 h-5" />
           </span>
           <span class="flex-1 text-left">
             <span class="block text-base text-gray-900 font-medium">
@@ -328,7 +324,7 @@ async function quickToggleNotAvailable(it) {
             </span>
             <span class="block text-xs text-emerald-700 mt-0.5">✓ Couvert</span>
           </span>
-          <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
         </button>
 
         <!-- Site / GTB sans entité (cas vide impossible normalement) -->
@@ -347,7 +343,7 @@ async function quickToggleNotAvailable(it) {
             class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white rounded-xl border border-gray-200 text-base text-gray-700 active:bg-gray-50"
           >
             Aller à l'onglet {{ coverageDetail.label }}
-            <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
           </button>
         </template>
 
@@ -365,13 +361,13 @@ async function quickToggleNotAvailable(it) {
               >
                 <!-- Icône / pictogramme selon le type d'entité -->
                 <span class="shrink-0">
-                  <MapPinIcon v-if="coverageDetail.kind === 'zones'" class="w-6 h-6 text-indigo-600" />
+                  <FontAwesomeIcon :icon="['fas', 'map-pin']" v-if="coverageDetail.kind === 'zones'" class="w-6 h-6 text-indigo-600" />
                   <SystemCategoryIcon
                     v-else-if="coverageDetail.kind === 'systems'"
                     :category="m.category"
                     size="md"
                   />
-                  <BoltIcon v-else-if="coverageDetail.kind === 'meters'" class="w-6 h-6 text-amber-600" />
+                  <FontAwesomeIcon :icon="['fas', 'bolt']" v-else-if="coverageDetail.kind === 'meters'" class="w-6 h-6 text-amber-600" />
                 </span>
                 <div class="flex-1 min-w-0">
                   <!-- Zones : nom + nature -->
@@ -397,7 +393,7 @@ async function quickToggleNotAvailable(it) {
                   <!-- Fallback (jamais utilisé en pratique) -->
                   <p v-else class="text-base text-gray-900 truncate">{{ m.name }}</p>
                 </div>
-                <ChevronRightIcon class="w-5 h-5 text-gray-400 shrink-0" />
+                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
               </button>
             </li>
           </ul>
@@ -429,9 +425,9 @@ async function quickToggleNotAvailable(it) {
                 {{ it.label }}
               </p>
               <p class="text-xs mt-0.5 flex items-center gap-1">
-                <CheckIcon v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
-                <NoSymbolIcon v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-400" />
-                <ExclamationCircleIcon v-else class="w-3.5 h-3.5 text-amber-500" />
+                <FontAwesomeIcon :icon="['fas', 'check']" v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
+                <FontAwesomeIcon :icon="['fas', 'ban']" v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-400" />
+                <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" v-else class="w-3.5 h-3.5 text-amber-500" />
                 <span :class="{
                   'text-emerald-700': it.status === 'available',
                   'text-gray-500':    it.status === 'not_available',
@@ -443,7 +439,7 @@ async function quickToggleNotAvailable(it) {
                 </span>
             </p>
             </div>
-            <ChevronRightIcon class="w-5 h-5 text-gray-300 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
           </button>
           <!-- Bouton Non dispo inline (ne ouvre pas le sheet) -->
           <button type="button" @click.stop="quickToggleNotAvailable(it)"
@@ -451,7 +447,7 @@ async function quickToggleNotAvailable(it) {
                            it.status === 'not_available'
                              ? 'text-gray-700 bg-gray-100 border-gray-300 active:bg-gray-200'
                              : 'text-gray-500 bg-white border-gray-200 active:bg-gray-50']">
-            <NoSymbolIcon class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', 'ban']" class="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -499,13 +495,13 @@ async function quickToggleNotAvailable(it) {
           <div class="grid grid-cols-2 gap-2">
             <button type="button" @click="cameraInput?.click()"
                     class="inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl">
-              <CameraIcon class="w-5 h-5" /> Photo
+              <FontAwesomeIcon :icon="['fas', 'camera']" class="w-5 h-5" /> Photo
             </button>
             <input ref="cameraInput" type="file" accept="image/*" capture="environment"
                    class="hidden" @change="onFileSelected" />
             <button type="button" @click="fileInput?.click()"
                     class="inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-gray-700 bg-white border border-gray-200 active:bg-gray-50 rounded-xl">
-              <DocumentIcon class="w-5 h-5" /> Fichier
+              <FontAwesomeIcon :icon="['fas', 'file']" class="w-5 h-5" /> Fichier
             </button>
             <input ref="fileInput" type="file" multiple class="hidden" @change="onFileSelected" />
           </div>
@@ -514,7 +510,7 @@ async function quickToggleNotAvailable(it) {
                 class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm">
               <a :href="getSiteDocumentDownloadUrl(f.id)" target="_blank" class="flex-1 truncate text-indigo-700">{{ f.title }}</a>
               <button type="button" @click="removeFile(f)" class="text-gray-400 active:text-red-600 p-1.5">
-                <TrashIcon class="w-4 h-4" />
+                <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4" />
               </button>
             </li>
           </ul>

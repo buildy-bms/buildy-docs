@@ -1,4 +1,6 @@
 <script setup>
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 /**
  * Bouton « + Note » à côté de chaque sous-titre de la carte GTB sur
  * mobile (mig 109). Self-contained : gère son propre sheet d'édition
@@ -10,7 +12,6 @@
  */
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import MobileSheet from './MobileSheet.vue'
@@ -69,7 +70,7 @@ async function save() {
         ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
         : 'border-gray-300 text-gray-600 bg-white']"
   >
-    <PencilSquareIcon class="w-3.5 h-3.5" />
+    <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3.5 h-3.5" />
     {{ hasNote ? 'Note' : '+ Note' }}
   </button>
 
