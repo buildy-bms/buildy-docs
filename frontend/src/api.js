@@ -601,5 +601,6 @@ export const faqAiGenerate = (payload = {}) => {
 export const faqAiRewriteSelection = ({ article_id, selection_html, instruction = '' }) =>
   api.post('/faq/ai/rewrite-selection', { article_id, selection_html, instruction })
 export const faqAiSuggestMissing = () => api.post('/faq/ai/missing-articles')
+export const faqAiCorpusStats = () => api.get('/faq/ai/corpus-stats')
 
 export default api

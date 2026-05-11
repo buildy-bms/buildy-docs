@@ -2,6 +2,48 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.22",
+      "date": "2026-05-11",
+      "title": "FAQ Buildy : génération IA fiabilisée, éditeur réparé",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La génération d'article par IA n'est plus tronquée",
+          "what": "Sur des articles longs (typiquement les FAQ techniques R175 / BACS), le moteur s'arrêtait au milieu d'une phrase. La limite de tokens en sortie a été quadruplée (2048 → 8192) sur la génération et la réécriture. Si malgré tout la limite est atteinte, un encart orange « Article potentiellement incomplet » s'affiche au-dessus de l'aperçu.",
+          "where": "FAQ Buildy → bouton « Générer un article » d'une catégorie, ou « Réécrire avec IA » dans l'éditeur d'un article.",
+          "how_to_test": "Pose une question dense (ex : « Le décret BACS impose-t-il une certification ISO 52120-1 ? »), génère l'article, et vérifie qu'il se termine proprement (dernière phrase complète, conclusion claire). Pas d'encart orange = pas de troncature."
+        },
+        {
+          "kind": "feat",
+          "title": "L'IA utilise désormais le corpus Buildy complet (sections, équipements, fonctionnalités, articles FAQ existants)",
+          "what": "Les descriptions de la bibliothèque étaient passées à l'IA en version résumée (1500 caractères max par entité). Elles sont maintenant envoyées en intégralité (jusqu'à 8000 caractères) et les articles FAQ déjà publiés en entier (jusqu'à 6000 caractères), pour des citations plus précises et de meilleurs liens internes. Le surcoût en tokens est amorti par le cache éphémère.",
+          "where": "FAQ Buildy → modale « Générer un article » — un encart violet en haut résume ce qui est envoyé à l'IA (N sections · M équipements · K fonctionnalités · L articles FAQ).",
+          "how_to_test": "Ouvre la modale de génération : un chip violet apparaît avec les compteurs du corpus. Génère un article sur une fonctionnalité Buildy précise et vérifie que le résultat reprend des détails fins de la description bibliothèque (pas juste un résumé)."
+        },
+        {
+          "kind": "fix",
+          "title": "Impossible d'ajouter un lien dans l'éditeur FAQ — corrigé",
+          "what": "Deux bugs cumulés bloquaient les liens : la modale d'insertion ne communiquait plus avec l'éditeur (props/events désalignés), et Tiptap v3 supprimait silencieusement mailto:/tel:/ancres. Les liens fonctionnent à nouveau pour http(s), mailto, tel, ancres (#…) et chemins relatifs.",
+          "where": "Éditeur d'article FAQ → bouton lien (icône chaînon) dans la toolbar.",
+          "how_to_test": "Sélectionne du texte, clique sur l'icône lien, saisis https://exemple.com → le lien s'applique. Refais le test avec mailto:contact@buildy.fr puis tel:+33123 → fonctionnent tous les deux."
+        },
+        {
+          "kind": "fix",
+          "title": "Le bouton « Lien vers un autre article FAQ » est réapparu dans la toolbar",
+          "what": "Le bouton qui permet d'insérer un lien interne vers un autre article publié sur help.buildy.fr avait disparu. Il est de retour (icône livre ouvert à côté du lien externe), avec recherche live par titre. Endpoint backend correspondant ajouté.",
+          "where": "Éditeur d'article FAQ → toolbar, icône « livre ouvert » juste à droite du bouton de lien externe.",
+          "how_to_test": "Place le curseur dans le texte, clique sur l'icône livre ouvert → une modale liste les articles publiés. Choisis-en un : un lien vers l'article est inséré au curseur avec le titre comme texte cliquable. Avec une sélection active, la sélection devient le texte du lien."
+        },
+        {
+          "kind": "ux",
+          "title": "La toolbar de l'éditeur reste visible au scroll",
+          "what": "Sur les articles longs, on devait remonter en haut pour accéder aux boutons de mise en forme. La toolbar est maintenant collante (sticky) : elle suit le défilement et reste accessible en permanence.",
+          "where": "Éditeur d'article FAQ.",
+          "how_to_test": "Ouvre un long article et fais défiler le contenu : la barre d'outils (titres, gras, listes, callouts, lien, image, IA) reste figée en haut de la zone d'édition."
+        }
+      ]
+    },
+    {
       "version": "0.1.21",
       "date": "2026-05-11",
       "title": "Correctif : onglet Site et statut Docs de la PWA audit",
