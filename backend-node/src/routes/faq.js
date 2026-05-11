@@ -262,6 +262,22 @@ async function routes(fastify) {
   });
 
   // ── Articles ────────────────────────────────────────────────────
+  // Recherche compacte pour la modale "Lien vers un autre article FAQ" dans
+  // l'éditeur Tiptap. Retourne uniquement les articles publiés ayant déjà été
+  // poussés sur Crisp (crisp_url renseigné).
+  fastify.get('/faq/articles/searchable', async (request) => {
+    const q = (request.query?.q || '').trim() || null;
+    const rows = db.faqArticles.list({ status: 'published', q, limit: 50 });
+    return rows
+      .filter((a) => a.crisp_url)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        crisp_url: a.crisp_url,
+        category_name: a.category_name,
+      }));
+  });
+
   fastify.get('/faq/articles', async (request) => {
     const { category_id, status, q, locale } = request.query || {};
     return db.faqArticles.list({
@@ -565,6 +581,23 @@ async function routes(fastify) {
       log.warn(`FAQ AI generate: ${e.message}`);
       return reply.code(500).send({ detail: e.message });
     }
+  });
+
+  // Stats du corpus envoyé à l'IA lors de la génération d'un article.
+  // Permet à l'utilisateur de voir ce qui sert de "source de vérité" à Claude.
+  fastify.get('/faq/ai/corpus-stats', async (_request, _reply) => {
+    const sections = db.sectionTemplates?.list?.({ kind: 'standard' }) || [];
+    const equipments = db.equipmentTemplates?.list?.() || [];
+    const features = db.sectionTemplates?.list?.({ kind: 'functionality' }) || [];
+    const faqArticles = db.faqArticles?.listForCorpus?.() || [];
+    return {
+      sections: sections.length,
+      equipments: equipments.length,
+      features: features.length,
+      faq_articles: faqArticles.length,
+      mode: 'exhaustive',
+      details: 'Corpus complet (descriptions intégrales jusqu’à 8 000 caractères par entité, articles FAQ entiers).',
+    };
   });
 
   fastify.post('/faq/ai/missing-articles', async (request, reply) => {

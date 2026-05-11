@@ -23,12 +23,13 @@ import Highlight from '@tiptap/extension-highlight'
 import {
   BoldIcon, ItalicIcon, UnderlineIcon, ListBulletIcon, NumberedListIcon,
   LinkIcon, PhotoIcon, CodeBracketIcon, ChatBubbleBottomCenterTextIcon,
-  H1Icon, H2Icon, H3Icon, SparklesIcon,
+  H1Icon, H2Icon, H3Icon, SparklesIcon, BookOpenIcon,
   LightBulbIcon, InformationCircleIcon, ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import api from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import LinkInputModal from './LinkInputModal.vue'
+import FaqArticleLinkModal from './FaqArticleLinkModal.vue'
 import FaqRewriteSelectionModal from './FaqRewriteSelectionModal.vue'
 
 const props = defineProps({
@@ -118,7 +119,16 @@ const editor = useEditor({
       blockquote: false, // remplacé par notre FaqBlockquote avec variantes
     }),
     Placeholder.configure({ placeholder: props.placeholder }),
-    Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+    Link.configure({
+      openOnClick: false,
+      autolink: true,
+      linkOnPaste: true,
+      // Tiptap @link v3 strip silencieusement mailto:/tel:/#anchor par défaut.
+      // On élargit les protocoles + on remplace isAllowedUri pour accepter
+      // toute URL bien formée (http(s), mailto, tel, ancres, chemins relatifs).
+      protocols: ['mailto', 'tel', 'http', 'https', 'ftp'],
+      isAllowedUri: (uri) => /^(https?:\/\/|mailto:|tel:|#|\/)/i.test(uri),
+    }),
     FaqImage.configure({ inline: false, allowBase64: false }),
     FaqBlockquote,
     Underline,
@@ -140,6 +150,7 @@ onBeforeUnmount(() => editor.value?.destroy())
 // ── Toolbar actions ────────────────────────────────────────────────
 const linkModalOpen = ref(false)
 const linkPrefill = ref('')
+const articleLinkModalOpen = ref(false)
 
 function isActive(name, attrs) {
   return editor.value?.isActive(name, attrs) || false
@@ -157,6 +168,29 @@ function setHeading(level) {
 function openLink() {
   linkPrefill.value = editor.value?.getAttributes('link')?.href || ''
   linkModalOpen.value = true
+}
+function openArticleLink() {
+  articleLinkModalOpen.value = true
+}
+function onArticleLinkSelect({ url, title }) {
+  articleLinkModalOpen.value = false
+  if (!editor.value || !url) return
+  const { from, to } = editor.value.state.selection
+  if (from === to) {
+    // Pas de sélection : on insère le titre comme texte du lien.
+    editor.value
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        text: title || url,
+        marks: [{ type: 'link', attrs: { href: url } }],
+      })
+      .run()
+  } else {
+    // Sélection active : on enveloppe le texte sélectionné dans un lien.
+    editor.value.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+  }
 }
 function applyLink(href) {
   if (!editor.value) return
@@ -310,9 +344,9 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
 </script>
 
 <template>
-  <div class="border border-gray-200 rounded-lg bg-white overflow-hidden">
-    <!-- Toolbar -->
-    <div class="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50/60 flex-wrap">
+  <div class="border border-gray-200 rounded-lg bg-white">
+    <!-- Toolbar (sticky pour rester visible sur articles longs) -->
+    <div class="sticky top-0 z-10 flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50/95 backdrop-blur-sm rounded-t-lg flex-wrap">
       <!-- Headings -->
       <button type="button" @click="setHeading(1)" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('heading', { level: 1 }) ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Titre H1">
         <H1Icon class="w-4 h-4" />
@@ -384,8 +418,13 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
       <span class="w-px h-5 bg-gray-200 mx-1.5" />
 
       <!-- Link -->
-      <button type="button" @click="openLink" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('link') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Lien">
+      <button type="button" @click="openLink" :class="['p-1.5 rounded hover:bg-gray-200 transition', isActive('link') ? 'bg-gray-200 text-gray-900' : 'text-gray-600']" title="Lien externe (URL)">
         <LinkIcon class="w-4 h-4" />
+      </button>
+      <button type="button" @click="openArticleLink"
+              class="p-1.5 rounded hover:bg-gray-200 transition text-gray-600"
+              title="Lien vers un autre article FAQ">
+        <BookOpenIcon class="w-4 h-4" />
       </button>
 
       <!-- Image upload -->
@@ -426,8 +465,12 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
       <EditorContent :editor="editor" :class="editorClass" />
     </div>
 
-    <LinkInputModal v-if="linkModalOpen" :prefill="linkPrefill"
-                    @close="linkModalOpen = false" @submit="applyLink" />
+    <LinkInputModal v-if="linkModalOpen" :initial-url="linkPrefill"
+                    @close="linkModalOpen = false" @save="applyLink" />
+
+    <FaqArticleLinkModal v-if="articleLinkModalOpen"
+                         @close="articleLinkModalOpen = false"
+                         @select="onArticleLinkSelect" />
 
     <FaqRewriteSelectionModal v-if="rewriteSelectionModalOpen"
                               :article-id="articleId"

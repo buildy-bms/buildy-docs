@@ -960,13 +960,21 @@ function getActivePrompt(key, fallback) {
 // côté appelant pour économiser les tokens entre appels successifs.
 //
 // Options :
-//   - mode 'full' (défaut) : corpus le plus complet possible (1500 chars/entité)
-//                            pour les modes rewrite / generate.
+//   - mode 'exhaustive'     : corpus intégral (8000 chars/entité, articles FAQ
+//                             en entier 6000 chars). Pour la génération d'articles
+//                             où la précision factuelle prime. S'appuie sur le
+//                             prompt caching éphémère pour amortir le coût.
+//   - mode 'full' (défaut)  : corpus résumé (1500 chars/entité) pour rewrite.
 //   - mode 'titles'         : corpus minimal pour suggest_missing (titres+résumé court).
 function buildBuildyCorpusContext({ mode = 'full' } = {}) {
   const lines = [];
-  const isFull = mode === 'full';
-  const MAX = isFull ? 1500 : 240;
+  const isExhaustive = mode === 'exhaustive';
+  const isFull = mode === 'full' || isExhaustive;
+  // Garde-fou anti-pathologique sur le mode exhaustive : 8 K chars / entité
+  // ≈ 2500 tokens × ~30 entités → corpus borné à ~75 K tokens en pire cas
+  // (largement sous les 200 K du contexte Sonnet 4.6).
+  const MAX = isExhaustive ? 8000 : (isFull ? 1500 : 240);
+  const MAX_FAQ = isExhaustive ? 6000 : (isFull ? 600 : 180);
   const truncate = (html, max = MAX) => {
     const txt = stripHtml(html || '');
     return txt.length > max ? txt.slice(0, max) + '…' : txt;
@@ -1052,7 +1060,7 @@ function buildBuildyCorpusContext({ mode = 'full' } = {}) {
       lines.push('## ARTICLES FAQ DÉJÀ PUBLIÉS (utilise leur URL pour les liens internes)');
       for (const a of articles) {
         if (!a.title || !a.crisp_url) continue;
-        const summary = truncate(a.content_html, isFull ? 600 : 180);
+        const summary = truncate(a.content_html, MAX_FAQ);
         lines.push(`### [${a.title}](${a.crisp_url})${a.category_name ? ' — *' + a.category_name + '*' : ''}`);
         if (summary) lines.push(summary);
         lines.push('');
@@ -1285,7 +1293,7 @@ async function assistFaqRewriteSelection({ selectionHtml, instruction = '', arti
 
   const resp = await client().messages.create({
     model: config.claudeModel,
-    max_tokens: 1500,
+    max_tokens: 4096,
     system: [{ type: 'text', text: systemText }],
     messages: [{ role: 'user', content: userText }],
   });
@@ -1384,13 +1392,17 @@ async function assistFaqRewrite({ article }) {
     }
     const resp = await client().messages.create({
       model: config.claudeModel,
-      max_tokens: 2048,
+      max_tokens: 8192,
       system: systemBlocks,
       messages: [{ role: 'user', content: userParts.join('\n') }],
     });
     const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const truncated = resp.stop_reason === 'max_tokens';
+    if (truncated) {
+      console.warn('[faq.ai] rewrite truncated (max_tokens hit)', { usage: resp.usage });
+    }
     const { html, suggested_title } = _extractTitle(raw, article.title);
-    return { html, suggested_title, usage: resp.usage };
+    return { html, suggested_title, usage: resp.usage, truncated };
   };
 
   return _withSeoLoop(callClaude);
@@ -1398,7 +1410,7 @@ async function assistFaqRewrite({ article }) {
 
 async function assistFaqGenerate({ question, categoryName = null }) {
   if (!question || !question.trim()) throw new Error('Question manquante');
-  const corpus = buildBuildyCorpusContext({ mode: 'full' });
+  const corpus = buildBuildyCorpusContext({ mode: 'exhaustive' });
   const fewShot = _buildFewShotBlock();
 
   const systemBlocks = [
@@ -1435,13 +1447,17 @@ async function assistFaqGenerate({ question, categoryName = null }) {
     }
     const resp = await client().messages.create({
       model: config.claudeModel,
-      max_tokens: 2048,
+      max_tokens: 8192,
       system: systemBlocks,
       messages: [{ role: 'user', content: userParts.join('\n') }],
     });
     const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const truncated = resp.stop_reason === 'max_tokens';
+    if (truncated) {
+      console.warn('[faq.ai] generate truncated (max_tokens hit)', { usage: resp.usage });
+    }
     const { html, suggested_title } = _extractTitle(raw, '');
-    return { html, suggested_title, usage: resp.usage };
+    return { html, suggested_title, usage: resp.usage, truncated };
   };
 
   return _withSeoLoop(callClaude);
@@ -1465,7 +1481,7 @@ async function assistFaqSuggestMissing() {
 
   const resp = await client().messages.create({
     model: config.claudeModel,
-    max_tokens: 2048,
+    max_tokens: 8192,
     system: systemBlocks,
     messages: [{ role: 'user', content: userPrompt }],
   });

@@ -18,12 +18,13 @@ import { useRouter } from 'vue-router'
 import {
   PlusIcon, XMarkIcon, SparklesIcon, ArrowPathIcon, PhotoIcon, PencilSquareIcon,
   ListBulletIcon, ChatBubbleLeftRightIcon, BookOpenIcon, WrenchScrewdriverIcon, LightBulbIcon,
-  ArrowUturnLeftIcon, CheckIcon,
+  ArrowUturnLeftIcon, CheckIcon, ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import SafeHtml from './SafeHtml.vue'
 import AnnotationEditor from './faq-annotations/AnnotationEditor.vue'
 import { useFaqStore } from '@/stores/faq'
+import { faqAiCorpusStats } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { compressImage, estimateVisionCost } from '@/composables/useImageCompression'
 
@@ -202,8 +203,13 @@ function insertHere() {
   emit('close')
 }
 
+const corpusStats = ref(null)
+
 onMounted(() => {
   if (props.defaultType) onTypeChange(props.defaultType)
+  faqAiCorpusStats()
+    .then(({ data }) => { corpusStats.value = data })
+    .catch(() => { /* silencieux : pas bloquant */ })
 })
 </script>
 
@@ -214,9 +220,22 @@ onMounted(() => {
 
     <!-- Étape 1 : inputs (avant génération ou retour) -->
     <div v-if="!result">
-      <p class="text-sm text-gray-500 mb-4 -mt-1">
+      <p class="text-sm text-gray-500 mb-2 -mt-1">
         L'IA s'appuie sur le corpus Buildy + tes captures d'écran pour générer un article structuré selon le type choisi.
       </p>
+      <div v-if="corpusStats"
+           class="flex flex-wrap items-center gap-2 mb-4 px-3 py-2 rounded-lg border border-violet-100 bg-violet-50/60 text-xs text-violet-900"
+           v-tooltip="corpusStats.details">
+        <SparklesIcon class="w-3.5 h-3.5 shrink-0 text-violet-500" />
+        <span class="font-medium">Corpus complet :</span>
+        <span>{{ corpusStats.sections }} sections</span>
+        <span class="opacity-50">·</span>
+        <span>{{ corpusStats.equipments }} équipements</span>
+        <span class="opacity-50">·</span>
+        <span>{{ corpusStats.features }} fonctionnalités</span>
+        <span class="opacity-50">·</span>
+        <span>{{ corpusStats.faq_articles }} articles FAQ existants</span>
+      </div>
 
       <!-- Type d'article -->
       <label class="block text-sm font-medium text-gray-700 mb-2">Type d'article</label>
@@ -321,6 +340,17 @@ onMounted(() => {
           <p class="text-xs text-gray-500 mt-0.5">
             {{ result.usage?.input_tokens || 0 }} tokens in · {{ result.usage?.output_tokens || 0 }} tokens out
             <span v-if="result.meta?.images_count"> · {{ result.meta.images_count }} capture(s)</span>
+          </p>
+        </div>
+      </div>
+      <div v-if="result.truncated"
+           class="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-orange-200 bg-orange-50 text-sm text-orange-900">
+        <ExclamationTriangleIcon class="w-5 h-5 shrink-0 text-orange-500 mt-0.5" />
+        <div>
+          <p class="font-medium">Article potentiellement incomplet</p>
+          <p class="text-xs mt-0.5 text-orange-800">
+            La génération a atteint la limite de tokens et a été coupée. Relance « Régénérer »
+            pour obtenir une version plus concise, ou crée l'article puis demande à l'IA de compléter la fin.
           </p>
         </div>
       </div>
