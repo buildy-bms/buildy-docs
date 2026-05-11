@@ -207,19 +207,24 @@ async function logout() {
             <ArrowRightStartOnRectangleIcon class="w-4 h-4 shrink-0" />
             <span v-if="!sidebarCollapsed">Déconnexion</span>
           </button>
-          <!-- Numéro de version visible étendu ET collapsé (icône ⓘ avec
-               tooltip en collapsed) — repère pour le support quand Kévin
-               teste un déploiement. -->
-          <p v-if="!sidebarCollapsed" class="text-[10px] text-white/40 px-2.5">
+          <!-- Numéro de version cliquable → page Release Notes. Visible
+               etendu ET collapsé (tooltip en collapsed). -->
+          <router-link
+            v-if="!sidebarCollapsed"
+            :to="{ name: 'release-notes' }"
+            class="block text-[10px] text-white/40 hover:text-white/90 px-2.5 transition-colors"
+            v-tooltip="'Voir les notes de version'"
+          >
             Buildy Docs v{{ appVersion || '0.1.0' }}<span v-if="buildSha"> · {{ buildSha }}</span>
-          </p>
-          <p
+          </router-link>
+          <router-link
             v-else
-            class="text-[9px] text-white/40 text-center font-mono"
-            v-tooltip="`Buildy Docs v${appVersion || '0.1.0'}${buildSha ? ' · ' + buildSha : ''}`"
+            :to="{ name: 'release-notes' }"
+            class="block text-[9px] text-white/40 hover:text-white/90 text-center font-mono transition-colors"
+            v-tooltip="`Buildy Docs v${appVersion || '0.1.0'}${buildSha ? ' · ' + buildSha : ''} — voir notes de version`"
           >
             {{ buildSha || ('v' + (appVersion || '0.1.0')) }}
-          </p>
+          </router-link>
         </div>
       </aside>
 

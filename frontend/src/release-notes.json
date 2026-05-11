@@ -1,0 +1,139 @@
+{
+  "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
+  "versions": [
+    {
+      "version": "0.1.17",
+      "date": "2026-05-11",
+      "title": "Badge \"Offre requise\" plus visible + page Release Notes",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Badge « Offre requise » passe du vert au rouge",
+          "what": "Dans le tableau de synthèse des fonctionnalités d'un PDF AF, la colonne marquée « Offre requise » utilise désormais une pastille rouge (au lieu de verte). Le message d'alerte est immédiat : « le niveau visé ne couvre pas tout ».",
+          "where": "PDF d'export AF (annexe « Synthèse — Tableau des fonctionnalités Buildy »), PDF Synthèse, PDF Liste de points.",
+          "how_to_test": "Ouvre une AF dont le niveau visé est inférieur au niveau requis (ex. visé Essentiel + fonctions Smart exigées par la MOA). Exporte le PDF AF. Dans la page « Synthèse des fonctionnalités », la colonne du niveau requis doit afficher une pastille rouge « OFFRE REQUISE » en plus de la pastille or « OFFRE CIBLÉE » sur le niveau visé."
+        },
+        {
+          "kind": "feature",
+          "title": "Page Release Notes accessible depuis la sidebar",
+          "what": "Le numéro de version en bas de la sidebar (« Buildy Docs v0.1.17 ») devient cliquable et ouvre cette page. Chaque version a sa liste de nouveautés en langage fonctionnel — pratique pour suivre ce qui change sans lire les commits techniques.",
+          "where": "Sidebar gauche, en bas (au-dessus du bouton Déconnexion).",
+          "how_to_test": "Clique sur le numéro de version. La page Release Notes s'ouvre avec l'historique complet."
+        }
+      ]
+    },
+    {
+      "version": "0.1.16",
+      "date": "2026-05-11",
+      "title": "Niveau Buildy requis enfin correct sur la couverture des PDFs",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le « Niveau Buildy requis » affiché sur la cover correspond au vrai besoin de l'AF",
+          "what": "Avant : la couverture du PDF affichait toujours le niveau visé (contrat) comme « niveau requis ». Quand une AF contient des fonctions exigées par la MOA à un niveau supérieur au contrat, ce dépassement n'était pas visible sur la cover. Désormais le calcul est le même que dans le bandeau supérieur de l'AF (« Smart — Dépasse le contrat »).",
+          "where": "Page de garde des 3 PDFs : AF complète, Synthèse, Liste de points.",
+          "how_to_test": "Ouvre une AF contractée en Essentiel mais avec 1 ou 2 fonctions « Exigée par la MOA » en niveau Smart. Le bandeau supérieur de l'AF doit dire « Niveau requis : Smart — Dépasse le contrat ». Exporte le PDF AF : sur la couverture, le bloc « Niveau Buildy requis » doit afficher Smart (et non Essentiels)."
+        }
+      ]
+    },
+    {
+      "version": "0.1.15",
+      "date": "2026-05-11",
+      "title": "Tableau synthèse PDF : badge « Offre requise » sur le bon niveau",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La colonne du niveau requis reçoit son badge dans le tableau de synthèse PDF",
+          "what": "Première étape du fix complet (achevé en 0.1.16). Le badge « OFFRE REQUISE » apparaît désormais sur la colonne du niveau réellement nécessaire (et plus seulement sur la colonne visée par défaut).",
+          "where": "PDF AF, page « Synthèse — Tableau des fonctionnalités Buildy ».",
+          "how_to_test": "Exporte un PDF AF avec un dépassement de niveau. Le tableau doit afficher 2 badges : OFFRE CIBLÉE (niveau visé, or) + OFFRE REQUISE (niveau requis, rouge depuis 0.1.17)."
+        }
+      ]
+    },
+    {
+      "version": "0.1.14",
+      "date": "2026-05-10",
+      "title": "Arborescence plus dense + PDF synthèse plus doux + bandeau MAJ aligné sur Buildy Tools",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Arborescence des sections : hauteur fixe et uniforme",
+          "what": "Toutes les lignes de l'arborescence ont désormais exactement la même hauteur (24px), quel que soit le niveau. Plus dense, plus lisible quand l'AF est riche en sections.",
+          "where": "Toutes les AFs — colonne gauche (arborescence).",
+          "how_to_test": "Ouvre une AF avec beaucoup de sections imbriquées. Compare l'espacement entre les sections de niveau 1, 2, 3 — il doit être identique partout."
+        },
+        {
+          "kind": "ux",
+          "title": "PDF synthèse page 2 : couleurs plus pâles",
+          "what": "La matrice « Zones × Catégories » utilise désormais un header slate clair (au lieu de navy saturé) et des valeurs en vert émeraude sobre. Plus reposant pour la lecture imprimée.",
+          "where": "PDF Synthèse, page 2.",
+          "how_to_test": "Génère le PDF Synthèse d'une AF avec quelques zones et instances. La matrice doit afficher un header gris-bleuté pâle et des valeurs en vert doux."
+        },
+        {
+          "kind": "ux",
+          "title": "Bandeau « Nouvelle version disponible » aligné sur Buildy Tools",
+          "what": "Le bandeau de mise à jour s'affiche désormais en haut de l'écran sur toute la largeur (au lieu d'une popup flottante en bas), avec la couleur indigo Tailwind native — exactement le même pattern que Buildy Tools.",
+          "where": "Toutes les pages, dès qu'une nouvelle version est déployée côté serveur.",
+          "how_to_test": "Déploie une nouvelle version, attends 30 secondes : un bandeau indigo doit apparaître en haut de l'écran avec un bouton « Recharger »."
+        }
+      ]
+    },
+    {
+      "version": "0.1.13",
+      "date": "2026-05-10",
+      "title": "PDF synthèse : icônes catégories en pastilles + arborescence allégée",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Icônes catégories dans les en-têtes de la matrice PDF synthèse",
+          "what": "Chaque entête de colonne (Chauffage, Climatisation, Ventilation…) affiche désormais une pastille ronde avec l'icône colorée de la catégorie. Reconnaissance instantanée.",
+          "where": "PDF Synthèse, page 2 (matrice Zones × Catégories).",
+          "how_to_test": "Génère le PDF Synthèse, regarde les entêtes de colonnes : pastille colorée + icône."
+        },
+        {
+          "kind": "ux",
+          "title": "Sections masquées grisées dans l'arborescence",
+          "what": "Quand tu masques une section d'un export (œil barré), elle est désormais entièrement grisée dans l'arborescence — visuel distinct des sections « écartées par la MOA » (qui restent en jaune barré).",
+          "where": "Arborescence d'une AF.",
+          "how_to_test": "Sur une section, clique sur l'œil pour la masquer. Elle doit devenir grise et translucide (50% d'opacité)."
+        }
+      ]
+    },
+    {
+      "version": "0.1.12 et antérieurs",
+      "date": "2026-05-04 → 2026-05-10",
+      "title": "Refonte data-tables audit BACS, régulation thermique 3 niveaux, tooltips Buildy, PWA tactile",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Refonte complète des data-tables desktop d'un audit BACS",
+          "what": "Les 4 listes principales d'un audit (Zones, Systèmes, Compteurs, Régulation thermique) sont désormais de vrais tableaux alignés avec entêtes triables, lignes alternées, actions icon-only au survol, drag-drop conservé.",
+          "where": "Audit BACS desktop — Cards 02 à 05.",
+          "how_to_test": "Ouvre un audit BACS sur desktop. Chaque liste doit avoir des colonnes alignées, des entêtes cliquables pour trier (↑↓), et des actions Notes/Photo/Partage/Dup/Suppr en icônes au hover."
+        },
+        {
+          "kind": "feature",
+          "title": "Régulation thermique R175-6 — 3 niveaux + exemption bois automatique",
+          "what": "Chaque couple zone × usage thermique se décline en 3 niveaux (Production / Distribution / Émission), chacun avec son équipement de régulation et ses notes. L'exemption R175-6 II (générateurs bois) est détectée automatiquement quand l'équipement de production utilise du bois.",
+          "where": "Audit BACS — Card 05 Régulation thermique.",
+          "how_to_test": "Ajoute une régulation thermique sur une zone chauffage. Renseigne 3 équipements (production gaz, distribution circulateur, émission radiateur). Le tableau doit afficher les 3 niveaux. Si tu changes l'énergie de production en « bois », la checkbox « Exempté R175-6 II » se coche automatiquement."
+        },
+        {
+          "kind": "ux",
+          "title": "Tooltips Buildy quasi-instantanés (30 ms) + truncate automatique",
+          "what": "Les tooltips s'affichent en 30 ms au lieu de 120 ms — perception instantanée. Bonus : les cellules tronquées affichent automatiquement leur contenu complet au survol grâce à la nouvelle directive v-truncate-tooltip.",
+          "where": "Partout dans l'app.",
+          "how_to_test": "Survole une icône (œil, poubelle, etc.) — le tooltip apparaît immédiatement. Sur une cellule de tableau dont le texte est tronqué (...), un tooltip avec le texte complet apparaît."
+        },
+        {
+          "kind": "feature",
+          "title": "PWA tactile pour l'audit BACS sur tablette/téléphone",
+          "what": "Modales ≥ 44 px, listes en cards stack, KPIs cliquables pour aller directement à l'entité, photos terrain par action du plan de mise en conformité, sync 5 s desktop ↔ PWA.",
+          "where": "PWA audit BACS (iPhone, iPad, Android).",
+          "how_to_test": "Installe l'app PWA sur un téléphone (Safari → Sur l'écran d'accueil). Ouvre un audit, navigue entre les onglets, prends une photo sur une action du plan."
+        }
+      ]
+    }
+  ],
+  "ancien_changelog_note": "Pour les versions antérieures à 0.1.12, voir le fichier CHANGELOG.md à la racine du repo (format technique complet)."
+}

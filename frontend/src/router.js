@@ -72,6 +72,12 @@ const routes = [
     component: () => import('@/views/SitesListView.vue'),
   },
   {
+    path: '/release-notes',
+    name: 'release-notes',
+    meta: { title: 'Notes de version' },
+    component: () => import('@/views/ReleaseNotesView.vue'),
+  },
+  {
     path: '/library',
     redirect: '/library/sections',
   },
