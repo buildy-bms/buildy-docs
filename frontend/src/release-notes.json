@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.18",
+      "date": "2026-05-11",
+      "title": "Bibliothèque : suppressions définitives + assistant IA recentré sur la description fonctionnelle",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les éléments supprimés de la bibliothèque ne reviennent plus au prochain redémarrage",
+          "what": "Avant : supprimer un point d'un modèle d'équipement OU une catégorie système faisait revenir la donnée quelques minutes plus tard (au prochain restart du serveur). Désormais une suppression est définitive — l'élément reste supprimé. Si tu veux le récupérer, recrée-le explicitement avec la même clé.",
+          "where": "Bibliothèque → Systèmes techniques → onglet Modèles d'équipement (points) et onglet Catégories.",
+          "how_to_test": "Ouvre un modèle d'équipement, supprime un de ses points. Attends quelques minutes ou demande un redémarrage. Le point ne doit pas revenir. Idem en supprimant une catégorie système non utilisée."
+        },
+        {
+          "kind": "ux",
+          "title": "Assistant IA « Réécrire » d'un équipement : plus de liste de points lus/écrits",
+          "what": "Avant : quand tu demandais à l'IA de réécrire la description d'un équipement (aérotherme, CTA, chaudière…), elle ajoutait systématiquement un paragraphe « points typiquement collectés » (état marche/arrêt, consigne, défauts…) et un paragraphe sur la commande d'écriture Buildy. Ces contenus n'ont rien à faire dans une description fonctionnelle — les points sont définis dans la table dédiée plus bas. Désormais la sortie IA respecte 4 contenus obligatoires : (1) fonctionnement de l'équipement, (2) utilité dans le bâtiment, (3) rôle de la supervision Buildy au niveau fonctionnel, (4) Buildy ne régule pas — la régulation reste assurée par l'équipement lui-même.",
+          "where": "Bibliothèque → Modèles d'équipement → ouvre un équipement → bouton « Réécrire avec IA » sur le champ Description fonctionnelle.",
+          "how_to_test": "Sur l'aérotherme (ou n'importe quel équipement avec déjà une description qui liste des points), clique « Réécrire avec IA ». La nouvelle version ne doit plus contenir de liste de points, ni mention d'écriture/commande, ni récitation de protocoles. Elle doit parler du fonctionnement, de l'utilité, de la valeur d'exploitation apportée par Buildy, et insister sur le fait que Buildy ne régule pas."
+        }
+      ]
+    },
+    {
       "version": "0.1.17",
       "date": "2026-05-11",
       "title": "Badge \"Offre requise\" plus visible + page Release Notes",
