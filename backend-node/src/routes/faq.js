@@ -506,10 +506,14 @@ async function routes(fastify) {
       const result = await assistFaqRewrite({
         article: { ...article, category_name: cat?.name || null },
       });
-      db.faqArticles.update(articleId, {
+      // Bumpe updated_at + lastAiAssistAt. Comme le front utilise un
+      // optimistic-lock sur updated_at au save, on retourne la nouvelle valeur
+      // pour qu'il puisse rafraichir son `original.updated_at` et eviter un
+      // 409 "Conflit de version" au prochain Enregistrer / Publier.
+      const updated = db.faqArticles.update(articleId, {
         lastAiAssistAt: new Date().toISOString(),
       }, request.authUser?.id || null);
-      return result;
+      return { ...result, updated_at: updated?.updated_at || null };
     } catch (e) {
       log.warn(`FAQ AI rewrite ${articleId}: ${e.message}`);
       return reply.code(500).send({ detail: e.message });

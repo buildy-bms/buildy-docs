@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.23",
+      "date": "2026-05-11",
+      "title": "Correctif : faux « Conflit de version » après réécriture IA d'un article FAQ",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de modale « Conflit de version » après « Réécrire avec IA »",
+          "what": "Quand tu utilisais « Réécrire avec IA » sur un article FAQ, l'enregistrement ou la publication qui suivait déclenchait systématiquement une modale rouge « Conflit de version » obligeant à recharger (= perdre la version IA). La cause : la réécriture IA bump la date de modification côté serveur sans que l'éditeur le sache, et le verrou optimiste se mettait alors à hurler à tort.",
+          "where": "FAQ Buildy → éditeur d'un article → bouton « Réécrire avec IA », puis « Enregistrer » ou « Publier vers Crisp ».",
+          "how_to_test": "Ouvre un article FAQ, clique « Réécrire avec IA », attends le résultat, puis clique « Enregistrer » ou « Publier vers Crisp » — la sauvegarde doit passer sans modale de conflit."
+        }
+      ]
+    },
+    {
       "version": "0.1.22",
       "date": "2026-05-11",
       "title": "FAQ Buildy : génération IA fiabilisée, éditeur réparé",
