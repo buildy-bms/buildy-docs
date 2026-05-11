@@ -507,6 +507,10 @@ function selectCategory(id) {
                 <th class="text-left px-4 py-2 font-medium">Titre</th>
                 <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Catégorie</th>
                 <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Statut</th>
+                <th class="text-left px-4 py-2 font-medium whitespace-nowrap"
+                    v-tooltip="'Score SEO recalculé à chaque enregistrement, génération ou pull. ≥ 80 vert · 60-79 ambre · < 60 rouge.'">
+                  SEO
+                </th>
                 <th class="text-left px-4 py-2 font-medium whitespace-nowrap">Sync</th>
                 <th class="text-right px-4 py-2 font-medium whitespace-nowrap">Actions</th>
               </tr>
@@ -528,6 +532,19 @@ function selectCategory(id) {
                   </span>
                   <span v-else class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs">
                     Brouillon
+                  </span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span v-if="a.seo_score === null || a.seo_score === undefined"
+                        class="text-xs text-gray-400">—</span>
+                  <span v-else
+                        :class="[
+                          'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium tabular-nums',
+                          a.seo_score >= 80 ? 'bg-emerald-50 text-emerald-700' :
+                          a.seo_score >= 60 ? 'bg-amber-50 text-amber-700' :
+                          'bg-red-50 text-red-700',
+                        ]">
+                    {{ a.seo_score }}/100
                   </span>
                 </td>
                 <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
@@ -554,7 +571,7 @@ function selectCategory(id) {
                 </td>
               </tr>
               <tr v-if="!filteredArticles.length">
-                <td colspan="5" class="px-4 py-12 text-center text-sm text-gray-400">
+                <td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">
                   Aucun article. Configurez Crisp puis lancez un pull, ou créez un article manuellement.
                 </td>
               </tr>

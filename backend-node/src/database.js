@@ -8063,6 +8063,7 @@ const faqArticles = {
       SELECT a.id, a.crisp_id, a.category_id, a.title, a.slug, a.description, a.status, a.visibility,
              a.locale, a.dirty, a.pulled_at, a.pushed_at, a.crisp_updated_at, a.crisp_url,
              a.last_ai_assist_at, a.created_at, a.updated_at,
+             a.seo_score, a.seo_scored_at,
              c.name AS category_name
       FROM faq_articles a
       LEFT JOIN faq_categories c ON c.id = a.category_id
