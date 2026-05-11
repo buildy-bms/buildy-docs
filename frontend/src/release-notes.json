@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.37",
+      "date": "2026-05-11",
+      "title": "Refonte profonde des prompts IA FAQ : titres + descriptions + corps « parfaits »",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Plus de marque (« Buildy », « Hyperveez », « Gojee ») en tête de titre",
+          "what": "Nouvelle règle 11 dans tous les prompts FAQ : le titre ne commence PAS par une marque, sauf si le produit EST le sujet de l'article (« À quoi sert Gojee... » reste OK). Raison : la persona Google ne tape pas la marque dans sa requête — elle cherche « Comment superviser une GTB multi-sites ? », pas « Comment Buildy supervise ma GTB ? ».",
+          "where": "Tous les boutons IA FAQ : baguette titre, baguette description, « Réécrire avec IA », « Générer depuis une question », « Générer depuis fonctionnalité ».",
+          "how_to_test": "Reclique la baguette titre sur un article où la marque était en tête : le nouveau titre ne doit plus commencer par Buildy/Hyperveez/Gojee."
+        },
+        {
+          "kind": "ux",
+          "title": "Meta-descriptions persona-first avec 3 patterns de hook alternés",
+          "what": "Nouvelle règle 12 : la description doit commencer par un hook (scénario, question utilisateur ou chiffre fort), pas par un verbe d'action générique. Bannir « grâce à Buildy » en fin et les superlatifs vides (« puissant », « solution complète », « performant »).",
+          "where": "Baguette description dans l'éditeur FAQ + génération automatique d'articles.",
+          "how_to_test": "Reclique la baguette description : la nouvelle phrase doit ouvrir sur un scénario concret (« Vendredi 22h... »), une question (« Comment savoir... ? ») ou un chiffre (« 5 ans de rétention, 30 sec... »)."
+        },
+        {
+          "kind": "ux",
+          "title": "Service-angle obligatoire — la FAQ Crisp n'accueille plus de procédures step-by-step",
+          "what": "Nouvelle règle 13 : la FAQ publique répond à « pourquoi / à quoi ça sert / qu'est-ce que ça change », pas à « clique ici puis là ». Les procédures (« Comment faire X dans l'app ») iront dans un futur user manual / aide in-app. Préfère « Comment optimiser ses équipements grâce aux programmations horaires ? » à « Comment créer une programmation horaire ? ».",
+          "where": "Tous les boutons IA + génération automatique d'articles. Les 5 brouillons procéduraux (mot de passe Gojee, acquitter une alarme, programmation horaire pas-à-pas, etc.) sont parqués hors FAQ Crisp.",
+          "how_to_test": "Génère un article via « Générer depuis une question » : si la question est procédurale, l'IA doit la reformuler en angle service."
+        },
+        {
+          "kind": "ux",
+          "title": "Excellence éditoriale : variation interrogative + corps avec opener concret + bénéfices quantifiés",
+          "what": "Le prompt impose désormais une distribution variée des mots interrogatifs (Comment / Pourquoi / À quoi sert / Faut-il / Quels sont) au lieu du tout-« Comment ». Le corps doit ouvrir sur un mini-scénario / question rhétorique / chiffre fort. Persona en sujet de phrase. CTA service-oriented en fin (« Évaluez votre conformité BACS », pas « Contactez le support »). Anti-hallucination renforcé : pas de chiffre fictif ni de partenariat/certification inventé.",
+          "where": "Génération et réécriture automatique d'articles.",
+          "how_to_test": "Génère 3-4 articles tests : les titres doivent commencer par au moins 3 mots interrogatifs différents ; les corps doivent ouvrir sur un opener concret ; aucun chiffre fictif."
+        }
+      ]
+    },
+    {
       "version": "0.1.36",
       "date": "2026-05-11",
       "title": "Prompts IA FAQ : forme question par défaut + chasse aux contradictions",
