@@ -15,9 +15,11 @@ const {
   PROMPT_KEY_FAQ_REWRITE,
   PROMPT_KEY_FAQ_GENERATE,
   PROMPT_KEY_FAQ_SUGGEST_MISSING,
+  PROMPT_KEY_FAQ_FROM_FUNCTIONALITY,
   DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE,
   DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
   DEFAULT_SYSTEM_PROMPT_FAQ_SUGGEST_MISSING,
+  DEFAULT_SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY,
   PROMPT_KEY_BACS_SYNTHESIS,
   PROMPT_KEY_BACS_TRANSCRIPT,
   DEFAULT_SYSTEM_PROMPT_BACS_SYNTHESIS,
@@ -40,6 +42,11 @@ const PROMPT_CATALOG = {
     label: 'FAQ Buildy — Générer un article depuis une question',
     description: 'Prompt système utilisé par le bouton "Générer depuis une question" dans la page FAQ. Produit titre + corps complet en s\'appuyant sur le corpus Buildy.',
     default_body: DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE,
+  },
+  [PROMPT_KEY_FAQ_FROM_FUNCTIONALITY]: {
+    label: 'FAQ Buildy — Générer un article depuis une fonctionnalité biblio',
+    description: 'Prompt système utilisé par le bouton "Article FAQ" sur la page bibliothèque de fonctionnalités. Transforme une fonctionnalité Buildy en article SEO public Crisp, avec injection des captures CDN et maillage interne BACS.',
+    default_body: DEFAULT_SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY,
   },
   [PROMPT_KEY_FAQ_SUGGEST_MISSING]: {
     label: 'FAQ Buildy — Suggérer des articles manquants',
