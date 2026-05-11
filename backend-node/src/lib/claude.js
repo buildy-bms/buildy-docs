@@ -1508,7 +1508,7 @@ async function assistFaqRewriteDescription({ article }) {
     ``,
     `=== LONGUEUR (règle absolue) ===`,
     `- 130 à 145 caractères STRICT. Jamais plus.`,
-    `- Compte les caractères (espaces compris) AVANT de répondre.`,
+    `- Vérifie mentalement le décompte AVANT de répondre — mais NE METS PAS le décompte dans la sortie.`,
     `- La phrase doit se TERMINER complètement (point final), pas être coupée.`,
     `- Si hésitation longue/courte, prends la courte.`,
     ``,
@@ -1547,9 +1547,13 @@ async function assistFaqRewriteDescription({ article }) {
     `- Superlatifs marketing vides : "solution complète", "puissant", "performant", "optimisé", "leader", "innovant", "unique".`,
     `- Hook 100% du temps en verbe d'action ("Pilotez, Supervisez, Configurez, Auditez...") — c'est un pattern qui devient répétitif. Verbe d'action OK occasionnellement, alterner avec les patterns A/B/C.`,
     ``,
-    `RÉPONSE : 1 ligne contenant la SEULE description finale (130-145 chars). Pas de préambule,`,
-    `pas de "Voici", pas de guillemets, pas de markdown, pas de balises HTML, pas de commentaires`,
-    `<!-- --> ni de markers TITLE/DESCRIPTION.`,
+    `RÉPONSE : EXACTEMENT 1 ligne contenant la SEULE phrase finale (130-145 chars). RIEN d'autre.`,
+    `INTERDIT dans la sortie (ce sont des erreurs déjà observées) :`,
+    `- Préambule ("Voici", "Réponse :", "Description :")`,
+    `- Décompte de caractères ("Comptage : 144 caractères.", "(144 chars)", "✓", "144c")`,
+    `- Guillemets, markdown, balises HTML, commentaires <!-- -->`,
+    `- Markers TITLE / DESCRIPTION`,
+    `- Toute justification ou méta-commentaire après la phrase.`,
   ].join('\n');
   const userText = [
     `Titre : ${article.title || '(aucun)'}`,
@@ -1566,7 +1570,15 @@ async function assistFaqRewriteDescription({ article }) {
     messages: [{ role: 'user', content: userText }],
   });
   const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-  const description = _truncateClean(_cleanInline(raw), 160);
+  // Garde-fou : si Claude ajoute un méta-commentaire de comptage en fin
+  // (« Comptage : 144 caractères. », « (144 chars) », « ✓ »), on le strip.
+  const stripped = raw
+    .replace(/\s*[—–-]?\s*Comptage\s*:[^\n]*$/i, '')
+    .replace(/\s*\(\s*\d{1,3}\s*(chars?|caract[eè]res?)\s*\)\s*$/i, '')
+    .replace(/\s*\d{1,3}\s*(chars?|caract[eè]res?)\s*\.?\s*[✓✗]?\s*$/i, '')
+    .replace(/\s*[✓✗]\s*$/u, '')
+    .trim();
+  const description = _truncateClean(_cleanInline(stripped), 160);
   return { description, usage: resp.usage };
 }
 
