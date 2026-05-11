@@ -70,6 +70,9 @@ const config = Object.freeze({
   // Synchro Sites avec Fleet Manager (token de service partage entre les 2 apps)
   buildySitesSyncToken: process.env.BUILDY_SITES_SYNC_TOKEN || '',
   fmSyncUrl: process.env.FM_SYNC_URL || '',
+  // Token Bearer pour pousser l'audit trail Docs vers FM (POST /api/fleet/docs-audit-batch).
+  // Token dedie (separation de privileges avec sites-sync) — meme valeur cote FM.
+  buildyDocsAuditToken: process.env.BUILDY_DOCS_AUDIT_TOKEN || '',
 
   // HTTPS (optionnel — certificats auto-signes pour acces NetBird)
   httpsEnabled: process.env.HTTPS_ENABLED === 'true',

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 138;
+const TARGET_VERSION = 139;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5660,6 +5660,27 @@ function runMigrations() {
     db.pragma('user_version = 138');
   }
 
+  if (current < 139) {
+    // Consolidation audit trail vers Fleet Manager (push periodique).
+    // Singleton qui stocke :
+    //  - epoch (uuid v4) : identifie l'instance Docs. Regenere uniquement si
+    //    la DB est restauree depuis un snapshot (les ids AUTOINCREMENT
+    //    pourraient se recycler).
+    //  - last_id : id max deja pousse avec succes. Le worker pousse les
+    //    audit_log.id > last_id.
+    // Le couple (epoch, audit_log.id) est la cle de dedup cote FM.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_sync_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        epoch TEXT NOT NULL,
+        last_id INTEGER NOT NULL DEFAULT 0,
+        last_pushed_at TEXT
+      );
+    `);
+    log.info('Migration 139 appliquee : audit_sync_state (consolidation audit trail vers FM)');
+    db.pragma('user_version = 139');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7745,6 +7766,47 @@ const sitesSyncQueue = {
   },
 };
 
+// ── Audit sync state (consolidation vers Fleet Manager) ─────────────
+// Singleton (id=1). epoch identifie l'instance Docs cote FM. last_id avance
+// au fur et a mesure que les batches sont pousses avec succes.
+const auditSync = {
+  // Lit l'etat ; si absent, l'initialise avec un nouvel epoch (UUID v4).
+  // Idempotent : le premier appel cree le row, les suivants le retournent.
+  getOrInit() {
+    let row = db.prepare('SELECT epoch, last_id, last_pushed_at FROM audit_sync_state WHERE id = 1').get();
+    if (!row) {
+      const epoch = require('crypto').randomUUID();
+      db.prepare('INSERT INTO audit_sync_state (id, epoch, last_id) VALUES (1, ?, 0)').run(epoch);
+      row = { epoch, last_id: 0, last_pushed_at: null };
+    }
+    return row;
+  },
+  // Avance le curseur apres un push reussi.
+  setLastId(lastId) {
+    db.prepare(`
+      UPDATE audit_sync_state
+      SET last_id = ?, last_pushed_at = CURRENT_TIMESTAMP
+      WHERE id = 1
+    `).run(lastId);
+  },
+  // Recupere un batch d'events a pousser (avec join users + sites pour
+  // resoudre username + site_uuid). Limite a 500 (cap cote FM).
+  fetchBatch(cursor, limit = 500) {
+    return db.prepare(`
+      SELECT a.id, a.created_at, a.action, a.af_id, a.section_id, a.template_id,
+             a.payload, COALESCE(u.email, u.display_name) AS username,
+             s.site_uuid
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN afs af ON af.id = a.af_id
+      LEFT JOIN sites s ON s.site_id = af.site_id
+      WHERE a.id > ?
+      ORDER BY a.id ASC
+      LIMIT ?
+    `).all(cursor, limit);
+  },
+};
+
 // ── Prompts IA editables ────────────────────────────────────────────
 const aiPrompts = {
   get(key) {
@@ -8728,6 +8790,7 @@ module.exports = {
   zones,
   equipments,
   sitesSyncQueue,
+  auditSync,
   aiPrompts,
   crispSettings,
   faqSettings,
