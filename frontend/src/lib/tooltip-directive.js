@@ -10,7 +10,12 @@
 // Le tooltip est singleton (un seul DOM partagé) et téléporté au <body>
 // avec position fixed.
 
-const SHOW_DELAY = 120
+// Tooltip quasi-instantané (30ms) — perçu comme immédiat tout en évitant
+// le flash sur les survols fugaces (curseur qui traverse plusieurs icônes
+// alignées). Sur les boutons icon-only des data-tables (Notes / Photo /
+// Partage / Dup / Suppr), c'est indispensable pour comprendre l'action
+// sans cliquer.
+const SHOW_DELAY = 30
 const HIDE_DELAY = 60
 const OFFSET = 6
 
@@ -169,5 +174,48 @@ export const tooltipDirective = {
     el.removeEventListener('blur', onLeave)
     if (currentTarget === el) hide()
     delete el.__tooltipOpts
+  },
+}
+
+// Directive v-truncate-tooltip : affiche automatiquement une tooltip avec
+// le textContent quand le contenu déborde (scrollWidth > clientWidth).
+// Utile pour les cellules de tableau, libellés tronqués, pills serrées.
+//
+// Usage :
+//   <span class="truncate" v-truncate-tooltip>{{ longText }}</span>
+//   <td v-truncate-tooltip="{ placement: 'top' }">…</td>
+//
+// La directive ne fait rien si le contenu tient ; sinon elle injecte
+// dynamiquement le textContent dans __tooltipOpts au moment du hover.
+function onTruncateEnter(e) {
+  const target = e.currentTarget
+  const isTruncated = target.scrollWidth > target.clientWidth + 1
+                   || target.scrollHeight > target.clientHeight + 1
+  if (!isTruncated) return
+  const text = (target.textContent || '').trim()
+  if (!text) return
+  const placement = target.__truncateTooltipPlacement || 'top'
+  clearTimeout(showTimer)
+  showTimer = setTimeout(() => show(target, { text, placement }), SHOW_DELAY)
+}
+
+export const truncateTooltipDirective = {
+  mounted(el, binding) {
+    el.__truncateTooltipPlacement = binding.value?.placement || 'top'
+    el.addEventListener('mouseenter', onTruncateEnter)
+    el.addEventListener('mouseleave', onLeave)
+    el.addEventListener('focus', onTruncateEnter)
+    el.addEventListener('blur', onLeave)
+  },
+  updated(el, binding) {
+    el.__truncateTooltipPlacement = binding.value?.placement || 'top'
+  },
+  beforeUnmount(el) {
+    el.removeEventListener('mouseenter', onTruncateEnter)
+    el.removeEventListener('mouseleave', onLeave)
+    el.removeEventListener('focus', onTruncateEnter)
+    el.removeEventListener('blur', onLeave)
+    if (currentTarget === el) hide()
+    delete el.__truncateTooltipPlacement
   },
 }

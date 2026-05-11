@@ -285,7 +285,7 @@ async function removeDevice(d) {
     <!-- Header avec puissance totale + bouton + vert -->
     <div class="flex items-center justify-between mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
-        <span class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
+        <span v-truncate-tooltip class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
         <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
           {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'systèmes' : 'système' }})
         </span>
@@ -306,6 +306,7 @@ async function removeDevice(d) {
           @click="toggleAddMenu"
           :aria-expanded="addMenuOpen"
           aria-label="Plus d'options pour ajouter"
+          v-tooltip="'Plus d\'options pour ajouter (depuis la bibliothèque…)'"
           class="inline-flex items-center justify-center px-1.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-r-lg shadow-sm border-l border-emerald-700 shrink-0"
         >
           <ChevronDownIcon class="w-3.5 h-3.5 shrink-0" />
@@ -343,9 +344,9 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
             <DataTableSortHeader sort-key="brand" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Marque</DataTableSortHeader>
             <DataTableSortHeader sort-key="model_reference" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Référence</DataTableSortHeader>
-            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Qté</DataTableSortHeader>
+            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Quantité</DataTableSortHeader>
             <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
-            <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puiss.</DataTableSortHeader>
+            <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
             <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
             <th>Rôle</th>
             <DataTableSortHeader sort-key="location" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Localisation</DataTableSortHeader>
@@ -482,7 +483,7 @@ async function removeDevice(d) {
                 <button type="button"
                         @click="patchDevice(d, { out_of_service: !d.out_of_service })"
                         :class="['flag-pill', d.out_of_service ? 'flag-danger-on' : 'flag-off']"
-                        title="Hors service — ignoré dans le plan d'action">
+                        v-tooltip="'Hors service — ignoré dans le plan d\'action'">
                   <span class="flag-ico">{{ d.out_of_service ? '✕' : '○' }}</span> HS
                 </button>
               </div>

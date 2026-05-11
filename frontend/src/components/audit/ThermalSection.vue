@@ -93,6 +93,17 @@ function deviceOptionsForLevel(t, level) {
   }))
 }
 
+// R175-6 II : exemption auto si le device pointé en Production utilise
+// le bois (`energy_source === 'wood'`). Affichée en lecture seule grisée
+// dans la cellule « Exempté bois » pour signaler à l'auditeur que c'est
+// dérivé du système — pas besoin de cocher manuellement.
+function exemptAutoFromWood(t) {
+  if (!t.generator_device_id) return false
+  const devices = props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  const d = devices.find(dd => dd.id === t.generator_device_id)
+  return d?.energy_source === 'wood'
+}
+
 // Drag & drop des lignes thermiques. Sortable sur la <table> avec
 // draggable="tbody" — chaque tbody contient la ligne principale + sa
 // ligne de détail repliable, donc les deux suivent le drag ensemble.
@@ -179,15 +190,15 @@ onBeforeUnmount(teardownSortable)
           <th class="w-8"></th>
           <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
           <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <th>Auto ?</th>
-          <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régul</DataTableSortHeader>
-          <th>Exempt</th>
+          <th>Régulation auto&nbsp;?</th>
+          <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régulation</DataTableSortHeader>
+          <th>Exempté bois</th>
           <th>Production</th>
-          <th>Régul. prod</th>
+          <th>Régulation production</th>
           <th>Distribution</th>
-          <th>Régul. distrib</th>
+          <th>Régulation distribution</th>
           <th>Émission</th>
-          <th>Régul. émis</th>
+          <th>Régulation émission</th>
           <th>Notes</th>
         </tr>
       </thead>
@@ -227,12 +238,22 @@ onBeforeUnmount(teardownSortable)
             </div>
           </td>
           <td class="align-middle">
-            <Tooltip v-if="(t.category || 'heating') === 'heating'"
-                     text="Si coché : production = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
-              <input type="checkbox" :checked="!!t.generator_exempt_wood"
-                     @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
-                     class="rounded border-gray-300" />
-            </Tooltip>
+            <template v-if="(t.category || 'heating') === 'heating'">
+              <!-- Auto-coché lecture seule si le système de Production est
+                   au bois (R175-6 II). L'auditeur peut quand même forcer
+                   l'exemption via le flag manuel pour les cas particuliers. -->
+              <Tooltip v-if="exemptAutoFromWood(t)"
+                       text="Auto-détecté depuis le système de Production (énergie bois). Exempt R175-6 II appliqué automatiquement.">
+                <input type="checkbox" checked disabled
+                       class="rounded border-emerald-300 bg-emerald-50 cursor-help" />
+              </Tooltip>
+              <Tooltip v-else
+                       text="Si coché : production = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
+                <input type="checkbox" :checked="!!t.generator_exempt_wood"
+                       @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
+                       class="rounded border-gray-300" />
+              </Tooltip>
+            </template>
             <span v-else class="text-gray-300 text-xs">—</span>
           </td>
           <!-- Production : équipement (sans type/âge, ils sont sur le device Card 03) -->

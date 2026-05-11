@@ -73,7 +73,7 @@ function hasNotes(html) {
             size="sm"
             :loading="regenerating"
             @click.stop="emit('regenerate')"
-            title="Recalcule le plan d'actions correctives à partir des données saisies (préserve les annotations commerciales)"
+            v-tooltip="'Recalcule le plan d\'actions correctives à partir des données saisies (préserve les annotations commerciales)'"
           >
             <template v-if="!regenerating" #icon-left>
               <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" />
