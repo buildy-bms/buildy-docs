@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.25",
+      "date": "2026-05-11",
+      "title": "Liste FAQ triable + filtre par tranche de score SEO",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le tableau des articles FAQ est triable par colonne",
+          "what": "Chaque en-tête de colonne (Titre, Catégorie, Statut, SEO, Sync) est cliquable : 1er clic = tri croissant, 2e clic = décroissant, 3e clic = retour au tri par défaut (date de modification). L'indicateur ↑↓↕ montre l'état actuel.",
+          "where": "FAQ Buildy → tableau central listant les articles.",
+          "how_to_test": "Clique sur « SEO » → les articles s'ordonnent du moins bon au meilleur score. Reclique → ordre inverse. Pareil pour Titre (A→Z / Z→A), Catégorie, Statut (Brouillon avant Publié), Sync (date)."
+        },
+        {
+          "kind": "ux",
+          "title": "Nouveau filtre rapide par tranche de score SEO",
+          "what": "Une liste déroulante à côté du filtre Statut permet d'isoler en un clic les articles « À améliorer » (< 60), « Moyen » (60-79), « Bons » (≥ 80) ou « Non scorés ». Idéal pour traiter les articles faibles en priorité.",
+          "where": "FAQ Buildy → barre d'outils au-dessus du tableau, après le sélecteur de statut.",
+          "how_to_test": "Choisis « À améliorer (< 60) » dans la liste : seuls les articles avec score rouge restent affichés. Le compteur « Effacer (N) » apparaît à droite — clique dessus pour réinitialiser tous les filtres en un seul geste."
+        }
+      ]
+    },
+    {
       "version": "0.1.24",
       "date": "2026-05-11",
       "title": "Score SEO visible directement dans la liste des articles FAQ",
