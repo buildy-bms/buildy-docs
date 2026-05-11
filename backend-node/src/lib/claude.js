@@ -345,7 +345,19 @@ function buildLibraryUserPrompt({ mode, kind, title, html, parent_path, category
     } else if (kind === 'functionality') {
       lines.push(`Decris cette fonctionnalite Buildy : ce qu'elle apporte fonctionnellement au client, pourquoi (lien BACS si applicable), comment elle se distingue selon le niveau de contrat. 3 a 5 paragraphes COURTS (1 a 3 phrases par paragraphe).`);
     } else if (kind === 'equipment_description') {
-      lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier) : son role, sa metrologie/regulation native, ce que Buildy apporte en supervision en aval. 3 a 4 paragraphes COURTS (1 a 3 phrases par paragraphe). Pas de zones/locaux.`);
+      lines.push(`Decris ce modele d'equipement de maniere agnostique (sans marque ni modele particulier). 3 a 4 paragraphes COURTS (1 a 3 phrases par paragraphe). Pas de zones/locaux.`);
+      lines.push(``);
+      lines.push(`CONTENU OBLIGATOIRE — dans cet ordre :`);
+      lines.push(`1) Fonctionnement de l'equipement : principe physique/technique, comment il marche concretement.`);
+      lines.push(`2) Utilite : a quoi il sert dans le batiment, quel service il rend (conditionnement thermique d'un local, distribution d'eau, ventilation hygienique, eclairage de tel usage, etc.). Quand c'est pertinent, mentionner les modes d'usage typiques.`);
+      lines.push(`3) Role de la supervision Buildy POUR CE TYPE D'EQUIPEMENT : quelle valeur d'exploitation elle apporte (suivi etat de marche, suivi consommation/energie, detection de derives, remontee de defauts, planning d'usage, comparaison inter-equipements...). Rester au niveau fonctionnel, PAS technique-points.`);
+      lines.push(`4) Insister : la regulation (asservissement, boucle PID, sequence de demarrage, securites...) est assuree par l'equipement lui-meme ou son automate/regulateur natif. Buildy NE REGULE PAS, il supervise sans interferer. Faire un renvoi : "voir « Role de Buildy dans l'ecosysteme GTB »".`);
+      lines.push(``);
+      lines.push(`INTERDIT — ne PAS faire ces erreurs frequentes :`);
+      lines.push(`- INTERDIT de lister les points typiquement lus ou ecrits (etat marche/arret, consigne active, defauts equipement, vitesse ventilateur, temperature de soufflage, etc.). Les points sont definis ailleurs (table des points de l'equipement) — ils n'ont rien a faire ici.`);
+      lines.push(`- INTERDIT de parler d'"ecriture", de "commande marche/arret transmise", de "consigne transmise" ou plus generalement de la capacite d'ecriture de Buildy. Ce n'est pas le sujet d'une description fonctionnelle.`);
+      lines.push(`- INTERDIT de reciter la liste des protocoles supportes : renvoyer a "Role de Buildy dans l'ecosysteme GTB".`);
+      lines.push(`- INTERDIT le ton commercial ou les superlatifs. Style technique sobre, pose, descriptif.`);
     } else if (kind === 'equipment_bacs_justification') {
       lines.push(`Redige une justification courte qui explique pourquoi cet equipement est concerne par le decret BACS, en citant les articles applicables avec la notation N° (jamais §). 2 a 3 paragraphes COURTS (1 a 3 phrases par paragraphe). Style juridique-technique sobre.`);
     } else if (kind === 'bacs_audit_notes') {
