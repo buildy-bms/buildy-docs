@@ -1089,17 +1089,6 @@ html body .csh-home-list.csh-home-list-large .csh-home-list-wrap .csh-home-list-
   text-decoration-thickness: 2px !important;
 }
 
-/* Crisp injecte automatiquement le `alt` de l'image comme légende visible
-   sous l'image (via ::after sur .csh-markdown-image, en couleur de lien).
-   On masque ce rendu : l'auteur préfère écrire une légende italique
-   explicitement en paragraphe séparé sous l'image. Le alt reste pour
-   SEO et lecteurs d'écran. */
-.csh-article .csh-article-content article .csh-markdown-image::after,
-.csh-article .csh-article-content article .csh-markdown-image::before {
-  content: none !important;
-  display: none !important;
-}
-
 /* Images d'article : respectent l'attribut width=Wpx posé dans Tiptap
    (BubbleMenu image : Petite 320 / Moyenne 560 / Grande 900 / Pleine).
    Crisp rend `![alt](url =Wxauto)` en <img width="W">. Sans contrainte CSS,
