@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.35",
+      "date": "2026-05-11",
+      "title": "Titres FAQ : mot-clé adapté au sujet + forme question quand naturel",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Plus de « Supervision GTB » imposé par défaut sur tous les titres reformulés",
+          "what": "Le prompt « Reformuler le titre » (bouton baguette IA au-dessus du champ titre) a été réécrit pour choisir le mot-clé SEO QUI MATCHE le sujet réel de l'article : « audit BACS » pour un sujet conformité, « logiciel GTB » pour un sujet produit, « parc immobilier multi-sites » pour le sujet multi-bâtiments, etc. — au lieu de défaulter sur « supervision GTB » à chaque fois. La forme question est préférée quand l'article répond vraiment à une question utilisateur ; nominale courte sinon. Les 3 prompts FAQ (« Générer », « Réécrire », « Générer depuis fonctionnalité ») ont également la même règle pour les titres qu'ils produisent.",
+          "where": "Éditeur d'article FAQ → bouton baguette à droite du champ titre. Aussi appliqué automatiquement aux articles générés ou réécrits via les autres boutons IA.",
+          "how_to_test": "Sur un article où l'IA avait collé « Supervision GTB » de force dans le titre alors que le sujet n'est pas la supervision (ex. un sujet conformité ou multi-sites), recliquer la baguette : le nouveau titre doit utiliser un mot-clé plus juste."
+        }
+      ]
+    },
+    {
       "version": "0.1.34",
       "date": "2026-05-11",
       "title": "Réécriture IA avec instructions custom + page FAQ pleine largeur",
