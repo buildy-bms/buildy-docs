@@ -18,6 +18,8 @@ import SectionTemplateEditor from '@/components/SectionTemplateEditor.vue'
 import BulkRegenerateModal from '@/components/BulkRegenerateModal.vue'
 import TemplateAttachmentsGrid from '@/components/TemplateAttachmentsGrid.vue'
 import BaseModal from '@/components/BaseModal.vue'
+import LibraryFaqStatusBadge from '@/components/library/LibraryFaqStatusBadge.vue'
+import LibraryGenerateFaqModal from '@/components/library/LibraryGenerateFaqModal.vue'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 // Lazy-load la full lib FA Pro Solid : la grille des fonctionnalites peut
@@ -76,6 +78,19 @@ function availCell(value) {
 const items = ref([])
 const allTemplates = ref([])
 const search = ref('')
+// Génération article FAQ depuis une fonctionnalité (Lot 138)
+const faqGenerateTarget = ref(null) // row functionality | null
+const faqBadgeRefreshKey = ref(0)   // bump pour forcer re-fetch des badges après generate
+function openFaqGenerate(row) { faqGenerateTarget.value = row }
+function closeFaqGenerate() { faqGenerateTarget.value = null }
+function onFaqGenerated() {
+  // Force tous les badges à re-fetch leur statut après création
+  faqBadgeRefreshKey.value++
+}
+function parseBacsCodes(text) {
+  if (!text) return []
+  return String(text).split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+}
 // Filtre statut de validation : 'all' | 'pending' (vide+brouillon) |
 // 'empty' | 'draft' | 'validated'.
 const validationFilter = ref('all')
@@ -511,6 +526,7 @@ onBeforeUnmount(teardownSortables)
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Smart</th>
             <th class="text-center px-3 py-2.5 whitespace-nowrap">Premium</th>
             <th class="text-left px-4 py-2.5 whitespace-nowrap">BACS</th>
+            <th class="text-center px-3 py-2.5 whitespace-nowrap" title="Article FAQ public lié à cette fonctionnalité">FAQ</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap">AFs</th>
             <th class="text-center px-4 py-2.5 whitespace-nowrap"></th>
           </tr>
@@ -522,7 +538,7 @@ onBeforeUnmount(teardownSortables)
         <tbody ref="tbodyRef">
           <template v-for="g in groupedItems" :key="g.root ? `g-${g.root.id}` : 'g-none'">
             <tr class="group-header bg-gray-50 border-t-2 border-gray-200">
-              <td colspan="9" class="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-gray-600">
+              <td colspan="10" class="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-gray-600">
                 {{ g.root ? g.root.title : 'Sans section parente' }}
                 <span class="ml-2 text-gray-400 normal-case font-normal tracking-normal">
                   · {{ g.items.length }} fonctionnalité{{ g.items.length > 1 ? 's' : '' }}
@@ -578,6 +594,13 @@ onBeforeUnmount(teardownSortables)
               <td class="px-4 py-2 whitespace-nowrap">
                 <BacsBadge v-if="t.bacs_articles" :reference="t.bacs_articles" />
                 <span v-else class="text-gray-300 italic text-xs">—</span>
+              </td>
+              <td class="px-3 py-2 text-center whitespace-nowrap" @click.stop>
+                <LibraryFaqStatusBadge
+                  :section-template-id="t.id"
+                  :refresh-key="faqBadgeRefreshKey"
+                  @generate="openFaqGenerate(t)"
+                />
               </td>
               <td class="px-4 py-2 text-center text-xs whitespace-nowrap">
                 <span v-if="t.outdated_count > 0" class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded" v-tooltip="'AFs utilisant cette fonctionnalité / AFs avec mise à jour en attente'">
@@ -698,6 +721,16 @@ onBeforeUnmount(teardownSortables)
         </button>
       </template>
     </BaseModal>
+
+    <!-- Génération article FAQ depuis une fonctionnalité (Lot 138) -->
+    <LibraryGenerateFaqModal
+      v-if="faqGenerateTarget"
+      :functionality="faqGenerateTarget"
+      :bacs-codes="parseBacsCodes(faqGenerateTarget.bacs_articles)"
+      :attachments-count="faqGenerateTarget.attachments_count || 0"
+      @close="closeFaqGenerate"
+      @generated="onFaqGenerated"
+    />
   </div>
 </template>
 

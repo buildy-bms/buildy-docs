@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 137;
+const TARGET_VERSION = 138;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5625,6 +5625,41 @@ function runMigrations() {
     db.pragma('user_version = 137');
   }
 
+  if (current < 138) {
+    // Synchronisation bibliothèque de fonctionnalités -> FAQ Crisp (Lot 138).
+    // 1) Lien biblio -> article FAQ : permet de tracer quelle fonctionnalité a
+    //    généré l'article, détecter une divergence (biblio modifiée depuis la
+    //    dernière génération) et préserver les éditions manuelles côté FAQ.
+    // 2) Codes BACS couverts par l'article : permet le maillage interne SEO
+    //    automatique (un article fonctionnalité peut renvoyer vers l'article
+    //    BACS approprié).
+    // 3) Flag confidentiel sur les fonctionnalités : empêche la publication
+    //    FAQ d'algorithmes propriétaires ou de techniques d'intégration.
+    // 4) Table mapping local -> FTP pour les captures de la biblio publiées
+    //    sur l'hébergement Crisp public.
+    db.exec(`
+      ALTER TABLE faq_articles ADD COLUMN source_section_template_id INTEGER REFERENCES section_templates(id) ON DELETE SET NULL;
+      ALTER TABLE faq_articles ADD COLUMN source_synced_version INTEGER;
+      ALTER TABLE faq_articles ADD COLUMN source_synced_at DATETIME;
+      ALTER TABLE faq_articles ADD COLUMN source_overridden INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE faq_articles ADD COLUMN bacs_articles TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_faq_source_section_tpl ON faq_articles(source_section_template_id);
+      CREATE INDEX IF NOT EXISTS idx_faq_bacs_articles ON faq_articles(bacs_articles);
+
+      ALTER TABLE section_templates ADD COLUMN faq_publishable INTEGER NOT NULL DEFAULT 1;
+
+      CREATE TABLE IF NOT EXISTS library_attachment_publications (
+        attachment_id INTEGER PRIMARY KEY REFERENCES attachments(id) ON DELETE CASCADE,
+        ftp_url TEXT NOT NULL,
+        file_hash TEXT NOT NULL,
+        published_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    log.info('Migration 138 appliquee : sync biblio -> FAQ (source_*, bacs_articles, faq_publishable, library_attachment_publications)');
+    db.pragma('user_version = 138');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6112,7 +6147,7 @@ const sectionTemplates = {
     }
     return false;
   },
-  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName, changelog }) {
+  update(id, { title, bodyHtml, bacsArticles, serviceLevel, updatedBy, kind, parentTemplateId, equipmentTemplateId, availE, availS, availP, iconName, changelog, faqPublishable }) {
     // Snapshot du body_html courant AVANT ecrasement, ssi le body change
     // reellement. Permet la restauration depuis l'UI (modale d'edition).
     if (bodyHtml !== undefined) {
@@ -6139,6 +6174,7 @@ const sectionTemplates = {
     if (availS !== undefined) { fields.push('avail_s = ?'); params.push(availS); }
     if (availP !== undefined) { fields.push('avail_p = ?'); params.push(availP); }
     if (iconName !== undefined) { fields.push('icon_name = ?'); params.push(iconName); }
+    if (faqPublishable !== undefined) { fields.push('faq_publishable = ?'); params.push(faqPublishable ? 1 : 0); }
     if (updatedBy !== undefined) { fields.push('updated_by = ?'); params.push(updatedBy); }
     // Auto-clear validation : si le contenu change, on repasse en brouillon.
     // Le snapshot ci-dessus a deja teste le diff effectif.
@@ -8102,15 +8138,22 @@ const faqArticles = {
   create({ crispId = null, categoryId = null, title, slug = null, description = null,
            contentHtml = null, status = 'draft', visibility = 'public', locale = 'fr',
            dirty = 1, pulledAt = null, crispUpdatedAt = null, crispUrl = null,
-           createdBy = null }) {
+           createdBy = null,
+           // Sync biblio -> FAQ (mig 138)
+           sourceSectionTemplateId = null, sourceSyncedVersion = null,
+           sourceSyncedAt = null, sourceOverridden = 0, bacsArticles = null }) {
     const r = db.prepare(`
       INSERT INTO faq_articles (crisp_id, category_id, title, slug, description, content_html,
                                 status, visibility, locale, dirty, pulled_at, crisp_updated_at,
-                                crisp_url, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                crisp_url, created_by, updated_by,
+                                source_section_template_id, source_synced_version,
+                                source_synced_at, source_overridden, bacs_articles)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(crispId, categoryId, title, slug, description, contentHtml,
            status, visibility, locale, dirty ? 1 : 0, pulledAt, crispUpdatedAt,
-           crispUrl, createdBy, createdBy);
+           crispUrl, createdBy, createdBy,
+           sourceSectionTemplateId, sourceSyncedVersion,
+           sourceSyncedAt, sourceOverridden ? 1 : 0, bacsArticles);
     return this.getById(r.lastInsertRowid);
   },
   update(id, patch, userId = null) {
@@ -8123,11 +8166,18 @@ const faqArticles = {
       pulledAt: 'pulled_at', pushedAt: 'pushed_at', crispUpdatedAt: 'crisp_updated_at',
       crispUrl: 'crisp_url',
       lastAiAssistAt: 'last_ai_assist_at',
+      // Sync biblio -> FAQ (mig 138)
+      sourceSectionTemplateId: 'source_section_template_id',
+      sourceSyncedVersion: 'source_synced_version',
+      sourceSyncedAt: 'source_synced_at',
+      sourceOverridden: 'source_overridden',
+      bacsArticles: 'bacs_articles',
     };
     for (const [k, col] of Object.entries(map)) {
       if (patch[k] !== undefined) {
         sets.push(`${col} = ?`);
-        args.push(k === 'dirty' ? (patch[k] ? 1 : 0) : patch[k]);
+        const isBool = k === 'dirty' || k === 'sourceOverridden';
+        args.push(isBool ? (patch[k] ? 1 : 0) : patch[k]);
       }
     }
     if (!sets.length) return this.getById(id);
@@ -8172,6 +8222,56 @@ const faqArticles = {
       ORDER BY seo_score DESC, updated_at DESC
       LIMIT ?
     `).all(...args);
+  },
+
+  // Sync biblio -> FAQ (mig 138) : retrouve l'article FAQ lié à une fonctionnalité.
+  // Une fonctionnalité peut avoir 0 ou plusieurs articles ; on retourne le plus
+  // récent (cas standard : 1 seul article par fonctionnalité).
+  getBySectionTemplateId(sectionTemplateId) {
+    return db.prepare(`
+      SELECT * FROM faq_articles
+      WHERE source_section_template_id = ?
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get(sectionTemplateId);
+  },
+
+  // Lookup articles BACS publiés qui couvrent un ou plusieurs codes BACS.
+  // Reçoit ['R175-3 1°', 'R175-6'] -> retourne les articles dont bacs_articles
+  // contient au moins un de ces codes. Utilisé pour le maillage SEO interne.
+  listBacsCoverage(codes) {
+    if (!Array.isArray(codes) || codes.length === 0) return [];
+    const where = codes.map(() => 'bacs_articles LIKE ?').join(' OR ');
+    const args = codes.map(c => `%${c}%`);
+    return db.prepare(`
+      SELECT id, title, crisp_url, bacs_articles
+      FROM faq_articles
+      WHERE crisp_url IS NOT NULL AND status = 'published' AND (${where})
+      ORDER BY title
+    `).all(...args);
+  },
+};
+
+// Sync biblio -> FAQ (mig 138) : mapping entre attachment local et URL FTP
+// publique. Permet d'éviter de re-uploader les captures à chaque regénération
+// si le fichier n'a pas changé (file_hash sha256 inchangé).
+const libraryAttachmentPublications = {
+  get(attachmentId) {
+    return db.prepare('SELECT * FROM library_attachment_publications WHERE attachment_id = ?').get(attachmentId);
+  },
+  upsert({ attachmentId, ftpUrl, fileHash }) {
+    db.prepare(`
+      INSERT INTO library_attachment_publications (attachment_id, ftp_url, file_hash, published_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(attachment_id) DO UPDATE SET
+        ftp_url = excluded.ftp_url,
+        file_hash = excluded.file_hash,
+        published_at = CURRENT_TIMESTAMP
+    `).run(attachmentId, ftpUrl, fileHash);
+    return this.get(attachmentId);
+  },
+  remove(attachmentId) {
+    db.prepare('DELETE FROM library_attachment_publications WHERE attachment_id = ?').run(attachmentId);
   },
 };
 
@@ -8633,6 +8733,7 @@ module.exports = {
   faqCategoriesTombstones,
   faqCategories,
   faqArticles,
+  libraryAttachmentPublications,
   bacsAuditDeviceZones,
   bacsChecklistCatalog,
   bacsAuditChecklist,

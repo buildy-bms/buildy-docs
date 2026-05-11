@@ -20,6 +20,9 @@ const { confirm } = useConfirm()
 const settingsOpen = ref(false)
 const searchQuery = ref('')
 const statusFilter = ref('')
+// Sync biblio -> FAQ (Lot 138) : filtre rapide pour ne voir que les articles
+// générés depuis la bibliothèque de fonctionnalités.
+const onlyLibrarySource = ref(false)
 const showSuggestions = ref(false)
 const suggestions = ref([])
 const loadingSuggestions = ref(false)
@@ -63,6 +66,7 @@ const categoryTree = computed(() => {
 const filteredArticles = computed(() => {
   let arr = store.articles
   if (statusFilter.value) arr = arr.filter((a) => a.status === statusFilter.value)
+  if (onlyLibrarySource.value) arr = arr.filter((a) => !!a.source_section_template_id)
   return arr
 })
 
@@ -484,6 +488,12 @@ function selectCategory(id) {
               <option value="draft">Brouillons</option>
               <option value="published">Publiés</option>
             </select>
+            <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer whitespace-nowrap"
+                   title="Filtrer pour ne voir que les articles générés depuis la bibliothèque de fonctionnalités">
+              <input v-model="onlyLibrarySource" type="checkbox"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              Depuis biblio
+            </label>
             <button @click="newArticle"
                     class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap">
               <PlusIcon class="w-4 h-4 shrink-0" />

@@ -30,6 +30,7 @@ const updateSchema = z.object({
   equipment_template_id: z.number().int().positive().nullable().optional(),
   icon_name: z.string().nullable().optional(),
   document_kinds: documentKindsSchema.optional(),
+  faq_publishable: z.boolean().optional(),
 });
 
 const createSchema = z.object({
@@ -47,6 +48,7 @@ const createSchema = z.object({
   equipment_template_id: z.number().int().positive().nullable().optional(),
   icon_name: z.string().nullable().optional(),
   document_kinds: documentKindsSchema.optional(),
+  faq_publishable: z.boolean().optional(),
 });
 
 // Service level derive de la matrice avail_e/s/p :
@@ -404,6 +406,7 @@ async function routes(fastify) {
       availS: body.avail_s,
       availP: body.avail_p,
       iconName: body.icon_name,
+      faqPublishable: body.faq_publishable,
       // Service level : derive de avail_* si fourni, sinon valeur explicite
       serviceLevel: availProvided ? derivedLevel : body.service_level,
       updatedBy: userId || null,
@@ -540,6 +543,61 @@ async function routes(fastify) {
       body_html: snapshot.body_html || null,
       title: snapshot.title || null,
     };
+  });
+
+  // ── Synchronisation biblio fonctionnalités → FAQ Crisp (Lot 138) ────
+  // 3 endpoints qui s'appuient sur lib/library-faq-sync.js :
+  //   GET    /section-templates/:id/faq-status   — état (synchro/divergé/édité)
+  //   POST   /section-templates/:id/generate-faq — créé un nouvel article FAQ
+  //   POST   /section-templates/:id/regenerate-faq — re-génère l'article existant
+  // Garde-fou : refusent si la fonctionnalité a faq_publishable=0 (confidentielle).
+
+  fastify.get('/section-templates/:id/faq-status', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const { getFaqStatusForFunctionality } = require('../lib/library-faq-sync');
+    const status = getFaqStatusForFunctionality(id);
+    if (!status.exists_template) return reply.code(404).send({ detail: 'Section type non trouvée' });
+    return status;
+  });
+
+  fastify.post('/section-templates/:id/generate-faq', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const body = request.body || {};
+    const categoryId = body.category_id ? parseInt(body.category_id, 10) : null;
+    const locale = body.locale || 'fr';
+    const userId = request.authUser?.id || null;
+    try {
+      const { generateFaqFromFunctionality } = require('../lib/library-faq-sync');
+      const article = await generateFaqFromFunctionality({
+        sectionTemplateId: id, categoryId, locale, userId,
+      });
+      return article;
+    } catch (e) {
+      log.warn(`generate-faq from section-template ${id} échec : ${e.message}`);
+      return reply.code(e.status || 500).send({ detail: e.message });
+    }
+  });
+
+  fastify.post('/section-templates/:id/regenerate-faq', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const body = request.body || {};
+    const articleId = body.article_id ? parseInt(body.article_id, 10) : null;
+    const force = body.force === true;
+    if (!articleId) return reply.code(400).send({ detail: 'article_id requis' });
+    const userId = request.authUser?.id || null;
+    // Verif coherence article ↔ section_template
+    const article = db.faqArticles.getById(articleId);
+    if (!article || article.source_section_template_id !== id) {
+      return reply.code(400).send({ detail: 'article_id ne correspond pas à cette fonctionnalité source' });
+    }
+    try {
+      const { regenerateFaqFromFunctionality } = require('../lib/library-faq-sync');
+      const updated = await regenerateFaqFromFunctionality({ articleId, force, userId });
+      return updated;
+    } catch (e) {
+      log.warn(`regenerate-faq from section-template ${id} article=${articleId} échec : ${e.message}`);
+      return reply.code(e.status || 500).send({ detail: e.message });
+    }
   });
 }
 

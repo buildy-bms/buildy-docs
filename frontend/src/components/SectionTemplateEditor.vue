@@ -84,6 +84,9 @@ const form = ref({
   // Liste de strings parmi document_kinds catalogue (af / brochure / bacs_audit).
   // Defaut a la creation : ['af']. Une section avec liste vide n'apparait nulle part.
   document_kinds: ['af'],
+  // Sync biblio -> FAQ (Lot 138) : par defaut une fonctionnalité est publiable
+  // sur la FAQ publique Crisp. L'admin coche « Confidentiel » pour bloquer.
+  faq_publishable: true,
 })
 
 // Cascade des tags aux descendants ON par defaut (coherent avec la cascade
@@ -310,6 +313,9 @@ watch(() => props.template, (t) => {
     document_kinds: (t && Array.isArray(t.document_kinds) && t.document_kinds.length)
       ? [...t.document_kinds]
       : ['af'],
+    // En édition : faq_publishable vient du serveur (DEFAULT 1).
+    // En création : true par défaut (la fonctionnalité est publiable).
+    faq_publishable: t ? t.faq_publishable !== 0 : true,
   }
 }, { immediate: true })
 
@@ -392,6 +398,8 @@ async function save({ close = true } = {}) {
       payload.avail_e = form.value.avail_e || null
       payload.avail_s = form.value.avail_s || null
       payload.avail_p = form.value.avail_p || null
+      // Flag « Confidentiel — ne pas publier sur la FAQ publique » (Lot 138)
+      payload.faq_publishable = !!form.value.faq_publishable
     }
     if (isEdit.value) {
       const { data } = await updateSectionTemplate(props.template.id, payload, {
@@ -701,6 +709,27 @@ async function destroy() {
            class="text-[11px] text-gray-500 italic mt-1.5">
           Les AFs existantes restent figées sur la version liée. La mise à jour est proposée à l'ouverture de chaque AF.
         </p>
+      </fieldset>
+
+      <!-- Publication FAQ publique (Lot 138) — uniquement pour les fonctionnalités.
+           Coché par défaut : la fonctionnalité peut alimenter un article FAQ Google.
+           Décoché = confidentiel, le bouton « Générer FAQ » est grisé en biblio. -->
+      <fieldset v-if="showAvailability" class="border border-gray-200 rounded-lg px-3 pt-2 pb-2.5">
+        <legend class="text-[11px] font-medium text-gray-600 px-1.5">Publication FAQ publique</legend>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input v-model="form.faq_publishable" type="checkbox"
+                 class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+          <span class="text-xs text-gray-700 leading-snug">
+            <strong>Autoriser la publication d'un article FAQ</strong> sur
+            <code class="text-[10px] bg-gray-100 px-1 rounded">help.buildy.fr</code>
+            depuis cette fonctionnalité.
+            <span class="block text-gray-500 mt-0.5">
+              Décoche si la fonctionnalité décrit un algorithme propriétaire ou des
+              techniques d'intégration à ne pas exposer aux concurrents. Le contenu
+              reste utilisable dans les PDF audits BACS internes.
+            </span>
+          </span>
+        </label>
       </fieldset>
 
       <!-- Captures du modele : repliable pour ne pas occuper la moitie de

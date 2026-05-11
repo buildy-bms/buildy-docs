@@ -329,6 +329,14 @@ export const bulkUpdateSectionTemplateDocumentKinds = (payload) =>
   api.post('/section-templates/bulk-document-kinds', payload)
 export const deleteSectionTemplate = (id, { force = false } = {}) =>
   api.delete(`/section-templates/${id}`, { params: force ? { force: 1 } : {} })
+
+// Synchronisation biblio fonctionnalités -> FAQ Crisp (Lot 138)
+export const getFaqStatusForFunctionality = (id) =>
+  api.get(`/section-templates/${id}/faq-status`)
+export const generateFaqFromFunctionality = (id, { category_id, locale } = {}) =>
+  api.post(`/section-templates/${id}/generate-faq`, { category_id, locale })
+export const regenerateFaqFromFunctionality = (id, { article_id, force = false }) =>
+  api.post(`/section-templates/${id}/regenerate-faq`, { article_id, force })
 export const cloneSectionTemplate = (id, data) => api.post(`/section-templates/${id}/clone`, data)
 
 // Statut de validation du contenu (mig 89). validate marque la section/feature

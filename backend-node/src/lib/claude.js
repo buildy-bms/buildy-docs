@@ -759,6 +759,7 @@ async function assistTranscriptMapping({ skeleton, transcript }) {
 const PROMPT_KEY_FAQ_REWRITE = 'faq.rewrite';
 const PROMPT_KEY_FAQ_GENERATE = 'faq.generate';
 const PROMPT_KEY_FAQ_SUGGEST_MISSING = 'faq.suggest_missing';
+const PROMPT_KEY_FAQ_FROM_FUNCTIONALITY = 'faq.generate_from_functionality';
 
 const SYSTEM_PROMPT_FAQ_BASE = [
   `Tu rédiges des articles de la base de connaissance Crisp Helpdesk de Buildy, publiés sur https://help.buildy.fr/.`,
@@ -924,6 +925,65 @@ const SYSTEM_PROMPT_FAQ_GENERATE = [
   `chauffage/climatisation/ventilation, BACnet/Modbus selon le sujet). Verbe d'action en tête`,
   `quand possible (Pilotez, Supervisez, Configurez, Diagnostiquez). Pas de "Buildy" en tête,`,
   `pas de "Cet article".`,
+].join('\n');
+
+// Prompt dédié à la génération d'articles FAQ depuis une fonctionnalité de la
+// bibliothèque (Lot 138). Diffère du prompt GENERATE habituel sur 3 points :
+//   - L'IA reçoit une FONCTIONNALITÉ structurée (titre + body_html biblio +
+//     codes BACS) plutôt qu'une question utilisateur.
+//   - L'IA reçoit la liste des CAPTURES déjà uploadées sur le CDN public Crisp
+//     et doit les insérer naturellement dans le corps (pas de placeholders).
+//   - L'IA reçoit la liste des ARTICLES BACS publiés et peut insérer des liens
+//     internes pertinents pour le maillage SEO.
+const SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY = [
+  SYSTEM_PROMPT_FAQ_BASE,
+  ``,
+  `=== MODE : ARTICLE DEPUIS UNE FONCTIONNALITÉ BUILDY ===`,
+  `Tu reçois une FONCTIONNALITÉ de la bibliothèque Buildy (description riche métier),`,
+  `optionnellement une liste de CAPTURES d'écran à insérer (URLs publiques), et`,
+  `optionnellement une liste d'ARTICLES BACS de référence (R175-1 à R175-6) déjà`,
+  `publiés sur la même base.`,
+  ``,
+  `Mission : produire un article FAQ optimisé Google qui présente cette fonctionnalité`,
+  `aux exploitants de bâtiment / MOA / MOE non techniques.`,
+  ``,
+  `=== STRUCTURE ATTENDUE ===`,
+  `1. <p> d'introduction (1-2 phrases) qui répond à la question implicite "à quoi sert`,
+  `   cette fonctionnalité ?" et intègre 1-2 mots-clés métier dans les 150 premiers chars.`,
+  `2. 2-4 sections H2 avec mots-clés métier dans les titres (ex : "Surveiller la connectivité GTB",`,
+  `   "Configurer une alerte de dérive énergétique"). Pas plus de 5 sections H2 au total.`,
+  `3. Sous les H2 : paragraphes courts (3-5 lignes max), liste à puces si étapes ou critères.`,
+  `4. Mots-clés métier en <strong> aux endroits naturels (limite 4-6 strong par article).`,
+  `5. 1 callout maximum : soit <blockquote class="callout-tip"> pour une astuce, soit`,
+  `   <blockquote class="callout-info"> pour un point d'attention.`,
+  `6. FAQ subsidiaire en fin (2-3 questions/réponses courtes) sous un H2 "Questions fréquentes".`,
+  ``,
+  `=== CAPTURES D'ÉCRAN ===`,
+  `Si la liste de captures est fournie, INSÈRE chaque capture là où elle éclaire le propos`,
+  `(juste après le paragraphe qui décrit la fonctionnalité illustrée). Syntaxe :`,
+  `\`<p><img src="URL_FOURNIE" alt="CAPTION_FOURNIE"></p>\``,
+  `Utilise EXACTEMENT les URLs fournies, ne les réécris pas. Si caption fournie, utilise-la`,
+  `comme alt + comme petite légende <em> juste après l'image.`,
+  `LIMITE 4-6 images max par article même s'il y en a plus. Choisis les plus pertinentes`,
+  `selon la narration. Pas de <img data-placeholder> ici, on a des vraies images.`,
+  ``,
+  `=== MAILLAGE INTERNE BACS ===`,
+  `Si une liste d'ARTICLES BACS est fournie avec leurs URLs, insère 1 ou 2 liens internes`,
+  `vers les plus pertinents : "Pour le détail du décret sur ce point, voir notre article`,
+  `<a href=\"URL_FOURNIE\">titre fourni</a>." Ne force pas un lien si le contexte ne s'y prête pas.`,
+  ``,
+  `=== POSITIONNEMENT — TRÈS IMPORTANT ===`,
+  `NE mentionne JAMAIS les niveaux d'offre Essentials / Smart / Premium ni les notions`,
+  `de "inclus" / "option payante". L'article public ne parle pas de tarification.`,
+  ``,
+  `=== TITRE OBLIGATOIRE (SEO) ===`,
+  `Commence ta réponse par le marker \`<!--TITLE: titre proposé-->\` puis enchaîne le HTML.`,
+  `Forme question quand applicable ("Comment configurer une alerte de dérive énergétique ?"),`,
+  `sinon nominale courte ("Programmation horaire des équipements techniques"). 40-60 chars.`,
+  ``,
+  `=== META-DESCRIPTION OBLIGATOIRE (SEO) ===`,
+  `Juste après le marker TITLE, ajoute le marker \`<!--DESCRIPTION: meta-description-->\`.`,
+  `MAX 160 chars STRICT (Crisp tronque), idéal 140-155. Verbe d'action en tête + 1-2 mots-clés métier.`,
 ].join('\n');
 
 const SYSTEM_PROMPT_FAQ_SUGGEST_MISSING = [
@@ -1463,6 +1523,103 @@ async function assistFaqGenerate({ question, categoryName = null }) {
   return _withSeoLoop(callClaude);
 }
 
+// Génération d'un article FAQ depuis une fonctionnalité bibliothèque (Lot 138).
+// Args :
+//   - functionality : row section_templates (is_functionality=1) avec body_html + bacs_articles
+//   - attachments   : Array de { url, caption, position } déjà publiées sur CDN public Crisp
+//   - bacsCoverage  : Array de { id, title, crisp_url } des articles BACS publiés à linker
+//   - locale        : 'fr' par défaut
+// Retour : { html, suggested_title, suggested_description, seo_score, usage }
+async function assistFaqGenerateFromFunctionality({ functionality, attachments = [], bacsCoverage = [], locale = 'fr' }) {
+  if (!functionality) throw new Error('Fonctionnalité manquante');
+  const corpus = buildBuildyCorpusContext({ mode: 'exhaustive' });
+  const fewShot = _buildFewShotBlock();
+
+  const systemBlocks = [
+    {
+      type: 'text',
+      text: getActivePrompt(PROMPT_KEY_FAQ_FROM_FUNCTIONALITY, SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY),
+      cache_control: { type: 'ephemeral' },
+    },
+    {
+      type: 'text',
+      text: `=== CORPUS BUILDY ===\n${corpus}`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (fewShot) {
+    systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
+  }
+
+  // Bloc utilisateur structuré : fonctionnalité + captures + articles BACS à linker.
+  function buildUserParts(retryContext) {
+    const parts = [
+      `=== FONCTIONNALITÉ SOURCE ===`,
+      `Titre : ${functionality.title || '(sans titre)'}`,
+      functionality.slug ? `Slug : ${functionality.slug}` : null,
+      functionality.bacs_articles ? `Codes BACS couverts : ${functionality.bacs_articles}` : null,
+      ``,
+      `Contenu riche (HTML brut, source de vérité) :`,
+      functionality.body_html || '(vide — déduire à partir du titre uniquement)',
+      ``,
+    ].filter(Boolean);
+
+    if (attachments.length > 0) {
+      parts.push(`=== CAPTURES À INSÉRER (URLs publiques, ordre suggéré) ===`);
+      attachments.forEach((a, i) => {
+        parts.push(`${i + 1}. URL : ${a.url}`);
+        if (a.caption) parts.push(`   Caption : ${a.caption}`);
+      });
+      parts.push('');
+    } else {
+      parts.push(`=== CAPTURES ===`, `(aucune capture attachée — pas d'image à insérer)`, '');
+    }
+
+    if (bacsCoverage.length > 0) {
+      parts.push(`=== ARTICLES BACS À LIER (maillage SEO interne) ===`);
+      bacsCoverage.forEach((b) => {
+        parts.push(`- "${b.title}" → ${b.crisp_url} (codes : ${b.bacs_articles || ''})`);
+      });
+      parts.push('');
+    }
+
+    if (retryContext?.feedback) {
+      parts.push(`=== ARTICLE GÉNÉRÉ AU 1ER PASSAGE ===`);
+      parts.push(retryContext.previousHtml || '');
+      parts.push('');
+      parts.push(retryContext.feedback);
+    } else {
+      parts.push(`Rédige l'article FAQ complet (markers TITLE + DESCRIPTION + HTML).`);
+    }
+    return parts.join('\n');
+  }
+
+  const callClaude = async (retryContext) => {
+    const resp = await client().messages.create({
+      model: config.claudeModel,
+      max_tokens: 8192,
+      system: systemBlocks,
+      messages: [{ role: 'user', content: buildUserParts(retryContext) }],
+    });
+    const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    const truncated = resp.stop_reason === 'max_tokens';
+    if (truncated) console.warn('[faq.ai] from-functionality truncated (max_tokens hit)', { usage: resp.usage });
+    const { html, suggested_title, suggested_description } = _extractTitle(raw, functionality.title || '');
+    return { html, suggested_title, suggested_description, usage: resp.usage, truncated };
+  };
+
+  const result = await _withSeoLoop(callClaude);
+  return {
+    title: result.suggested_title || functionality.title || 'Article FAQ',
+    description: result.suggested_description || null,
+    html: result.html,
+    seo_score: result.seo_score,
+    seo_weak_checks: result.seo_weak_checks,
+    usage: result.usage,
+    truncated: result.truncated,
+  };
+}
+
 async function assistFaqSuggestMissing() {
   const corpus = buildBuildyCorpusContext({ includeFaqTitles: true });
   const systemBlocks = [
@@ -1505,9 +1662,12 @@ module.exports = {
   // FAQ Buildy / Crisp
   assistFaqRewrite, assistFaqGenerate, assistFaqSuggestMissing,
   assistFaqRewriteTitle, assistFaqRewriteDescription, assistFaqRewriteSelection,
+  assistFaqGenerateFromFunctionality,
   buildBuildyCorpusContext,
   PROMPT_KEY_FAQ_REWRITE,
   PROMPT_KEY_FAQ_GENERATE,
+  PROMPT_KEY_FAQ_FROM_FUNCTIONALITY,
+  DEFAULT_SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY: SYSTEM_PROMPT_FAQ_FROM_FUNCTIONALITY,
   PROMPT_KEY_FAQ_SUGGEST_MISSING,
   DEFAULT_SYSTEM_PROMPT_FAQ_REWRITE: SYSTEM_PROMPT_FAQ_REWRITE,
   DEFAULT_SYSTEM_PROMPT_FAQ_GENERATE: SYSTEM_PROMPT_FAQ_GENERATE,

@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRouter, onBeforeRouteLeave, RouterLink } from 'vue-router'
 import {
   ChevronLeftIcon, ArrowUpOnSquareIcon, SparklesIcon, TrashIcon,
   CheckCircleIcon, ArrowTopRightOnSquareIcon,
   ArrowDownTrayIcon, ClockIcon,
+  LinkIcon, ExclamationTriangleIcon, ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { useFaqStore } from '@/stores/faq'
 import { useNotification } from '@/composables/useNotification'
@@ -26,6 +27,9 @@ const draft = ref({
   category_id: null,
   status: 'draft',
   visibility: 'public',
+  // Codes BACS couverts par l'article (Lot 138). Permet le maillage SEO
+  // automatique depuis les articles générés depuis une fonctionnalité.
+  bacs_articles: '',
 })
 const original = ref(null)
 const loading = ref(true)
@@ -40,9 +44,18 @@ const dirty = computed(() => {
     draft.value.content_html !== (original.value.content_html || '') ||
     draft.value.category_id !== (original.value.category_id || null) ||
     draft.value.status !== original.value.status ||
-    draft.value.visibility !== original.value.visibility
+    draft.value.visibility !== original.value.visibility ||
+    draft.value.bacs_articles !== (original.value.bacs_articles || '')
   )
 })
+
+// Sync biblio -> FAQ (Lot 138) : flags d'affichage pour la top-bar + bandeau
+// de divergence. Récupère le statut détaillé en lazy-fetch après loadArticle.
+const linkedFunctionalityId = computed(() => original.value?.source_section_template_id || null)
+const sourceOverridden = computed(() => original.value?.source_overridden === 1)
+const sourceSyncedAt = computed(() => original.value?.source_synced_at || null)
+const syncStatus = ref(null) // { diverged, overridden, article, ... } depuis /faq-status
+const regenerating = ref(false)
 
 const credentialsConfigured = computed(() => store.settings?.has_credentials || false)
 
@@ -195,14 +208,67 @@ onMounted(async () => {
       category_id: article.category_id || null,
       status: article.status || 'draft',
       visibility: article.visibility || 'public',
+      bacs_articles: article.bacs_articles || '',
     }
     loadSeoScore() // async, non-bloquant
+    loadSyncStatus() // async, non-bloquant — alimente badge + bandeau divergence
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Article introuvable')
   } finally {
     loading.value = false
   }
 })
+
+// Sync biblio -> FAQ (Lot 138) : récupère le statut détaillé depuis la
+// fonctionnalité source si l'article est lié, pour afficher le bandeau de
+// divergence et permettre la regénération.
+async function loadSyncStatus() {
+  if (!linkedFunctionalityId.value) return
+  try {
+    const { getFaqStatusForFunctionality } = await import('@/api')
+    const { data } = await getFaqStatusForFunctionality(linkedFunctionalityId.value)
+    syncStatus.value = data
+  } catch (e) {
+    syncStatus.value = null
+  }
+}
+
+async function regenerateFromLibrary({ force = false } = {}) {
+  if (!linkedFunctionalityId.value || !original.value?.id) return
+  if (!force && sourceOverridden.value) {
+    if (!await confirm({
+      title: 'Écraser tes éditions manuelles ?',
+      message: 'Cet article a été édité à la main depuis sa génération. Une regénération va remplacer ton contenu. L\'historique est snapshoté avant pour permettre un retour arrière.',
+      confirmText: 'Regénérer quand même',
+      danger: true,
+    })) return
+    force = true
+  }
+  regenerating.value = true
+  try {
+    const { regenerateFaqFromFunctionality } = await import('@/api')
+    const { data } = await regenerateFaqFromFunctionality(linkedFunctionalityId.value, {
+      article_id: original.value.id, force,
+    })
+    original.value = data
+    draft.value = {
+      title: data.title || '',
+      description: data.description || '',
+      content_html: data.content_html || '',
+      category_id: data.category_id || null,
+      status: data.status || 'draft',
+      visibility: data.visibility || 'public',
+      bacs_articles: data.bacs_articles || '',
+    }
+    success('Article regénéré depuis la biblio.')
+    loadSeoScore()
+    loadSyncStatus()
+  } catch (e) {
+    notifyError(e.response?.data?.detail || 'Échec de la regénération')
+  } finally {
+    regenerating.value = false
+  }
+}
 
 // ── Garde-fou perte de données ──────────────────────────────────────
 // 1. Fermeture onglet / refresh navigateur : prompt natif beforeunload.
@@ -261,6 +327,7 @@ async function save() {
       category_id: draft.value.category_id,
       status: draft.value.status,
       visibility: draft.value.visibility,
+      bacs_articles: draft.value.bacs_articles?.trim() || null,
       // Optimistic locking : empêche un second onglet d'écraser nos changements.
       expected_updated_at: original.value?.updated_at,
     })
@@ -379,6 +446,15 @@ function back() {
               :title="seoTooltip">
           SEO {{ seoScore }}/100
         </span>
+        <!-- Badge « Lié à une fonctionnalité biblio » (Lot 138) -->
+        <RouterLink v-if="linkedFunctionalityId"
+                    :to="`/library/functionalities`"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs whitespace-nowrap hover:bg-indigo-100 transition"
+                    title="Article généré depuis la bibliothèque de fonctionnalités. Cliquer pour ouvrir la biblio.">
+          <LinkIcon class="w-3 h-3 shrink-0" />
+          Lié à la biblio
+          <span v-if="sourceOverridden" class="ml-1 text-amber-700">(édité)</span>
+        </RouterLink>
         <div class="ml-auto flex items-center gap-2">
           <a v-if="original?.crisp_url && original?.status === 'published'"
              :href="original.crisp_url" target="_blank" rel="noopener"
@@ -420,6 +496,30 @@ function back() {
             <TrashIcon class="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      <!-- Bandeau de divergence biblio (Lot 138) : la fonctionnalité source a
+           évolué depuis la dernière génération. L'utilisateur peut regénérer
+           (l'IA réécrit le contenu) ou ignorer. -->
+      <div v-if="syncStatus?.diverged" class="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3 text-sm">
+        <ExclamationTriangleIcon class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <div class="font-medium text-amber-900">La fonctionnalité source a évolué.</div>
+          <div class="text-amber-700 text-xs mt-0.5">
+            Dernière synchro biblio : {{ sourceSyncedAt ? new Date(sourceSyncedAt).toLocaleDateString('fr-FR') : 'inconnue' }}.
+            <span v-if="sourceOverridden"> Article édité manuellement — une regénération écrasera tes modifications (snapshot avant).</span>
+          </div>
+        </div>
+        <button @click="regenerateFromLibrary()" :disabled="regenerating"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition whitespace-nowrap disabled:opacity-50">
+          <ArrowPathIcon v-if="regenerating" class="w-3.5 h-3.5 shrink-0 animate-spin" />
+          <SparklesIcon v-else class="w-3.5 h-3.5 shrink-0" />
+          {{ regenerating ? 'Regénération…' : 'Regénérer' }}
+        </button>
+        <button @click="syncStatus = null"
+                class="px-3 py-1.5 text-xs rounded-lg text-amber-700 hover:bg-amber-100 transition whitespace-nowrap">
+          Ignorer
+        </button>
       </div>
 
       <div v-if="suggestedTitle" class="mb-3 bg-violet-50 border border-violet-200 rounded-lg p-3 flex items-center gap-3 text-sm">
@@ -471,6 +571,22 @@ function back() {
               {{ (draft.description || '').length }}/160 caractères
             </span>
             <span class="text-gray-400">Crisp tronque au-delà de 160</span>
+          </div>
+        </div>
+
+        <!-- Articles BACS couverts (Lot 138) — permet aux articles générés depuis
+             une fonctionnalité de pointer ici via maillage interne SEO. -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Articles BACS couverts
+            <span class="text-xs font-normal text-gray-500">— maillage SEO interne (optionnel)</span>
+          </label>
+          <input v-model="draft.bacs_articles" type="text"
+                 placeholder="Ex : R175-3 1°, R175-6"
+                 class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition" />
+          <div class="mt-1 text-xs text-gray-500">
+            Si cet article décrit une (ou plusieurs) sous-section du décret BACS, indique le(s) code(s) ici.
+            Les articles fonctionnalité publiés pointeront automatiquement vers cet article quand ils couvrent les mêmes codes.
           </div>
         </div>
 

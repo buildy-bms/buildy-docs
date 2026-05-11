@@ -66,6 +66,10 @@ const articleCreateSchema = z.object({
   status: z.enum(['draft', 'published']).optional(),
   visibility: z.enum(['public', 'private']).optional(),
   locale: z.string().min(2).max(10).optional(),
+  // Codes BACS couverts par l'article (mig 138). Saisi par l'admin pour
+  // permettre le maillage SEO interne depuis les articles fonctionnalités.
+  // Format libre : "R175-3 1°, R175-6" ou "R175-1".
+  bacs_articles: z.string().max(200).nullable().optional(),
 });
 
 const articleUpdateSchema = articleCreateSchema.partial().extend({
@@ -400,11 +404,13 @@ async function routes(fastify) {
     const data = parsed.data;
     const created = db.faqArticles.create({
       title: data.title,
+      description: data.description || null,
       contentHtml: data.content_html || '',
       categoryId: data.category_id || null,
       status: data.status || 'draft',
       visibility: data.visibility || 'public',
       locale: data.locale || 'fr',
+      bacsArticles: data.bacs_articles || null,
       dirty: 1,
       createdBy: request.authUser?.id || null,
     });
@@ -437,7 +443,20 @@ async function routes(fastify) {
     if (parsed.data.status !== undefined) patch.status = parsed.data.status;
     if (parsed.data.visibility !== undefined) patch.visibility = parsed.data.visibility;
     if (parsed.data.locale !== undefined) patch.locale = parsed.data.locale;
+    if (parsed.data.bacs_articles !== undefined) patch.bacsArticles = parsed.data.bacs_articles;
     patch.dirty = 1;
+
+    // Sync biblio -> FAQ (mig 138) : si cet article est lié à une fonctionnalité
+    // source ET que l'utilisateur édite du contenu (title/description/content_html),
+    // on marque source_overridden=1 pour que les prochaines regénérations exigent
+    // un force=true (préservation des éditions manuelles).
+    const isContentEdit = parsed.data.title !== undefined
+                        || parsed.data.description !== undefined
+                        || parsed.data.content_html !== undefined;
+    if (isContentEdit && article.source_section_template_id && !article.source_overridden) {
+      patch.sourceOverridden = 1;
+    }
+
     const updated = db.faqArticles.update(id, patch, request.authUser?.id || null);
     // Recalcul SEO si le contenu ou le titre a changé
     if (parsed.data.title !== undefined || parsed.data.content_html !== undefined) {
