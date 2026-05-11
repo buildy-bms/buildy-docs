@@ -12,6 +12,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import FaqRichTextEditor from '@/components/FaqRichTextEditor.vue'
 import FaqArticleHistoryModal from '@/components/FaqArticleHistoryModal.vue'
+import FaqRewriteArticleModal from '@/components/FaqRewriteArticleModal.vue'
 import { pullFaqArticleFromCrisp, faqAiRewriteTitle, faqAiRewriteDescription } from '@/api'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
@@ -93,24 +94,33 @@ async function loadSeoScore() {
 // ── Historique des versions ──
 const historyModalOpen = ref(false)
 
-// ── Réécriture IA (article entier) ──
+// ── Réécriture IA (article entier) — passe par la modale FaqRewriteArticleModal ──
+// Pour ouvrir : depuis la top-bar OU depuis la toolbar de FaqRichTextEditor
+// (qui émet @request-rewrite-full). La modale accepte des instructions
+// custom optionnelles (anti-hallucination, angle éditorial, etc.).
 const aiRewriting = ref(false)
-async function rewriteWithAI() {
-  if (!await confirm({
-    title: 'Réécrire l\'article avec l\'IA ?',
-    message: 'L\'article actuel sera remplacé par une version réécrite par Claude. Un snapshot est créé avant pour pouvoir revenir en arrière.',
-    confirmText: 'Réécrire',
-  })) return
+const rewriteModalOpen = ref(false)
+
+function openRewriteModal() {
+  rewriteModalOpen.value = true
+}
+async function rewriteWithAI(instructions = null) {
   aiRewriting.value = true
   try {
-    const data = await store.aiRewrite(parseInt(props.id, 10))
+    const data = await store.aiRewrite({
+      articleId: parseInt(props.id, 10),
+      instructions: instructions || null,
+    })
     if (data.html) draft.value.content_html = data.html
     if (data.suggested_title) suggestedTitle.value = data.suggested_title
     // L'appel IA a bumpé updated_at server-side (lastAiAssistAt). Sans ce
     // rafraichissement, le prochain save renverrait l'ancien expected_updated_at
     // et déclencherait un faux "Conflit de version".
     if (data.updated_at && original.value) original.value.updated_at = data.updated_at
-    success('Article réécrit par l\'IA. Vérifie et enregistre si ça te convient.')
+    rewriteModalOpen.value = false
+    success(instructions
+      ? 'Article réécrit avec tes instructions. Vérifie et enregistre.'
+      : 'Article réécrit par l\'IA. Vérifie et enregistre si ça te convient.')
   } catch (e) {
     notifyError(e.response?.data?.detail || 'Échec de la réécriture IA')
   } finally {
@@ -467,9 +477,9 @@ function back() {
             <ArrowTopRightOnSquareIcon class="w-4 h-4 shrink-0" />
             Voir en ligne
           </a>
-          <button @click="rewriteWithAI" :disabled="aiRewriting || !draft.content_html"
+          <button @click="openRewriteModal" :disabled="aiRewriting || !draft.content_html"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition whitespace-nowrap disabled:opacity-50"
-                  title="Réécrire l'article entier avec l'IA (snapshot avant)">
+                  title="Réécrire l'article entier avec l'IA (instructions optionnelles, snapshot avant)">
             <SparklesIcon class="w-4 h-4 shrink-0" />
             {{ aiRewriting ? 'Réécriture…' : 'Réécrire avec IA' }}
           </button>
@@ -625,9 +635,11 @@ function back() {
           <label class="block text-sm font-medium text-gray-700 mb-1">Contenu</label>
           <FaqRichTextEditor v-model="draft.content_html"
                              :article-id="parseInt(props.id, 10)"
+                             :rewriting="aiRewriting"
                              placeholder="Rédigez l'article…" min-height="320px"
                              @suggested-title="onSuggestedTitle"
-                             @rewritten="onRewritten" />
+                             @rewritten="onRewritten"
+                             @request-rewrite-full="openRewriteModal" />
         </div>
 
         <div v-if="original" class="text-xs text-gray-400 pt-3 border-t border-gray-100 flex items-center gap-4 flex-wrap">
@@ -644,5 +656,12 @@ function back() {
                             :article-id="parseInt(props.id, 10)"
                             @close="historyModalOpen = false"
                             @restored="onVersionRestored" />
+
+    <!-- Modale réécriture article complet avec instructions custom -->
+    <FaqRewriteArticleModal v-if="rewriteModalOpen"
+                            :article-title="draft.title"
+                            :loading="aiRewriting"
+                            @close="rewriteModalOpen = false"
+                            @submit="rewriteWithAI" />
   </div>
 </template>

@@ -522,10 +522,15 @@ async function routes(fastify) {
     const article = db.faqArticles.getById(articleId);
     if (!article) return reply.code(404).send({ detail: 'Article introuvable' });
     const cat = article.category_id ? db.faqCategories.getById(article.category_id) : null;
+    const instructions = (request.body?.instructions || '').toString().trim();
+    if (instructions.length > 4000) {
+      return reply.code(400).send({ detail: 'Instructions trop longues (max 4000 caractères)' });
+    }
     snapshotBeforeAi(articleId, 'before_ai_rewrite', request.authUser?.id || null);
     try {
       const result = await assistFaqRewrite({
         article: { ...article, category_name: cat?.name || null },
+        instructions: instructions || null,
       });
       // Bumpe updated_at + lastAiAssistAt. Comme le front utilise un
       // optimistic-lock sur updated_at au save, on retourne la nouvelle valeur

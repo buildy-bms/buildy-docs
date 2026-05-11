@@ -136,8 +136,13 @@ export const useFaqStore = defineStore('faq', () => {
   }
 
   // ── IA ──
-  async function aiRewrite(articleId) {
-    const { data } = await faqAiRewrite(articleId)
+  // aiRewrite(123)                                     — réécriture standard (legacy)
+  // aiRewrite({ articleId: 123, instructions: '...' }) — avec instructions custom
+  async function aiRewrite(payload) {
+    const body = (payload && typeof payload === 'object')
+      ? { article_id: payload.articleId || payload.article_id, instructions: payload.instructions || null }
+      : { article_id: payload }
+    const { data } = await faqAiRewrite(body)
     return data
   }
   // Accepte 2 formes :
