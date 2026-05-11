@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.21",
+      "date": "2026-05-11",
+      "title": "Correctif : onglet Site et statut Docs de la PWA audit",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "L'onglet « Site » et les boutons de statut « À collecter / Collecté / Non dispo. » ne s'affichent plus en blanc",
+          "what": "Suite à la refonte 0.1.20 (migration globale des icônes vers FontAwesome), l'onglet Site et les boutons de statut de la check-list Docs faisaient référence en interne à d'anciennes icônes qui n'existaient plus côté code — la page devenait blanche au chargement. Corrigé.",
+          "where": "PWA audit BACS / GTB → onglet « Site » (page d'identification du projet) et onglet « Docs » (boutons de statut sur chaque item de la check-list documentaire).",
+          "how_to_test": "Ouvrir un audit, taper « Site » : la page doit s'afficher avec le bandeau « Applicabilité R175-2 » coloré, l'identification du projet, et les toggles « Travaux générateur » / « Réseau urbain ». Onglet « Docs » : sur n'importe quel item, les 3 boutons de statut doivent apparaître avec leur icône respective."
+        }
+      ]
+    },
+    {
       "version": "0.1.20",
       "date": "2026-05-11",
       "title": "Navigation PWA audit : barre indicatrice glissante, badges chiffrés, transitions fluides",
