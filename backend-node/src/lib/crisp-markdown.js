@@ -408,6 +408,18 @@ function htmlToCrispMarkdown(html) {
   // Paragraphes
   s = s.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, c) => `\n${_htmlInline(c).trim()}\n`);
 
+  // Images block-level (Tiptap rend l'extension Image en `inline: false`,
+  // donc les `<img>` ne sont PAS dans un `<p>` et ne passent jamais par
+  // _htmlInline — il faut les convertir explicitement avant le strip général.
+  s = s.replace(/<img\s+[^>]*>/gi, (m) => {
+    if (/\bdata-placeholder="true"/i.test(m)) return '';
+    if (/\bsrc="placeholder:/i.test(m)) return '';
+    const src = (m.match(/\bsrc="([^"]+)"/i) || [])[1] || '';
+    const alt = (m.match(/\balt="([^"]*)"/i) || [])[1] || '';
+    const w = (m.match(/\bwidth="(\d+)"/i) || [])[1];
+    return src ? `\n![${alt}](${src}${w ? ` =${w}xauto` : ''})\n` : '';
+  });
+
   // Strip toutes balises résiduelles
   s = s.replace(/<\/?[a-z][^>]*>/gi, '');
 

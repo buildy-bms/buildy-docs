@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.33",
+      "date": "2026-05-11",
+      "title": "Correctif : images d'article disparues à la publication Crisp",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les images d'article ne sont plus perdues au push vers Crisp",
+          "what": "L'extension Image de Tiptap rend les images en block-level (hors `<p>`). Le converter HTML→Markdown ne traitait les images QUE quand elles étaient à l'intérieur d'un paragraphe ; les autres étaient dégagées par le strip général en fin de chaîne. Conséquence : depuis la 0.1.32 qui a introduit le réglage de taille, toute republication d'un article supprimait les images côté Crisp. Le converter gère maintenant les images block-level explicitement (avec ou sans width).",
+          "where": "FAQ Buildy → éditeur d'un article → « Publier vers Crisp ». Aucune action utilisateur requise — fix transparent.",
+          "how_to_test": "Ouvre l'article incriminé (cf. article 39 « Supervision GTB sur app mobile ») → republier vers Crisp → ouvrir help.buildy.fr → l'image est de retour avec la taille que tu avais choisie."
+        }
+      ]
+    },
+    {
       "version": "0.1.32",
       "date": "2026-05-11",
       "title": "FAQ Buildy : régler la taille des images d'article",
