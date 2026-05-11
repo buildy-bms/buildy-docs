@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.36",
+      "date": "2026-05-11",
+      "title": "Prompts IA FAQ : forme question par défaut + chasse aux contradictions",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les titres FAQ sont maintenant des questions par défaut",
+          "what": "Bug logique : tous les prompts FAQ disaient « forme question si naturelle, sinon nominale ». Pour une FAQ (Frequently Asked Questions), c'est l'inverse : forme QUESTION par défaut, nominale seulement pour des textes de référence (CGV, décret BACS officiel...). Cette règle est désormais explicite dans les 7 prompts IA FAQ touchés.",
+          "where": "Tous les boutons IA de la FAQ : baguette titre, baguette description, « Réécrire avec IA » (article complet et passage), « Générer depuis une question », « Générer depuis fonctionnalité ».",
+          "how_to_test": "Reclique la baguette titre sur un article : tu dois obtenir une question (Comment / Faut-il / À quoi sert / Quels sont / Pourquoi)."
+        },
+        {
+          "kind": "fix",
+          "title": "« Supervision GTB » n'est plus collé de force dans tous les titres",
+          "what": "Chaque prompt avait 2-3 sections « TITRE » avec une règle legacy « commence par le mot-clé principal » qui forçait l'IA à mettre un mot-clé en tête. « Supervision GTB » était listé en NIVEAU 1 des mots-clés prioritaires à pied d'égalité avec « audit BACS » / « logiciel GTB » → biais énorme. Cleanup : suppression des blocs « TITRE (SEO) » legacy (3 prompts DB + 3 défauts code) ; « supervision GTB » sorti du NIVEAU 1 avec note explicite « uniquement quand l'article parle vraiment de pilotage temps réel » ; règle dédiée « adapter le mot-clé au sujet réel » présente dans tous les prompts.",
+          "where": "Idem ci-dessus.",
+          "how_to_test": "Sur un article qui ne parle PAS de pilotage temps réel (ex. Buildy Connect / API / intégration), reclique la baguette : « supervision GTB » ne doit plus apparaître."
+        }
+      ]
+    },
+    {
       "version": "0.1.35",
       "date": "2026-05-11",
       "title": "Titres FAQ : mot-clé adapté au sujet + forme question quand naturel",
