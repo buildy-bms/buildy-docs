@@ -15,11 +15,12 @@ const { error, success } = useNotification()
 
 const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_audit')
 
+// Icones FA en kebab-case (passees a FontAwesomeIcon via :icon="['fas', ...]")
 const APPLICABILITY_LABEL = {
-  subject_immediate: { label: 'Soumis immédiatement', icon: ExclamationTriangleIcon, cls: 'bg-red-50 text-red-800 border-red-200' },
-  subject_2025: { label: 'Soumis — échéance 1er janvier 2025', icon: ExclamationTriangleIcon, cls: 'bg-orange-50 text-orange-800 border-orange-200' },
-  subject_2027: { label: 'Soumis — échéance 1er janvier 2027', icon: ExclamationTriangleIcon, cls: 'bg-amber-50 text-amber-800 border-amber-200' },
-  not_subject: { label: 'Non assujetti (puissance < 70 kW)', icon: CheckCircleIcon, cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  subject_immediate: { label: 'Soumis immédiatement',            icon: 'triangle-exclamation', cls: 'bg-red-50 text-red-800 border-red-200' },
+  subject_2025:      { label: 'Soumis — échéance 1er janvier 2025', icon: 'triangle-exclamation', cls: 'bg-orange-50 text-orange-800 border-orange-200' },
+  subject_2027:      { label: 'Soumis — échéance 1er janvier 2027', icon: 'triangle-exclamation', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  not_subject:       { label: 'Non assujetti (puissance < 70 kW)',  icon: 'circle-check',         cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
 }
 
 let saveTimer = null
@@ -101,7 +102,10 @@ const generatorWorksDone = computed({
     <!-- Hero : applicabilité R175-2 -->
     <div v-if="isBacs && document?.bacs_applicability_status"
          :class="['rounded-2xl border p-4 flex items-start gap-3', APPLICABILITY_LABEL[document.bacs_applicability_status]?.cls]">
-      <component :is="APPLICABILITY_LABEL[document.bacs_applicability_status]?.icon || ExclamationTriangleIcon" class="w-7 h-7 shrink-0 mt-0.5" />
+      <FontAwesomeIcon
+        :icon="['fas', APPLICABILITY_LABEL[document.bacs_applicability_status]?.icon || 'triangle-exclamation']"
+        class="w-7 h-7 shrink-0 mt-0.5"
+      />
       <div class="flex-1 min-w-0">
         <p class="text-[11px] uppercase tracking-wider opacity-75 font-medium">Applicabilité R175-2</p>
         <p class="text-base font-medium leading-tight mt-0.5">

@@ -466,15 +466,15 @@ async function quickToggleNotAvailable(it) {
         <!-- Statut -->
         <div class="grid grid-cols-3 gap-2">
           <button v-for="opt in [
-            { v: 'pending',       label: 'À collecter',  icon: ExclamationCircleIcon },
-            { v: 'available',     label: 'Collecté',     icon: CheckIcon },
-            { v: 'not_available', label: 'Non dispo.',   icon: NoSymbolIcon },
+            { v: 'pending',       label: 'À collecter',  icon: 'circle-exclamation' },
+            { v: 'available',     label: 'Collecté',     icon: 'check' },
+            { v: 'not_available', label: 'Non dispo.',   icon: 'ban' },
           ]" :key="opt.v" type="button" @click="editingStatus = opt.v"
             :class="['flex flex-col items-center gap-1 px-2 py-3 text-xs font-medium rounded-xl border-2',
                      editingStatus === opt.v
                        ? 'border-indigo-500 bg-indigo-50 text-indigo-800'
                        : 'border-gray-200 bg-white text-gray-600']">
-            <component :is="opt.icon" class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', opt.icon]" class="w-5 h-5" />
             {{ opt.label }}
           </button>
         </div>
