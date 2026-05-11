@@ -16,7 +16,7 @@
  * « Add to Home Screen » en mode standalone propre.
  */
 
-const CACHE_VERSION = 'buildy-docs-v4';
+const CACHE_VERSION = 'buildy-docs-v5';
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 const APP_SHELL_CACHE = `${CACHE_VERSION}-app-shell`;
 const APP_SHELL_URL = '/index.html';

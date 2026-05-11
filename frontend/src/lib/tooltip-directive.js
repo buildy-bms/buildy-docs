@@ -138,16 +138,6 @@ function getOpts(binding) {
   return binding.value
 }
 
-function onEnter(e) {
-  // Capture synchrone : e.currentTarget est nullé après le retour du handler
-  // (spec DOM), donc on ne peut PAS y accéder depuis le setTimeout.
-  const target = e.currentTarget
-  const opts = target.__tooltipOpts
-  if (!opts) return
-  clearTimeout(showTimer)
-  showTimer = setTimeout(() => show(target, opts), SHOW_DELAY)
-}
-
 function onLeave() {
   hide()
 }
@@ -155,9 +145,18 @@ function onLeave() {
 export const tooltipDirective = {
   mounted(el, binding) {
     el.__tooltipOpts = getOpts(binding)
-    el.addEventListener('mouseenter', onEnter)
+    // Closure : on capture `el` ici plutôt que de lire `e.currentTarget`
+    // dans le handler (qui peut être nullé selon le timing du setTimeout).
+    const enter = () => {
+      const opts = el.__tooltipOpts
+      if (!opts) return
+      clearTimeout(showTimer)
+      showTimer = setTimeout(() => show(el, opts), SHOW_DELAY)
+    }
+    el.__tooltipEnter = enter
+    el.addEventListener('mouseenter', enter)
     el.addEventListener('mouseleave', onLeave)
-    el.addEventListener('focus', onEnter)
+    el.addEventListener('focus', enter)
     el.addEventListener('blur', onLeave)
   },
   updated(el, binding) {
@@ -172,12 +171,16 @@ export const tooltipDirective = {
     }
   },
   beforeUnmount(el) {
-    el.removeEventListener('mouseenter', onEnter)
+    const enter = el.__tooltipEnter
+    if (enter) {
+      el.removeEventListener('mouseenter', enter)
+      el.removeEventListener('focus', enter)
+    }
     el.removeEventListener('mouseleave', onLeave)
-    el.removeEventListener('focus', onEnter)
     el.removeEventListener('blur', onLeave)
     if (currentTarget === el) hide()
     delete el.__tooltipOpts
+    delete el.__tooltipEnter
   },
 }
 
@@ -191,35 +194,36 @@ export const tooltipDirective = {
 //
 // La directive ne fait rien si le contenu tient ; sinon elle injecte
 // dynamiquement le textContent dans __tooltipOpts au moment du hover.
-function onTruncateEnter(e) {
-  const target = e.currentTarget
-  const isTruncated = target.scrollWidth > target.clientWidth + 1
-                   || target.scrollHeight > target.clientHeight + 1
-  if (!isTruncated) return
-  const text = (target.textContent || '').trim()
-  if (!text) return
-  const placement = target.__truncateTooltipPlacement || 'top'
-  clearTimeout(showTimer)
-  showTimer = setTimeout(() => show(target, { text, placement }), SHOW_DELAY)
-}
-
 export const truncateTooltipDirective = {
   mounted(el, binding) {
     el.__truncateTooltipPlacement = binding.value?.placement || 'top'
-    el.addEventListener('mouseenter', onTruncateEnter)
+    const enter = () => {
+      if (!(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) return
+      const text = (el.textContent || '').trim()
+      if (!text) return
+      const placement = el.__truncateTooltipPlacement || 'top'
+      clearTimeout(showTimer)
+      showTimer = setTimeout(() => show(el, { text, placement }), SHOW_DELAY)
+    }
+    el.__truncateTooltipEnter = enter
+    el.addEventListener('mouseenter', enter)
     el.addEventListener('mouseleave', onLeave)
-    el.addEventListener('focus', onTruncateEnter)
+    el.addEventListener('focus', enter)
     el.addEventListener('blur', onLeave)
   },
   updated(el, binding) {
     el.__truncateTooltipPlacement = binding.value?.placement || 'top'
   },
   beforeUnmount(el) {
-    el.removeEventListener('mouseenter', onTruncateEnter)
+    const enter = el.__truncateTooltipEnter
+    if (enter) {
+      el.removeEventListener('mouseenter', enter)
+      el.removeEventListener('focus', enter)
+    }
     el.removeEventListener('mouseleave', onLeave)
-    el.removeEventListener('focus', onTruncateEnter)
     el.removeEventListener('blur', onLeave)
     if (currentTarget === el) hide()
     delete el.__truncateTooltipPlacement
+    delete el.__truncateTooltipEnter
   },
 }
