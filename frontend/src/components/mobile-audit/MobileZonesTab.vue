@@ -15,32 +15,18 @@ import { useConfirm } from '@/composables/useConfirm'
 import { createZone, updateZone, deleteZone, listZones, resyncBacsAudit } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
+import MobileSelectSheet from './MobileSelectSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import { ZONE_NATURES as ZONE_NATURES_DECORATED } from '@/lib/audit-options'
 
 const audit = useAuditStore()
 const { document, zones } = storeToRefs(audit)
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
 
-const ZONE_NATURES = [
-  { value: 'shared-office', label: 'Bureau partagé' },
-  { value: 'private-office', label: 'Bureau privé' },
-  { value: 'open-space', label: 'Open-space' },
-  { value: 'commercial-space', label: 'Espace commercial' },
-  { value: 'meeting-room', label: 'Salle de réunion' },
-  { value: 'workshop', label: 'Atelier' },
-  { value: 'switchboard', label: 'Tableau électrique' },
-  { value: 'technical-area', label: 'Local technique' },
-  { value: 'classroom', label: 'Salle de classe' },
-  { value: 'leasure-space', label: 'Espace loisirs' },
-  { value: 'foyer', label: 'Foyer' },
-  { value: 'corridor', label: 'Couloir' },
-  { value: 'outdoor', label: 'Extérieur' },
-  { value: 'meters', label: 'Local compteurs' },
-  { value: 'shared-space', label: 'Espace partagé' },
-  { value: 'logistic-cell', label: 'Cellule logistique' },
-  { value: 'stock', label: 'Stock' },
-]
+// Décorées (icon + color) depuis lib/audit-options pour rendu visuel
+// dans MobileSelectSheet. Liste partagée avec backend (bacs-requirements).
+const ZONE_NATURES = ZONE_NATURES_DECORATED
 function natureLabel(v) { return ZONE_NATURES.find(n => n.value === v)?.label || '—' }
 
 // Sheet state
@@ -210,18 +196,17 @@ const totalSurface = computed(() =>
             type="text"
             placeholder="ex : Bureaux R+1"
             autocapitalize="sentences"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+            class="touch-control w-full"
           />
         </MobileField>
 
         <MobileField label="Nature de la zone" hint="Type d'usage (R175-1 6°). Une zone fonctionnelle = un local ou regroupement de locaux ayant le même type d'utilisation.">
-          <select
+          <MobileSelectSheet
             v-model="editForm.nature"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
-          >
-            <option :value="null">— Sélectionner —</option>
-            <option v-for="opt in ZONE_NATURES" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+            :options="ZONE_NATURES"
+            title="Nature de la zone"
+            placeholder="— Sélectionner —"
+          />
         </MobileField>
 
         <MobileField label="Surface (m²)" hint="Surface au sol approximative de la zone.">
@@ -233,7 +218,7 @@ const totalSurface = computed(() =>
             min="0"
             step="1"
             placeholder="—"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white text-right font-medium"
+            class="touch-control w-full text-right font-medium"
           />
         </MobileField>
 

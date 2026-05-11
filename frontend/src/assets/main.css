@@ -113,6 +113,35 @@
   .font-bold { font-weight: 500 !important; }
   .font-extrabold { font-weight: 500 !important; }
   .font-black { font-weight: 500 !important; }
+
+  /**
+   * Cible tactile uniformisée PWA audit : 44pt min, padding généreux,
+   * style aligné sur la mémoire feedback_form_style_modern (rounded-lg,
+   * border gray-200, focus ring/30). À appliquer sur les inputs et
+   * boutons de la PWA pour éviter de répéter la combinaison
+   * `min-h-11 px-4 py-2.5 text-base bg-white border border-gray-200
+   * rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30
+   * focus:border-indigo-500`. Desktop garde son propre style compact.
+   */
+  .touch-control {
+    min-height: 44px;
+    padding: 0.625rem 1rem;
+    font-size: 1rem;
+    line-height: 1.25rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    transition: border-color 120ms, box-shadow 120ms;
+  }
+  .touch-control:focus,
+  .touch-control:focus-visible {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px color-mix(in oklch, #6366f1 30%, transparent);
+  }
+  .touch-control::placeholder {
+    color: #9ca3af;
+  }
 }
 strong, b { font-weight: 500; }
 

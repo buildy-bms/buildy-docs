@@ -11,10 +11,10 @@
  * - Cartes cliquables plein-largeur pour les toggles (zone tap >= 44pt) ;
  *   la checkbox visuelle reste à droite mais c'est tout le bloc qui est
  *   un button.
- * - Toutes les listes déroulantes utilisent `<MobileNativeSelect>` =
- *   `<select>` natif (picker système iOS). Les listes creatable (type
- *   production, régulations P/D/E) ajoutent une option « ✏️ Autre —
- *   saisir » qui révèle un input texte sous le select.
+ * - Toutes les listes déroulantes utilisent `<MobileSelectSheet>` =
+ *   bottom sheet iOS-natif custom avec icônes/pilules colorées et
+ *   recherche auto. Les listes creatable (type production) ajoutent
+ *   un item terminal « + Saisir une autre valeur… ».
  * - Inputs numériques : inputmode="numeric" pattern="[0-9]*".
  * - Auto-save 400 ms (identique au comportement précédent), donc le sheet
  *   n'a pas de bouton « Enregistrer » dans son header (hide-save).
@@ -27,7 +27,7 @@ import { useNotification } from '@/composables/useNotification'
 import { updateBacsThermal } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
-import MobileNativeSelect from './MobileNativeSelect.vue'
+import MobileSelectSheet from './MobileSelectSheet.vue'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
 
 const LEVEL_NOTES_FIELD = {
@@ -113,12 +113,19 @@ const regulationDeviceOptions = computed(() =>
 )
 
 const GENERATOR_OPTIONS = [
-  { value: 'gas', label: 'Gaz' },
-  { value: 'electric', label: 'Effet Joule' },
-  { value: 'heat_pump', label: 'Pompe à chaleur' },
-  { value: 'wood_appliance', label: 'Appareil bois (exempté R175-6)' },
-  { value: 'district_heating', label: 'Réseau de chaleur' },
-  { value: 'other', label: 'Autre' },
+  { value: 'gas',              label: 'Gaz',                              icon: 'fa-fire-flame-curved', color: '#f97316' },
+  { value: 'electric',         label: 'Effet Joule',                      icon: 'fa-bolt',              color: '#eab308' },
+  { value: 'heat_pump',        label: 'Pompe à chaleur',                  icon: 'fa-temperature-half',  color: '#0ea5e9' },
+  { value: 'wood_appliance',   label: 'Appareil bois (exempté R175-6)',   icon: 'fa-tree',              color: '#65a30d' },
+  { value: 'district_heating', label: 'Réseau de chaleur',                icon: 'fa-pipe',              color: '#dc2626' },
+  { value: 'other',            label: 'Autre',                            icon: 'fa-circle-question',   color: '#6b7280' },
+]
+// Granularité de régulation : pilules colorées selon niveau de finesse.
+const REGULATION_TYPE_OPTIONS = [
+  { value: 'per_room',     label: 'Par pièce',           pill: 'Fin',         pillTone: 'emerald' },
+  { value: 'per_zone',     label: 'Par zone',            pill: 'Zone',        pillTone: 'amber'   },
+  { value: 'central_only', label: 'Centrale uniquement', pill: 'Centrale',    pillTone: 'rose'    },
+  { value: 'none',         label: 'Aucune',              pill: 'Aucune',      pillTone: 'slate'   },
 ]
 
 let saveTimer = null
@@ -220,20 +227,16 @@ async function saveLevelNote() {
       </button>
 
       <template v-if="thermalRow.has_automatic_regulation">
-        <!-- Granularité : select natif iOS (4 options fixes) -->
+        <!-- Granularité de la régulation -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2">
           <MobileField label="Granularité de la régulation">
-            <select
-              :value="thermalRow.regulation_type || ''"
-              @change="e => patch({ regulation_type: e.target.value || null })"
-              class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
-            >
-              <option value="">— Sélectionner —</option>
-              <option value="per_room">Par pièce</option>
-              <option value="per_zone">Par zone</option>
-              <option value="central_only">Centrale uniquement</option>
-              <option value="none">Aucune</option>
-            </select>
+            <MobileSelectSheet
+              :model-value="thermalRow.regulation_type"
+              @update:modelValue="v => patch({ regulation_type: v || null })"
+              :options="REGULATION_TYPE_OPTIONS"
+              title="Granularité"
+              placeholder="— Sélectionner —"
+            />
           </MobileField>
         </div>
 
@@ -241,21 +244,23 @@ async function saveLevelNote() {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">🔧 Production</p>
           <MobileField label="Équipement de production">
-            <MobileNativeSelect
+            <MobileSelectSheet
               :model-value="thermalRow.generator_device_id"
               @update:modelValue="v => patch({ generator_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="productionDeviceOptions"
+              title="Équipement de production"
               placeholder="— aucun équipement"
             />
           </MobileField>
           <div class="space-y-3 pl-4 border-l-4 border-amber-300">
             <template v-if="thermalRow.generator_device_id">
               <MobileField label="Type de production">
-                <MobileNativeSelect
+                <MobileSelectSheet
                   :model-value="thermalRow.generator_type"
                   @update:modelValue="v => patch({ generator_type: v || null })"
                   :options="GENERATOR_OPTIONS"
                   creatable
+                  title="Type de production"
                   placeholder="— Sélectionner —"
                   custom-placeholder="ex : chaudière condensation, PAC air-eau…"
                 />
@@ -266,15 +271,16 @@ async function saveLevelNote() {
                   :value="thermalRow.generator_age_years ?? ''"
                   @blur="e => patch({ generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
                   placeholder="ex : 8"
-                  class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                  class="touch-control w-full"
                 />
               </MobileField>
             </template>
             <MobileField label="Équipement de régulation (sonde, thermostat, GTB)">
-              <MobileNativeSelect
+              <MobileSelectSheet
                 :model-value="thermalRow.production_regulation_device_id"
                 @update:modelValue="v => patch({ production_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
                 :options="regulationDeviceOptions"
+                title="Équipement de régulation"
                 placeholder="— aucun"
               />
             </MobileField>
@@ -296,19 +302,21 @@ async function saveLevelNote() {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">🚰 Distribution</p>
           <MobileField label="Équipement de distribution">
-            <MobileNativeSelect
+            <MobileSelectSheet
               :model-value="thermalRow.distribution_device_id"
               @update:modelValue="v => patch({ distribution_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="distributionDeviceOptions"
+              title="Équipement de distribution"
               placeholder="— aucune (DRV, poêle…)"
             />
           </MobileField>
           <div class="space-y-3 pl-4 border-l-4 border-amber-300">
             <MobileField label="Équipement de régulation">
-              <MobileNativeSelect
+              <MobileSelectSheet
                 :model-value="thermalRow.distribution_regulation_device_id"
                 @update:modelValue="v => patch({ distribution_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
                 :options="regulationDeviceOptions"
+                title="Équipement de régulation"
                 placeholder="— aucun"
               />
             </MobileField>
@@ -330,19 +338,21 @@ async function saveLevelNote() {
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-3">
           <p class="text-sm font-semibold text-gray-700">♨️ Émission</p>
           <MobileField label="Équipement d'émission">
-            <MobileNativeSelect
+            <MobileSelectSheet
               :model-value="thermalRow.emission_device_id"
               @update:modelValue="v => patch({ emission_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
               :options="emissionDeviceOptions"
+              title="Équipement d'émission"
               placeholder="— aucun"
             />
           </MobileField>
           <div class="space-y-3 pl-4 border-l-4 border-amber-300">
             <MobileField label="Équipement de régulation">
-              <MobileNativeSelect
+              <MobileSelectSheet
                 :model-value="thermalRow.emission_regulation_device_id"
                 @update:modelValue="v => patch({ emission_regulation_device_id: v != null && v !== '' ? parseInt(v, 10) : null })"
                 :options="regulationDeviceOptions"
+                title="Équipement de régulation"
                 placeholder="— aucun"
               />
             </MobileField>
