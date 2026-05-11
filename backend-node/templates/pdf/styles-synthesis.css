@@ -322,6 +322,12 @@ table.zones-matrix th.zones-cat .zones-cat-icon {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  /* Pastille ronde colorée : fond = icon_color avec ~10% opacité (hex+1a),
+     icone SVG dessus pleine couleur. Donne une visibilité forte sur le fond
+     navy header sans saturer. */
+  width: 5mm; height: 5mm;
+  border-radius: 50%;
+  padding: 0;
 }
 table.zones-matrix th.zones-cat .zones-cat-icon svg {
   /* En writing-mode vertical, on derote l'icone pour qu'elle reste
@@ -331,10 +337,10 @@ table.zones-matrix th.zones-cat .zones-cat-icon svg {
 table.zones-matrix th.zones-cat .zones-cat-label { white-space: nowrap; }
 table.zones-matrix th.zones-cat .bacs-col-marker {
   display: inline-block; font-size: 8pt; font-weight: 700;
-  color: #00cd92; letter-spacing: 0.02em; white-space: nowrap;
+  color: #6ee7b7; letter-spacing: 0.02em; white-space: nowrap;
 }
 table.zones-matrix th.zones-total {
-  width: 16mm; background: #00cd92; color: #1b2842;
+  width: 16mm; background: #d1fae5; color: #047857;
   vertical-align: middle;
 }
 
@@ -347,7 +353,9 @@ table.zones-matrix td.zones-name {
 }
 table.zones-matrix td.zones-name .muted { color: #9ca3af; font-size: 7.5pt; font-weight: 400; }
 table.zones-matrix td.zones-cell { font-size: 9.5pt; color: #1b2842; }
-table.zones-matrix td.zones-cell strong { color: #00cd92; font-weight: 700; }
+/* Valeurs non-nulles : vert emerald-700 sobre (plus pâle que #00cd92 saturé),
+   meme palette que les pilules Optionnel / Booléen ailleurs dans le PDF. */
+table.zones-matrix td.zones-cell strong { color: #047857; font-weight: 700; }
 table.zones-matrix td.zones-total {
   background: #f8fafc; font-weight: 700; color: #1b2842; font-size: 9.5pt;
 }
@@ -357,7 +365,8 @@ table.zones-matrix tfoot td {
   background: #1b2842; color: white; font-weight: 700; padding: 2.5mm 1.5mm; font-size: 9pt;
 }
 table.zones-matrix tfoot td.zones-name { background: #1b2842; color: white; }
-table.zones-matrix tfoot td.zones-total { background: #00cd92; color: #1b2842; }
+/* Total grand format : pastel emerald (au lieu du green saturé #00cd92). */
+table.zones-matrix tfoot td.zones-total { background: #d1fae5; color: #047857; }
 
 .legal-note {
   margin-top: 4mm; padding: 3mm 4mm; background: #f9fafb;
