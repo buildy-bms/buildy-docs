@@ -18,17 +18,27 @@ const store = useFaqStore()
 const { success, error: notifyError, info } = useNotification()
 const { confirm } = useConfirm()
 
+// ── Persistance des filtres en localStorage ──
+// Les filtres, la recherche, la catégorie sélectionnée et le tri du tableau
+// sont sauvegardés pour ne pas se perdre au refresh / retour sur la page.
+const FILTERS_STORAGE_KEY = 'buildy-faq-list-filters-v1'
+function loadStoredFilters() {
+  try { return JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY) || '{}') || {} }
+  catch { return {} }
+}
+const _stored = loadStoredFilters()
+
 const settingsOpen = ref(false)
-const searchQuery = ref('')
-const statusFilter = ref('')
+const searchQuery = ref(_stored.searchQuery || '')
+const statusFilter = ref(_stored.statusFilter || '')
 // Filtre par niveau de score SEO. Permet de filtrer rapidement les articles
 // à retravailler (< 60) ou les bons exemples (>= 80) sans regarder chaque ligne.
-const seoFilter = ref('') // '' | 'low' (<60) | 'mid' (60-79) | 'high' (>=80) | 'none' (jamais score)
+const seoFilter = ref(_stored.seoFilter || '') // '' | 'low' (<60) | 'mid' (60-79) | 'high' (>=80) | 'none' (jamais score)
 // Sync biblio -> FAQ (Lot 138) : filtre rapide pour ne voir que les articles
 // générés depuis la bibliothèque de fonctionnalités.
-const onlyLibrarySource = ref(false)
+const onlyLibrarySource = ref(!!_stored.onlyLibrarySource)
 // Tri par colonne (Titre / Catégorie / Statut / SEO / Sync) — sticky 3-state.
-const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort('updated_at', 'desc')
+const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort(_stored.sortKey || 'updated_at', _stored.sortDir || 'desc')
 const showSuggestions = ref(false)
 const suggestions = ref([])
 const loadingSuggestions = ref(false)
@@ -132,9 +142,37 @@ function relativeTime(iso) {
 onMounted(async () => {
   await store.loadSettings()
   await store.loadCategories()
-  await store.loadArticles()
+  // Restaure la catégorie sélectionnée après chargement (vérifie qu'elle existe encore).
+  if (_stored.selectedCategoryId) {
+    const exists = store.categories?.some?.((c) => c.id === _stored.selectedCategoryId)
+    if (exists) store.selectedCategoryId = _stored.selectedCategoryId
+  }
+  await store.loadArticles({
+    categoryId: store.selectedCategoryId,
+    status: statusFilter.value || null,
+    q: searchQuery.value || null,
+  })
   if (!credentialsConfigured.value) settingsOpen.value = true
 })
+
+// Persistance auto en localStorage à chaque changement de filtre/tri/catégorie.
+watch(
+  [searchQuery, statusFilter, seoFilter, onlyLibrarySource, sortKey, sortDir, () => store.selectedCategoryId],
+  () => {
+    try {
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+        searchQuery: searchQuery.value,
+        statusFilter: statusFilter.value,
+        seoFilter: seoFilter.value,
+        onlyLibrarySource: onlyLibrarySource.value,
+        sortKey: sortKey.value,
+        sortDir: sortDir.value,
+        selectedCategoryId: store.selectedCategoryId,
+      }))
+    } catch { /* quota plein ou mode privé : on ignore silencieusement */ }
+  },
+  { deep: false },
+)
 
 let watcherDebounce = null
 watch([() => store.selectedCategoryId, statusFilter, searchQuery], () => {

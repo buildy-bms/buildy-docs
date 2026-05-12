@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.39",
+      "date": "2026-05-12",
+      "title": "FAQ Buildy : les filtres et le tri sont mémorisés au refresh",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Plus besoin de tout resaisir après un F5 ou un retour à la page",
+          "what": "La page FAQ Buildy mémorise désormais en local : la recherche, le filtre par statut, le filtre par score SEO, le toggle « Depuis biblio », la catégorie sélectionnée dans la barre de pills, ainsi que la colonne et le sens de tri du tableau. Tu retrouves exactement la vue d'où tu étais parti, même après un refresh ou un aller-retour vers un article.",
+          "where": "Sidebar → FAQ Buildy (/faq).",
+          "how_to_test": "Pose un filtre statut « Publié », tape « décret » dans la recherche, sélectionne la pill « Hyperveez » et trie par score SEO décroissant. Recharge la page (F5) : tu dois retrouver la même vue sans avoir à tout retaper."
+        }
+      ]
+    },
+    {
       "version": "0.1.38",
       "date": "2026-05-11",
       "title": "Fix : description IA ne contient plus le décompte de caractères en fin",
