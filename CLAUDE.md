@@ -27,6 +27,38 @@ pm2 restart buildy-docs          # restart manuel (PM2 watch est actif sur backe
 pm2 stop buildy-docs             # arret backend
 ```
 
+## Git workflow — Release
+
+Convention alignee sur buildy-tools et edge-fleet-manager : tags `vX.Y.Z` avec bump
+du 3e chiffre **a chaque commit** (cf. memory `feedback_buildy_docs_version_bump.md`).
+Les chiffres majeur/mineur ne changent que sur ordre explicite.
+
+1. **Bumper la version dans DEUX fichiers** avant chaque commit :
+   - `frontend/package.json`
+   - `backend-node/package.json`
+   - (BD n'utilise pas de fichier `VERSION` racine, contrairement a BT/FM)
+2. **Ajouter une entree** dans `frontend/src/release-notes.json` (cf. memory
+   `feedback_buildy_docs_release_notes.md`)
+3. Commit avec la version dans le sujet (convention BD) : `feat(scope): ... (0.1.45)`
+4. Push sur `main`
+5. **Apres chaque push, taguer le commit** :
+   ```bash
+   git tag v0.1.45 && git push origin v0.1.45
+   ```
+   Pas de prompt necessaire — c'est un reflexe, le tag est juste une marque de
+   reference pour le rollback / audit / release notes.
+6. **Deploiement prod** systematique apres chaque modif (cf. memory
+   `feedback_buildy_docs_deploy_prod_each_change.md`) via Hosteur :
+   ```bash
+   ssh 39448-1106@gate.rag-control.hosteur.com -p 3022
+   cd /opt/buildy-docs && bash deploy/update-vps.sh
+   ```
+
+**Tentatives multiples** : si un commit/tag `v0.1.45` s'avere defaillant et qu'on
+refait `v0.1.46` sur le meme sujet, **editer l'entree existante** dans
+`release-notes.json` plutot que d'en ajouter une nouvelle. La regle est identique
+a BT/FM (cf. memory `feedback_bt_fm_release_notes.md`).
+
 ## ⚠️ Reflexes obligatoires Claude (incidents 2026-05-08 et 2026-05-09)
 
 ### Au demarrage de chaque session
