@@ -1648,7 +1648,7 @@ async function assistFaqRewrite({ article, instructions = null }) {
   return _withSeoLoop(callClaude);
 }
 
-async function assistFaqGenerate({ question, categoryName = null }) {
+async function assistFaqGenerate({ question, categoryName = null, articleType = 'howto', images = [], annotations = [], includeImagesInContent = false }) {
   if (!question || !question.trim()) throw new Error('Question manquante');
   const corpus = buildBuildyCorpusContext({ mode: 'exhaustive' });
   const fewShot = _buildFewShotBlock();
@@ -1669,27 +1669,73 @@ async function assistFaqGenerate({ question, categoryName = null }) {
     systemBlocks.push({ type: 'text', text: fewShot, cache_control: { type: 'ephemeral' } });
   }
 
+  // Captures Vision : les images fournies sont passées en image blocks à Claude
+  // (multimodal). Limite à 8 images, total cumulé < ~5 MB pour éviter timeouts.
+  const visionBlocks = (Array.isArray(images) ? images : []).slice(0, 8).map((img, idx) => {
+    if (!img?.buffer) return null;
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: img.mediaType || 'image/png',
+        data: img.buffer.toString('base64'),
+      },
+      _idx: idx,
+    };
+  }).filter(Boolean);
+
   const callClaude = async (retryContext) => {
-    const userParts = [
-      `=== QUESTION CLIENT ===`,
+    const userTextParts = [
+      `=== QUESTION UTILISATEUR ===`,
       question.trim(),
       ``,
     ];
-    if (categoryName) userParts.push(`Catégorie cible : ${categoryName}`, '');
+    if (articleType) userTextParts.push(`Type d'article cible : ${articleType}`, '');
+    if (categoryName) userTextParts.push(`Catégorie cible : ${categoryName}`, '');
+
+    if (visionBlocks.length > 0) {
+      userTextParts.push(`=== CAPTURES D'ÉCRAN FOURNIES (${visionBlocks.length}) ===`);
+      userTextParts.push(`Tu trouveras ${visionBlocks.length} capture(s) en pièce jointe. Décris ce qu'elles montrent dans le contexte de l'article. Les annotations textuelles associées :`);
+      for (let i = 0; i < visionBlocks.length; i++) {
+        const ann = (annotations[i] || '').trim();
+        userTextParts.push(`  Capture ${i + 1} : ${ann || '(pas d\'annotation)'}`);
+      }
+      if (includeImagesInContent) {
+        userTextParts.push('');
+        userTextParts.push(`L'utilisateur souhaite que ces captures soient référencées DANS l'article publié. Génère des balises <img data-placeholder="true" alt="..."> aux endroits où chaque capture serait pertinente, en décrivant précisément dans l'alt ce que la capture doit montrer. Ne fabrique pas d'URL réelle, utilise uniquement data-placeholder="true".`);
+      } else {
+        userTextParts.push('');
+        userTextParts.push(`L'utilisateur NE veut PAS que les captures apparaissent dans l'article publié — elles ne servent que de contexte pour comprendre. N'utilise pas <img> dans la sortie.`);
+      }
+      userTextParts.push('');
+    }
 
     if (retryContext?.feedback) {
-      userParts.push(`=== ARTICLE GÉNÉRÉ AU 1ER PASSAGE ===`);
-      userParts.push(retryContext.previousHtml || '');
-      userParts.push('');
-      userParts.push(retryContext.feedback);
+      userTextParts.push(`=== ARTICLE GÉNÉRÉ AU 1ER PASSAGE ===`);
+      userTextParts.push(retryContext.previousHtml || '');
+      userTextParts.push('');
+      userTextParts.push(retryContext.feedback);
     } else {
-      userParts.push(`Rédige l'article FAQ complet (titre + corps HTML).`);
+      userTextParts.push(`Rédige l'article FAQ complet (titre + corps HTML).`);
     }
+
+    // Construction du message user : si Vision, content = [image1, image2, ..., text].
+    // Sinon, content = string simple (plus efficace).
+    let userContent;
+    if (visionBlocks.length > 0) {
+      userContent = [
+        ...visionBlocks.map(({ _idx, ...rest }) => rest),
+        { type: 'text', text: userTextParts.join('\n') },
+      ];
+    } else {
+      userContent = userTextParts.join('\n');
+    }
+
     const resp = await client().messages.create({
       model: config.claudeModel,
       max_tokens: 8192,
       system: systemBlocks,
-      messages: [{ role: 'user', content: userParts.join('\n') }],
+      messages: [{ role: 'user', content: userContent }],
     });
     const raw = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
     const truncated = resp.stop_reason === 'max_tokens';
