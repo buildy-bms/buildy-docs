@@ -25,12 +25,14 @@ import {
   LinkIcon, PhotoIcon, CodeBracketIcon, ChatBubbleBottomCenterTextIcon,
   H1Icon, H2Icon, H3Icon, SparklesIcon, BookOpenIcon,
   LightBulbIcon, InformationCircleIcon, ExclamationTriangleIcon,
+  DocumentPlusIcon,
 } from '@heroicons/vue/24/outline'
 import api from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import LinkInputModal from './LinkInputModal.vue'
 import FaqArticleLinkModal from './FaqArticleLinkModal.vue'
 import FaqRewriteSelectionModal from './FaqRewriteSelectionModal.vue'
+import FaqGenerateModal from './FaqGenerateModal.vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -356,6 +358,25 @@ function rewriteWithAi() {
   emit('request-rewrite-full')
 }
 
+// ── Bouton "Insérer depuis captures" ──────────────────────────────
+// Ouvre la modale FaqGenerateModal en mode 'insert' : drag-drop captures
+// + instruction texte → l'IA génère du HTML qui est inséré à la position
+// du curseur (ou en fin de document si pas de sélection).
+const insertModalOpen = ref(false)
+function openInsertModal() {
+  if (!props.articleId) return
+  insertModalOpen.value = true
+}
+function onInsertGenerated(payload) {
+  const html = payload?.html || ''
+  if (!editor.value || !html) { insertModalOpen.value = false; return }
+  editor.value.chain().focus().insertContent(html).run()
+  emit('update:modelValue', editor.value.getHTML())
+  if (payload.suggested_title) emit('suggested-title', payload.suggested_title)
+  insertModalOpen.value = false
+  success('Contenu inséré dans l\'article')
+}
+
 const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none px-4 py-3')
 </script>
 
@@ -452,7 +473,13 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
              class="hidden" @change="onImageSelected" />
 
       <!-- IA — pousser à droite -->
-      <div v-if="articleId" class="ml-auto">
+      <div v-if="articleId" class="ml-auto inline-flex items-center gap-1.5">
+        <button type="button" @click="openInsertModal"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition whitespace-nowrap"
+                title="Générer du contenu depuis captures d'écran et instructions, et l'insérer ici">
+          <DocumentPlusIcon class="w-3.5 h-3.5 shrink-0" />
+          Insérer depuis captures
+        </button>
         <button type="button" @click="rewriteWithAi" :disabled="aiRunning"
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition whitespace-nowrap disabled:opacity-50">
           <SparklesIcon class="w-3.5 h-3.5 shrink-0" :class="aiRunning ? 'animate-pulse' : ''" />
@@ -515,6 +542,14 @@ const editorClass = computed(() => 'prose prose-sm max-w-none focus:outline-none
                               :selection-html="rewriteSelectionHtml"
                               @close="rewriteSelectionModalOpen = false"
                               @rewritten="applyRewrittenSelection" />
+
+    <!-- Modale « Insérer depuis captures » : génère du HTML depuis captures
+         + instruction texte et l'insère au curseur dans l'éditeur Tiptap. -->
+    <FaqGenerateModal v-if="insertModalOpen"
+                      mode="insert"
+                      :article-id="articleId"
+                      @close="insertModalOpen = false"
+                      @insert="onInsertGenerated" />
   </div>
 </template>
 

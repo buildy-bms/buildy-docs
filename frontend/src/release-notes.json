@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.40",
+      "date": "2026-05-12",
+      "title": "Retour du bouton « Insérer depuis captures » dans l'éditeur FAQ",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le bouton qui génère du contenu depuis captures + texte est de retour dans la toolbar",
+          "what": "La modale FaqGenerateModal en mode 'insert' (drag-drop de captures, instruction texte, l'IA produit du HTML inséré au curseur) n'était plus accessible depuis l'éditeur d'article. Bouton « Insérer depuis captures » rajouté dans la toolbar Tiptap, à gauche de « Réécrire avec IA ».",
+          "where": "FAQ Buildy → éditeur d'un article → toolbar de mise en forme, côté droit.",
+          "how_to_test": "Ouvre un article, clique sur « Insérer depuis captures ». La modale s'ouvre : choisis un type, glisse 1-3 captures, ajoute une instruction (ex : « Décris l'écran et donne la marche à suivre pour exporter en CSV »), clique « Insérer ici ». Le contenu HTML est inséré à la position du curseur."
+        }
+      ]
+    },
+    {
       "version": "0.1.39",
       "date": "2026-05-12",
       "title": "FAQ Buildy : les filtres et le tri sont mémorisés au refresh",
