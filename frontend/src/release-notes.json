@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.44",
+      "date": "2026-05-12",
+      "title": "Bandeau de notifications en haut de l'écran",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les notifications passent en bandeau haut full-width (au lieu du toast top-right)",
+          "what": "Les messages de succès, avertissement et erreur s'affichent désormais en bandeau plein haut de l'écran avec les couleurs Buildy (#00cd92 vert, #f5c259 orange, #e95369 rouge). Ils ne recouvrent plus les boutons en haut à droite (Enregistrer, Publier, etc.). Bouton X pour fermer manuellement, auto-dismiss après 4s (6s pour les erreurs).",
+          "where": "Partout dans l'app — tout message déclenché par une action (sauvegarde, suppression, erreur API, etc.).",
+          "how_to_test": "Sauvegarde une AF ou un audit : le bandeau vert apparaît en haut, plein écran, sans masquer la toolbar. Provoque une erreur (ex : tenter de supprimer un site lié à un audit) : bandeau rouge même comportement. Convention unifiée avec buildy-tools et fleet-manager."
+        }
+      ]
+    },
+    {
       "version": "0.1.43",
       "date": "2026-05-12",
       "title": "Génération depuis captures : preview stylée + vraies images publiées",
