@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.43",
+      "date": "2026-05-12",
+      "title": "Génération depuis captures : preview stylée + vraies images publiées",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le preview de l'article généré est désormais lisible (H2, listes, callouts, images)",
+          "what": "La preview de la modale « Générer depuis captures » affichait le HTML en texte plat (titres non stylés, listes sans puces, captures absentes). Ajout de styles scoped au composant : H1/H2/H3 hiérarchisés, paragraphes et listes (UL/OL) lisibles, callouts (vert/jaune/orange) avec leurs couleurs, images bordées et centrées. Les `<img data-placeholder>` apparaissent en zone hachurée avec l'alt visible (au lieu d'apparaître comme texte inline).",
+          "where": "Sidebar → FAQ Buildy → « Générer depuis captures » → étape de preview après génération.",
+          "how_to_test": "Génère un article avec des captures, regarde l'étape de prévisualisation : tu dois voir les H2/H3 stylés, les listes à puces ou numérotées, et les emplacements d'images soit comme zones hachurées (placeholder) soit comme vraies images centrées."
+        },
+        {
+          "kind": "ux",
+          "title": "Les captures sont vraiment publiées dans l'article (plus de placeholders à uploader)",
+          "what": "Quand tu coches « Inclure ces captures dans l'article publié », les captures sont désormais uploadées vers le CDN FTP avant l'appel Claude. L'IA reçoit les URLs publiques et insère directement des `<img src=\"https://www.buildy.fr/docs/crisp-faq/...\">` aux emplacements pertinents — plus besoin de re-uploader manuellement après création. Si l'upload FTP échoue, fallback sur placeholder (comme avant).",
+          "where": "Sidebar → FAQ Buildy → « Générer depuis captures » avec captures + checkbox « Inclure dans l'article » cochée.",
+          "how_to_test": "Génère un article avec 2 captures et la case « Inclure » cochée. Crée l'article : ouvre l'éditeur → les captures sont déjà des `<img>` réels (pas des zones grises) avec des URLs `www.buildy.fr/docs/crisp-faq/...`. Publie vers Crisp : les captures apparaissent immédiatement sur help.buildy.fr sans étape d'upload supplémentaire."
+        }
+      ]
+    },
+    {
       "version": "0.1.42",
       "date": "2026-05-12",
       "title": "Retrait du bouton « Insérer depuis captures » dans la toolbar de l'éditeur",

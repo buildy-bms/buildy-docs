@@ -1695,17 +1695,26 @@ async function assistFaqGenerate({ question, categoryName = null, articleType = 
 
     if (visionBlocks.length > 0) {
       userTextParts.push(`=== CAPTURES D'ÉCRAN FOURNIES (${visionBlocks.length}) ===`);
-      userTextParts.push(`Tu trouveras ${visionBlocks.length} capture(s) en pièce jointe. Décris ce qu'elles montrent dans le contexte de l'article. Les annotations textuelles associées :`);
+      userTextParts.push(`Tu trouveras ${visionBlocks.length} capture(s) en pièce jointe. Lis-les vraiment (couleur, libellés, position des boutons, état des champs). Annotations textuelles fournies :`);
       for (let i = 0; i < visionBlocks.length; i++) {
         const ann = (annotations[i] || '').trim();
-        userTextParts.push(`  Capture ${i + 1} : ${ann || '(pas d\'annotation)'}`);
+        const url = images[i]?.url;
+        userTextParts.push(`  Capture ${i + 1}${url ? ` (URL publique : ${url})` : ''} : ${ann || '(pas d\'annotation)'}`);
       }
       if (includeImagesInContent) {
         userTextParts.push('');
-        userTextParts.push(`L'utilisateur souhaite que ces captures soient référencées DANS l'article publié. Génère des balises <img data-placeholder="true" alt="..."> aux endroits où chaque capture serait pertinente, en décrivant précisément dans l'alt ce que la capture doit montrer. Ne fabrique pas d'URL réelle, utilise uniquement data-placeholder="true".`);
+        // URLs déjà uploadées vers le CDN public Crisp via le pipeline FAQ : on
+        // demande à l'IA d'insérer DIRECTEMENT les <img src="URL_REELLE"> aux
+        // emplacements pertinents (pas de placeholder à uploader manuellement).
+        const realUrls = images.filter(im => im?.url).length;
+        if (realUrls === visionBlocks.length) {
+          userTextParts.push(`L'utilisateur souhaite que ces captures soient PUBLIÉES dans l'article. Elles sont déjà uploadées sur notre CDN (URLs fournies ci-dessus). Utilise EXACTEMENT ces URLs dans des balises <img src="URL_FOURNIE" alt="description précise de ce qu'on voit"> aux endroits pertinents du corps. Ne crée AUCUN <img data-placeholder>, on a des vraies images. Décris dans le alt ce qui est visible (nom de l'écran, élément à mettre en évidence, action visible) — c'est ce qui sert de légende SEO.`);
+        } else {
+          userTextParts.push(`L'utilisateur souhaite que ces captures soient référencées dans l'article publié. Certaines URLs ne sont pas disponibles (upload FTP a échoué) : pour celles SANS URL, génère un <img data-placeholder="true" alt="..."> qui décrit précisément ce qu'on voit. Pour celles AVEC URL, utilise EXACTEMENT l'URL fournie dans <img src="...">.`);
+        }
       } else {
         userTextParts.push('');
-        userTextParts.push(`L'utilisateur NE veut PAS que les captures apparaissent dans l'article publié — elles ne servent que de contexte pour comprendre. N'utilise pas <img> dans la sortie.`);
+        userTextParts.push(`L'utilisateur NE veut PAS que les captures apparaissent dans l'article publié — elles ne servent que de contexte pour comprendre. N'utilise AUCUNE balise <img> dans la sortie.`);
       }
       userTextParts.push('');
     }
