@@ -598,14 +598,56 @@ async function routes(fastify) {
   });
 
   fastify.post('/faq/ai/generate', async (request, reply) => {
-    const question = (request.body?.question || '').trim();
-    const categoryId = request.body?.category_id ? parseInt(request.body.category_id, 10) : null;
+    // Accepte JSON simple (texte seul) ou multipart/form-data (avec captures
+    // d'écran à passer à Claude Vision). Détection via le content-type.
+    const isMultipart = request.isMultipart?.();
+    let question = '';
+    let categoryId = null;
+    let articleType = 'howto';
+    let includeImagesInContent = false;
+    let annotations = [];
+    const imageBuffers = [];
+
+    if (isMultipart) {
+      const parts = request.parts({ limits: { fileSize: 8 * 1024 * 1024, files: 8 } });
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          if (!/^image\/(png|jpe?g|webp|gif)$/i.test(part.mimetype || '')) {
+            await part.toBuffer().catch(() => {});
+            continue;
+          }
+          try {
+            const buf = await part.toBuffer();
+            if (part.file?.truncated) continue;
+            imageBuffers.push({ buffer: buf, mediaType: part.mimetype });
+          } catch { /* skip */ }
+        } else if (part.type === 'field') {
+          const v = part.value;
+          if (part.fieldname === 'question') question = (v || '').trim();
+          else if (part.fieldname === 'category_id') categoryId = v ? parseInt(v, 10) : null;
+          else if (part.fieldname === 'article_type') articleType = (v || 'howto').trim();
+          else if (part.fieldname === 'include_images_in_content') includeImagesInContent = v === '1' || v === 'true';
+          else if (part.fieldname === 'annotations') {
+            try { annotations = JSON.parse(v || '[]'); } catch { annotations = []; }
+          }
+        }
+      }
+    } else {
+      question = (request.body?.question || '').trim();
+      categoryId = request.body?.category_id ? parseInt(request.body.category_id, 10) : null;
+      articleType = (request.body?.article_type || 'howto').trim();
+    }
+
     if (!question) return reply.code(400).send({ detail: 'question requise' });
     const cat = categoryId ? db.faqCategories.getById(categoryId) : null;
     try {
       return await assistFaqGenerate({
         question,
         categoryName: cat?.name || null,
+        articleType,
+        images: imageBuffers,
+        annotations,
+        includeImagesInContent,
       });
     } catch (e) {
       log.warn(`FAQ AI generate: ${e.message}`);
