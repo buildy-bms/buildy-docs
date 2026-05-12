@@ -354,7 +354,7 @@ onMounted(() => {
           </p>
         </div>
       </div>
-      <div class="border border-gray-200 rounded-lg p-4 max-h-[55vh] overflow-y-auto bg-white prose prose-sm max-w-none">
+      <div class="faq-gen-preview border border-gray-200 rounded-lg p-4 max-h-[55vh] overflow-y-auto bg-white">
         <SafeHtml :html="result.html" />
       </div>
       <div class="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-100">
@@ -385,3 +385,42 @@ onMounted(() => {
                       @close="annotationTarget = null" @save="onAnnotationSaved" />
   </BaseModal>
 </template>
+
+<style scoped>
+/* Rendu de la preview HTML générée (pas de @tailwindcss/typography installé,
+   donc on applique nos propres styles pour H2/H3/p/listes/callouts/img). */
+.faq-gen-preview :deep(h1) { font-size: 1.5rem; font-weight: 700; line-height: 1.25; margin: 0 0 0.75rem; color: #111827; }
+.faq-gen-preview :deep(h2) { font-size: 1.15rem; font-weight: 700; line-height: 1.3; margin: 1.25rem 0 0.5rem; color: #1f2937; }
+.faq-gen-preview :deep(h3) { font-size: 1rem; font-weight: 600; line-height: 1.35; margin: 1rem 0 0.4rem; color: #1f2937; }
+.faq-gen-preview :deep(p) { margin: 0.5rem 0; line-height: 1.65; color: #374151; }
+.faq-gen-preview :deep(strong) { font-weight: 600; color: #111827; }
+.faq-gen-preview :deep(ul) { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+.faq-gen-preview :deep(ol) { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+.faq-gen-preview :deep(li) { margin: 0.25rem 0; line-height: 1.6; color: #374151; }
+.faq-gen-preview :deep(a) { color: #4f46e5; text-decoration: underline; }
+.faq-gen-preview :deep(code) { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.875em; }
+.faq-gen-preview :deep(blockquote) {
+  margin: 0.75rem 0; padding: 0.75rem 1rem; border-left: 3px solid #d1d5db;
+  background: #f9fafb; color: #374151; border-radius: 0 0.375rem 0.375rem 0;
+}
+.faq-gen-preview :deep(blockquote.callout-tip) { border-left-color: #22c55e; background: #ecfdf5; color: #064e3b; }
+.faq-gen-preview :deep(blockquote.callout-info) { border-left-color: #eab308; background: #fefce8; color: #422006; }
+.faq-gen-preview :deep(blockquote.callout-warning) { border-left-color: #f97316; background: #fff7ed; color: #431407; }
+.faq-gen-preview :deep(img) {
+  max-width: 100%; height: auto; display: block;
+  margin: 0.75rem auto; border-radius: 0.375rem; border: 1px solid #e5e7eb;
+}
+/* Placeholders d'image : zone grise hachurée avec alt visible. */
+.faq-gen-preview :deep(img[data-placeholder="true"]) {
+  background: repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 10px, #e5e7eb 10px, #e5e7eb 20px);
+  border: 2px dashed #9ca3af;
+  min-height: 110px;
+  width: 100%;
+  position: relative;
+}
+.faq-gen-preview :deep(img[data-placeholder="true"])::after {
+  content: "🖼 " attr(alt);
+  display: block; padding: 1rem; text-align: center; color: #4b5563; font-size: 0.875rem;
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+}
+</style>

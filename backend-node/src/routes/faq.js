@@ -640,12 +640,35 @@ async function routes(fastify) {
 
     if (!question) return reply.code(400).send({ detail: 'question requise' });
     const cat = categoryId ? db.faqCategories.getById(categoryId) : null;
+
+    // Si l'utilisateur veut que les captures apparaissent dans l'article publié
+    // (includeImagesInContent=true), on les uploade vers le FTP OVH (via le
+    // pipeline FAQ standard : sharp resize ≤1600px, WebP sauf PNG transparent)
+    // AVANT l'appel Claude, pour pouvoir injecter les URLs réelles dans le HTML
+    // généré au lieu de placeholders à uploader manuellement après.
+    let publishedImages = [];
+    if (includeImagesInContent && imageBuffers.length > 0) {
+      for (const img of imageBuffers) {
+        try {
+          const up = await uploadImage(img.buffer, img.mediaType);
+          publishedImages.push({ ...img, url: up.url, width: up.width, height: up.height });
+        } catch (e) {
+          log.warn(`FAQ AI generate: upload image échec : ${e.message}`);
+          publishedImages.push(img); // pas d'URL, l'IA verra l'image mais sans pouvoir la lier
+        }
+      }
+    } else {
+      // Captures contextuelles uniquement : on les donne au modèle Vision pour
+      // qu'il comprenne, mais sans upload (elles n'apparaissent pas dans l'article).
+      publishedImages = imageBuffers;
+    }
+
     try {
       return await assistFaqGenerate({
         question,
         categoryName: cat?.name || null,
         articleType,
-        images: imageBuffers,
+        images: publishedImages,
         annotations,
         includeImagesInContent,
       });
