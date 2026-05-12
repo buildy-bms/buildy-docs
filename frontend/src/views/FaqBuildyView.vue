@@ -12,6 +12,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useTableSort } from '@/composables/useTableSort'
 import BaseModal from '@/components/BaseModal.vue'
 import FaqCategoryNode from '@/components/FaqCategoryNode.vue'
+import FaqGenerateModal from '@/components/FaqGenerateModal.vue'
 
 const router = useRouter()
 const store = useFaqStore()
@@ -44,9 +45,6 @@ const suggestions = ref([])
 const loadingSuggestions = ref(false)
 
 const generateModalOpen = ref(false)
-const generateQuestion = ref('')
-const generateCategoryId = ref(null)
-const generating = ref(false)
 
 const categoryModalOpen = ref(false)
 const categoryDraft = ref({ id: null, name: '', description: '', color: '', parent_id: null })
@@ -395,30 +393,6 @@ async function createFromSuggestion(s) {
   }
 }
 
-async function runGenerate() {
-  if (!generateQuestion.value.trim()) {
-    notifyError('Question requise')
-    return
-  }
-  generating.value = true
-  try {
-    const r = await store.aiGenerate(generateQuestion.value, generateCategoryId.value)
-    const created = await store.createArticle({
-      title: r.suggested_title || 'Article IA',
-      content_html: r.html || '<p></p>',
-      category_id: generateCategoryId.value,
-      status: 'draft',
-    })
-    generateModalOpen.value = false
-    generateQuestion.value = ''
-    router.push(`/faq/articles/${created.id}`)
-  } catch (e) {
-    notifyError(e.response?.data?.detail || 'Échec')
-  } finally {
-    generating.value = false
-  }
-}
-
 function selectCategory(id) {
   store.selectedCategoryId = id
 }
@@ -443,9 +417,10 @@ function selectCategory(id) {
           Suggestions IA
         </button>
         <button @click="generateModalOpen = true"
-                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap">
+                class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap"
+                title="Générer un nouvel article FAQ depuis des captures d'écran et une instruction texte">
           <SparklesIcon class="w-4 h-4 shrink-0" />
-          Générer depuis une question
+          Générer depuis captures
         </button>
         <button v-if="credentialsConfigured" @click="pull" :disabled="store.loadingPull"
                 class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 transition whitespace-nowrap disabled:opacity-50">
@@ -706,40 +681,16 @@ function selectCategory(id) {
       </div>
     </BaseModal>
 
-    <!-- Modale "Générer depuis une question" -->
-    <BaseModal v-if="generateModalOpen" size="lg" :dismiss-on-backdrop="false"
-               @close="generateModalOpen = false" :title="'Générer un article depuis une question'">
-      <div class="space-y-5">
-        <p class="text-sm text-gray-500 -mt-1">
-          L'IA s'appuie sur le corpus Buildy (sections, équipements, fonctionnalités) pour produire un article cohérent en français professionnel.
-        </p>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">Quelle question veux-tu documenter ?</label>
-          <textarea v-model="generateQuestion" rows="4"
-                    placeholder="Comment configurer une alerte sur un compteur ?"
-                    class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition resize-y" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">Catégorie cible <span class="text-gray-400 font-normal">(optionnel)</span></label>
-          <select v-model="generateCategoryId"
-                  class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition bg-white">
-            <option :value="null">— Aucune —</option>
-            <option v-for="c in store.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </div>
-        <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-          <button @click="generateModalOpen = false"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 transition whitespace-nowrap">
-            Annuler
-          </button>
-          <button @click="runGenerate" :disabled="generating || !generateQuestion.trim()"
-                  class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition whitespace-nowrap disabled:opacity-50 shadow-sm">
-            <SparklesIcon class="w-4 h-4 shrink-0" />
-            {{ generating ? 'Génération…' : 'Générer l\'article' }}
-          </button>
-        </div>
-      </div>
-    </BaseModal>
+<!-- Modale « Générer un article depuis captures + question » (mode create).
+         FaqGenerateModal supporte le drag-drop captures (jusqu'à 8), annotations
+         optionnelles, instruction texte + sélection du type d'article et de la
+         catégorie. La modale gère elle-même POST /faq/articles + redirection
+         vers /faq/articles/:id. -->
+    <FaqGenerateModal v-if="generateModalOpen"
+                      mode="create"
+                      :default-category-id="store.selectedCategoryId || null"
+                      @close="generateModalOpen = false"
+                      @created="generateModalOpen = false" />
 
     <!-- Modale suggestions IA -->
     <BaseModal v-if="showSuggestions" size="lg" @close="showSuggestions = false" :title="'Articles FAQ manquants suggérés'">
