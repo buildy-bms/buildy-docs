@@ -135,6 +135,25 @@ h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
   color: rgba(255,255,255,0.5); font-style: italic;
   padding-left: 1mm;
 }
+/* Modèle commercial — petit bloc sous le verdict, explicite l'engagement (Essentials = licence
+   perpétuelle, Smart/Premium = abonnement, options = avenant). Évite le quiproquo "+X options
+   payantes" sur la cover. */
+.cover-commercial-model {
+  margin: 2mm 0 0;
+  padding: 2mm 0 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.cover-commercial-label {
+  font-size: 7pt; text-transform: uppercase; letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.55); margin: 0 0 1.5mm;
+}
+.cover-commercial-list {
+  margin: 0; padding: 0 0 0 4mm;
+  font-size: 8.5pt; color: rgba(255,255,255,0.85); line-height: 1.5;
+}
+.cover-commercial-list li { margin: 0; }
+.cover-commercial-list strong { color: white; font-weight: 600; }
+
 .cover-level-band-shortfall { border-left-color: #f87171; }
 .cover-level-band-shortfall .cover-kpi-value { color: #f87171; }
 .cover-level-band-no-contract { border-left-color: #fbbf24; }

@@ -636,6 +636,17 @@ async function routes(fastify) {
       return inst.candidateKeys.includes(catKey);
     }
 
+    // Catégorie *primaire* par instance pour la matrice zones × catégories : la première
+    // catégorie qui matche dans l'ordre de SYSTEM_CATEGORIES. Sans ça, une CTA déclarée à la
+    // fois en « Chauffage & Climatisation » et « Ventilation » apparaît dans 2 colonnes et le
+    // total ligne/colonne diverge du compte d'instances (93 vs 94). L'inventaire détaillé §5
+    // continue d'exposer toutes les catégories d'usage — l'info n'est pas perdue.
+    const primaryCategoryByInstance = new Map();
+    for (const inst of allInstances) {
+      const cat = SYSTEM_CATEGORIES.find(c => instanceMatchesCategory(inst, c.key));
+      if (cat) primaryCategoryByInstance.set(inst.id, cat.key);
+    }
+
     // Lien explicite instance ↔ zones (Lot 32) ; fallback sur matching `location` si pas de lien.
     const linkRows = db.instanceZones.listForAf(afId);
     const zonesByInstance = new Map();
@@ -681,7 +692,7 @@ async function routes(fastify) {
       const cells = SYSTEM_CATEGORIES.map(cat => {
         let count = 0;
         for (const inst of allInstances) {
-          if (!instanceMatchesCategory(inst, cat.key)) continue;
+          if (primaryCategoryByInstance.get(inst.id) !== cat.key) continue;
           if (!instanceMatchesZone(inst, z)) continue;
           const linked = zonesByInstance.get(inst.id);
           if (linked && linked.size > 0) {
