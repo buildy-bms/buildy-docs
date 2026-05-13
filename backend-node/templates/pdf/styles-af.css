@@ -701,6 +701,26 @@ table.zones-table td.zone-name { font-weight: 600; color: #1b2842; }
 .protocol-pill[data-protocol="OCPP"]          { background: #fae8ff; color: #86198f; border-color: #f5d0fe; }
 .protocol-pill[data-protocol="SunSpec"]       { background: #fef9c3; color: #713f12; border-color: #fef08a; }
 
+/* Bandeau "Zones desservies" sous chaque équipement de l'AF. Aligné sur
+   `.protocols-bar` pour cohérence visuelle, mais avec une palette sobre
+   navy/gris (informatif, pas décoratif comme les protocoles). Ajouté
+   suite à la revue AMOA Virtuo (mai 2026) qui demandait la zone par
+   équipement — l'info existe dans la Liste de Points, mais redondance
+   utile dans l'AF pour qu'un lecteur n'ait pas à faire l'aller-retour. */
+.zone-pill {
+  display: inline-block;
+  padding: 0.5mm 2.2mm;
+  background: #eef2ff;
+  color: #312e81;
+  border: 0.3mm solid #c7d2fe;
+  border-radius: 999px;
+  font-size: 7.5pt;
+  font-weight: 600;
+  margin-right: 1.5mm;
+  margin-bottom: 0.5mm;
+}
+.zones-bar { margin-top: 0.5mm; }
+
 /* Colonne Nom technique (monospace) + colonne Nature */
 .points-mini td.tech-name code {
   font-family: 'SFMono-Regular', Consolas, monospace;

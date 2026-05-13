@@ -116,7 +116,7 @@
       {{#each rows}}
       <tr class="{{#if isFirstOfInstance}}row-first{{/if}}">
         <td class="col-cat">{{#if isFirstOfInstance}}{{categoryName}}{{/if}}</td>
-        <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{#if (gt instanceQty 1)}} <span class="qty-badge">×{{instanceQty}}</span>{{/if}}{{/if}}</td>
+        <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{#if (gt instanceQty 1)}} <span class="qty-badge">×{{instanceQty}}</span>{{/if}}{{#if instanceNotes}}<div class="instance-notes">{{instanceNotes}}</div>{{/if}}{{/if}}</td>
         <td class="col-loc">{{#if isFirstOfInstance}}{{instanceLocation}}{{/if}}</td>
         <td class="col-tech">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
         <td class="col-label">{{label}}</td>

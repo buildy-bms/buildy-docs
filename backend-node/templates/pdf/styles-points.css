@@ -777,6 +777,20 @@ table.systems-table tfoot td {
 /* En A4 paysage la page-offerings n'a pas besoin de page-break-before
    car .page le fait deja. On le neutralise. */
 .page-offerings .annex-offerings { page-break-before: auto; padding: 0; }
+/* Description (champ `notes` côté DB) affichée sous le repère en gris
+   italique. Sert à préciser l'usage d'un équipement (ex : ECS vs EFS sur
+   compteur eau, scénario sur éclairage, etc.). Visible uniquement quand
+   non vide ; n'occupe aucun espace sinon. */
+.instance-notes {
+  font-style: italic;
+  font-size: 6.5pt;
+  color: #64748b;
+  margin-top: 0.6mm;
+  line-height: 1.3;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
 /* Badge de quantité affiché à côté du repère quand qty > 1. Rappel visuel
    que la ligne représente N devices, pas 1. Sans ce badge, la cover qui
    annonce 46 instances semblait incohérente avec un tableau qui n'a qu'1

@@ -130,6 +130,15 @@
     </p>
     {{/if}}
 
+    {{#if equipment.served_zones.length}}
+    <p class="protocols-bar zones-bar">
+      <span class="protocols-label">Zones desservies :</span>
+      {{#each equipment.served_zones}}
+      <span class="zone-pill">{{this}}</span>
+      {{/each}}
+    </p>
+    {{/if}}
+
     {{#if equipment.points_read.length}}
     <div class="points-block">
       <h5 class="points-block-title">Données typiquement lues ({{equipment.points_read.length}})</h5>

@@ -255,11 +255,30 @@ async function buildAfExportData(af, opts = {}) {
       const bacs_justification = (sec.bacs_justification && sec.bacs_justification.trim())
         ? sec.bacs_justification
         : (tpl?.bacs_justification || null);
+      // Zones desservies par cette catégorie d'équipement = union des zones
+      // liées via M2M equipment_instance_zones pour toutes les instances de
+      // la section. Affichées sous forme de pills sous chaque équipement de
+      // l'AF (cf. AMOA Virtuo mai 2026 qui réclamait la zone par équipement).
+      // Dédupliquées et triées selon l'ordre des zones de l'AF.
+      const instancesOfSec = db.equipmentInstances.listBySection(sec.id);
+      const zoneIdSet = new Set();
+      for (const inst of instancesOfSec) {
+        for (const z of db.instanceZones.listForInstance(inst.id)) {
+          zoneIdSet.add(z.id);
+        }
+      }
+      let served_zones = [];
+      if (zoneIdSet.size > 0) {
+        const zonesSection = allSections.find(s => s.kind === 'zones');
+        const allZones = zonesSection ? db.afZones.listBySection(zonesSection.id) : [];
+        served_zones = allZones.filter(z => zoneIdSet.has(z.id)).map(z => z.name);
+      }
       equipment = {
         description_html,
         points_read: points.filter(p => p.direction === 'read'),
         points_write: points.filter(p => p.direction === 'write'),
         preferred_protocols: protocols,
+        served_zones,
         bacs_justification,
       };
     }
@@ -771,6 +790,7 @@ function buildPointsListExportData(af, opts = {}) {
       reference: inst.reference,
       location: inst.location,
       qty: inst.qty,
+      notes: inst.notes,
       points: points.map((p) => ({
         label: p.label,
         data_type: p.data_type,
@@ -789,6 +809,7 @@ function buildPointsListExportData(af, opts = {}) {
           categoryName: sec.title,
           instanceRef: inst.reference,
           instanceQty: inst.qty || 1,
+          instanceNotes: inst.notes || '',
           instanceLocation: inst.location || '',
           isFirstOfInstance: first,
           label: p.label,
