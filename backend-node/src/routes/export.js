@@ -651,13 +651,46 @@ async function routes(fastify) {
       return loc && loc.includes(normalize(zone.name));
     }
 
-    // Construit la matrice zones × catégories
+    // Construit la matrice zones × catégories.
+    // Bug fix : une instance liée à N zones via la M2M `equipment_instance_zones`
+    // était additionnée N fois (qty entière par zone), gonflant artificiellement
+    // le grand total. On répartit `qty` proportionnellement entre les zones liées
+    // (floor(qty / N) par zone, le reste va aux premières zones par ordre de
+    // position). Le fallback texte `location` (legacy, sans M2M) garde qty plein
+    // car on ne dispose d'aucune info de répartition.
+    // Pré-calcul de la part de qty allouée à chaque (instance, zone).
+    const instanceZoneShare = new Map(); // key = `${inst.id}:${zone.id}` -> share
+    for (const inst of allInstances) {
+      const linked = zonesByInstance.get(inst.id);
+      if (!linked || linked.size === 0) continue; // pas de M2M : fallback texte traité plus bas
+      const linkedZoneIds = zones
+        .filter(z => linked.has(z.id))
+        .map(z => z.id); // ordonné selon zones (position)
+      const n = linkedZoneIds.length;
+      if (n === 0) continue;
+      const qty = inst.qty || 1;
+      const base = Math.floor(qty / n);
+      let remainder = qty - base * n;
+      for (const zid of linkedZoneIds) {
+        const extra = remainder > 0 ? 1 : 0;
+        if (remainder > 0) remainder--;
+        instanceZoneShare.set(`${inst.id}:${zid}`, base + extra);
+      }
+    }
     const zonesMatrix = zones.map(z => {
       const cells = SYSTEM_CATEGORIES.map(cat => {
         let count = 0;
         for (const inst of allInstances) {
           if (!instanceMatchesCategory(inst, cat.key)) continue;
-          if (instanceMatchesZone(inst, z)) count += (inst.qty || 1);
+          if (!instanceMatchesZone(inst, z)) continue;
+          const linked = zonesByInstance.get(inst.id);
+          if (linked && linked.size > 0) {
+            // M2M explicite : part proportionnelle pré-calculée
+            count += instanceZoneShare.get(`${inst.id}:${z.id}`) || 0;
+          } else {
+            // Fallback legacy par texte `location` : qty plein
+            count += (inst.qty || 1);
+          }
         }
         return count;
       });
