@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.47",
+      "date": "2026-05-13",
+      "title": "Modèle commercial expliqué sur la cover + dedup CTA dans la matrice zones",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Bloc « Modèle commercial » sur la cover des exports AF / Synthèse / Liste de Points",
+          "what": "Le bandeau cover (Required vs Visé) intègre désormais un petit bloc explicatif sous le verdict : Essentials = licence perpétuelle livrée avec le projet, Smart/Premium = abonnement annuel résiliable à l'échéance, options payantes = avenant au contrat. Évite le quiproquo « ils sont à Essentials mais ont 2 options payantes, c'est facturé comment ? » remonté par l'AMOA Virtuo. Affiché systématiquement sur les 3 livrables — l'AMOA voit la mécanique commerciale dès la première page.",
+          "where": "Cover (page 1) des PDF exportés : Analyse Fonctionnelle, Synthèse, Liste de Points contractuelle.",
+          "how_to_test": "Exporter une AF ou une Liste de Points. Sur la cover, sous la ligne verdict italique (« Le niveau visé est insuffisant… »), un bloc avec 3 lignes : Essentials → licence perpétuelle, Smart/Premium → abonnement annuel, Options payantes → avenant."
+        },
+        {
+          "kind": "fix",
+          "title": "Matrice « Zones × catégories » de la Synthèse : chaque instance comptée une seule fois",
+          "what": "Une CTA déclarée à la fois en « Chauffage & Climatisation » et « Ventilation » apparaissait dans 2 colonnes de la matrice §2 de la Synthèse, gonflant le total à 94 alors que la §4 et la §5 disent 93. La matrice n'utilise désormais que la catégorie *primaire* de chaque instance (la première qui matche dans l'ordre des catégories de la bibliothèque). L'inventaire détaillé §5 continue d'exposer toutes les catégories d'usage — l'info n'est pas perdue, juste agrégée différemment. Total ligne/colonne = total inventaire = total LP.",
+          "where": "PDF Synthèse → §2. Zones fonctionnelles du bâtiment.",
+          "how_to_test": "Sur l'AF Virtuo, exporter la Synthèse. Le total de la matrice zones doit valoir 93 (pas 94). La CTA n'apparaît plus que dans une seule colonne (« Chauffage & Climatisation » dans cet exemple)."
+        }
+      ]
+    },
+    {
       "version": "0.1.46",
       "date": "2026-05-13",
       "title": "Description sur les instances visible dans la Liste de Points + zones desservies par équipement dans l'AF",
