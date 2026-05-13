@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.45",
+      "date": "2026-05-13",
+      "title": "Compteurs instances/points cohérents entre Liste de Points et Synthèse + légende sur la LP",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les compteurs d'instances et de points sont désormais cohérents entre les 3 PDF d'une AF",
+          "what": "Avant : la Liste de Points affichait 1 instance pour une entrée d'équipement avec quantité 46 (au lieu de 46), tandis que la Synthèse affichait le bon compte mais sa matrice zones × catégories double-comptait les équipements liés à plusieurs zones. Résultat : cover LP 38/70 vs cover Synthèse 93/676 vs matrice zones 164. Maintenant la LP utilise la quantité réelle et la matrice zones répartit proportionnellement entre les zones liées — les 3 documents portent le même grand total.",
+          "where": "Export PDF d'une AF — boutons Liste de points et Synthèse depuis la barre d'actions de l'AF.",
+          "how_to_test": "Sur une AF avec un équipement multi-quantité rattaché à plusieurs zones (ex : une entrée 'Unités intérieures' qty=46 liée à 2 zones), exporter la Liste de Points et la Synthèse. Vérifier que les KPIs de couverture affichent le même nombre d'instances et de points, et que le grand total de la matrice §2 de la Synthèse correspond au total instances §4."
+        },
+        {
+          "kind": "ux",
+          "title": "Légende des colonnes ajoutée en tête de la Liste de Points",
+          "what": "Ajout d'un bloc Légende avant le tableau des points qui explique chaque colonne : Type (Mesure / État / Alarme / Commande / Consigne), Sens (R lecture / W écriture), Nature (Booléen / Numérique / Enum / Chaîne de caractères) et Optionnel (pastille verte = point optionnel selon l'équipement terrain). Reprend strictement les badges du tableau pour cohérence visuelle. Demandé par un AMOA GTB qui trouvait la LP cryptique pour un non-Buildy.",
+          "where": "Export PDF Liste de Points — page 2, juste avant le tableau global des points.",
+          "how_to_test": "Exporter une Liste de Points sur n'importe quelle AF. Vérifier que la page 2 commence par un encart 'Légende des colonnes' avec 4 sous-blocs alignés et que le tableau qui suit reprend les mêmes pastilles colorées."
+        }
+      ]
+    },
+    {
       "version": "0.1.44",
       "date": "2026-05-12",
       "title": "Bandeau de notifications en haut de l'écran",

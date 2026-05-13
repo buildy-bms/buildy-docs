@@ -788,6 +788,7 @@ function buildPointsListExportData(af, opts = {}) {
         rows.push({
           categoryName: sec.title,
           instanceRef: inst.reference,
+          instanceQty: inst.qty || 1,
           instanceLocation: inst.location || '',
           isFirstOfInstance: first,
           label: p.label,
@@ -802,13 +803,18 @@ function buildPointsListExportData(af, opts = {}) {
       }
     }
 
+    // Bug fix : `equipment_instances` peut avoir qty>1 (ex : 46 unités intérieures
+    // sur une seule entrée). Le compteur d'instances et le total de points doivent
+    // refléter la quantité réelle de devices, pas le nombre de rows. Le rendu
+    // visuel du tableau (rows.push) reste 1 ligne par entrée × point.
+    const totalDevices = instances.reduce((acc, i) => acc + (i.qty || 1), 0);
     return {
       name: sec.title,
       bacsArticles: resolveLiveBacs(sec),
       instances: instancesWithPoints,
-      instancesCount: instances.length,
+      instancesCount: totalDevices,
       pointsPerInstance: points.length,
-      pointsTotal: instances.length * points.length,
+      pointsTotal: totalDevices * points.length,
     };
   }).filter((c) => c.instancesCount > 0 || c.pointsPerInstance > 0);
 

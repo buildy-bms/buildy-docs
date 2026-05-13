@@ -55,6 +55,46 @@
   </p>
 </section>
 
+{{!-- ═══════════ Légende des colonnes ═══════════ --}}
+<section class="legend-section">
+  <h2 class="legend-title">Légende des colonnes</h2>
+  <div class="legend-grid">
+    <div class="legend-block">
+      <p class="legend-block-title">Type</p>
+      <ul class="legend-items">
+        <li><span class="badge-type type-Mesure">Mesure</span> Valeur physique mesurée (température, débit, puissance…)</li>
+        <li><span class="badge-type type-État">État</span> État logique de l'équipement (marche/arrêt, mode actif…)</li>
+        <li><span class="badge-type type-Alarme">Alarme</span> Booléen de défaut ou anomalie détectée</li>
+        <li><span class="badge-type type-Commande">Commande</span> Action ponctuelle envoyée à l'équipement</li>
+        <li><span class="badge-type type-Consigne">Consigne</span> Paramètre réglable transmis à l'équipement</li>
+      </ul>
+    </div>
+    <div class="legend-block">
+      <p class="legend-block-title">Sens</p>
+      <ul class="legend-items">
+        <li><span class="badge-dir dir-R">R</span> Lecture — Buildy lit la donnée exposée par l'équipement</li>
+        <li><span class="badge-dir dir-W">W</span> Écriture — Buildy écrit la valeur sur l'équipement</li>
+      </ul>
+    </div>
+    <div class="legend-block">
+      <p class="legend-block-title">Nature</p>
+      <ul class="legend-items">
+        <li><span class="badge-nature" data-nature="Booléen">Booléen</span> Vrai / Faux</li>
+        <li><span class="badge-nature" data-nature="Numérique">Numérique</span> Valeur chiffrée avec unité</li>
+        <li><span class="badge-nature" data-nature="Enum">Enum</span> Valeur dans une liste fermée</li>
+        <li><span class="badge-nature" data-nature="Chaîne de caractères">Chaîne de caractères</span> Texte libre (code erreur, libellé…)</li>
+      </ul>
+    </div>
+    <div class="legend-block">
+      <p class="legend-block-title">Optionnel</p>
+      <ul class="legend-items">
+        <li><span class="checkbox checked">✓</span> Point optionnel — peut ne pas être exposé selon le modèle, le firmware ou la configuration de l'équipement terrain.</li>
+        <li><span class="checkbox"></span> Point attendu par défaut sur cette catégorie d'équipement.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 {{!-- ═══════════ Tableau global de tous les points ═══════════ --}}
 <section class="points-section">
   <table class="points">
@@ -76,7 +116,7 @@
       {{#each rows}}
       <tr class="{{#if isFirstOfInstance}}row-first{{/if}}">
         <td class="col-cat">{{#if isFirstOfInstance}}{{categoryName}}{{/if}}</td>
-        <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{/if}}</td>
+        <td class="col-ref">{{#if isFirstOfInstance}}<strong>{{instanceRef}}</strong>{{#if (gt instanceQty 1)}} <span class="qty-badge">×{{instanceQty}}</span>{{/if}}{{/if}}</td>
         <td class="col-loc">{{#if isFirstOfInstance}}{{instanceLocation}}{{/if}}</td>
         <td class="col-tech">{{#if tech_name}}<code>{{tech_name}}</code>{{else}}—{{/if}}</td>
         <td class="col-label">{{label}}</td>
