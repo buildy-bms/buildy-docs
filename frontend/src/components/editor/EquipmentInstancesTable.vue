@@ -403,8 +403,9 @@ async function bulkDuplicate() {
           </div>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Description</label>
           <textarea v-model="editForm.notes" rows="2" autocomplete="off"
+                    placeholder="Précisions visibles dans la Liste de Points (ex : ECS, EFS, arrosage, process…)"
                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition"></textarea>
         </div>
       </form>

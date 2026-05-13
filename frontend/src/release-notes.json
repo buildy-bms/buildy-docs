@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.46",
+      "date": "2026-05-13",
+      "title": "Description sur les instances visible dans la Liste de Points + zones desservies par équipement dans l'AF",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le champ « Notes » d'une instance d'équipement devient « Description » et apparaît dans la Liste de Points",
+          "what": "Le champ libre saisissable sur chaque instance d'équipement (anciennement appelé Notes dans le modal d'édition) est renommé Description et son contenu est désormais imprimé sous le repère dans le PDF Liste de Points, en italique gris. Permet de préciser l'usage d'un compteur (ECS, EFS, arrosage, process), une particularité d'éclairage, etc. — visible par le destinataire du livrable. Vide par défaut, n'occupe aucune place quand non renseigné.",
+          "where": "AF Detail → tableau Instances d'une section équipement → bouton Éditer → champ Description. Visible dans le PDF Liste de Points exporté.",
+          "how_to_test": "Sur une AF, ouvrir un compteur eau, éditer une instance et saisir « ECS » dans Description. Exporter la Liste de Points : la mention apparaît en italique sous le repère, dans la même cellule."
+        },
+        {
+          "kind": "ux",
+          "title": "Bandeau « Zones desservies » sous chaque équipement de l'AF",
+          "what": "Sur chaque chapitre équipement de l'AF (DRV, CTA, éclairage…), un nouveau bandeau pills affiche les zones fonctionnelles rattachées aux instances de l'équipement, juste sous le bandeau Protocoles exigés. Le lecteur n'a plus à aller chercher la zone dans la Liste de Points ou la Synthèse pour savoir où servent les équipements décrits. Style sobre navy/gris, masqué si aucune zone rattachée. Demandé par revue AMOA Virtuo (mai 2026).",
+          "where": "Export PDF Analyse Fonctionnelle — sur chaque section équipement (§4.1.1 DRV, §4.1.2 unité intérieure, §4.2.1 CTA, etc.).",
+          "how_to_test": "Sur l'AF Virtuo (ou une AF avec des instances rattachées à des zones via le tableau Instances), exporter le PDF AF. Vérifier qu'apparaît sous chaque équipement la ligne « Zones desservies : Bureau 1 - VIVENDIA   Bureau 2 - MESSAGERIE X » (ou équivalent), juste après les Protocoles exigés."
+        }
+      ]
+    },
+    {
       "version": "0.1.45",
       "date": "2026-05-13",
       "title": "Compteurs instances/points cohérents entre Liste de Points et Synthèse + légende sur la LP",
