@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>{{title}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body>
+
+{{!-- Couverture pleine page --}}
+<section class="cover">
+  <div class="cover-eyebrow">
+    Livre blanc <span class="accent">·</span> Buildy{{#if audienceLabel}} <span class="accent">·</span> {{audienceLabel}}{{/if}}
+  </div>
+  <div class="cover-center">
+    <h1 class="cover-title">{{title}}</h1>
+    {{#if subtitle}}<p class="cover-sub">{{subtitle}}</p>{{/if}}
+  </div>
+  <div class="cover-foot">
+    {{#if version}}<strong>Version {{version}}</strong> · {{/if}}{{dateLabel}}
+  </div>
+</section>
+
+{{!-- Chapitres : flux naturel, chaque .chapter-title force une page --}}
+{{#each chapters}}
+<section class="chapter">
+  <h1 class="chapter-title">{{title}}</h1>
+  <div class="chapter-body">
+    {{{body_html}}}
+  </div>
+</section>
+{{/each}}
+
+</body>
+</html>

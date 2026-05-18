@@ -1,0 +1,179 @@
+/* ==========================================================================
+   Livre blanc Buildy — design system PDF, pagination en FLUX NATUREL.
+   Le contenu coule de page en page ; Chromium gere les sauts. Les titres
+   de chapitre forcent une nouvelle page, les encadres ne se coupent jamais.
+   Aucun reglage manuel de pagination.
+   ========================================================================== */
+
+:root{
+  --navy:#1b2842;
+  --navy-dark:#0f1a2e;
+  --mint:#00cd92;
+  --mint-dark:#00a578;
+  --gray-900:#111827;
+  --gray-700:#374151;
+  --gray-500:#6b7280;
+  --gray-300:#d1d5db;
+  --gray-100:#f3f4f6;
+  --gray-50:#fafafa;
+  --warn:#b45309;
+  --tip:#047857;
+}
+
+@page{ size:A4; margin:22mm 18mm; }
+/* La regle cover full-bleed @page :first vit dans styles-whitepaper-book.css
+   (chargee uniquement pour le layout 'book') — sinon elle casserait le
+   layout 'single-page' des documents compagnons. */
+
+*{ box-sizing:border-box; }
+html,body{
+  margin:0; padding:0;
+  font-family:'Inter',sans-serif;
+  color:var(--gray-900);
+  -webkit-font-smoothing:antialiased;
+  font-size:10.5pt;
+  line-height:1.55;
+}
+
+/* ── Couverture ───────────────────────────────────────────────────── */
+.cover{
+  background:var(--navy);
+  color:#fff;
+  height:297mm;
+  width:210mm;
+  padding:32mm 26mm;
+  display:flex;
+  flex-direction:column;
+  break-after:page;
+}
+.cover-eyebrow{
+  font-size:9pt;
+  font-weight:600;
+  letter-spacing:0.22em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.55);
+}
+.cover-eyebrow .accent{ color:var(--mint); }
+.cover-center{ margin-top:auto; margin-bottom:auto; }
+.cover-title{
+  font-family:'Poppins',sans-serif;
+  font-size:38pt;
+  font-weight:700;
+  line-height:1.08;
+  letter-spacing:-0.02em;
+  margin:0;
+}
+.cover-title .y{ color:var(--mint); }
+.cover-sub{
+  font-size:13pt;
+  font-weight:400;
+  color:rgba(255,255,255,0.8);
+  margin-top:14px;
+  max-width:150mm;
+}
+.cover-foot{
+  font-size:9.5pt;
+  color:rgba(255,255,255,0.5);
+  letter-spacing:0.04em;
+}
+.cover-foot strong{ color:rgba(255,255,255,0.8); font-weight:600; }
+
+/* ── Chapitres (flux naturel) ─────────────────────────────────────── */
+.chapter{ }
+.chapter-title{
+  font-family:'Poppins',sans-serif;
+  font-size:24pt;
+  font-weight:700;
+  line-height:1.12;
+  letter-spacing:-0.02em;
+  color:var(--navy);
+  margin:0 0 4mm 0;
+  break-before:page;          /* chaque chapitre demarre une page */
+  padding-bottom:4mm;
+  border-bottom:2px solid var(--mint);
+}
+/* Le tout premier chapitre ne force pas de page vide apres la cover :
+   la cover a deja break-after:page. */
+.chapter:first-of-type .chapter-title{ break-before:auto; }
+
+/* ── Contenu Tiptap ───────────────────────────────────────────────── */
+.chapter-body h2{
+  font-family:'Poppins',sans-serif;
+  font-size:15pt;
+  font-weight:600;
+  color:var(--navy);
+  margin:8mm 0 3mm 0;
+  break-after:avoid;
+}
+.chapter-body h3{
+  font-family:'Poppins',sans-serif;
+  font-size:12pt;
+  font-weight:600;
+  color:var(--navy);
+  margin:6mm 0 2mm 0;
+  break-after:avoid;
+}
+.chapter-body p{ margin:0 0 3mm 0; }
+.chapter-body ul,.chapter-body ol{ margin:0 0 3mm 0; padding-left:6mm; }
+.chapter-body li{ margin-bottom:1.5mm; }
+.chapter-body strong{ font-weight:600; color:var(--gray-900); }
+.chapter-body a{ color:var(--navy); text-decoration:underline; }
+.chapter-body img{ max-width:100%; height:auto; break-inside:avoid; }
+.chapter-body table{ break-inside:avoid; border-collapse:collapse; width:100%; margin:0 0 3mm 0; }
+.chapter-body th,.chapter-body td{ border:1px solid var(--gray-300); padding:2mm 3mm; text-align:left; }
+.chapter-body th{ background:var(--gray-100); font-weight:600; }
+
+/* Encadres (blockquote Tiptap + variantes callout-{tip,info,warning}) */
+.chapter-body blockquote,
+.chapter-body .callout-tip,
+.chapter-body .callout-info,
+.chapter-body .callout-warning{
+  border-left:4px solid var(--navy);
+  background:var(--gray-100);
+  padding:4mm 6mm;
+  margin:4mm 0;
+  break-inside:avoid;          /* jamais coupe entre 2 pages */
+}
+.chapter-body .callout-tip{ border-left-color:var(--tip); background:#ecfdf5; }
+.chapter-body .callout-warning{ border-left-color:var(--warn); background:#fffbeb; }
+.chapter-body blockquote p:last-child,
+.chapter-body .callout-tip p:last-child,
+.chapter-body .callout-info p:last-child,
+.chapter-body .callout-warning p:last-child{ margin-bottom:0; }
+
+/* ── Layout single-page (documents compagnons : checklists…) ───────── */
+.singlepage .sp-header{
+  background:var(--navy);
+  color:#fff;
+  border-radius:8px;
+  margin:0 0 7mm 0;
+  padding:8mm 9mm;
+}
+.singlepage .sp-eyebrow{
+  font-size:8.5pt;
+  font-weight:600;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.55);
+  margin-bottom:6px;
+}
+.singlepage .sp-title{
+  font-family:'Poppins',sans-serif;
+  font-size:22pt;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  margin:0;
+}
+.singlepage .sp-sub{
+  font-size:10.5pt;
+  color:rgba(255,255,255,0.78);
+  margin:6px 0 0 0;
+}
+.singlepage .sp-chapter{ break-inside:avoid; margin-bottom:6mm; }
+.singlepage .sp-chapter-title{
+  font-family:'Poppins',sans-serif;
+  font-size:13pt;
+  font-weight:700;
+  color:var(--navy);
+  margin:0 0 3mm 0;
+}

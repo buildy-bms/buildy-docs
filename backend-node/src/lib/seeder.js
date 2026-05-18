@@ -487,7 +487,11 @@ function backfillNewPlanSections() {
   }
   PLAN_AF.forEach((top, i) => walk(top, null, i));
 
-  const allAfs = db.db.prepare('SELECT id FROM afs WHERE deleted_at IS NULL').all();
+  // Uniquement les vraies AF : le plan AF n'a pas de sens pour les audits
+  // BACS (tables bacs_audit_*), brochures (brochure_items) ni livres blancs
+  // (chapitres libres). Sans ce filtre, ces documents recevaient les ~54
+  // sections du plan AF a chaque boot.
+  const allAfs = db.db.prepare("SELECT id FROM afs WHERE deleted_at IS NULL AND kind = 'af'").all();
   let totalInserted = 0;
 
   for (const af of allAfs) {

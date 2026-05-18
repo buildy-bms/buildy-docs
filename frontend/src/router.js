@@ -141,6 +141,18 @@ const routes = [
     component: () => import('@/views/BrochureDetailView.vue'),
   },
   {
+    path: '/marketing/whitepapers',
+    name: 'whitepapers',
+    meta: { title: 'Livres blancs' },
+    component: () => import('@/views/WhitepapersListView.vue'),
+  },
+  {
+    path: '/marketing/whitepapers/:id',
+    name: 'whitepaper-detail',
+    meta: { title: 'Livre blanc' },
+    component: () => import('@/views/WhitepaperDetailView.vue'),
+  },
+  {
     path: '/faq',
     name: 'faq-buildy',
     meta: { title: 'FAQ Buildy' },
