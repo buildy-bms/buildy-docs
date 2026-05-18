@@ -317,6 +317,30 @@ h1, h2, h3, h4, h5 {
   gap: 6mm;
   margin-bottom: 8mm;
 }
+.essential-caveat {
+  display: flex;
+  align-items: flex-start;
+  gap: 2.5mm;
+  margin: 0 0 6mm;
+  padding: 2.5mm 3.5mm;
+  background: #f8fafc;
+  border: 0.4pt solid #e2e8f0;
+  border-radius: 2mm;
+  font-size: 8pt;
+  line-height: 1.45;
+  color: #475569;
+}
+.essential-caveat-icon {
+  flex-shrink: 0;
+  width: 4mm; height: 4mm;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: #fff;
+  font-weight: 700;
+  font-size: 6.5pt;
+  font-style: italic;
+}
 .essential-block-title {
   font-family: 'Poppins', sans-serif;
   font-size: 8.5pt;
@@ -1759,9 +1783,9 @@ h3.subheading {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #9ca3af;
-  background: #fff;
-  border: 0.3pt solid #e5e7eb;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 0.3pt solid #fecaca;
   border-radius: 2mm;
   padding: 0.5mm 2mm;
 }
@@ -1979,4 +2003,144 @@ h3.subheading {
   border-top: 0.3pt dashed #e5e7eb;
   font-size: 8pt;
   color: #374151;
+}
+
+/* ── Page de clôture plein-bord — accompagnement Buildy ───────────
+   Symétrique de la page de garde : fond navy edge-to-edge via la
+   @page nommée "closing" (margin:0). Le header/footer Puppeteer y est
+   masqué en post-traitement (closingFullBleed). Ton sobre, coordonnées
+   de contact, invitation à la démo. */
+@page closing {
+  margin: 0;
+  background: #1b2842;
+}
+.closing {
+  page: closing;
+  page-break-before: always;
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  padding: 28mm 26mm;
+  background: var(--buildy-navy);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Trait vert Buildy vertical à gauche, comme la cover */
+.closing::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 28mm; bottom: 28mm;
+  width: 2.5mm;
+  background: var(--buildy-green);
+}
+.closing-top {
+  display: flex;
+  flex-direction: column;
+  gap: 14mm;
+}
+.closing-logo {
+  width: 38mm;
+  filter: brightness(0) invert(1);
+}
+.closing-eyebrow {
+  font-family: 'Inter', sans-serif;
+  font-size: 7.5pt;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.26em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.closing-main {
+  margin-top: 16mm;
+  flex: 1 1 auto;
+}
+.closing-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  margin: 0 0 7mm;
+  color: white;
+  max-width: 140mm;
+}
+.closing-lead {
+  font-size: 9.5pt;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0 0 7mm;
+  max-width: 150mm;
+}
+.closing-lead strong { color: white; font-weight: 600; }
+.closing-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+}
+.closing-points li {
+  position: relative;
+  padding-left: 7mm;
+  font-size: 9pt;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+}
+.closing-points li::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 1.6mm;
+  width: 2.6mm; height: 2.6mm;
+  border-radius: 0.6mm;
+  background: var(--buildy-green);
+}
+.closing-cta {
+  margin-top: 14mm;
+  padding: 9mm 10mm;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3pt solid var(--buildy-green);
+  border-radius: 2.5mm;
+}
+.closing-cta-label {
+  display: block;
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 5mm;
+}
+.closing-cta-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+}
+.closing-cta-row {
+  font-size: 11pt;
+  font-weight: 600;
+  color: white;
+}
+.closing-cta-key {
+  display: inline-block;
+  width: 26mm;
+  font-family: 'Inter', sans-serif;
+  font-size: 7.5pt;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.closing-cta-demo {
+  display: block;
+  margin-top: 6mm;
+  padding-top: 5mm;
+  border-top: 0.4pt solid rgba(255, 255, 255, 0.14);
+  font-size: 9pt;
+  color: rgba(255, 255, 255, 0.78);
 }

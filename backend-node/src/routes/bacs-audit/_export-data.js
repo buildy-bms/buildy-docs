@@ -115,7 +115,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0);
     return {
       ...s,
-      categoryLabel: SYSTEM_LABEL[s.system_category] || s.system_category,
+      categoryLabel: s.is_bacs === 0
+        ? (s.custom_label || 'Usage')
+        : (SYSTEM_LABEL[s.system_category] || s.system_category),
       negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
       commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
       devices: devs,
@@ -254,10 +256,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     category: t.category || 'heating',
     categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
     regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
+    // La régulation automatique se déduit du type (≠ none) — la colonne
+    // has_automatic_regulation n'est plus saisie (Feature J).
+    has_automatic_regulation: !!(t.regulation_type && t.regulation_type !== 'none'),
+    // Exemption R175-6 II déduite de l'énergie de production.
+    generator_exempt_wood: generatorEnergy === 'wood',
     // Compat ascendante : `generatorLabel` et `generator_age_years` exposés
     // ici à partir du device pointé pour ne pas casser les templates PDF
     // qui les référencent (bacs-audit-tables.hbs).
-    generatorLabel: generatorEnergy ? (GENERATOR_LABEL[generatorEnergy] || generatorEnergy) : '—',
+    // generatorEnergy est une energy_source (gas/wood/electric…) → libellé
+    // via ENERGY_LABEL (GENERATOR_LABEL est indexé par type de générateur).
+    generatorLabel: generatorEnergy ? (ENERGY_LABEL[generatorEnergy] || generatorEnergy) : '—',
     generator_age_years: generatorAgeYears,
     // Mig 129 : décomposition par niveau Production / Distribution / Émission.
     // Chaque niveau expose nom de l'équipement-process + nom de l'équipement
@@ -303,6 +312,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     blocking: actionItems.blocking.length,
     major: actionItems.major.length,
     minor: actionItems.minor.length,
+    total: actionItems.blocking.length + actionItems.major.length + actionItems.minor.length,
   };
 
   // Justifications (Annexe C). La source est derivee de la FK non-NULL

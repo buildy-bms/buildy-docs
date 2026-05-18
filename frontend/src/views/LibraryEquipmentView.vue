@@ -30,7 +30,7 @@ import { useSystemCategories } from '@/composables/useSystemCategories'
 import { useRouter, useRoute } from 'vue-router'
 import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
 
-// Helpers libellés FR pour les défauts énergie/niveau dans la table.
+// Helpers libellés FR pour les défauts énergie/rôle dans la table.
 function energyLabel(value) {
   return ENERGY_OPTIONS.find(o => o.value === value)?.label || value
 }
@@ -631,7 +631,7 @@ onMounted(async () => {
                 Énergie {{ sortBy === 'default_energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_device_role')">
-                Niveau {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+                Rôle {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}

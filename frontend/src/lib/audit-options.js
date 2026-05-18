@@ -12,14 +12,34 @@
 export const ENERGY_OPTIONS = [
   { value: 'gas',              label: 'Gaz',                icon: 'fa-fire-flame-curved', color: '#f97316' },
   { value: 'electric',         label: 'Électrique',         icon: 'fa-bolt',              color: '#eab308' },
-  { value: 'heat_pump',        label: 'PAC',                icon: 'fa-temperature-half',  color: '#0ea5e9' },
-  { value: 'district_heating', label: 'Réseau de chaleur',  icon: 'fa-pipe',              color: '#dc2626' },
+  { value: 'district_heating', label: 'Calories / Frigories', icon: 'fa-pipe',            color: '#dc2626' },
   { value: 'wood',             label: 'Bois',               icon: 'fa-tree',              color: '#65a30d' },
   { value: 'biomass',          label: 'Biomasse',           icon: 'fa-leaf',              color: '#16a34a' },
   { value: 'fuel_oil',         label: 'Fioul',              icon: 'fa-droplet',           color: '#92400e' },
   { value: 'solar',            label: 'Solaire',            icon: 'fa-solar-panel',       color: '#facc15' },
   { value: 'autre',            label: 'Autre',              icon: 'fa-circle-question',   color: '#6b7280' },
 ]
+
+// Libellés FR des catégories d'usage BACS (system_category). Pour un usage
+// manuel non BACS (is_bacs=0), le libellé affiché est `custom_label`.
+export const SYSTEM_CATEGORY_LABELS = {
+  heating: 'Chauffage',
+  cooling: 'Refroidissement',
+  ventilation: 'Ventilation',
+  dhw: 'Eau chaude sanitaire',
+  lighting_indoor: 'Éclairage intérieur',
+  lighting_outdoor: 'Éclairage extérieur',
+  electricity_production: 'Production photovoltaïque',
+}
+
+// Libellé d'un usage (ligne bacs_audit_systems), BACS ou manuel.
+export function systemUsageLabel(system) {
+  if (!system) return 'Usage'
+  if (system.is_bacs === 0 || system.is_bacs === false) {
+    return system.custom_label || 'Usage personnalisé'
+  }
+  return SYSTEM_CATEGORY_LABELS[system.system_category] || system.system_category || 'Usage'
+}
 
 export const ROLE_OPTIONS = [
   { value: 'production',   label: 'Production',   icon: 'fa-industry',          color: '#dc2626' },

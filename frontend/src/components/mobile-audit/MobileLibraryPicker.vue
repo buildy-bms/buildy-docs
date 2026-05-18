@@ -17,6 +17,7 @@ import MobileSelectSheet from './MobileSelectSheet.vue'
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
 import { listEquipmentTemplates, createBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useAuditStore } from '@/stores/audit'
 import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
 
 const props = defineProps({
@@ -26,6 +27,17 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'added'])
 const { success, error: notifyError } = useNotification()
+const auditStore = useAuditStore()
+
+// Un même modèle bibliothèque ne peut être ajouté qu'une fois par usage.
+const usedTemplateIds = computed(() => new Set(
+  (auditStore.devices || [])
+    .filter(d => d.system_id === props.system.id && d.equipment_template_id)
+    .map(d => d.equipment_template_id),
+))
+function isUsed(t) {
+  return usedTemplateIds.value.has(t.id) || recentlyAdded.value.has(t.id)
+}
 
 // Mapping côté front cohérent avec
 // backend-node/src/lib/system-categories.js::libraryCategoriesForBacsCategory.
@@ -47,13 +59,24 @@ const roleFilter = ref(null)
 const adding = ref({})
 const recentlyAdded = ref(new Set())
 
-const allowedCategories = computed(() =>
-  LIBRARY_CATS_FOR_BACS[props.system.system_category] || [],
-)
+// usage BACS → catégories mappées ; usage manuel rattaché → sa catégorie ;
+// usage manuel libre → null (toute la bibliothèque).
+const allowedCategories = computed(() => {
+  if (props.system.is_bacs === 0) {
+    return props.system.library_category_key ? [props.system.library_category_key] : null
+  }
+  return LIBRARY_CATS_FOR_BACS[props.system.system_category] || []
+})
 
 async function loadTemplates() {
   loading.value = true
   try {
+    if (allowedCategories.value === null) {
+      const { data } = await listEquipmentTemplates()
+      templates.value = (data || []).sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '', 'fr'))
+      return
+    }
     if (!allowedCategories.value.length) {
       templates.value = []
       return
@@ -130,7 +153,7 @@ function hasRole(value) {
 }
 
 async function pickTemplate(t) {
-  if (adding.value[t.id]) return
+  if (adding.value[t.id] || isUsed(t)) return
   adding.value = { ...adding.value, [t.id]: true }
   try {
     await createBacsDevice(props.system.id, { equipment_template_id: t.id })
@@ -223,7 +246,7 @@ const title = computed(() =>
           <button
             type="button"
             @click="pickTemplate(t)"
-            :disabled="!!adding[t.id]"
+            :disabled="!!adding[t.id] || isUsed(t)"
             class="w-full flex items-start gap-3 px-3 py-3 text-left active:bg-gray-50 disabled:opacity-60"
           >
             <EquipmentIcon :template="t" size="md" class="mt-0.5" />
@@ -246,16 +269,16 @@ const title = computed(() =>
             <button
               type="button"
               @click="pickTemplate(t)"
-              :disabled="!!adding[t.id]"
+              :disabled="!!adding[t.id] || isUsed(t)"
               :class="[
                 'w-full min-h-11 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-base font-medium rounded-lg transition',
-                recentlyAdded.has(t.id)
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 active:bg-emerald-100'
+                isUsed(t)
+                  ? 'bg-gray-50 text-gray-400 border border-gray-200'
                   : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50',
               ]"
             >
-              <FontAwesomeIcon v-if="recentlyAdded.has(t.id)" :icon="['fas', 'check']" class="w-4 h-4 shrink-0" />
-              {{ adding[t.id] ? 'Ajout…' : recentlyAdded.has(t.id) ? 'Ajouté · Encore ?' : 'Ajouter' }}
+              <FontAwesomeIcon v-if="isUsed(t)" :icon="['fas', 'check']" class="w-4 h-4 shrink-0" />
+              {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
             </button>
           </div>
         </li>

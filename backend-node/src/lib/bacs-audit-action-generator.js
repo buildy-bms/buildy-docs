@@ -83,11 +83,12 @@ function computeTargetActions(documentId) {
     target.set(keyOfItem(item), item);
   }
 
-  // Systems (R175-1 §4 + R175-3 §3 + §4)
+  // Systems (R175-1 §4 + R175-3 §3 + §4). Les usages manuels non BACS
+  // (is_bacs=0) sont hors décret → exclus du scoring (mig 144).
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name FROM bacs_audit_systems s
     LEFT JOIN zones z ON z.id = s.zone_id
-    WHERE s.document_id = ?
+    WHERE s.document_id = ? AND s.is_bacs = 1
   `).all(documentId);
   for (const s of systems) {
     const catFr = SYSTEM_LABEL_FR[s.system_category] || s.system_category;
@@ -159,8 +160,9 @@ function computeTargetActions(documentId) {
         });
       }
 
-      // R175-3 §4 — arret manuel possible
-      if (d.meets_r175_3_p4 === 0) {
+      // R175-3 §4 — arret manuel possible. Non coche (0 OU non evalue) =
+      // non satisfait : coherent avec la pastille ✗ affichee dans le rapport.
+      if (!d.meets_r175_3_p4) {
         addTarget({
           source_device_id: d.id, source_subtype: 'r175_3_p4',
           category: 'bms_upgrade', severity: 'major',
@@ -171,8 +173,8 @@ function computeTargetActions(documentId) {
         });
       }
 
-      // R175-3 §4 — fonctionnement autonome
-      if (d.meets_r175_3_p4_autonomous === 0) {
+      // R175-3 §4 — fonctionnement autonome (idem : non coché = non satisfait).
+      if (!d.meets_r175_3_p4_autonomous) {
         addTarget({
           source_device_id: d.id, source_subtype: 'r175_3_p4_autonomous',
           category: 'bms_upgrade', severity: 'major',
@@ -234,7 +236,19 @@ function computeTargetActions(documentId) {
   // documentId. Le discriminator entre les checks (P1, P2, maintenance...)
   // passe par source_subtype.
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId);
-  if (bms && !bms.out_of_service) {
+  // present === 0 : aucune GTB sur site → une seule action « installer une
+  // GTB », et on saute toutes les vérifs de capacités GTB.
+  const noGtb = bms && bms.present === 0;
+  if (noGtb) {
+    addTarget({
+      source_bms_document_id: documentId, source_subtype: 'no_gtb',
+      category: 'bms_upgrade', severity: 'blocking',
+      r175_article: 'R175-3',
+      title: 'Installer une GTB conforme au décret BACS',
+      description: 'Aucune GTB n\'est présente sur le site. Le décret BACS impose un système d\'automatisation et de contrôle du bâtiment (GTB) assurant le suivi, la détection des dérives et le pilotage des systèmes techniques.',
+    });
+  }
+  if (!noGtb && bms && !bms.out_of_service) {
     if (bms.meets_r175_3_p1 === 0) {
       addTarget({
         source_bms_document_id: documentId, source_subtype: 'r175_3_p1',
@@ -269,7 +283,9 @@ function computeTargetActions(documentId) {
       addTarget({
         source_bms_document_id: documentId, source_subtype: 'data_provision_manager',
         category: 'documentation', severity: 'major',
-        r175_article: 'R175-3',
+        // « dernier alinéa » → axe « Mise à disposition des données » du
+        // tableau de bord (axisOfArticle matche /dernier|alin|donn/).
+        r175_article: 'R175-3 dernier alinéa',
         title: 'Documenter la mise à disposition des données au gestionnaire du bâtiment',
         description: 'L\'article R175-3 (dernier alinéa) impose au propriétaire de mettre les données archivées à disposition du gestionnaire du bâtiment à sa demande. Aucune procédure documentée n\'a été identifiée.',
       });
@@ -278,7 +294,7 @@ function computeTargetActions(documentId) {
       addTarget({
         source_bms_document_id: documentId, source_subtype: 'data_provision_operators',
         category: 'documentation', severity: 'major',
-        r175_article: 'R175-3',
+        r175_article: 'R175-3 dernier alinéa',
         title: 'Documenter la transmission des données aux exploitants des systèmes techniques',
         description: 'L\'article R175-3 (dernier alinéa) impose au propriétaire de transmettre à chaque exploitant les données concernant le système technique qu\'il opère. Aucune procédure documentée n\'a été identifiée.',
       });
@@ -319,10 +335,13 @@ function computeTargetActions(documentId) {
       // (l'auditeur n'a pas besoin de cocher manuellement). Le flag
       // generator_exempt_wood reste un override pour les cas particuliers
       // (biomasse autre que bois, ou exemption forcee).
-      const prodWood = t.prod_energy_source === 'wood';
-      const exempt = !!t.generator_exempt_wood || prodWood;
-      if (exempt) continue;
-      if (!t.has_automatic_regulation) {
+      // L'exemption se déduit uniquement de l'énergie de l'équipement de
+      // production (plus de case à cocher manuelle generator_exempt_wood).
+      if (t.prod_energy_source === 'wood') continue;
+      // « Régulation automatique » se déduit de regulation_type (plus de
+      // colonne has_automatic_regulation).
+      const noRegulation = !t.regulation_type || t.regulation_type === 'none';
+      if (noRegulation) {
         addTarget({
           source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
@@ -336,11 +355,13 @@ function computeTargetActions(documentId) {
   }
 
   // R175-5-1 — inspection periodique par tiers (rapport conserve 10 ans).
-  const inspections = db.db.prepare(
+  // Sans GTB sur site, aucune inspection BACS n'est à programmer.
+  if (!noGtb) {
+   const inspections = db.db.prepare(
     'SELECT * FROM bacs_audit_inspections WHERE document_id = ? ORDER BY COALESCE(last_inspection_date, \'1970\') DESC'
-  ).all(documentId);
-  const today = new Date().toISOString().slice(0, 10);
-  if (inspections.length === 0) {
+   ).all(documentId);
+   const today = new Date().toISOString().slice(0, 10);
+   if (inspections.length === 0) {
     // Item synthetique : aucune inspection en DB, donc pas de FK.
     // source_subtype = 'no_inspection' assure l'unicite de la cle d'idempotence.
     addTarget({
@@ -350,7 +371,7 @@ function computeTargetActions(documentId) {
       title: 'Programmer une inspection périodique du BACS par un tiers',
       description: 'L\'article R175-5-1 impose une inspection périodique réalisée par un tiers (rapport conservé 10 ans). Aucune trace d\'inspection n\'a été déposée pour ce site.',
     });
-  } else {
+   } else {
     const latest = inspections[0];
     if (latest.next_inspection_due_date && latest.next_inspection_due_date < today) {
       addTarget({
@@ -361,6 +382,7 @@ function computeTargetActions(documentId) {
         description: `Échéance prévue ${latest.next_inspection_due_date} non respectée. Replanifier l'inspection par un tiers (rapport conservé 10 ans).`,
       });
     }
+   }
   }
 
   return target;
@@ -424,8 +446,13 @@ function regenerateActionItems(documentId) {
         resolved++;
       }
     } else {
-      // Mise a jour (sans toucher status si != open)
-      const updateStatus = e.status === 'open' ? 'open' : e.status;
+      // Mise a jour. L'item est de nouveau dans la cible :
+      //  - s'il etait 'done' (gap precedemment resolu), le gap est RE-OUVERT
+      //    -> on repasse en 'open' (sinon l'action reste invisible alors que
+      //    le probleme est revenu — cf. bascule GTB presente/absente).
+      //  - s'il etait 'declined' (ecarte manuellement par l'auditeur), on
+      //    respecte ce choix et on le laisse 'declined'.
+      const updateStatus = e.status === 'declined' ? 'declined' : 'open';
       db.db.prepare(`
         UPDATE bacs_audit_action_items
         SET category = ?, severity = ?, r175_article = ?, title = ?, description = ?,

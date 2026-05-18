@@ -2,6 +2,223 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.59",
+      "date": "2026-05-18",
+      "title": "Rapport PDF d'audit : méthodologie étoffée et page de clôture",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Annexe B (méthodologie) complétée",
+          "what": "L'annexe B du rapport PDF gagne 7 nouveaux points de méthodologie : arrêt manuel / fonctionnement autonome (R175-3 §4), fourniture des données à un service tiers, absence de GTB, comptage et sous-comptage, sévérité des actions et verdict global, inspection périodique R175-5-1, usages et zones hors décret. Ces textes restent éditables depuis « Textes standards PDF ».",
+          "where": "Rapport PDF d'un audit BACS — Annexe B.",
+          "how_to_test": "Exporter le PDF d'un audit BACS et vérifier l'Annexe B : les 16 points de méthodologie sont présents."
+        },
+        {
+          "kind": "improvement",
+          "title": "Page de clôture avec invitation à la mise en conformité",
+          "what": "Le rapport PDF se termine désormais par une page de clôture sobre, fond navy, qui récapitule le nombre d'actions correctives à engager et donne les coordonnées de contact Buildy (contact@buildy.fr, 04 28 39 03 34, www.buildy.fr) pour accompagner la mise en conformité.",
+          "where": "Rapport PDF d'un audit BACS — dernière page.",
+          "how_to_test": "Exporter le PDF d'un audit : la dernière page affiche le panneau navy d'accompagnement Buildy."
+        },
+        {
+          "kind": "improvement",
+          "title": "Bibliothèque : « niveaux » renommés en « rôles »",
+          "what": "Dans l'éditeur de modèles de systèmes de la bibliothèque, le champ « Niveau par défaut » s'appelle désormais « Rôle(s) par défaut », pour rester cohérent avec le vocabulaire utilisé dans les audits.",
+          "where": "Bibliothèque d'équipements — édition d'un modèle de système.",
+          "how_to_test": "Ouvrir un modèle de système : le sous-bloc Pré-remplissage parle de « rôle »."
+        },
+        {
+          "kind": "fix",
+          "title": "Type de zone : libellés en toutes lettres",
+          "what": "Dans le tableau des zones de l'audit, le sélecteur de type affichait « Fonct. » / « Tech. » abrégés. Il affiche désormais « Fonctionnelle » / « Technique » en entier.",
+          "where": "Détail d'un audit — section Zones, colonne Type.",
+          "how_to_test": "Ouvrir un audit et vérifier la colonne Type du tableau des zones."
+        }
+      ]
+    },
+    {
+      "version": "0.1.58",
+      "date": "2026-05-18",
+      "title": "Audit BACS : validation d'étape et tableau de bord fiabilisés",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Validation des étapes « Zones techniques », « Inspections » et « Check-list »",
+          "what": "La validation de ces trois étapes du suivi d'audit échouait silencieusement (erreur serveur) : le serveur ne reconnaissait pas ces clés d'étape. Les 13 étapes du stepper sont désormais toutes validables.",
+          "where": "Détail d'un audit BACS — colonne de progression à gauche.",
+          "how_to_test": "Compléter puis valider les étapes Zones techniques / Inspections / Check-list documentaire : la validation passe."
+        },
+        {
+          "kind": "fix",
+          "title": "Tableau de bord : ligne « Mise à disposition des données » correcte",
+          "what": "Les actions liées à la mise à disposition des données R175-3 (dernier alinéa) étaient comptabilisées sur la mauvaise ligne du tableau de bord de conformité (« Suivi continu » au lieu de « Mise à disposition des données »). Elles sont désormais rattachées à la bonne exigence.",
+          "where": "Rapport PDF — tableau de bord de conformité R175.",
+          "how_to_test": "Sur un audit avec GTB sans procédure de mise à disposition documentée, la ligne R175-3 D.A. du tableau de bord reflète l'action."
+        },
+        {
+          "kind": "fix",
+          "title": "Modale d'ajout de système : choix multi-protocoles",
+          "what": "Le champ « Protocole de communication » de la modale d'ajout devient multi-protocoles (comme le tableau des équipements). Auparavant, choisir OPC-UA, LonWorks ou API REST provoquait une erreur. On peut maintenant cocher un ou plusieurs protocoles.",
+          "where": "Card 4 « Systèmes techniques » → Ajouter un système (saisie manuelle).",
+          "how_to_test": "Ouvrir « Ajouter un système », sélectionner plusieurs protocoles dont OPC-UA : l'ajout réussit."
+        }
+      ]
+    },
+    {
+      "version": "0.1.57",
+      "date": "2026-05-18",
+      "title": "Rapport PDF : cohérence du verdict et du plan d'action",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Site sans GTB : exigences GTB correctement « non conformes »",
+          "what": "Un audit « Pas de GTB » affichait à tort plusieurs exigences en vert (interopérabilité, arrêt manuel, mise à disposition des données, vérifications, formation). Sans GTB, ces exigences sont désormais « Non conforme », et l'action « Installer une GTB » réapparaît bien dans le plan (elle restait bloquée à l'état « terminée » après une bascule présent/absent).",
+          "where": "Rapport PDF — tableau de bord R175 et plan de mise en conformité.",
+          "how_to_test": "Sur un audit « Pas de GTB », générer le rapport : les lignes GTB du tableau de bord sont rouges et le plan contient « Installer une GTB »."
+        },
+        {
+          "kind": "fix",
+          "title": "Compteurs fantômes retirés du plan",
+          "what": "Les compteurs devenus obsolètes (énergie d'un équipement modifiée — ex. chaudière passée au bois) ou rattachés à un usage hors décret ne génèrent plus d'action bloquante : ils repassent automatiquement en « non requis ». Le plan ne liste que les compteurs réellement exigés.",
+          "where": "Card 4 « Compteurs » et plan de mise en conformité.",
+          "how_to_test": "Changer l'énergie d'un équipement : les anciens compteurs ne sont plus comptés comme requis."
+        },
+        {
+          "kind": "fix",
+          "title": "Cohérence des pastilles et du tableau de bord",
+          "what": "Un équipement non évalué « Arrêt manuel / Autonome » est désormais traité comme non conforme (cohérent avec la pastille ✗ affichée). Les pastilles R175-3 ne s'affichent plus sur les équipements des usages hors décret. Le détail de régulation thermique n'est plus déroulé quand R175-6 est non applicable. L'énergie de production s'affiche en clair (« Bois » et non « wood »). Sommaire : numéros de page corrigés. Encadré ajouté quand l'assujettissement n'est pas statué.",
+          "where": "Rapport PDF — chapitres Systèmes, Régulation thermique, Sommaire, page L'essentiel.",
+          "how_to_test": "Régénérer un rapport et vérifier sommaire, pastilles et chapitre régulation."
+        }
+      ]
+    },
+    {
+      "version": "0.1.56",
+      "date": "2026-05-18",
+      "title": "Rapport PDF : chapitre GTB cohérent sans GTB, usages absents en rouge",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Chapitre GTB du rapport quand il n'y a pas de GTB",
+          "what": "Quand l'audit indique « Pas de GTB », le chapitre 6 du rapport PDF n'affiche plus toute la grille d'analyse vide (solution « Non renseigné », usages couverts, capacités R175-3, etc.) mais un encadré clair indiquant l'absence de GTB et le renvoi au plan de mise en conformité.",
+          "where": "Rapport PDF d'audit BACS, chapitre 6 « Solution GTB / GTC ».",
+          "how_to_test": "Sur un audit « Pas de GTB », générer le rapport (ou l'aperçu) : le chapitre 6 tient en un encadré."
+        },
+        {
+          "kind": "improvement",
+          "title": "Usages absents signalés en rouge dans le rapport",
+          "what": "Dans le chapitre Systèmes du rapport, les usages marqués « Non présent » ou « Pas de … » s'affichent désormais avec une pastille rouge, cohérente avec le code couleur de l'app.",
+          "where": "Rapport PDF d'audit, chapitre 3 « Systèmes techniques par zone ».",
+          "how_to_test": "Générer le rapport d'un audit ayant des usages non présents : les pastilles sont rouges."
+        }
+      ]
+    },
+    {
+      "version": "0.1.55",
+      "date": "2026-05-18",
+      "title": "Éditeur de notes enrichi : titres, souligné et citations",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Plus d'options de mise en forme dans les éditeurs de notes",
+          "what": "L'éditeur de texte riche (notes des systèmes, zones, GTB, régulation, descriptions de la bibliothèque…) reçoit les boutons classiques absents jusqu'ici : titres niveau 2 et 3, souligné, et citation. Il proposait déjà gras, italique, listes et lien.",
+          "where": "Toutes les fenêtres de notes des audits et les champs de description de la bibliothèque.",
+          "how_to_test": "Ouvrir une note (icône crayon sur un système, une zone, la GTB…) : la barre d'outils propose désormais H2, H3, souligné et citation."
+        }
+      ]
+    },
+    {
+      "version": "0.1.54",
+      "date": "2026-05-18",
+      "title": "Correctif : ajout d'équipement impossible sur les sites au bois / fioul",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Ajout d'un système technique qui échouait (erreur serveur)",
+          "what": "Sur un audit comportant un équipement au bois, à la biomasse ou au fioul, l'ajout de tout nouveau système technique renvoyait une erreur serveur : le compteur d'énergie correspondant ne pouvait pas être créé. Ces énergies sont désormais sous-comptées via un compteur d'énergie thermique. Les icônes des modèles de la bibliothèque s'affichent aussi correctement.",
+          "where": "Card 4 « Systèmes techniques », ajout d'un système (saisie manuelle ou bibliothèque).",
+          "how_to_test": "Sur un audit avec un équipement bois/fioul, ajouter un système : l'ajout réussit."
+        }
+      ]
+    },
+    {
+      "version": "0.1.53",
+      "date": "2026-05-18",
+      "title": "Audits : déplacement plus rapide, usages depuis la bibliothèque de catégories",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Déplacer un système en deux clics",
+          "what": "Le menu de déplacement affiche maintenant directement la liste des usages (groupés par zone) : un clic sur un usage déplace l'équipement immédiatement, sans passer par un menu déroulant.",
+          "where": "Card 4 « Systèmes techniques », icône de déplacement (double flèche) sur chaque équipement.",
+          "how_to_test": "Cliquer l'icône de déplacement d'un équipement, puis cliquer un autre usage dans la liste : l'équipement est déplacé aussitôt."
+        },
+        {
+          "kind": "improvement",
+          "title": "Ajouter un usage : bouton plus visible et choix depuis la bibliothèque",
+          "what": "Le bouton « Ajouter un usage » est maintenant un vrai bouton encadré, bien visible sous chaque zone. À l'ajout, on choisit une catégorie dans la bibliothèque de catégories (Chauffage, Éclairage, Comptage…) ou on saisit un nom libre.",
+          "where": "Card 4 « Systèmes techniques », bouton « Ajouter un usage » sous chaque zone.",
+          "how_to_test": "Cliquer « Ajouter un usage » : un sélecteur propose les catégories de la bibliothèque ; en choisir une, ou taper un nom personnalisé."
+        },
+        {
+          "kind": "improvement",
+          "title": "Bibliothèque d'équipements disponible pour les usages hors BACS",
+          "what": "On peut désormais ajouter un système depuis la bibliothèque d'équipements aussi pour les usages ajoutés manuellement. Si l'usage est rattaché à une catégorie de la bibliothèque, la liste est filtrée sur cette catégorie ; sinon toute la bibliothèque est proposée.",
+          "where": "Card 4 « Systèmes techniques », bouton « Depuis la bibliothèque » d'un usage manuel.",
+          "how_to_test": "Sur un usage ajouté manuellement, ouvrir « Depuis la bibliothèque » : les modèles d'équipement s'affichent."
+        }
+      ]
+    },
+    {
+      "version": "0.1.52",
+      "date": "2026-05-18",
+      "title": "Audits : déplacer/partager les systèmes, usages libres, GTB présente ou absente, plan épuré",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Déplacer ou partager un système technique entre usages et zones",
+          "what": "Chaque système technique (équipement) peut désormais être déplacé vers un autre usage de la même zone ou d'une autre zone, et partagé entre plusieurs usages (cas d'un équipement qui dessert plusieurs usages). Plus besoin de le supprimer et le ressaisir en cas d'erreur de saisie.",
+          "where": "Card 4 « Systèmes techniques », icône de partage dans la colonne Actions de chaque équipement.",
+          "how_to_test": "Ouvrir un équipement, cliquer l'icône de partage : choisir un autre « Usage principal » le déplace ; cocher des usages dans « Aussi présent dans » le partage."
+        },
+        {
+          "kind": "feature",
+          "title": "Ajouter des usages libres, y compris dans les zones techniques",
+          "what": "On peut créer manuellement des usages hors décret BACS (bornes de recharge, occultation…) et en ajouter dans les zones techniques, puis y saisir des systèmes techniques. Les zones techniques apparaissent maintenant dans la card 4.",
+          "where": "Card 4 « Systèmes techniques », bouton « Ajouter un usage » sous chaque zone.",
+          "how_to_test": "Sous une zone, cliquer « Ajouter un usage », saisir un nom : l'usage apparaît, on y ajoute des systèmes en saisie manuelle, et on peut le supprimer."
+        },
+        {
+          "kind": "feature",
+          "title": "GTB : indiquer d'emblée « présente » ou « pas de GTB »",
+          "what": "La card GTB commence par un choix « GTB présente / Pas de GTB ». Sans GTB, le détail GTB et la section Inspection périodique R175-5-1 sont masqués, et une action « Installer une GTB » est ajoutée au plan.",
+          "where": "Card 6 (audit GTB) / 7 (audit BACS) « Solution GTB ».",
+          "how_to_test": "Choisir « Pas de GTB » : la saisie R175 et l'inspection disparaissent, l'action apparaît dans le plan. « GTB présente » réaffiche tout."
+        },
+        {
+          "kind": "feature",
+          "title": "Validation d'étape bloquée tant que l'essentiel n'est pas saisi",
+          "what": "Le bouton « Valider cette étape » du suivi d'audit reste désactivé tant que les informations essentielles de l'étape ne sont pas renseignées.",
+          "where": "Colonne de progression de l'audit (stepper) à gauche.",
+          "how_to_test": "Sur une étape incomplète, le bouton de validation est grisé avec un rappel ; compléter l'étape l'active."
+        },
+        {
+          "kind": "feature",
+          "title": "Plan de mise en conformité épuré et regroupé par zone",
+          "what": "Le statut et la note commerciale sont retirés des actions (jamais renseignés, place gagnée). Les actions sont regroupées par zone. Un bouton « Écarter » permet de retirer une action auto-générée non pertinente.",
+          "where": "Card 12 « Plan de mise en conformité ».",
+          "how_to_test": "Les actions s'affichent sous des en-têtes de zone ; « Écarter » retire une action du plan et du PDF, « Réintégrer » la remet."
+        },
+        {
+          "kind": "improvement",
+          "title": "Bibliothèque, énergies et régulation thermique affinées",
+          "what": "Un modèle de bibliothèque ne peut être ajouté qu'une fois par usage. L'énergie « Réseau de chaleur » devient « Calories / Frigories » et l'énergie « PAC » est supprimée. La card Régulation thermique perd la colonne « Régulation Auto » et la ligne détail (sonde/thermostat) redondantes ; l'exemption bois est déduite automatiquement. La modale d'ajout de système exige Protocole, Énergie et Niveau.",
+          "where": "Cards 4 et 6 de l'audit, modale d'ajout de système, bibliothèque d'équipements.",
+          "how_to_test": "Ajouter deux fois le même modèle de bibliothèque dans un usage : le bouton passe « Déjà ajouté ». Le menu Énergie n'affiche plus « PAC »."
+        }
+      ]
+    },
+    {
       "version": "0.1.51",
       "date": "2026-05-18",
       "title": "Audits : nouvelle card « Zones techniques » pour inventorier les locaux hors décret BACS",

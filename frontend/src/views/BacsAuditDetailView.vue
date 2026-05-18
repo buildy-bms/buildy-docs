@@ -290,14 +290,34 @@ const STATUS_LABEL = {
   declined: 'Non retenue',
 }
 
+// Card 4 : on liste TOUTES les zones (fonctionnelles ET techniques),
+// y compris celles sans aucun usage encore — c'est là qu'on ajoute des
+// usages manuels. Les zones techniques sont ainsi visibles et éditables.
 const systemsByZone = computed(() => {
-  const groups = new Map()
+  const byZone = new Map()
   for (const s of systems.value) {
-    const k = s.zone_id
-    if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, zone_nature: s.zone_nature, items: [] })
-    groups.get(k).items.push(s)
+    if (!byZone.has(s.zone_id)) byZone.set(s.zone_id, [])
+    byZone.get(s.zone_id).push(s)
   }
-  return [...groups.values()]
+  const groups = []
+  const seen = new Set()
+  for (const z of (zones.value || [])) {
+    seen.add(z.zone_id)
+    groups.push({
+      zone_id: z.zone_id, zone_name: z.name, zone_nature: z.nature,
+      zone_kind: z.kind || 'functional', items: byZone.get(z.zone_id) || [],
+    })
+  }
+  // Zones présentes via leurs systèmes mais absentes du store (audit sans
+  // site rattaché) : on les conserve pour ne rien masquer.
+  for (const [zid, items] of byZone) {
+    if (seen.has(zid)) continue
+    groups.push({
+      zone_id: zid, zone_name: items[0]?.zone_name, zone_nature: items[0]?.zone_nature,
+      zone_kind: 'functional', items,
+    })
+  }
+  return groups
 })
 
 // Replier/déplier manuellement les zones et catégories de la card 3.
@@ -482,22 +502,16 @@ const bmsSteps = computed(() => {
 // Devices disponibles comme générateurs pour une (zone, catégorie).
 // On filtre sur la category — un device de chauffage n'a aucun sens
 // comme générateur de la régulation clim et inversement.
-// Inclut aussi les devices partagés depuis une autre zone via
-// bacs_audit_device_extra_zones (mig 98) : une chaufferie commune
-// dessert plusieurs zones et doit apparaître dans toutes.
+// Inclut aussi les devices partagés depuis un autre usage via
+// bacs_audit_device_shared_systems (mig 143).
 function generatorDevicesForZoneCategory(zoneId, category) {
-  const sysById = new Map(systems.value.map(s => [s.id, s]))
-  const sysIds = systems.value
+  const sysIds = new Set(systems.value
     .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
-    .map(s => s.id)
-  return devices.value.filter(d => {
-    if (sysIds.includes(d.system_id)) return true
-    if (Array.isArray(d.extra_zone_ids) && d.extra_zone_ids.includes(zoneId)) {
-      const parentSys = sysById.get(d.system_id)
-      return parentSys?.system_category === category
-    }
-    return false
-  })
+    .map(s => s.id))
+  return devices.value.filter(d =>
+    sysIds.has(d.system_id) ||
+    (Array.isArray(d.extra_system_ids) && d.extra_system_ids.some(sid => sysIds.has(sid)))
+  )
 }
 
 // Panneau d'activité (slide-out a droite, comme dans l'AF detail).
@@ -618,10 +632,12 @@ const STEP_DEFINITIONS = [
     label: 'Régulation thermique',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
     isComplete: () => thermal.value.length > 0 },
+  // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
-    isComplete: () => !!bms.value?.existing_solution },
+    isComplete: () => bms.value?.present === 0 ||
+      (bms.value?.present === 1 && !!bms.value?.existing_solution) },
   { key: 'inspections',
     label: 'Inspections',
     description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
@@ -641,7 +657,8 @@ const STEP_DEFINITIONS = [
   { key: 'review',
     label: 'Plan & livraison',
     description: 'Plan de mise en conformite relu et annote commercialement.',
-    isComplete: () => actionItems.value.every(a => a.estimated_effort || a.status !== 'open') },
+    // Le plan n'a plus de champ par action à renseigner : sign-off manuel.
+    isComplete: () => true },
   { key: 'synthesis',
     label: 'Synthèse',
     description: 'Note de synthese redigee (manuellement ou via Claude).',
@@ -697,6 +714,8 @@ function gotoChecklistBms() {
 const STEPS_BACS_ONLY = new Set(['thermal', 'inspections', 'review'])
 const stepperSteps = computed(() => STEP_DEFINITIONS
   .filter(def => isBacs.value || !STEPS_BACS_ONLY.has(def.key))
+  // Sans GTB sur site, l'inspection périodique R175-5-1 n'a pas lieu d'être.
+  .filter(def => !(def.key === 'inspections' && bms.value?.present === 0))
   .map(def => {
     const p = auditProgress.value?.[def.key] || {}
     return {
@@ -711,6 +730,11 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
   }))
 
 async function validateStep(stepKey) {
+  // Garde : on ne valide pas une étape dont les infos essentielles manquent.
+  if (!stepFor(stepKey)?.complete) {
+    error('Complétez l\'étape avant de la valider.')
+    return
+  }
   try {
     const { data } = await validateBacsAuditStep(docId, stepKey, true)
     auditProgress.value = data.audit_progress || {}
@@ -1404,8 +1428,9 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @refresh-audit-data="refreshAuditData"
       />
 
-      <!-- 8. Inspection périodique par un tiers (R175-5-1) -->
-      <InspectionsSection v-if="isBacs"
+      <!-- 8. Inspection périodique par un tiers (R175-5-1).
+           Masquée sans GTB sur site : rien à faire inspecter. -->
+      <InspectionsSection v-if="isBacs && bms?.present !== 0"
                           :active="activeStepKey === 'inspections'"
                           :step="stepFor('inspections')"
                           @validate-step="validateStep"
@@ -1531,7 +1556,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
     />
     <AddDeviceModal
       v-if="addDeviceModalSystem"
-      :system-label="SYSTEM_LABEL[addDeviceModalSystem.system_category] || addDeviceModalSystem.system_category"
+      :system-label="addDeviceModalSystem.is_bacs === 0 ? (addDeviceModalSystem.custom_label || 'Usage') : (SYSTEM_LABEL[addDeviceModalSystem.system_category] || addDeviceModalSystem.system_category)"
       :zone-name="addDeviceModalSystem.zone_name || ''"
       :energy-options="ENERGY_OPTIONS"
       :role-options="ROLE_OPTIONS"
@@ -1542,7 +1567,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
     <LibraryDevicePicker
       v-if="libraryDevicePickerSystem"
       :system="libraryDevicePickerSystem"
-      :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :system-label="libraryDevicePickerSystem.is_bacs === 0 ? (libraryDevicePickerSystem.custom_label || 'Usage') : (SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category)"
       :zone-name="libraryDevicePickerSystem.zone_name || ''"
       @close="libraryDevicePickerSystem = null"
       @added="refreshAuditData"

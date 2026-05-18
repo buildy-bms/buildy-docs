@@ -46,8 +46,9 @@ const ENERGY_LABEL = {
   gas: 'Gaz',
   electric: 'Électrique',
   wood: 'Bois',
-  heat_pump: 'PAC',
-  district_heating: 'Réseau de chaleur',
+  // Fallback de compat pour d'éventuelles lignes legacy non migrées.
+  heat_pump: 'Électrique',
+  district_heating: 'Calories / Frigories',
   fuel_oil: 'Fioul',
   solar: 'Solaire',
   biomass: 'Biomasse',
@@ -68,7 +69,6 @@ const METER_TYPE_LABEL = {
   gas: 'Gaz',
   water: 'Eau',
   thermal: 'Thermique',
-  other: 'Autre',
 };
 
 const METER_USAGE_LABEL = {

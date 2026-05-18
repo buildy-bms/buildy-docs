@@ -327,8 +327,6 @@
         <th class="col-zone">Zone</th>
         <th class="col-title">Titre de l'action</th>
         <th class="col-source">Item source</th>
-        <th class="col-status">Statut</th>
-        <th class="col-comm-notes">Note commerciale</th>
       </tr>
     </thead>
     <tbody>
@@ -346,8 +344,6 @@
               <span class="muted">—</span>
             {{/if}}
           </td>
-          <td class="col-status"><span class="status-pill status-pill-{{status}}">{{#if (eq status "open")}}Ouverte{{else}}{{#if (eq status "quoted")}}Chiffrée{{else}}{{#if (eq status "in_progress")}}En cours{{else}}{{status}}{{/if}}{{/if}}{{/if}}</span></td>
-          <td class="col-comm-notes">{{#if commercial_notes}}{{commercial_notes}}{{else}}<span class="muted">—</span>{{/if}}</td>
         </tr>
       {{/each}}
     </tbody>

@@ -838,13 +838,17 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   let inserted = 0;
 
   // Mapping energie -> meter_type (le type physique du compteur)
+  // Note : 'other' n'est PAS un meter_type valide (CHECK bacs_audit_meters
+  // = electric/electric_production/gas/water/thermal). Les énergies sans
+  // compteur dédié (bois, biomasse, fioul) se sous-comptent via un compteur
+  // d'énergie thermique sur le circuit.
   const ENERGY_TO_METER_TYPE = {
     gas: 'gas',
     electric: 'electric',
     heat_pump: 'electric',
-    wood: 'other',
-    biomass: 'other',
-    fuel_oil: 'other',
+    wood: 'thermal',
+    biomass: 'thermal',
+    fuel_oil: 'thermal',
     district_heating: 'thermal',
     solar: 'electric_production',
   };
@@ -862,7 +866,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // Mapping general (compteur energie primaire au niveau batiment) — libelles FR
   const ENERGY_TO_GENERAL = {
     gas: { meter_type: 'gas', notes: 'Compteur général gaz du bâtiment' },
-    fuel_oil: { meter_type: 'other', notes: 'Compteur général fioul du bâtiment' },
+    fuel_oil: { meter_type: 'thermal', notes: 'Compteur général fioul du bâtiment' },
     district_heating: { meter_type: 'thermal', notes: 'Compteur général thermique (réseau de chaleur)' },
   };
   // Labels FR pour les notes auto-generes
@@ -894,14 +898,22 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     VALUES (?, NULL, 'other', ?, 1, 0, 0, ?)
   `);
 
-  // Recupere tous les devices avec leur zone parent
+  // Recupere tous les devices avec leur zone parent. is_bacs = 1 : les
+  // usages manuels hors decret ne generent PAS de compteur reglementaire.
   const devices = db.db.prepare(`
     SELECT d.id, d.energy_source, s.zone_id, s.system_category, z.name AS zone_name
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN zones z ON z.id = s.zone_id
-    WHERE s.document_id = ? AND d.energy_source IS NOT NULL
+    WHERE s.document_id = ? AND s.is_bacs = 1 AND d.energy_source IS NOT NULL
   `).all(documentId);
+
+  // Ensemble canonique des compteurs reellement requis. Sert ensuite a
+  // remettre `required=0` sur les compteurs devenus orphelins (energie
+  // changee/supprimee) sans les supprimer (tracabilite + saisies terrain).
+  const targetKeys = new Set();
+  const keyZonal = (zoneId, usage, type) => `z${zoneId}:${usage}:${type}`;
+  const keyGeneral = (usage, type) => `g:${usage}:${type}`;
 
   // 1. Compteurs zonaux : 1 par (zone, meter_type, usage) selon les devices
   const zonalSeen = new Set();
@@ -911,6 +923,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
     // L'usage est porte par la categorie du systeme parent du device
     const usage = CATEGORY_TO_USAGE[d.system_category] || 'other';
     const key = `${d.zone_id}:${usage}:${meterType}`;
+    targetKeys.add(keyZonal(d.zone_id, usage, meterType));
     if (zonalSeen.has(key)) continue;
     zonalSeen.add(key);
     if (findExistingZonal.get(documentId, d.zone_id, usage, meterType)) continue;
@@ -928,16 +941,37 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   // Compteur general electrique : si AU MOINS 1 device electrique/PAC/solar
   // (ou si AU MOINS 1 device tout court pour respecter la regle "compteur
   // general electrique toujours obligatoire des qu'il y a un audit serieux")
-  if (devices.length > 0 && !findExistingGeneral.get(documentId, 'other', 'electric')) {
-    insGeneral.run(documentId, 'electric', 'Compteur général électrique du bâtiment');
-    inserted++;
+  if (devices.length > 0) {
+    targetKeys.add(keyGeneral('other', 'electric'));
+    if (!findExistingGeneral.get(documentId, 'other', 'electric')) {
+      insGeneral.run(documentId, 'electric', 'Compteur général électrique du bâtiment');
+      inserted++;
+    }
   }
   for (const energy of generalEnergies) {
     const map = ENERGY_TO_GENERAL[energy];
     if (!map) continue;
+    targetKeys.add(keyGeneral('other', map.meter_type));
     if (findExistingGeneral.get(documentId, 'other', map.meter_type)) continue;
     insGeneral.run(documentId, map.meter_type, map.notes);
     inserted++;
+  }
+
+  // 3. Synchronise le flag `required` : un compteur encore dans la cible
+  //    reste requis ; un compteur orphelin (energie changee/supprimee, usage
+  //    hors BACS) repasse a required=0 — sans suppression (tracabilite +
+  //    saisies present_actual/photos conservees). Evite les actions
+  //    bloquantes fantomes sur des compteurs qui n'ont plus lieu d'etre.
+  const allMeters = db.db.prepare(
+    'SELECT id, zone_id, usage, meter_type, required FROM bacs_audit_meters WHERE document_id = ?'
+  ).all(documentId);
+  const setRequired = db.db.prepare('UPDATE bacs_audit_meters SET required = ? WHERE id = ?');
+  for (const m of allMeters) {
+    const k = m.zone_id != null
+      ? keyZonal(m.zone_id, m.usage, m.meter_type)
+      : keyGeneral(m.usage, m.meter_type);
+    const wanted = targetKeys.has(k) ? 1 : 0;
+    if ((m.required ? 1 : 0) !== wanted) setRequired.run(wanted, m.id);
   }
 
   return inserted;

@@ -103,6 +103,18 @@ function exemptAutoFromWood(t) {
   const d = devices.find(dd => dd.id === t.generator_device_id)
   return d?.energy_source === 'wood'
 }
+// La colonne « Exempté bois » n'est affichée que si au moins une ligne
+// est concernée (gain de largeur sinon).
+const anyWoodExempt = computed(() =>
+  (props.thermalFiltered || []).some(t => exemptAutoFromWood(t)),
+)
+// Nombre de zones avec une régulation effective (type renseigné ≠ none).
+const regulatedCount = computed(() =>
+  (props.thermalFiltered || []).filter(t => t.regulation_type && t.regulation_type !== 'none').length,
+)
+const woodExemptCount = computed(() =>
+  (props.thermalFiltered || []).filter(t => exemptAutoFromWood(t)).length,
+)
 
 // Drag & drop des lignes thermiques. Sortable sur la <table> avec
 // draggable="tbody" — chaque tbody contient la ligne principale + sa
@@ -159,9 +171,9 @@ onBeforeUnmount(teardownSortable)
     <template #summary>
       <span v-if="thermalFiltered.length">
         {{ thermalFiltered.length }} zone{{ thermalFiltered.length > 1 ? 's' : '' }} thermique{{ thermalFiltered.length > 1 ? 's' : '' }}
-        · {{ thermalFiltered.filter(t => t.has_automatic_regulation).length }} régulation{{ thermalFiltered.filter(t => t.has_automatic_regulation).length > 1 ? 's' : '' }} auto
-        <span v-if="thermalFiltered.filter(t => t.generator_exempt_wood).length">
-          · {{ thermalFiltered.filter(t => t.generator_exempt_wood).length }} exempté{{ thermalFiltered.filter(t => t.generator_exempt_wood).length > 1 ? 's' : '' }} bois
+        · {{ regulatedCount }} régulation{{ regulatedCount > 1 ? 's' : '' }} auto
+        <span v-if="woodExemptCount">
+          · {{ woodExemptCount }} exempté{{ woodExemptCount > 1 ? 's' : '' }} bois
         </span>
       </span>
       <span v-else class="italic">Aucune régulation thermique relevée</span>
@@ -190,9 +202,8 @@ onBeforeUnmount(teardownSortable)
           <th class="w-8"></th>
           <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
           <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <th>Régulation auto&nbsp;?</th>
           <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régulation</DataTableSortHeader>
-          <th>Exempté bois</th>
+          <th v-if="anyWoodExempt">Exempté bois</th>
           <th>Production</th>
           <th>Régulation production</th>
           <th>Distribution</th>
@@ -223,37 +234,25 @@ onBeforeUnmount(teardownSortable)
             </span>
           </td>
           <td class="align-middle">
-            <input type="checkbox" :checked="!!t.has_automatic_regulation"
-                   @change="e => patchThermal(t, { has_automatic_regulation: e.target.checked })"
-                   class="rounded border-gray-300" />
-          </td>
-          <td class="align-middle">
             <div class="min-w-32">
               <SearchableSelect
                 :model-value="t.regulation_type"
                 @update:modelValue="v => patchThermal(t, { regulation_type: v || null })"
                 :options="(regulationOptions || []).filter(o => o.value)"
+                :invalid="!t.regulation_type"
                 size="sm" placeholder="—"
                 search-placeholder="Filtrer ou ajouter…" />
             </div>
           </td>
-          <td class="align-middle">
-            <template v-if="(t.category || 'heating') === 'heating'">
-              <!-- Auto-coché lecture seule si le système de Production est
-                   au bois (R175-6 II). L'auditeur peut quand même forcer
-                   l'exemption via le flag manuel pour les cas particuliers. -->
-              <Tooltip v-if="exemptAutoFromWood(t)"
-                       text="Auto-détecté depuis le système de Production (énergie bois). Exempt R175-6 II appliqué automatiquement.">
-                <input type="checkbox" checked disabled
-                       class="rounded border-emerald-300 bg-emerald-50 cursor-help" />
-              </Tooltip>
-              <Tooltip v-else
-                       text="Si coché : production = appareil indépendant de chauffage au bois → exempté R175-6 (cf décret R175-6 II)">
-                <input type="checkbox" :checked="!!t.generator_exempt_wood"
-                       @change="e => patchThermal(t, { generator_exempt_wood: e.target.checked })"
-                       class="rounded border-gray-300" />
-              </Tooltip>
-            </template>
+          <td v-if="anyWoodExempt" class="align-middle">
+            <!-- Exemption R175-6 II déduite automatiquement de l'énergie de
+                 l'équipement de Production (bois). Lecture seule. -->
+            <Tooltip v-if="exemptAutoFromWood(t)"
+                     text="Exemption R175-6 II : l'équipement de Production est au bois.">
+              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
+                Exempté — bois
+              </span>
+            </Tooltip>
             <span v-else class="text-gray-300 text-xs">—</span>
           </td>
           <!-- Production : équipement (sans type/âge, ils sont sur le device Card 03) -->
@@ -263,6 +262,7 @@ onBeforeUnmount(teardownSortable)
                 :model-value="t.generator_device_id"
                 @update:modelValue="v => patchThermal(t, { generator_device_id: v != null ? parseInt(v, 10) : null })"
                 :options="deviceOptionsForLevel(t, 'production')"
+                :invalid="!t.generator_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
             </div>
@@ -275,6 +275,7 @@ onBeforeUnmount(teardownSortable)
                   :model-value="t.production_regulation_device_id"
                   @update:modelValue="v => patchThermal(t, { production_regulation_device_id: v != null ? parseInt(v, 10) : null })"
                   :options="deviceOptionsForLevel(t, 'regulation')"
+                  :invalid="!t.production_regulation_device_id"
                   size="sm" placeholder="—"
                   search-placeholder="Sonde, thermo…" />
               </div>
@@ -296,6 +297,7 @@ onBeforeUnmount(teardownSortable)
                 :model-value="t.distribution_device_id"
                 @update:modelValue="v => patchThermal(t, { distribution_device_id: v != null ? parseInt(v, 10) : null })"
                 :options="deviceOptionsForLevel(t, 'distribution')"
+                :invalid="!t.distribution_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
             </div>
@@ -308,6 +310,7 @@ onBeforeUnmount(teardownSortable)
                   :model-value="t.distribution_regulation_device_id"
                   @update:modelValue="v => patchThermal(t, { distribution_regulation_device_id: v != null ? parseInt(v, 10) : null })"
                   :options="deviceOptionsForLevel(t, 'regulation')"
+                  :invalid="!t.distribution_regulation_device_id"
                   size="sm" placeholder="—"
                   search-placeholder="Sonde, thermo…" />
               </div>
@@ -329,6 +332,7 @@ onBeforeUnmount(teardownSortable)
                 :model-value="t.emission_device_id"
                 @update:modelValue="v => patchThermal(t, { emission_device_id: v != null ? parseInt(v, 10) : null })"
                 :options="deviceOptionsForLevel(t, 'emission')"
+                :invalid="!t.emission_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
             </div>
@@ -341,6 +345,7 @@ onBeforeUnmount(teardownSortable)
                   :model-value="t.emission_regulation_device_id"
                   @update:modelValue="v => patchThermal(t, { emission_regulation_device_id: v != null ? parseInt(v, 10) : null })"
                   :options="deviceOptionsForLevel(t, 'regulation')"
+                  :invalid="!t.emission_regulation_device_id"
                   size="sm" placeholder="—"
                   search-placeholder="Sonde, thermo…" />
               </div>
@@ -373,55 +378,6 @@ onBeforeUnmount(teardownSortable)
                     v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
               <PencilSquareIcon class="w-4 h-4 shrink-0" />
             </button>
-          </td>
-        </tr>
-        <!-- Détail R175-6 : toujours visible, plein-largeur sous le couple -->
-        <tr class="bg-amber-50/30 text-xs">
-          <td colspan="13" class="px-5 py-2.5">
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span class="text-[11px] text-gray-400 italic shrink-0">
-                ↳ détail R175-6 · {{ t.zone_name }} · {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-              </span>
-              <div class="flex items-center gap-1.5">
-                <Tooltip text="Où est physiquement placée la sonde de température ? Murale 1,5m, gaine de reprise, plancher… Le décret n'impose pas une position précise mais une régulation effective.">
-                  <label class="text-[11px] font-medium text-gray-600 inline-flex items-center gap-0.5 cursor-help">
-                    Sonde
-                    <InformationCircleIcon class="w-3 h-3 text-gray-400" />
-                  </label>
-                </Tooltip>
-                <input type="text" :value="t.sensor_position" placeholder="ex : murale 1,5m, gaine reprise…"
-                       @blur="e => patchThermal(t, { sensor_position: e.target.value || null })"
-                       class="w-56 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 placeholder:italic placeholder:text-gray-300" />
-              </div>
-              <div class="flex items-center gap-1.5">
-                <Tooltip text="Manuel = molette sans programmation. Programmable = plages horaires. Adaptatif = auto-apprentissage. Connecté = smart, pilotable à distance.">
-                  <label class="text-[11px] font-medium text-gray-600 inline-flex items-center gap-0.5 cursor-help">
-                    Thermostat
-                    <InformationCircleIcon class="w-3 h-3 text-gray-400" />
-                  </label>
-                </Tooltip>
-                <select :value="t.thermostat_type"
-                        @change="e => patchThermal(t, { thermostat_type: e.target.value || null })"
-                        class="w-44 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500">
-                  <option :value="null">— à choisir</option>
-                  <option value="manual">Manuel</option>
-                  <option value="programmable">Programmable</option>
-                  <option value="adaptive">Adaptatif</option>
-                  <option value="connected">Connecté</option>
-                </select>
-              </div>
-              <Tooltip text="Robinets thermostatiques sur les radiateurs ? Comptent comme régulation R175-6 si présents et fonctionnels sur tous les émetteurs.">
-                <label class="flex items-center gap-1.5 cursor-pointer text-gray-700 text-xs">
-                  <input type="checkbox" :checked="!!t.has_thermostatic_valves"
-                         @change="e => patchThermal(t, { has_thermostatic_valves: e.target.checked })"
-                         class="rounded border-gray-300" />
-                  <span class="inline-flex items-center gap-0.5">
-                    Robinets thermostatiques
-                    <InformationCircleIcon class="w-3 h-3 text-gray-400" />
-                  </span>
-                </label>
-              </Tooltip>
-            </div>
           </td>
         </tr>
       </tbody>

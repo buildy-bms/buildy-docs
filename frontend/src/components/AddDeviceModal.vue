@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 
 const props = defineProps({
   systemLabel: { type: String, required: true },
@@ -14,13 +15,37 @@ const emit = defineEmits(['close', 'submit'])
 
 const form = ref({
   name: '', brand: '', model_reference: '', power_kw: null,
-  // Multi-rôle (mig 117).
-  energy_source: null, device_role: [], communication_protocol: null,
+  // Multi-rôle (mig 117). communication_protocols = JSON array (multi),
+  // cohérent avec le tableau des équipements (plus de champ mono-enum).
+  energy_source: null, device_role: [], communication_protocols: null,
   location: '', notes: '',
 })
 const submitting = ref(false)
 
-const canSubmit = () => !!(form.value.name?.trim() || form.value.brand?.trim() || form.value.model_reference?.trim())
+// Nombre de protocoles sélectionnés (communication_protocols = JSON string).
+function protocolCount() {
+  try {
+    const a = JSON.parse(form.value.communication_protocols || '[]')
+    return Array.isArray(a) ? a.length : 0
+  } catch { return 0 }
+}
+
+const hasIdentity = () => !!(form.value.name?.trim() || form.value.brand?.trim() || form.value.model_reference?.trim())
+const canSubmit = () =>
+  hasIdentity() &&
+  !!form.value.energy_source &&
+  Array.isArray(form.value.device_role) && form.value.device_role.length > 0 &&
+  protocolCount() > 0
+
+// Liste des champs obligatoires manquants (affichée sous le bouton grisé).
+const missingFields = () => {
+  const out = []
+  if (!hasIdentity()) out.push('un nom, une marque ou une référence')
+  if (!form.value.energy_source) out.push('l\'énergie')
+  if (!(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le niveau')
+  if (protocolCount() === 0) out.push('le(s) protocole(s)')
+  return out
+}
 
 async function submit() {
   if (!canSubmit() || submitting.value) return
@@ -61,7 +86,7 @@ async function submit() {
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Énergie</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Énergie <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.energy_source"
             :options="energyOptions"
@@ -75,7 +100,7 @@ async function submit() {
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x)</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x) <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.device_role"
             :options="roleOptions"
@@ -86,11 +111,11 @@ async function submit() {
           />
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Protocole de communication</label>
-          <SearchableSelect
-            v-model="form.communication_protocol"
+          <label class="block text-xs font-medium text-gray-700 mb-1">Protocole(s) de communication <span class="text-red-500">*</span></label>
+          <ProtocolMultiPicker
+            v-model="form.communication_protocols"
             :options="commOptions"
-            placeholder="Sélectionner un protocole"
+            placeholder="Sélectionner un ou plusieurs protocoles"
           />
         </div>
         <div class="sm:col-span-2">
@@ -99,6 +124,9 @@ async function submit() {
                     class="w-full px-3 py-2 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"></textarea>
         </div>
       </div>
+      <p v-if="!canSubmit() && !submitting" class="text-xs text-amber-600">
+        Renseignez {{ missingFields().join(', ') }} pour pouvoir ajouter le système.
+      </p>
       <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"
                 class="px-4 py-2 min-h-11 sm:min-h-0 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">

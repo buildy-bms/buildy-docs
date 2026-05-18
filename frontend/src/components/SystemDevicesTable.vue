@@ -11,7 +11,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropTr from './PhotoDropTr.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
-import DeviceZoneSharing from './DeviceZoneSharing.vue'
+import DeviceMoveShare from './DeviceMoveShare.vue'
 import DataTableSortHeader from './DataTableSortHeader.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
@@ -47,36 +47,21 @@ const { confirm } = useConfirm()
 // site rattaché n'a pas son store.zones rempli, mais ses systèmes ont
 // toujours leur zone_id puisque c'est une FK obligatoire.
 const auditStore = useAuditStore()
-const documentZones = computed(() => {
-  const map = new Map()
-  for (const s of auditStore.systems || []) {
-    if (s.zone_id != null && !map.has(s.zone_id)) {
-      map.set(s.zone_id, { zone_id: s.zone_id, name: s.zone_name || `Zone #${s.zone_id}` })
-    }
-  }
-  // Complète avec les zones du store si dispo (au cas où l'audit a des
-  // zones définies sans système matricé encore).
-  for (const z of auditStore.zones || []) {
-    if (!map.has(z.zone_id)) map.set(z.zone_id, { zone_id: z.zone_id, name: z.name })
-  }
-  return [...map.values()]
-})
+// Tous les systèmes (zone × usage) de l'audit — alimente DeviceMoveShare.
+const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
 
-// Devices partagés depuis une autre zone du document (mig 98) : un device
-// dont le système parent est dans une autre zone, mais dont les extra_zone_ids
-// contiennent zone_id du système courant ET dont la catégorie matche.
-// Affichés en plus des devices propres avec un badge « Partagé depuis ».
+// Devices partagés depuis un autre usage (mig 143) : un device dont le
+// système primaire est ailleurs mais dont les extra_system_ids contiennent
+// l'id du système courant. Affichés en plus des devices propres.
 const sharedDevices = computed(() => {
   const all = auditStore.devices || []
-  return all.filter(d => {
-    if (d.system_id === props.system.id) return false
-    if (!(d.extra_zone_ids || []).includes(props.system.zone_id)) return false
-    const originSys = (auditStore.systems || []).find(s => s.id === d.system_id)
-    return originSys?.system_category === props.system.system_category
-  })
+  return all.filter(d =>
+    d.system_id !== props.system.id &&
+    (d.extra_system_ids || []).includes(props.system.id)
+  )
 })
 
 // Tri : factorisé via composable. 3 clics : asc → desc → désactivé.
@@ -99,20 +84,14 @@ const displayDevices = computed(() =>
   sortedRows([...props.devices, ...sharedDevices.value], sortValue)
 )
 
+// Un device affiché ici mais dont le système primaire est ailleurs =
+// partagé depuis un autre usage.
 function isSharedFromOtherZone(d) {
   return d.system_id !== props.system.id
 }
 function originZoneNameFor(d) {
   const sys = (auditStore.systems || []).find(s => s.id === d.system_id)
   return sys?.zone_name || 'autre zone'
-}
-// Pour le sélecteur DeviceZoneSharing : l'« origine » est la zone du
-// système parent du device (pas du système courant). Sur la vue miroir
-// dans une zone extra, le système courant n'est PAS l'origine.
-function originZoneIdOf(d) {
-  if (d.system_id === props.system.id) return props.system.zone_id
-  const sys = (auditStore.systems || []).find(s => s.id === d.system_id)
-  return sys?.zone_id ?? props.system.zone_id
 }
 
 const newDevice = ref({
@@ -297,7 +276,7 @@ async function removeDevice(d) {
         <button
           type="button"
           @click="onClickAddManual"
-          class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-l-lg shadow-sm whitespace-nowrap"
+          class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm whitespace-nowrap rounded-l-lg"
         >
           <PlusIcon class="w-3.5 h-3.5 shrink-0" /> Ajouter un système
         </button>
@@ -371,8 +350,8 @@ async function removeDevice(d) {
             <td class="px-2 py-2 align-middle">
               <input type="text" :value="d.name" placeholder="Nommer ce système"
                      @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                     :size="Math.max((d.name || '').length, 18)"
-                     class="font-semibold text-gray-900 bg-transparent border-0 px-0 focus:outline-none focus:ring-0 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+                     :class="inputCls"
+                     class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
             </td>
             <!-- Marque -->
             <td class="px-2 py-2 align-middle">
@@ -470,15 +449,15 @@ async function removeDevice(d) {
               <div class="flex items-center gap-1">
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
-                        :class="['flag-pill', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'R175-3 4° — Arrêt manuel possible'">
-                  <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt
+                        :class="['flag-pill whitespace-nowrap', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
+                        v-tooltip="'L\'équipement peut être arrêté à la main par l\'exploitant.'">
+                  <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
-                        :class="['flag-pill', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'R175-3 4° — Reprise autonome de la GTB'">
-                  <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Auto.
+                        :class="['flag-pill whitespace-nowrap', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
+                        v-tooltip="'L\'équipement repart seul après une coupure ou un redémarrage de la GTB, sans intervention.'">
+                  <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
                 </button>
                 <button type="button"
                         @click="patchDevice(d, { out_of_service: !d.out_of_service })"
@@ -516,10 +495,9 @@ async function removeDevice(d) {
                     {{ (photosByDevice[d.id] || []).length }}
                   </span>
                 </button>
-                <DeviceZoneSharing
+                <DeviceMoveShare
                   :device="d"
-                  :origin-zone-id="originZoneIdOf(d)"
-                  :zones="documentZones"
+                  :systems="documentSystems"
                   @updated="emit('changed')" />
                 <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
                 <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">

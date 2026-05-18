@@ -71,21 +71,15 @@ const sheetTitle = computed(() => {
 })
 
 // Liste des équipements de la zone + catégorie. Inclut les équipements
-// partagés depuis une autre zone via bacs_audit_device_extra_zones (mig 98) :
-// une chaufferie commune dessert plusieurs zones et doit y apparaître.
+// partagés depuis un autre usage via bacs_audit_device_shared_systems (mig 143).
 const candidateDevices = computed(() => {
-  const sysById = new Map(systems.value.map(s => [s.id, s]))
-  const sysIds = systems.value
+  const sysIds = new Set(systems.value
     .filter(s => s.zone_id === props.zoneId && s.present && s.system_category === props.category)
-    .map(s => s.id)
-  return devices.value.filter(d => {
-    if (sysIds.includes(d.system_id)) return true
-    if (Array.isArray(d.extra_zone_ids) && d.extra_zone_ids.includes(props.zoneId)) {
-      const parentSys = sysById.get(d.system_id)
-      return parentSys?.system_category === props.category
-    }
-    return false
-  })
+    .map(s => s.id))
+  return devices.value.filter(d =>
+    sysIds.has(d.system_id) ||
+    (Array.isArray(d.extra_system_ids) && d.extra_system_ids.some(sid => sysIds.has(sid)))
+  )
 })
 
 function toOption(d) {
@@ -202,33 +196,9 @@ async function saveLevelNote() {
         </p>
       </div>
 
-      <!-- Toggle « Régulation automatique présente » : carte cliquable plein-largeur -->
-      <button
-        type="button"
-        @click="patch({ has_automatic_regulation: !thermalRow.has_automatic_regulation })"
-        class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-      >
-        <div class="flex-1 min-w-0">
-          <p class="text-base text-gray-900 font-medium">Régulation automatique présente ?</p>
-          <p class="text-sm text-gray-500 mt-1 leading-relaxed">
-            Système qui ajuste seul la température : thermostat connecté, sonde + vanne motorisée, GTB…
-          </p>
-        </div>
-        <span
-          :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                   thermalRow.has_automatic_regulation
-                     ? 'bg-amber-500 border-amber-500 text-white'
-                     : 'bg-white border-gray-300']"
-          aria-hidden="true"
-        >
-          <svg v-if="thermalRow.has_automatic_regulation" viewBox="0 0 16 16" class="w-5 h-5">
-            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </span>
-      </button>
-
-      <template v-if="thermalRow.has_automatic_regulation">
-        <!-- Granularité de la régulation -->
+      <template>
+        <!-- Granularité de la régulation (la présence d'une régulation se
+             déduit du type choisi : « Aucune » = pas de régulation). -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2">
           <MobileField label="Granularité de la régulation">
             <MobileSelectSheet
@@ -371,33 +341,6 @@ async function saveLevelNote() {
           </div>
         </div>
       </template>
-
-      <!-- Exempté bois — uniquement chauffage -->
-      <button
-        v-if="category === 'heating'"
-        type="button"
-        @click="patch({ generator_exempt_wood: !thermalRow.generator_exempt_wood })"
-        class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-      >
-        <div class="flex-1 min-w-0">
-          <p class="text-base text-gray-900 font-medium">Exempté — appareil bois</p>
-          <p class="text-sm text-gray-500 mt-1 leading-relaxed">
-            Production = appareil <strong>indépendant</strong> de chauffage au bois (poêle, insert).
-            Exempté de R175-6 (II du décret).
-          </p>
-        </div>
-        <span
-          :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                   thermalRow.generator_exempt_wood
-                     ? 'bg-amber-500 border-amber-500 text-white'
-                     : 'bg-white border-gray-300']"
-          aria-hidden="true"
-        >
-          <svg v-if="thermalRow.generator_exempt_wood" viewBox="0 0 16 16" class="w-5 h-5">
-            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </span>
-      </button>
 
       <p class="text-xs text-gray-400 text-center pt-2">
         Sauvegarde automatique. Tu peux fermer cette page à tout moment.

@@ -160,15 +160,13 @@ async function saveEdit() {
             {{ SEVERITY_LABEL[it.severity].label }}
           </span>
           <span class="text-[10px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</span>
-          <span class="ml-auto inline-flex items-center gap-1 text-[10px] text-gray-500">
-            <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3 h-3" />
-            {{ STATUS_LABEL[it.status] || it.status }}
+          <span v-if="it.status === 'declined'" class="ml-auto inline-flex items-center gap-1 text-[10px] text-gray-500 italic">
+            Écartée
           </span>
         </div>
         <p class="text-sm font-medium text-gray-900 leading-snug">{{ it.title }}</p>
         <p v-if="it.description" class="text-xs text-gray-600 mt-1.5 leading-relaxed">{{ it.description }}</p>
         <p v-if="it.zone_name" class="text-xs text-gray-500 mt-2">📍 {{ it.zone_name }}</p>
-        <p v-if="it.commercial_notes" class="text-xs text-indigo-700 mt-2 italic">💬 {{ it.commercial_notes }}</p>
       </button>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
@@ -213,15 +211,16 @@ async function saveEdit() {
           />
         </div>
 
-        <!-- Statut -->
-        <MobileField label="Statut">
-          <MobileNativeSelect
-            :model-value="draft.status"
-            @update:modelValue="v => draft.status = v || 'open'"
-            :options="STATUS_OPTIONS"
-            placeholder="— Statut —"
-          />
-        </MobileField>
+        <!-- Écarter / réintégrer l'action du plan -->
+        <button type="button"
+                @click="draft.status = draft.status === 'declined' ? 'open' : 'declined'"
+                :class="['w-full min-h-11 inline-flex items-center justify-center gap-2 py-3 text-base font-medium rounded-xl border-2 transition',
+                         draft.status === 'declined'
+                           ? 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                           : 'border-gray-300 text-gray-600 bg-white']">
+          <FontAwesomeIcon :icon="['fas', draft.status === 'declined' ? 'eye' : 'eye-slash']" class="w-4 h-4" />
+          {{ draft.status === 'declined' ? 'Réintégrer dans le plan' : 'Écarter cette action' }}
+        </button>
 
         <!-- Effort estimé -->
         <MobileField label="Effort estimé" hint="Pour le devis commercial. Peut être laissé vide.">
@@ -231,16 +230,6 @@ async function saveEdit() {
             :options="EFFORT_OPTIONS"
             placeholder="— À évaluer —"
           />
-        </MobileField>
-
-        <!-- Notes commerciales -->
-        <MobileField label="Notes commerciales" hint="Visible uniquement en interne (devis, suivi).">
-          <textarea
-            v-model="draft.commercial_notes"
-            rows="3"
-            placeholder="ex : Devis Sodexo en cours, attente d'arbitrage MOA…"
-            class="w-full min-h-11 px-3 py-3 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 resize-y"
-          ></textarea>
         </MobileField>
 
         <!-- Alternatives proposées (texte libre, V1 mobile sans richtext) -->

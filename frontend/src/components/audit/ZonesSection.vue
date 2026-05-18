@@ -238,12 +238,12 @@ onBeforeUnmount(teardownZonesSortable)
                         v-tooltip="'Zone fonctionnelle — assujettie au décret BACS'"
                         :class="(z.kind || 'functional') === 'functional'
                           ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                        class="px-2 py-1 font-medium transition whitespace-nowrap">Fonct.</button>
+                        class="px-2.5 py-1 font-medium transition whitespace-nowrap">Fonctionnelle</button>
                 <button type="button" @click="patchZoneKind(z, 'technical')"
                         v-tooltip="'Zone technique — hors décret BACS'"
                         :class="(z.kind || 'functional') === 'technical'
                           ? 'bg-slate-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
-                        class="px-2 py-1 font-medium transition whitespace-nowrap border-l border-gray-200">Tech.</button>
+                        class="px-2.5 py-1 font-medium transition whitespace-nowrap border-l border-gray-200">Technique</button>
               </div>
             </td>
             <td class="whitespace-nowrap">

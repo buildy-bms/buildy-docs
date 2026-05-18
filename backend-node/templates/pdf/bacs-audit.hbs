@@ -74,6 +74,13 @@
     </div>
   </div>
 
+  {{#if isBacs}}{{#unless compliance.assujettissement.determined}}
+  <div class="essential-caveat">
+    <span class="essential-caveat-icon">i</span>
+    <span>Assujettissement au décret non statué — puissance ou date de permis non renseignées. Le verdict porte sur les non-conformités constatées et sera confirmé une fois l'assujettissement déterminé.</span>
+  </div>
+  {{/unless}}{{/if}}
+
   <div class="essential-grid">
     {{#if isBacs}}
     <div class="essential-applicability">
@@ -91,7 +98,7 @@
         {{/if}}
         <li>
           <span class="step-num">{{#if compliance.assujettissement.pcDateLabel}}3{{else}}2{{/if}}</span>
-          <span class="step-body">Seuil applicable : <strong>{{compliance.assujettissement.threshold}} kW</strong> → {{compliance.assujettissement.conclusion}}</span>
+          <span class="step-body">Seuil applicable : <strong>{{compliance.assujettissement.thresholdLabel}}</strong> → {{compliance.assujettissement.conclusion}}</span>
         </li>
       </ol>
     </div>
@@ -298,10 +305,12 @@
     <span class="info-card-label">Client</span>
     <span class="info-card-value">{{document.client_name}}</span>
   </div>
+  {{#if site.address}}
   <div class="info-card info-card-wide">
     <span class="info-card-label">Adresse</span>
     <span class="info-card-value">{{site.address}}</span>
   </div>
+  {{/if}}
   {{#if isBacs}}
     {{#if document.bacs_total_power_kw}}
     <div class="info-card info-card-accent">
@@ -448,6 +457,7 @@
                   <td>{{commLabel}}</td>
                   <td>{{location}}</td>
                 </tr>
+                {{#if ../is_bacs}}
                 <tr class="r175-3-row" {{#if out_of_service}}style="opacity:0.5"{{/if}}>
                   <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
                     <span class="r175-3-label">R175-3 :</span>
@@ -462,6 +472,7 @@
                     </span>
                   </td>
                 </tr>
+                {{/if}}
               {{/each}}
             </tbody>
           </table>
@@ -564,12 +575,6 @@
   <span class="callout-icon">⚠️</span>
   <div class="callout-body"><strong>R175-6 applicable</strong> — {{r175_6_applicable.reason}}.</div>
 </div>
-{{else}}
-<div class="callout callout-reco">
-  <span class="callout-icon">✅</span>
-  <div class="callout-body"><strong>R175-6 non applicable</strong> — {{r175_6_applicable.reason}}.</div>
-</div>
-{{/if}}
 
 {{#if thermal.length}}
 {{!-- Mig 129 : 1 carte par couple (zone × catégorie) avec en-tête (champs
@@ -641,10 +646,22 @@
 {{else}}
 <p class="muted">Régulation thermique non documentée.</p>
 {{/if}}
+{{else}}
+<div class="callout callout-reco">
+  <span class="callout-icon">✅</span>
+  <div class="callout-body"><strong>R175-6 non applicable</strong> — {{r175_6_applicable.reason}}. La régulation thermique automatique par zone n'est pas exigée pour ce bâtiment ; le détail par zone n'est pas reproduit.</div>
+</div>
+{{/if}}
 {{/if}}
 
 {{!-- ═══════════ Chapitre 6 — GTB / Supervision ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#1b2842" "16"}}} {{#if isBacs}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
+{{#if (eq bms.present 0)}}
+<div class="callout callout-warn">
+  <span class="callout-icon">⚠️</span>
+  <div class="callout-body"><strong>Aucune GTB sur le site.</strong> Le bâtiment ne dispose d'aucun système de gestion technique. L'installation d'une GTB conforme au décret BACS figure dans le plan de mise en conformité (chapitre 7). Les exigences R175-3, R175-4 et R175-5 ne sont donc pas évaluées en détail dans ce chapitre.</div>
+</div>
+{{else}}
 {{#if bms}}
 {{#if bms.out_of_service}}
 <div class="callout callout-warn">
@@ -950,6 +967,7 @@
 {{else}}
 <p class="muted">Évaluation de la GTB non renseignée.</p>
 {{/if}}
+{{/if}}
 
 {{!-- ═══════════ Chapitre 7 — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "16"}}} 7. {{#if isBacs}}Plan de mise en conformité{{else}}Préconisations Buildy pour le devis{{/if}}</h1>
@@ -1121,6 +1139,38 @@
   </ol>
 </section>
 {{/if}}
+
+{{!-- ═══════════ Page de clôture plein-bord — accompagnement Buildy ═══════════ --}}
+<section class="closing">
+  <header class="closing-top">
+    <img class="closing-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <span class="closing-eyebrow">{{#if isBacs}}Mise en conformité · Décret R175{{else}}Extension de votre GTB{{/if}}</span>
+  </header>
+
+  <main class="closing-main">
+    <h2 class="closing-title">{{#if isBacs}}Passez à la mise en conformité avec Buildy{{else}}Faisons évoluer votre GTB ensemble{{/if}}</h2>
+    <p class="closing-lead">
+      {{#if actionStats.total}}Ce rapport identifie <strong>{{actionStats.total}} action{{#unless (eq actionStats.total 1)}}s{{/unless}} corrective{{#unless (eq actionStats.total 1)}}s{{/unless}}</strong> à engager{{#if isBacs}}{{#if applicabilityLabel}} pour répondre à l'échéance réglementaire ({{applicabilityLabel}}){{/if}}{{/if}}.{{else}}Ce rapport dresse l'état des lieux complet de votre installation.{{/if}}
+      Buildy accompagne les propriétaires et exploitants de la définition du plan d'actions jusqu'à sa mise en œuvre.
+    </p>
+
+    <ul class="closing-points">
+      <li>Chiffrage du plan d'actions et priorisation par échéance.</li>
+      <li>Déploiement de la solution Buildy : supervision multi-sites, suivi des consommations, conservation des données.</li>
+      <li>Suivi de la conformité dans le temps et préparation de l'inspection périodique.</li>
+    </ul>
+  </main>
+
+  <div class="closing-cta">
+    <span class="closing-cta-label">Pour échanger sur la suite</span>
+    <div class="closing-cta-rows">
+      <span class="closing-cta-row"><span class="closing-cta-key">Courriel</span> contact@buildy.fr</span>
+      <span class="closing-cta-row"><span class="closing-cta-key">Téléphone</span> 04 28 39 03 34</span>
+      <span class="closing-cta-row"><span class="closing-cta-key">Site</span> www.buildy.fr</span>
+    </div>
+    <span class="closing-cta-demo">Demandez une démonstration de la solution Buildy.</span>
+  </div>
+</section>
 
 </body>
 </html>

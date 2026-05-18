@@ -48,13 +48,16 @@ const props = defineProps({
   // Mode multi-select : modelValue = array, click sur une option toggle,
   // popover reste ouvert. Affichage chips dans le trigger.
   multiple: { type: Boolean, default: false },
+  // Si true : habillage rouge pâle pour signaler une info manquante.
+  invalid: { type: Boolean, default: false },
 })
 
 const triggerCls = computed(() => [
   // min-h-11 (44px) garantit la cible tactile iOS HIG sur mobile pour
   // toutes les variantes (sm/md). Sur desktop le visuel reste compact
   // car le contenu ne dépasse pas la hauteur intrinsèque du texte.
-  'w-full flex items-center gap-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-0',
+  'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-0',
+  props.invalid ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',
 ])
