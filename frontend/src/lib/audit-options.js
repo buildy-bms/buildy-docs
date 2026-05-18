@@ -48,12 +48,20 @@ export const ZONE_NATURES = [
   { value: 'corridor',         label: 'Couloir',              icon: 'fa-arrows-left-right', color: '#64748b' },
   { value: 'logistic-cell',    label: 'Cellule logistique',   icon: 'fa-boxes-stacked',     color: '#475569' },
   { value: 'stock',            label: 'Stock',                icon: 'fa-warehouse',         color: '#374151' },
-  { value: 'switchboard',      label: 'Tableau électrique',   icon: 'fa-bolt-lightning',    color: '#eab308' },
-  { value: 'technical-area',   label: 'Local technique',      icon: 'fa-gears',             color: '#6b7280' },
-  { value: 'server-room',      label: 'Local informatique',   icon: 'fa-server',            color: '#0f766e' },
-  { value: 'meters',           label: 'Local compteurs',      icon: 'fa-gauge',             color: '#059669' },
-  { value: 'outdoor',          label: 'Extérieur',            icon: 'fa-tree-city',         color: '#16a34a' },
+  { value: 'switchboard',      label: 'Tableau électrique',   icon: 'fa-bolt-lightning',    color: '#eab308', technical: true },
+  { value: 'technical-area',   label: 'Local technique',      icon: 'fa-gears',             color: '#6b7280', technical: true },
+  { value: 'server-room',      label: 'Local informatique',   icon: 'fa-server',            color: '#0f766e', technical: true },
+  { value: 'meters',           label: 'Local compteurs',      icon: 'fa-gauge',             color: '#059669', technical: true },
+  { value: 'outdoor',          label: 'Extérieur',            icon: 'fa-tree-city',         color: '#16a34a', technical: true },
 ]
+
+// Natures considérées « techniques » par défaut : à la saisie d'une zone,
+// si l'auditeur choisit l'une de ces natures, le type de zone est
+// pré-rempli sur « technique » (corrigeable). Hors périmètre du décret
+// BACS — ces zones n'alimentent pas les cards Systèmes / Compteurs.
+export function isTechnicalNature(value) {
+  return !!ZONE_NATURES.find(n => n.value === value)?.technical
+}
 
 export const COMM_OPTIONS = [
   { value: 'modbus_tcp',      label: 'Modbus TCP',      icon: 'fa-network-wired',     color: '#1e40af' },

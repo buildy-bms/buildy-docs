@@ -22,7 +22,7 @@ const { document, systems } = storeToRefs(audit)
 <template>
   <CollapsibleSection storage-key="credentials" section-id="section-credentials" :active="active">
     <template #header>
-      <SectionHeader number="10" title="Credentials d'accès"
+      <SectionHeader number="11" title="Credentials d'accès"
                      subtitle="Logins web/SSH/VPN aux GTB et systèmes (chiffrés AES-256-GCM)"
                      :icon="WrenchScrewdriverIcon" icon-color="text-amber-600"
                      :step="step"

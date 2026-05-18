@@ -617,4 +617,23 @@ export const faqAiRewriteSelection = ({ article_id, selection_html, instruction 
 export const faqAiSuggestMissing = () => api.post('/faq/ai/missing-articles')
 export const faqAiCorpusStats = () => api.get('/faq/ai/corpus-stats')
 
+// ─── Livres blancs (Marketing) ──────────────────────────────────────
+export const listWhitepapers = () => api.get('/whitepapers')
+export const createWhitepaper = (payload) => api.post('/whitepapers', payload)
+export const getWhitepaper = (id) => api.get(`/whitepapers/${id}`)
+export const updateWhitepaper = (id, payload) => api.patch(`/whitepapers/${id}`, payload)
+export const deleteWhitepaper = (id) => api.delete(`/whitepapers/${id}`)
+export const getWhitepaperChapter = (id, chapterId) =>
+  api.get(`/whitepapers/${id}/chapters/${chapterId}`)
+export const createWhitepaperChapter = (id, payload) =>
+  api.post(`/whitepapers/${id}/chapters`, payload)
+export const updateWhitepaperChapter = (id, chapterId, payload) =>
+  api.patch(`/whitepapers/${id}/chapters/${chapterId}`, payload)
+export const deleteWhitepaperChapter = (id, chapterId) =>
+  api.delete(`/whitepapers/${id}/chapters/${chapterId}`)
+export const moveWhitepaperChapter = (id, chapterId, direction) =>
+  api.post(`/whitepapers/${id}/chapters/${chapterId}/move`, { direction })
+export const exportWhitepaperPdf = (id) =>
+  api.get(`/whitepapers/${id}/export/pdf`, { responseType: 'blob' })
+
 export default api

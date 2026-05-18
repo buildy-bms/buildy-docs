@@ -124,7 +124,7 @@ function hasNotes(html) {
 <template>
   <CollapsibleSection storage-key="bms" section-id="section-bms" :active="active">
     <template #header>
-      <SectionHeader :number="audit.isBacs ? '6' : '5'"
+      <SectionHeader :number="audit.isBacs ? '7' : '6'"
                      :title="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
                      :subtitle="audit.isBacs ? 'R175-3 + R175-4 + R175-5' : 'Inventaire du superviseur en place'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-purple-600"
