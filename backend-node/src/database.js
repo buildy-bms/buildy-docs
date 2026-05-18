@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 139;
+const TARGET_VERSION = 140;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5681,6 +5681,48 @@ function runMigrations() {
     db.pragma('user_version = 139');
   }
 
+  if (current < 140) {
+    // Livres blancs marketing : nouveau kind 'whitepaper' dans la table afs
+    // (table unifiee des documents). Edition Tiptap, export PDF flux naturel.
+    // Documents compagnons (checklists, infographies) = whitepaper enfants
+    // relies via parent_af_id.
+    //
+    // 1. Etendre les CHECK kind + status via writable_schema (pattern mig 106).
+    //    - kind : ajout de 'whitepaper'
+    //    - status : ajout de 'draft' / 'published' (statuts livre blanc)
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      const replaceAfsSql = db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'afs'"
+      );
+      replaceAfsSql.run(
+        "CHECK (kind IN ('af','bacs_audit','brochure'))",
+        "CHECK (kind IN ('af','bacs_audit','brochure','whitepaper'))",
+      );
+      replaceAfsSql.run(
+        "CHECK (status IN ('redaction', 'validee', 'commissioning', 'commissioned', 'livree'))",
+        "CHECK (status IN ('redaction', 'validee', 'commissioning', 'commissioned', 'livree', 'draft', 'published'))",
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    // 2. Colonnes specifiques whitepaper (prefixe wp_, cf. convention bacs_).
+    //    slug existe deja sur afs : reutilise tel quel.
+    db.exec(`
+      ALTER TABLE afs ADD COLUMN parent_af_id INTEGER REFERENCES afs(id) ON DELETE CASCADE;
+      ALTER TABLE afs ADD COLUMN wp_layout TEXT;        -- 'book' | 'single-page'
+      ALTER TABLE afs ADD COLUMN wp_audience TEXT;      -- ex 'property_manager'
+      ALTER TABLE afs ADD COLUMN wp_version TEXT;       -- '1.0', '1.1' (saisi manuel)
+      ALTER TABLE afs ADD COLUMN wp_meta_json TEXT;     -- JSON cover/pivot/back
+      CREATE INDEX IF NOT EXISTS idx_afs_parent ON afs(parent_af_id) WHERE parent_af_id IS NOT NULL;
+    `);
+    log.info('Migration 140 appliquee : kind whitepaper + colonnes wp_*');
+    db.pragma('user_version = 140');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6600,7 +6642,7 @@ const afs = {
   update(id, fields) {
     const allowed = [
       'client_name', 'project_name', 'site_address', 'service_level', 'status', 'delivered_at',
-      'kind', 'site_id', 'title',
+      'kind', 'site_id', 'title', 'slug',
       'bacs_total_power_kw', 'bacs_total_power_source', 'bacs_building_permit_date',
       'bacs_applicable_deadline', 'bacs_applicability_status',
       'delivered_pdf_sha256', 'delivered_git_tag',
@@ -6608,6 +6650,8 @@ const afs = {
       'audit_existing_af_status', 'bacs_district_heating_substation_kw',
       'bacs_roi_study_status', 'bacs_roi_study_html',
       'bacs_generator_works_date',
+      // Livres blancs (mig 140)
+      'parent_af_id', 'wp_layout', 'wp_audience', 'wp_version', 'wp_meta_json',
     ];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
@@ -6632,6 +6676,27 @@ const afs = {
     return db.prepare(`
       SELECT status, COUNT(*) as count FROM afs WHERE deleted_at IS NULL GROUP BY status
     `).all();
+  },
+  // ── Livres blancs (mig 140) ────────────────────────────────────────
+  // Liste les livres blancs « parents » (parent_af_id IS NULL) avec le
+  // compte de leurs documents compagnons.
+  listWhitepapers() {
+    return db.prepare(`
+      SELECT a.*,
+             (SELECT COUNT(*) FROM afs c
+                WHERE c.parent_af_id = a.id AND c.deleted_at IS NULL) AS companion_count
+      FROM afs a
+      WHERE a.kind = 'whitepaper' AND a.parent_af_id IS NULL AND a.deleted_at IS NULL
+      ORDER BY a.updated_at DESC
+    `).all();
+  },
+  // Documents compagnons d'un livre blanc parent.
+  listCompanions(parentId) {
+    return db.prepare(`
+      SELECT * FROM afs
+      WHERE kind = 'whitepaper' AND parent_af_id = ? AND deleted_at IS NULL
+      ORDER BY created_at ASC
+    `).all(parentId);
   },
 };
 
@@ -7597,15 +7662,15 @@ const zones = {
   getById(id) {
     return db.prepare(`SELECT ${ZONES_SELECT} FROM zones WHERE id = ?`).get(id);
   },
-  create({ siteId, name, nature, position, surfaceM2, notes }) {
+  create({ siteId, name, nature, kind, position, surfaceM2, notes }) {
     const result = db.prepare(`
-      INSERT INTO zones (site_id, name, nature, position, surface_m2, notes)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(siteId, name, nature || null, position || 0, surfaceM2 ?? null, notes || null);
+      INSERT INTO zones (site_id, name, nature, kind, position, surface_m2, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(siteId, name, nature || null, kind || 'functional', position || 0, surfaceM2 ?? null, notes || null);
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['name', 'nature', 'position', 'surface_m2', 'notes', 'notes_html', 'deleted_at'];
+    const allowed = ['name', 'nature', 'kind', 'position', 'surface_m2', 'notes', 'notes_html', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;

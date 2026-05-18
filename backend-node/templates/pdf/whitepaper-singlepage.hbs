@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>{{title}}</title>
+<style>{{{styles}}}</style>
+</head>
+<body class="singlepage">
+
+<header class="sp-header">
+  <div class="sp-eyebrow">Buildy{{#if audienceLabel}} · {{audienceLabel}}{{/if}}</div>
+  <h1 class="sp-title">{{title}}</h1>
+  {{#if subtitle}}<p class="sp-sub">{{subtitle}}</p>{{/if}}
+</header>
+
+{{#each chapters}}
+<section class="sp-chapter">
+  {{#if title}}<h2 class="sp-chapter-title">{{title}}</h2>{{/if}}
+  <div class="chapter-body">
+    {{{body_html}}}
+  </div>
+</section>
+{{/each}}
+
+</body>
+</html>

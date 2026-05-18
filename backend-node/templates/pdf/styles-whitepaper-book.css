@@ -1,0 +1,4 @@
+/* Override charge UNIQUEMENT pour le layout 'book' (livre blanc complet).
+   Cover full-bleed : 1re page sans marge + fond navy (double defense
+   sub-pixel Chromium, cf. CLAUDE.md). Ne pas charger pour 'single-page'. */
+@page :first{ margin:0; background:#1b2842; }

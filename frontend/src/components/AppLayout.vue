@@ -21,6 +21,7 @@ import {
   DocumentDuplicateIcon,
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
+  BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import CommandPalette from './CommandPalette.vue'
 
@@ -66,6 +67,8 @@ const nav = [
   { name: 'Fonctionnalités', to: '/library/functionalities', icon: SparklesIcon },
   { section: 'Support' },
   { name: 'FAQ Buildy', to: '/faq', icon: ChatBubbleLeftRightIcon },
+  { section: 'Marketing' },
+  { name: 'Livres blancs', to: '/marketing/whitepapers', icon: BookOpenIcon },
   { section: 'Système' },
   { name: 'Paramètres BACS', to: '/admin/bacs-parameters', icon: Cog6ToothIcon },
   { name: 'Prompts IA', to: '/ai-prompts', icon: SparklesIcon },

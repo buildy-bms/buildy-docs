@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.50",
+      "date": "2026-05-18",
+      "title": "Livres blancs : nouveau type de document avec éditeur intégré et export PDF",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Gestion des livres blancs dans une nouvelle section « Marketing »",
+          "what": "Buildy Docs gère désormais les livres blancs comme un type de document à part entière. Chaque livre blanc se rédige chapitre par chapitre dans un éditeur riche (titres, listes, liens, images, encadrés information / conseil / attention) avec barre d'outils collée en haut au défilement et sauvegarde automatique. La mise en page et la pagination du PDF sont entièrement automatiques — aucun réglage manuel, les encadrés ne sont jamais coupés. Métadonnées éditables : titre, audience cible, version, statut brouillon / publié. Des documents compagnons (checklists, infographies) peuvent être rattachés à un livre blanc parent.",
+          "where": "Menu latéral → section « Marketing » → « Livres blancs » (liste à /marketing/whitepapers, édition à /marketing/whitepapers/:id).",
+          "how_to_test": "Ouvrir « Livres blancs », cliquer « Nouveau livre blanc » et saisir un titre. Ajouter des chapitres, rédiger du contenu avec la barre d'outils. Cliquer « Export PDF » : le document sort paginé proprement. « Publier » bascule le statut brouillon / publié."
+        }
+      ]
+    },
+    {
       "version": "0.1.48",
       "date": "2026-05-18",
       "title": "Saisie inline d'un audit : plus de perte de texte pendant la synchro automatique",
