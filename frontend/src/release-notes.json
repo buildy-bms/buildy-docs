@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.51",
+      "date": "2026-05-18",
+      "title": "Audits : nouvelle card « Zones techniques » pour inventorier les locaux hors décret BACS",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Card « Zones techniques » entre les zones fonctionnelles et les systèmes",
+          "what": "Une nouvelle card (n° 3) permet de recenser les locaux techniques d'un site — local technique, TGBT, local compteurs, local informatique, extérieur — sans qu'ils soient assujettis au décret BACS. Contrairement aux zones fonctionnelles, une zone technique ne génère aucun système ni compteur automatiquement dans les cards suivantes : c'est un simple inventaire. À la saisie d'une zone, le type (Fonctionnelle / Technique) est pré-rempli selon la nature choisie et reste corrigeable d'un clic. Une zone peut être basculée d'une card à l'autre à tout moment via le sélecteur de type. Toutes les cards suivantes ont été renumérotées (Systèmes = 4, Compteurs = 5, etc.).",
+          "where": "Détail d'un audit BACS ou GTB → card « 3. Zones techniques », juste après « 2. Zones fonctionnelles ». Disponible aussi sur mobile dans l'onglet Zones (groupes Fonctionnelles / Techniques).",
+          "how_to_test": "Ouvrir un audit, dans la card « Zones techniques » cliquer « Ajouter une zone technique » et choisir une nature (ex : Local technique → type pré-rempli sur Technique). La zone apparaît dans la card 3 mais ne crée aucune ligne dans Systèmes / Compteurs. Basculer une zone existante en « Technique » via le sélecteur de type la déplace dans la card 3."
+        }
+      ]
+    },
+    {
       "version": "0.1.50",
       "date": "2026-05-18",
       "title": "Livres blancs : nouveau type de document avec éditeur intégré et export PDF",

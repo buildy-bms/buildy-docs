@@ -118,7 +118,7 @@ onBeforeUnmount(teardownSortables)
 <template>
   <CollapsibleSection storage-key="systems" section-id="section-systems" :active="active">
     <template #header>
-      <SectionHeader number="3" :title="'Systèmes techniques par zone'"
+      <SectionHeader number="4" :title="'Systèmes techniques par zone'"
                      :subtitle="audit.isBacs ? 'R175-1 4° + R175-3 3°, 4°' : 'Inventaire des systèmes'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-indigo-600"
                      :step="step"

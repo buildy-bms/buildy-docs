@@ -50,7 +50,7 @@ async function removeInspection(ins) {
 <template>
   <CollapsibleSection storage-key="inspections" section-id="section-inspections" :active="active">
     <template #header>
-      <SectionHeader number="7" :title="'Inspection périodique par un tiers'"
+      <SectionHeader number="8" :title="'Inspection périodique par un tiers'"
                      subtitle="R175-5-1 — rapport conservé 10 ans"
                      :icon="ClockIcon" icon-color="text-amber-600"
                      :step="step"

@@ -1,15 +1,30 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import { isTechnicalNature } from '@/lib/audit-options'
 
 const props = defineProps({
   zoneNatures: { type: Array, required: true },
+  // Type pré-sélectionné selon la card d'origine ('functional' | 'technical').
+  kind: { type: String, default: 'functional' },
 })
 const emit = defineEmits(['close', 'submit'])
 
-const form = ref({ name: '', nature: null, surface_m2: null })
+const form = ref({ name: '', nature: null, surface_m2: null, kind: props.kind })
 const submitting = ref(false)
+const isTechnical = computed(() => form.value.kind === 'technical')
+
+// Pré-remplit le type de zone quand la nature choisie est technique
+// (Local technique, TGBT, local compteurs…). Pré-remplissage à sens
+// unique (jamais de rétrogradation auto vers « fonctionnelle » : on ne
+// contredit pas la card d'origine ni un choix manuel).
+const kindTouched = ref(false)
+watch(() => form.value.nature, (nat) => {
+  if (kindTouched.value || !nat) return
+  if (isTechnicalNature(nat)) form.value.kind = 'technical'
+})
+function setKind(k) { kindTouched.value = true; form.value.kind = k }
 
 async function submit() {
   if (!form.value.name.trim() || submitting.value) return
@@ -24,7 +39,8 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal :title="'Ajouter une zone fonctionnelle'" size="md" :dismiss-on-backdrop="false" @close="emit('close')">
+  <BaseModal :title="isTechnical ? 'Ajouter une zone technique' : 'Ajouter une zone fonctionnelle'"
+             size="md" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Nom de la zone *</label>
@@ -44,6 +60,22 @@ async function submit() {
           :options="zoneNatures"
           placeholder="Sélectionner une nature"
         />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Type de zone</label>
+        <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <button type="button" @click="setKind('functional')"
+                  :class="!isTechnical ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                  class="px-4 py-2 font-medium transition">Fonctionnelle</button>
+          <button type="button" @click="setKind('technical')"
+                  :class="isTechnical ? 'bg-slate-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                  class="px-4 py-2 font-medium transition border-l border-gray-200">Technique</button>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          {{ isTechnical
+            ? 'Local hors décret BACS : pas de système ni compteur généré automatiquement.'
+            : 'Zone assujettie au décret BACS : alimente les cards Systèmes et Compteurs.' }}
+        </p>
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Surface (m²)</label>

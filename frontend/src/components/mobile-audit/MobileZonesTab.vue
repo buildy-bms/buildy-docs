@@ -11,7 +11,7 @@ import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
-import { ZONE_NATURES as ZONE_NATURES_DECORATED } from '@/lib/audit-options'
+import { ZONE_NATURES as ZONE_NATURES_DECORATED, isTechnicalNature } from '@/lib/audit-options'
 
 const audit = useAuditStore()
 const { document, zones } = storeToRefs(audit)
@@ -23,17 +23,38 @@ const { confirm } = useConfirm()
 const ZONE_NATURES = ZONE_NATURES_DECORATED
 function natureLabel(v) { return ZONE_NATURES.find(n => n.value === v)?.label || '—' }
 
+// Zones réparties par type. Les zones techniques (local technique, TGBT…)
+// sont hors décret BACS : listées à part, sans systèmes / compteurs auto.
+const functionalZones = computed(() =>
+  zones.value.filter(z => (z.kind || 'functional') !== 'technical'))
+const technicalZones = computed(() =>
+  zones.value.filter(z => (z.kind || 'functional') === 'technical'))
+
 // Sheet state
 const editing = ref(null) // { mode: 'create'|'edit', zone: {...} }
-const editForm = ref({ name: '', nature: null, surface_m2: null })
+const editForm = ref({ name: '', nature: null, surface_m2: null, kind: 'functional' })
 const saving = ref(false)
 
-function openCreate() {
-  editForm.value = { name: '', nature: null, surface_m2: null }
+// Pré-remplit le type quand la nature est technique (sens unique :
+// jamais de rétrogradation auto vers « fonctionnelle »). Corrigeable.
+const kindTouched = ref(false)
+watch(() => editForm.value.nature, (nat) => {
+  if (kindTouched.value || !nat) return
+  if (isTechnicalNature(nat)) editForm.value.kind = 'technical'
+})
+function setKind(k) { kindTouched.value = true; editForm.value.kind = k }
+
+function openCreate(kind = 'functional') {
+  editForm.value = { name: '', nature: null, surface_m2: null, kind }
+  kindTouched.value = false
   editing.value = { mode: 'create' }
 }
 function openEdit(z) {
-  editForm.value = { name: z.name, nature: z.nature, surface_m2: z.surface_m2 }
+  editForm.value = {
+    name: z.name, nature: z.nature, surface_m2: z.surface_m2,
+    kind: z.kind || 'functional',
+  }
+  kindTouched.value = true
   editing.value = { mode: 'edit', zone: z }
 }
 function close() {
@@ -62,6 +83,7 @@ async function save() {
         site_id: document.value.site_id,
         name: editForm.value.name.trim(),
         nature: editForm.value.nature,
+        kind: editForm.value.kind || 'functional',
         surface_m2: editForm.value.surface_m2 ?? null,
       })
       const r = await listZones(document.value.site_id)
@@ -73,6 +95,7 @@ async function save() {
       const patch = {
         name: editForm.value.name.trim(),
         nature: editForm.value.nature,
+        kind: editForm.value.kind || 'functional',
         surface_m2: editForm.value.surface_m2 ?? null,
       }
       const { data } = await updateZone(editing.value.zone.zone_id, patch)
@@ -132,35 +155,71 @@ const totalSurface = computed(() =>
     <!-- Bouton Ajouter prominent en haut -->
     <button
       type="button"
-      @click="openCreate"
+      @click="openCreate('functional')"
       class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
     >
       <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5" />
       Ajouter une zone
     </button>
 
-    <!-- Liste -->
-    <div v-if="zones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-      <button
-        v-for="z in zones"
-        :key="z.zone_id"
-        type="button"
-        @click="openEdit(z)"
-        class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
-      >
-        <div class="flex-1 min-w-0">
-          <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
-          <p class="text-sm text-gray-500 truncate mt-1">
-            <span>{{ natureLabel(z.nature) }}</span>
-            <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
-          </p>
-        </div>
-        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
-      </button>
+    <!-- Zones fonctionnelles -->
+    <div>
+      <p class="px-1 pb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        Zones fonctionnelles ({{ functionalZones.length }})
+      </p>
+      <div v-if="functionalZones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <button
+          v-for="z in functionalZones"
+          :key="z.zone_id"
+          type="button"
+          @click="openEdit(z)"
+          class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p class="text-sm text-gray-500 truncate mt-1">
+              <span>{{ natureLabel(z.nature) }}</span>
+              <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
+            </p>
+          </div>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
+        </button>
+      </div>
+      <p v-else class="text-sm text-gray-400 italic px-1 py-2">Aucune zone fonctionnelle</p>
     </div>
-    <div v-else class="text-center py-6">
-      <FontAwesomeIcon :icon="['fas', 'table-cells-large']" class="w-10 h-10 text-gray-300 mx-auto" />
-      <p class="text-sm text-gray-500 mt-2">Aucune zone définie pour l'instant</p>
+
+    <!-- Zones techniques (hors décret BACS) -->
+    <div>
+      <div class="flex items-center justify-between px-1 pb-1.5">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Zones techniques ({{ technicalZones.length }})
+        </p>
+        <button type="button" @click="openCreate('technical')"
+                class="tap-target inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+          <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3.5 h-3.5" /> Ajouter
+        </button>
+      </div>
+      <div v-if="technicalZones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <button
+          v-for="z in technicalZones"
+          :key="z.zone_id"
+          type="button"
+          @click="openEdit(z)"
+          class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p class="text-sm text-gray-500 truncate mt-1">
+              <span>{{ natureLabel(z.nature) }}</span>
+              <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
+            </p>
+          </div>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
+        </button>
+      </div>
+      <p v-else class="text-sm text-gray-400 italic px-1 py-2">
+        Aucune zone technique — locaux hors décret BACS (local technique, TGBT…).
+      </p>
     </div>
 
     <!-- Sheet édition -->
@@ -201,6 +260,21 @@ const totalSurface = computed(() =>
             title="Nature de la zone"
             placeholder="— Sélectionner —"
           />
+        </MobileField>
+
+        <MobileField label="Type de zone" hint="Une zone technique (local technique, TGBT, local compteurs…) est hors décret BACS : elle ne génère pas de système ni de compteur automatiquement.">
+          <div class="flex gap-2">
+            <button type="button" @click="setKind('functional')"
+                    :class="editForm.kind !== 'technical'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-600 border-gray-200'"
+                    class="touch-control flex-1 font-medium border">Fonctionnelle</button>
+            <button type="button" @click="setKind('technical')"
+                    :class="editForm.kind === 'technical'
+                      ? 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-gray-600 border-gray-200'"
+                    class="touch-control flex-1 font-medium border">Technique</button>
+          </div>
         </MobileField>
 
         <MobileField label="Surface (m²)" hint="Surface au sol approximative de la zone.">

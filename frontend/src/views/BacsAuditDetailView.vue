@@ -524,6 +524,18 @@ const devicesWithMeta = computed(() => {
   })
 })
 
+// Type de zone pré-rempli pour la modale d'ajout (selon la card cliquée :
+// « Zones fonctionnelles » -> functional, « Zones techniques » -> technical).
+const addZoneKind = ref('functional')
+
+// Émis par ZonesSection : { kind } seul = ouvrir la modale, payload avec
+// `name` = création directe (duplication).
+function onAddZoneRequest(payload) {
+  if (payload?.name) { addZone(payload); return }
+  addZoneKind.value = payload?.kind || 'functional'
+  showAddZoneModal.value = true
+}
+
 async function addZone(payload) {
   const data = payload || newZone.value
   if (!data.name?.trim() || !document.value?.site_id) return
@@ -532,6 +544,7 @@ async function addZone(payload) {
       site_id: document.value.site_id,
       name: data.name.trim(),
       nature: data.nature,
+      kind: data.kind || 'functional',
       surface_m2: data.surface_m2 ?? null,
     })
     const z = await listZones(document.value.site_id)
@@ -539,7 +552,9 @@ async function addZone(payload) {
     await resyncBacsAudit(docId)
     await refreshAuditData()
     newZone.value = { name: '', nature: null }
-    success('Zone ajoutée et plan d\'audit synchronisé')
+    success(data.kind === 'technical'
+      ? 'Zone technique ajoutée'
+      : 'Zone ajoutée et plan d\'audit synchronisé')
   } catch (e) {
     error(e.response?.data?.detail || 'Création zone impossible')
   }
@@ -584,7 +599,13 @@ const STEP_DEFINITIONS = [
   { key: 'zones',
     label: 'Zones',
     description: 'Au moins une zone fonctionnelle saisie.',
-    isComplete: () => zones.value.length > 0 },
+    isComplete: () => zones.value.some(z => (z.kind || 'functional') !== 'technical') },
+  { key: 'technical-zones',
+    label: 'Zones techniques',
+    description: 'Inventaire des locaux techniques hors decret BACS (optionnel).',
+    descriptionSite: 'Inventaire des locaux techniques du site (optionnel).',
+    // Étape optionnelle : jamais bloquante pour la complétion de l'audit.
+    isComplete: () => true },
   { key: 'systems',
     label: 'Systemes',
     description: 'Au moins un systeme present avec un equipement saisi.',
@@ -717,6 +738,7 @@ async function invalidateStep(stepKey) {
 const STEP_TO_SECTION_ID = {
   identification: 'section-identification',
   zones: 'section-zones',
+  'technical-zones': 'section-technical-zones',
   systems: 'section-systems',
   meters: 'section-meters',
   thermal: 'section-thermal',
@@ -1296,16 +1318,29 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
       <!-- 2. Zones fonctionnelles (R175-1 6°) -->
       <ZonesSection
+        kind="functional"
         :active="activeStepKey === 'zones'"
         :zone-natures="ZONE_NATURES"
         :step="stepFor('zones')"
         @open-notes="openNotesModal"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
-        @add-zone="payload => payload ? addZone(payload) : (showAddZoneModal = true)"
+        @add-zone="onAddZoneRequest"
       />
 
-      <!-- 3. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
+      <!-- 3. Zones techniques (hors décret BACS) -->
+      <ZonesSection
+        kind="technical"
+        :active="activeStepKey === 'technical-zones'"
+        :zone-natures="ZONE_NATURES"
+        :step="stepFor('technical-zones')"
+        @open-notes="openNotesModal"
+        @validate-step="validateStep"
+        @invalidate-step="invalidateStep"
+        @add-zone="onAddZoneRequest"
+      />
+
+      <!-- 4. Systèmes techniques par zone (R175-1 4° + R175-3 3°/4°) -->
       <SystemsSection
         :active="activeStepKey === 'systems'"
         :systems-by-zone="systemsByZone"
@@ -1327,7 +1362,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @add-device-from-library="sys => libraryDevicePickerSystem = sys"
       />
 
-      <!-- 4. Compteurs et mesurage (R175-3 1°) -->
+      <!-- 5. Compteurs et mesurage (R175-3 1°) -->
       <MetersSection
         :active="activeStepKey === 'meters'"
         :meter-usages="METER_USAGES"
@@ -1339,7 +1374,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @add-meter="showAddMeterModal = true"
       />
 
-      <!-- 5. Régulation thermique automatique (R175-6) -->
+      <!-- 6. Régulation thermique automatique (R175-6) -->
       <ThermalSection
         v-if="isBacs"
         :active="activeStepKey === 'thermal'"
@@ -1353,7 +1388,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @open-notes="openNotesModal"
       />
 
-      <!-- 6. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
+      <!-- 7. Solution GTB / GTC en place (R175-3 / R175-4 / R175-5) -->
       <BmsSection
         :active="activeStepKey === 'bms'"
         :bms-steps="bmsSteps"
@@ -1369,14 +1404,14 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @refresh-audit-data="refreshAuditData"
       />
 
-      <!-- 7. Inspection périodique par un tiers (R175-5-1) -->
+      <!-- 8. Inspection périodique par un tiers (R175-5-1) -->
       <InspectionsSection v-if="isBacs"
                           :active="activeStepKey === 'inspections'"
                           :step="stepFor('inspections')"
                           @validate-step="validateStep"
                           @invalidate-step="invalidateStep" />
 
-      <!-- 8. Check-list documentaire (mig 100) -->
+      <!-- 9. Check-list documentaire (mig 100) -->
       <ChecklistSection
         :doc-id="docId"
         :active="activeStepKey === 'docs-checklist'"
@@ -1389,7 +1424,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @goto-bms="gotoChecklistBms"
       />
 
-      <!-- 9. Documents du site (DOE) -->
+      <!-- 10. Documents du site (DOE) -->
       <DocumentsSection
         :active="activeStepKey === 'documents'"
         :site-doc-counts="siteDocCounts"
@@ -1398,7 +1433,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @invalidate-step="invalidateStep"
       />
 
-      <!-- 10. Credentials du site (accès) -->
+      <!-- 11. Credentials du site (accès) -->
       <CredentialsSection
         :active="activeStepKey === 'credentials'"
         :site-cred-count="siteCredCount"
@@ -1427,7 +1462,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @open-alternatives="openAlternativesEditor"
       />
 
-      <!-- 12. Note de synthèse (Claude) -->
+      <!-- 13. Note de synthèse (Claude) -->
       <SynthesisSection
         :active="activeStepKey === 'synthesis'"
         :synthesis-html="synthesisHtml"
@@ -1482,6 +1517,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
     <AddZoneModal
       v-if="showAddZoneModal"
       :zone-natures="ZONE_NATURES"
+      :kind="addZoneKind"
       @close="showAddZoneModal = false"
       @submit="addZone"
     />

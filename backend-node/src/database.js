@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 140;
+const TARGET_VERSION = 141;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5721,6 +5721,19 @@ function runMigrations() {
     `);
     log.info('Migration 140 appliquee : kind whitepaper + colonnes wp_*');
     db.pragma('user_version = 140');
+  }
+
+  if (current < 141) {
+    // Zones techniques : une zone peut etre « fonctionnelle » (assujettie au
+    // decret BACS, alimente les cards Systemes / Compteurs) ou « technique »
+    // (local technique, TGBT, local compteurs… hors perimetre BACS, listee
+    // pour l'inventaire mais sans auto-creation de systemes / compteurs).
+    // Defaut 'functional' : tout le parc existant reste fonctionnel.
+    db.exec(`
+      ALTER TABLE zones ADD COLUMN kind TEXT NOT NULL DEFAULT 'functional';
+    `);
+    log.info('Migration 141 appliquee : zones.kind (functional | technical)');
+    db.pragma('user_version = 141');
   }
 
   if (current > TARGET_VERSION) {

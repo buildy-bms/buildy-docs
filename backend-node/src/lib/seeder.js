@@ -745,6 +745,12 @@ function seedBacsAuditStructure(documentId, siteId) {
  * les nouvelles categories implied par la nouvelle nature sont ajoutees.
  */
 function resyncBacsAuditDataForZones(documentId, zones) {
+  // Seules les zones « fonctionnelles » alimentent l'auto-creation des
+  // systemes / regulations / compteurs. Les zones « techniques » (local
+  // technique, TGBT, local compteurs…) sont hors perimetre BACS : elles
+  // sont inventoriees dans leur propre card mais ne generent rien ici.
+  const functionalZones = zones.filter(z => (z.kind || 'functional') !== 'technical');
+
   const reqByNature = {};
   for (const r of db.db.prepare('SELECT zone_nature, required_categories FROM bacs_requirements_by_zone_nature').all()) {
     try { reqByNature[r.zone_nature] = JSON.parse(r.required_categories); }
@@ -756,7 +762,7 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     VALUES (?, ?, ?, 0)
   `);
   let systemsCount = 0;
-  for (const z of zones) {
+  for (const z of functionalZones) {
     const cats = z.nature ? (reqByNature[z.nature] || []) : [];
     for (const cat of cats) {
       const r = insertSystem.run(documentId, z.zone_id, cat);
@@ -786,7 +792,7 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     VALUES (?, ?, ?, 0)
   `);
   let thermalCount = 0;
-  for (const z of zones) {
+  for (const z of functionalZones) {
     const fromNature = z.nature ? (reqByNature[z.nature] || []) : [];
     const fromSystems = presentByZone.get(z.zone_id) || new Set();
     for (const cat of ['heating', 'cooling']) {
@@ -801,8 +807,8 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     INSERT OR IGNORE INTO bacs_audit_bms (document_id) VALUES (?)
   `).run(documentId);
 
-  // Compteurs auto (R175-3 §1)
-  const metersCount = resyncBacsAuditMetersForZones(documentId, zones);
+  // Compteurs auto (R175-3 §1) — zones fonctionnelles uniquement
+  const metersCount = resyncBacsAuditMetersForZones(documentId, functionalZones);
 
   return { systems_count: systemsCount, thermal_count: thermalCount, meters_count: metersCount };
 }

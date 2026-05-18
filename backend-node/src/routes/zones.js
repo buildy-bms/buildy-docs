@@ -13,10 +13,17 @@ const ZONE_NATURES = [
   'outdoor', 'meters', 'shared-space', 'logistic-cell', 'stock',
 ];
 
+// Une zone est soit « fonctionnelle » (assujettie au decret BACS, alimente
+// les cards Systemes / Compteurs), soit « technique » (local technique,
+// TGBT, local compteurs… hors perimetre BACS — inventoriee mais sans
+// auto-creation de systemes / compteurs).
+const ZONE_KINDS = ['functional', 'technical'];
+
 const createZoneSchema = z.object({
   site_id: z.number().int().positive(),
   name: z.string().min(1, 'Nom requis'),
   nature: z.enum(ZONE_NATURES).nullable().optional(),
+  kind: z.enum(ZONE_KINDS).optional(),
   position: z.number().int().optional(),
   surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -25,6 +32,7 @@ const createZoneSchema = z.object({
 const updateZoneSchema = z.object({
   name: z.string().min(1).optional(),
   nature: z.enum(ZONE_NATURES).nullable().optional(),
+  kind: z.enum(ZONE_KINDS).optional(),
   position: z.number().int().optional(),
   surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
@@ -61,6 +69,7 @@ async function routes(fastify) {
       siteId: body.site_id,
       name: body.name,
       nature: body.nature || null,
+      kind: body.kind || 'functional',
       position: body.position || 0,
       notes: body.notes || null,
       surfaceM2: body.surface_m2 ?? null,
@@ -101,6 +110,7 @@ async function routes(fastify) {
       siteId: zone.site_id,
       name: `${zone.name} (copie)`,
       nature: zone.nature,
+      kind: zone.kind,
       position: zone.position + 1,
       surfaceM2: zone.surface_m2,
       notes: zone.notes,
