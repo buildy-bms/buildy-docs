@@ -11,6 +11,7 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { compressBeforeUpload, extractExifMeta, getDeviceGeolocation } from '@/composables/usePhotoCompression'
 import { useViewport } from '@/composables/useViewport'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
 /**
  * Bouton compact (icone camera + compteur) qui sert aussi de zone de drop
@@ -33,6 +34,10 @@ const emit = defineEmits(['changed'])
 
 const { success, error: notifyError } = useNotification()
 const { isMobile } = useViewport()
+// Les photos transitent par un upload multipart non queueable hors-ligne :
+// on désactive le bouton tant qu'on n'a pas de réseau (cf. mode hors-ligne
+// PWA — seules les saisies texte sont mises en file d'attente).
+const { isOnline } = useOnlineStatus()
 const photos = ref([])
 const loading = ref(false)
 const showGallery = ref(false)
@@ -236,6 +241,12 @@ const btnCls = computed(() => {
   // avec badge compteur en pastille flottante (pattern adopté pour Notes
   // / Partage / Photo dans toute l'app desktop).
   const base = 'inline-flex items-center justify-center rounded-md transition whitespace-nowrap'
+  if (!isOnline.value) {
+    // Hors-ligne : bouton grisé, non cliquable.
+    const off = `${base} opacity-40 cursor-not-allowed`
+    if (isMobile.value) return `${off} gap-1 px-4 py-3.5 text-base w-full font-medium border bg-gray-200 border-gray-200 text-gray-500`
+    return `${off} relative p-1.5 text-gray-300`
+  }
   if (isMobile.value) {
     return `${base} gap-1 px-4 py-3.5 text-base w-full font-medium border bg-indigo-600 border-indigo-600 text-white active:bg-indigo-700`
   }
@@ -283,7 +294,10 @@ function exifTooltip(p) {
     <button
       type="button"
       :class="btnCls"
-      v-tooltip="label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos'"
+      :disabled="!isOnline"
+      v-tooltip="!isOnline
+        ? 'Photos indisponibles hors ligne — reconnecte-toi pour ajouter ou consulter des photos'
+        : (label ? `Photos - ${label} (clic pour ouvrir / glisse-depose pour ajouter)` : 'Photos')"
       @click="showGallery = !showGallery"
       @dragover.prevent="onDragOver"
       @dragenter.prevent="onDragEnter"

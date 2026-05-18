@@ -268,12 +268,12 @@ const totalSurface = computed(() =>
                     :class="editForm.kind !== 'technical'
                       ? 'bg-indigo-600 text-white border-indigo-600'
                       : 'bg-white text-gray-600 border-gray-200'"
-                    class="touch-control flex-1 font-medium border">Fonctionnelle</button>
+                    class="flex-1 min-h-11 px-3 rounded-lg border font-medium transition">Fonctionnelle</button>
             <button type="button" @click="setKind('technical')"
                     :class="editForm.kind === 'technical'
                       ? 'bg-slate-600 text-white border-slate-600'
                       : 'bg-white text-gray-600 border-gray-200'"
-                    class="touch-control flex-1 font-medium border">Technique</button>
+                    class="flex-1 min-h-11 px-3 rounded-lg border font-medium transition">Technique</button>
           </div>
         </MobileField>
 

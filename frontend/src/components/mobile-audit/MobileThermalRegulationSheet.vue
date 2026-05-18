@@ -196,10 +196,9 @@ async function saveLevelNote() {
         </p>
       </div>
 
-      <template>
-        <!-- Granularité de la régulation (la présence d'une régulation se
-             déduit du type choisi : « Aucune » = pas de régulation). -->
-        <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2">
+      <!-- Granularité de la régulation (la présence d'une régulation se
+           déduit du type choisi : « Aucune » = pas de régulation). -->
+      <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2">
           <MobileField label="Granularité de la régulation">
             <MobileSelectSheet
               :model-value="thermalRow.regulation_type"
@@ -340,8 +339,6 @@ async function saveLevelNote() {
             </button>
           </div>
         </div>
-      </template>
-
       <p class="text-xs text-gray-400 text-center pt-2">
         Sauvegarde automatique. Tu peux fermer cette page à tout moment.
       </p>
