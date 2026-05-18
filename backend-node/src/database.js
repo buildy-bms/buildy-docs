@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 141;
+const TARGET_VERSION = 148;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5736,6 +5736,173 @@ function runMigrations() {
     db.pragma('user_version = 141');
   }
 
+  if (current < 142) {
+    // L'energie « PAC » (heat_pump) est retiree : une pompe a chaleur n'est
+    // pas une energie, elle consomme de l'electricite. On bascule les
+    // systemes existants vers `electric`. Les CHECK DB restent permissifs
+    // (inoffensif) — seul le picker UI + l'enum Zod retirent la valeur.
+    db.exec(`
+      UPDATE bacs_audit_system_devices
+      SET energy_source = 'electric', updated_at = CURRENT_TIMESTAMP
+      WHERE energy_source = 'heat_pump';
+    `);
+    log.info('Migration 142 appliquee : energie PAC (heat_pump) basculee vers electric');
+    db.pragma('user_version = 142');
+  }
+
+  if (current < 143) {
+    // Partage d'un equipement entre plusieurs *systemes* (zone x usage).
+    // Generalise l'ancien partage zone-only (bacs_audit_device_extra_zones,
+    // mig 98) : un device a un systeme primaire (system_id) + 0..n systemes
+    // supplementaires ou il apparait aussi.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_audit_device_shared_systems (
+        device_id INTEGER NOT NULL REFERENCES bacs_audit_system_devices(id) ON DELETE CASCADE,
+        system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (device_id, system_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_bacs_dev_shared_sys
+        ON bacs_audit_device_shared_systems(system_id);
+    `);
+    // Reprise : chaque zone supplementaire devient le systeme de meme
+    // categorie que le systeme d'origine du device dans cette zone.
+    db.exec(`
+      INSERT OR IGNORE INTO bacs_audit_device_shared_systems (device_id, system_id)
+      SELECT ez.device_id, tgt.id
+      FROM bacs_audit_device_extra_zones ez
+      JOIN bacs_audit_system_devices d ON d.id = ez.device_id
+      JOIN bacs_audit_systems orig ON orig.id = d.system_id
+      JOIN bacs_audit_systems tgt
+        ON tgt.document_id = orig.document_id
+       AND tgt.zone_id = ez.zone_id
+       AND tgt.system_category = orig.system_category;
+      DROP TABLE bacs_audit_device_extra_zones;
+    `);
+    log.info('Migration 143 appliquee : bacs_audit_device_shared_systems (partage multi-usages)');
+    db.pragma('user_version = 143');
+  }
+
+  if (current < 144) {
+    // Usages non BACS : on retire le CHECK sur system_category (devient
+    // TEXT libre) pour permettre des usages manuels hors decret, et on
+    // ajoute custom_label (nom affiche) + is_bacs (0 = usage manuel).
+    // SQLite ne sait pas DROP un CHECK → redefinition de table. On coupe
+    // les FK pour que le DROP n'entraine pas de cascade sur les devices.
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      BEGIN;
+      CREATE TABLE bacs_audit_systems_new144 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+        zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        system_category TEXT NOT NULL,
+        equipment_id INTEGER REFERENCES equipments(id) ON DELETE SET NULL,
+        present INTEGER NOT NULL DEFAULT 0,
+        communication TEXT
+          CHECK (communication IS NULL OR communication IN
+            ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+             'knx','mbus','mqtt','autre','non_communicant','absent')),
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        meets_r175_3_p3 INTEGER,
+        meets_r175_3_p4 INTEGER,
+        meets_r175_3_p4_autonomous INTEGER DEFAULT 0,
+        managed_by_bms INTEGER DEFAULT 0,
+        notes_html TEXT,
+        not_concerned INTEGER DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0,
+        custom_label TEXT,
+        is_bacs INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(document_id, zone_id, system_category)
+      );
+      INSERT INTO bacs_audit_systems_new144
+        (id, document_id, zone_id, system_category, equipment_id, present,
+         communication, notes, created_at, updated_at, meets_r175_3_p3,
+         meets_r175_3_p4, meets_r175_3_p4_autonomous, managed_by_bms,
+         notes_html, not_concerned, position, custom_label, is_bacs)
+        SELECT id, document_id, zone_id, system_category, equipment_id, present,
+               communication, notes, created_at, updated_at, meets_r175_3_p3,
+               meets_r175_3_p4, meets_r175_3_p4_autonomous, managed_by_bms,
+               notes_html, not_concerned, position, NULL, 1
+        FROM bacs_audit_systems;
+      DROP TABLE bacs_audit_systems;
+      ALTER TABLE bacs_audit_systems_new144 RENAME TO bacs_audit_systems;
+      CREATE INDEX idx_bacs_systems_doc ON bacs_audit_systems(document_id);
+      CREATE INDEX idx_bacs_systems_zone ON bacs_audit_systems(zone_id);
+      CREATE INDEX idx_bacs_systems_equipment ON bacs_audit_systems(equipment_id)
+        WHERE equipment_id IS NOT NULL;
+      COMMIT;
+    `);
+    db.pragma('foreign_keys = ON');
+    log.info('Migration 144 appliquee : bacs_audit_systems sans CHECK system_category + custom_label/is_bacs');
+    db.pragma('user_version = 144');
+  }
+
+  if (current < 145) {
+    // Tracabilite du modele bibliotheque utilise pour creer un device :
+    // permet d'interdire l'ajout d'un meme modele deux fois dans un usage.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices
+      ADD COLUMN equipment_template_id INTEGER REFERENCES equipment_templates(id) ON DELETE SET NULL;
+    `);
+    log.info('Migration 145 appliquee : bacs_audit_system_devices.equipment_template_id');
+    db.pragma('user_version = 145');
+  }
+
+  if (current < 146) {
+    // Presence de la GTB : NULL = non repondu, 1 = GTB presente, 0 = pas
+    // de GTB. Quand 0, la card GTB et l'inspection R175-5-1 sont masquees.
+    db.exec(`
+      ALTER TABLE bacs_audit_bms ADD COLUMN present INTEGER;
+    `);
+    log.info('Migration 146 appliquee : bacs_audit_bms.present (GTB presente / absente)');
+    db.pragma('user_version = 146');
+  }
+
+  if (current < 147) {
+    // Usage manuel rattaché à une catégorie de la bibliothèque : permet de
+    // filtrer la bibliothèque d'équipements pour cet usage. NULL = usage
+    // libre (nom saisi à la main, bibliothèque non filtrée).
+    db.exec(`
+      ALTER TABLE bacs_audit_systems ADD COLUMN library_category_key TEXT;
+    `);
+    log.info('Migration 147 appliquee : bacs_audit_systems.library_category_key');
+    db.pragma('user_version = 147');
+  }
+
+  if (current < 148) {
+    // Annexe B (methodologie) etoffee : 7 nouveaux points couvrant R175-3 §4,
+    // le dernier alinea R175-3, l'absence de GTB, le comptage, la severite des
+    // actions, l'inspection R175-5-1 et les usages hors decret. La table
+    // pdf_boilerplate a ete seedee une seule fois (migration 65) -> on insere
+    // ici les titres absents, en fin de liste, sans toucher aux rows editees.
+    try {
+      const methodology = require('./lib/bacs-audit-methodology');
+      const existing = new Set(
+        db.prepare(`SELECT title FROM pdf_boilerplate WHERE kind = 'methodology'`)
+          .all().map((r) => r.title)
+      );
+      const maxPos = db.prepare(
+        `SELECT COALESCE(MAX(position), -1) AS p FROM pdf_boilerplate WHERE kind = 'methodology'`
+      ).get().p;
+      const insertMeth = db.prepare(`INSERT INTO pdf_boilerplate
+        (kind, position, title, body_html) VALUES ('methodology', ?, ?, ?)`);
+      let pos = maxPos + 1;
+      methodology.forEach((m) => {
+        if (!existing.has(m.title)) {
+          insertMeth.run(pos, m.title, m.body);
+          pos += 1;
+        }
+      });
+    } catch (err) {
+      log.warn(`Migration 148 (re-seed methodologie) KO : ${err.message}`);
+    }
+    log.info('Migration 148 appliquee : Annexe B methodologie etoffee');
+    db.pragma('user_version = 148');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -8416,38 +8583,38 @@ const libraryAttachmentPublications = {
   },
 };
 
-// ── Bacs Audit — partage multi-zones d'un device (mig 98) ────────────
-// Un même équipement physique (chaudière, VMC, luminaire) peut desservir
-// plusieurs zones fonctionnelles. La zone d'origine est implicite (celle
-// du système parent) ; les zones supplémentaires vivent dans cette table.
-const bacsAuditDeviceZones = {
-  // Zones supplémentaires desservies par un device. Renvoie [zoneId, ...].
+// ── Bacs Audit — partage multi-usages d'un device (mig 143) ──────────
+// Un même équipement physique (chaudière, VMC, luminaire) peut être
+// rattaché à plusieurs systèmes (zone × usage). Le système primaire est
+// `system_id` sur le device ; les systèmes supplémentaires vivent ici.
+const bacsAuditDeviceSharedSystems = {
+  // Systèmes supplémentaires où le device apparaît. Renvoie [systemId, ...].
   listExtraForDevice(deviceId) {
     return db.prepare(
-      'SELECT zone_id FROM bacs_audit_device_extra_zones WHERE device_id = ? ORDER BY zone_id'
-    ).all(deviceId).map(r => r.zone_id);
+      'SELECT system_id FROM bacs_audit_device_shared_systems WHERE device_id = ? ORDER BY system_id'
+    ).all(deviceId).map(r => r.system_id);
   },
 
-  // Liste plate des { device_id, zone_id } pour tous les devices d'un
+  // Liste plate des { device_id, system_id } pour tous les devices d'un
   // document : préfix de résolution sans N+1 pour le GET devices.
   listExtrasForDocument(documentId) {
     return db.prepare(`
-      SELECT ez.device_id, ez.zone_id
-      FROM bacs_audit_device_extra_zones ez
-      JOIN bacs_audit_system_devices d ON d.id = ez.device_id
+      SELECT ss.device_id, ss.system_id
+      FROM bacs_audit_device_shared_systems ss
+      JOIN bacs_audit_system_devices d ON d.id = ss.device_id
       JOIN bacs_audit_systems s ON s.id = d.system_id
       WHERE s.document_id = ?
     `).all(documentId);
   },
 
-  // Remplace l'ensemble des zones supplémentaires d'un device.
-  setExtraForDevice(deviceId, zoneIds) {
+  // Remplace l'ensemble des systèmes supplémentaires d'un device.
+  setExtraForDevice(deviceId, systemIds) {
     const tx = db.transaction(() => {
-      db.prepare('DELETE FROM bacs_audit_device_extra_zones WHERE device_id = ?').run(deviceId);
+      db.prepare('DELETE FROM bacs_audit_device_shared_systems WHERE device_id = ?').run(deviceId);
       const stmt = db.prepare(
-        'INSERT INTO bacs_audit_device_extra_zones (device_id, zone_id) VALUES (?, ?)'
+        'INSERT OR IGNORE INTO bacs_audit_device_shared_systems (device_id, system_id) VALUES (?, ?)'
       );
-      for (const zid of zoneIds) stmt.run(deviceId, zid);
+      for (const sid of systemIds) stmt.run(deviceId, sid);
     });
     tx();
   },
@@ -8876,7 +9043,7 @@ module.exports = {
   faqCategories,
   faqArticles,
   libraryAttachmentPublications,
-  bacsAuditDeviceZones,
+  bacsAuditDeviceSharedSystems,
   bacsChecklistCatalog,
   bacsAuditChecklist,
   gtbTopicsCatalog,

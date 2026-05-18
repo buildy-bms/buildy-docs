@@ -1,12 +1,12 @@
 <script setup>
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsSystem, updateBacsDeviceZones, createBacsDevice, updateBacsDevice, deleteBacsDevice } from '@/api'
+import { updateBacsSystem, shareBacsDevice, moveBacsDevice, createBacsDevice, updateBacsDevice, deleteBacsDevice, createBacsSystem, deleteBacsSystem, listSystemCategories } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
@@ -16,7 +16,7 @@ import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
-import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED } from '@/lib/audit-options'
+import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel } from '@/lib/audit-options'
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -43,11 +43,12 @@ const REGULATION_LABEL = {
 function thermalStatus(zoneId, category) {
   const t = thermalFor(zoneId, category)
   if (!t) return { label: 'Non concernée', tone: 'neutral' }
-  if (t.generator_exempt_wood) return { label: 'Exempté — appareil bois', tone: 'neutral' }
-  if (!t.has_automatic_regulation) return { label: 'À renseigner', tone: 'warn' }
+  // « Régulation automatique » se déduit de regulation_type (≠ none).
+  if (!t.regulation_type || t.regulation_type === 'none') {
+    return { label: 'À renseigner', tone: 'warn' }
+  }
   const granularity = REGULATION_LABEL[t.regulation_type]
-  if (granularity) return { label: `Automatique · ${granularity}`, tone: 'ok' }
-  return { label: 'Automatique · à compléter', tone: 'warn' }
+  return { label: `Automatique · ${granularity || t.regulation_type}`, tone: 'ok' }
 }
 
 const thermalSheetTarget = ref(null)
@@ -82,6 +83,9 @@ const SYSTEM_NEGATIVE_LABEL = {
 const ENERGY_OPTIONS = ENERGY_OPTIONS_DECORATED
 const ROLE_OPTIONS = ROLE_OPTIONS_DECORATED
 
+// Libellé d'un usage : catégorie BACS, ou nom libre si usage manuel.
+function usageLabel(s) { return systemUsageLabel(s) }
+
 const collapsedZones = ref(new Set())
 
 // Focus inter-tab : MobileChecklistTab navigue ici avec un system_id à
@@ -110,30 +114,33 @@ function toggleZone(zoneId) {
   collapsedZones.value = s
 }
 
+// Toutes les zones (fonctionnelles + techniques), même sans usage : on
+// peut y ajouter des usages manuels (zones techniques incluses).
 const systemsByZone = computed(() => {
-  const groups = new Map()
+  const byZone = new Map()
   for (const s of systems.value) {
-    // Garder les usages "non concerné" (= Absent dans le toggle mobile) :
-    // grisés au rendu pour permettre la réactivation.
-    const k = s.zone_id
-    if (!groups.has(k)) groups.set(k, { zone_id: s.zone_id, zone_name: s.zone_name, items: [] })
-    groups.get(k).items.push(s)
+    if (!byZone.has(s.zone_id)) byZone.set(s.zone_id, [])
+    byZone.get(s.zone_id).push(s)
   }
-  return [...groups.values()]
+  const groups = []
+  const seen = new Set()
+  for (const z of (zones.value || [])) {
+    seen.add(z.zone_id)
+    groups.push({ zone_id: z.zone_id, zone_name: z.name, zone_kind: z.kind || 'functional', items: byZone.get(z.zone_id) || [] })
+  }
+  for (const [zid, items] of byZone) {
+    if (seen.has(zid)) continue
+    groups.push({ zone_id: zid, zone_name: items[0]?.zone_name, zone_kind: 'functional', items })
+  }
+  return groups
 })
 
 function devicesOf(systemId) {
-  const sys = systems.value.find(s => s.id === systemId)
-  if (!sys) return []
   const own = devices.value.filter(d => d.system_id === systemId)
-  // Mig 98 : inclut aussi les devices d'autres systèmes partagés vers la
-  // zone courante avec la même catégorie (chaufferie commune, etc.).
-  const shared = devices.value.filter(d => {
-    if (d.system_id === systemId) return false
-    if (!(d.extra_zone_ids || []).includes(sys.zone_id)) return false
-    const origin = systems.value.find(s => s.id === d.system_id)
-    return origin?.system_category === sys.system_category
-  })
+  // Mig 143 : inclut les devices partagés vers cet usage.
+  const shared = devices.value.filter(d =>
+    d.system_id !== systemId && (d.extra_system_ids || []).includes(systemId),
+  )
   return [...own, ...shared]
 }
 function isSharedDevice(d, systemId) {
@@ -157,54 +164,97 @@ const editingDevice = ref(null)
 const deviceForm = ref({})
 const savingDevice = ref(false)
 
-// Sheet de partage multi-zones d'un device (mig 98)
+// Sheet de déplacement / partage d'un device entre usages (mig 143).
 const savingShare = ref(false)
-async function toggleShareDeviceZone(zoneId, checked) {
+async function toggleShareDeviceSystem(systemId, checked) {
   if (savingShare.value || !editingDevice.value?.device) return
   savingShare.value = true
   const dev = editingDevice.value.device
-  const next = new Set(dev.extra_zone_ids || [])
-  if (checked) next.add(zoneId); else next.delete(zoneId)
+  const next = new Set(dev.extra_system_ids || [])
+  if (checked) next.add(systemId); else next.delete(systemId)
   try {
-    const { data } = await updateBacsDeviceZones(dev.id, [...next])
+    const { data } = await shareBacsDevice(dev.id, [...next])
     Object.assign(dev, data)
-    success(checked ? 'Zone ajoutée au partage' : 'Zone retirée du partage')
+    success(checked ? 'Usage ajouté au partage' : 'Usage retiré du partage')
     await audit.refreshAuditCore()
   } catch (e) {
-    error(e.response?.data?.detail || 'Mise à jour des zones impossible')
+    error(e.response?.data?.detail || 'Partage impossible')
   } finally {
     savingShare.value = false
   }
 }
-
-function shareCandidateZones() {
-  if (!editingDevice.value?.system) return []
-  const originId = editingDevice.value.system.zone_id
-  return zones.value.filter(z => z.zone_id !== originId)
-}
-function shareAllChecked() {
-  const dev = editingDevice.value?.device
-  if (!dev) return false
-  const cands = shareCandidateZones()
-  if (!cands.length) return false
-  const set = new Set(dev.extra_zone_ids || [])
-  return cands.every(z => set.has(z.zone_id))
-}
-async function toggleAllShareDeviceZones() {
-  if (savingShare.value || !editingDevice.value?.device) return
+async function moveDeviceToSystem(systemId) {
+  if (savingShare.value || !editingDevice.value?.device || systemId === editingDevice.value.device.system_id) return
   savingShare.value = true
   const dev = editingDevice.value.device
-  const cands = shareCandidateZones()
-  const next = shareAllChecked() ? [] : cands.map(z => z.zone_id)
   try {
-    const { data } = await updateBacsDeviceZones(dev.id, next)
+    const { data } = await moveBacsDevice(dev.id, systemId)
     Object.assign(dev, data)
-    success(next.length ? 'Toutes les zones ajoutées' : 'Toutes les zones retirées')
+    if (editingDevice.value) editingDevice.value.system = systems.value.find(s => s.id === systemId) || editingDevice.value.system
+    success('Système déplacé')
     await audit.refreshAuditCore()
   } catch (e) {
-    error(e.response?.data?.detail || 'Mise à jour des zones impossible')
+    error(e.response?.data?.detail || 'Déplacement impossible')
   } finally {
     savingShare.value = false
+  }
+}
+// Systèmes candidats au partage : tous les usages sauf le primaire du device.
+function shareCandidateSystems() {
+  const dev = editingDevice.value?.device
+  if (!dev) return []
+  return (systems.value || []).filter(s => s.id !== dev.system_id)
+}
+// Options « usage principal » pour le MobileSelectSheet de déplacement.
+const moveSystemOptions = computed(() => (systems.value || []).map(s => ({
+  value: s.id,
+  label: `${s.zone_name || 'Zone'} — ${usageLabel(s)}`,
+})))
+
+// ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
+// Bibliothèque de catégories pour le choix d'usage.
+const categoryLibrary = ref([])
+onMounted(async () => {
+  try {
+    const { data } = await listSystemCategories()
+    categoryLibrary.value = data || []
+  } catch { /* silencieux */ }
+})
+const categoryOptions = computed(() => categoryLibrary.value.map(c => ({
+  value: c.key, label: c.label, icon: c.icon_value, color: c.icon_color,
+})))
+
+const addingUsageZone = ref(null)
+const newUsageValue = ref(null)
+function startAddUsage(zoneId) { addingUsageZone.value = zoneId; newUsageValue.value = null }
+function cancelAddUsage() { addingUsageZone.value = null; newUsageValue.value = null }
+async function confirmAddUsage(zoneId) {
+  const v = (newUsageValue.value || '').toString().trim()
+  if (!v) return
+  const cat = categoryLibrary.value.find(c => c.key === v)
+  const payload = cat
+    ? { zone_id: zoneId, label: cat.label, library_category_key: cat.key }
+    : { zone_id: zoneId, label: v }
+  try {
+    await createBacsSystem(audit.docId, payload)
+    cancelAddUsage()
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Ajout de l\'usage impossible')
+  }
+}
+async function removeUsage(s) {
+  const ok = await confirm({
+    title: 'Supprimer cet usage ?',
+    message: `« ${usageLabel(s)} » et ses systèmes seront supprimés.`,
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteBacsSystem(s.id)
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Suppression impossible')
   }
 }
 
@@ -214,6 +264,8 @@ function openLibraryDevicePicker(system) {
   libraryDevicePickerSystem.value = {
     id: system.id,
     system_category: system.system_category,
+    is_bacs: system.is_bacs,
+    library_category_key: system.library_category_key,
     zone_name: zones.value.find(z => z.zone_id === system.zone_id)?.name || '',
   }
 }
@@ -351,10 +403,10 @@ async function removeDevice(d) {
               <SystemCategoryIcon :category="s.system_category" size="md" />
               <div class="flex-1 min-w-0">
                 <p class="text-base font-medium text-gray-900 truncate leading-tight">
-                  {{ SYSTEM_LABEL[s.system_category] || s.system_category }}
+                  {{ usageLabel(s) }}
                 </p>
                 <p v-if="s.not_concerned" class="text-sm text-gray-500 mt-1 italic">
-                  {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || 'Non concerné' }}
+                  {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? "Usage non concerné" : "Non concerné") }}
                 </p>
                 <p v-else-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
                   {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
@@ -366,6 +418,11 @@ async function removeDevice(d) {
                   À renseigner : présent ou absent ?
                 </p>
               </div>
+              <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
+                      class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-400 active:bg-red-50 active:text-red-600"
+                      aria-label="Supprimer cet usage">
+                <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
+              </button>
             </div>
             <!-- Segmented control 2 états : Présent / Absent (= not_concerned).
                  Le 3e cas (rien de coché) est l'état initial par défaut. -->
@@ -453,6 +510,33 @@ async function removeDevice(d) {
               <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
             </button>
           </div>
+          <!-- Ajout manuel d'un usage (hors décret BACS / zones techniques) -->
+          <div class="px-4 py-3">
+            <div v-if="addingUsageZone === g.zone_id" class="space-y-2">
+              <p class="text-xs text-gray-500">Choisir une catégorie ou saisir un nom libre</p>
+              <MobileSelectSheet
+                v-model="newUsageValue"
+                :options="categoryOptions"
+                :creatable="true"
+                title="Catégorie d'usage"
+                placeholder="— Catégorie ou nom —"
+              />
+              <div class="flex gap-2">
+                <button type="button" @click="confirmAddUsage(g.zone_id)" :disabled="!newUsageValue"
+                        class="flex-1 min-h-11 py-3 text-base font-medium text-white bg-emerald-600 disabled:opacity-50 rounded-xl">
+                  Ajouter
+                </button>
+                <button type="button" @click="cancelAddUsage"
+                        class="px-4 min-h-11 py-3 text-base text-gray-600 bg-gray-100 rounded-xl">
+                  Annuler
+                </button>
+              </div>
+            </div>
+            <button v-else type="button" @click="startAddUsage(g.zone_id)"
+                    class="w-full min-h-11 inline-flex items-center justify-center gap-2 py-3 text-base font-medium text-indigo-600 bg-indigo-50 rounded-xl">
+              <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un usage
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -472,7 +556,7 @@ async function removeDevice(d) {
     >
       <div class="p-4 space-y-4">
         <p v-if="editingDevice?.system" class="text-xs text-gray-500">
-          {{ SYSTEM_LABEL[editingDevice.system.system_category] || editingDevice.system.system_category }} —
+          {{ usageLabel(editingDevice.system) }} —
           {{ editingDevice.system.zone_name }}
         </p>
 
@@ -669,51 +753,41 @@ async function removeDevice(d) {
         </div>
 
         <template v-if="editingDevice?.mode === 'edit'">
-          <!-- Partage multi-zones (mig 98) : un même équipement physique
-               peut alimenter plusieurs zones (chaufferie commune, etc.). -->
+          <!-- Déplacer / partager entre usages (mig 143). -->
+          <MobileField label="Usage principal">
+            <MobileSelectSheet
+              :model-value="editingDevice.device.system_id"
+              :options="moveSystemOptions"
+              title="Déplacer vers un usage"
+              placeholder="— Usage —"
+              @update:model-value="moveDeviceToSystem"
+            />
+          </MobileField>
           <div class="pt-2">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">
-                <FontAwesomeIcon :icon="['fas', 'share-nodes']" class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
-                Zones desservies
-              </p>
-              <button
-                v-if="shareCandidateZones().length"
-                type="button"
-                @click="toggleAllShareDeviceZones"
-                :disabled="savingShare"
-                class="text-xs font-medium text-indigo-600 active:text-indigo-800 disabled:opacity-50 whitespace-nowrap"
-              >
-                {{ shareAllChecked() ? 'Tout décocher' : 'Tout cocher' }}
-              </button>
-            </div>
+            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">
+              <FontAwesomeIcon :icon="['fas', 'share-nodes']" class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+              Aussi présent dans
+            </p>
             <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-              <div class="px-4 py-3 flex items-center gap-2 bg-gray-50">
-                <FontAwesomeIcon :icon="['fas', 'check']" class="w-5 h-5 text-gray-400 shrink-0" />
-                <span class="flex-1 text-base text-gray-700 truncate">
-                  {{ zones.find(z => z.zone_id === editingDevice.system.zone_id)?.name || 'Zone d\'origine' }}
-                </span>
-                <span class="text-[11px] text-gray-400 italic shrink-0">Origine</span>
-              </div>
               <label
-                v-for="z in zones.filter(z => z.zone_id !== editingDevice.system.zone_id)"
-                :key="z.zone_id"
+                v-for="sys in shareCandidateSystems()"
+                :key="sys.id"
                 class="px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-gray-50"
               >
                 <input
                   type="checkbox"
-                  :checked="(editingDevice.device.extra_zone_ids || []).includes(z.zone_id)"
+                  :checked="(editingDevice.device.extra_system_ids || []).includes(sys.id)"
                   :disabled="savingShare"
-                  @change="e => toggleShareDeviceZone(z.zone_id, e.target.checked)"
+                  @change="e => toggleShareDeviceSystem(sys.id, e.target.checked)"
                   class="w-5 h-5 rounded border-gray-300 shrink-0"
                 />
-                <span class="text-base text-gray-700 truncate">{{ z.name }}</span>
+                <span class="text-base text-gray-700 truncate">{{ sys.zone_name }} — {{ usageLabel(sys) }}</span>
               </label>
               <p
-                v-if="zones.filter(z => z.zone_id !== editingDevice.system.zone_id).length === 0"
+                v-if="!shareCandidateSystems().length"
                 class="px-4 py-4 text-sm text-gray-400 italic text-center"
               >
-                Aucune autre zone disponible.
+                Aucun autre usage disponible.
               </p>
             </div>
           </div>
@@ -735,7 +809,7 @@ async function removeDevice(d) {
     <MobileLibraryPicker
       v-if="libraryDevicePickerSystem"
       :system="libraryDevicePickerSystem"
-      :system-label="SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category"
+      :system-label="usageLabel(libraryDevicePickerSystem)"
       :zone-name="libraryDevicePickerSystem.zone_name || ''"
       @close="libraryDevicePickerSystem = null"
       @added="audit.refreshAuditCore()"

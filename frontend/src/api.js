@@ -391,8 +391,15 @@ export const ensureUserFromPocketId = (pocketid_id) => api.post('/users/ensure-b
 // ── Audit BACS — donnees structurees ──
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
 export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
-export const updateBacsDeviceZones = (deviceId, extraZoneIds) =>
-  api.patch(`/bacs-audit/devices/${deviceId}/zones`, { extra_zone_ids: extraZoneIds })
+// Usage manuel non BACS (mig 144).
+export const createBacsSystem = (docId, data) =>
+  api.post(`/bacs-audit/${docId}/systems`, data)
+export const deleteBacsSystem = (id) => api.delete(`/bacs-audit/systems/${id}`)
+// Partage / déplacement d'un device entre systèmes (zone × usage), mig 143.
+export const shareBacsDevice = (deviceId, extraSystemIds) =>
+  api.patch(`/bacs-audit/devices/${deviceId}/share`, { extra_system_ids: extraSystemIds })
+export const moveBacsDevice = (deviceId, systemId) =>
+  api.patch(`/bacs-audit/devices/${deviceId}/move`, { system_id: systemId })
 export const getBacsMeters = (docId) => api.get(`/bacs-audit/${docId}/meters`)
 export const createBacsMeter = (docId, data) => api.post(`/bacs-audit/${docId}/meters`, data)
 export const updateBacsMeter = (id, data) => api.patch(`/bacs-audit/meters/${id}`, data)

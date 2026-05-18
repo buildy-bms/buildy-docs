@@ -84,11 +84,17 @@ function buildAssujettissement(document) {
     case 'not_subject':       conclusion = 'Puissance < 70 kW — non assujetti au décret BACS.'; break;
     default:                  conclusion = 'Statut d\'assujettissement non renseigné.';
   }
+  const determined = !!status;
+  const threshold = status === 'subject_2027' ? 70 : 290;
   return {
     powerKw: power,
     pcDate,
     pcDateLabel: pcDate ? new Date(pcDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : null,
-    threshold: status === 'subject_2027' ? 70 : 290,
+    threshold,
+    // Tant que le statut n'est pas renseigné, on n'affiche pas un seuil
+    // unique trompeur : les deux seuils du décret coexistent.
+    determined,
+    thresholdLabel: determined ? `${threshold} kW` : '70 kW (2027) ou 290 kW (2025)',
     status,
     conclusion,
   };
@@ -134,6 +140,13 @@ function buildComplianceSummary({
     bucket.items.push(a);
   }
 
+  // Sans GTB sur le site, les exigences qui PORTENT sur la GTB ne peuvent
+  // pas être satisfaites — quel que soit le nombre d'actions générées.
+  const noGtb = !!bms && bms.present === 0;
+  const GTB_DEPENDENT_AXES = new Set([
+    'r175_3_3', 'r175_3_4', 'r175_3_data', 'r175_4', 'r175_5',
+  ]);
+
   const r175Dashboard = R175_EXIGENCES.map(ex => {
     const bucket = actionsByAxis.get(ex.axis) || { blocking: 0, major: 0, minor: 0, items: [] };
     const total = bucket.blocking + bucket.major + bucket.minor;
@@ -143,6 +156,9 @@ function buildComplianceSummary({
       v = 'info';
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       v = 'na';
+    } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
+      // Pas de GTB → exigence GTB non satisfaite par construction.
+      v = 'non_compliant';
     } else {
       v = verdictFromActions({ blocking: bucket.blocking, major: bucket.major });
     }
@@ -152,6 +168,8 @@ function buildComplianceSummary({
       contextSummary = applicabilityLabel;
     } else if (ex.axis === 'r175_6' && r175_6_applicable && !r175_6_applicable.applies) {
       contextSummary = `Non applicable — ${r175_6_applicable.reason}.`;
+    } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
+      contextSummary = 'Aucune GTB sur le site — exigence non satisfaite.';
     }
     return {
       code: ex.code,

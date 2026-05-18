@@ -1,17 +1,20 @@
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsSystem, reorderBacsSystems } from '@/api'
+import { useConfirm } from '@/composables/useConfirm'
+import { systemUsageLabel } from '@/lib/audit-options'
+import { updateBacsSystem, reorderBacsSystems, createBacsSystem, deleteBacsSystem, listSystemCategories } from '@/api'
 
 // Couleur d'accent par categorie de systeme : aligne avec
 // SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
@@ -49,6 +52,10 @@ const emit = defineEmits([
 const audit = useAuditStore()
 const { document, powerSummary } = storeToRefs(audit)
 const { error } = useNotification()
+const { confirm } = useConfirm()
+
+// Libellé d'un usage : catégorie BACS, ou nom libre si usage manuel.
+function usageLabel(s) { return systemUsageLabel(s) }
 
 async function patchSystem(s, patch) {
   Object.assign(s, patch)
@@ -56,6 +63,66 @@ async function patchSystem(s, patch) {
     await updateBacsSystem(s.id, patch)
     await audit.refreshActionItems()
   } catch { error('Sauvegarde système impossible') }
+}
+
+// ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
+// L'auditeur choisit un usage dans la bibliothèque de catégories, ou
+// saisit un nom libre (option "creatable" du SearchableSelect).
+const categoryLibrary = ref([])
+onMounted(async () => {
+  try {
+    const { data } = await listSystemCategories()
+    categoryLibrary.value = data || []
+  } catch { /* silencieux — on retombe sur la saisie libre */ }
+})
+const categoryOptions = computed(() => categoryLibrary.value.map(c => ({
+  value: c.key,
+  label: c.label,
+  icon: c.icon_value,
+  color: c.icon_color,
+})))
+
+const addingUsageZone = ref(null)   // zone_id en cours de saisie
+const newUsageValue = ref(null)     // key de catégorie OU texte libre
+function startAddUsage(zoneId) {
+  addingUsageZone.value = zoneId
+  newUsageValue.value = null
+}
+function cancelAddUsage() {
+  addingUsageZone.value = null
+  newUsageValue.value = null
+}
+async function confirmAddUsage(zoneId) {
+  const v = (newUsageValue.value || '').toString().trim()
+  if (!v) return
+  // Si la valeur correspond à une catégorie de la bibliothèque, on rattache
+  // l'usage à cette catégorie (filtre la bibliothèque d'équipements) ;
+  // sinon c'est un nom libre.
+  const cat = categoryLibrary.value.find(c => c.key === v)
+  const payload = cat
+    ? { zone_id: zoneId, label: cat.label, library_category_key: cat.key }
+    : { zone_id: zoneId, label: v }
+  try {
+    await createBacsSystem(audit.docId, payload)
+    cancelAddUsage()
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Ajout de l\'usage impossible')
+  }
+}
+async function removeUsage(s) {
+  const ok = await confirm({
+    title: 'Supprimer cet usage ?',
+    message: `« ${usageLabel(s)} » et tous ses systèmes techniques seront supprimés.`,
+    confirmLabel: 'Supprimer', danger: true,
+  })
+  if (!ok) return
+  try {
+    await deleteBacsSystem(s.id)
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Suppression impossible')
+  }
 }
 
 function refreshAuditData() { return audit.refreshAuditCore() }
@@ -163,6 +230,10 @@ onBeforeUnmount(teardownSortables)
             <MapPinIcon class="w-5 h-5 text-indigo-500" />
             <span class="font-semibold text-lg text-gray-900 cursor-pointer" @click="emit('toggle-zone-collapsed', g.zone_id)">{{ g.zone_name }}</span>
             <span v-if="g.zone_nature" class="text-xs text-gray-500 italic">— {{ zoneNatures.find(z => z.value === g.zone_nature)?.label || g.zone_nature }}</span>
+            <span v-if="g.zone_kind === 'technical'"
+                  class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 whitespace-nowrap">
+              hors décret BACS
+            </span>
             <span class="ml-auto text-[10px] text-gray-400">
               {{ g.items.filter(s => s.present).length }} actif{{ g.items.filter(s => s.present).length > 1 ? 's' : '' }}
               / {{ g.items.length }}
@@ -205,7 +276,7 @@ onBeforeUnmount(teardownSortables)
                   <SystemCategoryIcon :category="s.system_category" size="md" />
                   <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate"
                         @click="s.present && emit('toggle-system-collapsed', s.id)">
-                    {{ systemLabels[s.system_category] || s.system_category }}
+                    {{ usageLabel(s) }}
                   </span>
                   <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
                     <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
@@ -226,7 +297,7 @@ onBeforeUnmount(teardownSortables)
                     <button
                       type="button"
                       :disabled="!s.present"
-                      @click="emit('open-notes', { title: 'Notes systeme', contextLabel: (systemLabels[s.system_category] || s.system_category) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
+                      @click="emit('open-notes', { title: 'Notes systeme', contextLabel: (usageLabel(s)) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
                       :class="['inline-flex items-center justify-center p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed',
                         hasNotes(s.notes_html || s.notes)
                           ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
@@ -238,27 +309,64 @@ onBeforeUnmount(teardownSortables)
                       v-if="document?.site_uuid && s.present"
                       :site-uuid="document.site_uuid"
                       :attach-to="{ system_id: s.id }"
-                      :label="(systemLabels[s.system_category] || s.system_category) + ' - ' + g.zone_name" />
+                      :label="(usageLabel(s)) + ' - ' + g.zone_name" />
+                    <!-- Suppression : usages manuels (non BACS) uniquement. -->
+                    <button v-if="s.is_bacs === 0" type="button"
+                            @click="removeUsage(s)"
+                            class="inline-flex items-center justify-center p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                            v-tooltip="'Supprimer cet usage'">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
                 <SystemDevicesTable
                   v-if="s.present && !collapsedSystems.has(s.id)"
                   :system="s"
                   :devices="devicesBySystem[s.id] || []"
-                  :system-label="systemLabels[s.system_category] || s.system_category"
+                  :system-label="usageLabel(s)"
                   :site-uuid="document?.site_uuid"
                   @changed="refreshAuditData"
                   @system-updated="patch => patchSystem(s, patch)"
                   @open-device-notes="d => emit('open-notes', {
                     title: 'Notes equipement',
-                    contextLabel: (d.name || 'Equipement') + ' - ' + (systemLabels[s.system_category] || s.system_category) + ' / ' + g.zone_name,
+                    contextLabel: (d.name || 'Equipement') + ' - ' + (usageLabel(s)) + ' / ' + g.zone_name,
                     entityType: 'device', entityRef: d,
                     currentHtml: d.notes_html || d.notes || ''
                   })"
-                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })"
-                  @add-device-from-library="sys => emit('add-device-from-library', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name })" />
+                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })"
+                  @add-device-from-library="sys => emit('add-device-from-library', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
               </div>
             </template>
+            <!-- Ajout manuel d'un usage (hors matrice BACS) — choisir une
+                 catégorie de la bibliothèque ou saisir un nom libre. -->
+            <div v-if="addingUsageZone === g.zone_id"
+                 class="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/40 px-3 py-2.5 space-y-2">
+              <p class="text-[11px] font-medium text-gray-600">
+                Choisir une catégorie de la bibliothèque, ou saisir un nom libre
+              </p>
+              <div class="flex items-center gap-2">
+                <div class="flex-1 min-w-0">
+                  <SearchableSelect
+                    v-model="newUsageValue"
+                    :options="categoryOptions"
+                    :creatable="true"
+                    placeholder="Catégorie ou nom d'usage…"
+                    search-placeholder="Filtrer ou saisir un nom libre…" />
+                </div>
+                <button type="button" @click="confirmAddUsage(g.zone_id)" :disabled="!newUsageValue"
+                        class="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md whitespace-nowrap shrink-0">
+                  Ajouter
+                </button>
+                <button type="button" @click="cancelAddUsage"
+                        class="px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md whitespace-nowrap shrink-0">
+                  Annuler
+                </button>
+              </div>
+            </div>
+            <button v-else type="button" @click="startAddUsage(g.zone_id)"
+                    class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 border-2 border-dashed border-indigo-300 hover:border-indigo-400 hover:bg-indigo-50 rounded-lg whitespace-nowrap transition">
+              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un usage
+            </button>
           </div>
         </div>
       </div>

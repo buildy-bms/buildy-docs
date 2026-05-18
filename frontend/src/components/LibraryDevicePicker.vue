@@ -24,6 +24,7 @@ import EquipmentIcon from './EquipmentIcon.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import { listEquipmentTemplates, createBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
+import { useAuditStore } from '@/stores/audit'
 import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
 
 const props = defineProps({
@@ -33,6 +34,17 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'added'])
 const { success, error: notifyError } = useNotification()
+const auditStore = useAuditStore()
+
+// Un même modèle bibliothèque ne peut être ajouté qu'une fois par usage.
+const usedTemplateIds = computed(() => new Set(
+  (auditStore.devices || [])
+    .filter(d => d.system_id === props.system.id && d.equipment_template_id)
+    .map(d => d.equipment_template_id),
+))
+function isUsed(t) {
+  return usedTemplateIds.value.has(t.id) || recentlyAdded.value.has(t.id)
+}
 
 // Mapping côté front pour rester cohérent avec
 // backend-node/src/lib/system-categories.js::libraryCategoriesForBacsCategory.
@@ -56,13 +68,27 @@ const energyFilter = ref(null)
 const roleFilter = ref(null)
 const adding = ref({})  // template_id -> boolean
 
-const allowedCategories = computed(() =>
-  LIBRARY_CATS_FOR_BACS[props.system.system_category] || [],
-)
+// Catégories bibliothèque à proposer :
+//  - usage BACS : mappées depuis la system_category (LIBRARY_CATS_FOR_BACS)
+//  - usage manuel rattaché à une catégorie : cette catégorie
+//  - usage manuel libre : null → toute la bibliothèque
+const allowedCategories = computed(() => {
+  if (props.system.is_bacs === 0) {
+    return props.system.library_category_key ? [props.system.library_category_key] : null
+  }
+  return LIBRARY_CATS_FOR_BACS[props.system.system_category] || []
+})
 
 async function loadTemplates() {
   loading.value = true
   try {
+    // null = usage libre → on charge toute la bibliothèque.
+    if (allowedCategories.value === null) {
+      const { data } = await listEquipmentTemplates()
+      templates.value = (data || []).sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '', 'fr'))
+      return
+    }
     if (!allowedCategories.value.length) {
       templates.value = []
       return
@@ -133,7 +159,7 @@ function hasRole(value) {
 const recentlyAdded = ref(new Set())
 
 async function pickTemplate(t) {
-  if (adding.value[t.id]) return
+  if (adding.value[t.id] || isUsed(t)) return
   adding.value = { ...adding.value, [t.id]: true }
   try {
     await createBacsDevice(props.system.id, { equipment_template_id: t.id })
@@ -223,9 +249,7 @@ async function pickTemplate(t) {
         >
           <div class="flex items-start gap-2.5 min-w-0">
             <EquipmentIcon
-              :icon-kind="t.icon_kind"
-              :icon-value="t.icon_value"
-              :icon-color="t.icon_color"
+              :template="t"
               class="shrink-0 mt-0.5"
             />
             <div class="min-w-0 flex-1">
@@ -241,16 +265,16 @@ async function pickTemplate(t) {
           <button
             type="button"
             @click="pickTemplate(t)"
-            :disabled="!!adding[t.id]"
+            :disabled="!!adding[t.id] || isUsed(t)"
             :class="[
               'w-full inline-flex items-center justify-center gap-1.5 px-4 py-3 min-h-11 text-base font-medium rounded-lg transition',
-              recentlyAdded.has(t.id)
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 active:bg-emerald-100'
+              isUsed(t)
+                ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
                 : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50'
             ]"
           >
-            <CheckIcon v-if="recentlyAdded.has(t.id)" class="w-4 h-4 shrink-0" />
-            {{ adding[t.id] ? 'Ajout…' : recentlyAdded.has(t.id) ? 'Ajouté · Encore ?' : 'Ajouter' }}
+            <CheckIcon v-if="isUsed(t)" class="w-4 h-4 shrink-0" />
+            {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
           </button>
         </div>
       </div>
@@ -271,9 +295,7 @@ async function pickTemplate(t) {
               <td class="px-3 py-2.5">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <EquipmentIcon
-                    :icon-kind="t.icon_kind"
-                    :icon-value="t.icon_value"
-                    :icon-color="t.icon_color"
+                    :template="t"
                     class="shrink-0"
                   />
                   <div class="min-w-0">
@@ -293,16 +315,16 @@ async function pickTemplate(t) {
                 <button
                   type="button"
                   @click="pickTemplate(t)"
-                  :disabled="!!adding[t.id]"
+                  :disabled="!!adding[t.id] || isUsed(t)"
                   :class="[
                     'inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition shrink-0 whitespace-nowrap',
-                    recentlyAdded.has(t.id)
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                    isUsed(t)
+                      ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
                       : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'
                   ]"
                 >
-                  <CheckIcon v-if="recentlyAdded.has(t.id)" class="w-3.5 h-3.5 shrink-0" />
-                  {{ adding[t.id] ? 'Ajout…' : recentlyAdded.has(t.id) ? 'Ajouté · Encore ?' : 'Ajouter' }}
+                  <CheckIcon v-if="isUsed(t)" class="w-3.5 h-3.5 shrink-0" />
+                  {{ adding[t.id] ? 'Ajout…' : isUsed(t) ? 'Déjà ajouté' : 'Ajouter' }}
                 </button>
               </td>
             </tr>

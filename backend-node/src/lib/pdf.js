@@ -358,7 +358,7 @@ async function renderPdf(opts) {
   return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
 }
 
-async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
+async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, closingFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
   const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -410,17 +410,30 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
         );
         const firstPage = frontmatterEls.length + 1;
 
-        const anchors = document.querySelectorAll('[data-toc-anchor]');
+        // Chaque [data-toc-anchor] est un <h1 class="chapter"> en
+        // page-break-before:always → il demarre une nouvelle page. La page
+        // d'un chapitre = page du precedent + nombre de pages qu'il occupe
+        // (>=1, +1 par tranche de debordement). Un simple offset / hauteur
+        // de page serait faux : le rendu ecran ignore les sauts de page,
+        // donc des chapitres courts se retrouveraient sur la meme "page"
+        // calculee alors qu'ils sont paginés séparément.
+        const anchors = [...document.querySelectorAll('[data-toc-anchor]')];
+        const sectionsBottom = sectionsContainer.getBoundingClientRect().bottom + window.scrollY;
         const anchorPages = new Map();
-        for (const a of anchors) {
+        let currentPage = firstPage;
+        for (let i = 0; i < anchors.length; i++) {
+          const a = anchors[i];
           const id = a.getAttribute('data-toc-anchor');
           // Ajoute id="X" si absent — necessaire pour que <a href="#X">
           // soit cliquable dans le PDF.
           if (!a.id) a.id = `toc-${id}`;
+          anchorPages.set(id, currentPage);
           const top = a.getBoundingClientRect().top + window.scrollY;
-          const offsetInSections = Math.max(0, top - sectionsTop);
-          const pageNum = firstPage + Math.floor(offsetInSections / innerPx);
-          anchorPages.set(id, pageNum);
+          const nextTop = (i + 1 < anchors.length)
+            ? anchors[i + 1].getBoundingClientRect().top + window.scrollY
+            : sectionsBottom;
+          const chapterHeight = Math.max(0, nextTop - top);
+          currentPage += Math.max(1, Math.ceil(chapterHeight / innerPx));
         }
 
         // Met a jour les liens TOC + les rend cliquables
@@ -531,12 +544,19 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     const skipMaskBecauseFullBleed = coverFullBleed;
     const needMask = skipFirstPageHeaderFooter && pdfOptions.displayHeaderFooter
       && pdfOptions.margin && !skipMaskBecauseFullBleed;
+    // closingFullBleed : la derniere page est une page de cloture plein-bord
+    // (fond navy edge-to-edge via @page nommee margin:0). Puppeteer dessine
+    // quand meme le header/footer dans la bande de marge -> on masque ces
+    // 2 bandes avec des rectangles navy, comme maskFirstPage pour la cover.
+    const needMaskLast = closingFullBleed && pdfOptions.displayHeaderFooter
+      && pdfOptions.margin;
     const needPostProcess =
-      needMask ||
+      needMask || needMaskLast ||
       watermark || (addFormFields && extractedFields && extractedFields.length);
     if (needPostProcess) {
       await postProcessPdf(outputPath, {
         maskFirstPage: needMask ? { margin: pdfOptions.margin, color: '#1b2842' } : null,
+        maskLastPage: needMaskLast ? { margin: pdfOptions.margin, color: '#1b2842' } : null,
         watermark,
         formFields: addFormFields ? extractedFields : null,
         pageFormat,
@@ -565,25 +585,32 @@ async function replaceFirstPage(mainPath, coverPath) {
   fs.writeFileSync(mainPath, await mainDoc.save());
 }
 
-async function postProcessPdf(pdfPath, { maskFirstPage, watermark, formFields, pageFormat, pageOrientation }) {
+async function postProcessPdf(pdfPath, { maskFirstPage, maskLastPage, watermark, formFields, pageFormat, pageOrientation }) {
   const { PDFDocument, rgb } = require('pdf-lib');
   const bytes = fs.readFileSync(pdfPath);
   const doc = await PDFDocument.load(bytes);
   const pages = doc.getPages();
 
-  // 1. Masque header/footer page 1
-  if (maskFirstPage && pages.length > 0) {
-    const { margin, color } = maskFirstPage;
-    const firstPage = pages[0];
-    const { width, height } = firstPage.getSize();
+  // Masque les bandes header/footer d'une page avec un rectangle plein.
+  const maskHeaderFooter = (page, { margin, color }) => {
+    const { width, height } = page.getSize();
     const topPt = margin.top ? mmToPt(margin.top) : 0;
     const botPt = margin.bottom ? mmToPt(margin.bottom) : 0;
     const r = parseInt(color.slice(1, 3), 16) / 255;
     const g = parseInt(color.slice(3, 5), 16) / 255;
     const b = parseInt(color.slice(5, 7), 16) / 255;
     const fill = rgb(r, g, b);
-    if (topPt > 0) firstPage.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
-    if (botPt > 0) firstPage.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+    if (topPt > 0) page.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
+    if (botPt > 0) page.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+  };
+
+  // 1. Masque header/footer page 1
+  if (maskFirstPage && pages.length > 0) {
+    maskHeaderFooter(pages[0], maskFirstPage);
+  }
+  // 1bis. Masque header/footer derniere page (page de cloture plein-bord)
+  if (maskLastPage && pages.length > 0) {
+    maskHeaderFooter(pages[pages.length - 1], maskLastPage);
   }
 
   // 2. Filigrane Buildy — preservation d'aspect, dimensionne pour couvrir
@@ -594,6 +621,7 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark, formFields, p
     const {
       imagePath,
       skipFirstPage = false,
+      skipLastPage = false,
       widthRatio = 1.5,
       heightRatio = 1.5,
       opacity = 0.05,
@@ -604,7 +632,8 @@ async function postProcessPdf(pdfPath, { maskFirstPage, watermark, formFields, p
       : await doc.embedJpg(imageBytes);
     const aspect = img.height / img.width;
     const startIdx = skipFirstPage ? 1 : 0;
-    for (let i = startIdx; i < pages.length; i++) {
+    const endIdx = skipLastPage ? pages.length - 1 : pages.length;
+    for (let i = startIdx; i < endIdx; i++) {
       const p = pages[i];
       const { width: pw, height: ph } = p.getSize();
       const wByWidth = pw * widthRatio;
@@ -718,6 +747,11 @@ body {
    les styles du template). La marge negative compense le padding du body. */
 body > .cover:first-child {
   margin: -${d.padY}mm -${d.padX}mm 8mm -${d.padX}mm;
+  width: calc(100% + ${d.padX * 2}mm);
+}
+/* Idem pour la page de cloture plein-bord (derniere section). */
+body > .closing:last-child {
+  margin: 8mm -${d.padX}mm -${d.padY}mm -${d.padX}mm;
   width: calc(100% + ${d.padX * 2}mm);
 }
 `;

@@ -80,6 +80,13 @@ function onAfPick(e) {
   e.target.value = ''
 }
 
+// Présence de la GTB (Feature G) : 1 = présente, 0 = pas de GTB.
+async function setGtbPresent(val) {
+  bms.value.present = val
+  try { await audit.saveBms() }
+  catch { error('Sauvegarde GTB impossible') }
+}
+
 let saveTimer = null
 function saveBmsDebounced() {
   clearTimeout(saveTimer)
@@ -124,7 +131,7 @@ function hasNotes(html) {
 <template>
   <CollapsibleSection storage-key="bms" section-id="section-bms" :active="active">
     <template #header>
-      <SectionHeader :number="audit.isBacs ? '7' : '6'"
+      <SectionHeader number="7"
                      :title="audit.isBacs ? 'Solution GTB / GTC en place' : 'Solution de supervision en place'"
                      :subtitle="audit.isBacs ? 'R175-3 + R175-4 + R175-5' : 'Inventaire du superviseur en place'"
                      :icon="WrenchScrewdriverIcon" icon-color="text-purple-600"
@@ -156,7 +163,8 @@ function hasNotes(html) {
       </SectionHeader>
     </template>
     <template #summary>
-      <span v-if="bms.existing_solution">
+      <span v-if="bms.present === 0" class="italic">Pas de GTB sur le site</span>
+      <span v-else-if="bms.existing_solution">
         {{ bms.existing_solution }}<span v-if="bms.existing_solution_brand"> · {{ bms.existing_solution_brand }}</span>
         · suivi 5 ans {{ bms.meets_r175_3_p1 ? '✓' : '✗' }}
         · détection dérives {{ bms.meets_r175_3_p2 ? '✓' : '✗' }}
@@ -169,7 +177,35 @@ function hasNotes(html) {
       :attach-to="{ bms_document_id: bms.document_id }"
       :enabled="!!(document?.site_uuid && bms.document_id)"
       @changed="emit('refresh-audit-data')">
-      <div class="px-5 py-4 grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6">
+      <!-- Présence de la GTB : mêmes cases que présent/non concerné des
+           usages (card 4). « Pas de GTB » masque toute la saisie R175. -->
+      <div class="px-5 py-5">
+        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">
+          Une GTB est-elle présente sur le site ?
+        </p>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <label class="inline-flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+            <input type="checkbox" :checked="bms.present === 1"
+                   @change="e => setGtbPresent(e.target.checked ? 1 : null)"
+                   class="w-4 h-4 rounded border-gray-300" />
+            <span class="text-gray-700">GTB présente</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+            <input type="checkbox" :checked="bms.present === 0"
+                   @change="e => setGtbPresent(e.target.checked ? 0 : null)"
+                   class="w-4 h-4 rounded border-gray-300" />
+            <span class="text-gray-500 italic">Pas de GTB</span>
+          </label>
+        </div>
+        <p v-if="bms.present == null" class="text-xs text-amber-600 mt-3">
+          Indiquez d'abord si une GTB est présente pour saisir la suite.
+        </p>
+        <p v-else-if="bms.present === 0" class="text-xs text-gray-500 mt-3">
+          Aucune GTB sur le site — une action « Installer une GTB » est ajoutée au plan de mise en conformité.
+        </p>
+      </div>
+
+      <div v-if="bms.present === 1" class="px-5 py-4 grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6">
         <aside class="border-r border-gray-100 pr-4 sticky top-4 self-start">
           <h4 class="text-[11px] font-medium font-semibold text-gray-500 mb-3">Progression de la saisie</h4>
           <VerticalStepper :steps="bmsSteps" />

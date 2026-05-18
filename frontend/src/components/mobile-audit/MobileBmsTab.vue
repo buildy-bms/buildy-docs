@@ -56,6 +56,13 @@ function saveDebounced() {
   }, 400)
 }
 
+// Présence de la GTB (Feature G) : 1 = présente, 0 = pas de GTB.
+async function setGtbPresent(val) {
+  bms.value.present = val
+  try { await audit.saveBms() }
+  catch { error('Sauvegarde GTB impossible') }
+}
+
 async function patchDeviceBms(d, patch) {
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
@@ -134,6 +141,32 @@ const USAGES = [
       </div>
     </div>
 
+    <!-- Présence de la GTB : choix d'emblée (Feature G) -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+        Une GTB est-elle présente sur le site ?
+      </p>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" @click="setGtbPresent(1)"
+                :class="['min-h-11 py-3 text-base font-medium rounded-xl border-2 transition',
+                         bms.present === 1 ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600']">
+          GTB présente
+        </button>
+        <button type="button" @click="setGtbPresent(0)"
+                :class="['min-h-11 py-3 text-base font-medium rounded-xl border-2 transition',
+                         bms.present === 0 ? 'border-gray-500 bg-gray-100 text-gray-700' : 'border-gray-200 bg-white text-gray-600']">
+          Pas de GTB
+        </button>
+      </div>
+      <p v-if="bms.present == null" class="text-xs text-amber-600 mt-2">
+        Indiquez d'abord si une GTB est présente.
+      </p>
+      <p v-else-if="bms.present === 0" class="text-xs text-gray-500 mt-2">
+        Aucune GTB — une action « Installer une GTB » est ajoutée au plan.
+      </p>
+    </div>
+
+    <template v-if="bms.present === 1">
     <!-- Hors-service toggle -->
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <label class="flex items-start justify-between gap-3 px-4 py-5 cursor-pointer">
@@ -608,5 +641,6 @@ const USAGES = [
       :open="showInspections"
       @close="showInspections = false"
     />
+    </template>
   </div>
 </template>

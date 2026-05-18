@@ -2,7 +2,7 @@
 /**
  * Mini-éditeur de texte riche basé sur Tiptap (StarterKit).
  * - v-model:html → HTML interne
- * - Toolbar minimale : gras, italique, listes, lien
+ * - Toolbar : titres H2/H3, gras, italique, souligné, listes, citation, lien
  *
  * Pas conçu pour éditer un long contenu structuré (utiliser SectionEditor.vue
  * pour ça avec autosave). Idéal pour les champs courts comme description
@@ -12,9 +12,10 @@ import { ref, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import Underline from '@tiptap/extension-underline'
 import {
-  BoldIcon, ItalicIcon, ListBulletIcon, NumberedListIcon, LinkIcon, SparklesIcon,
-  ChevronDownIcon,
+  BoldIcon, ItalicIcon, UnderlineIcon, ListBulletIcon, NumberedListIcon, LinkIcon, SparklesIcon,
+  ChevronDownIcon, H2Icon, H3Icon, ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/outline'
 import { claudeLibraryAssist } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -115,9 +116,10 @@ const editor = useEditor({
   content: props.modelValue || '',
   extensions: [
     StarterKit.configure({
-      heading: { levels: [3, 4] },
+      heading: { levels: [2, 3, 4] },
       link: { openOnClick: false, autolink: true, linkOnPaste: true },
     }),
+    Underline,
     Placeholder.configure({
       placeholder: props.placeholder,
       emptyEditorClass: 'is-editor-empty',
@@ -187,13 +189,23 @@ function onSaveLink(url) {
 
 <template>
   <div class="border border-gray-200 rounded-lg bg-white shadow-sm">
-    <div v-if="editor" class="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+    <div v-if="editor" class="flex flex-wrap items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+      <button type="button" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
+              :class="['p-1 rounded hover:bg-gray-200', isActive('heading', { level: 2 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
+              v-tooltip="'Titre niveau 2'"><H2Icon class="w-3.5 h-3.5" /></button>
+      <button type="button" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()"
+              :class="['p-1 rounded hover:bg-gray-200', isActive('heading', { level: 3 }) ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
+              v-tooltip="'Titre niveau 3'"><H3Icon class="w-3.5 h-3.5" /></button>
+      <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="editor.chain().focus().toggleBold().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bold') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               v-tooltip="'Gras'"><BoldIcon class="w-3.5 h-3.5" /></button>
       <button type="button" @click="editor.chain().focus().toggleItalic().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('italic') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               v-tooltip="'Italique'"><ItalicIcon class="w-3.5 h-3.5" /></button>
+      <button type="button" @click="editor.chain().focus().toggleUnderline().run()"
+              :class="['p-1 rounded hover:bg-gray-200', isActive('underline') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
+              v-tooltip="'Souligné'"><UnderlineIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="editor.chain().focus().toggleBulletList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('bulletList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
@@ -201,6 +213,9 @@ function onSaveLink(url) {
       <button type="button" @click="editor.chain().focus().toggleOrderedList().run()"
               :class="['p-1 rounded hover:bg-gray-200', isActive('orderedList') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
               v-tooltip="'Liste numérotée'"><NumberedListIcon class="w-3.5 h-3.5" /></button>
+      <button type="button" @click="editor.chain().focus().toggleBlockquote().run()"
+              :class="['p-1 rounded hover:bg-gray-200', isActive('blockquote') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
+              v-tooltip="'Citation'"><ChatBubbleLeftRightIcon class="w-3.5 h-3.5" /></button>
       <span class="w-px h-4 bg-gray-300 mx-0.5"></span>
       <button type="button" @click="setLink"
               :class="['p-1 rounded hover:bg-gray-200', isActive('link') ? 'bg-gray-200 text-indigo-700' : 'text-gray-600']"
@@ -320,6 +335,14 @@ function onSaveLink(url) {
 :deep(.rich-prose ol) { list-style-type: decimal; }
 :deep(.rich-prose li) { margin: 0.25rem 0; line-height: 1.5; }
 :deep(.rich-prose a) { color: #4f46e5; text-decoration: underline; }
+:deep(.rich-prose h2) { font-size: 15px; font-weight: 600; color: #1f2937; margin: 0.85rem 0 0.4rem; line-height: 1.35; }
+:deep(.rich-prose h3) { font-size: 13.5px; font-weight: 600; color: #374151; margin: 0.7rem 0 0.3rem; line-height: 1.35; }
+:deep(.rich-prose h2:first-child), :deep(.rich-prose h3:first-child) { margin-top: 0; }
+:deep(.rich-prose blockquote) {
+  border-left: 3px solid #d1d5db; padding-left: 0.75rem; margin: 0.6rem 0;
+  color: #6b7280; font-style: italic;
+}
+:deep(.rich-prose u) { text-decoration: underline; }
 :deep(.rich-prose .is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
   float: left;

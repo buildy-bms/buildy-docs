@@ -97,6 +97,60 @@ async function routes(fastify) {
     return db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
   });
 
+  // POST /bacs-audit/:documentId/systems — ajout manuel d'un usage non BACS
+  // (system_category libre, is_bacs=0). Permet de saisir des usages hors
+  // decret (bornes de recharge, occultation…) ou des usages dans les zones
+  // techniques. Exclu du scoring R175 (cf. action-generator).
+  fastify.post('/bacs-audit/:documentId/systems', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(documentId, request, reply, { requiredRole: 'write' })) return;
+    const schema = z.object({
+      zone_id: z.number().int().positive(),
+      label: z.string().trim().min(1, 'Nom de l\'usage requis').max(120),
+      // Catégorie de la bibliothèque (optionnel) : rattache l'usage manuel
+      // à une catégorie connue → filtre la bibliothèque d'équipements.
+      library_category_key: z.string().trim().min(1).max(80).nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    const zone = db.db.prepare('SELECT id FROM zones WHERE id = ?').get(body.zone_id);
+    if (!zone) return reply.code(400).send({ detail: 'Zone introuvable.' });
+
+    const maxPos = db.db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ?'
+    ).get(documentId, body.zone_id).m;
+    const category = 'custom:' + require('crypto').randomUUID();
+    const r = db.db.prepare(`
+      INSERT INTO bacs_audit_systems
+        (document_id, zone_id, system_category, custom_label, is_bacs, present, position, library_category_key)
+      VALUES (?, ?, ?, ?, 0, 1, ?, ?)
+    `).run(documentId, body.zone_id, category, body.label, maxPos + 10, body.library_category_key || null);
+    logBacsAudit(request, 'bacs.system.create', documentId, { systemId: r.lastInsertRowid, label: body.label });
+    return reply.code(201).send(
+      db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(r.lastInsertRowid)
+    );
+  });
+
+  // DELETE /bacs-audit/systems/:id — suppression d'un usage MANUEL uniquement.
+  // Les usages BACS de la matrice ne se suppriment pas (toggle not_concerned).
+  fastify.delete('/bacs-audit/systems/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Usage non trouve' });
+    if (row.is_bacs) {
+      return reply.code(400).send({
+        detail: 'Un usage du décret BACS ne se supprime pas — utilisez « Non concerné ».',
+      });
+    }
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
+    db.db.prepare('DELETE FROM bacs_audit_systems WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.system.delete', row.document_id, { systemId: id });
+    regenerateActionItems(row.document_id);
+    return { deleted: true };
+  });
+
   // ─── Meters (R175-3 §1) ────────────────────────────────────────────
   fastify.get('/bacs-audit/:documentId/meters', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
@@ -240,6 +294,8 @@ async function routes(fastify) {
       return v;
     }, z.boolean().nullable().optional());
     const schema = z.object({
+      // Presence de la GTB : null = non repondu, true = presente, false = absente.
+      present: boolish,
       existing_solution: z.string().nullable().optional(),
       existing_solution_brand: z.string().nullable().optional(),
       location: z.string().nullable().optional(),
@@ -421,7 +477,9 @@ async function routes(fastify) {
     const row = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
     const schema = z.object({
-      has_automatic_regulation: z.boolean().optional(),
+      // `has_automatic_regulation` se déduit désormais de regulation_type
+      // (≠ none) et `generator_exempt_wood` de l'énergie de production —
+      // ces colonnes sont dormantes, l'UI ne les saisit plus (Feature J/M).
       regulation_type: z.enum(REGULATION_TYPES).nullable().optional(),
       // Mig 135 : generator_type (= energy_source du device) et
       // generator_age_years (= age_years du device) ont migré sur le
@@ -429,7 +487,6 @@ async function routes(fastify) {
       // generator_device_id = niveau "Production" (chaudière, PAC, unité
       // extérieure DRV…). Le nom DB historique reste, le label UI évolue.
       generator_device_id: z.number().int().nullable().optional(),
-      generator_exempt_wood: z.boolean().nullable().optional(),
       // Migration 87 : niveaux Distribution (pompes, AHU…) et Émission
       // (radiateurs, ventilo-conv, unités intérieures DRV…). Tous deux
       // facultatifs — certaines configs (DRV) sautent la distribution.
@@ -451,10 +508,8 @@ async function routes(fastify) {
       // meter / thermal — même UX). `notes` legacy conservé pour les saisies
       // historiques.
       notes_html: z.string().nullable().optional(),
-      // Migration 61 : detail R175-6
-      sensor_position: z.string().nullable().optional(),
-      thermostat_type: z.string().nullable().optional(),
-      has_thermostatic_valves: z.boolean().nullable().optional(),
+      // (Mig 61 : sensor_position / thermostat_type / has_thermostatic_valves
+      //  — ligne détail R175-6 retirée de l'UI (Feature J), champs dormants.)
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -531,7 +586,7 @@ async function routes(fastify) {
       title: z.string().min(1).optional(),
       description: z.string().nullable().optional(),
       severity: z.enum(['blocking','major','minor']).optional(),
-      commercial_notes: z.string().nullable().optional(),
+      // `commercial_notes` retiré de l'UI (Feature H) — colonne dormante.
       estimated_effort: z.enum(['low','medium','high']).nullable().optional(),
       status: z.enum(['open','quoted','in_progress','done','declined']).optional(),
       position: z.number().int().optional(),
@@ -543,7 +598,7 @@ async function routes(fastify) {
     sanitizeBodyHtmlFields(body);
     // Pour items auto-generes, on n'autorise QUE l'edit des champs commerciaux
     if (row.auto_generated) {
-      const allowed = ['commercial_notes', 'estimated_effort', 'status', 'position', 'alternative_solutions_html'];
+      const allowed = ['estimated_effort', 'status', 'position', 'alternative_solutions_html'];
       for (const k of Object.keys(body)) {
         if (!allowed.includes(k)) {
           delete body[k]; // ignore silently les champs metier
@@ -674,28 +729,26 @@ async function routes(fastify) {
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.system_category, d.position, d.id
     `).all(id);
-    // Mig 98 : enrichit chaque device avec ses zones supplémentaires desservies
-    // (chaufferie commune partagée entre Logistique + Ateliers, etc.). 1 requête
+    // Mig 143 : enrichit chaque device avec les systèmes supplémentaires où il
+    // est partagé (équipement desservant plusieurs usages / zones). 1 requête
     // groupée pour éviter le N+1.
-    const extras = db.bacsAuditDeviceZones.listExtrasForDocument(id);
+    const extras = db.bacsAuditDeviceSharedSystems.listExtrasForDocument(id);
     const extrasByDevice = new Map();
     for (const e of extras) {
       if (!extrasByDevice.has(e.device_id)) extrasByDevice.set(e.device_id, []);
-      extrasByDevice.get(e.device_id).push(e.zone_id);
+      extrasByDevice.get(e.device_id).push(e.system_id);
     }
-    return rows.map(d => ({ ...mapDevice(d), extra_zone_ids: extrasByDevice.get(d.id) || [] }));
+    return rows.map(d => ({ ...mapDevice(d), extra_system_ids: extrasByDevice.get(d.id) || [] }));
   });
 
-  // PATCH /bacs-audit/devices/:id/zones — partage du device avec d'autres
-  // zones fonctionnelles (mig 98). Body : { extra_zone_ids: [int] }. La zone
-  // d'origine (celle du système parent) est implicite et ne fait jamais
-  // partie des extras. Pas de contrainte de conflit : un même équipement
-  // physique peut très bien être présent dans des zones qui ont déjà chacune
-  // leur propre équipement (cas d'une chaudière de secours, par exemple).
-  fastify.patch('/bacs-audit/devices/:id/zones', async (request, reply) => {
+  // PATCH /bacs-audit/devices/:id/share — partage du device avec d'autres
+  // systèmes (zone × usage). Body : { extra_system_ids: [int] }. Le système
+  // primaire (system_id du device) est implicite et exclu des extras. Mig 143
+  // (généralise l'ancien partage zone-only mig 98).
+  fastify.patch('/bacs-audit/devices/:id/share', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const dev = db.db.prepare(`
-      SELECT d.*, s.zone_id AS origin_zone_id, s.document_id, s.system_category
+      SELECT d.*, s.document_id
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id
       WHERE d.id = ?
@@ -703,43 +756,77 @@ async function routes(fastify) {
     if (!dev) return reply.code(404).send({ detail: 'Équipement non trouvé' });
 
     const schema = z.object({
-      extra_zone_ids: z.array(z.number().int().positive()).default([]),
+      extra_system_ids: z.array(z.number().int().positive()).default([]),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
-    sanitizeBodyHtmlFields(body);
 
-    // Dédup et exclut la zone d'origine si fournie par erreur.
-    const requested = [...new Set(body.extra_zone_ids)].filter(z => z !== dev.origin_zone_id);
-    // Vérifier que chaque zone existe (sécurité)
-    for (const zid of requested) {
-      if (!db.db.prepare('SELECT 1 FROM zones WHERE id = ?').get(zid)) {
-        return reply.code(400).send({ detail: `Zone #${zid} introuvable.` });
+    // Dédup et exclut le système primaire si fourni par erreur.
+    const requested = [...new Set(body.extra_system_ids)].filter(sid => sid !== dev.system_id);
+    // Vérifier que chaque système cible appartient au même document.
+    for (const sid of requested) {
+      const tgt = db.db.prepare('SELECT document_id FROM bacs_audit_systems WHERE id = ?').get(sid);
+      if (!tgt || tgt.document_id !== dev.document_id) {
+        return reply.code(400).send({ detail: `Usage #${sid} introuvable dans cet audit.` });
       }
     }
 
-    db.bacsAuditDeviceZones.setExtraForDevice(id, requested);
-    logBacsAudit(request, 'bacs.device.share', dev.document_id, { deviceId: id, extraZoneIds: requested });
+    db.bacsAuditDeviceSharedSystems.setExtraForDevice(id, requested);
+    logBacsAudit(request, 'bacs.device.share', dev.document_id, { deviceId: id, extraSystemIds: requested });
 
-    // Auto « Présent » : pour chaque zone supplémentaire désormais desservie,
-    // s'assurer qu'il y a un système de la même catégorie marqué present=1.
-    // Si la matrice BACS l'avait pré-généré on bascule juste le flag, sinon
-    // on crée la ligne hors-matrice (cas cogénération, GTC dédiée, etc.).
-    const upsertPresent = db.db.prepare(`
-      INSERT INTO bacs_audit_systems (document_id, zone_id, system_category, present)
-      VALUES (?, ?, ?, 1)
-      ON CONFLICT(document_id, zone_id, system_category) DO UPDATE SET present = 1, not_concerned = 0
-    `);
-    for (const zid of requested) {
-      upsertPresent.run(dev.document_id, zid, dev.system_category);
-    }
+    // Auto « Présent » : chaque usage où le device est désormais partagé
+    // est marqué présent.
+    const markPresent = db.db.prepare(
+      'UPDATE bacs_audit_systems SET present = 1, not_concerned = 0 WHERE id = ?'
+    );
+    for (const sid of requested) markPresent.run(sid);
 
     regenerateActionItems(dev.document_id);
 
     return {
       ...mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id)),
-      extra_zone_ids: db.bacsAuditDeviceZones.listExtraForDevice(id),
+      extra_system_ids: db.bacsAuditDeviceSharedSystems.listExtraForDevice(id),
+    };
+  });
+
+  // PATCH /bacs-audit/devices/:id/move — déplace le device vers un autre
+  // système (zone × usage). Body : { system_id: int }.
+  fastify.patch('/bacs-audit/devices/:id/move', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const dev = db.db.prepare(`
+      SELECT d.*, s.document_id
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      WHERE d.id = ?
+    `).get(id);
+    if (!dev) return reply.code(404).send({ detail: 'Équipement non trouvé' });
+
+    const schema = z.object({ system_id: z.number().int().positive() });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    const target = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(body.system_id);
+    if (!target || target.document_id !== dev.document_id) {
+      return reply.code(400).send({ detail: 'Usage cible introuvable dans cet audit.' });
+    }
+
+    db.db.prepare(
+      'UPDATE bacs_audit_system_devices SET system_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(body.system_id, id);
+    // Un système ne peut pas être à la fois primaire et partagé.
+    db.db.prepare('DELETE FROM bacs_audit_device_shared_systems WHERE device_id = ? AND system_id = ?')
+      .run(id, body.system_id);
+    // L'usage cible devient présent.
+    db.db.prepare('UPDATE bacs_audit_systems SET present = 1, not_concerned = 0 WHERE id = ?')
+      .run(body.system_id);
+    logBacsAudit(request, 'bacs.device.move', dev.document_id, { deviceId: id, toSystemId: body.system_id });
+    regenerateActionItems(dev.document_id);
+
+    return {
+      ...mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(id)),
+      extra_system_ids: db.bacsAuditDeviceSharedSystems.listExtraForDevice(id),
     };
   });
 
@@ -760,7 +847,11 @@ async function routes(fastify) {
       power_kw: z.number().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
       device_role: deviceRoleSchema,
+      // communication_protocol (mono, enum) conservé pour compat ascendante ;
+      // communication_protocols (multi, JSON array TEXT) est le champ courant
+      // — pas d'enum strict, aligné sur le tableau des équipements.
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
+      communication_protocols: z.string().nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       equipment_template_id: z.number().int().positive().nullable().optional(),
@@ -786,6 +877,13 @@ async function routes(fastify) {
           detail: `Modèle « ${tpl.name} » (catégorie ${tpl.category}) incompatible avec la catégorie du système (${sys.system_category}).`,
         });
       }
+      // Un même modèle bibliothèque ne peut être ajouté qu'une fois par usage.
+      const dup = db.db.prepare(
+        'SELECT 1 FROM bacs_audit_system_devices WHERE system_id = ? AND equipment_template_id = ?'
+      ).get(sysId, body.equipment_template_id);
+      if (dup) {
+        return reply.code(409).send({ detail: 'Ce modèle est déjà présent dans cet usage.' });
+      }
       // Le payload explicite a priorité sur les défauts du template (l'utilisateur
       // peut customiser dans la modale avant de valider).
       if (!prefName) prefName = tpl.name;
@@ -799,14 +897,16 @@ async function routes(fastify) {
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_system_devices
         (system_id, position, name, brand, model_reference, power_kw, energy_source,
-         device_role, communication_protocol, location, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         device_role, communication_protocol, communication_protocols, location, notes, equipment_template_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sysId, maxPos + 10,
       prefName, body.brand || null, body.model_reference || null, body.power_kw ?? null,
       prefEnergy, prefRole,
       body.communication_protocol || null,
+      body.communication_protocols || null,
       body.location || null, body.notes || null,
+      body.equipment_template_id || null,
     );
     logBacsAudit(request, 'bacs.device.create', sys.document_id, { systemId: sysId, deviceId: r.lastInsertRowid, fromTemplate: body.equipment_template_id || null });
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)

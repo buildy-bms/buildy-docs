@@ -122,14 +122,19 @@ function connectorClass(s) {
       <template v-for="s in steps" :key="s.key">
         <div v-if="s.key === activeStepKey">
           <p class="text-[11px] text-gray-500 leading-snug mb-2">{{ s.description }}</p>
-          <button
-            v-if="!s.validated"
-            type="button"
-            @click="$emit('validate-step', s.key)"
-            class="w-full px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition shadow-sm"
-          >
-            ✓ Valider cette étape
-          </button>
+          <template v-if="!s.validated">
+            <button
+              type="button"
+              :disabled="!s.complete"
+              @click="$emit('validate-step', s.key)"
+              class="w-full px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
+            >
+              ✓ Valider cette étape
+            </button>
+            <p v-if="!s.complete" class="mt-1 text-[10px] text-gray-400 leading-snug">
+              Complétez l'étape avant de la valider.
+            </p>
+          </template>
           <button
             v-else
             type="button"

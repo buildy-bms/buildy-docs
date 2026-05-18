@@ -14,6 +14,7 @@ const { regenerateActionItems } = require('../../lib/bacs-audit-action-generator
 const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../../lib/seeder');
 const gitLib = require('../../lib/git');
 const { assertBacsAuditExists } = require('./_shared');
+const { isStepComplete } = require('../../lib/bacs-audit-step-completion');
 
 async function routes(fastify) {
   // ─── Livraison de l'audit ──────────────────────────────────────────
@@ -80,10 +81,11 @@ async function routes(fastify) {
   });
 
   // ─── Stepper progression (v2.9 / v2.10) ────────────────────────────
-  // 10 etapes manuelles a valider par l'auditeur :
-  //   identification, zones, systems, meters, thermal, bms, documents,
-  //   credentials, review, synthesis.
-  const AUDIT_STEPS = ['identification','zones','systems','meters','thermal','bms','documents','credentials','review','synthesis'];
+  // 13 etapes manuelles a valider par l'auditeur — DOIT rester aligne sur
+  // STEP_DEFINITIONS (frontend BacsAuditDetailView.vue) et sur les clés
+  // gérées par lib/bacs-audit-step-completion.js. Sinon validate-step
+  // rejette l'étape en 400 (z.enum).
+  const AUDIT_STEPS = ['identification','zones','technical-zones','systems','meters','thermal','bms','inspections','docs-checklist','documents','credentials','review','synthesis'];
 
   fastify.post('/bacs-audit/:documentId/validate-step', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
@@ -106,6 +108,14 @@ async function routes(fastify) {
     catch { progress = {}; }
 
     if (body.validated) {
+      // Verrou : on ne valide pas une étape dont les infos essentielles
+      // ne sont pas saisies (miroir de STEP_DEFINITIONS.isComplete côté
+      // front — cf. lib/bacs-audit-step-completion.js).
+      if (!isStepComplete(documentId, body.step)) {
+        return reply.code(400).send({
+          detail: 'Étape incomplète : renseignez les informations essentielles avant de la valider.',
+        });
+      }
       const user = request.authUser?.id ? db.users.getById(request.authUser.id) : null;
       progress[body.step] = {
         validated: true,
@@ -595,13 +605,11 @@ async function routes(fastify) {
         updated_at = CURRENT_TIMESTAMP
     `).run(af.id);
 
-    // 10. Thermal regulation : per_room sur open-space avec detail
-    //     (migration 61 : sensor_position, thermostat_type, robinets)
+    // 10. Thermal regulation : régulation par pièce sur l'open-space.
+    //     has_automatic_regulation se déduit de regulation_type ≠ none.
     db.db.prepare(`
       UPDATE bacs_audit_thermal_regulation
-      SET has_automatic_regulation = 1, regulation_type = 'per_room',
-          sensor_position = 'murale', thermostat_type = 'programmable',
-          has_thermostatic_valves = 1
+      SET regulation_type = 'per_room'
       WHERE document_id = ? AND zone_id = ?
     `).run(af.id, openSpace.zone_id);
 

@@ -15,7 +15,10 @@ const METER_TYPES = ['electric','electric_production','gas','water','thermal'];
 const RECOMMENDATIONS = ['to_add','to_replace','to_connect','compliant'];
 const REGULATION_TYPES = ['per_room','per_zone','central_only','none'];
 const GENERATOR_TYPES = ['gas','electric','heat_pump','wood_appliance','district_heating','other'];
-const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating',
+// `heat_pump` retiré (l'énergie « PAC » n'a pas de sens — une PAC consomme
+// de l'électricité). Les CHECK DB le permettent toujours (inoffensif) ; une
+// migration a basculé les anciennes lignes vers `electric`.
+const ENERGY_SOURCES = ['gas','electric','wood','district_heating',
   'fuel_oil','solar','biomass','autre'];
 // `device_role` est volontairement non-enum (z.string libre) depuis la
 // mig 99 — l'admin peut créer des niveaux custom (Production étage 2,

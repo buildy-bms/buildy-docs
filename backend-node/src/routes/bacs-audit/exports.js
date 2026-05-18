@@ -133,13 +133,12 @@ async function routes(fastify) {
       return /[",\n]/.test(s) ? `"${s}"` : s;
     };
     const headers = ['Severity', 'Article R175', 'Categorie', 'Titre', 'Zone', 'Equipement',
-      'Description', 'Status', 'Estimated effort', 'Notes commerciales'];
+      'Description'];
     const rows = [headers.join(',')];
     for (const it of items) {
       rows.push([
         esc(it.severity), esc(it.r175_article), esc(it.category), esc(it.title),
         esc(it.zone_name), esc(it.equipment_name), esc(it.description),
-        esc(it.status), esc(it.estimated_effort), esc(it.commercial_notes),
       ].join(','));
     }
     reply.header('Content-Type', 'text/csv; charset=utf-8');
@@ -269,7 +268,8 @@ async function routes(fastify) {
         template: 'bacs-audit', styles: 'styles-bacs-audit', data, outputPath,
         populateToc: true, pageFormat: 'A4',
         skipFirstPageHeaderFooter: true, coverFullBleed: true,
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
+        closingFullBleed: true,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, skipLastPage: true },
         fresh: true, // hot reload du template aussi pour le PDF
         pdfOptions: buildHeaderFooter({
           clientName: data.document.client_name,
@@ -326,7 +326,8 @@ async function routes(fastify) {
         pageFormat: 'A4',
         skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true },
+        closingFullBleed: true,
+        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, skipLastPage: true },
         pdfOptions: buildHeaderFooter({
           clientName: af.client_name,
           projectName: af.project_name,
