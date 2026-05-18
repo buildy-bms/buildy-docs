@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.62",
+      "date": "2026-05-18",
+      "title": "Audit mobile : navigation des systèmes par usage",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Onglet Systèmes : on entre dans un usage",
+          "what": "Sur la PWA, l'onglet Systèmes affiche désormais, pour chaque zone, la liste de ses usages avec leur statut présent/absent. Taper un usage présent ouvre une page dédiée regroupant ses équipements et sa régulation thermique — fini la longue liste à plat.",
+          "where": "Audit mobile — onglet Systèmes.",
+          "how_to_test": "Ouvrir l'onglet Systèmes, marquer un usage Présent, le taper : sa page dédiée s'ouvre avec les équipements et la régulation thermique."
+        }
+      ]
+    },
+    {
       "version": "0.1.61",
       "date": "2026-05-18",
       "title": "Audit mobile : correctifs PWA",
