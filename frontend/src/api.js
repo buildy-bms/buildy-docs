@@ -17,6 +17,26 @@ const PUBLIC_PATHS = ['/login']
 // + dernier état persistent dans le composable singleton.
 api.interceptors.request.use((cfg) => {
   notifySaveStart(cfg.method, cfg.url)
+  const queueable = isQueueable(
+    cfg.method, cfg.url,
+    cfg.headers?.['Content-Type'] || cfg.headers?.['content-type'],
+  )
+  if (queueable) {
+    // Les mutations audit sont de petits PATCH/POST : si rien ne répond
+    // en 12 s c'est qu'on est hors-ligne. Sans ce timeout, iOS PWA peut
+    // laisser la requête « pendre » 30 s+ et l'indicateur reste bloqué
+    // sur « Sauvegarde… ». Le timeout local n'affecte pas les requêtes
+    // longues (export PDF, etc.) qui ne sont pas queueables.
+    cfg.timeout = 12000
+    // Hors-ligne détecté de façon fiable : on ne tente même pas le
+    // réseau, on rejette tout de suite — l'interceptor de réponse route
+    // ça vers la queue offline comme une erreur réseau classique.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      const offlineErr = new Error('offline (navigator.onLine=false)')
+      offlineErr.config = cfg
+      return Promise.reject(offlineErr)
+    }
+  }
   return cfg
 })
 
@@ -642,5 +662,14 @@ export const moveWhitepaperChapter = (id, chapterId, direction) =>
   api.post(`/whitepapers/${id}/chapters/${chapterId}/move`, { direction })
 export const exportWhitepaperPdf = (id) =>
   api.get(`/whitepapers/${id}/export/pdf`, { responseType: 'blob' })
+// Mode « HTML brut » (coffre) — édition hors-app
+export const getWhitepaperSourceHtml = (id) => api.get(`/whitepapers/${id}/source-html`)
+export const replaceWhitepaperSourceHtml = (id, file) => {
+  const fd = new FormData()
+  fd.append('file', file, file.name || 'source.html')
+  return api.put(`/whitepapers/${id}/source-html`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
 
 export default api

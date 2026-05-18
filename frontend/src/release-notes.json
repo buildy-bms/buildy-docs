@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.61",
+      "date": "2026-05-18",
+      "title": "Audit mobile : correctifs PWA",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Régulation thermique : la saisie réapparaît sur mobile",
+          "what": "Sur la PWA, la page de régulation thermique d'un usage chauffage/refroidissement s'ouvrait vide (seul le rappel R175-6 s'affichait). Tous les champs (granularité, production, distribution, émission) sont de nouveau visibles.",
+          "where": "Audit mobile — Systèmes — Régulation thermique d'un usage.",
+          "how_to_test": "Ouvrir la régulation thermique d'un chauffage ou refroidissement : le formulaire s'affiche."
+        },
+        {
+          "kind": "fix",
+          "title": "Type de zone visible à la création",
+          "what": "À la création d'une zone sur mobile, le type sélectionné (Fonctionnelle / Technique) n'était pas mis en évidence et un des boutons apparaissait vide.",
+          "where": "Audit mobile — Zones — Nouvelle zone.",
+          "how_to_test": "Créer une zone : le type choisi est bien surligné."
+        },
+        {
+          "kind": "fix",
+          "title": "Sauvegarde hors ligne fiabilisée",
+          "what": "Hors ligne, une modification restait bloquée sur « Sauvegarde… » sans jamais aboutir. Les saisies (hors photos) sont désormais immédiatement mises en file d'attente et synchronisées au retour du réseau.",
+          "where": "Audit mobile — toutes les saisies texte.",
+          "how_to_test": "Passer en mode avion, modifier un champ : la saisie est enregistrée localement, puis synchronisée une fois le réseau revenu."
+        },
+        {
+          "kind": "improvement",
+          "title": "Boutons photo désactivés hors ligne",
+          "what": "Les photos ne pouvant pas être envoyées sans réseau, les boutons photo sont désormais grisés et indisponibles en mode hors ligne.",
+          "where": "Audit mobile et bureau — boutons Photos.",
+          "how_to_test": "Passer hors ligne : les boutons Photos sont grisés."
+        }
+      ]
+    },
+    {
       "version": "0.1.60",
       "date": "2026-05-18",
       "title": "Mise à jour technique et sécurité",
