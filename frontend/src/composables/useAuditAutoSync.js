@@ -22,10 +22,29 @@ export function useAuditAutoSync({ intervalMs = 30000, focusGraceMs = 2000 } = {
   let lastSyncAt = Date.now()
   let blurredAt = null
 
+  // Vrai si l'utilisateur est en train de saisir un champ : un input,
+  // une textarea ou une zone contenteditable (Tiptap) a le focus.
+  function isEditing() {
+    if (typeof document === 'undefined') return false
+    const el = document.activeElement
+    if (!el) return false
+    return el.tagName === 'INPUT'
+      || el.tagName === 'TEXTAREA'
+      || el.isContentEditable === true
+  }
+
   function tick() {
     if (typeof document === 'undefined') return
     if (document.visibilityState !== 'visible') return
     if (audit.loading || audit.saving) return
+    // Ne pas resynchroniser pendant une saisie en cours : softRefresh()
+    // remplace les tableaux du store (devices, systems, meters…) et un
+    // champ inline lié en `:value` verrait sa valeur non encore
+    // sauvegardée (sauvegarde au `blur`) écrasée en pleine frappe. Le
+    // symptôme : une saisie longue échoue car le tick 5 s tombe avant
+    // le blur. On reprendra la sync au tick suivant, une fois le champ
+    // quitté (donc sauvegardé).
+    if (isEditing()) return
     audit.softRefresh()
     lastSyncAt = Date.now()
   }
