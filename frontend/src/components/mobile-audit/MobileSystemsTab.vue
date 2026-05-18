@@ -57,6 +57,17 @@ function openThermalSheet(zoneId, category) {
 }
 function closeThermalSheet() { thermalSheetTarget.value = null }
 
+// ── Drill-down par usage ────────────────────────────────────────────
+// La liste par zone n'affiche que les usages + leur présent/absent.
+// Taper un usage présent ouvre une page dédiée avec ses équipements et
+// sa régulation thermique.
+const openedUsageId = ref(null)
+const openedUsage = computed(() =>
+  systems.value.find(s => s.id === openedUsageId.value) || null,
+)
+function openUsage(s) { openedUsageId.value = s.id }
+function closeUsage() { openedUsageId.value = null }
+
 const SYSTEM_LABEL = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
@@ -408,13 +419,7 @@ async function removeDevice(d) {
                 <p v-if="s.not_concerned" class="text-sm text-gray-500 mt-1 italic">
                   {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? "Usage non concerné" : "Non concerné") }}
                 </p>
-                <p v-else-if="devicesOf(s.id).length" class="text-sm text-gray-500 mt-1">
-                  {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
-                </p>
-                <p v-else-if="s.present" class="text-xs text-emerald-600 mt-1">
-                  Présent — ajoute des équipements ci-dessous
-                </p>
-                <p v-else class="text-xs text-gray-400 mt-1">
+                <p v-else-if="!s.present" class="text-xs text-gray-400 mt-1">
                   À renseigner : présent ou absent ?
                 </p>
               </div>
@@ -425,7 +430,7 @@ async function removeDevice(d) {
               </button>
             </div>
             <!-- Segmented control 2 états : Présent / Absent (= not_concerned).
-                 Le 3e cas (rien de coché) est l'état initial par défaut. -->
+                 Le présent/absent concerne l'usage, donc reste sur cette liste. -->
             <div class="mt-3 grid grid-cols-2 gap-2">
               <button type="button"
                       @click="patchSystem(s, { present: true, not_concerned: false })"
@@ -445,69 +450,23 @@ async function removeDevice(d) {
               </button>
             </div>
 
-            <!-- Devices nested -->
-            <div v-if="s.present" class="mt-3 pl-2 border-l-2 border-gray-100 space-y-1.5">
-              <button
-                v-for="d in devicesOf(s.id)"
-                :key="d.id"
-                @click="openEditDevice(d, s)"
-                :class="[
-                  'w-full flex items-center gap-2 px-3 py-3.5 hover:bg-gray-100 rounded-xl text-left',
-                  isSharedDevice(d, s.id) ? 'bg-emerald-50/60 border border-emerald-200' : 'bg-gray-50',
-                ]"
-              >
-                <div class="flex-1 min-w-0">
-                  <p
-                    v-if="isSharedDevice(d, s.id)"
-                    class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5"
-                  >
-                    Partagé depuis « {{ deviceOriginZoneName(d) }} »
-                  </p>
-                  <p class="text-base font-medium text-gray-800 truncate leading-tight">
-                    {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
-                  </p>
-                  <p class="text-sm text-gray-500 truncate mt-0.5">
-                    <span v-if="d.brand">{{ d.brand }}</span>
-                    <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
-                  </p>
-                </div>
-                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300" />
-              </button>
-              <div class="flex items-stretch gap-1.5">
-                <button
-                  @click="openCreateDevice(s)"
-                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
-                >
-                  <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter
-                </button>
-                <button
-                  @click="openLibraryDevicePicker(s)"
-                  class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
-                >
-                  <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-5 h-5 shrink-0" /> Bibliothèque
-                </button>
-              </div>
-            </div>
-
-            <!-- Régulation thermique R175-6 : déclencheur compact qui ouvre la sous-page -->
-            <button
-              v-if="isBacs && s.present && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
-              type="button"
-              @click="openThermalSheet(s.zone_id, s.system_category)"
-              class="mt-3 w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
-            >
-              <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
+            <!-- Drill-in : ouvre la page dédiée de l'usage (équipements +
+                 régulation thermique). Visible seulement si l'usage est présent. -->
+            <button v-if="s.present" type="button" @click="openUsage(s)"
+                    class="mt-2 w-full flex items-center gap-3 px-3 py-3.5 bg-gray-50 active:bg-gray-100 rounded-xl text-left">
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-amber-900 truncate">
-                  Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
+                <p class="text-sm font-medium text-gray-800">
+                  {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
                 </p>
-                <p :class="['text-xs mt-0.5 truncate',
+                <p v-if="isBacs && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
+                   :class="['text-xs mt-0.5 truncate',
                             thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
                             thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
-                  {{ thermalStatus(s.zone_id, s.system_category).label }}
+                  Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
                 </p>
+                <p v-else class="text-xs text-gray-400 mt-0.5">Voir les équipements</p>
               </div>
-              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
+              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
             </button>
           </div>
           <!-- Ajout manuel d'un usage (hors décret BACS / zones techniques) -->
@@ -545,6 +504,87 @@ async function removeDevice(d) {
       <p class="text-sm text-gray-500 mt-3">Pas encore de systèmes</p>
       <p class="text-xs text-gray-400 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
     </div>
+
+    <!-- Page dédiée d'un usage : équipements + régulation thermique. -->
+    <MobileSheet
+      :open="!!openedUsage"
+      :title="openedUsage ? usageLabel(openedUsage) : ''"
+      hide-save
+      @close="closeUsage"
+    >
+      <div v-if="openedUsage" class="p-4 space-y-4">
+        <p class="text-xs text-gray-500">{{ openedUsage.zone_name }}</p>
+
+        <!-- Équipements -->
+        <div class="space-y-1.5">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Équipements</p>
+          <button
+            v-for="d in devicesOf(openedUsage.id)"
+            :key="d.id"
+            @click="openEditDevice(d, openedUsage)"
+            :class="[
+              'w-full flex items-center gap-2 px-3 py-3.5 active:bg-gray-100 rounded-xl text-left',
+              isSharedDevice(d, openedUsage.id) ? 'bg-emerald-50/60 border border-emerald-200' : 'bg-gray-50',
+            ]"
+          >
+            <div class="flex-1 min-w-0">
+              <p
+                v-if="isSharedDevice(d, openedUsage.id)"
+                class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5"
+              >
+                Partagé depuis « {{ deviceOriginZoneName(d) }} »
+              </p>
+              <p class="text-base font-medium text-gray-800 truncate leading-tight">
+                {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+              </p>
+              <p class="text-sm text-gray-500 truncate mt-0.5">
+                <span v-if="d.brand">{{ d.brand }}</span>
+                <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
+              </p>
+            </div>
+            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300" />
+          </button>
+          <p v-if="!devicesOf(openedUsage.id).length" class="text-sm text-gray-400 py-2">
+            Aucun équipement — ajoute-en ci-dessous.
+          </p>
+          <div class="flex items-stretch gap-1.5 pt-1">
+            <button
+              @click="openCreateDevice(openedUsage)"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 active:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
+            >
+              <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter
+            </button>
+            <button
+              @click="openLibraryDevicePicker(openedUsage)"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white active:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
+            >
+              <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-5 h-5 shrink-0" /> Bibliothèque
+            </button>
+          </div>
+        </div>
+
+        <!-- Régulation thermique R175-6 -->
+        <button
+          v-if="isBacs && (openedUsage.system_category === 'heating' || openedUsage.system_category === 'cooling') && thermalFor(openedUsage.zone_id, openedUsage.system_category)"
+          type="button"
+          @click="openThermalSheet(openedUsage.zone_id, openedUsage.system_category)"
+          class="w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
+        >
+          <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-amber-900 truncate">
+              Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
+            </p>
+            <p :class="['text-xs mt-0.5 truncate',
+                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
+                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
+              {{ thermalStatus(openedUsage.zone_id, openedUsage.system_category).label }}
+            </p>
+          </div>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
+        </button>
+      </div>
+    </MobileSheet>
 
     <!-- Sheet édition device -->
     <MobileSheet
