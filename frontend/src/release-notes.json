@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.48",
+      "date": "2026-05-18",
+      "title": "Saisie inline d'un audit : plus de perte de texte pendant la synchro automatique",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La saisie d'un champ inline d'audit n'est plus écrasée par la synchro de fond",
+          "what": "Un audit ouvert se resynchronise tout seul toutes les 5 secondes (pour qu'un binôme terrain/bureau voie les modifs de l'autre sans rafraîchir). Cette resynchro rechargeait la liste des systèmes en pleine frappe : si on saisissait un texte un peu long dans un champ inline — typiquement la Localisation d'un système — la synchro tombait avant qu'on quitte le champ et remettait l'ancienne valeur. Résultat : la saisie semblait « ne pas fonctionner » au-delà d'un certain nombre de caractères. Désormais la synchro automatique se met en pause tant qu'un champ est en cours de saisie, et reprend dès qu'on le quitte (donc une fois la valeur enregistrée).",
+          "where": "Détail d'un audit BACS / GTB → tous les champs en saisie directe dans les tableaux (Localisation, Nom, Marque, Référence d'un système, etc.).",
+          "how_to_test": "Ouvrir un audit, cliquer dans le champ Localisation d'un système et taper lentement un texte long (plus de 5 secondes de frappe). Le texte ne doit plus disparaître ; en quittant le champ, la valeur est bien enregistrée."
+        }
+      ]
+    },
+    {
       "version": "0.1.47",
       "date": "2026-05-13",
       "title": "Modèle commercial expliqué sur la cover + dedup CTA dans la matrice zones",
