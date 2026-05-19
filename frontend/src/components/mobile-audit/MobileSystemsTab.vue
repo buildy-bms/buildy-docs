@@ -513,75 +513,84 @@ async function removeDevice(d) {
       @close="closeUsage"
     >
       <div v-if="openedUsage" class="p-4 space-y-4">
-        <p class="text-xs text-gray-500">{{ openedUsage.zone_name }}</p>
+        <div class="flex items-center gap-2 text-gray-500">
+          <FontAwesomeIcon :icon="['fas', 'map-pin']" class="w-3.5 h-3.5 shrink-0" />
+          <p class="text-sm font-medium">{{ openedUsage.zone_name }}</p>
+        </div>
 
-        <!-- Équipements -->
-        <div class="space-y-1.5">
-          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Équipements</p>
-          <button
-            v-for="d in devicesOf(openedUsage.id)"
-            :key="d.id"
-            @click="openEditDevice(d, openedUsage)"
-            :class="[
-              'w-full flex items-center gap-2 px-3 py-3.5 active:bg-gray-100 rounded-xl text-left',
-              isSharedDevice(d, openedUsage.id) ? 'bg-emerald-50/60 border border-emerald-200' : 'bg-gray-50',
-            ]"
-          >
-            <div class="flex-1 min-w-0">
-              <p
-                v-if="isSharedDevice(d, openedUsage.id)"
-                class="text-[10px] font-medium uppercase tracking-wider text-emerald-700 mb-0.5"
-              >
-                Partagé depuis « {{ deviceOriginZoneName(d) }} »
-              </p>
-              <p class="text-base font-medium text-gray-800 truncate leading-tight">
-                {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
-              </p>
-              <p class="text-sm text-gray-500 truncate mt-0.5">
-                <span v-if="d.brand">{{ d.brand }}</span>
-                <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
-              </p>
-            </div>
-            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300" />
-          </button>
-          <p v-if="!devicesOf(openedUsage.id).length" class="text-sm text-gray-500 py-2">
-            Aucun équipement — ajoute-en ci-dessous.
-          </p>
-          <div class="flex items-stretch gap-1.5 pt-1">
+        <!-- Carte Équipements : en-tête / liste séparée / pied d'actions -->
+        <section class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Équipements<span v-if="devicesOf(openedUsage.id).length" class="text-gray-400 font-normal"> · {{ devicesOf(openedUsage.id).length }}</span>
+            </p>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <button
+              v-for="d in devicesOf(openedUsage.id)"
+              :key="d.id"
+              @click="openEditDevice(d, openedUsage)"
+              :class="[
+                'w-full flex items-center gap-2 px-4 py-3.5 active:bg-gray-50 text-left',
+                isSharedDevice(d, openedUsage.id) ? 'bg-emerald-50/60' : '',
+              ]"
+            >
+              <div class="flex-1 min-w-0">
+                <p
+                  v-if="isSharedDevice(d, openedUsage.id)"
+                  class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 mb-0.5"
+                >
+                  Partagé depuis « {{ deviceOriginZoneName(d) }} »
+                </p>
+                <p class="text-base font-semibold text-gray-900 truncate leading-tight">
+                  {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+                </p>
+                <p class="text-sm text-gray-500 truncate mt-0.5">
+                  <span v-if="d.brand">{{ d.brand }}</span>
+                  <span v-if="d.power_kw"> · {{ d.power_kw }} kW</span>
+                </p>
+              </div>
+              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+            </button>
+            <p v-if="!devicesOf(openedUsage.id).length" class="px-4 py-5 text-sm text-gray-500 text-center">
+              Aucun équipement — ajoute-en ci-dessous.
+            </p>
+          </div>
+          <div class="flex items-stretch gap-1.5 p-3 border-t border-gray-200 bg-gray-50">
             <button
               @click="openCreateDevice(openedUsage)"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-emerald-50 active:bg-emerald-100 rounded-xl font-medium whitespace-nowrap"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-white bg-emerald-600 active:bg-emerald-700 rounded-xl font-medium whitespace-nowrap"
             >
               <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter
             </button>
             <button
               @click="openLibraryDevicePicker(openedUsage)"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white active:bg-emerald-50 border border-emerald-200 rounded-xl font-medium whitespace-nowrap"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white active:bg-emerald-50 border border-emerald-300 rounded-xl font-medium whitespace-nowrap"
             >
               <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-5 h-5 shrink-0" /> Bibliothèque
             </button>
           </div>
-        </div>
+        </section>
 
         <!-- Régulation thermique R175-6 -->
         <button
           v-if="isBacs && (openedUsage.system_category === 'heating' || openedUsage.system_category === 'cooling') && thermalFor(openedUsage.zone_id, openedUsage.system_category)"
           type="button"
           @click="openThermalSheet(openedUsage.zone_id, openedUsage.system_category)"
-          class="w-full tap-target flex items-center gap-3 px-4 py-3 bg-amber-50/60 border border-amber-200 rounded-xl active:bg-amber-100 text-left"
+          class="w-full tap-target flex items-center gap-3 px-4 py-3.5 bg-amber-50 border border-amber-300 rounded-2xl active:bg-amber-100 text-left"
         >
-          <span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
+          <span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center text-lg shrink-0">🌡️</span>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-amber-900 truncate">
               Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
             </p>
             <p :class="['text-xs mt-0.5 truncate',
-                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
-                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
+                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'warn' ? 'text-red-600 font-semibold' :
+                        thermalStatus(openedUsage.zone_id, openedUsage.system_category).tone === 'ok' ? 'text-emerald-700 font-medium' : 'text-gray-600']">
               {{ thermalStatus(openedUsage.zone_id, openedUsage.system_category).label }}
             </p>
           </div>
-          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-400 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-amber-500 shrink-0" />
         </button>
       </div>
     </MobileSheet>
