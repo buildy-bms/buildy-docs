@@ -15,7 +15,23 @@ import WhitepaperRichTextEditor from '@/components/WhitepaperRichTextEditor.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useWhitepaperStore()
-const { whitepaper, chapters, companions, currentChapter, loading, saving, isCompanion } = storeToRefs(store)
+const { whitepaper, chapters, companions, currentChapter, loading, saving, isCompanion, isHtmlMode, sourceInfo } = storeToRefs(store)
+
+function formatBytes(n) {
+  if (!n) return '—'
+  return n > 1024 * 1024 ? `${(n / 1048576).toFixed(1)} Mo` : `${Math.round(n / 1024)} Ko`
+}
+function formatDateTime(s) {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+async function onReplaceHtml(ev) {
+  const file = ev.target.files?.[0]
+  ev.target.value = ''
+  if (!file) return
+  try { await store.replaceSourceHtml(file); success('HTML source remplacé') }
+  catch (e) { error(e.response?.data?.detail || 'Échec du remplacement') }
+}
 const { success, error } = useNotification()
 const { confirm } = useConfirm()
 
@@ -177,7 +193,88 @@ watch(() => route.params.id, async (id) => {
       </div>
     </div>
 
-    <div class="flex gap-5 items-start">
+    <!-- ═══ Mode « HTML brut » (coffre) ═══ -->
+    <div v-if="isHtmlMode" class="flex gap-5 items-start">
+      <main class="flex-1 min-w-0 bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+            <BookOpenIcon class="w-5 h-5 text-indigo-500" />
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-gray-800">Document géré en HTML</h2>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed max-w-xl">
+              Ce livre blanc est stocké sous forme de HTML/CSS exact. Le PDF exporté est
+              fidèle au pixel à la source. Le contenu s'édite hors de l'application
+              (dans un éditeur de code) puis se remet à jour ici en remplaçant le fichier.
+            </p>
+          </div>
+        </div>
+
+        <dl class="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 text-sm max-w-md">
+          <dt class="text-gray-500">Fichier source</dt>
+          <dd class="text-gray-800 font-medium">source.html</dd>
+          <dt class="text-gray-500">Taille</dt>
+          <dd class="text-gray-800">{{ formatBytes(sourceInfo?.size_bytes) }}</dd>
+          <dt class="text-gray-500">Dernière mise à jour</dt>
+          <dd class="text-gray-800">{{ formatDateTime(sourceInfo?.updated_at) }}</dd>
+        </dl>
+
+        <div class="mt-6 flex items-center gap-3">
+          <label class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer whitespace-nowrap">
+            <ArrowDownTrayIcon class="w-4 h-4 shrink-0 rotate-180" />
+            Remplacer le HTML
+            <input type="file" accept=".html,text/html" class="hidden" @change="onReplaceHtml" />
+          </label>
+          <span class="text-xs text-gray-400">Charge un nouveau fichier .html exporté depuis ton éditeur.</span>
+        </div>
+      </main>
+
+      <!-- Métadonnées + compagnons -->
+      <aside class="w-72 shrink-0 space-y-4">
+        <div class="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+          <div class="text-xs font-semibold uppercase tracking-wider text-gray-500">Métadonnées</div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Audience</label>
+            <select
+              :value="whitepaper.audience || ''"
+              @change="saveMetaField('audience', $event.target.value || null)"
+              class="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            >
+              <option value="">Non précisée</option>
+              <option v-for="(label, key) in AUDIENCE_LABELS" :key="key" :value="key">{{ label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Version</label>
+            <input
+              :value="whitepaper.version || ''"
+              @change="saveMetaField('version', $event.target.value || null)"
+              type="text" placeholder="1.0"
+              class="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            />
+          </div>
+          <div class="text-xs text-gray-400">Slug : <code class="text-gray-500">{{ whitepaper.slug }}</code></div>
+        </div>
+        <div v-if="!isCompanion" class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div class="px-3 py-2 border-b border-gray-100 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Documents compagnons
+          </div>
+          <ul>
+            <li
+              v-for="c in companions" :key="c.id" @click="openCompanion(c)"
+              class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+            >
+              <DocumentTextIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              <span class="truncate">{{ c.title }}</span>
+            </li>
+            <li v-if="!companions.length" class="px-3 py-3 text-xs text-gray-400">Aucun compagnon.</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ═══ Mode « chapitres » (Tiptap) ═══ -->
+    <div v-else class="flex gap-5 items-start">
       <!-- Sidebar gauche -->
       <aside class="w-72 shrink-0 space-y-4">
         <!-- Chapitres -->
