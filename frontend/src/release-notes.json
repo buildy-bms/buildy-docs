@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.68",
+      "date": "2026-05-19",
+      "title": "Livres blancs : lien traçable et statistiques de clics",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Suivre les clics sur un livre blanc publié",
+          "what": "La publication d'un livre blanc crée désormais un lien traçable (buildy.fr/dl/…) à partager sur LinkedIn : il redirige vers le PDF tout en comptant chaque clic. La fiche du livre blanc affiche un panneau de statistiques — nombre de clics, visiteurs uniques, dernière visite, activité jour par jour et provenances. Les données sont récupérées automatiquement chaque jour ; un bouton « Rafraîchir » force une mise à jour immédiate.",
+          "where": "Marketing — Livres blancs — fiche d'un livre blanc publié.",
+          "how_to_test": "Publier un livre blanc, partager le lien « À partager », l'ouvrir : le clic apparaît dans les statistiques après un rafraîchissement."
+        }
+      ]
+    },
+    {
       "version": "0.1.67",
       "date": "2026-05-19",
       "title": "Livres blancs : publication du PDF en ligne",
