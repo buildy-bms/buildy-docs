@@ -18,9 +18,14 @@ const config = require('../config');
 const db = require('../database');
 const log = require('./logger').system;
 
-// ── Sources du tracker (générées avec l'URL des PDF de la config) ────
+// ── Sources du tracker ───────────────────────────────────────────────
+// Le script /dl/<slug> SERT le PDF lui-même (lecture disque) après avoir
+// journalisé le clic. Le dossier des PDF étant interdit en accès HTTP
+// direct (PDF_DIR_HTACCESS), ce script est le seul point d'entrée :
+// impossible de télécharger un PDF sans être comptabilisé.
 function trackerPhp() {
-  const pdfBase = config.wpFtpPublicBase; // ex: https://www.buildy.fr/telechargements
+  // Chemin relatif du dossier des PDF, vu depuis le dossier du tracker.
+  const pdfRel = path.posix.relative(config.wpTrackerRemoteDir, config.wpFtpRemoteDir) || '.';
   return `<?php
 // Redirecteur traçable des livres blancs Buildy — généré par Buildy Docs.
 $d = isset($_GET['d']) ? strtolower(trim($_GET['d'])) : '';
@@ -30,7 +35,13 @@ if (!preg_match('/^[a-z0-9-]{1,80}$/', $d)) {
   echo 'Document introuvable.';
   exit;
 }
-$target = '${pdfBase}/' . $d . '.pdf';
+$pdf = __DIR__ . '/${pdfRel}/' . $d . '.pdf';
+if (!is_file($pdf)) {
+  http_response_code(404);
+  header('Content-Type: text/plain; charset=utf-8');
+  echo 'Document introuvable.';
+  exit;
+}
 $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
 if (strpos($ip, '.') !== false) {
   $ip = preg_replace('/\\.\\d+$/', '.0', $ip);          // IPv4 : dernier octet masqué
@@ -47,7 +58,11 @@ $line = implode("\\t", array(
   $clean(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '')
 )) . "\\n";
 @file_put_contents(__DIR__ . '/hits.log', $line, FILE_APPEND | LOCK_EX);
-header('Location: ' . $target, true, 302);
+header('Content-Type: application/pdf');
+header('Content-Disposition: inline; filename="' . $d . '.pdf"');
+header('Content-Length: ' . filesize($pdf));
+header('Cache-Control: public, max-age=300');
+readfile($pdf);
 exit;
 `;
 }
@@ -60,6 +75,13 @@ RewriteRule ^([a-z0-9-]+)/?$ index.php?d=$1 [L,QSA]
 <Files "hits.log">
   Require all denied
 </Files>
+`;
+
+// Placé dans le dossier des PDF : interdit tout accès HTTP direct. Les PDF
+// ne sont lisibles que par le script /dl/ (lecture disque, hors HTTP).
+const PDF_DIR_HTACCESS = `# PDF des livres blancs : accès HTTP direct interdit.
+# Seul le redirecteur traçable /dl/ peut les servir.
+Require all denied
 `;
 
 function _ftpConfig() {
@@ -75,15 +97,22 @@ function _ftpConfig() {
   };
 }
 
-// Publie (ou met à jour) le redirecteur PHP sur buildy.fr. Idempotent.
+// Publie (ou met à jour) le tracker PHP + verrouille le dossier des PDF.
+// Idempotent — appelé à chaque publication d'un livre blanc.
 async function ensureTracker() {
   const client = new Client(30_000);
   client.ftp.verbose = false;
   try {
     await client.access(_ftpConfig());
+    const home = await client.pwd();
+    // 1. Le redirecteur traçable dans www/dl/
     await client.ensureDir(config.wpTrackerRemoteDir);
     await client.uploadFrom(Readable.from(trackerPhp()), 'index.php');
     await client.uploadFrom(Readable.from(TRACKER_HTACCESS), '.htaccess');
+    // 2. Le verrou d'accès direct dans le dossier des PDF
+    await client.cd(home);
+    await client.ensureDir(config.wpFtpRemoteDir);
+    await client.uploadFrom(Readable.from(PDF_DIR_HTACCESS), '.htaccess');
   } finally {
     client.close();
   }

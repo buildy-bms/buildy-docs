@@ -422,8 +422,14 @@ async function routes(fastify) {
     catch (err) { log.warn(`Publish whitepaper ${id} — tracker KO : ${err.message}`); }
 
     // Memorise l'etat de publication dans wp_meta_json + passe en 'published'.
+    // L'URL exposee est le lien tracable /dl/<slug> (le PDF direct est
+    // interdit d'acces) — c'est ce lien qu'on partage.
     const meta = gen.meta || {};
-    meta.published = { url: upload.url, at: new Date().toISOString(), size: upload.size };
+    meta.published = {
+      url: `${config.wpTrackerPublicBase}/${row.slug}`,
+      at: new Date().toISOString(),
+      size: upload.size,
+    };
     db.afs.update(id, {
       wp_meta_json: JSON.stringify(meta),
       status: 'published',

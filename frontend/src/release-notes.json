@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.69",
+      "date": "2026-05-19",
+      "title": "Livres blancs : le PDF n'est accessible que par le lien traçable",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Impossible de contourner le compteur de clics",
+          "what": "Le lien traçable ne fait plus une simple redirection (qui laissait l'adresse du PDF accessible en direct) : il sert désormais le PDF lui-même. Le dossier des PDF est interdit d'accès HTTP direct. Résultat : chaque téléchargement passe obligatoirement par le compteur, le PDF n'a plus d'adresse publique contournable.",
+          "where": "Lien buildy.fr/dl/… des livres blancs publiés.",
+          "how_to_test": "Republier un livre blanc, puis tenter d'ouvrir l'adresse directe du PDF : accès refusé. Seul le lien /dl/… fonctionne."
+        }
+      ]
+    },
+    {
       "version": "0.1.68",
       "date": "2026-05-19",
       "title": "Livres blancs : lien traçable et statistiques de clics",
