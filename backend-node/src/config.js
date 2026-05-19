@@ -86,6 +86,11 @@ const config = Object.freeze({
   faqFtpPassword: process.env.FAQ_FTP_PASSWORD || process.env.FTP_PASSWORD || '',
   faqFtpRemoteDir: (process.env.FAQ_FTP_REMOTE_DIR || 'www/docs/crisp-faq').replace(/\/$/, ''),
   faqFtpPublicBase: (process.env.FAQ_FTP_PUBLIC_BASE || 'https://www.buildy.fr/docs/crisp-faq').replace(/\/$/, ''),
+
+  // Livres blancs : publication des PDF vers le FTP OVH buildy.fr
+  // (mêmes credentials FTP que la FAQ ; seuls le dossier et l'URL changent).
+  wpFtpRemoteDir: (process.env.WP_FTP_REMOTE_DIR || 'www/telechargements').replace(/\/$/, ''),
+  wpFtpPublicBase: (process.env.WP_FTP_PUBLIC_BASE || 'https://www.buildy.fr/telechargements').replace(/\/$/, ''),
 });
 
 // Validations securite

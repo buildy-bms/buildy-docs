@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.67",
+      "date": "2026-05-19",
+      "title": "Livres blancs : publication du PDF en ligne",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Mettre un livre blanc en ligne en un clic",
+          "what": "Depuis la fiche d'un livre blanc, un bouton « Publier en ligne » génère le PDF et l'envoie sur le site buildy.fr. Le document devient accessible publiquement à une adresse stable (buildy.fr/telechargements/…). Un clic sur « Mettre à jour » republie la dernière version au même endroit. L'adresse publique s'affiche sous la barre d'outils, avec un bouton pour copier le lien.",
+          "where": "Marketing — Livres blancs — fiche d'un livre blanc.",
+          "how_to_test": "Ouvrir un livre blanc, cliquer « Publier en ligne », confirmer : le lien public apparaît et le PDF est accessible dans le navigateur."
+        }
+      ]
+    },
+    {
       "version": "0.1.66",
       "date": "2026-05-19",
       "title": "Livres blancs : mode coffre pour un PDF identique à l'original",

@@ -671,5 +671,6 @@ export const replaceWhitepaperSourceHtml = (id, file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+export const publishWhitepaper = (id) => api.post(`/whitepapers/${id}/publish`)
 
 export default api
