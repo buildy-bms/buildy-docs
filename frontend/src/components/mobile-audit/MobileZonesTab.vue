@@ -185,7 +185,7 @@ const totalSurface = computed(() =>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
         </button>
       </div>
-      <p v-else class="text-sm text-gray-400 italic px-1 py-2">Aucune zone fonctionnelle</p>
+      <p v-else class="text-sm text-gray-500 italic px-1 py-2">Aucune zone fonctionnelle</p>
     </div>
 
     <!-- Zones techniques (hors décret BACS) -->
@@ -217,7 +217,7 @@ const totalSurface = computed(() =>
           <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
         </button>
       </div>
-      <p v-else class="text-sm text-gray-400 italic px-1 py-2">
+      <p v-else class="text-sm text-gray-500 italic px-1 py-2">
         Aucune zone technique — locaux hors décret BACS (local technique, TGBT…).
       </p>
     </div>

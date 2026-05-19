@@ -12,7 +12,7 @@
 export const ENERGY_OPTIONS = [
   { value: 'gas',              label: 'Gaz',                icon: 'fa-fire-flame-curved', color: '#f97316' },
   { value: 'electric',         label: 'Électrique',         icon: 'fa-bolt',              color: '#eab308' },
-  { value: 'district_heating', label: 'Calories / Frigories', icon: 'fa-pipe',            color: '#dc2626' },
+  { value: 'district_heating', label: 'Calories / Frigories', icon: 'fa-temperature-snow', color: '#dc2626' },
   { value: 'wood',             label: 'Bois',               icon: 'fa-tree',              color: '#65a30d' },
   { value: 'biomass',          label: 'Biomasse',           icon: 'fa-leaf',              color: '#16a34a' },
   { value: 'fuel_oil',         label: 'Fioul',              icon: 'fa-droplet',           color: '#92400e' },

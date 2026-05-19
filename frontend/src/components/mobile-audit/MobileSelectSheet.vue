@@ -176,10 +176,10 @@ watch(() => props.modelValue, (v) => {
 
       <span
         class="flex-1 text-left truncate"
-        :class="triggerLabel ? 'text-gray-900' : 'text-gray-400 italic'"
+        :class="triggerLabel ? 'text-gray-900' : 'text-gray-500 italic'"
       >{{ triggerLabel || placeholder }}</span>
 
-      <FontAwesomeIcon :icon="['fas', 'chevron-down']" class="w-4 h-4 text-gray-400 shrink-0" />
+      <FontAwesomeIcon :icon="['fas', 'chevron-down']" class="w-4 h-4 text-gray-500 shrink-0" />
     </button>
 
     <!-- Bottom sheet -->
@@ -250,7 +250,7 @@ watch(() => props.modelValue, (v) => {
           <template v-else>
             <div v-if="showSearch" class="shrink-0 px-3 pt-3">
               <div class="relative">
-                <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
                 <input
                   ref="searchInput"
                   v-model="search"
@@ -297,7 +297,7 @@ watch(() => props.modelValue, (v) => {
                 />
               </button>
 
-              <div v-if="!filtered.length" class="px-4 py-6 text-center text-sm text-gray-400 italic">
+              <div v-if="!filtered.length" class="px-4 py-6 text-center text-sm text-gray-500 italic">
                 Aucun résultat
               </div>
 

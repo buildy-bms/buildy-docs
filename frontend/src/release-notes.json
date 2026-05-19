@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.64",
+      "date": "2026-05-19",
+      "title": "Lisibilité PWA et finitions audit",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Meilleur contraste sur la PWA",
+          "what": "Les libellés de champs, textes d'aide et indications secondaires de l'audit mobile ont été assombris pour une lecture plus facile, notamment en extérieur.",
+          "where": "Audit mobile — tous les écrans.",
+          "how_to_test": "Parcourir l'audit mobile : les textes gris clairs sont plus lisibles."
+        },
+        {
+          "kind": "improvement",
+          "title": "Icône de l'énergie « Calories / Frigories »",
+          "what": "L'énergie « Calories / Frigories » utilise désormais une icône de température plus parlante.",
+          "where": "Audit — sélecteur d'énergie d'un équipement.",
+          "how_to_test": "Ouvrir le sélecteur d'énergie : « Calories / Frigories » a une icône de thermomètre."
+        },
+        {
+          "kind": "improvement",
+          "title": "Champ nom de zone homogène",
+          "what": "Le champ d'édition du nom d'une zone a le même habillage que celui du nom d'un système : bordure visible, on voit qu'il est éditable.",
+          "where": "Audit — tableau des zones.",
+          "how_to_test": "Survoler le nom d'une zone : il a une bordure d'input comme les noms de systèmes."
+        }
+      ]
+    },
+    {
       "version": "0.1.63",
       "date": "2026-05-19",
       "title": "Correctif : connexion impossible — l'authentification PocketID rétablie",

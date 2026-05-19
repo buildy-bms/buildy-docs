@@ -170,7 +170,7 @@ const initials = computed(() => {
       </button>
 
       <!-- Loading -->
-      <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
+      <div v-if="loading" class="text-center py-12 text-gray-500 text-sm">Chargement…</div>
 
       <!-- Empty -->
       <div v-else-if="!filteredAudits.length" class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">

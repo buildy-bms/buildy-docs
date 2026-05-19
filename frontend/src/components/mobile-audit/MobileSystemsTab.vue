@@ -396,7 +396,7 @@ async function removeDevice(d) {
           class="w-full flex items-center gap-2 px-4 py-3 border-b border-gray-100 active:bg-gray-50"
         >
           <FontAwesomeIcon :icon="['fas', 'chevron-down']"
-            :class="['w-4 h-4 text-gray-400 transition-transform shrink-0',
+            :class="['w-4 h-4 text-gray-500 transition-transform shrink-0',
                      collapsedZones.has(g.zone_id) ? '-rotate-90' : '']"
           />
           <p class="flex-1 min-w-0 text-base font-medium text-gray-900 truncate text-left">{{ g.zone_name }}</p>
@@ -419,12 +419,12 @@ async function removeDevice(d) {
                 <p v-if="s.not_concerned" class="text-sm text-gray-500 mt-1 italic">
                   {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? "Usage non concerné" : "Non concerné") }}
                 </p>
-                <p v-else-if="!s.present" class="text-xs text-gray-400 mt-1">
+                <p v-else-if="!s.present" class="text-xs text-gray-500 mt-1">
                   À renseigner : présent ou absent ?
                 </p>
               </div>
               <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
-                      class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-400 active:bg-red-50 active:text-red-600"
+                      class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
                       aria-label="Supprimer cet usage">
                 <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               </button>
@@ -464,7 +464,7 @@ async function removeDevice(d) {
                             thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
                   Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
                 </p>
-                <p v-else class="text-xs text-gray-400 mt-0.5">Voir les équipements</p>
+                <p v-else class="text-xs text-gray-500 mt-0.5">Voir les équipements</p>
               </div>
               <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
             </button>
@@ -502,7 +502,7 @@ async function removeDevice(d) {
     <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
       <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-3">Pas encore de systèmes</p>
-      <p class="text-xs text-gray-400 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
+      <p class="text-xs text-gray-500 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
     </div>
 
     <!-- Page dédiée d'un usage : équipements + régulation thermique. -->
@@ -544,7 +544,7 @@ async function removeDevice(d) {
             </div>
             <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300" />
           </button>
-          <p v-if="!devicesOf(openedUsage.id).length" class="text-sm text-gray-400 py-2">
+          <p v-if="!devicesOf(openedUsage.id).length" class="text-sm text-gray-500 py-2">
             Aucun équipement — ajoute-en ci-dessous.
           </p>
           <div class="flex items-stretch gap-1.5 pt-1">
@@ -825,7 +825,7 @@ async function removeDevice(d) {
               </label>
               <p
                 v-if="!shareCandidateSystems().length"
-                class="px-4 py-4 text-sm text-gray-400 italic text-center"
+                class="px-4 py-4 text-sm text-gray-500 italic text-center"
               >
                 Aucun autre usage disponible.
               </p>

@@ -202,7 +202,7 @@ async function removeInspection(ins) {
         <p class="text-xs text-gray-500 mt-1">Une action corrective est générée automatiquement tant qu'aucune inspection R175-5-1 n'est documentée.</p>
       </div>
 
-      <p class="text-xs text-gray-400 text-center pt-2">
+      <p class="text-xs text-gray-500 text-center pt-2">
         Sauvegarde automatique. Tu peux fermer cette page à tout moment.
       </p>
     </div>
