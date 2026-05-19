@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.65",
+      "date": "2026-05-19",
+      "title": "Audit mobile : page d'un usage mieux structurée",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Page d'un usage : cartes délimitées",
+          "what": "La page dédiée d'un usage (équipements + régulation thermique) manquait de structure : les éléments flottaient sans contour. Les équipements sont désormais regroupés dans une carte blanche clairement délimitée (en-tête, liste séparée, actions), pour une lecture plus nette.",
+          "where": "Audit mobile — Systèmes — page d'un usage.",
+          "how_to_test": "Ouvrir un usage présent : les équipements sont dans une carte bien délimitée."
+        }
+      ]
+    },
+    {
       "version": "0.1.64",
       "date": "2026-05-19",
       "title": "Lisibilité PWA et finitions audit",
