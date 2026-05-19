@@ -17,7 +17,9 @@
  * prochain tick reessaie.
  */
 
-const { Agent } = require('undici');
+// fetch + Agent du MEME undici (le fetch global de Node embarque une autre
+// version → « invalid onRequestStart method » si on melange).
+const { Agent, fetch } = require('undici');
 const config = require('../config');
 const db = require('../database');
 const log = require('./logger').system;

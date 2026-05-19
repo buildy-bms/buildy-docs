@@ -1,7 +1,11 @@
 'use strict';
 
 const crypto = require('crypto');
-const { Agent } = require('undici');
+// On importe `fetch` d'undici (pas le fetch global de Node) : le dispatcher
+// ci-dessous est un Agent undici, et le fetch global de Node embarque une
+// version d'undici differente — les melanger leve « invalid onRequestStart
+// method ». fetch + Agent doivent venir du meme undici.
+const { Agent, fetch } = require('undici');
 
 // PocketID tourne en HTTPS auto-signe sur le VPS Jelastic. Node refuse
 // les certs invalides par defaut → on declare un dispatcher dedie OIDC

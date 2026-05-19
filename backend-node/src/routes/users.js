@@ -3,7 +3,9 @@
 const db = require('../database');
 const config = require('../config');
 const log = require('../lib/logger').auth;
-const { Agent } = require('undici');
+// fetch + Agent du MEME undici (le fetch global de Node embarque une autre
+// version → « invalid onRequestStart method » si on melange).
+const { Agent, fetch } = require('undici');
 
 // PocketID est souvent en self-signed cert (NetBird). On accepte ces certs
 // uniquement pour les fetch PocketID, pas globalement.
