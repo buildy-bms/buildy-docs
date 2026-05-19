@@ -187,7 +187,7 @@ const title = computed(() =>
 
       <!-- Recherche -->
       <div class="relative">
-        <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
         <input
           v-model="search"
           type="search"
@@ -273,7 +273,7 @@ const title = computed(() =>
               :class="[
                 'w-full min-h-11 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-base font-medium rounded-lg transition',
                 isUsed(t)
-                  ? 'bg-gray-50 text-gray-400 border border-gray-200'
+                  ? 'bg-gray-50 text-gray-500 border border-gray-200'
                   : 'bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50',
               ]"
             >

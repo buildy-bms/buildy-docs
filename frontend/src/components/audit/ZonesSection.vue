@@ -222,7 +222,7 @@ onBeforeUnmount(teardownZonesSortable)
             <td>
               <input type="text" :value="z.name"
                      @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                     class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded bg-transparent" />
+                     class="w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
             </td>
             <td class="min-w-44">
               <SearchableSelect

@@ -264,9 +264,9 @@ async function quickToggleNotAvailable(it) {
             {{ { site: 'Site', zones: 'Zones', systems: 'Systèmes', meters: 'Compteurs', bms: 'GTB' }[kind] }}
           </p>
           <p class="text-2xl font-medium text-gray-900 mt-1 leading-none">
-            {{ coverage[kind].covered }}<span class="text-base text-gray-400 font-normal"> / {{ coverage[kind].total }}</span>
+            {{ coverage[kind].covered }}<span class="text-base text-gray-500 font-normal"> / {{ coverage[kind].total }}</span>
           </p>
-          <p v-if="coverage[kind].total === 0" class="text-[11px] text-gray-400 italic mt-1">Aucun</p>
+          <p v-if="coverage[kind].total === 0" class="text-[11px] text-gray-500 italic mt-1">Aucun</p>
           <p v-else-if="coverage[kind].covered === coverage[kind].total" class="text-[11px] text-emerald-700 mt-1">✓ Couvert</p>
           <p v-else class="text-[11px] text-amber-700 mt-1">⚠ {{ coverage[kind].total - coverage[kind].covered }} sans photo</p>
         </button>
@@ -284,7 +284,7 @@ async function quickToggleNotAvailable(it) {
         <div class="bg-gray-50 rounded-xl px-4 py-3">
           <p class="text-xs uppercase tracking-wider text-gray-500">Couverture</p>
           <p class="text-2xl font-medium text-gray-900 mt-1">
-            {{ coverageDetail.covered }} <span class="text-gray-400 text-base font-normal">/ {{ coverageDetail.total }}</span>
+            {{ coverageDetail.covered }} <span class="text-gray-500 text-base font-normal">/ {{ coverageDetail.total }}</span>
           </p>
         </div>
 
@@ -306,7 +306,7 @@ async function quickToggleNotAvailable(it) {
             </span>
             <span class="block text-xs text-amber-700 mt-0.5">Aucune photo · à prendre</span>
           </span>
-          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-500 shrink-0" />
         </button>
         <button
           v-else-if="(coverageDetail.kind === 'site' || coverageDetail.kind === 'bms') && coverageDetail.covered > 0"
@@ -324,7 +324,7 @@ async function quickToggleNotAvailable(it) {
             </span>
             <span class="block text-xs text-emerald-700 mt-0.5">✓ Couvert</span>
           </span>
-          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-500 shrink-0" />
         </button>
 
         <!-- Site / GTB sans entité (cas vide impossible normalement) -->
@@ -343,7 +343,7 @@ async function quickToggleNotAvailable(it) {
             class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white rounded-xl border border-gray-200 text-base text-gray-700 active:bg-gray-50"
           >
             Aller à l'onglet {{ coverageDetail.label }}
-            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
+            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-500 shrink-0" />
           </button>
         </template>
 
@@ -393,7 +393,7 @@ async function quickToggleNotAvailable(it) {
                   <!-- Fallback (jamais utilisé en pratique) -->
                   <p v-else class="text-base text-gray-900 truncate">{{ m.name }}</p>
                 </div>
-                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-400 shrink-0" />
+                <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-500 shrink-0" />
               </button>
             </li>
           </ul>
@@ -410,8 +410,8 @@ async function quickToggleNotAvailable(it) {
         <h3 class="text-base font-medium text-gray-900">Pièces jointes du dossier</h3>
         <p class="text-xs text-gray-500 mt-0.5">{{ itemsHandled }} / {{ items.length }} traités</p>
       </div>
-      <div v-if="loading" class="px-4 py-6 text-sm text-gray-400 text-center">Chargement…</div>
-      <div v-else-if="!items.length" class="px-4 py-6 text-sm text-gray-400 italic text-center">
+      <div v-if="loading" class="px-4 py-6 text-sm text-gray-500 text-center">Chargement…</div>
+      <div v-else-if="!items.length" class="px-4 py-6 text-sm text-gray-500 italic text-center">
         Aucun item dans le catalogue.
       </div>
       <div v-else class="divide-y divide-gray-100">
@@ -426,7 +426,7 @@ async function quickToggleNotAvailable(it) {
               </p>
               <p class="text-xs mt-0.5 flex items-center gap-1">
                 <FontAwesomeIcon :icon="['fas', 'check']" v-if="it.status === 'available'" class="w-3.5 h-3.5 text-emerald-600" />
-                <FontAwesomeIcon :icon="['fas', 'ban']" v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-400" />
+                <FontAwesomeIcon :icon="['fas', 'ban']" v-else-if="it.status === 'not_available'" class="w-3.5 h-3.5 text-gray-500" />
                 <FontAwesomeIcon :icon="['fas', 'circle-exclamation']" v-else class="w-3.5 h-3.5 text-amber-500" />
                 <span :class="{
                   'text-emerald-700': it.status === 'available',
@@ -509,7 +509,7 @@ async function quickToggleNotAvailable(it) {
             <li v-for="f in editingFiles" :key="f.id"
                 class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm">
               <a :href="getSiteDocumentDownloadUrl(f.id)" target="_blank" class="flex-1 truncate text-indigo-700">{{ f.title }}</a>
-              <button type="button" @click="removeFile(f)" class="text-gray-400 active:text-red-600 p-1.5">
+              <button type="button" @click="removeFile(f)" class="text-gray-500 active:text-red-600 p-1.5">
                 <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4" />
               </button>
             </li>

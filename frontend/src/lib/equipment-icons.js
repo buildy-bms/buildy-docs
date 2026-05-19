@@ -28,7 +28,7 @@ import {
   // Compteurs / pills
   faFaucet,
   // Options de selects audit (ENERGY/ROLE/ZONE_NATURES/COMM_OPTIONS cf. lib/audit-options.js)
-  faFireFlameCurved, faPipe, faTree, faCircleQuestion, faRoute, faSliders,
+  faFireFlameCurved, faPipe, faTemperatureSnow, faTree, faCircleQuestion, faRoute, faSliders,
   faBriefcase, faPeopleGroup, faUserTie, faTableCellsLarge, faHandshake,
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,
@@ -53,7 +53,7 @@ const ICONS = [
   faFaucetDrip, faGauge, faTowerCell, faWindowMaximize,
   faSparkles, faCircleCheck, faBan, faEye, faEyeSlash, faTrashCan,
   faFaucet,
-  faFireFlameCurved, faPipe, faTree, faCircleQuestion, faRoute, faSliders,
+  faFireFlameCurved, faPipe, faTemperatureSnow, faTree, faCircleQuestion, faRoute, faSliders,
   faBriefcase, faPeopleGroup, faUserTie, faTableCellsLarge, faHandshake,
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,

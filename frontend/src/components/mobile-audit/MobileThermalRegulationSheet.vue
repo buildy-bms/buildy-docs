@@ -339,7 +339,7 @@ async function saveLevelNote() {
             </button>
           </div>
         </div>
-      <p class="text-xs text-gray-400 text-center pt-2">
+      <p class="text-xs text-gray-500 text-center pt-2">
         Sauvegarde automatique. Tu peux fermer cette page à tout moment.
       </p>
     </div>
@@ -364,7 +364,7 @@ async function saveLevelNote() {
         placeholder="Ce que tu observes…"
         class="w-full text-sm rounded-lg border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
       ></textarea>
-      <p class="text-[11px] text-gray-400 italic">
+      <p class="text-[11px] text-gray-500 italic">
         Formatage simplifié sur mobile (pas de gras / listes). Saisir une note riche depuis le poste de bureau si besoin.
       </p>
     </div>

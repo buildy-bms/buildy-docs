@@ -376,7 +376,7 @@ async function removeAudit() {
       class="flex-1 overflow-y-auto overscroll-contain relative"
       :style="{ paddingBottom: 'calc(56px + max(4px, env(safe-area-inset-bottom)))' }"
     >
-      <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
+      <div v-if="loading" class="text-center py-12 text-gray-500 text-sm">Chargement…</div>
       <template v-else-if="document">
         <div :class="['tab-pane', activeTab === 'site' ? 'tab-pane-active' : '']">
           <MobileSiteTab v-show="activeTab === 'site'" />
@@ -550,7 +550,7 @@ async function removeAudit() {
         </div>
 
         <!-- Numéro de version Buildy Docs -->
-        <p class="pt-2 text-center text-[11px] text-gray-400">
+        <p class="pt-2 text-center text-[11px] text-gray-500">
           Buildy Docs v{{ appVersion || '0.1.0' }}<span v-if="buildSha"> · {{ buildSha }}</span>
         </p>
       </div>
