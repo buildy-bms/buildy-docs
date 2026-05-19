@@ -18,6 +18,7 @@ const db = require('../database');
 const config = require('../config');
 const { uniqueSlug } = require('../lib/slug');
 const { renderPdf, renderRawHtmlPdf } = require('../lib/pdf');
+const { uploadWhitepaperPdf } = require('../lib/whitepaper-ftp');
 const { assertRead, assertWrite } = require('../lib/af-permissions');
 const log = require('../lib/logger').system;
 
@@ -86,6 +87,61 @@ function toWhitepaper(row) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+// Genere le PDF d'un livre blanc (mode coffre HTML ou mode chapitres) et
+// renvoie { path, sizeBytes, mode }. Les erreurs « metier » (pas de source,
+// pas de chapitre) portent err.clientStatus = 400.
+async function generateWhitepaperPdf(row) {
+  const id = row.id;
+  let meta = {};
+  try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
+
+  const outDir = path.join(path.resolve(config.exportsDir), String(id));
+  fs.mkdirSync(outDir, { recursive: true });
+  const outputPath = path.join(outDir, `whitepaper-${Date.now()}.pdf`);
+
+  // ── Mode « HTML brut » (coffre) : rendu fidele au pixel ───────────
+  if (meta.mode === 'html') {
+    const htmlPath = wpSourceHtml(id);
+    if (!fs.existsSync(htmlPath)) {
+      const e = new Error('Aucun fichier HTML source pour ce livre blanc');
+      e.clientStatus = 400;
+      throw e;
+    }
+    const result = await renderRawHtmlPdf({ htmlPath, outputPath });
+    return { path: result.path, sizeBytes: result.sizeBytes, mode: 'html', meta };
+  }
+
+  // ── Mode « chapitres » (Tiptap + template flux naturel) ───────────
+  const chapters = db.sections.listByAf(id)
+    .slice()
+    .sort((a, b) => (a.position || 0) - (b.position || 0))
+    .map(c => ({ title: c.title, body_html: c.body_html || '<p></p>' }));
+  if (!chapters.length) {
+    const e = new Error("Ajoutez au moins un chapitre avant d'exporter");
+    e.clientStatus = 400;
+    throw e;
+  }
+
+  const data = {
+    title: row.title,
+    subtitle: meta.subtitle || null,
+    version: row.wp_version || null,
+    audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
+    dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    chapters,
+  };
+  const isSinglePage = row.wp_layout === 'single-page';
+  const result = await renderPdf({
+    template: isSinglePage ? 'whitepaper-singlepage' : 'whitepaper-book',
+    styles: isSinglePage ? 'styles-whitepaper' : ['styles-whitepaper', 'styles-whitepaper-book'],
+    data,
+    outputPath,
+    pageFormat: 'A4',
+    coverFullBleed: !isSinglePage,
+  });
+  return { path: result.path, sizeBytes: result.sizeBytes, mode: 'chapters', meta };
 }
 
 async function routes(fastify) {
@@ -306,81 +362,71 @@ async function routes(fastify) {
     }
     if (!assertRead(request, reply, id)) return;
 
-    let meta = {};
-    try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
-
-    const outDir = path.join(path.resolve(config.exportsDir), String(id));
-    fs.mkdirSync(outDir, { recursive: true });
-    const outputPath = path.join(outDir, `whitepaper-${Date.now()}.pdf`);
-
-    // ── Mode « HTML brut » (coffre) : rendu fidele au pixel ───────────
-    if (meta.mode === 'html') {
-      const htmlPath = wpSourceHtml(id);
-      if (!fs.existsSync(htmlPath)) {
-        return reply.code(400).send({ detail: 'Aucun fichier HTML source pour ce livre blanc' });
-      }
-      let result;
-      try {
-        result = await renderRawHtmlPdf({ htmlPath, outputPath });
-      } catch (err) {
-        log.error(`PDF whitepaper (html) render failed: ${err.message}`);
-        return reply.code(502).send({ detail: `Échec de la génération PDF : ${err.message}` });
-      }
-      db.auditLog.add({
-        afId: id, userId: request.authUser?.id,
-        action: 'whitepaper.export.pdf', payload: { mode: 'html', size: result.sizeBytes },
-      });
-      const buf = fs.readFileSync(result.path);
-      reply.header('Content-Type', 'application/pdf');
-      reply.header('Content-Disposition', `attachment; filename="${row.slug || 'livre-blanc'}.pdf"`);
-      return reply.send(buf);
-    }
-
-    // ── Mode « chapitres » (Tiptap + template flux naturel) ───────────
-    const chapters = db.sections.listByAf(id)
-      .slice()
-      .sort((a, b) => (a.position || 0) - (b.position || 0))
-      .map(c => ({ title: c.title, body_html: c.body_html || '<p></p>' }));
-
-    if (!chapters.length) {
-      return reply.code(400).send({ detail: 'Ajoutez au moins un chapitre avant d\'exporter' });
-    }
-
-    const data = {
-      title: row.title,
-      subtitle: meta.subtitle || null,
-      version: row.wp_version || null,
-      audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
-      dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-      chapters,
-    };
-
-    const isSinglePage = row.wp_layout === 'single-page';
-    let result;
+    let gen;
     try {
-      result = await renderPdf({
-        template: isSinglePage ? 'whitepaper-singlepage' : 'whitepaper-book',
-        styles: isSinglePage ? 'styles-whitepaper' : ['styles-whitepaper', 'styles-whitepaper-book'],
-        data,
-        outputPath,
-        pageFormat: 'A4',
-        coverFullBleed: !isSinglePage,
-      });
+      gen = await generateWhitepaperPdf(row);
     } catch (err) {
-      log.error(`PDF whitepaper render failed: ${err.message}`);
-      return reply.code(502).send({ detail: `Échec de la génération PDF : ${err.message}` });
+      if (!err.clientStatus) log.error(`PDF whitepaper ${id} render failed: ${err.message}`);
+      return reply.code(err.clientStatus || 502).send({
+        detail: err.clientStatus ? err.message : `Échec de la génération PDF : ${err.message}`,
+      });
     }
 
     db.auditLog.add({
       afId: id, userId: request.authUser?.id,
-      action: 'whitepaper.export.pdf',
-      payload: { chapters: chapters.length, size: result.sizeBytes },
+      action: 'whitepaper.export.pdf', payload: { mode: gen.mode, size: gen.sizeBytes },
     });
-
-    const buffer = fs.readFileSync(result.path);
+    const buf = fs.readFileSync(gen.path);
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', `attachment; filename="${row.slug || 'livre-blanc'}.pdf"`);
-    return reply.send(buffer);
+    return reply.send(buf);
+  });
+
+  // ─── Publication / mise a jour du PDF sur le FTP OVH buildy.fr ──────
+  // Genere le PDF et l'envoie sur le FTP public. Le fichier prend le nom
+  // du slug : l'URL publique est stable, une republication l'ecrase.
+  fastify.post('/whitepapers/:id/publish', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertWrite(request, reply, id)) return;
+    if (!row.slug) {
+      return reply.code(400).send({ detail: 'Le livre blanc doit avoir un slug avant publication' });
+    }
+
+    let gen;
+    try {
+      gen = await generateWhitepaperPdf(row);
+    } catch (err) {
+      if (!err.clientStatus) log.error(`Publish whitepaper ${id} render failed: ${err.message}`);
+      return reply.code(err.clientStatus || 502).send({
+        detail: err.clientStatus ? err.message : `Échec de la génération PDF : ${err.message}`,
+      });
+    }
+
+    let upload;
+    try {
+      upload = await uploadWhitepaperPdf(gen.path, `${row.slug}.pdf`);
+    } catch (err) {
+      log.error(`Publish whitepaper ${id} FTP failed: ${err.message}`);
+      return reply.code(502).send({ detail: `Échec de l'envoi vers le FTP : ${err.message}` });
+    }
+
+    // Memorise l'etat de publication dans wp_meta_json + passe en 'published'.
+    const meta = gen.meta || {};
+    meta.published = { url: upload.url, at: new Date().toISOString(), size: upload.size };
+    db.afs.update(id, {
+      wp_meta_json: JSON.stringify(meta),
+      status: 'published',
+      updatedBy: request.authUser?.id,
+    });
+    db.auditLog.add({
+      afId: id, userId: request.authUser?.id,
+      action: 'whitepaper.publish', payload: { url: upload.url, size: upload.size },
+    });
+    return toWhitepaper(db.afs.getById(id));
   });
 
   // ─── HTML source (mode coffre) : consulter ─────────────────────────

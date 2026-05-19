@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   ArrowLeftIcon, PlusIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon,
-  ArrowDownTrayIcon, DocumentTextIcon, BookOpenIcon,
+  ArrowDownTrayIcon, ArrowUpTrayIcon, ClipboardDocumentIcon, DocumentTextIcon, BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import { useWhitepaperStore } from '@/stores/whitepaper'
 import { exportWhitepaperPdf } from '@/api'
@@ -15,7 +15,7 @@ import WhitepaperRichTextEditor from '@/components/WhitepaperRichTextEditor.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useWhitepaperStore()
-const { whitepaper, chapters, companions, currentChapter, loading, saving, isCompanion, isHtmlMode, sourceInfo } = storeToRefs(store)
+const { whitepaper, chapters, companions, currentChapter, loading, saving, publishing, isCompanion, isHtmlMode, sourceInfo } = storeToRefs(store)
 
 function formatBytes(n) {
   if (!n) return '—'
@@ -45,8 +45,6 @@ const AUDIENCE_LABELS = {
   moa_moe: 'MOA / MOE / BE',
   exploitant: 'Exploitant',
 }
-
-const isPublished = computed(() => whitepaper.value?.status === 'published')
 
 // ── Sauvegarde auto du chapitre (debounce 800ms) ────────────────────
 let saveTimer = null
@@ -98,9 +96,31 @@ async function saveMetaField(field, value) {
   catch { error('Échec de la mise à jour') }
 }
 
-async function togglePublished() {
-  await saveMetaField('status', isPublished.value ? 'draft' : 'published')
-  success(isPublished.value ? 'Livre blanc publié' : 'Repassé en brouillon')
+// ── Publication / mise à jour du PDF sur le FTP OVH buildy.fr ───────
+const publishedInfo = computed(() => whitepaper.value?.meta?.published || null)
+
+async function publishOnline() {
+  const wasPublished = !!publishedInfo.value
+  const ok = await confirm({
+    title: wasPublished ? 'Mettre à jour la publication ?' : 'Publier ce document en ligne ?',
+    message: wasPublished
+      ? 'Le PDF en ligne sera remplacé par la version actuelle du document.'
+      : 'Le PDF va être généré et mis en ligne sur buildy.fr — il sera accessible publiquement à tous.',
+    confirmLabel: wasPublished ? 'Mettre à jour' : 'Publier',
+  })
+  if (!ok) return
+  try {
+    await store.publish()
+    success(wasPublished ? 'Publication mise à jour' : 'Document publié en ligne')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Échec de la publication')
+  }
+}
+
+function copyPublishedUrl() {
+  if (!publishedInfo.value?.url) return
+  navigator.clipboard?.writeText(publishedInfo.value.url)
+  success('Lien copié')
 }
 
 async function exportPdf() {
@@ -181,16 +201,31 @@ watch(() => route.params.id, async (id) => {
           {{ exporting ? 'Export…' : 'Export PDF' }}
         </button>
         <button
-          @click="togglePublished"
-          class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap"
-          :class="isPublished ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+          @click="publishOnline"
+          :disabled="publishing"
+          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap disabled:opacity-50"
+          :class="publishedInfo ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
         >
-          {{ isPublished ? 'Publié ✓' : 'Publier' }}
+          <ArrowUpTrayIcon class="w-4 h-4 shrink-0" />
+          {{ publishing ? 'Publication…' : (publishedInfo ? 'Mettre à jour' : 'Publier en ligne') }}
         </button>
         <button @click="removeWhitepaper" class="p-2 text-gray-400 hover:text-red-600" v-tooltip="'Supprimer'">
           <TrashIcon class="w-4 h-4" />
         </button>
       </div>
+    </div>
+
+    <!-- Bandeau « en ligne » : URL publique du PDF publié -->
+    <div v-if="publishedInfo" class="flex items-center gap-2 -mt-2 mb-5 text-sm min-w-0">
+      <span class="inline-flex items-center gap-1.5 font-medium text-emerald-700 shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> En ligne
+      </span>
+      <a :href="publishedInfo.url" target="_blank" rel="noopener"
+         class="text-indigo-600 hover:underline truncate">{{ publishedInfo.url }}</a>
+      <button @click="copyPublishedUrl" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+        <ClipboardDocumentIcon class="w-4 h-4" />
+      </button>
+      <span class="text-gray-400 shrink-0 whitespace-nowrap">· publié le {{ formatDateTime(publishedInfo.at) }}</span>
     </div>
 
     <!-- ═══ Mode « HTML brut » (coffre) ═══ -->

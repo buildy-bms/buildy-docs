@@ -4,7 +4,7 @@ import {
   getWhitepaper, updateWhitepaper, deleteWhitepaper,
   getWhitepaperChapter, createWhitepaperChapter, updateWhitepaperChapter,
   deleteWhitepaperChapter, moveWhitepaperChapter,
-  getWhitepaperSourceHtml, replaceWhitepaperSourceHtml,
+  getWhitepaperSourceHtml, replaceWhitepaperSourceHtml, publishWhitepaper,
 } from '@/api'
 
 // Store d'un livre blanc en cours d'edition. Chargement light de l'arbre
@@ -17,6 +17,7 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
   const currentChapter = ref(null)   // { id, title, body_html } — chapitre selectionne
   const loading = ref(false)
   const saving = ref(false)
+  const publishing = ref(false)
 
   const isCompanion = computed(() => !!whitepaper.value?.parent_af_id)
   // Mode « HTML brut » (coffre) : le document stocke son HTML/CSS exact,
@@ -122,6 +123,18 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
     await deleteWhitepaper(whitepaper.value.id)
   }
 
+  // Genere le PDF et le publie / met a jour sur le FTP OVH buildy.fr.
+  async function publish() {
+    if (!whitepaper.value) return
+    publishing.value = true
+    try {
+      const { data } = await publishWhitepaper(whitepaper.value.id)
+      whitepaper.value = { ...whitepaper.value, ...data }
+    } finally {
+      publishing.value = false
+    }
+  }
+
   function reset() {
     whitepaper.value = null
     chapters.value = []
@@ -130,9 +143,9 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
   }
 
   return {
-    whitepaper, chapters, companions, currentChapter, loading, saving,
+    whitepaper, chapters, companions, currentChapter, loading, saving, publishing,
     isCompanion, isHtmlMode, sourceInfo,
     load, selectChapter, saveCurrentChapter, addChapter, removeChapter,
-    moveChapter, saveMeta, remove, reset, replaceSourceHtml,
+    moveChapter, saveMeta, remove, reset, replaceSourceHtml, publish,
   }
 })
