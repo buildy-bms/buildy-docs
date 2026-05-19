@@ -4,6 +4,7 @@ import {
   getWhitepaper, updateWhitepaper, deleteWhitepaper,
   getWhitepaperChapter, createWhitepaperChapter, updateWhitepaperChapter,
   deleteWhitepaperChapter, moveWhitepaperChapter,
+  getWhitepaperSourceHtml, replaceWhitepaperSourceHtml,
 } from '@/api'
 
 // Store d'un livre blanc en cours d'edition. Chargement light de l'arbre
@@ -18,6 +19,10 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
   const saving = ref(false)
 
   const isCompanion = computed(() => !!whitepaper.value?.parent_af_id)
+  // Mode « HTML brut » (coffre) : le document stocke son HTML/CSS exact,
+  // edite hors-app, rendu fidele au pixel. Pas d'edition par chapitres.
+  const isHtmlMode = computed(() => whitepaper.value?.meta?.mode === 'html')
+  const sourceInfo = ref(null)  // { size_bytes, updated_at } pour le mode html
 
   async function load(id) {
     loading.value = true
@@ -27,9 +32,30 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
       chapters.value = (data.chapters || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))
       companions.value = data.companions || []
       currentChapter.value = null
-      if (chapters.value.length) await selectChapter(chapters.value[0].id)
+      sourceInfo.value = null
+      if (data.meta?.mode === 'html') {
+        try {
+          const { data: src } = await getWhitepaperSourceHtml(id)
+          sourceInfo.value = { size_bytes: src.size_bytes, updated_at: src.updated_at }
+        } catch { sourceInfo.value = null }
+      } else if (chapters.value.length) {
+        await selectChapter(chapters.value[0].id)
+      }
     } finally {
       loading.value = false
+    }
+  }
+
+  // Mode html : remplace le fichier source.html (upload hors-app).
+  async function replaceSourceHtml(file) {
+    if (!whitepaper.value) return
+    saving.value = true
+    try {
+      await replaceWhitepaperSourceHtml(whitepaper.value.id, file)
+      const { data: src } = await getWhitepaperSourceHtml(whitepaper.value.id)
+      sourceInfo.value = { size_bytes: src.size_bytes, updated_at: src.updated_at }
+    } finally {
+      saving.value = false
     }
   }
 
@@ -104,8 +130,9 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
   }
 
   return {
-    whitepaper, chapters, companions, currentChapter, loading, saving, isCompanion,
+    whitepaper, chapters, companions, currentChapter, loading, saving,
+    isCompanion, isHtmlMode, sourceInfo,
     load, selectChapter, saveCurrentChapter, addChapter, removeChapter,
-    moveChapter, saveMeta, remove, reset,
+    moveChapter, saveMeta, remove, reset, replaceSourceHtml,
   }
 })

@@ -17,9 +17,16 @@ const { z } = require('zod');
 const db = require('../database');
 const config = require('../config');
 const { uniqueSlug } = require('../lib/slug');
-const { renderPdf } = require('../lib/pdf');
+const { renderPdf, renderRawHtmlPdf } = require('../lib/pdf');
 const { assertRead, assertWrite } = require('../lib/af-permissions');
 const log = require('../lib/logger').system;
+
+// Racine de stockage des livres blancs « HTML brut » (mode coffre) :
+// data/whitepaper-sources/<id>/source.html + assets/. Le HTML est edite
+// hors-app (IDE) et rendu tel quel — PDF fidele au pixel.
+const WP_SOURCES_ROOT = path.join(path.dirname(path.resolve(config.exportsDir)), 'whitepaper-sources');
+function wpSourceDir(id) { return path.join(WP_SOURCES_ROOT, String(id)); }
+function wpSourceHtml(id) { return path.join(wpSourceDir(id), 'source.html'); }
 
 const LAYOUTS = ['book', 'single-page'];
 const STATUSES = ['draft', 'published'];
@@ -299,6 +306,37 @@ async function routes(fastify) {
     }
     if (!assertRead(request, reply, id)) return;
 
+    let meta = {};
+    try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
+
+    const outDir = path.join(path.resolve(config.exportsDir), String(id));
+    fs.mkdirSync(outDir, { recursive: true });
+    const outputPath = path.join(outDir, `whitepaper-${Date.now()}.pdf`);
+
+    // ── Mode « HTML brut » (coffre) : rendu fidele au pixel ───────────
+    if (meta.mode === 'html') {
+      const htmlPath = wpSourceHtml(id);
+      if (!fs.existsSync(htmlPath)) {
+        return reply.code(400).send({ detail: 'Aucun fichier HTML source pour ce livre blanc' });
+      }
+      let result;
+      try {
+        result = await renderRawHtmlPdf({ htmlPath, outputPath });
+      } catch (err) {
+        log.error(`PDF whitepaper (html) render failed: ${err.message}`);
+        return reply.code(502).send({ detail: `Échec de la génération PDF : ${err.message}` });
+      }
+      db.auditLog.add({
+        afId: id, userId: request.authUser?.id,
+        action: 'whitepaper.export.pdf', payload: { mode: 'html', size: result.sizeBytes },
+      });
+      const buf = fs.readFileSync(result.path);
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Disposition', `attachment; filename="${row.slug || 'livre-blanc'}.pdf"`);
+      return reply.send(buf);
+    }
+
+    // ── Mode « chapitres » (Tiptap + template flux naturel) ───────────
     const chapters = db.sections.listByAf(id)
       .slice()
       .sort((a, b) => (a.position || 0) - (b.position || 0))
@@ -308,9 +346,6 @@ async function routes(fastify) {
       return reply.code(400).send({ detail: 'Ajoutez au moins un chapitre avant d\'exporter' });
     }
 
-    let meta = {};
-    try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
-
     const data = {
       title: row.title,
       subtitle: meta.subtitle || null,
@@ -319,10 +354,6 @@ async function routes(fastify) {
       dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
       chapters,
     };
-
-    const outDir = path.join(path.resolve(config.exportsDir), String(id));
-    fs.mkdirSync(outDir, { recursive: true });
-    const outputPath = path.join(outDir, `whitepaper-${Date.now()}.pdf`);
 
     const isSinglePage = row.wp_layout === 'single-page';
     let result;
@@ -350,6 +381,58 @@ async function routes(fastify) {
     reply.header('Content-Type', 'application/pdf');
     reply.header('Content-Disposition', `attachment; filename="${row.slug || 'livre-blanc'}.pdf"`);
     return reply.send(buffer);
+  });
+
+  // ─── HTML source (mode coffre) : consulter ─────────────────────────
+  fastify.get('/whitepapers/:id/source-html', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertRead(request, reply, id)) return;
+    const htmlPath = wpSourceHtml(id);
+    if (!fs.existsSync(htmlPath)) {
+      return reply.code(404).send({ detail: 'Aucun HTML source' });
+    }
+    const html = fs.readFileSync(htmlPath, 'utf-8');
+    const stat = fs.statSync(htmlPath);
+    return { size_bytes: stat.size, updated_at: stat.mtime.toISOString(), html };
+  });
+
+  // ─── HTML source (mode coffre) : remplacer ─────────────────────────
+  // Upload multipart d'un fichier .html (edition hors-app, IDE).
+  fastify.put('/whitepapers/:id/source-html', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertWrite(request, reply, id)) return;
+
+    const file = await request.file();
+    if (!file) return reply.code(400).send({ detail: 'Fichier HTML manquant' });
+    const html = (await file.toBuffer()).toString('utf-8');
+    if (!/<html[\s>]/i.test(html)) {
+      return reply.code(400).send({ detail: 'Le fichier ne ressemble pas à un document HTML' });
+    }
+    fs.mkdirSync(wpSourceDir(id), { recursive: true });
+    fs.writeFileSync(wpSourceHtml(id), html, 'utf-8');
+
+    // Bascule le document en mode 'html' s'il ne l'etait pas encore.
+    let meta = {};
+    try { meta = row.wp_meta_json ? JSON.parse(row.wp_meta_json) : {}; } catch { meta = {}; }
+    if (meta.mode !== 'html') {
+      meta.mode = 'html';
+      db.afs.update(id, { wp_meta_json: JSON.stringify(meta), updatedBy: request.authUser?.id });
+    } else {
+      db.afs.update(id, { updatedBy: request.authUser?.id }); // touch updated_at
+    }
+    db.auditLog.add({
+      afId: id, userId: request.authUser?.id,
+      action: 'whitepaper.source-html.replace', payload: { size: html.length },
+    });
+    return { ok: true, size_bytes: html.length };
   });
 }
 

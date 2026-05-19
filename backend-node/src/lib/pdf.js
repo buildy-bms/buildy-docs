@@ -801,9 +801,62 @@ function renderHtml({ template, styles, data, pageFormat = 'A4', pageOrientation
   return tpl({ ...data, styles: fullCss });
 }
 
+// ── Rendu PDF d'un livre blanc « HTML brut » ─────────────────────────
+// Rend un fichier HTML autonome EXACTEMENT tel quel (avec ses assets
+// relatifs resolus via file://), sans template ni Handlebars. Garantit
+// un PDF fidele au pixel au HTML d'origine. Le HTML cible peut definir
+// `body.puppeteer-export` pour masquer ses elements d'edition (bouton
+// export, badges de debordement). Pre-flight overflow : avorte si une
+// `.page` deborde de plus de 3 mm (tolerance navigateur).
+async function renderRawHtmlPdf(opts) {
+  return _withTimeout(_renderRawHtmlPdfImpl(opts), RENDER_TIMEOUT_MS, `renderRawHtmlPdf(${opts.htmlPath})`);
+}
+
+async function _renderRawHtmlPdfImpl({ htmlPath, outputPath }) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 1 });
+    await page.goto('file://' + htmlPath, { waitUntil: 'networkidle0', timeout: 120_000 });
+    await page.evaluate(() => document.body.classList.add('puppeteer-export'));
+    await page.evaluate(() => (document.fonts && document.fonts.ready) || true);
+    await new Promise((r) => setTimeout(r, 1500)); // settle fontes / kit FA
+
+    // Pre-flight : aucune section ne doit deborder de > 3 mm (cf. la
+    // procedure METHODE-FIX-DEBORDEMENT du livre blanc original).
+    const overflows = await page.evaluate(() => {
+      const PX_PER_MM = 96 / 25.4;
+      const MAX = 297 * PX_PER_MM;
+      const sel = 'section.page, section.cover, section.pivot, section.back';
+      return [...document.querySelectorAll(sel)]
+        .map((p, i) => ({ index: i + 1, overMm: Math.max(0, (p.scrollHeight - MAX) / PX_PER_MM) }))
+        .filter((x) => x.overMm > 3);
+    });
+    if (overflows.length) {
+      const list = overflows.map((o) => `page ${o.index} (+${o.overMm.toFixed(1)} mm)`).join(', ');
+      throw new Error(`Debordement de pages : ${list}`);
+    }
+
+    await page.pdf({
+      path: outputPath,
+      width: '210mm',
+      height: '297mm',
+      printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: false,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    const stat = fs.statSync(outputPath);
+    return { path: outputPath, sizeBytes: stat.size };
+  } finally {
+    await page.close().catch(() => { /* ignore */ });
+  }
+}
+
 module.exports = {
   renderPdf,
   renderHtml,
+  renderRawHtmlPdf,
   buildHeaderFooter,
   loadAssetDataUrl,
   loadFileAsDataUrl,
