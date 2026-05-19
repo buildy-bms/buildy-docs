@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.63",
+      "date": "2026-05-19",
+      "title": "Correctif : connexion impossible — l'authentification PocketID rétablie",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La connexion à Buildy Docs échouait avec « OIDC init impossible »",
+          "what": "Depuis une mise à jour de dépendance, l'application ne parvenait plus à contacter PocketID pour ouvrir une session : toute tentative de connexion renvoyait « OIDC init impossible : fetch failed ». En cause, un mélange de deux versions de la librairie réseau interne (undici) — l'agent HTTP et le client fetch ne provenaient plus de la même version, ce qui faisait échouer chaque appel vers les serveurs internes. Les synchronisations avec Fleet Manager (audits, sites) et l'annuaire PocketID étaient touchées par le même défaut. Corrigé en alignant fetch et agent HTTP sur la même version dans les quatre points d'appel concernés.",
+          "where": "Page de connexion (le bouton PocketID fonctionne de nouveau) ; en arrière-plan, synchronisation des audits et des sites avec Fleet Manager.",
+          "how_to_test": "Ouvrir docs.buildy.fr, lancer la connexion PocketID : l'authentification aboutit et l'application s'ouvre normalement, sans message « OIDC init impossible »."
+        }
+      ]
+    },
+    {
       "version": "0.1.62",
       "date": "2026-05-18",
       "title": "Audit mobile : navigation des systèmes par usage",
