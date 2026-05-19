@@ -234,6 +234,17 @@ async function main() {
     }
   }, 10 * 60_000);
 
+  // Ingestion quotidienne des clics des liens tracables des livres blancs
+  // (telecharge hits.log depuis le FTP buildy.fr, ingere en base — idempotent).
+  {
+    const { ingestClicks } = require('./lib/whitepaper-tracker');
+    const runClicksIngest = () => ingestClicks()
+      .then((r) => { if (r.newRows) log.info(`Clics livres blancs : ${r.newRows} nouveau(x)`); })
+      .catch((e) => log.warn(`Ingestion clics livres blancs KO : ${e.message}`));
+    setTimeout(runClicksIngest, 60_000);             // rattrapage ~1 min apres le boot
+    setInterval(runClicksIngest, 24 * 60 * 60_000);  // puis une fois par jour
+  }
+
   try {
     await fastify.listen({ port: config.port, host: config.host });
     const proto = config.httpsEnabled ? 'https' : 'http';

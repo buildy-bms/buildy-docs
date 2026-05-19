@@ -672,5 +672,7 @@ export const replaceWhitepaperSourceHtml = (id, file) => {
   })
 }
 export const publishWhitepaper = (id) => api.post(`/whitepapers/${id}/publish`)
+export const getWhitepaperClicks = (id) => api.get(`/whitepapers/${id}/clicks`)
+export const refreshWhitepaperClicks = (id) => api.post(`/whitepapers/${id}/clicks/refresh`)
 
 export default api

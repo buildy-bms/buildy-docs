@@ -5,6 +5,7 @@ import {
   getWhitepaperChapter, createWhitepaperChapter, updateWhitepaperChapter,
   deleteWhitepaperChapter, moveWhitepaperChapter,
   getWhitepaperSourceHtml, replaceWhitepaperSourceHtml, publishWhitepaper,
+  getWhitepaperClicks, refreshWhitepaperClicks,
 } from '@/api'
 
 // Store d'un livre blanc en cours d'edition. Chargement light de l'arbre
@@ -18,6 +19,8 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
   const loading = ref(false)
   const saving = ref(false)
   const publishing = ref(false)
+  const clicks = ref(null)            // stats du lien traçable { total, by_day, ... }
+  const clicksLoading = ref(false)
 
   const isCompanion = computed(() => !!whitepaper.value?.parent_af_id)
   // Mode « HTML brut » (coffre) : le document stocke son HTML/CSS exact,
@@ -42,6 +45,7 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
       } else if (chapters.value.length) {
         await selectChapter(chapters.value[0].id)
       }
+      await loadClicks()
     } finally {
       loading.value = false
     }
@@ -130,8 +134,30 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
     try {
       const { data } = await publishWhitepaper(whitepaper.value.id)
       whitepaper.value = { ...whitepaper.value, ...data }
+      await loadClicks()
     } finally {
       publishing.value = false
+    }
+  }
+
+  // Statistiques du lien traçable (clics, provenances, visites récentes).
+  async function loadClicks() {
+    if (!whitepaper.value) return
+    try {
+      const { data } = await getWhitepaperClicks(whitepaper.value.id)
+      clicks.value = data
+    } catch { clicks.value = null }
+  }
+
+  // Force une ingestion FTP des logs avant de relire les stats.
+  async function refreshClicks() {
+    if (!whitepaper.value) return
+    clicksLoading.value = true
+    try {
+      const { data } = await refreshWhitepaperClicks(whitepaper.value.id)
+      clicks.value = data
+    } finally {
+      clicksLoading.value = false
     }
   }
 
@@ -140,12 +166,15 @@ export const useWhitepaperStore = defineStore('whitepaper', () => {
     chapters.value = []
     companions.value = []
     currentChapter.value = null
+    clicks.value = null
   }
 
   return {
     whitepaper, chapters, companions, currentChapter, loading, saving, publishing,
+    clicks, clicksLoading,
     isCompanion, isHtmlMode, sourceInfo,
     load, selectChapter, saveCurrentChapter, addChapter, removeChapter,
     moveChapter, saveMeta, remove, reset, replaceSourceHtml, publish,
+    loadClicks, refreshClicks,
   }
 })

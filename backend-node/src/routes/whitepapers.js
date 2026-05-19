@@ -19,6 +19,7 @@ const config = require('../config');
 const { uniqueSlug } = require('../lib/slug');
 const { renderPdf, renderRawHtmlPdf } = require('../lib/pdf');
 const { uploadWhitepaperPdf } = require('../lib/whitepaper-ftp');
+const { ensureTracker, ingestClicks } = require('../lib/whitepaper-tracker');
 const { assertRead, assertWrite } = require('../lib/af-permissions');
 const log = require('../lib/logger').system;
 
@@ -83,6 +84,7 @@ function toWhitepaper(row) {
     version: row.wp_version || null,
     parent_af_id: row.parent_af_id || null,
     meta,
+    tracker_url: row.slug ? `${config.wpTrackerPublicBase}/${row.slug}` : null,
     companion_count: row.companion_count ?? undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -414,6 +416,11 @@ async function routes(fastify) {
       return reply.code(502).send({ detail: `Échec de l'envoi vers le FTP : ${err.message}` });
     }
 
+    // Publie / rafraichit le redirecteur tracable /dl/<slug> (best-effort :
+    // le PDF est deja en ligne, on ne fait pas echouer la publication).
+    try { await ensureTracker(); }
+    catch (err) { log.warn(`Publish whitepaper ${id} — tracker KO : ${err.message}`); }
+
     // Memorise l'etat de publication dans wp_meta_json + passe en 'published'.
     const meta = gen.meta || {};
     meta.published = { url: upload.url, at: new Date().toISOString(), size: upload.size };
@@ -427,6 +434,34 @@ async function routes(fastify) {
       action: 'whitepaper.publish', payload: { url: upload.url, size: upload.size },
     });
     return toWhitepaper(db.afs.getById(id));
+  });
+
+  // ─── Statistiques de clics du lien traçable ────────────────────────
+  fastify.get('/whitepapers/:id/clicks', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertRead(request, reply, id)) return;
+    return db.whitepaperClicks.statsForAf(id);
+  });
+
+  // ─── Rafraichit les clics depuis le FTP (ingestion a la demande) ───
+  fastify.post('/whitepapers/:id/clicks/refresh', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertRead(request, reply, id)) return;
+    try {
+      await ingestClicks();
+    } catch (err) {
+      log.warn(`Refresh clics whitepaper ${id} KO : ${err.message}`);
+      return reply.code(502).send({ detail: `Échec du rafraîchissement : ${err.message}` });
+    }
+    return db.whitepaperClicks.statsForAf(id);
   });
 
   // ─── HTML source (mode coffre) : consulter ─────────────────────────

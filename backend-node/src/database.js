@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 148;
+const TARGET_VERSION = 149;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5903,6 +5903,29 @@ function runMigrations() {
     db.pragma('user_version = 148');
   }
 
+  if (current < 149) {
+    // Clics sur les liens tracables des livres blancs. Chaque ligne = un clic
+    // sur le redirecteur PHP /dl/<slug> hebergé sur buildy.fr, ramené par
+    // l'ingestion FTP quotidienne. hit_uid (uniqid genere cote PHP) rend
+    // l'ingestion idempotente (INSERT OR IGNORE).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS whitepaper_clicks (
+        hit_uid     TEXT PRIMARY KEY,
+        af_id       INTEGER REFERENCES afs(id) ON DELETE CASCADE,
+        slug        TEXT NOT NULL,
+        hit_at      TEXT NOT NULL,
+        ip_prefix   TEXT,
+        referer     TEXT,
+        user_agent  TEXT,
+        ingested_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_wp_clicks_af ON whitepaper_clicks(af_id);
+      CREATE INDEX IF NOT EXISTS idx_wp_clicks_hit_at ON whitepaper_clicks(hit_at);
+    `);
+    log.info('Migration 149 appliquee : table whitepaper_clicks');
+    db.pragma('user_version = 149');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -9005,8 +9028,55 @@ const bacsAuditGtbObservations = {
   },
 };
 
+// ── Clics sur les liens tracables des livres blancs ──────────────────
+const whitepaperClicks = {
+  // Insere un lot de clics (ingestion FTP). Idempotent via hit_uid.
+  insertMany(rows) {
+    if (!rows || !rows.length) return 0;
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO whitepaper_clicks
+        (hit_uid, af_id, slug, hit_at, ip_prefix, referer, user_agent)
+      VALUES (@hit_uid, @af_id, @slug, @hit_at, @ip_prefix, @referer, @user_agent)
+    `);
+    const tx = db.transaction((items) => {
+      let n = 0;
+      for (const r of items) n += stmt.run(r).changes;
+      return n;
+    });
+    return tx(rows);
+  },
+  // Statistiques d'un livre blanc pour l'UI.
+  statsForAf(afId) {
+    const total = db.prepare(
+      `SELECT COUNT(*) AS c FROM whitepaper_clicks WHERE af_id = ?`).get(afId).c;
+    const uniques = db.prepare(
+      `SELECT COUNT(DISTINCT ip_prefix) AS c FROM whitepaper_clicks WHERE af_id = ?`).get(afId).c;
+    const lastHit = db.prepare(
+      `SELECT MAX(hit_at) AS m FROM whitepaper_clicks WHERE af_id = ?`).get(afId).m;
+    const byDay = db.prepare(`
+      SELECT substr(hit_at, 1, 10) AS day, COUNT(*) AS count
+      FROM whitepaper_clicks WHERE af_id = ?
+      GROUP BY day ORDER BY day DESC LIMIT 30
+    `).all(afId);
+    const byReferer = db.prepare(`
+      SELECT CASE WHEN referer IS NULL OR referer = '' THEN '(accès direct)'
+                  ELSE referer END AS source,
+             COUNT(*) AS count
+      FROM whitepaper_clicks WHERE af_id = ?
+      GROUP BY source ORDER BY count DESC LIMIT 10
+    `).all(afId);
+    const recent = db.prepare(`
+      SELECT hit_at, ip_prefix, referer, user_agent
+      FROM whitepaper_clicks WHERE af_id = ?
+      ORDER BY hit_at DESC LIMIT 25
+    `).all(afId);
+    return { total, uniques, last_hit_at: lastHit, by_day: byDay, by_referer: byReferer, recent };
+  },
+};
+
 module.exports = {
   init,
+  whitepaperClicks,
   pdfBoilerplate,
   offeringLevels,
   brochureItems,

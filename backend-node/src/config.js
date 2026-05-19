@@ -91,6 +91,12 @@ const config = Object.freeze({
   // (mêmes credentials FTP que la FAQ ; seuls le dossier et l'URL changent).
   wpFtpRemoteDir: (process.env.WP_FTP_REMOTE_DIR || 'www/telechargements').replace(/\/$/, ''),
   wpFtpPublicBase: (process.env.WP_FTP_PUBLIC_BASE || 'https://www.buildy.fr/telechargements').replace(/\/$/, ''),
+
+  // Lien traçable des livres blancs : redirecteur PHP /dl/<slug> hébergé sur
+  // buildy.fr qui journalise chaque clic puis redirige vers le PDF. Les logs
+  // sont ramenés par une ingestion FTP quotidienne.
+  wpTrackerRemoteDir: (process.env.WP_TRACKER_REMOTE_DIR || 'www/dl').replace(/\/$/, ''),
+  wpTrackerPublicBase: (process.env.WP_TRACKER_PUBLIC_BASE || 'https://www.buildy.fr/dl').replace(/\/$/, ''),
 });
 
 // Validations securite
