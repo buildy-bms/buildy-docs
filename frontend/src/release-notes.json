@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.70",
+      "date": "2026-05-19",
+      "title": "Livres blancs retirés de « Mes documents »",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de livres blancs dans le listing des documents de production",
+          "what": "Les livres blancs et leurs documents compagnons apparaissaient dans « Mes documents » avec le tag « AF » — ce qui les confondait avec des analyses fonctionnelles. Ils ne sont désormais listés que dans leur page dédiée, Marketing → Livres blancs. Le compteur du haut de page (« X AFs ») reflète à nouveau les vrais documents de production.",
+          "where": "Mes documents (vue principale).",
+          "how_to_test": "Ouvrir « Mes documents » : le livre blanc et la checklist ont disparu de la liste ; ils restent visibles dans Marketing → Livres blancs."
+        }
+      ]
+    },
+    {
       "version": "0.1.69",
       "date": "2026-05-19",
       "title": "Livres blancs : le PDF n'est accessible que par le lien traçable",
