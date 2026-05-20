@@ -6813,7 +6813,10 @@ const afs = {
    *   uniquement, ou contextes internes).
    */
   list({ status, includeDeleted = false, forUserId } = {}) {
-    let sql = 'SELECT a.* FROM afs a WHERE 1=1';
+    // Documents de production (AF / audit BACS / site_audit / brochure).
+    // Les livres blancs ont leur propre listing (listWhitepapers) — on les
+    // exclut ici pour qu'ils n'apparaissent pas dans « Mes documents ».
+    let sql = "SELECT a.* FROM afs a WHERE a.kind != 'whitepaper'";
     const params = [];
     if (!includeDeleted) sql += ' AND a.deleted_at IS NULL';
     if (status) { sql += ' AND a.status = ?'; params.push(status); }
@@ -6876,8 +6879,11 @@ const afs = {
     db.prepare('UPDATE afs SET deleted_at = NULL WHERE id = ?').run(id);
   },
   countByStatus() {
+    // Compteurs « Mes documents » : exclut les livres blancs (listing séparé).
     return db.prepare(`
-      SELECT status, COUNT(*) as count FROM afs WHERE deleted_at IS NULL GROUP BY status
+      SELECT status, COUNT(*) as count FROM afs
+      WHERE deleted_at IS NULL AND kind != 'whitepaper'
+      GROUP BY status
     `).all();
   },
   // ── Livres blancs (mig 140) ────────────────────────────────────────
