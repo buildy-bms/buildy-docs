@@ -481,9 +481,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     applicabilityLabel: applicabilityLabelForSummary,
   });
 
-  // Carte statique du site (Google Static Maps) embarquée en data URL.
-  // Best-effort : null si la clé/API est indisponible → PDF sans carte.
-  const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
+  // Vue satellite statique du site (Google Static Maps) embarquée en data
+  // URL. Best-effort : null si la clé/API est indisponible → PDF sans vue.
+  const siteMapDataUrl = await buildSiteStaticMap({ site });
 
   return {
     document: af,

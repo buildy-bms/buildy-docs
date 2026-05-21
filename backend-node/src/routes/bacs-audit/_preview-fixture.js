@@ -35,6 +35,7 @@ const {
   APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL,
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
+const { buildSiteStaticMap } = require('../../lib/static-map');
 
 // Lazy require de pdf-charts (chartjs-node-canvas) — même pattern que
 // _export-data.js pour éviter de polluer require.cache au boot Fastify.
@@ -98,6 +99,8 @@ const SITE = {
   site_uuid: 'fixture-atlas-sud-uuid',
   name: 'Plateforme Logistique Atlas Sud',
   address: '12 rue des Chesnes, Parc des Chesnes, 38070 Saint-Quentin-Fallavier',
+  latitude: 45.63953,
+  longitude: 5.09748,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -787,6 +790,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
     isBacs: true,
     isSiteAudit: false,
     site: SITE,
+    siteMapDataUrl: await buildSiteStaticMap({ site: SITE }),
     zones,
     systemsByZone,
     compliance,
