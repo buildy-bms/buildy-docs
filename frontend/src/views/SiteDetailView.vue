@@ -15,6 +15,8 @@ import { useNotification } from '@/composables/useNotification'
 import { ZONE_NATURES } from '@/lib/audit-options'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
+import SitePhotoGallery from '@/components/SitePhotoGallery.vue'
+import SiteCredentialsManager from '@/components/SiteCredentialsManager.vue'
 
 const props = defineProps({ uuid: { type: String, required: true } })
 const router = useRouter()
@@ -202,6 +204,19 @@ function onSiteSaved() {
           </tbody>
         </table>
         <p v-else class="px-4 py-6 text-sm text-gray-500 italic">Aucune zone définie.</p>
+      </div>
+
+      <!-- Photos -->
+      <SitePhotoGallery :uuid="uuid" class="mt-5" />
+
+      <!-- Identifiants -->
+      <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mt-5">
+        <div class="px-4 py-2.5 border-b border-gray-100">
+          <h2 class="text-sm font-semibold text-gray-700">Identifiants d'accès</h2>
+        </div>
+        <div class="p-3">
+          <SiteCredentialsManager :site-uuid="uuid" />
+        </div>
       </div>
     </template>
 
