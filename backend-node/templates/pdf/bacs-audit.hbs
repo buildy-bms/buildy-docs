@@ -346,6 +346,13 @@
   {{/if}}
 </div>
 
+{{#if siteMapDataUrl}}
+<div class="map-figure" style="text-align:center;margin:3mm 0 5mm">
+  <img src="{{siteMapDataUrl}}" alt="Vue satellite du site"
+       style="max-width:150mm;border:1px solid #e2e8f0;border-radius:6px" />
+</div>
+{{/if}}
+
 {{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
 <div class="panel">
   <div class="panel-head">
@@ -393,12 +400,6 @@
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
-{{#if siteMapDataUrl}}
-<div class="map-figure" style="text-align:center;margin:3mm 0 5mm">
-  <img src="{{siteMapDataUrl}}" alt="Carte du site et des zones"
-       style="max-width:150mm;border:1px solid #e2e8f0;border-radius:6px" />
-</div>
-{{/if}}
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
