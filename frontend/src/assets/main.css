@@ -416,3 +416,9 @@ input[type="checkbox"]:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Decale un overlay plein ecran sous le bandeau de notification haut
+   (--buildy-banner-h publie par NotificationToast.vue). 0px sans notification. */
+.banner-safe-top {
+  padding-top: var(--buildy-banner-h, 0px);
+}

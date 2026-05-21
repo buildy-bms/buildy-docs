@@ -26,7 +26,7 @@ onBeforeUnmount(() => {
     <transition name="slide-up">
       <div
         v-if="open"
-        class="fixed inset-0 z-50 flex flex-col bg-gray-50"
+        class="fixed inset-0 z-50 flex flex-col bg-gray-50 banner-safe-top"
       >
         <!-- Header style iOS-natif : Annuler texte + Titre + Enregistrer texte bold -->
         <header

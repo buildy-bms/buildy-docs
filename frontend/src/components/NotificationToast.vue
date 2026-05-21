@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useNotification } from '@/composables/useNotification'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 
@@ -16,10 +17,29 @@ const STYLES = {
 function styleFor(type) {
   return STYLES[type] || STYLES.info
 }
+
+// Publie la hauteur du bandeau dans --buildy-banner-h pour que les drawers /
+// panneaux plein ecran (.banner-safe-top) se decalent dessous et ne se fassent
+// pas masquer leur croix de fermeture. 0px quand aucune notification.
+const bannerEl = ref(null)
+let ro = null
+function publishHeight() {
+  const h = bannerEl.value ? bannerEl.value.offsetHeight : 0
+  document.documentElement.style.setProperty('--buildy-banner-h', `${h}px`)
+}
+onMounted(() => {
+  ro = new ResizeObserver(publishHeight)
+  if (bannerEl.value) ro.observe(bannerEl.value)
+  publishHeight()
+})
+onUnmounted(() => {
+  if (ro) ro.disconnect()
+  document.documentElement.style.setProperty('--buildy-banner-h', '0px')
+})
 </script>
 
 <template>
-  <div class="fixed top-0 inset-x-0 z-200 pointer-events-none flex flex-col">
+  <div ref="bannerEl" class="fixed top-0 inset-x-0 z-200 pointer-events-none flex flex-col">
     <TransitionGroup name="banner">
       <div
         v-for="n in notifications"
