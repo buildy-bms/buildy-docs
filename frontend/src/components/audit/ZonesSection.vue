@@ -405,10 +405,11 @@ onBeforeUnmount(teardownZonesSortable)
   <BaseModal
     v-if="mapZone"
     :title="`Positionner « ${mapZone.name} » sur la carte`"
-    size="lg"
+    size="full"
     @close="mapZone = null"
   >
     <ZoneMapPicker
+      large
       v-model:latitude="mapCoords.latitude"
       v-model:longitude="mapCoords.longitude"
       :kind="mapZone.kind || 'functional'"
