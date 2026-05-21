@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.74",
+      "date": "2026-05-21",
+      "title": "Le bandeau de notification ne masque plus la croix de fermeture",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Croix de fermeture toujours accessible sous le bandeau de notification",
+          "what": "Quand une notification s'affichait en haut de l'écran pendant qu'un panneau plein écran était ouvert (saisie d'audit sur mobile), le bandeau recouvrait la croix de fermeture — impossible de fermer le panneau tant que la notification restait affichée. Le panneau se décale maintenant juste sous le bandeau : la croix reste visible et cliquable.",
+          "where": "Saisie d'audit sur mobile — panneaux d'édition plein écran.",
+          "how_to_test": "Ouvrir un panneau d'édition sur mobile, déclencher une notification → la croix de fermeture reste accessible."
+        }
+      ]
+    },
+    {
       "version": "0.1.73",
       "date": "2026-05-21",
       "title": "Audits BACS : lecture des notes vocales fiabilisée et positionnement du site sur la carte",
