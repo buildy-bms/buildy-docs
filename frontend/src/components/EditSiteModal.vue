@@ -9,6 +9,7 @@
 import { ref, computed } from 'vue'
 import BaseModal from './BaseModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
+import ZoneMapPicker from './ZoneMapPicker.vue'
 import { updateSite } from '@/api'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -90,9 +91,21 @@ async function submit() {
           placeholder="Rechercher une adresse française…"
           @selected="onAddressSelected"
         />
-        <p v-if="form.latitude != null" class="mt-1 text-[11px] text-gray-400">
-          Coordonnées GPS enregistrées — la carte des zones se centrera sur le bâtiment.
-        </p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1.5">
+          Position du site sur la carte
+          <span class="text-gray-400 font-normal">— déplacez le pin si la position issue de l'adresse est imprécise</span>
+        </label>
+        <ZoneMapPicker
+          v-model:latitude="form.latitude"
+          v-model:longitude="form.longitude"
+          kind="site"
+          point-label="le site"
+          :zones="audit.zones || []"
+          :site="{ address: form.address }"
+          :allow-site-edit="false"
+        />
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>

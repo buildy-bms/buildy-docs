@@ -10,6 +10,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { createOptimizerStream, optimizeBuffer, readExifTakenAt, readExifMetadata } = require('../lib/image-optimizer');
 const { transcribeAudio } = require('../lib/transcription');
+const { transcodeToMp3 } = require('../lib/audio');
 
 const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
   'datasheet','manuel_utilisateur','rapport_essais','photo','autre'];
@@ -130,8 +131,8 @@ async function routes(fastify) {
 
     // Pour les images on force JPEG optimise. Pour le reste (audio/PDF/DWG/etc.)
     // on garde l'extension d'origine et on ecrit le stream tel quel.
-    const filename = crypto.randomUUID() + (isImage ? '.jpg' : extFromMime(fileMime, file.filename));
-    const fullPath = path.join(dir, filename);
+    let filename = crypto.randomUUID() + (isImage ? '.jpg' : extFromMime(fileMime, file.filename));
+    let fullPath = path.join(dir, filename);
     let storedMime = isImage ? 'image/jpeg' : (isAudio ? fileMime : (file.mimetype || 'application/octet-stream'));
 
     // Pour les images on bufferise pour pouvoir parser l'EXIF (GPS, date,
@@ -173,6 +174,20 @@ async function routes(fastify) {
         return reply.code(413).send({ detail: `Fichier trop lourd (max ${MAX_BYTES / 1024 / 1024} MB)` });
       }
       throw err;
+    }
+
+    // Note vocale : re-encode en MP3 pour une lecture fiable (les MP4 issus
+    // de MediaRecorder iOS sont souvent illisibles par <audio>). Best-effort :
+    // si ffmpeg échoue, on conserve le fichier d'origine.
+    if (isAudio) {
+      const mp3Name = filename.replace(/\.[^.]+$/, '') + '.mp3';
+      const mp3Path = path.join(dir, mp3Name);
+      if (await transcodeToMp3(fullPath, mp3Path)) {
+        try { fs.unlinkSync(fullPath); } catch { /* ignore */ }
+        filename = mp3Name;
+        fullPath = mp3Path;
+        storedMime = 'audio/mpeg';
+      }
     }
 
     const sizeBytes = fs.statSync(fullPath).size;

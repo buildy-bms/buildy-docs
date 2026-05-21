@@ -7,10 +7,13 @@
  *
  * v-model:latitude / v-model:longitude — coordonnées de la zone éditée.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from 'vue'
 import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import { loadGoogleMaps, ZONE_PIN_COLORS } from '@/lib/google-maps'
-import EditSiteModal from './EditSiteModal.vue'
+// Import paresseux : ZoneMapPicker ↔ EditSiteModal se référencent
+// mutuellement (EditSiteModal embarque une carte). L'import async casse
+// le cycle de dépendances.
+const EditSiteModal = defineAsyncComponent(() => import('./EditSiteModal.vue'))
 
 const props = defineProps({
   latitude: { type: Number, default: null },
@@ -24,6 +27,11 @@ const props = defineProps({
   site: { type: Object, default: () => ({}) },
   // true : carte agrandie (modale dédiée de positionnement).
   large: { type: Boolean, default: false },
+  // false : masque le bouton « Modifier l'adresse du site » (évite la
+  // récursion quand la carte est elle-même dans EditSiteModal).
+  allowSiteEdit: { type: Boolean, default: true },
+  // Libellé de l'entité positionnée, pour le texte d'aide.
+  pointLabel: { type: String, default: 'la zone' },
 })
 const emit = defineEmits(['update:latitude', 'update:longitude'])
 
@@ -143,8 +151,8 @@ async function initMap() {
   map = new google.maps.Map(mapEl.value, {
     center: FRANCE.center,
     zoom: FRANCE.zoom,
-    // Plan routier par défaut ; bascule Plan / Satellite via le contrôle natif.
-    mapTypeId: 'roadmap',
+    // Vue satellite par défaut ; bascule Plan / Satellite via le contrôle natif.
+    mapTypeId: 'hybrid',
     streetViewControl: false,
     mapTypeControl: true,
     fullscreenControl: true,
@@ -169,6 +177,22 @@ watch(() => props.kind, (k) => {
   if (currentMarker) currentMarker.setIcon(pinIcon(ZONE_PIN_COLORS[k] || ZONE_PIN_COLORS.functional))
 })
 
+// Coordonnées modifiées depuis l'extérieur (ex. choix d'une adresse dans
+// EditSiteModal → géocodage) : déplacer le pin et recentrer. Le garde
+// d'égalité évite la boucle avec les emit update:latitude/longitude.
+watch(() => [props.latitude, props.longitude], ([lat, lng]) => {
+  if (status.value !== 'ready' || !map) return
+  if (lat == null || lng == null) {
+    if (currentMarker) { currentMarker.setMap(null); currentMarker = null }
+    return
+  }
+  const pos = currentMarker && currentMarker.getPosition()
+  if (pos && Math.abs(pos.lat() - lat) < 1e-7 && Math.abs(pos.lng() - lng) < 1e-7) return
+  placeCurrent(lat, lng)
+  map.setCenter({ lat, lng })
+  if (map.getZoom() < 16) map.setZoom(18)
+})
+
 onMounted(initMap)
 onBeforeUnmount(() => {
   contextMarkers.forEach(m => m.setMap(null))
@@ -179,7 +203,7 @@ onBeforeUnmount(() => {
 <template>
   <div :class="large ? 'w-[78vw] max-w-240' : ''">
     <!-- Barre d'outils : éditer l'adresse du site (sert au centrage carte) -->
-    <div v-if="status === 'ready' && canEditSite" class="mb-2 flex justify-end">
+    <div v-if="status === 'ready' && canEditSite && allowSiteEdit" class="mb-2 flex justify-end">
       <button type="button" @click="showEditSite = true"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap">
         <Cog6ToothIcon class="w-4 h-4 shrink-0" />
@@ -202,7 +226,7 @@ onBeforeUnmount(() => {
       <span class="text-gray-500 truncate">
         {{ latitude != null
           ? 'Déplacez le pin ou cliquez ailleurs pour ajuster la position.'
-          : 'Cliquez sur la carte pour positionner la zone.' }}
+          : `Cliquez sur la carte pour positionner ${pointLabel}.` }}
       </span>
       <button v-if="latitude != null" type="button" @click="clearPoint"
               class="text-gray-400 hover:text-red-600 whitespace-nowrap shrink-0">
