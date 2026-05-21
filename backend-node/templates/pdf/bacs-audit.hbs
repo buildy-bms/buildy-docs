@@ -311,6 +311,12 @@
     <span class="info-card-value">{{site.address}}</span>
   </div>
   {{/if}}
+  {{#if site.coords_label}}
+  <div class="info-card">
+    <span class="info-card-label">Coordonnées GPS</span>
+    <span class="info-card-value">{{site.coords_label}}</span>
+  </div>
+  {{/if}}
   {{#if isBacs}}
     {{#if document.bacs_total_power_kw}}
     <div class="info-card info-card-accent">
@@ -361,7 +367,7 @@
             <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
             <td>{{categoryLabel}}</td>
             <td>{{zone_name}}</td>
-            <td><strong>{{power_kw}} kW</strong></td>
+            <td><strong>{{#if has_multiple}}{{total_power_kw}}{{else}}{{power_kw}}{{/if}} kW</strong>{{#if has_multiple}} ({{quantity}}&times;{{power_kw}}){{/if}}</td>
           </tr>
         {{/each}}
         <tr class="total-row">
@@ -387,6 +393,12 @@
 
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
+{{#if siteMapDataUrl}}
+<div class="map-figure" style="text-align:center;margin:3mm 0 5mm">
+  <img src="{{siteMapDataUrl}}" alt="Carte du site et des zones"
+       style="max-width:150mm;border:1px solid #e2e8f0;border-radius:6px" />
+</div>
+{{/if}}
 {{#if zones.length}}
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
@@ -452,7 +464,7 @@
                   </td>
                   <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
                   <td>{{energyLabel}}</td>
-                  <td>{{power_kw}}{{#if power_kw}} kW{{/if}}</td>
+                  <td>{{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{/if}}{{/if}}</td>
                   <td>{{roleLabel}}</td>
                   <td>{{commLabel}}</td>
                   <td>{{location}}</td>

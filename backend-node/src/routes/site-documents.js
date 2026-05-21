@@ -426,6 +426,52 @@ async function routes(fastify) {
     }
     return db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(id);
   });
+
+  // POST /site-documents/:id/export-transcript-to-notes — ajoute la
+  // transcription d'une note vocale aux notes (notes_html) de l'element
+  // rattache (zone / systeme / equipement / compteur). Declenche manuellement
+  // depuis le bouton « Exporter vers les notes » (PWA + desktop).
+  fastify.post('/site-documents/:id/export-transcript-to-notes', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const doc = db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(id);
+    if (!doc) return reply.code(404).send({ detail: 'Document non trouve' });
+    if (doc.media_type !== 'audio' || doc.transcript_status !== 'done' || !doc.transcript_text) {
+      return reply.code(400).send({ detail: 'Aucune transcription a exporter' });
+    }
+    // Mappe la FK renseignee vers l'entite cible.
+    const TARGETS = [
+      ['bacs_audit_zone_id', 'zones'],
+      ['bacs_audit_system_id', 'bacs_audit_systems'],
+      ['bacs_audit_device_id', 'bacs_audit_system_devices'],
+      ['bacs_audit_meter_id', 'bacs_audit_meters'],
+    ];
+    const target = TARGETS.find(([fk]) => doc[fk] != null);
+    if (!target) {
+      return reply.code(400).send({ detail: "Cet element n'accepte pas l'export vers des notes" });
+    }
+    const [fk, table] = target;
+    const targetId = doc[fk];
+    const row = db.db.prepare(`SELECT notes_html FROM ${table} WHERE id = ?`).get(targetId);
+    if (!row) return reply.code(404).send({ detail: 'Element cible non trouve' });
+
+    const dateFr = new Date(doc.transcribed_at || doc.uploaded_at || Date.now())
+      .toLocaleDateString('fr-FR');
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const block = `<p data-voice-note="${id}">🎤 <em>Note vocale du ${dateFr}</em> — ${esc(doc.transcript_text)}</p>`;
+
+    // Re-export : remplace le bloc precedent de cette note vocale s'il existe.
+    let html = row.notes_html || '';
+    const existing = new RegExp(`<p data-voice-note="${id}">.*?</p>`, 's');
+    html = existing.test(html) ? html.replace(existing, block) : (html ? html + block : block);
+
+    db.db.prepare(`UPDATE ${table} SET notes_html = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+      .run(html, targetId);
+    db.db.prepare('UPDATE site_documents SET transcript_exported_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(id);
+    db.auditLog.add({ userId: request.authUser?.id, action: 'site_document.transcript_export',
+      payload: { id, target: `${table}#${targetId}` } });
+    return db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(id);
+  });
 }
 
 module.exports = routes;

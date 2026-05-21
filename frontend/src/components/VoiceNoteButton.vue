@@ -13,10 +13,11 @@
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import {
   MicrophoneIcon, StopIcon, TrashIcon, XMarkIcon, SparklesIcon, ArrowPathIcon,
+  ArrowDownTrayIcon, CheckIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
-  transcribeSiteDocument, getSiteDocumentDownloadUrl,
+  transcribeSiteDocument, exportSiteDocumentTranscript, getSiteDocumentDownloadUrl,
 } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useViewport } from '@/composables/useViewport'
@@ -189,6 +190,22 @@ async function transcribeNote(note) {
   }
 }
 
+// Exporte la transcription vers les notes (notes_html) de l'élément rattaché.
+async function exportToNotes(note) {
+  if (note._exporting) return
+  note._exporting = true
+  try {
+    const { data } = await exportSiteDocumentTranscript(note.id)
+    Object.assign(note, data)
+    success('Transcription exportée vers les notes de l\'élément')
+    emit('changed')
+  } catch (err) {
+    notifyError(err.response?.data?.detail || 'Export vers les notes impossible')
+  } finally {
+    note._exporting = false
+  }
+}
+
 async function deleteNote(note) {
   if (!confirm('Supprimer cette note vocale ?')) return
   try {
@@ -329,9 +346,22 @@ const btnCls = computed(() => {
                    :class="['w-full', isMobile ? 'h-12' : 'h-9']"></audio>
 
             <!-- Transcription -->
-            <div v-if="n.transcript_status === 'done'"
-                 class="text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded p-2 whitespace-pre-wrap">
-              {{ n.transcript_text || '(transcription vide)' }}
+            <div v-if="n.transcript_status === 'done'" class="space-y-1.5">
+              <div class="text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded p-2 whitespace-pre-wrap">
+                {{ n.transcript_text || '(transcription vide)' }}
+              </div>
+              <button type="button" @click="exportToNotes(n)" :disabled="n._exporting"
+                      class="inline-flex items-center justify-center gap-1.5 font-medium rounded-lg border whitespace-nowrap transition disabled:opacity-50"
+                      :class="[
+                        n.transcript_exported_at
+                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                          : 'text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100',
+                        isMobile ? 'w-full min-h-11 text-sm' : 'px-2.5 py-1 text-xs']">
+                <component :is="n.transcript_exported_at ? CheckIcon : ArrowDownTrayIcon" class="w-4 h-4 shrink-0" />
+                {{ n._exporting
+                  ? 'Export…'
+                  : (n.transcript_exported_at ? 'Exporté — ré-exporter vers les notes' : 'Exporter vers les notes') }}
+              </button>
             </div>
             <p v-else-if="n.transcript_status === 'processing'"
                class="text-xs text-violet-600 inline-flex items-center gap-1.5">

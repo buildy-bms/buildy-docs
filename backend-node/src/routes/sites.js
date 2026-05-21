@@ -33,6 +33,8 @@ const incomingSyncSchema = z.object({
   customer_name: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   updated_at: z.string().optional(),
   deleted_at: z.string().nullable().optional(),
 });

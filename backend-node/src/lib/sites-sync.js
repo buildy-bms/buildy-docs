@@ -28,6 +28,8 @@ function serializeSite(site) {
     customer_name: site.customer_name,
     address: site.address,
     notes: site.notes,
+    latitude: site.latitude ?? null,
+    longitude: site.longitude ?? null,
     updated_at: site.updated_at,
     deleted_at: site.deleted_at,
   };
@@ -84,6 +86,8 @@ function applyIncomingSync(payload) {
       customerName: payload.customer_name || null,
       address: payload.address || null,
       notes: payload.notes || null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
       syncedAt: new Date().toISOString(),
     });
     if (payload.deleted_at) db.sites.softDelete(created.site_id);
@@ -100,6 +104,8 @@ function applyIncomingSync(payload) {
     customerName: payload.customer_name ?? null,
     address: payload.address ?? null,
     notes: payload.notes ?? null,
+    latitude: payload.latitude ?? null,
+    longitude: payload.longitude ?? null,
     syncedAt: new Date().toISOString(),
     deletedAt: payload.deleted_at || null,
   });

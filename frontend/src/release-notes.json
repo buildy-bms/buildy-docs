@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.75",
+      "date": "2026-05-21",
+      "title": "Audits BACS : transcriptions, carte et puissances dans le rapport PDF",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Exporter une transcription vocale vers les notes",
+          "what": "Une fois une note vocale transcrite, un bouton « Exporter vers les notes » ajoute le texte aux notes de l'élément rattaché (zone, système, équipement, compteur). Comme les notes figurent déjà dans le rapport PDF, la transcription s'y retrouve automatiquement.",
+          "where": "Audit BACS → bouton micro → transcription → bouton « Exporter vers les notes » (ordinateur et mobile).",
+          "how_to_test": "Transcrire une note vocale, cliquer « Exporter vers les notes » : le texte apparaît dans les notes de la zone/du système, et dans le PDF exporté."
+        },
+        {
+          "kind": "feature",
+          "title": "Carte du site dans le rapport PDF",
+          "what": "Le chapitre Zones du rapport PDF affiche une carte (vue satellite) du site avec un repère par zone positionnée. Aucune carte si aucune zone n'est géolocalisée.",
+          "where": "Rapport PDF d'audit BACS → chapitre 2 « Zones fonctionnelles ».",
+          "how_to_test": "Positionner des zones sur la carte, exporter le rapport PDF : la carte s'affiche en tête du chapitre Zones."
+        },
+        {
+          "kind": "improvement",
+          "title": "Coordonnées GPS et puissance × quantité dans le PDF",
+          "what": "Le rapport affiche les coordonnées GPS du site (chapitre Identification). Dans les tableaux d'équipements, la puissance d'un équipement saisi en quantité multiple est affichée en puissance totale installée (ex. « 6 kW (2×3) »).",
+          "where": "Rapport PDF d'audit BACS — chapitres Identification et Systèmes.",
+          "how_to_test": "Exporter le rapport d'un audit dont un site a des coordonnées et un équipement en quantité > 1."
+        },
+        {
+          "kind": "fix",
+          "title": "Coordonnées du site synchronisées avec Fleet Manager",
+          "what": "Les coordonnées GPS d'un site sont désormais incluses dans la synchronisation bidirectionnelle avec Fleet Manager (elles restaient jusqu'ici propres à Buildy Docs).",
+          "where": "Synchronisation des sites Buildy Docs ↔ Fleet Manager.",
+          "how_to_test": "Renseigner l'adresse d'un site, vérifier côté Fleet Manager que les coordonnées arrivent."
+        }
+      ]
+    },
+    {
       "version": "0.1.74",
       "date": "2026-05-21",
       "title": "Le bandeau de notification ne masque plus la croix de fermeture",
