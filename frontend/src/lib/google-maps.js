@@ -38,7 +38,9 @@ export function loadGoogleMaps() {
 
 // Couleur des pins selon le type de zone — cohérent avec les toggles
 // Fonctionnelle (indigo) / Technique (slate) de l'UI des zones.
+// `site` : pin de positionnement du site lui-même (distinct des zones).
 export const ZONE_PIN_COLORS = {
   functional: '#4f46e5', // indigo-600
   technical: '#475569',  // slate-600
+  site: '#0d9488',       // teal-600
 }

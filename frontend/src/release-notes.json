@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.73",
+      "date": "2026-05-21",
+      "title": "Audits BACS : lecture des notes vocales fiabilisée et positionnement du site sur la carte",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Lecture des notes vocales fiabilisée",
+          "what": "Les notes vocales enregistrées sur iPhone restaient parfois illisibles (lecteur qui tourne en rond) : le format audio produit par le navigateur n'était pas lu de façon fiable. Chaque note est désormais ré-encodée en MP3 à l'enregistrement — un format lu partout sans accroc.",
+          "where": "Audit BACS → bouton micro → écouter une note vocale.",
+          "how_to_test": "Enregistrer une note vocale sur iPhone, puis appuyer sur Lecture : le son se lit."
+        },
+        {
+          "kind": "improvement",
+          "title": "Positionner le site sur la carte",
+          "what": "Dans « Modifier le site », une carte permet de placer précisément le site. La position déduite de l'adresse étant parfois imprécise, il suffit de déplacer le pin à l'emplacement exact du bâtiment.",
+          "where": "Audit BACS → Modifier le site → carte « Position du site sur la carte ».",
+          "how_to_test": "Ouvrir « Modifier le site », déplacer le pin du site sur la carte, enregistrer."
+        }
+      ]
+    },
+    {
       "version": "0.1.72",
       "date": "2026-05-21",
       "title": "Audits BACS : carte de positionnement agrandie et lecture des notes vocales corrigée",
@@ -9,9 +30,9 @@
         {
           "kind": "improvement",
           "title": "Carte de positionnement des zones agrandie",
-          "what": "La fenêtre « Positionner sur la carte » s'ouvre désormais en grand format. La carte s'affiche en vue Plan par défaut, avec bascule Plan / Satellite. Un bouton « Modifier l'adresse du site » est accessible directement au-dessus de la carte.",
+          "what": "La fenêtre « Positionner sur la carte » s'ouvre désormais en grand format, avec bascule Plan / Satellite. Un bouton « Modifier l'adresse du site » est accessible directement au-dessus de la carte.",
           "where": "Audit BACS → Zones → icône carte d'une zone.",
-          "how_to_test": "Ouvrir la carte d'une zone : grande fenêtre, vue Plan, bouton « Modifier l'adresse du site » visible en haut."
+          "how_to_test": "Ouvrir la carte d'une zone : grande fenêtre, bouton « Modifier l'adresse du site » visible en haut."
         },
         {
           "kind": "fix",
