@@ -14,7 +14,7 @@
  *   systems : [{ id, zone_id, zone_name, system_category, custom_label, is_bacs }]
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
+import { ArrowsRightLeftIcon, ShareIcon } from '@heroicons/vue/24/outline'
 import { moveBacsDevice, shareBacsDevice } from '@/api'
 import { systemUsageLabel } from '@/lib/audit-options'
 import { useNotification } from '@/composables/useNotification'
@@ -26,7 +26,8 @@ const props = defineProps({
 const emit = defineEmits(['updated'])
 const { error: notifyError, success } = useNotification()
 
-const open = ref(false)
+// Un seul popover ouvert à la fois : 'move' | 'share' | null.
+const openKind = ref(null)
 const saving = ref(false)
 const rootRef = ref(null)
 
@@ -43,6 +44,16 @@ const systemsByZone = computed(() => {
   }
   return [...map.values()]
 })
+
+// Usages proposés au partage : on exclut l'usage principal du device et les
+// usages « non concernés » (catégorie absente de la zone) ; les zones vidées
+// sont retirées. Les usages déjà partagés restent visibles (cochés) pour
+// pouvoir les retirer.
+const shareZones = computed(() =>
+  systemsByZone.value
+    .map(g => ({ ...g, items: g.items.filter(s => s.id !== props.device.system_id && !s.not_concerned) }))
+    .filter(g => g.items.length)
+)
 
 function labelOf(s) { return systemUsageLabel(s) }
 
@@ -77,8 +88,8 @@ async function toggleShare(systemId, checked) {
   }
 }
 
-function toggleOpen() { open.value = !open.value }
-function close() { open.value = false }
+function toggle(kind) { openKind.value = openKind.value === kind ? null : kind }
+function close() { openKind.value = null }
 
 // Popover téléporté au <body> pour échapper aux overflow:hidden des cartes.
 const popupRef = ref(null)
@@ -95,7 +106,7 @@ function onDocClick(e) {
   if (popupRef.value && popupRef.value.contains(e.target)) return
   close()
 }
-watch(open, async (v) => {
+watch(openKind, async (v) => {
   if (v) {
     await nextTick()
     updatePos()
@@ -115,19 +126,30 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="relative inline-flex shrink-0 whitespace-nowrap">
+  <div ref="rootRef" class="relative inline-flex items-center shrink-0 whitespace-nowrap">
+    <!-- Déplacer : change l'usage principal du système -->
     <button
       type="button"
-      @click="toggleOpen"
-      :class="[
-        'relative p-1.5 rounded-md transition',
-        sharedCount > 0
-          ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-          : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100',
-      ]"
-      v-tooltip="'Déplacer vers un autre usage / partager'"
+      @click="toggle('move')"
+      :class="['p-1.5 rounded-md transition',
+               openKind === 'move'
+                 ? 'text-indigo-700 bg-indigo-50'
+                 : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+      v-tooltip="'Déplacer vers un autre usage'"
     >
       <ArrowsRightLeftIcon class="w-4 h-4 shrink-0" />
+    </button>
+    <!-- Partager : rend le système présent dans d'autres usages -->
+    <button
+      type="button"
+      @click="toggle('share')"
+      :class="['relative p-1.5 rounded-md transition',
+               sharedCount > 0 || openKind === 'share'
+                 ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                 : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+      v-tooltip="'Partager dans d\'autres usages'"
+    >
+      <ShareIcon class="w-4 h-4 shrink-0" />
       <span v-if="sharedCount > 0"
             class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[9px] font-semibold bg-emerald-600 text-white rounded-full">
         +{{ sharedCount }}
@@ -137,22 +159,23 @@ onBeforeUnmount(() => {
 
   <Teleport to="body">
     <div
-      v-if="open"
+      v-if="openKind"
       ref="popupRef"
       :style="{ position: 'fixed', top: pos.top + 'px', left: pos.left + 'px', width: DROPDOWN_W + 'px' }"
       class="z-60 bg-white border border-gray-200 rounded-lg shadow-lg text-sm flex flex-col max-h-112"
     >
       <div class="px-3 py-2 border-b border-gray-100 shrink-0">
-        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Déplacer / partager</p>
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+          {{ openKind === 'move' ? 'Déplacer vers' : 'Partager dans d\'autres usages' }}
+        </p>
         <p class="text-[11px] text-gray-400 mt-0.5 truncate">
           {{ device.name || 'Système technique' }}
         </p>
       </div>
 
-      <div class="overflow-y-auto flex-1 py-2 px-3 space-y-3">
+      <div class="overflow-y-auto flex-1 py-2 px-3">
         <!-- Déplacer vers : liste cliquable d'usages, 1 clic = déplacement -->
-        <div>
-          <p class="text-[11px] font-medium text-gray-600 mb-1">Déplacer vers…</p>
+        <template v-if="openKind === 'move'">
           <div v-for="g in systemsByZone" :key="g.zone_id" class="mb-1.5 last:mb-0">
             <p class="text-[10px] uppercase tracking-wider text-gray-400 px-1">{{ g.zone_name }}</p>
             <button
@@ -170,15 +193,15 @@ onBeforeUnmount(() => {
               <span v-if="s.id === device.system_id" class="text-[10px] text-indigo-500 shrink-0">actuel</span>
             </button>
           </div>
-        </div>
+        </template>
 
-        <!-- Aussi présent dans : partage multi-usages -->
-        <div class="border-t border-gray-100 pt-2">
-          <p class="text-[11px] font-medium text-gray-600 mb-1">Aussi présent dans</p>
-          <div v-for="g in systemsByZone" :key="g.zone_id" class="mb-1.5 last:mb-0">
+        <!-- Partager : usages supplémentaires (multi-sélection). Les usages
+             « non concernés » sont masqués. -->
+        <template v-else>
+          <div v-for="g in shareZones" :key="g.zone_id" class="mb-1.5 last:mb-0">
             <p class="text-[10px] uppercase tracking-wider text-gray-400 px-1">{{ g.zone_name }}</p>
             <label
-              v-for="s in g.items.filter(x => x.id !== device.system_id)"
+              v-for="s in g.items"
               :key="s.id"
               class="px-1 py-1 flex items-center gap-2 hover:bg-gray-50 cursor-pointer rounded"
             >
@@ -192,7 +215,10 @@ onBeforeUnmount(() => {
               <span class="text-gray-700 truncate">{{ labelOf(s) }}</span>
             </label>
           </div>
-        </div>
+          <p v-if="!shareZones.length" class="text-[11px] text-gray-400 italic px-1 py-2">
+            Aucun autre usage présent où partager ce système.
+          </p>
+        </template>
       </div>
     </div>
   </Teleport>

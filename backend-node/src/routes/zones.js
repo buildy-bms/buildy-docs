@@ -27,6 +27,8 @@ const createZoneSchema = z.object({
   position: z.number().int().optional(),
   surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
 });
 
 const updateZoneSchema = z.object({
@@ -37,6 +39,8 @@ const updateZoneSchema = z.object({
   surface_m2: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
   notes_html: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
 });
 
 async function routes(fastify) {
@@ -73,6 +77,8 @@ async function routes(fastify) {
       position: body.position || 0,
       notes: body.notes || null,
       surfaceM2: body.surface_m2 ?? null,
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
     });
     db.auditLog.add({
       userId: request.authUser?.id,

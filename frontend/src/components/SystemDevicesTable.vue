@@ -12,6 +12,7 @@ import PhotoDropTr from './PhotoDropTr.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import DeviceMoveShare from './DeviceMoveShare.vue'
+import VoiceNoteButton from './VoiceNoteButton.vue'
 import DataTableSortHeader from './DataTableSortHeader.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
@@ -51,7 +52,12 @@ const auditStore = useAuditStore()
 const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, isThermalCategory } from '@/lib/audit-options'
+
+// Le rôle/niveau (Production / Distribution / Émission / Régulation) ne
+// concerne que les systèmes thermiques (R175-6) : la colonne est verrouillée
+// pour les autres catégories (ventilation, ECS, éclairage, PV, usages manuels).
+const roleLocked = computed(() => !isThermalCategory(props.system?.system_category))
 
 // Devices partagés depuis un autre usage (mig 143) : un device dont le
 // système primaire est ailleurs mais dont les extra_system_ids contiennent
@@ -172,8 +178,12 @@ const selectCls = 'w-full text-sm px-2 py-1 border border-gray-200 rounded-md ho
 const inputAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 placeholder:italic placeholder:text-gray-400'
 const selectAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-center'
 
+// Puissance totale du système : somme des puissances × quantité de chaque
+// équipement (un équipement saisi en quantité 3 compte 3 fois).
 const totalPowerKw = computed(() =>
-  props.devices.reduce((s, d) => s + (Number(d.power_kw) || 0), 0)
+  Math.round(
+    props.devices.reduce((s, d) => s + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0) * 10,
+  ) / 10
 )
 
 async function addDevice() {
@@ -327,7 +337,7 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
             <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
             <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
-            <th>Rôle</th>
+            <th>Rôle(s)</th>
             <DataTableSortHeader sort-key="location" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Localisation</DataTableSortHeader>
             <th>Communication</th>
             <th>État</th>
@@ -403,10 +413,11 @@ async function removeDevice(d) {
                 />
               </div>
             </td>
-            <!-- Rôle -->
+            <!-- Rôle(s) — verrouillé hors chauffage / climatisation (R175-6) -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div class="min-w-32">
                 <SearchableSelect
+                  v-if="!roleLocked"
                   :model-value="Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])"
                   @update:model-value="v => patchDevice(d, { device_role: Array.isArray(v) ? v : [] })"
                   :options="ROLE_OPTIONS"
@@ -414,8 +425,10 @@ async function removeDevice(d) {
                   :clearable="true"
                   :creatable="true"
                   size="sm"
-                  placeholder="Rôle"
+                  placeholder="Rôle(s)"
                 />
+                <span v-else class="block text-center text-gray-300 select-none"
+                      v-tooltip="'Le rôle ne concerne que les systèmes de chauffage et de climatisation'">—</span>
               </div>
             </td>
             <!-- Localisation -->
@@ -495,6 +508,11 @@ async function removeDevice(d) {
                     {{ (photosByDevice[d.id] || []).length }}
                   </span>
                 </button>
+                <VoiceNoteButton
+                  v-if="siteUuid"
+                  :site-uuid="siteUuid"
+                  :attach-to="{ device_id: d.id }"
+                  :label="d.name || d.brand || `Système #${d.id}`" />
                 <DeviceMoveShare
                   :device="d"
                   :systems="documentSystems"

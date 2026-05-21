@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 149;
+const TARGET_VERSION = 151;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5926,6 +5926,34 @@ function runMigrations() {
     db.pragma('user_version = 149');
   }
 
+  if (current < 150) {
+    // Coordonnees GPS des zones (placement sur carte Google Maps) et des
+    // sites (centrage de la carte / capture depuis l'autocompletion BAN).
+    db.exec(`
+      ALTER TABLE zones ADD COLUMN latitude REAL;
+      ALTER TABLE zones ADD COLUMN longitude REAL;
+      ALTER TABLE sites ADD COLUMN latitude REAL;
+      ALTER TABLE sites ADD COLUMN longitude REAL;
+    `);
+    log.info('Migration 150 appliquee : colonnes latitude/longitude (zones + sites)');
+    db.pragma('user_version = 150');
+  }
+
+  if (current < 151) {
+    // Notes vocales : site_documents heberge desormais aussi de l'audio.
+    // media_type discrimine photo/audio sans toucher au CHECK `category`.
+    // transcript_status NULL = jamais transcrit ; transcription a la demande.
+    db.exec(`
+      ALTER TABLE site_documents ADD COLUMN media_type TEXT NOT NULL DEFAULT 'photo';
+      ALTER TABLE site_documents ADD COLUMN duration_seconds REAL;
+      ALTER TABLE site_documents ADD COLUMN transcript_text TEXT;
+      ALTER TABLE site_documents ADD COLUMN transcript_status TEXT;
+      ALTER TABLE site_documents ADD COLUMN transcribed_at TEXT;
+    `);
+    log.info('Migration 151 appliquee : colonnes audio/transcript sur site_documents');
+    db.pragma('user_version = 151');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7801,18 +7829,20 @@ const sites = {
   getByUuid(uuid) {
     return db.prepare(`SELECT ${SITES_SELECT} FROM sites WHERE site_uuid = ?`).get(uuid);
   },
-  create({ siteUuid, name, customerName, address, notes, createdBy, syncedAt }) {
+  create({ siteUuid, name, customerName, address, notes, latitude, longitude, createdBy, syncedAt }) {
     const result = db.prepare(`
-      INSERT INTO sites (site_uuid, name, customer_name, address, notes, created_by, updated_by, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sites (site_uuid, name, customer_name, address, notes, latitude, longitude, created_by, updated_by, synced_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       siteUuid, name, customerName || null, address || null, notes || null,
+      latitude ?? null, longitude ?? null,
       createdBy || null, createdBy || null, syncedAt || null,
     );
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['name', 'customer_name', 'address', 'notes', 'synced_at', 'deleted_at'];
+    const allowed = ['name', 'customer_name', 'address', 'notes', 'latitude', 'longitude',
+                     'synced_at', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
@@ -7871,15 +7901,17 @@ const zones = {
   getById(id) {
     return db.prepare(`SELECT ${ZONES_SELECT} FROM zones WHERE id = ?`).get(id);
   },
-  create({ siteId, name, nature, kind, position, surfaceM2, notes }) {
+  create({ siteId, name, nature, kind, position, surfaceM2, notes, latitude, longitude }) {
     const result = db.prepare(`
-      INSERT INTO zones (site_id, name, nature, kind, position, surface_m2, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(siteId, name, nature || null, kind || 'functional', position || 0, surfaceM2 ?? null, notes || null);
+      INSERT INTO zones (site_id, name, nature, kind, position, surface_m2, notes, latitude, longitude)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(siteId, name, nature || null, kind || 'functional', position || 0, surfaceM2 ?? null, notes || null,
+           latitude ?? null, longitude ?? null);
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
-    const allowed = ['name', 'nature', 'kind', 'position', 'surface_m2', 'notes', 'notes_html', 'deleted_at'];
+    const allowed = ['name', 'nature', 'kind', 'position', 'surface_m2', 'notes', 'notes_html',
+                     'latitude', 'longitude', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;

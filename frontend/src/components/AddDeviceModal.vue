@@ -1,26 +1,39 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
+import { createBacsDevice } from '@/api'
+import { isThermalCategory } from '@/lib/audit-options'
+import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
+  systemId: { type: Number, required: true },
   systemLabel: { type: String, required: true },
+  systemCategory: { type: String, default: null },
   zoneName: { type: String, default: '' },
   energyOptions: { type: Array, required: true },
   roleOptions: { type: Array, required: true },
   commOptions: { type: Array, required: true },
 })
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits(['close', 'created'])
+const { success, error } = useNotification()
 
-const form = ref({
+// Le niveau (Production / Distribution / Émission / Régulation) découle du
+// découpage thermique R175-6 : champ masqué et non requis hors chauffage /
+// climatisation.
+const roleApplies = computed(() => isThermalCategory(props.systemCategory))
+
+const EMPTY_FORM = () => ({
   name: '', brand: '', model_reference: '', power_kw: null,
   // Multi-rôle (mig 117). communication_protocols = JSON array (multi),
   // cohérent avec le tableau des équipements (plus de champ mono-enum).
   energy_source: null, device_role: [], communication_protocols: null,
   location: '', notes: '',
 })
+const form = ref(EMPTY_FORM())
 const submitting = ref(false)
+const nameInput = ref(null)
 
 // Nombre de protocoles sélectionnés (communication_protocols = JSON string).
 function protocolCount() {
@@ -34,7 +47,7 @@ const hasIdentity = () => !!(form.value.name?.trim() || form.value.brand?.trim()
 const canSubmit = () =>
   hasIdentity() &&
   !!form.value.energy_source &&
-  Array.isArray(form.value.device_role) && form.value.device_role.length > 0 &&
+  (!roleApplies.value || (Array.isArray(form.value.device_role) && form.value.device_role.length > 0)) &&
   protocolCount() > 0
 
 // Liste des champs obligatoires manquants (affichée sous le bouton grisé).
@@ -42,17 +55,37 @@ const missingFields = () => {
   const out = []
   if (!hasIdentity()) out.push('un nom, une marque ou une référence')
   if (!form.value.energy_source) out.push('l\'énergie')
-  if (!(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le niveau')
+  if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le niveau')
   if (protocolCount() === 0) out.push('le(s) protocole(s)')
   return out
 }
 
-async function submit() {
+// keepContext=true : « Enregistrer et ajouter un autre ». Réinitialise
+// l'identité du système mais conserve énergie / niveau / protocoles
+// (généralement communs aux équipements d'un même système) et garde la
+// modale ouverte. Sinon : ferme la modale après la création.
+async function submit(keepContext = false) {
   if (!canSubmit() || submitting.value) return
   submitting.value = true
   try {
-    await emit('submit', { ...form.value })
-    emit('close')
+    await createBacsDevice(props.systemId, { ...form.value })
+    emit('created')
+    if (keepContext) {
+      const kept = {
+        energy_source: form.value.energy_source,
+        device_role: [...form.value.device_role],
+        communication_protocols: form.value.communication_protocols,
+      }
+      form.value = { ...EMPTY_FORM(), ...kept }
+      success('Système ajouté — saisissez le suivant')
+      await nextTick()
+      nameInput.value?.focus()
+    } else {
+      success('Système ajouté')
+      emit('close')
+    }
+  } catch (e) {
+    error(e.response?.data?.detail || 'Création du système impossible')
   } finally {
     submitting.value = false
   }
@@ -61,11 +94,11 @@ async function submit() {
 
 <template>
   <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
-    <form @submit.prevent="submit" class="space-y-4">
+    <form @submit.prevent="submit(false)" class="space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Nom du système</label>
-          <input v-model="form.name" type="text" autofocus
+          <input v-model="form.name" type="text" autofocus ref="nameInput"
                  placeholder="ex : Chaudière gaz principale, Groupe DRV…"
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
@@ -99,7 +132,7 @@ async function submit() {
                  placeholder="—"
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
-        <div>
+        <div v-if="roleApplies">
           <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x) <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.device_role"
@@ -129,11 +162,15 @@ async function submit() {
       </p>
       <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2">
         <button type="button" @click="emit('close')"
-                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
+                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm text-gray-700 hover:bg-gray-100 rounded-lg whitespace-nowrap">
           Annuler
         </button>
+        <button type="button" @click="submit(true)" :disabled="!canSubmit() || submitting"
+                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-lg border border-emerald-200 whitespace-nowrap">
+          Enregistrer et ajouter un autre
+        </button>
         <button type="submit" :disabled="!canSubmit() || submitting"
-                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm">
+                class="px-4 py-2 min-h-11 sm:min-h-0 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm whitespace-nowrap">
           {{ submitting ? 'Création…' : 'Ajouter le système' }}
         </button>
       </div>

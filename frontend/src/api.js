@@ -544,6 +544,11 @@ export const uploadSiteDocument = (siteUuid, formData, params) =>
 export const updateSiteDocument = (id, data) => api.patch(`/site-documents/${id}`, data)
 export const deleteSiteDocument = (id) => api.delete(`/site-documents/${id}`)
 export const getSiteDocumentDownloadUrl = (id) => `/api/site-documents/${id}/download`
+// Notes vocales : transcription a la demande (OpenAI Whisper / gpt-4o-transcribe)
+export const transcribeSiteDocument = (id) => api.post(`/site-documents/${id}/transcribe`)
+
+// ── Configuration publique (cle Google Maps restreinte par referent) ──
+export const getPublicConfig = () => api.get('/public-config')
 
 // ── Site credentials ──
 export const listSiteCredentials = (siteUuid) => api.get(`/sites/${siteUuid}/credentials`)

@@ -13,6 +13,7 @@ import MobileSelectSheet from './MobileSelectSheet.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 
 const audit = useAuditStore()
 const { document, meters, zones } = storeToRefs(audit)
@@ -242,6 +243,16 @@ function toggleProtocol(p) {
              class="bg-white rounded-xl border border-gray-200 px-4 py-3">
           <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
           <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ meter_id: editing.meter.id }"
+            :label="(editing.meter.zone_name || 'Général') + ' / ' + usageLabel(editing.meter.usage)"
+            size="md"
+          />
+        </div>
+        <div v-if="editing?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Notes vocales</p>
+          <VoiceNoteButton
             :site-uuid="document.site_uuid"
             :attach-to="{ meter_id: editing.meter.id }"
             :label="(editing.meter.zone_name || 'Général') + ' / ' + usageLabel(editing.meter.usage)"

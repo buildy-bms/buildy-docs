@@ -9,6 +9,7 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -306,6 +307,11 @@ onBeforeUnmount(teardownSortables)
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
                     <BacsPhotoButton
+                      v-if="document?.site_uuid && s.present"
+                      :site-uuid="document.site_uuid"
+                      :attach-to="{ system_id: s.id }"
+                      :label="(usageLabel(s)) + ' - ' + g.zone_name" />
+                    <VoiceNoteButton
                       v-if="document?.site_uuid && s.present"
                       :site-uuid="document.site_uuid"
                       :attach-to="{ system_id: s.id }"

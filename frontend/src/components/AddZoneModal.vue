@@ -2,16 +2,21 @@
 import { ref, computed, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
+import ZoneMapPicker from './ZoneMapPicker.vue'
 import { isTechnicalNature } from '@/lib/audit-options'
 
 const props = defineProps({
   zoneNatures: { type: Array, required: true },
   // Type pré-sélectionné selon la card d'origine ('functional' | 'technical').
   kind: { type: String, default: 'functional' },
+  // Zones existantes du site (pins de contexte sur la carte).
+  zones: { type: Array, default: () => [] },
+  // Site rattaché { address, latitude, longitude } — centrage de la carte.
+  site: { type: Object, default: () => ({}) },
 })
 const emit = defineEmits(['close', 'submit'])
 
-const form = ref({ name: '', nature: null, surface_m2: null, kind: props.kind })
+const form = ref({ name: '', nature: null, surface_m2: null, kind: props.kind, latitude: null, longitude: null })
 const submitting = ref(false)
 const isTechnical = computed(() => form.value.kind === 'technical')
 
@@ -40,7 +45,7 @@ async function submit() {
 
 <template>
   <BaseModal :title="isTechnical ? 'Ajouter une zone technique' : 'Ajouter une zone fonctionnelle'"
-             size="md" :dismiss-on-backdrop="false" @close="emit('close')">
+             size="lg" :dismiss-on-backdrop="false" @close="emit('close')">
     <form @submit.prevent="submit" class="space-y-4">
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Nom de la zone *</label>
@@ -84,6 +89,18 @@ async function submit() {
           type="number" min="0" step="1"
           placeholder="—"
           class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">
+          Position sur la carte <span class="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <ZoneMapPicker
+          v-model:latitude="form.latitude"
+          v-model:longitude="form.longitude"
+          :kind="form.kind"
+          :zones="zones"
+          :site="site"
         />
       </div>
       <div class="flex items-center justify-end gap-2 pt-2">

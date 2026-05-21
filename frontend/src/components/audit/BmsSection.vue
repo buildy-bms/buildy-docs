@@ -6,6 +6,7 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import PhotoDropzone from '@/components/PhotoDropzone.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
 import BmsComponentsTable from '@/components/BmsComponentsTable.vue'
@@ -159,6 +160,11 @@ function hasNotes(html) {
             :site-uuid="document.site_uuid"
             :attach-to="{ bms_document_id: bms.document_id }"
             label="GTB" size="md" />
+          <VoiceNoteButton
+            v-if="document?.site_uuid && bms.document_id"
+            :site-uuid="document.site_uuid"
+            :attach-to="{ bms_document_id: bms.document_id }"
+            label="GTB" size="md" />
         </template>
       </SectionHeader>
     </template>
@@ -294,11 +300,15 @@ function hasNotes(html) {
                 </p>
                 <p class="mt-1 text-[11px] text-gray-400">PDF, Word, schéma, image…</p>
               </div>
-              <div v-if="document?.site_uuid" class="mt-2 flex justify-end">
+              <div v-if="document?.site_uuid" class="mt-2 flex justify-end gap-1">
                 <BacsPhotoButton
                   :site-uuid="document.site_uuid"
                   :attach-to="{ bms_document_id: bms.document_id }"
                   label="Photo du schéma" size="sm" />
+                <VoiceNoteButton
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ bms_document_id: bms.document_id }"
+                  label="GTB" size="sm" />
               </div>
             </div>
             <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">

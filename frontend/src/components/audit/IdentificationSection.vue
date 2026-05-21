@@ -115,7 +115,10 @@ const r175_6_applicable = computed(() => {
                   {{ d.name || (d.brand ? d.brand : '—') }}{{ d.model_reference ? ' / ' + d.model_reference : '' }}
                   <span class="text-gray-400">({{ d.zone_name || '—' }})</span>
                 </span>
-                <span class="font-semibold whitespace-nowrap">{{ d.power_kw }} kW</span>
+                <span class="font-semibold whitespace-nowrap">
+                  <template v-if="(d.quantity || 1) > 1">{{ d.quantity }} × {{ d.power_kw }} = {{ Math.round((Number(d.power_kw) || 0) * d.quantity * 10) / 10 }} kW</template>
+                  <template v-else>{{ d.power_kw }} kW</template>
+                </span>
               </li>
             </ul>
             <p class="mt-2 pt-1.5 border-t border-gray-200 flex justify-between font-semibold">

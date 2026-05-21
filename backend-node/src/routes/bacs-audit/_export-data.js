@@ -112,7 +112,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Enrichit systems avec devices + sums et group par zone
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
-    const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0), 0);
+    const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
     return {
       ...s,
       categoryLabel: s.is_bacs === 0
@@ -373,11 +373,12 @@ async function buildBacsAuditExportData(af, opts = {}) {
     .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
     .map(d => ({
       name: d.name, brand: d.brand, model_reference: d.model_reference,
-      power_kw: d.power_kw, zone_name: d.zone_name,
+      power_kw: d.power_kw, quantity: d.quantity, zone_name: d.zone_name,
       category: d.system_category,
       categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
     }));
-  const heatingCoolingTotal = heatingCoolingBreakdown.reduce((s, d) => s + (Number(d.power_kw) || 0), 0);
+  const heatingCoolingTotal = heatingCoolingBreakdown.reduce(
+    (s, d) => s + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
 
   // Boilerplate methodologie + disclaimers : lit la DB (admin-editable),
   // fallback sur les fichiers .js statiques si la table est vide.
@@ -427,7 +428,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
   for (const d of devices) {
     if (d.power_kw == null) continue;
     const cat = d.system_category || 'autre';
-    powerByUsage.set(cat, (powerByUsage.get(cat) || 0) + Number(d.power_kw));
+    powerByUsage.set(cat, (powerByUsage.get(cat) || 0) + Number(d.power_kw) * (Number(d.quantity) || 1));
   }
   const USAGE_ORDER = ['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor'];
   const barItems = USAGE_ORDER

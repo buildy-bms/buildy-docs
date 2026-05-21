@@ -19,8 +19,14 @@ const searchQuery = ref('')
 
 const showForm = ref(false)
 const editing = ref(null) // null = création, sinon site complet
-const form = ref({ name: '', customer_name: '', address: '', notes: '' })
+const form = ref({ name: '', customer_name: '', address: '', notes: '', latitude: null, longitude: null })
 const submitting = ref(false)
+
+// Capture les coordonnées GPS renvoyées par l'autocomplétion d'adresse (BAN).
+function onAddressSelected(s) {
+  form.value.latitude = s?.lat ?? null
+  form.value.longitude = s?.lng ?? null
+}
 
 function normalize(s) {
   return (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -50,7 +56,7 @@ async function refresh() {
 
 function openCreate() {
   editing.value = null
-  form.value = { name: '', customer_name: '', address: '', notes: '' }
+  form.value = { name: '', customer_name: '', address: '', notes: '', latitude: null, longitude: null }
   showForm.value = true
 }
 
@@ -61,6 +67,8 @@ function openEdit(site) {
     customer_name: site.customer_name || '',
     address: site.address || '',
     notes: site.notes || '',
+    latitude: site.latitude ?? null,
+    longitude: site.longitude ?? null,
   }
   showForm.value = true
 }
@@ -275,6 +283,7 @@ onMounted(refresh)
           <AddressAutocomplete
             v-model="form.address"
             placeholder="ex : 42 rue de la Tête d'Or, 69006 Lyon"
+            @selected="onAddressSelected"
           />
         </div>
         <div>

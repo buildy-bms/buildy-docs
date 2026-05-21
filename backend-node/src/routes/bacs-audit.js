@@ -1081,7 +1081,7 @@ async function routes(fastify) {
     if (!assertBacsAuditExists(id, request, reply)) return;
     const rows = db.db.prepare(`
       SELECT s.system_category AS category,
-             COALESCE(SUM(d.power_kw), 0) AS total_kw,
+             COALESCE(SUM(d.power_kw * COALESCE(d.quantity, 1)), 0) AS total_kw,
              COUNT(d.id) AS device_count
       FROM bacs_audit_systems s
       LEFT JOIN bacs_audit_system_devices d ON d.system_id = s.id
@@ -1093,7 +1093,7 @@ async function routes(fastify) {
     const heatingCooling = (byCategory.heating?.total_kw || 0) + (byCategory.cooling?.total_kw || 0);
     // Detail des devices comptes pour le total chauffage + clim (transparence)
     const breakdown = db.db.prepare(`
-      SELECT d.id, d.name, d.brand, d.model_reference, d.power_kw,
+      SELECT d.id, d.name, d.brand, d.model_reference, d.power_kw, d.quantity,
              s.system_category, z.name AS zone_name
       FROM bacs_audit_system_devices d
       JOIN bacs_audit_systems s ON s.id = d.system_id

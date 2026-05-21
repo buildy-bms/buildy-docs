@@ -4,10 +4,13 @@ import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
 import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import BaseModal from '@/components/BaseModal.vue'
+import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
 import { useTableSort } from '@/composables/useTableSort'
@@ -32,7 +35,7 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { document, zones } = storeToRefs(audit)
+const { document, zones, site } = storeToRefs(audit)
 
 const isTechnical = computed(() => props.kind === 'technical')
 
@@ -100,6 +103,22 @@ async function dupZone(z) {
     name: `${z.name} (copie)`, nature: z.nature,
     surface_m2: z.surface_m2, kind: z.kind || 'functional',
   })
+}
+
+// Positionnement de la zone sur la carte Google Maps (modale dédiée).
+const mapZone = ref(null)
+const mapCoords = ref({ latitude: null, longitude: null })
+function openZoneMap(z) {
+  mapCoords.value = { latitude: z.latitude ?? null, longitude: z.longitude ?? null }
+  mapZone.value = z
+}
+async function saveZoneMap() {
+  if (!mapZone.value) return
+  await patchZone(mapZone.value, {
+    latitude: mapCoords.value.latitude,
+    longitude: mapCoords.value.longitude,
+  })
+  mapZone.value = null
 }
 
 function refreshAuditData() { return audit.refreshAuditCore() }
@@ -266,13 +285,28 @@ onBeforeUnmount(teardownZonesSortable)
               </button>
             </td>
             <td>
-              <BacsPhotoButton
-                v-if="document?.site_uuid"
-                :site-uuid="document.site_uuid"
-                :attach-to="{ zone_id: z.zone_id }"
-                :label="z.name" />
+              <div class="inline-flex items-center gap-0.5">
+                <BacsPhotoButton
+                  v-if="document?.site_uuid"
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ zone_id: z.zone_id }"
+                  :label="z.name" />
+                <VoiceNoteButton
+                  v-if="document?.site_uuid"
+                  :site-uuid="document.site_uuid"
+                  :attach-to="{ zone_id: z.zone_id }"
+                  :label="z.name" />
+              </div>
             </td>
             <td class="whitespace-nowrap">
+              <button @click="openZoneMap(z)"
+                      :class="['p-1.5 rounded transition',
+                               z.latitude != null
+                                 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                                 : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50']"
+                      v-tooltip="z.latitude != null ? 'Position sur la carte' : 'Positionner sur la carte'">
+                <MapPinIcon class="w-4 h-4" />
+              </button>
               <button @click="dupZone(z)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
                 <DocumentDuplicateIcon class="w-4 h-4" />
               </button>
@@ -345,6 +379,12 @@ onBeforeUnmount(teardownZonesSortable)
             :attach-to="{ zone_id: z.zone_id }"
             :label="z.name"
             class="flex-1" />
+          <button @click="openZoneMap(z)"
+                  class="tap-target inline-flex items-center justify-center rounded-lg border border-gray-200 px-3"
+                  :class="z.latitude != null ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'"
+                  aria-label="Positionner sur la carte">
+            <MapPinIcon class="w-4 h-4" />
+          </button>
           <button @click="dupZone(z)"
                   class="tap-target inline-flex items-center justify-center text-gray-400 hover:text-indigo-600 rounded-lg border border-gray-200 px-3"
                   aria-label="Dupliquer">
@@ -360,4 +400,31 @@ onBeforeUnmount(teardownZonesSortable)
       </div>
     </div>
   </CollapsibleSection>
+
+  <!-- Positionnement de la zone sur la carte Google Maps -->
+  <BaseModal
+    v-if="mapZone"
+    :title="`Positionner « ${mapZone.name} » sur la carte`"
+    size="lg"
+    @close="mapZone = null"
+  >
+    <ZoneMapPicker
+      v-model:latitude="mapCoords.latitude"
+      v-model:longitude="mapCoords.longitude"
+      :kind="mapZone.kind || 'functional'"
+      :zones="zones"
+      :current-zone-id="mapZone.zone_id"
+      :site="site || {}"
+    />
+    <template #footer>
+      <button type="button" @click="mapZone = null"
+              class="px-4 py-2 text-sm rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
+        Annuler
+      </button>
+      <button type="button" @click="saveZoneMap"
+              class="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+        Enregistrer la position
+      </button>
+    </template>
+  </BaseModal>
 </template>

@@ -132,7 +132,7 @@ const buttonCls = computed(() => {
         v-if="open"
         ref="popoverEl"
         :style="{ top: popoverPos.top + 'px', left: popoverPos.left + 'px', width: popoverPos.width + 'px' }"
-        class="fixed z-50 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1"
+        class="fixed z-115 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl py-1"
       >
         <div class="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 sticky top-0 bg-white">
           <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Protocole(s)</span>

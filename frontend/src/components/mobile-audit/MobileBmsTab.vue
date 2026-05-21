@@ -12,6 +12,7 @@ import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MobileBmsTopicNoteButton from './MobileBmsTopicNoteButton.vue'
 
 const audit = useAuditStore()
@@ -117,6 +118,16 @@ const USAGES = [
          class="bg-white rounded-2xl border border-gray-200 p-4">
       <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos GTB</p>
       <BacsPhotoButton
+        :site-uuid="document.site_uuid"
+        :attach-to="{ bms_document_id: bms.document_id }"
+        label="GTB"
+        size="md"
+      />
+    </div>
+    <div v-if="document?.site_uuid && bms.document_id"
+         class="bg-white rounded-2xl border border-gray-200 p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes vocales GTB</p>
+      <VoiceNoteButton
         :site-uuid="document.site_uuid"
         :attach-to="{ bms_document_id: bms.document_id }"
         label="GTB"

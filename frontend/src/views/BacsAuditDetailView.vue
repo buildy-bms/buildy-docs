@@ -20,7 +20,7 @@ import {
   getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsTablesPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
   listZones, createZone, updateZone, deleteZone,
-  getBacsDevices, getBacsPowerSummary, updateBacsDevice, createBacsDevice,
+  getBacsDevices, getBacsPowerSummary, updateBacsDevice,
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
   updateBacsAuditSynthesis, generateBacsAuditSynthesis,
   duplicateZone, duplicateBacsMeter,
@@ -45,6 +45,7 @@ import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
 import EditAuditMetadataModal from '@/components/EditAuditMetadataModal.vue'
+import EditSiteModal from '@/components/EditSiteModal.vue'
 // Sections lourdes : lazy-loaded pour réduire le bundle initial du
 // chemin /bacs-audit/:id. Pattern repris de AfDetailView (PR #52).
 // Le tree est paint avant que ces composants chargent (~30 % de gain
@@ -85,6 +86,7 @@ const saveStatus = useGlobalSaveStatus()
 const { isNarrow } = useViewport()
 const showShare = ref(false)
 const showEditMetadata = ref(false)
+const showEditSite = ref(false)
 
 async function onMetadataSaved(updated) {
   showEditMetadata.value = false
@@ -178,16 +180,6 @@ const libraryDevicePickerSystem = ref(null) // { id, system_category, zone_name 
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
 import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES } from '@/lib/audit-options'
 
-async function submitAddDevice(payload) {
-  if (!addDeviceModalSystem.value) return
-  try {
-    await createBacsDevice(addDeviceModalSystem.value.id, payload)
-    await refreshAuditData()
-    success('Équipement ajouté')
-  } catch (e) {
-    error(e.response?.data?.detail || 'Création de l\'équipement impossible')
-  }
-}
 const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
 watch(showNotConcernedSystems, v => localStorage.setItem('bacs-show-not-concerned', v ? '1' : '0'))
 const hiddenNotConcernedCount = computed(() =>
@@ -560,6 +552,8 @@ async function addZone(payload) {
       nature: data.nature,
       kind: data.kind || 'functional',
       surface_m2: data.surface_m2 ?? null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
     })
     const z = await listZones(document.value.site_id)
     zones.value = z.data
@@ -611,7 +605,7 @@ const STEP_DEFINITIONS = [
     description: 'Site et applicabilite R175-2 renseignes.',
     isComplete: () => !!site.value && !!document.value?.bacs_applicability_status },
   { key: 'zones',
-    label: 'Zones',
+    label: 'Zones fonctionnelles',
     description: 'Au moins une zone fonctionnelle saisie.',
     isComplete: () => zones.value.some(z => (z.kind || 'functional') !== 'technical') },
   { key: 'technical-zones',
@@ -1267,6 +1261,11 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
               <PencilSquareIcon class="w-4 h-4 text-gray-400 shrink-0" />
               Modifier les paramètres
             </button>
+            <button v-if="auditStore.site" @click="showSettingsMenu = false; showEditSite = true"
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+              <MapPinIcon class="w-4 h-4 text-gray-400 shrink-0" />
+              Modifier le site
+            </button>
             <button @click="showSettingsMenu = false; showShare = true"
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
               <UserPlusIcon class="w-4 h-4 text-gray-400 shrink-0" />
@@ -1543,6 +1542,8 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       v-if="showAddZoneModal"
       :zone-natures="ZONE_NATURES"
       :kind="addZoneKind"
+      :zones="zones"
+      :site="auditStore.site"
       @close="showAddZoneModal = false"
       @submit="addZone"
     />
@@ -1556,13 +1557,15 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
     />
     <AddDeviceModal
       v-if="addDeviceModalSystem"
+      :system-id="addDeviceModalSystem.id"
       :system-label="addDeviceModalSystem.is_bacs === 0 ? (addDeviceModalSystem.custom_label || 'Usage') : (SYSTEM_LABEL[addDeviceModalSystem.system_category] || addDeviceModalSystem.system_category)"
+      :system-category="addDeviceModalSystem.system_category"
       :zone-name="addDeviceModalSystem.zone_name || ''"
       :energy-options="ENERGY_OPTIONS"
       :role-options="ROLE_OPTIONS"
       :comm-options="COMM_OPTIONS"
       @close="addDeviceModalSystem = null"
-      @submit="submitAddDevice"
+      @created="refreshAuditData"
     />
     <LibraryDevicePicker
       v-if="libraryDevicePickerSystem"
@@ -1610,6 +1613,12 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       :audit="document"
       @close="showEditMetadata = false"
       @saved="onMetadataSaved"
+    />
+
+    <EditSiteModal
+      v-if="showEditSite && auditStore.site"
+      :site="auditStore.site"
+      @close="showEditSite = false"
     />
 
     <!-- Bottom navigation mobile/tablette portrait : raccourcis vers les sections principales -->
