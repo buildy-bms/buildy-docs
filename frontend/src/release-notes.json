@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.80",
+      "date": "2026-05-22",
+      "title": "Ajuster la position GPS du site en déplaçant le pin sur la carte",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Pin du site pré-placé depuis l'adresse, déplaçable",
+          "what": "À l'ouverture de « Modifier le site », l'adresse est géolocalisée et un pin apparaît directement sur la carte. Il suffit de le déplacer si la position issue de l'adresse n'est pas assez précise — utile quand l'adresse est approximative (lieu-dit, zone d'activité). La position retenue est celle utilisée pour la vue satellite du rapport PDF.",
+          "where": "Audit BACS → Plus → Modifier le site ; ou Mes Sites → fiche d'un site → Modifier le site.",
+          "how_to_test": "Ouvrir « Modifier le site » sur un site sans coordonnées : le pin apparaît à l'adresse. Le déplacer, enregistrer : la position est conservée."
+        }
+      ]
+    },
+    {
       "version": "0.1.79",
       "date": "2026-05-22",
       "title": "Rapport PDF : la vue satellite réapparaît même sans coordonnées du site",

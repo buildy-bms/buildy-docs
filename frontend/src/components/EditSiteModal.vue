@@ -6,10 +6,11 @@
  * La table `sites` est la source de vérité de l'adresse — la synchro
  * bidirectionnelle avec Fleet Manager propage automatiquement.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import BaseModal from './BaseModal.vue'
 import AddressAutocomplete from './AddressAutocomplete.vue'
 import ZoneMapPicker from './ZoneMapPicker.vue'
+import { loadGoogleMaps } from '@/lib/google-maps'
 import { updateSite } from '@/api'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -39,6 +40,23 @@ function onAddressSelected(s) {
   form.value.latitude = s?.lat ?? null
   form.value.longitude = s?.lng ?? null
 }
+
+// Le site a une adresse mais pas encore de coordonnées : on géocode
+// l'adresse au chargement pour pré-placer le pin sur la carte. L'auditeur
+// peut ensuite le déplacer si la position issue de l'adresse est imprécise.
+onMounted(async () => {
+  if (form.value.latitude != null || !form.value.address) return
+  try {
+    const google = await loadGoogleMaps()
+    const { results } = await new google.maps.Geocoder()
+      .geocode({ address: form.value.address, region: 'FR' })
+    const loc = results?.[0]?.geometry?.location
+    if (loc && form.value.latitude == null) {
+      form.value.latitude = loc.lat()
+      form.value.longitude = loc.lng()
+    }
+  } catch { /* repli silencieux : le pin reste à poser manuellement */ }
+})
 
 async function submit() {
   if (!canSubmit.value) return
