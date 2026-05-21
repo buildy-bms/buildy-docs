@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.77",
+      "date": "2026-05-22",
+      "title": "Fiche de site : galerie photos et identifiants d'accès",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Galerie photos du site",
+          "what": "La fiche d'un site affiche désormais toutes ses photos en grille, classées de la plus récente à la plus ancienne (date de prise de vue issue des métadonnées de la photo, sinon date d'import). Un clic ouvre la photo en grand avec navigation au clavier ; les photos géolocalisées sont signalées.",
+          "where": "Mes Sites → fiche d'un site → section « Photos ».",
+          "how_to_test": "Ouvrir la fiche d'un site ayant des photos : la galerie s'affiche, cliquer une vignette l'ouvre en plein écran."
+        },
+        {
+          "kind": "feature",
+          "title": "Identifiants d'accès depuis la fiche de site",
+          "what": "Les identifiants techniques d'un site (accès web, SSH, VPN, SNMP, bureau à distance) sont gérables directement depuis sa fiche : ajout, modification, révélation et suppression. Les mots de passe restent chiffrés ; leur affichage est tracé dans l'historique.",
+          "where": "Mes Sites → fiche d'un site → section « Identifiants d'accès ».",
+          "how_to_test": "Ouvrir la fiche d'un site, ajouter un identifiant, le révéler : le mot de passe s'affiche, l'action est journalisée."
+        }
+      ]
+    },
+    {
       "version": "0.1.76",
       "date": "2026-05-22",
       "title": "Page détail d'un site : tous ses documents et zones au même endroit",
