@@ -72,6 +72,13 @@ const routes = [
     component: () => import('@/views/SitesListView.vue'),
   },
   {
+    path: '/sites/:uuid',
+    name: 'site-detail',
+    meta: { title: 'Site' },
+    component: () => import('@/views/SiteDetailView.vue'),
+    props: true,
+  },
+  {
     path: '/release-notes',
     name: 'release-notes',
     meta: { title: 'Notes de version' },

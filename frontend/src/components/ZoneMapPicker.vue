@@ -32,6 +32,8 @@ const props = defineProps({
   allowSiteEdit: { type: Boolean, default: true },
   // Libellé de l'entité positionnée, pour le texte d'aide.
   pointLabel: { type: String, default: 'la zone' },
+  // true : carte en lecture seule (aucun placement de pin, pas d'aide).
+  readonly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:latitude', 'update:longitude'])
 
@@ -157,13 +159,15 @@ async function initMap() {
     mapTypeControl: true,
     fullscreenControl: true,
   })
-  map.addListener('click', (e) => {
-    const lat = e.latLng.lat()
-    const lng = e.latLng.lng()
-    placeCurrent(lat, lng)
-    emit('update:latitude', lat)
-    emit('update:longitude', lng)
-  })
+  if (!props.readonly) {
+    map.addListener('click', (e) => {
+      const lat = e.latLng.lat()
+      const lng = e.latLng.lng()
+      placeCurrent(lat, lng)
+      emit('update:latitude', lat)
+      emit('update:longitude', lng)
+    })
+  }
   status.value = 'ready'
   renderContextMarkers()
   if (props.latitude != null && props.longitude != null) {
@@ -203,7 +207,7 @@ onBeforeUnmount(() => {
 <template>
   <div :class="large ? 'w-[78vw] max-w-240' : ''">
     <!-- Barre d'outils : éditer l'adresse du site (sert au centrage carte) -->
-    <div v-if="status === 'ready' && canEditSite && allowSiteEdit" class="mb-2 flex justify-end">
+    <div v-if="status === 'ready' && canEditSite && allowSiteEdit && !readonly" class="mb-2 flex justify-end">
       <button type="button" @click="showEditSite = true"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap">
         <Cog6ToothIcon class="w-4 h-4 shrink-0" />
@@ -222,7 +226,7 @@ onBeforeUnmount(() => {
         {{ errorMsg }}
       </div>
     </div>
-    <div v-if="status === 'ready'" class="mt-1.5 flex items-center justify-between gap-3 text-xs">
+    <div v-if="status === 'ready' && !readonly" class="mt-1.5 flex items-center justify-between gap-3 text-xs">
       <span class="text-gray-500 truncate">
         {{ latitude != null
           ? 'Déplacez le pin ou cliquez ailleurs pour ajuster la position.'

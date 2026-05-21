@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   BuildingOffice2Icon, MapPinIcon, MagnifyingGlassIcon, XMarkIcon,
   PlusIcon, PencilSquareIcon, TrashIcon, ArrowPathIcon,
@@ -12,6 +13,11 @@ import AddressAutocomplete from '@/components/AddressAutocomplete.vue'
 
 const { success, error } = useNotification()
 const { confirm } = useConfirm()
+const router = useRouter()
+
+function openSite(s) {
+  router.push({ name: 'site-detail', params: { uuid: s.site_uuid } })
+}
 
 const sites = ref([])
 const loading = ref(false)
@@ -208,7 +214,8 @@ onMounted(refresh)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="s in filtered" :key="s.site_uuid" class="border-t border-gray-100 hover:bg-indigo-50/40 group">
+          <tr v-for="s in filtered" :key="s.site_uuid" @click="openSite(s)"
+              class="border-t border-gray-100 hover:bg-indigo-50/40 group cursor-pointer">
             <td class="px-4 py-2.5 font-semibold text-gray-800 whitespace-nowrap">
               {{ s.name }}
               <span class="block text-[10px] text-gray-400 font-mono font-normal">{{ s.site_uuid.slice(0, 8) }}</span>
@@ -228,10 +235,10 @@ onMounted(refresh)
             <td class="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{{ formatDate(s.updated_at) }}</td>
             <td class="px-4 py-2.5 text-right">
               <div class="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                <button @click="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" v-tooltip="'Éditer'">
+                <button @click.stop="openEdit(s)" class="text-gray-400 hover:text-indigo-600 p-1" v-tooltip="'Éditer'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
-                <button @click="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="'Supprimer'">
+                <button @click.stop="confirmDelete(s)" class="text-gray-400 hover:text-red-600 p-1" v-tooltip="'Supprimer'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>

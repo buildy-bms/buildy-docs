@@ -403,6 +403,7 @@ export const claudeLibraryAssist = (payload) =>
 // ── Sites (synchro bidirectionnelle Fleet Manager) ──
 export const listSites = (params) => api.get('/sites', { params })
 export const getSite = (uuid) => api.get(`/sites/${uuid}`)
+export const getSiteOverview = (uuid) => api.get(`/sites/${uuid}/overview`)
 export const createSite = (data) => api.post('/sites', data)
 export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
