@@ -546,6 +546,9 @@ export const deleteSiteDocument = (id) => api.delete(`/site-documents/${id}`)
 export const getSiteDocumentDownloadUrl = (id) => `/api/site-documents/${id}/download`
 // Notes vocales : transcription a la demande (OpenAI Whisper / gpt-4o-transcribe)
 export const transcribeSiteDocument = (id) => api.post(`/site-documents/${id}/transcribe`)
+// Exporte la transcription vers les notes de l'element rattache
+export const exportSiteDocumentTranscript = (id) =>
+  api.post(`/site-documents/${id}/export-transcript-to-notes`)
 
 // ── Configuration publique (cle Google Maps restreinte par referent) ──
 export const getPublicConfig = () => api.get('/public-config')

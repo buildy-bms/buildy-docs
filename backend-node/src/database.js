@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 151;
+const TARGET_VERSION = 152;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5952,6 +5952,15 @@ function runMigrations() {
     `);
     log.info('Migration 151 appliquee : colonnes audio/transcript sur site_documents');
     db.pragma('user_version = 151');
+  }
+
+  if (current < 152) {
+    // Note vocale : horodate l'export de la transcription vers les notes de
+    // l'element rattache (bouton « Exporter vers les notes »). Permet de
+    // remplacer le bloc precedent en cas de re-export.
+    db.exec(`ALTER TABLE site_documents ADD COLUMN transcript_exported_at TEXT;`);
+    log.info('Migration 152 appliquee : colonne transcript_exported_at sur site_documents');
+    db.pragma('user_version = 152');
   }
 
   if (current > TARGET_VERSION) {

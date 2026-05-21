@@ -10,6 +10,7 @@ const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const { parseRoles } = require('../../lib/device-roles');
+const { buildSiteStaticMap } = require('../../lib/static-map');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
@@ -49,6 +50,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   // Donnees principales
   const site = af.site_id ? db.sites.getById(af.site_id) : null;
+  // Coordonnees GPS du site, formatees pour l'info-card du chapitre 1.
+  if (site && site.latitude != null && site.longitude != null) {
+    site.coords_label = `${Number(site.latitude).toFixed(5)}, ${Number(site.longitude).toFixed(5)}`;
+  }
   const zones = (site ? db.zones.listBySite(site.site_id) : []).map(z => ({
     ...z,
     natureLabel: z.nature ? (ZONE_NATURE_LABEL[z.nature] || z.nature) : '—',
@@ -102,6 +107,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
     const roles = parseRoles(d.device_role);
     d.device_role = roles; // expose array (utile si template Hbs y accède directement)
     d.roleLabel = roles.length ? roles.map(r => ROLE_LABEL[r] || r).join(' / ') : '—';
+    // Puissance installée = puissance unitaire × quantité. `quantity` > 1 →
+    // le template affiche « 3 kW × 2 = 6 kW » ; sinon la puissance simple.
+    const qty = Number(d.quantity) || 1;
+    d.total_power_kw = d.power_kw != null
+      ? Math.round((Number(d.power_kw) || 0) * qty * 10) / 10
+      : null;
+    d.has_multiple = qty > 1;
     d.commLabel = d.communication_protocol
       ? (COMM_LABEL[d.communication_protocol] || d.communication_protocol)
       : 'Non communicant';
@@ -373,7 +385,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
     .map(d => ({
       name: d.name, brand: d.brand, model_reference: d.model_reference,
-      power_kw: d.power_kw, quantity: d.quantity, zone_name: d.zone_name,
+      power_kw: d.power_kw, quantity: d.quantity,
+      total_power_kw: d.total_power_kw, has_multiple: d.has_multiple,
+      zone_name: d.zone_name,
       category: d.system_category,
       categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
     }));
@@ -467,11 +481,16 @@ async function buildBacsAuditExportData(af, opts = {}) {
     applicabilityLabel: applicabilityLabelForSummary,
   });
 
+  // Carte statique du site (Google Static Maps) embarquée en data URL.
+  // Best-effort : null si la clé/API est indisponible → PDF sans carte.
+  const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
+
   return {
     document: af,
     isBacs,
     isSiteAudit: !isBacs,
     site,
+    siteMapDataUrl,
     zones,
     systemsByZone,
     compliance,

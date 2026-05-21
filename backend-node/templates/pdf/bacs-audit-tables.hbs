@@ -188,7 +188,7 @@
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-energy">{{energyLabel}}</td>
-                <td class="col-power">{{power_kw}}</td>
+                <td class="col-power">{{#if has_multiple}}{{total_power_kw}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{power_kw}}{{/if}}</td>
                 <td class="col-role">{{roleLabel}}</td>
                 <td class="col-comm">{{commLabel}}</td>
                 <td class="col-loc">{{location}}</td>
