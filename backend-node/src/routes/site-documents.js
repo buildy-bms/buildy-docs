@@ -9,6 +9,7 @@ const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { createOptimizerStream, optimizeBuffer, readExifTakenAt, readExifMetadata } = require('../lib/image-optimizer');
+const { transcribeAudio } = require('../lib/transcription');
 
 const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonctionnelle',
   'datasheet','manuel_utilisateur','rapport_essais','photo','autre'];
@@ -17,6 +18,9 @@ const CATEGORIES = ['plan','schema_electrique','schema_synoptique','analyse_fonc
 const MAX_BYTES = 25 * 1024 * 1024;
 
 const IMAGE_MIMES = new Set(['image/jpeg','image/jpg','image/png','image/webp','image/heic','image/heif']);
+// Notes vocales : audio enregistré dans la PWA (MediaRecorder → webm le plus
+// souvent ; m4a sur certains iOS).
+const AUDIO_MIMES = new Set(['audio/webm','audio/ogg','audio/mp4','audio/mpeg','audio/wav','audio/x-m4a','audio/m4a']);
 
 function siteDocsDir(siteUuid) {
   const dir = path.resolve(config.attachmentsDir, '..', 'site-documents', siteUuid);
@@ -34,6 +38,8 @@ function extFromMime(mime, fallbackName) {
     'application/msword': '.doc',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
     'text/plain': '.txt',
+    'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mpeg': '.mp3',
+    'audio/mp4': '.m4a', 'audio/x-m4a': '.m4a', 'audio/m4a': '.m4a', 'audio/wav': '.wav',
   };
   if (map[mime]) return map[mime];
   // Fallback : recupere l'extension du filename d'origine
@@ -104,7 +110,9 @@ async function routes(fastify) {
       // ce que le serveur peut extraire du buffer reçu.
       taken_at: clientTakenAt, gps_latitude: clientGpsLat,
       gps_longitude: clientGpsLng, camera_make: clientCameraMake,
-      camera_model: clientCameraModel } = request.query;
+      camera_model: clientCameraModel,
+      // Notes vocales : durée enregistrée côté client (secondes).
+      duration_seconds: clientDuration } = request.query;
     if (!title) return reply.code(400).send({ detail: 'Title requis (query string)' });
     if (!category || !CATEGORIES.includes(category)) {
       return reply.code(400).send({ detail: 'Categorie invalide' });
@@ -113,14 +121,18 @@ async function routes(fastify) {
     const file = await request.file({ limits: { fileSize: MAX_BYTES } });
     if (!file) return reply.code(400).send({ detail: 'Aucun fichier recu' });
 
-    const isImage = IMAGE_MIMES.has((file.mimetype || '').toLowerCase());
+    // Normalise le mime (MediaRecorder renvoie p. ex. "audio/webm;codecs=opus").
+    const fileMime = (file.mimetype || '').toLowerCase().split(';')[0].trim();
+    const isImage = IMAGE_MIMES.has(fileMime);
+    const isAudio = AUDIO_MIMES.has(fileMime);
+    const mediaType = isAudio ? 'audio' : 'photo';
     const dir = siteDocsDir(site.site_uuid);
 
-    // Pour les images on force JPEG optimise. Pour le reste (PDF/DWG/etc.)
+    // Pour les images on force JPEG optimise. Pour le reste (audio/PDF/DWG/etc.)
     // on garde l'extension d'origine et on ecrit le stream tel quel.
-    const filename = crypto.randomUUID() + (isImage ? '.jpg' : extFromMime(file.mimetype, file.filename));
+    const filename = crypto.randomUUID() + (isImage ? '.jpg' : extFromMime(fileMime, file.filename));
     const fullPath = path.join(dir, filename);
-    let storedMime = isImage ? 'image/jpeg' : (file.mimetype || 'application/octet-stream');
+    let storedMime = isImage ? 'image/jpeg' : (isAudio ? fileMime : (file.mimetype || 'application/octet-stream'));
 
     // Pour les images on bufferise pour pouvoir parser l'EXIF (GPS, date,
     // appareil) AVANT optimisation — sharp strip les EXIF par défaut, donc
@@ -188,8 +200,9 @@ async function routes(fastify) {
          bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
          bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_checklist_id,
          bacs_audit_action_item_id, uploaded_by,
-         taken_at, gps_latitude, gps_longitude, camera_make, camera_model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         taken_at, gps_latitude, gps_longitude, camera_make, camera_model,
+         media_type, duration_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       site.site_id, title, category, filename, file.filename, sizeBytes, storedMime,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
@@ -201,6 +214,7 @@ async function routes(fastify) {
       bacs_audit_action_item_id ? parseInt(bacs_audit_action_item_id, 10) : null,
       userId || null,
       finalTakenAt, finalGpsLat, finalGpsLng, finalCameraMake, finalCameraModel,
+      mediaType, clientDuration != null && clientDuration !== '' ? parseFloat(clientDuration) : null,
     );
     db.auditLog.add({ userId, action: 'site_document.upload',
       payload: { site_uuid: site.site_uuid, title, category, filename: file.filename } });
@@ -333,6 +347,41 @@ async function routes(fastify) {
     db.auditLog.add({ userId: request.authUser?.id, action: 'site_document.delete',
       payload: { site_uuid: doc.site_uuid, filename: doc.filename } });
     return reply.code(204).send();
+  });
+
+  // POST /site-documents/:id/transcribe — transcription d'une note vocale
+  // a la demande (OpenAI Whisper / gpt-4o-transcribe). Synchrone : declenche
+  // depuis le desktop, l'auditeur attend le resultat. Rejouable sur echec.
+  fastify.post('/site-documents/:id/transcribe', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const doc = db.db.prepare(`
+      SELECT d.*, s.site_uuid FROM site_documents d
+      JOIN sites s ON s.id = d.site_id WHERE d.id = ?
+    `).get(id);
+    if (!doc) return reply.code(404).send({ detail: 'Document non trouve' });
+    if (doc.media_type !== 'audio') {
+      return reply.code(400).send({ detail: 'Ce document n\'est pas une note vocale' });
+    }
+    const fullPath = path.join(siteDocsDir(doc.site_uuid), doc.filename);
+    if (!fs.existsSync(fullPath)) {
+      return reply.code(404).send({ detail: 'Fichier audio introuvable sur disque' });
+    }
+    db.db.prepare("UPDATE site_documents SET transcript_status = 'processing' WHERE id = ?").run(id);
+    try {
+      const { text } = await transcribeAudio(fullPath, { language: 'fr' });
+      db.db.prepare(`
+        UPDATE site_documents
+        SET transcript_text = ?, transcript_status = 'done', transcribed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(text, id);
+      db.auditLog.add({ userId: request.authUser?.id, action: 'site_document.transcribe',
+        payload: { site_uuid: doc.site_uuid, id } });
+    } catch (err) {
+      db.db.prepare("UPDATE site_documents SET transcript_status = 'failed' WHERE id = ?").run(id);
+      log.warn(`Transcription failed for site_document ${id}: ${err.message}`);
+      return reply.code(502).send({ detail: err.message || 'Transcription impossible' });
+    }
+    return db.db.prepare('SELECT * FROM site_documents WHERE id = ?').get(id);
   });
 }
 

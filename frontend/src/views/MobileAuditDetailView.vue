@@ -17,6 +17,7 @@ import api from '@/api'
 import MobileSheet from '@/components/mobile-audit/MobileSheet.vue'
 import MobileShareSheet from '@/components/mobile-audit/MobileShareSheet.vue'
 import MobileEditAuditMetadataSheet from '@/components/mobile-audit/MobileEditAuditMetadataSheet.vue'
+import EditSiteModal from '@/components/EditSiteModal.vue'
 import MobileSynthesisSheet from '@/components/mobile-audit/MobileSynthesisSheet.vue'
 
 import MobileSiteTab from '@/components/mobile-audit/MobileSiteTab.vue'
@@ -195,6 +196,11 @@ const showEditMetadata = ref(false)
 function openEditMetadata() {
   showSettings.value = false
   showEditMetadata.value = true
+}
+const showEditSite = ref(false)
+function openEditSite() {
+  showSettings.value = false
+  showEditSite.value = true
 }
 async function onMetadataSaved(updated) {
   showEditMetadata.value = false
@@ -480,6 +486,16 @@ async function removeAudit() {
           Modifier les paramètres
         </button>
 
+        <!-- Modifier le site rattaché (nom, adresse, coordonnées GPS) -->
+        <button
+          v-if="auditStore.site"
+          @click="openEditSite"
+          class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 active:bg-indigo-100 rounded-xl"
+        >
+          <FontAwesomeIcon :icon="['fas', 'map-pin']" class="w-5 h-5" />
+          Modifier le site
+        </button>
+
         <!-- Statut audit -->
         <div v-if="document?.delivered_at" class="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
           <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
@@ -576,6 +592,13 @@ async function removeAudit() {
       :audit="document"
       @close="showEditMetadata = false"
       @saved="onMetadataSaved"
+    />
+
+    <!-- Édition du site rattaché (nom, adresse, coordonnées GPS) -->
+    <EditSiteModal
+      v-if="showEditSite && auditStore.site"
+      :site="auditStore.site"
+      @close="showEditSite = false"
     />
   </div>
 </template>

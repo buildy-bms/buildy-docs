@@ -49,6 +49,16 @@ export const ROLE_OPTIONS = [
   { value: 'autre',        label: 'Autre',        icon: 'fa-circle-question',   color: '#6b7280' },
 ]
 
+// Le rôle/niveau (Production / Distribution / Émission / Régulation) découle
+// du découpage thermique R175-6 : il n'a de sens que pour les systèmes de
+// chauffage et de climatisation. Pour tous les autres usages (ventilation,
+// ECS, éclairage, photovoltaïque, usages manuels), la colonne Rôle est
+// verrouillée car non pertinente.
+const THERMAL_CATEGORIES = new Set(['heating', 'cooling'])
+export function isThermalCategory(category) {
+  return THERMAL_CATEGORIES.has(category)
+}
+
 // Natures de zones — couvre l'enum bacs_requirements_by_zone_nature côté
 // backend (cf. backend-node/src/seeds/bacs-requirements.js). Ajouter une
 // entrée ici sans l'ajouter dans bacs-requirements.js : la nature ne

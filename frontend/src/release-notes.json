@@ -2,6 +2,62 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.71",
+      "date": "2026-05-21",
+      "title": "Audits BACS : carte des zones, notes vocales, édition du site et corrections de saisie",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Positionner les zones sur une carte",
+          "what": "Chaque zone (fonctionnelle ou technique) peut être placée sur une carte sous forme de pin coloré, à la création comme à l'édition. La carte s'ouvre en vue satellite, centrée sur le bâtiment. Un bouton « Modifier le site » sur la carte permet de corriger l'adresse au passage.",
+          "where": "Audit BACS → Zones → icône carte sur chaque zone, et dans la fenêtre d'ajout de zone.",
+          "how_to_test": "Ouvrir une zone, cliquer sur l'icône carte, placer le pin sur le bâtiment, enregistrer la position."
+        },
+        {
+          "kind": "feature",
+          "title": "Notes vocales sur le terrain",
+          "what": "Partout où l'on peut prendre une photo (zones, systèmes, compteurs, GTB, équipements), on peut désormais enregistrer une note vocale. La note est écoutable côté bureau, et un bouton « Transcrire » la convertit en texte par IA à la demande.",
+          "where": "Audit BACS — bouton micro à côté des boutons photo.",
+          "how_to_test": "Sur un système, enregistrer une note vocale, l'écouter côté bureau, puis cliquer « Transcrire »."
+        },
+        {
+          "kind": "feature",
+          "title": "Modifier le site depuis l'audit",
+          "what": "Un bouton « Modifier le site » ouvre une fenêtre pour éditer le nom, l'adresse et les notes du site. L'adresse est saisie avec autocomplétion et enregistre les coordonnées GPS, qui servent à centrer la carte des zones.",
+          "where": "Audit BACS → menu Plus (ordinateur) ou Paramètres de l'audit (mobile) → Modifier le site.",
+          "how_to_test": "Ouvrir « Modifier le site », changer l'adresse via l'autocomplétion, enregistrer."
+        },
+        {
+          "kind": "improvement",
+          "title": "Saisie d'équipements plus rapide",
+          "what": "La fenêtre d'ajout d'un système gagne un bouton « Enregistrer et ajouter un autre » qui garde la fenêtre ouverte et conserve l'énergie, le niveau et les protocoles. La liste des protocoles s'affiche désormais correctement par-dessus la fenêtre.",
+          "where": "Audit BACS → Systèmes → Ajouter un système.",
+          "how_to_test": "Ajouter un système, cliquer « Enregistrer et ajouter un autre » ; vérifier que la liste des protocoles s'ouvre au-dessus."
+        },
+        {
+          "kind": "improvement",
+          "title": "Déplacer et Partager séparés",
+          "what": "L'action « Déplacer / Partager » d'un équipement est scindée en deux boutons distincts. Le menu Partager ne propose plus que les usages réellement présents.",
+          "where": "Audit BACS → Systèmes → actions d'un équipement.",
+          "how_to_test": "Sur un équipement, utiliser les boutons Déplacer puis Partager."
+        },
+        {
+          "kind": "improvement",
+          "title": "Colonne Rôle(s) verrouillée hors thermique",
+          "what": "La colonne « Rôle(s) » (Production / Distribution / Émission) n'est éditable que pour les systèmes de chauffage et de climatisation, où elle a un sens. L'étape « Zones » du parcours est renommée « Zones fonctionnelles ».",
+          "where": "Audit BACS → Systèmes.",
+          "how_to_test": "Vérifier qu'un système ventilation ou éclairage affiche « — » dans la colonne Rôle(s), éditable sur un système chauffage."
+        },
+        {
+          "kind": "fix",
+          "title": "Puissance totale : la quantité est prise en compte",
+          "what": "Le calcul de puissance d'un usage et du total chauffage + climatisation multiplie désormais la puissance de chaque équipement par sa quantité. Un équipement saisi en quantité 3 compte pour 3.",
+          "where": "Audit BACS → Systèmes (total par usage) et Identification (puissance cumulée).",
+          "how_to_test": "Saisir un équipement 120 kW en quantité 3 : le total affiche 360 kW."
+        }
+      ]
+    },
+    {
       "version": "0.1.70",
       "date": "2026-05-19",
       "title": "Livres blancs retirés de « Mes documents »",

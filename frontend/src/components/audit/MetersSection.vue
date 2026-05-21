@@ -9,6 +9,7 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
@@ -254,12 +255,20 @@ onBeforeUnmount(teardownMetersSortable)
             </button>
           </td>
           <td>
-            <BacsPhotoButton
-              v-if="document?.site_uuid"
-              :site-uuid="document.site_uuid"
-              :attach-to="{ meter_id: m.id }"
-              :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
-            />
+            <div class="inline-flex items-center gap-0.5">
+              <BacsPhotoButton
+                v-if="document?.site_uuid"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ meter_id: m.id }"
+                :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
+              />
+              <VoiceNoteButton
+                v-if="document?.site_uuid"
+                :site-uuid="document.site_uuid"
+                :attach-to="{ meter_id: m.id }"
+                :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
+              />
+            </div>
           </td>
           <td class="whitespace-nowrap">
             <button @click="dupMeter(m)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">

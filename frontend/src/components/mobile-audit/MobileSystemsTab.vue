@@ -14,6 +14,7 @@ import MobileThermalRegulationSheet from './MobileThermalRegulationSheet.vue'
 import MobileLibraryPicker from './MobileLibraryPicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel } from '@/lib/audit-options'
@@ -615,6 +616,16 @@ async function removeDevice(d) {
              class="bg-white rounded-xl border border-gray-200 px-4 py-3">
           <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Photos</p>
           <BacsPhotoButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ device_id: editingDevice.device.id }"
+            :label="editingDevice.device.name || editingDevice.device.brand || `Équipement #${editingDevice.device.id}`"
+            size="md"
+          />
+        </div>
+        <div v-if="editingDevice?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Notes vocales</p>
+          <VoiceNoteButton
             :site-uuid="document.site_uuid"
             :attach-to="{ device_id: editingDevice.device.id }"
             :label="editingDevice.device.name || editingDevice.device.brand || `Équipement #${editingDevice.device.id}`"

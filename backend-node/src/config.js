@@ -63,6 +63,16 @@ const config = Object.freeze({
   // Budget mensuel Claude en euros (0 = pas de plafond, credit restant non affiche)
   claudeMonthlyBudgetEur: parseFloat(process.env.CLAUDE_MONTHLY_BUDGET_EUR || '0') || 0,
 
+  // Google Maps — carte de positionnement des zones (cle restreinte par
+  // referent HTTP, exposee au frontend via GET /api/public-config).
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+
+  // OpenAI — transcription des notes vocales (Whisper / gpt-4o-transcribe).
+  // Anthropic ne fournit pas de speech-to-text : moteur isole dans
+  // lib/transcription.js, swappable.
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiTranscribeModel: process.env.OPENAI_TRANSCRIBE_MODEL || 'gpt-4o-transcribe',
+
   // CORS — origines autorisees
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3100')
     .split(',').map(s => s.trim()).filter(Boolean),

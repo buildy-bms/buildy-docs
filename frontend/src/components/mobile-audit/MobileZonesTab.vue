@@ -11,6 +11,8 @@ import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
+import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
 import { ZONE_NATURES as ZONE_NATURES_DECORATED, isTechnicalNature } from '@/lib/audit-options'
 
 const audit = useAuditStore()
@@ -32,7 +34,7 @@ const technicalZones = computed(() =>
 
 // Sheet state
 const editing = ref(null) // { mode: 'create'|'edit', zone: {...} }
-const editForm = ref({ name: '', nature: null, surface_m2: null, kind: 'functional' })
+const editForm = ref({ name: '', nature: null, surface_m2: null, kind: 'functional', latitude: null, longitude: null })
 const saving = ref(false)
 
 // Pré-remplit le type quand la nature est technique (sens unique :
@@ -45,7 +47,7 @@ watch(() => editForm.value.nature, (nat) => {
 function setKind(k) { kindTouched.value = true; editForm.value.kind = k }
 
 function openCreate(kind = 'functional') {
-  editForm.value = { name: '', nature: null, surface_m2: null, kind }
+  editForm.value = { name: '', nature: null, surface_m2: null, kind, latitude: null, longitude: null }
   kindTouched.value = false
   editing.value = { mode: 'create' }
 }
@@ -53,6 +55,7 @@ function openEdit(z) {
   editForm.value = {
     name: z.name, nature: z.nature, surface_m2: z.surface_m2,
     kind: z.kind || 'functional',
+    latitude: z.latitude ?? null, longitude: z.longitude ?? null,
   }
   kindTouched.value = true
   editing.value = { mode: 'edit', zone: z }
@@ -85,6 +88,8 @@ async function save() {
         nature: editForm.value.nature,
         kind: editForm.value.kind || 'functional',
         surface_m2: editForm.value.surface_m2 ?? null,
+        latitude: editForm.value.latitude ?? null,
+        longitude: editForm.value.longitude ?? null,
       })
       const r = await listZones(document.value.site_id)
       zones.value = r.data
@@ -97,6 +102,8 @@ async function save() {
         nature: editForm.value.nature,
         kind: editForm.value.kind || 'functional',
         surface_m2: editForm.value.surface_m2 ?? null,
+        latitude: editForm.value.latitude ?? null,
+        longitude: editForm.value.longitude ?? null,
       }
       const { data } = await updateZone(editing.value.zone.zone_id, patch)
       Object.assign(editing.value.zone, data)
@@ -242,6 +249,16 @@ const totalSurface = computed(() =>
             size="md"
           />
         </div>
+        <div v-if="editing?.mode === 'edit' && document?.site_uuid"
+             class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">Notes vocales</p>
+          <VoiceNoteButton
+            :site-uuid="document.site_uuid"
+            :attach-to="{ zone_id: editing.zone.zone_id }"
+            :label="editing.zone.name"
+            size="md"
+          />
+        </div>
 
         <MobileField label="Nom" hint="Nom court qui identifie la zone dans tout l'audit. Reste cohérent avec les plans du bâtiment si possible." required>
           <input
@@ -287,6 +304,17 @@ const totalSurface = computed(() =>
             step="1"
             placeholder="—"
             class="touch-control w-full text-right font-medium"
+          />
+        </MobileField>
+
+        <MobileField label="Position sur la carte" hint="Place un repère sur le bâtiment. Touchez la carte pour positionner la zone, déplacez le pin pour ajuster.">
+          <ZoneMapPicker
+            v-model:latitude="editForm.latitude"
+            v-model:longitude="editForm.longitude"
+            :kind="editForm.kind"
+            :zones="zones"
+            :current-zone-id="editing?.zone?.zone_id ?? null"
+            :site="audit.site || {}"
           />
         </MobileField>
 

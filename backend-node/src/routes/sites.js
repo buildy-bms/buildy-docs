@@ -12,6 +12,8 @@ const createSiteSchema = z.object({
   customer_name: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
   // Cas exceptionnel : si FM cree un site et nous le pousse, il fournit son uuid
   site_uuid: z.string().uuid().optional(),
 });
@@ -21,6 +23,8 @@ const updateSiteSchema = z.object({
   customer_name: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
 });
 
 const incomingSyncSchema = z.object({
@@ -80,6 +84,8 @@ async function routes(fastify) {
       customerName: body.customer_name || null,
       address: body.address || null,
       notes: body.notes || null,
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
       createdBy: userId,
     });
     db.auditLog.add({ userId, action: 'site.create', payload: { site_uuid: siteUuid, name: body.name } });
@@ -103,6 +109,8 @@ async function routes(fastify) {
       customerName: body.customer_name,
       address: body.address,
       notes: body.notes,
+      latitude: body.latitude,
+      longitude: body.longitude,
       updatedBy: userId,
     });
     db.auditLog.add({ userId, action: 'site.update', payload: { site_uuid: site.site_uuid, fields: Object.keys(body) } });
