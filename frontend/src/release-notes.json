@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.76",
+      "date": "2026-05-22",
+      "title": "Page détail d'un site : tous ses documents et zones au même endroit",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Fiche détaillée d'un site",
+          "what": "Chaque site dispose désormais d'une page dédiée qui regroupe ses documents (AF, audits), ses zones, ses compteurs d'activité (AF, audits, zones, équipements, photos, notes vocales, identifiants) et une carte de ses zones. C'est le point d'entrée naturel pour retrouver tout ce qui concerne un site.",
+          "where": "Mes Sites → cliquer sur une ligne de la liste.",
+          "how_to_test": "Ouvrir Mes Sites, cliquer sur un site : la page détail s'affiche. Cliquer sur un document de la liste ouvre l'AF ou l'audit correspondant."
+        },
+        {
+          "kind": "improvement",
+          "title": "Modifier le site depuis sa fiche",
+          "what": "Le bouton « Modifier le site » de la fiche ouvre la modale d'édition (nom, client, adresse, position sur la carte) sans repasser par la liste.",
+          "where": "Mes Sites → fiche d'un site → bouton « Modifier le site ».",
+          "how_to_test": "Ouvrir la fiche d'un site, cliquer « Modifier le site », changer l'adresse, enregistrer : la fiche se met à jour."
+        }
+      ]
+    },
+    {
       "version": "0.1.75",
       "date": "2026-05-21",
       "title": "Audits BACS : transcriptions, carte et puissances dans le rapport PDF",

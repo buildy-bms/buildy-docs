@@ -68,6 +68,37 @@ async function routes(fastify) {
     return site;
   });
 
+  // GET /api/sites/:uuid/overview — vue d'ensemble (hub de site) :
+  // site + documents rattaches + zones + compteurs.
+  fastify.get('/sites/:uuid/overview', async (request, reply) => {
+    const site = db.sites.getByUuid(request.params.uuid);
+    if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
+    const sid = site.site_id;
+    const documents = db.db.prepare(`
+      SELECT id, kind, project_name, client_name, status, updated_at, delivered_at
+      FROM afs WHERE site_id = ? AND deleted_at IS NULL
+      ORDER BY updated_at DESC
+    `).all(sid);
+    const zones = db.zones.listBySite(sid);
+    const count = (sql) => db.db.prepare(sql).get(sid).c;
+    return {
+      site,
+      documents,
+      zones,
+      counts: {
+        af: documents.filter(d => d.kind === 'af').length,
+        audit: documents.filter(d => d.kind === 'bacs_audit' || d.kind === 'site_audit').length,
+        zones: zones.length,
+        equipments: count(`SELECT COUNT(*) c FROM equipments e JOIN zones z ON z.id = e.zone_id
+                           WHERE z.site_id = ? AND e.deleted_at IS NULL AND z.deleted_at IS NULL`),
+        documents: count(`SELECT COUNT(*) c FROM site_documents WHERE site_id = ?`),
+        photos: count(`SELECT COUNT(*) c FROM site_documents WHERE site_id = ? AND category = 'photo'`),
+        voiceNotes: count(`SELECT COUNT(*) c FROM site_documents WHERE site_id = ? AND media_type = 'audio'`),
+        credentials: count(`SELECT COUNT(*) c FROM site_credentials WHERE site_id = ?`),
+      },
+    };
+  });
+
   // POST /api/sites — creation locale + push vers FM (best-effort)
   fastify.post('/sites', async (request, reply) => {
     let body;
