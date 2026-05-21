@@ -22,6 +22,8 @@ const props = defineProps({
   currentZoneId: { type: Number, default: null },
   // { address, latitude, longitude } — pour centrer la carte.
   site: { type: Object, default: () => ({}) },
+  // true : carte agrandie (modale dédiée de positionnement).
+  large: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:latitude', 'update:longitude'])
 
@@ -141,7 +143,8 @@ async function initMap() {
   map = new google.maps.Map(mapEl.value, {
     center: FRANCE.center,
     zoom: FRANCE.zoom,
-    mapTypeId: 'hybrid',
+    // Plan routier par défaut ; bascule Plan / Satellite via le contrôle natif.
+    mapTypeId: 'roadmap',
     streetViewControl: false,
     mapTypeControl: true,
     fullscreenControl: true,
@@ -174,8 +177,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>
-    <div class="relative w-full h-72 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+  <div :class="large ? 'w-[78vw] max-w-240' : ''">
+    <!-- Barre d'outils : éditer l'adresse du site (sert au centrage carte) -->
+    <div v-if="status === 'ready' && canEditSite" class="mb-2 flex justify-end">
+      <button type="button" @click="showEditSite = true"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap">
+        <Cog6ToothIcon class="w-4 h-4 shrink-0" />
+        Modifier l'adresse du site
+      </button>
+    </div>
+    <div :class="['relative w-full rounded-lg overflow-hidden border border-gray-200 bg-gray-100',
+                  large ? 'h-[64vh] min-h-95' : 'h-80']">
       <div ref="mapEl" class="absolute inset-0"></div>
       <div v-if="status === 'loading'"
            class="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
@@ -187,17 +199,11 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div v-if="status === 'ready'" class="mt-1.5 flex items-center justify-between gap-3 text-xs">
-      <div class="flex items-center gap-3 min-w-0">
-        <button v-if="canEditSite" type="button" @click="showEditSite = true"
-                class="inline-flex items-center gap-1 text-gray-500 hover:text-indigo-600 whitespace-nowrap shrink-0">
-          <Cog6ToothIcon class="w-3.5 h-3.5 shrink-0" /> Modifier le site
-        </button>
-        <span class="text-gray-500 truncate">
-          {{ latitude != null
-            ? 'Déplacez le pin ou cliquez ailleurs pour ajuster la position.'
-            : 'Cliquez sur la carte pour positionner la zone.' }}
-        </span>
-      </div>
+      <span class="text-gray-500 truncate">
+        {{ latitude != null
+          ? 'Déplacez le pin ou cliquez ailleurs pour ajuster la position.'
+          : 'Cliquez sur la carte pour positionner la zone.' }}
+      </span>
       <button v-if="latitude != null" type="button" @click="clearPoint"
               class="text-gray-400 hover:text-red-600 whitespace-nowrap shrink-0">
         Retirer le point

@@ -280,20 +280,26 @@ const btnCls = computed(() => {
         <div class="flex-1 overflow-y-auto p-3 space-y-3"
              :style="isMobile ? { paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' } : {}">
           <!-- Contrôle d'enregistrement -->
-          <div v-if="recording"
-               class="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
-            <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse shrink-0"></span>
-            <span class="flex-1 text-sm font-medium text-red-700 tabular-nums">
-              Enregistrement… {{ fmtDuration(elapsed) }}
-            </span>
-            <button type="button" @click="cancelRecording"
-                    class="px-2 py-1 text-xs text-gray-600 hover:text-gray-900">
-              Annuler
-            </button>
-            <button type="button" @click="stopRecording"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg">
-              <StopIcon class="w-4 h-4" /> Arrêter
-            </button>
+          <div v-if="recording" class="rounded-lg bg-red-50 border border-red-200 p-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse shrink-0"></span>
+              <span class="flex-1 font-medium text-red-700 tabular-nums"
+                    :class="isMobile ? 'text-base' : 'text-sm'">
+                Enregistrement… {{ fmtDuration(elapsed) }}
+              </span>
+            </div>
+            <div class="mt-2.5 flex items-center gap-2">
+              <button type="button" @click="cancelRecording"
+                      class="flex-1 inline-flex items-center justify-center font-medium text-gray-700 bg-white border border-gray-300 rounded-lg active:bg-gray-50"
+                      :class="isMobile ? 'min-h-12 text-base' : 'min-h-9 text-sm'">
+                Annuler
+              </button>
+              <button type="button" @click="stopRecording"
+                      class="flex-1 inline-flex items-center justify-center gap-1.5 font-medium text-white bg-red-600 hover:bg-red-700 active:bg-red-700 rounded-lg"
+                      :class="isMobile ? 'min-h-12 text-base' : 'min-h-9 text-sm'">
+                <StopIcon class="w-5 h-5 shrink-0" /> Arrêter
+              </button>
+            </div>
           </div>
           <button v-else type="button" @click="startRecording" :disabled="uploading"
                   class="w-full inline-flex items-center justify-center gap-2 px-4 font-medium text-white bg-violet-600 hover:bg-violet-700 active:bg-violet-700 rounded-lg disabled:opacity-50"
@@ -308,32 +314,39 @@ const btnCls = computed(() => {
             Aucune note vocale.
           </p>
           <div v-for="n in notes" :key="n.id"
-               class="rounded-lg border border-gray-200 bg-white p-2.5 space-y-2">
-            <div class="flex items-center gap-2 text-[11px] text-gray-500">
+               class="rounded-lg border border-gray-200 bg-white space-y-2"
+               :class="isMobile ? 'p-3' : 'p-2.5'">
+            <div class="flex items-center gap-2 text-xs text-gray-500">
               <span class="font-medium text-gray-700 tabular-nums">{{ fmtDuration(n.duration_seconds) || '—' }}</span>
               <span class="truncate flex-1">{{ fmtDate(n.uploaded_at) }}</span>
-              <button @click="deleteNote(n)" class="text-gray-400 hover:text-red-600 shrink-0" v-tooltip="'Supprimer'">
-                <TrashIcon class="w-4 h-4" />
+              <button type="button" @click="deleteNote(n)"
+                      class="shrink-0 inline-flex items-center justify-center text-gray-400 hover:text-red-600 active:text-red-600 rounded-md"
+                      :class="isMobile ? 'w-11 h-11 -my-2' : 'p-1'" v-tooltip="'Supprimer'" aria-label="Supprimer">
+                <TrashIcon :class="isMobile ? 'w-5 h-5' : 'w-4 h-4'" />
               </button>
             </div>
-            <audio controls preload="none" :src="getSiteDocumentDownloadUrl(n.id)" class="w-full h-9"></audio>
+            <audio controls preload="metadata" :src="getSiteDocumentDownloadUrl(n.id)"
+                   :class="['w-full', isMobile ? 'h-12' : 'h-9']"></audio>
 
             <!-- Transcription -->
             <div v-if="n.transcript_status === 'done'"
-                 class="text-xs text-gray-700 bg-gray-50 border border-gray-100 rounded p-2 whitespace-pre-wrap">
+                 class="text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded p-2 whitespace-pre-wrap">
               {{ n.transcript_text || '(transcription vide)' }}
             </div>
             <p v-else-if="n.transcript_status === 'processing'"
                class="text-xs text-violet-600 inline-flex items-center gap-1.5">
               <ArrowPathIcon class="w-3.5 h-3.5 animate-spin" /> Transcription en cours…
             </p>
-            <div v-else class="flex items-center gap-2">
+            <div v-else class="space-y-1">
               <button type="button" @click="transcribeNote(n)"
-                      class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-md whitespace-nowrap">
-                <SparklesIcon class="w-3.5 h-3.5 shrink-0" />
+                      class="inline-flex items-center justify-center gap-1.5 font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 active:bg-violet-100 border border-violet-200 rounded-lg whitespace-nowrap"
+                      :class="isMobile ? 'w-full min-h-12 text-sm' : 'px-2.5 py-1 text-xs'">
+                <SparklesIcon class="w-4 h-4 shrink-0" />
                 {{ n.transcript_status === 'failed' ? 'Réessayer la transcription' : 'Transcrire' }}
               </button>
-              <span v-if="n.transcript_status === 'failed'" class="text-[11px] text-red-600">Échec</span>
+              <p v-if="n.transcript_status === 'failed'" class="text-[11px] text-red-600">
+                Échec de la transcription.
+              </p>
             </div>
           </div>
         </div>

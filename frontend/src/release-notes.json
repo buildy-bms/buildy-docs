@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.72",
+      "date": "2026-05-21",
+      "title": "Audits BACS : carte de positionnement agrandie et lecture des notes vocales corrigée",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Carte de positionnement des zones agrandie",
+          "what": "La fenêtre « Positionner sur la carte » s'ouvre désormais en grand format. La carte s'affiche en vue Plan par défaut, avec bascule Plan / Satellite. Un bouton « Modifier l'adresse du site » est accessible directement au-dessus de la carte.",
+          "where": "Audit BACS → Zones → icône carte d'une zone.",
+          "how_to_test": "Ouvrir la carte d'une zone : grande fenêtre, vue Plan, bouton « Modifier l'adresse du site » visible en haut."
+        },
+        {
+          "kind": "fix",
+          "title": "Lecture des notes vocales corrigée sur iPhone / iPad",
+          "what": "La lecture d'une note vocale échouait sur iOS (« Erreur » au clic sur Lecture). Le serveur répond désormais correctement aux requêtes de lecture progressive exigées par Safari.",
+          "where": "Audit BACS → bouton micro → écouter une note vocale.",
+          "how_to_test": "Sur iPhone, ouvrir une note vocale enregistrée et appuyer sur Lecture : le son se lit."
+        },
+        {
+          "kind": "improvement",
+          "title": "Notes vocales : boutons adaptés au tactile",
+          "what": "Les boutons d'enregistrement (Annuler, Arrêter), de transcription et de suppression des notes vocales sont agrandis sur mobile pour être confortables au doigt.",
+          "where": "Audit BACS → bouton micro (sur mobile).",
+          "how_to_test": "Sur mobile, enregistrer une note : les boutons Annuler / Arrêter sont larges et faciles à toucher."
+        }
+      ]
+    },
+    {
       "version": "0.1.71",
       "date": "2026-05-21",
       "title": "Audits BACS : carte des zones, notes vocales, édition du site et corrections de saisie",

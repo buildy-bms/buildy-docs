@@ -287,7 +287,10 @@ async function routes(fastify) {
     return reply.code(201).send({ photos: inserted, errors });
   });
 
-  // GET /site-documents/:id/download — sert le fichier
+  // GET /site-documents/:id/download — sert le fichier.
+  // Gère les requêtes Range (206) : indispensable pour la lecture audio/vidéo
+  // sur iOS Safari, qui refuse de lire un média si le serveur ne répond pas
+  // en 206 Partial Content (sinon l'élément <audio> affiche « Erreur »).
   fastify.get('/site-documents/:id/download', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const doc = db.db.prepare(`
@@ -297,10 +300,35 @@ async function routes(fastify) {
     if (!doc) return reply.code(404).send({ detail: 'Document non trouve' });
     const fullPath = path.join(siteDocsDir(doc.site_uuid), doc.filename);
     if (!fs.existsSync(fullPath)) return reply.code(404).send({ detail: 'Fichier introuvable sur disque' });
-    return reply
-      .header('Content-Type', doc.mime_type || 'application/octet-stream')
-      .header('Content-Disposition', `attachment; filename="${doc.original_name || doc.filename}"`)
-      .send(fs.createReadStream(fullPath));
+
+    const total = fs.statSync(fullPath).size;
+    const mime = doc.mime_type || 'application/octet-stream';
+    // Médias (audio/vidéo/image) servis inline ; les autres en téléchargement.
+    const isMedia = doc.media_type === 'audio'
+      || mime.startsWith('audio/') || mime.startsWith('video/') || mime.startsWith('image/');
+    reply.header('Content-Type', mime);
+    reply.header('Accept-Ranges', 'bytes');
+    reply.header('Content-Disposition', isMedia
+      ? 'inline'
+      : `attachment; filename="${String(doc.original_name || doc.filename).replace(/"/g, '')}"`);
+
+    const range = request.headers.range;
+    const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m) {
+      let start = m[1] ? parseInt(m[1], 10) : 0;
+      let end = m[2] ? parseInt(m[2], 10) : total - 1;
+      if (isNaN(start)) start = 0;
+      if (isNaN(end) || end >= total) end = total - 1;
+      if (start > end || start >= total) {
+        return reply.code(416).header('Content-Range', `bytes */${total}`).send();
+      }
+      return reply
+        .code(206)
+        .header('Content-Range', `bytes ${start}-${end}/${total}`)
+        .header('Content-Length', end - start + 1)
+        .send(fs.createReadStream(fullPath, { start, end }));
+    }
+    return reply.header('Content-Length', total).send(fs.createReadStream(fullPath));
   });
 
   // PATCH /site-documents/:id — title, category, rattachements
