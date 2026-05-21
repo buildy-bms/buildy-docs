@@ -483,7 +483,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
 
   // Vue satellite statique du site (Google Static Maps) embarquée en data
   // URL. Best-effort : null si la clé/API est indisponible → PDF sans vue.
-  const siteMapDataUrl = await buildSiteStaticMap({ site });
+  // `zones` sert de repli de centrage quand le site n'a pas de coordonnées.
+  const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
 
   return {
     document: af,

@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.79",
+      "date": "2026-05-22",
+      "title": "Rapport PDF : la vue satellite réapparaît même sans coordonnées du site",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Vue satellite affichée à partir de l'adresse ou des zones",
+          "what": "La vue satellite avait disparu du rapport PDF pour les sites sans coordonnées GPS propres (la quasi-totalité). Elle est de nouveau affichée : le centre de la carte est déduit de l'adresse du site, sinon de la position de ses zones.",
+          "where": "Rapport PDF d'audit BACS → chapitre 1 « Identification du site ».",
+          "how_to_test": "Exporter le rapport PDF d'un audit dont le site a une adresse ou des zones placées sur la carte : la vue satellite apparaît dans le chapitre Identification."
+        }
+      ]
+    },
+    {
       "version": "0.1.78",
       "date": "2026-05-22",
       "title": "Rapport PDF : vue satellite du site déplacée dans le chapitre Identification",
