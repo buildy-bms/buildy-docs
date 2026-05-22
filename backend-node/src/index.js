@@ -55,6 +55,12 @@ async function main() {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (config.corsOrigins.includes(origin)) return cb(null, true);
+      // En dev, le port du serveur Vite peut varier (5173, 5174…) selon ce
+      // qui est déjà occupé. On tolère donc toute origine localhost hors prod.
+      if (process.env.NODE_ENV !== 'production'
+          && /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+        return cb(null, true);
+      }
       cb(new Error('CORS non autorise'), false);
     },
     credentials: true,

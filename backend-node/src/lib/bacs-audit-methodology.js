@@ -23,7 +23,7 @@ module.exports = [
   },
   {
     title: 'Seuil de puissance applicable',
-    body: `La puissance considérée pour déterminer l'applicabilité du décret est la puissance nominale utile cumulée des systèmes de chauffage et de climatisation, conformément à R175-2 §I. Les seuils sont 290 kW (échéance 1er janvier 2025) et 70 kW (échéance 1er janvier 2027), avec exemption en deçà de 70 kW.`,
+    body: `La puissance considérée pour déterminer l'applicabilité du décret est la puissance nominale utile cumulée des systèmes de chauffage et de climatisation, conformément à R175-2 §I. Les seuils sont 290 kW (échéance 1er janvier 2025) et 70 kW (échéance 1er janvier 2030, report acté par le décret publié au Journal officiel le 26 décembre 2025), avec exemption en deçà de 70 kW.`,
   },
   {
     title: 'Définition de zone fonctionnelle',
@@ -51,7 +51,7 @@ module.exports = [
   },
   {
     title: 'Date butoir applicable',
-    body: `Buildy calcule la date butoir réglementaire en fonction de la puissance nominale utile cumulée et de la date du permis de construire selon R175-2 : > 290 kW échéance 1er janvier 2025 (immédiate pour les bâtiments neufs livrés après cette date), > 70 kW échéance 1er janvier 2027 ou date de renouvellement du système. Cette date est rappelée en première page du rapport.`,
+    body: `Buildy calcule la date butoir réglementaire en fonction de la puissance nominale utile cumulée et de la date du permis de construire selon R175-2 : > 290 kW échéance 1er janvier 2025 (immédiate pour les bâtiments neufs livrés après cette date), entre 70 et 290 kW échéance 1er janvier 2030 (échéance repoussée de 2027 à 2030 par le décret publié au Journal officiel le 26 décembre 2025) ou date de renouvellement du système. Cette date est rappelée en première page du rapport.`,
   },
   {
     title: 'Arrêt manuel et fonctionnement autonome (R175-3 §4)',

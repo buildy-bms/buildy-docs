@@ -126,15 +126,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="relative inline-flex items-center shrink-0 whitespace-nowrap">
+  <div ref="rootRef" class="relative inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
     <!-- Déplacer : change l'usage principal du système -->
     <button
       type="button"
       @click="toggle('move')"
-      :class="['p-1.5 rounded-md transition',
-               openKind === 'move'
-                 ? 'text-indigo-700 bg-indigo-50'
-                 : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+      :class="['btn-icon', openKind === 'move' && 'is-active']"
       v-tooltip="'Déplacer vers un autre usage'"
     >
       <ArrowsRightLeftIcon class="w-4 h-4 shrink-0" />
@@ -143,10 +140,7 @@ onBeforeUnmount(() => {
     <button
       type="button"
       @click="toggle('share')"
-      :class="['relative p-1.5 rounded-md transition',
-               sharedCount > 0 || openKind === 'share'
-                 ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                 : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+      :class="['btn-icon relative', (sharedCount > 0 || openKind === 'share') && 'is-success']"
       v-tooltip="'Partager dans d\'autres usages'"
     >
       <ShareIcon class="w-4 h-4 shrink-0" />

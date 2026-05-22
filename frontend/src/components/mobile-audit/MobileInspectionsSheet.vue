@@ -86,17 +86,6 @@ async function removeInspection(ins) {
         </p>
       </div>
 
-      <!-- Bouton + ajouter -->
-      <button
-        type="button"
-        @click="addInspection"
-        :disabled="adding"
-        class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-xl disabled:opacity-50"
-      >
-        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
-        {{ adding ? 'Ajout…' : 'Ajouter une inspection' }}
-      </button>
-
       <!-- Liste des inspections -->
       <div v-if="inspections.length" class="space-y-3">
         <div
@@ -201,6 +190,16 @@ async function removeInspection(ins) {
         <p class="text-sm font-medium text-gray-700 mt-3">Aucune inspection tracée</p>
         <p class="text-xs text-gray-500 mt-1">Une action corrective est générée automatiquement tant qu'aucune inspection R175-5-1 n'est documentée.</p>
       </div>
+
+      <button
+        type="button"
+        @click="addInspection"
+        :disabled="adding"
+        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition disabled:opacity-50"
+      >
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+        {{ adding ? 'Ajout…' : 'Ajouter une inspection' }}
+      </button>
 
       <p class="text-xs text-gray-500 text-center pt-2">
         Sauvegarde automatique. Tu peux fermer cette page à tout moment.

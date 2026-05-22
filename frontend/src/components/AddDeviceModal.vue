@@ -15,6 +15,9 @@ const props = defineProps({
   energyOptions: { type: Array, required: true },
   roleOptions: { type: Array, required: true },
   commOptions: { type: Array, required: true },
+  // Mode onglet : rend le formulaire sans son BaseModal propre (panneau
+  // « Saisie manuelle » de la modale d'ajout d'équipement à 2 onglets).
+  embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'created'])
 const { success, error } = useNotification()
@@ -23,6 +26,11 @@ const { success, error } = useNotification()
 // découpage thermique R175-6 : champ masqué et non requis hors chauffage /
 // climatisation.
 const roleApplies = computed(() => isThermalCategory(props.systemCategory))
+
+// Item 3c — la puissance nominale n'a de sens que pour les usages
+// thermiques / aérauliques (masquée pour éclairage, production élec.).
+const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+const showPower = computed(() => POWER_RELEVANT.has(props.systemCategory))
 
 const EMPTY_FORM = () => ({
   name: '', brand: '', model_reference: '', power_kw: null,
@@ -93,7 +101,11 @@ async function submit(keepContext = false) {
 </script>
 
 <template>
-  <BaseModal :title="`Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`" size="xl" :dismiss-on-backdrop="false" @close="emit('close')">
+  <component
+    :is="embedded ? 'div' : BaseModal"
+    v-bind="embedded ? {} : { title: `Ajouter un système — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`, size: 'xl', dismissOnBackdrop: false }"
+    @close="emit('close')"
+  >
     <form @submit.prevent="submit(false)" class="space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
@@ -126,7 +138,7 @@ async function submit(keepContext = false) {
             placeholder="Sélectionner une énergie"
           />
         </div>
-        <div>
+        <div v-if="showPower">
           <label class="block text-xs font-medium text-gray-700 mb-1">Puissance (kW)</label>
           <input v-model.number="form.power_kw" type="number" inputmode="decimal" pattern="[0-9.,]*" min="0" step="0.1"
                  placeholder="—"
@@ -175,5 +187,5 @@ async function submit(keepContext = false) {
         </button>
       </div>
     </form>
-  </BaseModal>
+  </component>
 </template>

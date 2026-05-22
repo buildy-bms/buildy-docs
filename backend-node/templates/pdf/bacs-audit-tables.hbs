@@ -124,6 +124,7 @@
         <th class="col-ref">Réf</th>
         <th class="col-name">Nom</th>
         <th class="col-nature">Nature</th>
+        <th class="col-nature">Régime d'activité</th>
         <th class="col-surface">Surface (m²)</th>
         <th class="col-notes">Notes</th>
       </tr>
@@ -134,12 +135,37 @@
           <td class="col-ref">{{ref}}</td>
           <td class="col-name"><strong>{{name}}</strong></td>
           <td class="col-nature">{{natureLabel}}</td>
+          <td class="col-nature">{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td>
           <td class="col-surface">{{surface_m2}}</td>
           <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
         </tr>
       {{/each}}
     </tbody>
   </table>
+
+  {{!-- Item 7d/7e — zones fonctionnelles de suivi --}}
+  {{#if functionalZones.mergedCount}}
+  <table class="syn syn-zones" style="margin-top:4mm">
+    <thead>
+      <tr>
+        <th class="col-nature">Système technique</th>
+        <th class="col-name">Zone fonctionnelle de suivi</th>
+        <th class="col-notes">Justification du regroupement</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each functionalZones.byCategory}}
+        {{#each groups}}
+          <tr>
+            <td class="col-nature">{{../categoryLabel}}</td>
+            <td class="col-name"><strong>{{label}}</strong></td>
+            <td class="col-notes">{{#if merged}}{{justification}}{{else}}<span class="muted">Zone d'usage homogène — pas de regroupement.</span>{{/if}}</td>
+          </tr>
+        {{/each}}
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
 </section>
 {{/if}}
 
@@ -177,6 +203,12 @@
         <tr class="zone-row"><th colspan="14">{{zone_name}}</th></tr>
         {{#each items}}
           {{#if present}}
+            {{!-- Item 4d — assujetti calculé pour ce système --}}
+            {{#if liability}}{{#if ../../hasLiabilityData}}
+              <tr class="liability-row">
+                <td colspan="14">{{{categoryIcon system_category "10"}}} <strong>{{categoryLabel}}</strong> — {{liability.label}}</td>
+              </tr>
+            {{/if}}{{/if}}
             {{#each devices}}
               <tr {{#if out_of_service}}class="row-hs"{{/if}}>
                 <td class="col-ref">{{ref}}</td>
@@ -184,6 +216,7 @@
                 <td class="col-name">
                   <strong>{{name}}</strong>
                   {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
+                  {{#if shared_zone_count}}<span class="shared-badge">↔ Partagé {{add shared_zone_count 1}} zones</span>{{/if}}
                 </td>
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
@@ -193,8 +226,8 @@
                 <td class="col-comm">{{commLabel}}</td>
                 <td class="col-loc">{{location}}</td>
                 <td class="col-bool"><span class="{{#if meets_r175_3_p3}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p3}}✓{{else}}✗{{/if}}</span></td>
-                <td class="col-bool"><span class="{{#if meets_r175_3_p4}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p4}}✓{{else}}✗{{/if}}</span></td>
-                <td class="col-bool"><span class="{{#if meets_r175_3_p4_autonomous}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}}</span></td>
+                <td class="col-bool"><span class="{{triCls meets_r175_3_p4 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4}}</span></td>
+                <td class="col-bool"><span class="{{triCls meets_r175_3_p4_autonomous 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4_autonomous}}</span></td>
                 <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
               </tr>
             {{/each}}
@@ -211,7 +244,7 @@
     <span class="section-eyebrow">Tableau 2 / 4</span>
     <h2 class="section-title">Compteurs et mesurage par zone fonctionnelle</h2>
     <p class="section-intro">
-      Compteurs requis sur le site (R175-3 §1° — suivi continu pas horaire des consommations par usage et par zone). Les compteurs requis mais non présents constituent autant d'actions de mise en conformité.
+      Compteurs requis sur le site (R175-3 §1° — suivi continu pas horaire des consommations par usage et par zone). Les compteurs requis mais non présents constituent autant d'actions de mise en conformité.{{#if functionalZones.mergedCount}} Lorsque des zones sont regroupées en une zone fonctionnelle de suivi (cf. tableau ci-dessus), un comptage unique suffit pour la zone regroupée.{{/if}}
     </p>
   </header>
 
@@ -289,7 +322,7 @@
       {{#each thermal}}
         <tr>
           <td class="col-ref">{{ref}}</td>
-          <td class="col-zone">{{zone_name}}</td>
+          <td class="col-zone">{{zone_name}}{{#if label}}<div class="thermal-row-label">{{label}}</div>{{/if}}</td>
           <td class="col-usage">{{{categoryIcon category "11"}}}<span class="cat-label">{{categoryLabel}}</span></td>
           <td class="col-bool"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
           <td class="col-type">{{regulationLabel}}</td>

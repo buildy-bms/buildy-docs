@@ -2,10 +2,12 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon, QuestionMarkCircleIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
+import ZoneFunctionalHelpModal from '@/components/audit/ZoneFunctionalHelpModal.vue'
+import ZonePartiesModal from '@/components/audit/ZonePartiesModal.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -18,6 +20,7 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones } from '@/api'
+import { ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
 
 // Section Zones — rendue deux fois selon `kind` :
 //   - 'functional' : zones fonctionnelles (R175-1 6°), assujetties BACS,
@@ -35,9 +38,12 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { document, zones, site } = storeToRefs(audit)
+const { document, zones, site, siteParties } = storeToRefs(audit)
 
 const isTechnical = computed(() => props.kind === 'technical')
+
+// Modale d'aide pédagogique « Comprendre la zone fonctionnelle » (item 7a).
+const showHelp = ref(false)
 
 // Présentation propre à chaque type de card.
 const KIND_UI = computed(() => isTechnical.value
@@ -94,6 +100,9 @@ async function removeZone(z) {
     }
     await resyncBacsAudit(audit.docId)
     await audit.refreshAuditCore()
+    // La zone supprimée a pu être affectée à des parties prenantes
+    // (zone_parties supprimé en cascade) — resynchronise leurs zones.
+    await audit.refreshSiteParties()
   } catch { error('Suppression impossible') }
 }
 
@@ -125,6 +134,16 @@ function refreshAuditData() { return audit.refreshAuditCore() }
 function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
+}
+
+// Parties prenantes du site (item 4) : lues depuis le store partagé
+// (`audit.siteParties`) — la carte Structure juridique et cette section
+// pointent ainsi la même liste, toujours à jour. Un bouton par zone ouvre
+// une modale dédiée pour gérer les parties rattachées.
+const partiesModalZone = ref(null)
+function openPartiesModal(z) { partiesModalZone.value = z }
+function zoneHasParties(z) {
+  return siteParties.value.some(p => (p.zone_ids || []).includes(z.zone_id))
 }
 
 // Tri data-table (clic en-tête, asc → desc → off).
@@ -192,6 +211,12 @@ onBeforeUnmount(teardownZonesSortable)
                      @invalidate="emit('invalidate-step', $event)">
         <template v-if="audit.isBacs && !isTechnical" #subtitle-extra><R175Tooltip article="R175-1 6°" /></template>
         <template #actions>
+          <button v-if="!isTechnical" type="button" @click.stop="showHelp = true"
+                  v-tooltip="'Comprendre la zone fonctionnelle'"
+                  class="inline-flex items-center justify-center p-1 rounded-md text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition"
+                  aria-label="Aide : comprendre la zone fonctionnelle">
+            <QuestionMarkCircleIcon class="w-5 h-5" />
+          </button>
           <span class="text-[11px] text-gray-500 whitespace-nowrap">{{ kindZones.length }} zone{{ kindZones.length > 1 ? 's' : '' }}</span>
         </template>
       </SectionHeader>
@@ -216,16 +241,15 @@ onBeforeUnmount(teardownZonesSortable)
             <th class="w-8"></th>
             <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
             <th>Nature</th>
+            <th v-if="!isTechnical">Régime d'activité</th>
             <th>Type</th>
             <DataTableSortHeader sort-key="surface_m2" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Surface (m²)</DataTableSortHeader>
-            <th>Notes</th>
-            <th>Photos</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody ref="zonesBodyRef">
-          <PhotoDropTr v-for="z in sortedZones" :key="z.zone_id"
-                       :row-class="'zone-row'"
+          <template v-for="z in sortedZones" :key="z.zone_id">
+          <PhotoDropTr :row-class="'zone-row'"
                        :data-id="z.zone_id"
                        :site-uuid="document?.site_uuid || ''"
                        :attach-to="{ zone_id: z.zone_id }"
@@ -251,6 +275,14 @@ onBeforeUnmount(teardownZonesSortable)
                 placeholder="Nature de la zone"
               />
             </td>
+            <td v-if="!isTechnical" class="min-w-44">
+              <SearchableSelect
+                :model-value="z.occupancy_profile"
+                @update:model-value="v => patchZone(z, { occupancy_profile: v || null })"
+                :options="ZONE_OCCUPANCY_PROFILES"
+                placeholder="Régime d'activité"
+              />
+            </td>
             <td class="whitespace-nowrap">
               <div class="inline-flex rounded-md border border-gray-200 overflow-hidden text-xs">
                 <button type="button" @click="patchZoneKind(z, 'functional')"
@@ -261,7 +293,7 @@ onBeforeUnmount(teardownZonesSortable)
                 <button type="button" @click="patchZoneKind(z, 'technical')"
                         v-tooltip="'Zone technique — hors décret BACS'"
                         :class="(z.kind || 'functional') === 'technical'
-                          ? 'bg-slate-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
+                          ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'"
                         class="px-2.5 py-1 font-medium transition whitespace-nowrap border-l border-gray-200">Technique</button>
               </div>
             </td>
@@ -272,20 +304,15 @@ onBeforeUnmount(teardownZonesSortable)
                        class="w-full text-sm px-2 py-1 border border-transparent hover:border-gray-200 focus:border-indigo-500 focus:outline-none rounded bg-transparent" />
               </div>
             </td>
-            <td>
-              <button
-                type="button"
-                @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
-                :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
-                  hasNotes(z.notes_html || z.notes)
-                    ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
-                v-tooltip="hasNotes(z.notes_html || z.notes) ? 'Modifier les notes' : 'Ajouter une note'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </td>
-            <td>
-              <div class="inline-flex items-center gap-0.5">
+            <td class="whitespace-nowrap">
+              <div class="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
+                  :class="['btn-icon', hasNotes(z.notes_html || z.notes) && 'is-active']"
+                  v-tooltip="hasNotes(z.notes_html || z.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                  <PencilSquareIcon class="w-4 h-4" />
+                </button>
                 <BacsPhotoButton
                   v-if="document?.site_uuid"
                   :site-uuid="document.site_uuid"
@@ -296,29 +323,32 @@ onBeforeUnmount(teardownZonesSortable)
                   :site-uuid="document.site_uuid"
                   :attach-to="{ zone_id: z.zone_id }"
                   :label="z.name" />
+                <button @click="openPartiesModal(z)"
+                        :class="['btn-icon', zoneHasParties(z) && 'is-active']"
+                        v-tooltip="'Parties prenantes de la zone'"
+                        aria-label="Parties prenantes de la zone">
+                  <UserGroupIcon class="w-4 h-4" />
+                </button>
+                <button @click="openZoneMap(z)"
+                        :class="['btn-icon', z.latitude != null && 'is-active']"
+                        v-tooltip="z.latitude != null ? 'Position sur la carte' : 'Positionner sur la carte'">
+                  <MapPinIcon class="w-4 h-4" />
+                </button>
+                <button @click="dupZone(z)" class="btn-icon" v-tooltip="'Dupliquer'">
+                  <DocumentDuplicateIcon class="w-4 h-4" />
+                </button>
+                <button @click="removeZone(z)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
               </div>
             </td>
-            <td class="whitespace-nowrap">
-              <button @click="openZoneMap(z)"
-                      :class="['p-1.5 rounded transition',
-                               z.latitude != null
-                                 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
-                                 : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50']"
-                      v-tooltip="z.latitude != null ? 'Position sur la carte' : 'Positionner sur la carte'">
-                <MapPinIcon class="w-4 h-4" />
-              </button>
-              <button @click="dupZone(z)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
-                <DocumentDuplicateIcon class="w-4 h-4" />
-              </button>
-              <button @click="removeZone(z)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
-                <TrashIcon class="w-4 h-4" />
-              </button>
-            </td>
           </PhotoDropTr>
-          <tr class="bg-emerald-50/30">
-            <td colspan="8" class="px-5 py-3 text-center">
-              <button @click="emit('add-zone', { kind })" class="btn-success">
-                <PlusIcon class="w-4 h-4" />
+          </template>
+          <tr>
+            <td :colspan="isTechnical ? 6 : 7" class="px-3 py-3">
+              <button @click="emit('add-zone', { kind })"
+                      class="btn-add">
+                <PlusIcon class="w-4 h-4 shrink-0" />
                 {{ isTechnical ? 'Ajouter une zone technique' : 'Ajouter une zone' }}
               </button>
             </td>
@@ -352,6 +382,13 @@ onBeforeUnmount(teardownZonesSortable)
                  @blur="e => patchZone(z, { surface_m2: e.target.value === '' ? null : parseFloat(e.target.value) })"
                  class="w-full px-3 py-1 border border-gray-200 rounded-lg" />
         </div>
+        <SearchableSelect
+          v-if="!isTechnical"
+          :model-value="z.occupancy_profile"
+          @update:model-value="v => patchZone(z, { occupancy_profile: v || null })"
+          :options="ZONE_OCCUPANCY_PROFILES"
+          placeholder="Régime d'activité…"
+        />
         <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
           <button type="button" @click="patchZoneKind(z, 'functional')"
                   :class="(z.kind || 'functional') === 'functional'
@@ -359,7 +396,7 @@ onBeforeUnmount(teardownZonesSortable)
                   class="px-3 py-1.5 font-medium transition">Fonctionnelle</button>
           <button type="button" @click="patchZoneKind(z, 'technical')"
                   :class="(z.kind || 'functional') === 'technical'
-                    ? 'bg-slate-600 text-white' : 'bg-white text-gray-500'"
+                    ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500'"
                   class="px-3 py-1.5 font-medium transition border-l border-gray-200">Technique</button>
         </div>
         <div class="flex items-center gap-2">
@@ -393,8 +430,9 @@ onBeforeUnmount(teardownZonesSortable)
         </div>
       </div>
       <div class="p-3">
-        <button @click="emit('add-zone', { kind })" class="w-full tap-target btn-success justify-center">
-          <PlusIcon class="w-4 h-4" />
+        <button @click="emit('add-zone', { kind })"
+                class="btn-add">
+          <PlusIcon class="w-4 h-4 shrink-0" />
           {{ isTechnical ? 'Ajouter une zone technique' : 'Ajouter une zone' }}
         </button>
       </div>
@@ -428,4 +466,15 @@ onBeforeUnmount(teardownZonesSortable)
       </button>
     </template>
   </BaseModal>
+
+  <!-- Aide pédagogique « Comprendre la zone fonctionnelle » (item 7a) -->
+  <ZoneFunctionalHelpModal v-if="showHelp" @close="showHelp = false" />
+
+  <!-- Parties prenantes rattachées à une zone (item 4/5) -->
+  <ZonePartiesModal
+    v-if="partiesModalZone"
+    :zone="partiesModalZone"
+    :site-parties="siteParties"
+    @close="partiesModalZone = null"
+  />
 </template>

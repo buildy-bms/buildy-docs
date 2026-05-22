@@ -54,7 +54,8 @@ const updateAfSchema = z.object({
  * - puissance < 70 kW => not_subject (hors champ)
  * - puissance >= 290 kW => subject_2025 (echeance 1er janvier 2025)
  *   - sauf si PC > 8 avril 2024 => subject_immediate (s'applique a la livraison)
- * - 70 kW <= puissance < 290 kW => subject_2027 (echeance 1er janvier 2027)
+ * - 70 kW <= puissance < 290 kW => subject_2030 (echeance 1er janvier 2030,
+ *   report acte par le decret publie au JO le 26 decembre 2025)
  *
  * Retourne { status, deadline } ou null si la puissance n'est pas renseignee.
  */
@@ -69,7 +70,7 @@ function computeBacsApplicability(powerKw, buildingPermitDate) {
     }
     return { status: 'subject_2025', deadline: '2025-01-01' };
   }
-  return { status: 'subject_2027', deadline: '2027-01-01' };
+  return { status: 'subject_2030', deadline: '2030-01-01' };
 }
 
 async function routes(fastify) {

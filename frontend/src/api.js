@@ -409,6 +409,32 @@ export const updateSite = (uuid, data) => api.patch(`/sites/${uuid}`, data)
 export const deleteSite = (uuid) => api.delete(`/sites/${uuid}`)
 export const ensureUserFromPocketId = (pocketid_id) => api.post('/users/ensure-by-pocketid-id', { pocketid_id })
 
+// ── Parties prenantes du site (item 4 — structure juridique) ──
+export const getSiteParties = (uuid) => api.get(`/sites/${uuid}/parties`)
+export const createSiteParty = (uuid, data) => api.post(`/sites/${uuid}/parties`, data)
+export const updateSiteParty = (id, data) => api.patch(`/site-parties/${id}`, data)
+export const deleteSiteParty = (id) => api.delete(`/site-parties/${id}`)
+// Affectation périmètre : parties d'une zone / d'un système.
+export const getZoneParties = (zoneId) => api.get(`/site-zones/${zoneId}/parties`)
+export const setZoneParties = (zoneId, partyIds) =>
+  api.put(`/site-zones/${zoneId}/parties`, { party_ids: partyIds })
+export const getPartyZones = (partyId) => api.get(`/site-parties/${partyId}/zones`)
+export const setPartyZones = (partyId, zoneIds) =>
+  api.put(`/site-parties/${partyId}/zones`, { zone_ids: zoneIds })
+export const getSystemParties = (systemId) => api.get(`/bacs-audit/systems/${systemId}/parties`)
+export const setSystemParties = (systemId, parties) =>
+  api.put(`/bacs-audit/systems/${systemId}/parties`, { parties })
+// Calcul automatique de l'assujetti par système (item 4d).
+export const getBacsLiability = (docId) => api.get(`/bacs-audit/${docId}/liability`)
+
+// ── Historique de consommation de référence (item 13) ──
+export const getSiteEnergyHistory = (uuid) => api.get(`/sites/${uuid}/energy-history`)
+export const createSiteEnergyHistory = (uuid, data) => api.post(`/sites/${uuid}/energy-history`, data)
+export const importSiteEnergyHistory = (uuid, rows) =>
+  api.post(`/sites/${uuid}/energy-history/bulk`, { rows })
+export const updateSiteEnergyHistory = (id, data) => api.patch(`/site-energy-history/${id}`, data)
+export const deleteSiteEnergyHistory = (id) => api.delete(`/site-energy-history/${id}`)
+
 // ── Audit BACS — donnees structurees ──
 export const getBacsSystems = (docId) => api.get(`/bacs-audit/${docId}/systems`)
 export const updateBacsSystem = (id, data) => api.patch(`/bacs-audit/systems/${id}`, data)
@@ -453,7 +479,9 @@ export const updateBacsBmsComponent = (id, data) => api.patch(`/bacs-audit/bms-c
 export const duplicateBacsBmsComponent = (id) => api.post(`/bacs-audit/bms-components/${id}/duplicate`)
 export const deleteBacsBmsComponent = (id) => api.delete(`/bacs-audit/bms-components/${id}`)
 export const getBacsThermal = (docId) => api.get(`/bacs-audit/${docId}/thermal-regulation`)
+export const createBacsThermal = (docId, data) => api.post(`/bacs-audit/${docId}/thermal-regulation`, data)
 export const updateBacsThermal = (id, data) => api.patch(`/bacs-audit/thermal-regulation/${id}`, data)
+export const deleteBacsThermal = (id) => api.delete(`/bacs-audit/thermal-regulation/${id}`)
 export const getBacsInspections = (docId) => api.get(`/bacs-audit/${docId}/inspections`)
 export const createBacsInspection = (docId, data) => api.post(`/bacs-audit/${docId}/inspections`, data)
 export const updateBacsInspection = (id, data) => api.patch(`/bacs-audit/inspections/${id}`, data)

@@ -33,6 +33,9 @@ import {
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,
   faServer, faTreeCity, faNetworkWired, faCloud, faPlugCircleXmark,
+  // ZONE_NATURES enrichies (item 7b) + ZONE_OCCUPANCY_PROFILES (item 14)
+  faKitchenSet, faUtensils, faShirt, faToilet, faBed, faSuitcaseMedical,
+  faDumbbell, faSoap, faInfinity, faGraduationCap, faArrowsToDot, faSun,
   // PWA audit UI (MobileAuditDetailView, MobileSelectSheet, MobileLibraryPicker,
   // tous les Mobile*Tab et sheets après migration Heroicons → FA)
   faChevronLeft, faChevronRight, faChevronDown, faXmark, faMagnifyingGlass,
@@ -41,6 +44,10 @@ import {
   faBookOpen, faClock, faSignalSlash, faIdCard, faClipboardList, faClipboardCheck,
   faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
   faMapPin, faShare, faEllipsis,
+  // Structure juridique & parties prenantes (item 4)
+  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faKey, faShuffle,
+  // Base de consommations de référence (item 13)
+  faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -58,12 +65,16 @@ const ICONS = [
   faShop, faChalkboardUser, faScrewdriverWrench, faCouch, faMugHot, faUsers,
   faArrowsLeftRight, faBoxesStacked, faWarehouse, faBoltLightning, faGears,
   faServer, faTreeCity, faNetworkWired, faCloud, faPlugCircleXmark,
+  faKitchenSet, faUtensils, faShirt, faToilet, faBed, faSuitcaseMedical,
+  faDumbbell, faSoap, faInfinity, faGraduationCap, faArrowsToDot, faSun,
   faChevronLeft, faChevronRight, faChevronDown, faXmark, faMagnifyingGlass,
   faPlus, faCheck, faCircleXmark, faCircleExclamation,
   faTriangleExclamation, faCircleUser, faPencil, faPenToSquare, faShareNodes,
   faBookOpen, faClock, faSignalSlash, faIdCard, faClipboardList, faClipboardCheck,
   faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
   faMapPin, faShare, faEllipsis,
+  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faKey, faShuffle,
+  faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
 ]
 
 library.add(...ICONS)

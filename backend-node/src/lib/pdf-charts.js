@@ -214,10 +214,54 @@ async function barAfCoverage({ levels = {} } = {}) {
   return _renderToDataUrl(config, { width: 500, height: 280 });
 }
 
+/**
+ * Bar groupé — répartition mensuelle des consommations de référence
+ * (item 13). 1 dataset par énergie, 12 colonnes (jan → déc).
+ * series: [{ label, color, values: [12 nombres] }]
+ */
+async function energyMonthlyBar({ series = [], unit = 'kWh' } = {}) {
+  if (!series.length) return null;
+  const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+  const config = {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: series.map(s => ({
+        label: s.label,
+        data: s.values,
+        backgroundColor: s.color || COLORS.info,
+        borderWidth: 0,
+        borderRadius: 3,
+      })),
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: unit, font: { size: 11 } },
+          grid: { color: '#f3f4f6' },
+          ticks: { font: { size: 10 } },
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      },
+      plugins: {
+        legend: series.length > 1
+          ? { position: 'top', labels: { boxWidth: 12, padding: 10, font: { size: 11 } } }
+          : { display: false },
+        tooltip: { enabled: false },
+        datalabels: { display: false },
+      },
+    },
+  };
+  return _renderToDataUrl(config, { width: 640, height: 300 });
+}
+
 module.exports = {
   donutSeverity,
   radarCompliance,
   barUsagePower,
   barAfCoverage,
+  energyMonthlyBar,
   COLORS,
 };

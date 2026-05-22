@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon, BookOpenIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, onMounted, watch } from 'vue'
+import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice, duplicateBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -9,11 +9,11 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import PhotoDropTr from './PhotoDropTr.vue'
-import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import DeviceMoveShare from './DeviceMoveShare.vue'
 import VoiceNoteButton from './VoiceNoteButton.vue'
 import DataTableSortHeader from './DataTableSortHeader.vue'
+import DeviceEditModal from './audit/DeviceEditModal.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 
@@ -32,7 +32,7 @@ const props = defineProps({
   systemLabel: { type: String, required: true },
   siteUuid: { type: String, default: null },
 })
-const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device', 'add-device-from-library'])
+const emit = defineEmits(['changed', 'system-updated', 'open-device-notes', 'add-device'])
 
 function hasNotes(htmlOrText) {
   if (!htmlOrText) return false
@@ -52,12 +52,29 @@ const auditStore = useAuditStore()
 const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, isThermalCategory } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, isDeviceComplete } from '@/lib/audit-options'
 
-// Le rôle/niveau (Production / Distribution / Émission / Régulation) ne
-// concerne que les systèmes thermiques (R175-6) : la colonne est verrouillée
-// pour les autres catégories (ventilation, ECS, éclairage, PV, usages manuels).
-const roleLocked = computed(() => !isThermalCategory(props.system?.system_category))
+// Item 3c — les puissances nominales (chaud / froid) n'ont de sens que pour
+// les systèmes qui mettent en jeu une puissance thermique ou aéraulique.
+// Masquées pour l'éclairage et la production d'électricité (où elles
+// n'alimentent ni le cumul R175-2 ni un calcul utile).
+const POWER_RELEVANT_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+const showPower = computed(() => POWER_RELEVANT_CATEGORIES.has(props.system?.system_category))
+
+// Champ de puissance pertinent pour l'usage de CE tableau. Dans un usage
+// refroidissement, un équipement réversible (qui sert aussi un usage
+// chauffage) porte sa puissance froid dans `power_kw_cooling` ; un
+// équipement de froid seul la porte dans `power_kw`. Ailleurs : `power_kw`.
+function powerFieldFor(d) {
+  if (props.system?.system_category !== 'cooling') return 'power_kw'
+  const ids = new Set([d.system_id, ...(d.extra_system_ids || [])])
+  const reversible = (auditStore.systems || []).some(
+    s => ids.has(s.id) && s.system_category === 'heating')
+  return reversible ? 'power_kw_cooling' : 'power_kw'
+}
+
+// Item 3 — modale d'édition détaillée d'un équipement (désengorge la ligne).
+const editingDevice = ref(null)
 
 // Devices partagés depuis un autre usage (mig 143) : un device dont le
 // système primaire est ailleurs mais dont les extra_system_ids contiennent
@@ -79,7 +96,7 @@ function sortValue(d, key) {
     case 'model_reference': return (d.model_reference || '').toLowerCase()
     case 'quantity': return Number(d.quantity) || 1
     case 'age_years': return Number(d.age_years) || 0
-    case 'power_kw': return Number(d.power_kw) || 0
+    case 'power_kw': return Number(d[powerFieldFor(d)]) || 0
     case 'energy_source': return (d.energy_source || '').toLowerCase()
     case 'location': return (d.location || '').toLowerCase()
     default: return ''
@@ -182,7 +199,7 @@ const selectAddCls = 'w-full px-1.5 py-1 border border-indigo-200 bg-white round
 // équipement (un équipement saisi en quantité 3 compte 3 fois).
 const totalPowerKw = computed(() =>
   Math.round(
-    props.devices.reduce((s, d) => s + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0) * 10,
+    props.devices.reduce((s, d) => s + (Number(d[powerFieldFor(d)]) || 0) * (Number(d.quantity) || 1), 0) * 10,
   ) / 10
 )
 
@@ -234,24 +251,10 @@ async function dupDevice(d) {
   }
 }
 
-// Menu déroulant du split button « Ajouter un système »
-const addMenuOpen = ref(false)
-const addMenuRef = ref(null)
-function toggleAddMenu() { addMenuOpen.value = !addMenuOpen.value }
-function closeAddMenu() { addMenuOpen.value = false }
-function onClickAddManual() {
-  closeAddMenu()
+// Ouvre la modale d'ajout d'équipement à 2 onglets (bibliothèque / manuel).
+function onClickAddDevice() {
   emit('add-device', props.system)
 }
-function onClickAddFromLibrary() {
-  closeAddMenu()
-  emit('add-device-from-library', props.system)
-}
-function onAddMenuDocClick(e) {
-  if (addMenuRef.value && !addMenuRef.value.contains(e.target)) closeAddMenu()
-}
-onMounted(() => document.addEventListener('mousedown', onAddMenuDocClick))
-onBeforeUnmount(() => document.removeEventListener('mousedown', onAddMenuDocClick))
 
 async function removeDevice(d) {
   const ok = await confirm({
@@ -271,56 +274,14 @@ async function removeDevice(d) {
 
 <template>
   <div class="bg-slate-50 border-t border-gray-200 px-3 py-3">
-    <!-- Header avec puissance totale + bouton + vert -->
-    <div class="flex items-center justify-between mb-2 flex-wrap gap-2 min-w-0">
+    <!-- Header avec puissance totale -->
+    <div class="flex items-center mb-2 flex-wrap gap-2 min-w-0">
       <div class="flex items-center gap-3 text-xs text-gray-600 min-w-0 flex-1">
         <span v-truncate-tooltip class="font-semibold text-gray-700 truncate">{{ systemLabel }}</span>
         <span v-if="totalPowerKw > 0" class="text-emerald-700 font-mono whitespace-nowrap">
           {{ totalPowerKw }} kW total ({{ devices.length }} {{ devices.length > 1 ? 'systèmes' : 'système' }})
         </span>
         <span v-else class="text-gray-400 italic whitespace-nowrap">aucun système saisi</span>
-      </div>
-      <!-- Split button : action principale = formulaire manuel,
-           déroulante = bibliothèque pré-filtrée sur la catégorie. -->
-      <div ref="addMenuRef" class="relative inline-flex shrink-0 whitespace-nowrap">
-        <button
-          type="button"
-          @click="onClickAddManual"
-          class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm whitespace-nowrap rounded-l-lg"
-        >
-          <PlusIcon class="w-3.5 h-3.5 shrink-0" /> Ajouter un système
-        </button>
-        <button
-          type="button"
-          @click="toggleAddMenu"
-          :aria-expanded="addMenuOpen"
-          aria-label="Plus d'options pour ajouter"
-          v-tooltip="'Plus d\'options pour ajouter (depuis la bibliothèque…)'"
-          class="inline-flex items-center justify-center px-1.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-r-lg shadow-sm border-l border-emerald-700 shrink-0"
-        >
-          <ChevronDownIcon class="w-3.5 h-3.5 shrink-0" />
-        </button>
-        <div
-          v-if="addMenuOpen"
-          class="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-lg w-60 py-1 text-sm"
-        >
-          <button
-            type="button"
-            @click="onClickAddManual"
-            class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 whitespace-nowrap"
-          >
-            <PlusIcon class="w-4 h-4 text-gray-500 shrink-0" />
-            <span>Saisir manuellement</span>
-          </button>
-          <button
-            type="button"
-            @click="onClickAddFromLibrary"
-            class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-50 hover:text-emerald-700 whitespace-nowrap"
-          >
-            <BookOpenIcon class="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Depuis la bibliothèque</span>
-          </button>
-        </div>
       </div>
     </div>
 
@@ -333,14 +294,9 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="name" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Nom</DataTableSortHeader>
             <DataTableSortHeader sort-key="brand" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Marque</DataTableSortHeader>
             <DataTableSortHeader sort-key="model_reference" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Référence</DataTableSortHeader>
-            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Quantité</DataTableSortHeader>
             <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
             <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
             <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
-            <th>Rôle(s)</th>
-            <DataTableSortHeader sort-key="location" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Localisation</DataTableSortHeader>
-            <th>Communication</th>
-            <th>État</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -375,14 +331,6 @@ async function removeDevice(d) {
                      @blur="e => e.target.value !== (d.model_reference || '') && patchDevice(d, { model_reference: e.target.value || null })"
                      :class="inputCls" class="min-w-32 placeholder:italic placeholder:text-gray-300" />
             </td>
-            <!-- Quantité (par défaut 1, mig 134) -->
-            <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="w-14 mx-auto">
-                <input type="number" min="1" step="1" :value="d.quantity ?? 1"
-                       @blur="e => patchDevice(d, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })"
-                       :class="inputCls" class="text-center" />
-              </div>
-            </td>
             <!-- Âge en années (mig 135, propriété du device) -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div class="w-16 mx-auto">
@@ -391,12 +339,16 @@ async function removeDevice(d) {
                        :class="inputCls" class="text-center placeholder:text-gray-300" />
               </div>
             </td>
-            <!-- Puissance -->
+            <!-- Puissance — item 3c : masquée hors usages thermiques. Le
+                 détail (frigorifique + type de calcul) est dans la modale. -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="relative w-20 mx-auto">
-                <input type="number" min="0" step="0.1" :value="d.power_kw" placeholder="—"
-                       @blur="e => patchDevice(d, { power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       :class="inputCls" class="text-right pr-6 placeholder:text-gray-300" />
+              <div v-if="!showPower" class="text-center text-xs text-gray-300"
+                   v-tooltip="'Sans objet pour cet usage'">—</div>
+              <div v-else class="relative w-24 mx-auto">
+                <input type="number" min="0" step="0.1" :value="d[powerFieldFor(d)]" placeholder="—"
+                       @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       :class="inputCls" class="text-right pr-9 placeholder:text-gray-300"
+                       v-tooltip="system.system_category === 'cooling' ? 'Puissance froid pour cet usage — détail chaud/froid dans la modale' : 'Puissance chaud / nominale — détail chaud/froid dans la modale'" />
                 <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>
@@ -413,81 +365,21 @@ async function removeDevice(d) {
                 />
               </div>
             </td>
-            <!-- Rôle(s) — verrouillé hors chauffage / climatisation (R175-6) -->
+            <!-- Actions : Modifier (modale détaillée) + notes / photo / etc. -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="min-w-32">
-                <SearchableSelect
-                  v-if="!roleLocked"
-                  :model-value="Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])"
-                  @update:model-value="v => patchDevice(d, { device_role: Array.isArray(v) ? v : [] })"
-                  :options="ROLE_OPTIONS"
-                  :multiple="true"
-                  :clearable="true"
-                  :creatable="true"
-                  size="sm"
-                  placeholder="Rôle(s)"
-                />
-                <span v-else class="block text-center text-gray-300 select-none"
-                      v-tooltip="'Le rôle ne concerne que les systèmes de chauffage et de climatisation'">—</span>
-              </div>
-            </td>
-            <!-- Localisation -->
-            <td class="px-2 py-2 align-middle">
-              <input type="text" :value="d.location" placeholder="ex : Local technique"
-                     @blur="e => e.target.value !== (d.location || '') && patchDevice(d, { location: e.target.value || null })"
-                     :class="inputCls" class="min-w-40 placeholder:italic placeholder:text-gray-300" />
-            </td>
-            <!-- Communication : protocoles + câblé sur la même ligne -->
-            <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="flex items-center gap-1.5 min-w-48">
-                <div class="flex-1 min-w-0">
-                  <ProtocolMultiPicker
-                    :model-value="d.communication_protocols || (d.communication_protocol && d.communication_protocol !== 'non_communicant' ? JSON.stringify([d.communication_protocol]) : null)"
-                    :options="COMM_OPTIONS"
-                    size="xs"
-                    placeholder="Aucun protocole"
-                    @update:modelValue="v => patchDevice(d, { communication_protocols: v, communication_protocol: null })"
-                  />
-                </div>
-                <button type="button"
-                        @click="patchDevice(d, { wired: !d.wired })"
-                        :class="['flag-pill shrink-0', d.wired ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'Communication câblée vers la GTB'">
-                  <span class="flag-ico">{{ d.wired ? '✓' : '✗' }}</span> Câblé
-                </button>
-              </div>
-            </td>
-            <!-- État : Arrêt manuel + Autonome + HS -->
-            <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="flex items-center gap-1">
-                <button type="button"
-                        @click="patchDevice(d, { meets_r175_3_p4: !d.meets_r175_3_p4 })"
-                        :class="['flag-pill whitespace-nowrap', d.meets_r175_3_p4 ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'L\'équipement peut être arrêté à la main par l\'exploitant.'">
-                  <span class="flag-ico">{{ d.meets_r175_3_p4 ? '✓' : '✗' }}</span> Arrêt manuel
-                </button>
-                <button type="button"
-                        @click="patchDevice(d, { meets_r175_3_p4_autonomous: !d.meets_r175_3_p4_autonomous })"
-                        :class="['flag-pill whitespace-nowrap', d.meets_r175_3_p4_autonomous ? 'flag-on' : 'flag-off']"
-                        v-tooltip="'L\'équipement repart seul après une coupure ou un redémarrage de la GTB, sans intervention.'">
-                  <span class="flag-ico">{{ d.meets_r175_3_p4_autonomous ? '✓' : '✗' }}</span> Autonome
-                </button>
-                <button type="button"
-                        @click="patchDevice(d, { out_of_service: !d.out_of_service })"
-                        :class="['flag-pill', d.out_of_service ? 'flag-danger-on' : 'flag-off']"
-                        v-tooltip="'Hors service — ignoré dans le plan d\'action'">
-                  <span class="flag-ico">{{ d.out_of_service ? '✕' : '○' }}</span> HS
-                </button>
-              </div>
-            </td>
-            <!-- Actions : icones seules + tooltip (compteur photo en badge) -->
-            <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div class="inline-flex items-center gap-0.5">
-                <button type="button" @click="emit('open-device-notes', d)"
-                        :class="['p-1.5 rounded-md transition',
-                          hasNotes(d.notes_html || d.notes)
+              <div class="inline-flex items-center gap-1">
+                <button type="button" @click="editingDevice = d"
+                        :class="['inline-flex items-center gap-1 px-2 py-1 mr-0.5 text-xs font-medium rounded-md transition whitespace-nowrap',
+                          isDeviceComplete(d, system.system_category)
                             ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                            : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+                            : 'text-red-700 bg-red-50 hover:bg-red-100']"
+                        v-tooltip="isDeviceComplete(d, system.system_category)
+                          ? 'Modifier l\'équipement'
+                          : 'Équipement incomplet — à compléter avant de valider l\'étape Systèmes'">
+                  <Cog6ToothIcon class="w-3.5 h-3.5 shrink-0" /> Modifier
+                </button>
+                <button type="button" @click="emit('open-device-notes', d)"
+                        :class="['btn-icon', hasNotes(d.notes_html || d.notes) && 'is-active']"
                         v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
@@ -495,10 +387,7 @@ async function removeDevice(d) {
                        :ref="el => { if (el) fileInputs[d.id] = el }"
                        @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
                 <button @click="pickPhotoFor(d.id)"
-                        :class="['relative p-1.5 rounded-md transition',
-                                 (photosByDevice[d.id] || []).length
-                                   ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                                   : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+                        :class="['btn-icon relative', (photosByDevice[d.id] || []).length && 'is-success']"
                         v-tooltip="(photosByDevice[d.id] || []).length
                           ? `${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`
                           : 'Ajouter une photo'">
@@ -518,10 +407,10 @@ async function removeDevice(d) {
                   :systems="documentSystems"
                   @updated="emit('changed')" />
                 <span class="w-px h-5 bg-gray-200 mx-0.5"></span>
-                <button @click="dupDevice(d)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
+                <button @click="dupDevice(d)" class="btn-icon" v-tooltip="'Dupliquer'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>
-                <button @click="removeDevice(d)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
+                <button @click="removeDevice(d)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
                   <TrashIcon class="w-4 h-4" />
                 </button>
               </div>
@@ -530,6 +419,29 @@ async function removeDevice(d) {
         </tbody>
       </table>
     </div>
+
+    <!-- Bouton d'ajout unique, pleine largeur : ouvre la modale à 2 onglets
+         (bibliothèque préfiltrée + saisie manuelle). -->
+    <div class="mt-2">
+      <button
+        type="button"
+        @click="onClickAddDevice"
+        class="btn-add"
+      >
+        <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un équipement
+      </button>
+    </div>
+
+    <!-- Modale d'édition détaillée de l'équipement (item 3). -->
+    <DeviceEditModal
+      v-if="editingDevice"
+      :device="editingDevice"
+      :system="system"
+      :system-label="systemLabel"
+      :zone-name="system.zone_name || ''"
+      @changed="emit('changed')"
+      @close="editingDevice = null"
+    />
   </div>
 </template>
 

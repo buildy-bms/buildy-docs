@@ -8,6 +8,8 @@ import { useNotification } from '@/composables/useNotification'
 import { updateAf, getBacsPowerSummary } from '@/api'
 import MobileField from './MobileField.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import SitePartiesCard from '@/components/audit/SitePartiesCard.vue'
+import EnergyHistoryCard from '@/components/audit/EnergyHistoryCard.vue'
 
 const audit = useAuditStore()
 const { document, site, powerSummary } = storeToRefs(audit)
@@ -19,7 +21,7 @@ const isBacs = computed(() => (document.value?.kind || 'bacs_audit') === 'bacs_a
 const APPLICABILITY_LABEL = {
   subject_immediate: { label: 'Soumis immédiatement',            icon: 'triangle-exclamation', cls: 'bg-red-50 text-red-800 border-red-200' },
   subject_2025:      { label: 'Soumis — échéance 1er janvier 2025', icon: 'triangle-exclamation', cls: 'bg-orange-50 text-orange-800 border-orange-200' },
-  subject_2027:      { label: 'Soumis — échéance 1er janvier 2027', icon: 'triangle-exclamation', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  subject_2030:      { label: 'Soumis — échéance 1er janvier 2030', icon: 'triangle-exclamation', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
   not_subject:       { label: 'Non assujetti (puissance < 70 kW)',  icon: 'circle-check',         cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
 }
 
@@ -167,6 +169,12 @@ const generatorWorksDone = computed({
         </MobileField>
       </div>
     </div>
+
+    <!-- Item 4 — Structure juridique & parties prenantes -->
+    <SitePartiesCard v-if="isBacs && document?.site_uuid" />
+
+    <!-- Item 13 — Base de consommations mensuelles de référence -->
+    <EnergyHistoryCard v-if="isBacs && document?.site_uuid" />
 
     <!-- BACS only : puissance + dates -->
     <template v-if="isBacs">

@@ -60,6 +60,59 @@ function isBuildySolution(bms) {
   return /buildy/.test(text);
 }
 
+// Item 10 — Contre-indications de pilotage par type d'équipement.
+// Chaque code bloque un certain type d'action R175-3 §4 (coupure /
+// arrêt manuel) et génère à la place un encart informatif.
+// Map code → { label (texte affiché dans l'action informative),
+//   blocksCutPower (true = bloque l'action « arrêt manuel ») }.
+const CONTRAINDICATION_INFO = {
+  do_not_cut_power_thermodynamic: {
+    label: 'Équipement thermodynamique : ne pas couper l\'alimentation électrique en cours de fonctionnement (lubrification du compresseur). Privilégier un arrêt piloté par la régulation.',
+    blocksCutPower: true,
+  },
+  do_not_cut_power_winter_boiler: {
+    label: 'Chaudière en période hivernale : ne pas couper l\'alimentation (perte de la protection hors-gel). L\'arrêt doit rester piloté.',
+    blocksCutPower: true,
+  },
+  legionella_loop_ecs: {
+    label: 'Boucle ECS : l\'arrêt est interdit (arrêté du 30 novembre 2005 — risque légionelle). Surveiller la température de bouclage.',
+    blocksCutPower: true,
+  },
+  continuous_ventilation_required: {
+    label: 'Ventilation en continu requise (EHPAD, hôpitaux, sanitaires) : ne pas programmer d\'arrêt — qualité d\'air et hygiène.',
+    blocksCutPower: true,
+  },
+  aci_tank_no_long_cut: {
+    label: 'Ballon ECS à anode à courant imposé (ACI) : pas de coupure prolongée (> 8 h) — perte de la protection anti-corrosion.',
+    blocksCutPower: true,
+  },
+  circulator_degommage: {
+    label: 'Circulateur avec fonction de dégommage : ne pas couper en été — perte de la protection anti-grippage.',
+    blocksCutPower: true,
+  },
+  lighting_already_optimized: {
+    label: 'Éclairage déjà optimisé (détection de présence + LED récentes) : généraliser une commande BACS n\'apporte pas de gisement d\'économies.',
+    blocksCutPower: false,
+  },
+};
+
+/**
+ * Charge les contre-indications BACS d'un device via son modèle
+ * d'équipement de la bibliothèque (`equipment_template_id`, mig 145+154).
+ * Retourne un tableau de codes (vide si non rattaché ou non renseigné).
+ */
+function loadContraindications(equipmentTemplateId) {
+  if (!equipmentTemplateId) return [];
+  try {
+    const row = db.db.prepare(
+      'SELECT bacs_contraindications FROM equipment_templates WHERE id = ?'
+    ).get(equipmentTemplateId);
+    if (!row || !row.bacs_contraindications) return [];
+    const parsed = JSON.parse(row.bacs_contraindications);
+    return Array.isArray(parsed) ? parsed.filter(c => typeof c === 'string') : [];
+  } catch { return []; }
+}
+
 // Cle d'idempotence : derivee de la FK source non-NULL (1 max parmi 6)
 // + source_subtype. Permet le matching `existingByKey` sur regen.
 function keyOfItem(item) {
@@ -104,6 +157,23 @@ function computeTargetActions(documentId) {
     // une action manuelle via la vue commerciale.
     if (!s.present) continue;
 
+    // Item 1 — Règle des 5 % : si l'auditeur a marqué le système comme
+    // négligeable (< 5 % de la consommation totale, FAQ ministère juin
+    // 2025), on ne génère AUCUNE action R175-3 dessus. Une action
+    // informative non-bloquante trace l'exemption (cf. encart PDF).
+    if (s.marked_negligible_under_5pct) {
+      const justif = (s.negligible_justification || '').trim();
+      addTarget({
+        source_system_id: s.id, source_subtype: 'negligible_5pct',
+        category: 'other', severity: 'minor',
+        r175_article: 'R175-3',
+        title: `Poste exempté — ${catFr}${zoneStr} considéré négligeable (< 5 %)`,
+        description: `Ce poste a été exempté de mise en conformité R175-3 en application de la règle des 5 % (FAQ ministère, juin 2025) : un poste représentant moins de 5 % de la consommation totale du bâtiment peut être écarté du raccordement et du comptage.${justif ? ` Justification de l'auditeur : ${justif}` : ''}`,
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+      continue;
+    }
+
     // Système présent + non communicant (legacy : on garde la règle communication=non_communicant)
     if (s.communication === 'non_communicant') {
       addTarget({
@@ -122,9 +192,25 @@ function computeTargetActions(documentId) {
     const sysDevices = db.db.prepare(`
       SELECT id, name, brand, model_reference, communication_protocol,
              meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service,
-             managed_by_bms, bms_integration_out_of_service
+             managed_by_bms, bms_integration_out_of_service, equipment_template_id
       FROM bacs_audit_system_devices WHERE system_id = ?
     `).all(s.id);
+
+    // Item 3 — ECS bouclée : une boucle ECS ne peut pas être arrêtée
+    // (arrêté du 30 nov. 2005 — risque légionelle). On ne génère pas
+    // d'action « arrêt manuel » R175-3 §4 sur les équipements de ce
+    // système ; à la place, une action informative au niveau du système.
+    const ecsLooped = s.system_category === 'dhw' && s.is_looped === 'looped';
+    if (ecsLooped) {
+      addTarget({
+        source_system_id: s.id, source_subtype: 'ecs_looped_legionella',
+        category: 'other', severity: 'minor',
+        r175_article: 'R175-3 §4',
+        title: `Surveiller la température du bouclage ECS${zoneStr}`,
+        description: 'Le système d\'eau chaude sanitaire est bouclé : son arrêt est interdit (arrêté du 30 novembre 2005 — risque légionelle). Le décret BACS ne s\'applique pas à l\'arrêt de ce poste. Surveillance de la température de bouclage recommandée (≥ 50 °C en tout point de la boucle).',
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
 
     for (const d of sysDevices) {
       if (d.out_of_service) continue;  // skip HS
@@ -160,15 +246,38 @@ function computeTargetActions(documentId) {
         });
       }
 
+      // Item 10 — Contre-indications de pilotage par type d'équipement.
+      // On lit les codes du modèle d'équipement (bibliothèque). Un code
+      // « blocksCutPower » interdit l'action « arrêt manuel » R175-3 §4 :
+      // on ne la génère pas, on émet une action informative à la place.
+      const contraindications = loadContraindications(d.equipment_template_id);
+      const cutPowerContraindicated = ecsLooped || contraindications.some(
+        c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
+
       // R175-3 §4 — arret manuel possible. Non coche (0 OU non evalue) =
       // non satisfait : coherent avec la pastille ✗ affichee dans le rapport.
-      if (!d.meets_r175_3_p4) {
+      // Sauf si une contre-indication interdit la coupure (item 10) ou si
+      // l'équipement appartient à une ECS bouclée (item 3).
+      if (!d.meets_r175_3_p4 && !cutPowerContraindicated) {
         addTarget({
           source_device_id: d.id, source_subtype: 'r175_3_p4',
           category: 'bms_upgrade', severity: 'major',
           r175_article: 'R175-3 §4',
           title: `Permettre l'arrêt manuel de « ${devName} »`,
           description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement chaque équipement. ${catFr}${zoneStr}.`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      } else if (!d.meets_r175_3_p4 && cutPowerContraindicated && !ecsLooped) {
+        // Contre-indication (hors ECS bouclée déjà tracée au niveau système) :
+        // action informative non-bloquante pour le traçage dans le PDF.
+        const codes = contraindications.filter(c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
+        const infoText = codes.map(c => CONTRAINDICATION_INFO[c].label).join(' ');
+        addTarget({
+          source_device_id: d.id, source_subtype: 'contraindication_no_cut',
+          category: 'other', severity: 'minor',
+          r175_article: 'R175-3 §4',
+          title: `Pilotage adapté requis pour « ${devName} » (contre-indication)`,
+          description: `${infoText} L'arrêt manuel R175-3 §4 ne doit pas se traduire par une coupure brutale d'alimentation sur cet équipement (${catFr}${zoneStr}).`,
           zone_id: s.zone_id, equipment_id: null,
         });
       }
@@ -299,6 +408,39 @@ function computeTargetActions(documentId) {
         description: 'L\'article R175-3 (dernier alinéa) impose au propriétaire de transmettre à chaque exploitant les données concernant le système technique qu\'il opère. Aucune procédure documentée n\'a été identifiée.',
       });
     }
+    // Item 15 — GTB existante : stockage 5 ans + accès aux données (R175-3).
+    // data_storage_5y_compliant = 'no' → action bloquante R175-3 1°.
+    if (bms.data_storage_5y_compliant === 'no') {
+      addTarget({
+        source_bms_document_id: documentId, source_subtype: 'data_storage_5y',
+        category: 'data_retention_upgrade', severity: 'blocking',
+        r175_article: 'R175-3 1°',
+        title: 'Mettre en place un archivage des consommations sur 5 ans',
+        description: 'L\'article R175-3 1° impose la conservation des données de consommation à l\'échelle mensuelle pendant au moins 5 ans. La GTB en place ne garantit pas cet archivage.',
+      });
+    }
+    // data_owner_access = 'no' → action majeure R175-3 (le propriétaire est
+    // propriétaire des données et doit y avoir accès).
+    if (bms.data_owner_access === 'no') {
+      addTarget({
+        source_bms_document_id: documentId, source_subtype: 'data_owner_access',
+        category: 'documentation', severity: 'major',
+        r175_article: 'R175-3 dernier alinéa',
+        title: 'Garantir l\'accès du propriétaire à ses données',
+        description: 'Le propriétaire du BACS est propriétaire des données de consommation et doit pouvoir y accéder directement (R175-3). Exiger l\'ouverture d\'un compte propriétaire auprès de l\'éditeur de la GTB.',
+      });
+    }
+    // export_capability = 'no' → action mineure (facilite le suivi).
+    if (bms.export_capability === 'no') {
+      addTarget({
+        source_bms_document_id: documentId, source_subtype: 'data_export_capability',
+        category: 'data_retention_upgrade', severity: 'minor',
+        r175_article: 'R175-3',
+        title: 'Activer l\'export des données au format standard',
+        description: 'La GTB ne permet pas d\'exporter les données au format standard (CSV / Excel). Recommandation : activer cette capacité pour faciliter le suivi énergétique et les déclarations réglementaires.',
+      });
+    }
+
     // R175-5 : formation. Skip si la solution en place est Buildy (support natif).
     if (bms.operator_trained === 0 && !isBuildySolution(bms)) {
       addTarget({
@@ -329,6 +471,16 @@ function computeTargetActions(documentId) {
       LEFT JOIN bacs_audit_system_devices d ON d.id = t.generator_device_id
       WHERE t.document_id = ?
     `).all(documentId);
+    // Plusieurs entrées de régulation peuvent coexister sur une même zone ×
+    // catégorie (mig 170). Une action est générée par entrée non conforme,
+    // chacune gardée distincte par son `source_thermal_id` (clé d'idempotence
+    // unique). Le libellé de l'entrée est ajouté au titre quand la zone porte
+    // plusieurs entrées de la même catégorie, pour éviter des doublons visuels.
+    const thermalCountByZoneCat = {};
+    for (const t of thermal) {
+      const k = `${t.zone_id}:${t.category || 'heating'}`;
+      thermalCountByZoneCat[k] = (thermalCountByZoneCat[k] || 0) + 1;
+    }
     for (const t of thermal) {
       // Exemption R175-6 II : appareil independant de chauffage au bois.
       // Auto-detectee si l'energie du device en Production est 'wood'
@@ -342,12 +494,19 @@ function computeTargetActions(documentId) {
       // colonne has_automatic_regulation).
       const noRegulation = !t.regulation_type || t.regulation_type === 'none';
       if (noRegulation) {
+        const cat = t.category || 'heating';
+        const defaultLabel = cat === 'cooling' ? 'Refroidissement' : 'Chauffage';
+        const entryLabel = (t.label && t.label.trim()) || defaultLabel;
+        const multiple = (thermalCountByZoneCat[`${t.zone_id}:${cat}`] || 0) > 1;
+        const title = multiple
+          ? `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`
+          : `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`;
         addTarget({
           source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
           r175_article: 'R175-6',
-          title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`,
-          description: 'L\'article R175-6 exige une régulation thermique automatique par pièce ou par zone chauffée. La zone n\'en dispose pas actuellement.',
+          title,
+          description: `L'article R175-6 exige une régulation thermique automatique par pièce ou par zone ${cat === 'cooling' ? 'refroidie' : 'chauffée'}. Le système « ${entryLabel} » n'en dispose pas actuellement.`,
           zone_id: t.zone_id,
         });
       }

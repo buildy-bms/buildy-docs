@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 152;
+const TARGET_VERSION = 172;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -5963,6 +5963,586 @@ function runMigrations() {
     db.pragma('user_version = 152');
   }
 
+  if (current < 153) {
+    // Item 3 — Avertissement légionelles ECS bouclée.
+    // `is_looped` sur les systèmes : 'looped' / 'not_looped' / 'unknown' / NULL.
+    // Pertinent uniquement pour les systèmes de catégorie 'dhw' (ECS).
+    // Une ECS bouclée ne peut pas être arrêtée (arrêté 30 nov. 2005 —
+    // risque légionelle) : le générateur d'actions ne génère plus
+    // d'action R175-3 §4 dessus, mais une action informative.
+    db.exec(`
+      ALTER TABLE bacs_audit_systems ADD COLUMN is_looped TEXT
+        CHECK (is_looped IS NULL OR is_looped IN ('looped','not_looped','unknown'));
+    `);
+    log.info('Migration 153 appliquee : bacs_audit_systems.is_looped (bouclage ECS)');
+    db.pragma('user_version = 153');
+  }
+
+  if (current < 154) {
+    // Item 10 — Contre-indications de pilotage par type d'équipement.
+    // JSON array de codes sur equipment_templates (bibliothèque). Le
+    // générateur d'actions lit ces codes via le equipment_template_id du
+    // device pour ne pas générer d'action contraire (ex : « arrêt manuel »
+    // sur une PAC marquée `do_not_cut_power_thermodynamic`).
+    db.exec(`ALTER TABLE equipment_templates ADD COLUMN bacs_contraindications TEXT;`);
+    log.info('Migration 154 appliquee : equipment_templates.bacs_contraindications');
+    db.pragma('user_version = 154');
+  }
+
+  if (current < 155) {
+    // Item 8 — Calcul de puissance différencié par type de système, sur
+    // les équipements physiques (`bacs_audit_system_devices`).
+    //  - power_calculation_type : règle de cumul (cf. guide PROFEEL p.8) :
+    //    thermodynamic_max | boiler_sum | joule_sum |
+    //    district_heating_substation | out_of_scope.
+    //  - power_kw_cooling : puissance frigorifique d'un équipement
+    //    thermodynamique (le `power_kw` existant porte la valeur chaud /
+    //    nominale). Pour le cumul max(chaud, froid).
+    //  - is_backup : équipement de secours → forcé out_of_scope.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN power_calculation_type TEXT
+        CHECK (power_calculation_type IS NULL OR power_calculation_type IN
+          ('thermodynamic_max','boiler_sum','joule_sum',
+           'district_heating_substation','out_of_scope'));
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN power_kw_cooling REAL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN is_backup INTEGER DEFAULT 0;
+    `);
+    log.info('Migration 155 appliquee : bacs_audit_system_devices power_calculation_type/power_kw_cooling/is_backup');
+    db.pragma('user_version = 155');
+  }
+
+  if (current < 156) {
+    // Item 1 — Règle des 5 % d'exemption par poste (FAQ ministère juin 2025).
+    // L'auditeur peut marquer un système comme négligeable (< 5 % de la
+    // consommation totale) : le générateur d'actions ne génère plus
+    // d'action R175-3 dessus, le PDF affiche un encart d'exemption.
+    db.exec(`
+      ALTER TABLE bacs_audit_systems ADD COLUMN marked_negligible_under_5pct INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_systems ADD COLUMN negligible_justification TEXT;
+    `);
+    log.info('Migration 156 appliquee : bacs_audit_systems marked_negligible_under_5pct/negligible_justification');
+    db.pragma('user_version = 156');
+  }
+
+  if (current < 157) {
+    // Item 15 — GTB existante : stockage 5 ans + accès aux données (R175-3).
+    // Caractérise la conformité de l'archivage et de l'accès aux données
+    // d'une GTB existante (table `bacs_audit_bms`).
+    db.exec(`
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_storage_5y_compliant TEXT
+        CHECK (data_storage_5y_compliant IS NULL OR data_storage_5y_compliant IN
+          ('yes','no','unknown'));
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_storage_location TEXT
+        CHECK (data_storage_location IS NULL OR data_storage_location IN
+          ('local','cloud_editeur','cloud_proprietaire','unknown'));
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_owner_access TEXT
+        CHECK (data_owner_access IS NULL OR data_owner_access IN
+          ('yes','no','partial'));
+      ALTER TABLE bacs_audit_bms ADD COLUMN gestionnaire_exploitant_access TEXT
+        CHECK (gestionnaire_exploitant_access IS NULL OR gestionnaire_exploitant_access IN
+          ('yes','no','partial'));
+      ALTER TABLE bacs_audit_bms ADD COLUMN export_capability TEXT
+        CHECK (export_capability IS NULL OR export_capability IN ('yes','no'));
+      ALTER TABLE bacs_audit_bms ADD COLUMN data_access_notes TEXT;
+    `);
+    log.info('Migration 157 appliquee : bacs_audit_bms stockage 5 ans + accès données (R175-3)');
+    db.pragma('user_version = 157');
+  }
+
+  if (current < 158) {
+    // Item 14 — Régime d'occupation par zone.
+    // Caractérise l'usage de la zone (2e composante de l'« usage » au sens
+    // du décret, avec la nature). Oriente aussi le générateur d'actions :
+    // pas de recommandation d'arrêt nocturne / intermittence si la zone est
+    // occupée en continu. `comfort_constraint` : contrainte de confort
+    // spécifique en texte libre (température minimale imposée, qualité
+    // d'air…). Enum fermé — pas de plages horaires détaillées (décision
+    // actée au plan).
+    db.exec(`
+      ALTER TABLE zones ADD COLUMN occupancy_profile TEXT
+        CHECK (occupancy_profile IS NULL OR occupancy_profile IN
+          ('continu','heures_bureau','scolaire','intermittent','saisonnier','autre'));
+      ALTER TABLE zones ADD COLUMN comfort_constraint TEXT;
+    `);
+    log.info('Migration 158 appliquee : zones.occupancy_profile + comfort_constraint (régime d\'occupation)');
+    db.pragma('user_version = 158');
+  }
+
+  if (current < 159) {
+    // Item 7c — Séparabilité du comptage d'un équipement partagé.
+    // Sur les équipements physiques (`bacs_audit_system_devices`) qui
+    // desservent plusieurs systèmes / zones (mécanisme device_shared_systems,
+    // mig 143), l'auditeur précise si le comptage de chaque zone desservie
+    // peut être séparé. Pilote le calcul des zones fonctionnelles de suivi
+    // (item 7d) : un équipement non séparable regroupe ses zones en une
+    // seule zone fonctionnelle de suivi.
+    //  - metering_separable : 'yes' / 'no' / 'partial'.
+    //  - metering_separable_note : justification courte (« circuit
+    //    hydraulique unique », « colonnes montantes communes »…).
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN metering_separable TEXT
+        CHECK (metering_separable IS NULL OR metering_separable IN
+          ('yes','no','partial'));
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN metering_separable_note TEXT;
+    `);
+    log.info('Migration 159 appliquee : bacs_audit_system_devices.metering_separable (+ note)');
+    db.pragma('user_version = 159');
+  }
+
+  if (current < 160) {
+    // Item 4a — Structure juridique du site (guide PROFEEL p.9-10).
+    // `ownership_structure` decrit le montage de propriete / occupation
+    // du site, qui pilote le calcul de l'assujetti par systeme (item 4d) :
+    //   single_owner_occupant      — proprietaire unique occupant (cas A)
+    //   condominium                — copropriete avec syndicat (cas B)
+    //   owner_with_tenants         — un proprietaire + preneurs a bail (cas C)
+    //   multiple_independent_tenants — plusieurs preneurs independants (cas D)
+    //   mixed                      — combinaison (a expliciter en texte libre)
+    // `ownership_notes` : particularites en texte libre.
+    //
+    // IMPORTANT : ces 2 colonnes ne sont PAS synchronisees avec Fleet
+    // Manager — c'est une donnee propre a Buildy Docs (cf. lib/sites-sync.js
+    // `serializeSite()` qui n'expose que name/customer_name/address/notes/
+    // coords/timestamps/deleted_at).
+    db.exec(`
+      ALTER TABLE sites ADD COLUMN ownership_structure TEXT
+        CHECK (ownership_structure IS NULL OR ownership_structure IN
+          ('single_owner_occupant','condominium','owner_with_tenants',
+           'multiple_independent_tenants','mixed'));
+      ALTER TABLE sites ADD COLUMN ownership_notes TEXT;
+    `);
+    log.info('Migration 160 appliquee : sites.ownership_structure + ownership_notes');
+    db.pragma('user_version = 160');
+  }
+
+  if (current < 161) {
+    // Item 4b — Parties prenantes d'un site (table unifiee tenants /
+    // proprietaires / syndicat / gestionnaire de reseau). Une partie est
+    // rattachee a un site et porte un `kind` :
+    //   owner_occupant   — proprietaire occupant
+    //   co_owner         — copropriétaire
+    //   tenant           — preneur a bail
+    //   syndicate        — syndicat de copropriete
+    //   network_operator — gestionnaire de reseau de chaleur urbain
+    //
+    // Soft-delete (`deleted_at`) : entite metier que l'utilisateur peut
+    // perdre par erreur (cf. CLAUDE.md convention soft-delete pattern 1).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS site_parties (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'owner_occupant'
+          CHECK (kind IN ('owner_occupant','co_owner','tenant','syndicate','network_operator')),
+        contact_email TEXT,
+        notes TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_site_parties_site ON site_parties(site_id, position);
+    `);
+    log.info('Migration 161 appliquee : table site_parties (parties prenantes)');
+    db.pragma('user_version = 161');
+  }
+
+  if (current < 162) {
+    // Item 4c — Junctions d'affectation du perimetre.
+    //  - zone_parties : quelle(s) partie(s) occupe(nt) / controle(nt) une
+    //    zone. Hard-delete (junction pure, cf. CLAUDE.md pattern 3).
+    //  - system_parties : quelle(s) partie(s) est/sont rattachee(s) a un
+    //    systeme + `responsible_for_works` (cle du cas C : un preneur qui
+    //    a realise des travaux preneurs sur un systeme devient assujetti
+    //    pour ce systeme).
+    // FK CASCADE sur la disparition de la zone / du systeme / de la partie.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS zone_parties (
+        zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        party_id INTEGER NOT NULL REFERENCES site_parties(id) ON DELETE CASCADE,
+        PRIMARY KEY (zone_id, party_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_zone_parties_party ON zone_parties(party_id);
+
+      CREATE TABLE IF NOT EXISTS system_parties (
+        system_id INTEGER NOT NULL REFERENCES bacs_audit_systems(id) ON DELETE CASCADE,
+        party_id INTEGER NOT NULL REFERENCES site_parties(id) ON DELETE CASCADE,
+        responsible_for_works INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (system_id, party_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_system_parties_party ON system_parties(party_id);
+    `);
+    log.info('Migration 162 appliquee : junctions zone_parties + system_parties');
+    db.pragma('user_version = 162');
+  }
+
+  if (current < 163) {
+    // Item 4c/4e — Flags d'assujettissement sur les systemes BACS.
+    //  - is_district_heating_substation (cas E) : le systeme est une
+    //    sous-station de reseau de chaleur urbain → le gestionnaire de
+    //    reseau (`kind='network_operator'`) est EXCLU de l'assujetti.
+    //  - serves_multiple_buildings (cas F) : systeme centralise desservant
+    //    plusieurs batiments du site → tous les proprietaires du site sont
+    //    assujettis. Buildy ne modelise pas aujourd'hui le multi-batiments
+    //    structurel (pas de table `buildings`) — le calcul du cas F est
+    //    donc degrade : « tous les proprietaires du site ».
+    db.exec(`
+      ALTER TABLE bacs_audit_systems ADD COLUMN is_district_heating_substation INTEGER DEFAULT 0;
+      ALTER TABLE bacs_audit_systems ADD COLUMN serves_multiple_buildings INTEGER DEFAULT 0;
+    `);
+    log.info('Migration 163 appliquee : bacs_audit_systems flags assujettissement (cas E/F)');
+    db.pragma('user_version = 163');
+  }
+
+  if (current < 164) {
+    // Item 4 — Index complementaires (perf jointures du calcul d'assujetti).
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_site_parties_active ON site_parties(site_id, deleted_at);
+    `);
+    log.info('Migration 164 appliquee : index site_parties actif');
+    db.pragma('user_version = 164');
+  }
+
+  if (current < 165) {
+    // Lot 5 / item 13 — Base de consommations mensuelles de reference.
+    // L'auditeur recupere les factures aupres du client / des locataires et
+    // saisit manuellement 12 a 24 mois de consommation par energie.
+    //
+    //   energy_type — enum FERME, synchro avec :
+    //     - ENERGY_HISTORY_TYPES dans routes/sites.js (validation Zod)
+    //     - ENERGY_HISTORY_TYPE_LABEL dans routes/bacs-audit/_labels.js (FR)
+    //     - ENERGY_HISTORY_TYPES dans frontend/src/lib/audit-options.js
+    //   quantity — kWh / m3 / MWh selon l'energie ; `unit` stocke le libelle.
+    //   tenant_id — FK nullable vers site_parties : rattacher la facture a un
+    //     preneur (item 4) pour repartir les consos par perimetre.
+    //   invoice_attachment_id — FK nullable vers site_documents : la facture
+    //     PDF uploadee (SET NULL si la piece jointe est supprimee).
+    //
+    // Soft-delete (`deleted_at`) : entite metier saisie a la main, que
+    // l'utilisateur peut perdre par erreur (cf. CLAUDE.md pattern 1).
+    // Unicite : site + energy_type + contract_label + year + month — empeche
+    // les doublons a l'import CSV / collage Excel.
+    // NB : la PK réelle de la table `sites` est la colonne `id` (vérifié en
+    // base via PRAGMA table_info). Le `CREATE TABLE sites` plus haut dans ce
+    // fichier mentionne `site_id` mais c'est un vestige historique ; la table
+    // réelle utilise `id`. La FK pointe donc sur `sites(id)`, cohérent avec
+    // zones / site_documents.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS site_energy_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+        energy_type TEXT NOT NULL DEFAULT 'electricity'
+          CHECK (energy_type IN ('electricity','gas','fuel_oil','district_heating','other')),
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+        quantity REAL,
+        unit TEXT NOT NULL DEFAULT 'kWh',
+        cost_eur REAL,
+        tenant_id INTEGER REFERENCES site_parties(id) ON DELETE SET NULL,
+        contract_label TEXT NOT NULL DEFAULT '',
+        invoice_attachment_id INTEGER REFERENCES site_documents(id) ON DELETE SET NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_site_energy_history_site
+        ON site_energy_history(site_id, deleted_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_site_energy_history_row
+        ON site_energy_history(site_id, energy_type, contract_label, year, month)
+        WHERE deleted_at IS NULL;
+    `);
+    log.info('Migration 165 appliquee : table site_energy_history (consommations de reference)');
+    db.pragma('user_version = 165');
+  }
+
+  if (current < 166) {
+    // Correctif item 13 — une version intermédiaire de la migration 165 a pu
+    // créer site_energy_history avec une FK pointant ailleurs que `sites(id)`.
+    // La PK réelle de `sites` est `id`. On recrée la table avec la FK correcte
+    // si nécessaire. Sur une installation neuve (165 déjà correcte) : no-op.
+    const fk = db.prepare("PRAGMA foreign_key_list(site_energy_history)").all();
+    const sitesFk = fk.find(f => f.table === 'sites');
+    if (sitesFk && sitesFk.to !== 'id') {
+      db.exec('BEGIN');
+      try {
+        db.exec(`
+          CREATE TABLE site_energy_history_fix166 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+            energy_type TEXT NOT NULL DEFAULT 'electricity'
+              CHECK (energy_type IN ('electricity','gas','fuel_oil','district_heating','other')),
+            year INTEGER NOT NULL,
+            month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+            quantity REAL,
+            unit TEXT NOT NULL DEFAULT 'kWh',
+            cost_eur REAL,
+            tenant_id INTEGER REFERENCES site_parties(id) ON DELETE SET NULL,
+            contract_label TEXT NOT NULL DEFAULT '',
+            invoice_attachment_id INTEGER REFERENCES site_documents(id) ON DELETE SET NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TEXT
+          );
+          INSERT INTO site_energy_history_fix166
+            SELECT id, site_id, energy_type, year, month, quantity, unit,
+                   cost_eur, tenant_id, contract_label, invoice_attachment_id,
+                   created_at, updated_at, deleted_at
+            FROM site_energy_history;
+          DROP TABLE site_energy_history;
+          ALTER TABLE site_energy_history_fix166 RENAME TO site_energy_history;
+          CREATE INDEX IF NOT EXISTS idx_site_energy_history_site
+            ON site_energy_history(site_id, deleted_at);
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_site_energy_history_row
+            ON site_energy_history(site_id, energy_type, contract_label, year, month)
+            WHERE deleted_at IS NULL;
+        `);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+      log.info('Migration 166 appliquee : correction FK site_energy_history → sites(id)');
+    } else {
+      log.info('Migration 166 : FK site_energy_history deja correcte, rien a faire');
+    }
+    db.pragma('user_version = 166');
+  }
+
+  if (current < 167) {
+    // Correctif Lot 4 — la migration 161 a créé site_parties avec une FK
+    // invalide `REFERENCES sites(site_id)` ; la PK réelle de `sites` est `id`.
+    // Une FK vers une colonne inexistante provoque « foreign key mismatch »
+    // à chaque INSERT (tout POST de partie prenante échouait). On recrée la
+    // table avec la FK correcte `sites(id)`. Idempotent : no-op sur une
+    // installation neuve (migration 161 déjà corrigée).
+    const fk = db.prepare("PRAGMA foreign_key_list(site_parties)").all();
+    const sitesFk = fk.find(f => f.table === 'sites');
+    if (sitesFk && sitesFk.to !== 'id') {
+      // site_parties est référencée par zone_parties / system_parties /
+      // site_energy_history : on désactive les FK le temps du DROP/RENAME
+      // (PRAGMA foreign_keys ne peut pas changer dans une transaction).
+      db.pragma('foreign_keys = OFF');
+      db.exec('BEGIN');
+      try {
+        db.exec(`
+          CREATE TABLE site_parties_fix167 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'owner_occupant'
+              CHECK (kind IN ('owner_occupant','co_owner','tenant','syndicate','network_operator')),
+            contact_email TEXT,
+            notes TEXT,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TEXT
+          );
+          INSERT INTO site_parties_fix167
+            SELECT id, site_id, name, kind, contact_email, notes, position,
+                   created_at, updated_at, deleted_at
+            FROM site_parties;
+          DROP TABLE site_parties;
+          ALTER TABLE site_parties_fix167 RENAME TO site_parties;
+          CREATE INDEX IF NOT EXISTS idx_site_parties_site ON site_parties(site_id, position);
+          CREATE INDEX IF NOT EXISTS idx_site_parties_active ON site_parties(site_id, deleted_at);
+        `);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        db.pragma('foreign_keys = ON');
+        throw e;
+      }
+      db.pragma('foreign_keys = ON');
+      log.info('Migration 167 appliquee : correction FK site_parties → sites(id)');
+    } else {
+      log.info('Migration 167 : FK site_parties deja correcte, rien a faire');
+    }
+    db.pragma('user_version = 167');
+  }
+
+  if (current < 168) {
+    // Correctif Lot 4 — la migration 162 a créé zone_parties avec une FK
+    // invalide `REFERENCES zones(zone_id)` ; la PK réelle de `zones` est `id`.
+    // On recrée la junction avec la bonne FK. Idempotent : no-op sur une
+    // installation neuve (migration 162 déjà corrigée).
+    const fk = db.prepare("PRAGMA foreign_key_list(zone_parties)").all();
+    const zonesFk = fk.find(f => f.table === 'zones');
+    if (zonesFk && zonesFk.to !== 'id') {
+      db.pragma('foreign_keys = OFF');
+      db.exec('BEGIN');
+      try {
+        db.exec(`
+          CREATE TABLE zone_parties_fix168 (
+            zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+            party_id INTEGER NOT NULL REFERENCES site_parties(id) ON DELETE CASCADE,
+            PRIMARY KEY (zone_id, party_id)
+          );
+          INSERT INTO zone_parties_fix168 SELECT zone_id, party_id FROM zone_parties;
+          DROP TABLE zone_parties;
+          ALTER TABLE zone_parties_fix168 RENAME TO zone_parties;
+          CREATE INDEX IF NOT EXISTS idx_zone_parties_party ON zone_parties(party_id);
+        `);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        db.pragma('foreign_keys = ON');
+        throw e;
+      }
+      db.pragma('foreign_keys = ON');
+      log.info('Migration 168 appliquee : correction FK zone_parties → zones(id)');
+    } else {
+      log.info('Migration 168 : FK zone_parties deja correcte, rien a faire');
+    }
+    db.pragma('user_version = 168');
+  }
+
+  if (current < 169) {
+    // Report réglementaire — décret publié au JO le 26 décembre 2025 : pour
+    // les bâtiments de 70 à 290 kW, l'échéance d'équipement en BACS passe du
+    // 1er janvier 2027 au 1er janvier 2030 (les > 290 kW restent à 2025).
+    // On renomme la valeur d'enum subject_2027 → subject_2030. SQLite ne sait
+    // pas ALTER un CHECK : on sauvegarde la colonne, on la recrée avec le
+    // nouveau CHECK (DROP/ADD COLUMN — plus sûr que recréer toute la table
+    // afs), puis on remappe les valeurs et les dates butoir.
+    const rows = db.prepare(
+      'SELECT id, bacs_applicability_status, bacs_applicable_deadline FROM afs ' +
+      'WHERE bacs_applicability_status IS NOT NULL'
+    ).all();
+    db.exec('BEGIN');
+    try {
+      db.exec('ALTER TABLE afs DROP COLUMN bacs_applicability_status');
+      db.exec(`
+        ALTER TABLE afs ADD COLUMN bacs_applicability_status TEXT
+          CHECK (bacs_applicability_status IS NULL OR bacs_applicability_status IN
+            ('subject_immediate','subject_2025','subject_2030','not_subject'))
+      `);
+      const upd = db.prepare(
+        'UPDATE afs SET bacs_applicability_status = ?, bacs_applicable_deadline = ? WHERE id = ?'
+      );
+      for (const r of rows) {
+        const status = r.bacs_applicability_status === 'subject_2027'
+          ? 'subject_2030' : r.bacs_applicability_status;
+        const deadline = r.bacs_applicable_deadline === '2027-01-01'
+          ? '2030-01-01' : r.bacs_applicable_deadline;
+        upd.run(status, deadline, r.id);
+      }
+      // Propage la correction de date dans les textes méthodologie déjà
+      // stockés dans pdf_boilerplate (le PDF lit cette table, pas le fichier
+      // statique de fallback). REPLACE ciblé — no-op si le texte n'y est pas.
+      db.prepare(
+        "UPDATE pdf_boilerplate SET body_html = REPLACE(body_html, " +
+        "'1er janvier 2027', '1er janvier 2030') " +
+        "WHERE kind = 'methodology' AND body_html LIKE '%1er janvier 2027%'"
+      ).run();
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    log.info('Migration 169 appliquee : echeance BACS 70-290 kW 2027 -> 2030');
+    db.pragma('user_version = 169');
+  }
+
+  if (current < 170) {
+    // Régulation thermique multi-systèmes — une même zone peut être desservie
+    // par plusieurs systèmes producteurs distincts (ex. chaudière gaz +
+    // aérothermes ET un DRV), chacun avec sa propre régulation R175-6. On
+    // retire la contrainte UNIQUE(document_id, zone_id, category) qui limitait
+    // à une seule entrée chauffage et une seule refroidissement par zone, et
+    // on ajoute une colonne `label` (libellé libre du système régulé).
+    // SQLite ne sait pas dropper une contrainte UNIQUE : on recrée la table.
+    // Idempotent : no-op si la colonne `label` existe déjà (= migration faite).
+    const tcols = db.prepare("PRAGMA table_info(bacs_audit_thermal_regulation)").all();
+    if (!tcols.some(c => c.name === 'label')) {
+      const copyCols = tcols.map(c => c.name).join(', ');
+      db.pragma('foreign_keys = OFF');
+      db.exec('BEGIN');
+      try {
+        db.exec(`
+          CREATE TABLE bacs_audit_thermal_regulation_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES afs(id) ON DELETE CASCADE,
+            zone_id INTEGER NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+            category TEXT NOT NULL CHECK (category IN ('heating','cooling')),
+            label TEXT,
+            has_automatic_regulation INTEGER NOT NULL DEFAULT 0,
+            regulation_type TEXT
+              CHECK (regulation_type IS NULL OR regulation_type IN
+                ('per_room','per_zone','central_only','none')),
+            generator_exempt_wood INTEGER DEFAULT 0,
+            generator_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            sensor_position TEXT,
+            thermostat_type TEXT,
+            has_thermostatic_valves INTEGER DEFAULT 0,
+            notes_html TEXT,
+            position INTEGER NOT NULL DEFAULT 0,
+            distribution_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            emission_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            production_regulation_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            distribution_regulation_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            emission_regulation_device_id INTEGER REFERENCES bacs_audit_system_devices(id) ON DELETE SET NULL,
+            production_notes_html TEXT,
+            distribution_notes_html TEXT,
+            emission_notes_html TEXT
+          );
+          INSERT INTO bacs_audit_thermal_regulation_new (${copyCols})
+            SELECT ${copyCols} FROM bacs_audit_thermal_regulation;
+          DROP TABLE bacs_audit_thermal_regulation;
+          ALTER TABLE bacs_audit_thermal_regulation_new RENAME TO bacs_audit_thermal_regulation;
+          CREATE INDEX idx_bacs_thermal_doc ON bacs_audit_thermal_regulation(document_id);
+        `);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        db.pragma('foreign_keys = ON');
+        throw e;
+      }
+      db.pragma('foreign_keys = ON');
+      log.info('Migration 170 appliquee : thermal_regulation multi-entrees (UNIQUE retire + colonne label)');
+    } else {
+      log.info('Migration 170 : thermal_regulation deja en multi-entrees, rien a faire');
+    }
+    db.pragma('user_version = 170');
+  }
+
+  if (current < 171) {
+    // Modale d'équipement — les boutons Oui/Non n'affichent aucune réponse
+    // tant qu'elle n'a pas été saisie. `is_backup` / `out_of_service` avaient
+    // un défaut 0 (= « Non » implicite) : on repasse à NULL les valeurs
+    // jamais saisies affirmativement (l'ancienne UI à cases cochées posait
+    // 0 = case décochée = non répondu). Comportement inchangé : NULL et 0
+    // sont tous deux « faux » pour le cumul de puissance et le plan d'action.
+    db.exec(`
+      UPDATE bacs_audit_system_devices SET is_backup = NULL WHERE is_backup = 0;
+      UPDATE bacs_audit_system_devices SET out_of_service = NULL WHERE out_of_service = 0;
+    `);
+    log.info('Migration 171 appliquee : is_backup / out_of_service jamais saisis repasses a NULL');
+    db.pragma('user_version = 171');
+  }
+
+  if (current < 172) {
+    // Complétude équipement — tous les boutons Oui/Non de la modale doivent
+    // être renseignés pour que l'équipement soit « validé ». Comme is_backup
+    // / out_of_service (mig 171), on repasse à NULL les flags de conformité
+    // dont le défaut historique 0 valait « non répondu » (ancienne UI à
+    // cases cochées). NULL et 0 restent tous deux « faux » pour la
+    // conformité et le cumul de puissance — aucun changement de calcul.
+    // `validation_forced` : l'auditeur peut marquer un équipement validé
+    // manuellement quand certaines infos resteront définitivement inconnues.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN validation_forced INTEGER DEFAULT 0;
+      UPDATE bacs_audit_system_devices SET wired = NULL WHERE wired = 0;
+      UPDATE bacs_audit_system_devices SET meets_r175_3_p4 = NULL WHERE meets_r175_3_p4 = 0;
+      UPDATE bacs_audit_system_devices SET meets_r175_3_p4_autonomous = NULL WHERE meets_r175_3_p4_autonomous = 0;
+    `);
+    log.info('Migration 172 appliquee : validation_forced + flags conformite jamais saisis repasses a NULL');
+    db.pragma('user_version = 172');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -6106,19 +6686,20 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, bacs_contraindications, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
             descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
             defaultEnergySource || null, defaultDeviceRole || null,
+            bacsContraindications || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, updatedBy }) {
+  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -6135,6 +6716,10 @@ const equipmentTemplates = {
     const roleSql   = defaultDeviceRole   === '__clear__' ? 'NULL' : 'COALESCE(?, default_device_role)';
     const energyArg = defaultEnergySource === '__clear__' ? [] : [defaultEnergySource ?? null];
     const roleArg   = defaultDeviceRole   === '__clear__' ? [] : [defaultDeviceRole ?? null];
+    // bacs_contraindications : '__clear__' = vide la liste (tableau vide
+    // sérialisé '[]' côté route → ici on accepte aussi le sentinel).
+    const contraSql = bacsContraindications === '__clear__' ? 'NULL' : 'COALESCE(?, bacs_contraindications)';
+    const contraArg = bacsContraindications === '__clear__' ? [] : [bacsContraindications ?? null];
 
     db.prepare(`
       UPDATE equipment_templates
@@ -6150,11 +6735,12 @@ const equipmentTemplates = {
           preferred_protocols = COALESCE(?, preferred_protocols),
           default_energy_source = ${energySql},
           default_device_role = ${roleSql},
+          bacs_contraindications = ${contraSql},
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, updatedBy || null, id);
+    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, ...contraArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -7850,8 +8436,12 @@ const sites = {
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
+    // `ownership_structure` / `ownership_notes` (item 4a) sont modifiables
+    // ici mais volontairement ABSENTS de lib/sites-sync.js `serializeSite()`
+    // — donnee propre a Buildy Docs, jamais poussee vers Fleet Manager.
     const allowed = ['name', 'customer_name', 'address', 'notes', 'latitude', 'longitude',
-                     'synced_at', 'deleted_at'];
+                     'synced_at', 'deleted_at',
+                     'ownership_structure', 'ownership_notes'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
@@ -7910,17 +8500,19 @@ const zones = {
   getById(id) {
     return db.prepare(`SELECT ${ZONES_SELECT} FROM zones WHERE id = ?`).get(id);
   },
-  create({ siteId, name, nature, kind, position, surfaceM2, notes, latitude, longitude }) {
+  create({ siteId, name, nature, kind, position, surfaceM2, notes, latitude, longitude,
+           occupancyProfile, comfortConstraint }) {
     const result = db.prepare(`
-      INSERT INTO zones (site_id, name, nature, kind, position, surface_m2, notes, latitude, longitude)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO zones (site_id, name, nature, kind, position, surface_m2, notes, latitude, longitude,
+                         occupancy_profile, comfort_constraint)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(siteId, name, nature || null, kind || 'functional', position || 0, surfaceM2 ?? null, notes || null,
-           latitude ?? null, longitude ?? null);
+           latitude ?? null, longitude ?? null, occupancyProfile || null, comfortConstraint || null);
     return this.getById(result.lastInsertRowid);
   },
   update(id, fields) {
     const allowed = ['name', 'nature', 'kind', 'position', 'surface_m2', 'notes', 'notes_html',
-                     'latitude', 'longitude', 'deleted_at'];
+                     'latitude', 'longitude', 'occupancy_profile', 'comfort_constraint', 'deleted_at'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
@@ -9075,6 +9667,220 @@ const bacsAuditGtbObservations = {
   },
 };
 
+// ── Parties prenantes d'un site (item 4b — structure juridique) ──────
+// Table unifiee proprietaires / preneurs / syndicat / gestionnaire de
+// reseau. Soft-delete : entite metier que l'utilisateur peut perdre par
+// erreur (cf. CLAUDE.md convention soft-delete pattern 1).
+const siteParties = {
+  listBySite(siteId, { includeDeleted = false } = {}) {
+    let sql = 'SELECT * FROM site_parties WHERE site_id = ?';
+    if (!includeDeleted) sql += ' AND deleted_at IS NULL';
+    sql += ' ORDER BY position, id';
+    return db.prepare(sql).all(siteId);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM site_parties WHERE id = ?').get(id);
+  },
+  create({ siteId, name, kind, contactEmail, notes, position }) {
+    const pos = position != null
+      ? position
+      : (db.prepare('SELECT COALESCE(MAX(position), 0) + 10 AS p FROM site_parties WHERE site_id = ?').get(siteId).p);
+    const r = db.prepare(`
+      INSERT INTO site_parties (site_id, name, kind, contact_email, notes, position)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(siteId, name, kind || 'owner_occupant', contactEmail || null, notes || null, pos);
+    return this.getById(r.lastInsertRowid);
+  },
+  update(id, fields) {
+    const allowed = ['name', 'kind', 'contact_email', 'notes', 'position', 'deleted_at'];
+    const sets = [], params = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
+      const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
+      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE site_parties SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return this.getById(id);
+  },
+  softDelete(id) {
+    const ts = db.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS ts").get().ts;
+    db.prepare('UPDATE site_parties SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
+      .run(ts, ts, id);
+  },
+  restore(id) {
+    db.prepare('UPDATE site_parties SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  },
+};
+
+// ── Junction zone × partie (item 4c) — hard-delete ───────────────────
+const zoneParties = {
+  listByZone(zoneId) {
+    return db.prepare(`
+      SELECT zp.party_id, p.name, p.kind
+      FROM zone_parties zp JOIN site_parties p ON p.id = zp.party_id
+      WHERE zp.zone_id = ? AND p.deleted_at IS NULL
+      ORDER BY p.position, p.id
+    `).all(zoneId);
+  },
+  // Remplace l'ensemble des affectations d'une zone par `partyIds`.
+  setForZone(zoneId, partyIds) {
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM zone_parties WHERE zone_id = ?').run(zoneId);
+      const ins = db.prepare('INSERT OR IGNORE INTO zone_parties (zone_id, party_id) VALUES (?, ?)');
+      for (const pid of partyIds || []) ins.run(zoneId, pid);
+    });
+    tx();
+    return this.listByZone(zoneId);
+  },
+  // Toutes les affectations zone × partie d'un site (pour le calcul d'assujetti).
+  listBySite(siteId) {
+    return db.prepare(`
+      SELECT zp.zone_id, zp.party_id
+      FROM zone_parties zp JOIN zones z ON z.id = zp.zone_id
+      WHERE z.site_id = ?
+    `).all(siteId);
+  },
+  // Zones auxquelles une partie prenante est affectée (sens inverse de
+  // listByZone — item 5 : affecter un occupant à plusieurs zones d'un coup).
+  listByParty(partyId) {
+    return db.prepare(`
+      SELECT zp.zone_id, z.name, z.kind
+      FROM zone_parties zp JOIN zones z ON z.id = zp.zone_id
+      WHERE zp.party_id = ? AND z.deleted_at IS NULL
+      ORDER BY z.position, z.id
+    `).all(partyId);
+  },
+  // Remplace l'ensemble des affectations d'une partie par `zoneIds`.
+  setForParty(partyId, zoneIds) {
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM zone_parties WHERE party_id = ?').run(partyId);
+      const ins = db.prepare('INSERT OR IGNORE INTO zone_parties (zone_id, party_id) VALUES (?, ?)');
+      for (const zid of zoneIds || []) ins.run(zid, partyId);
+    });
+    tx();
+    return this.listByParty(partyId);
+  },
+};
+
+// ── Junction systeme × partie (item 4c) — hard-delete ────────────────
+// `responsible_for_works` : la partie a realise des travaux preneurs sur
+// ce systeme (cle du cas C — le preneur devient alors assujetti).
+const systemParties = {
+  listBySystem(systemId) {
+    return db.prepare(`
+      SELECT sp.party_id, sp.responsible_for_works, p.name, p.kind
+      FROM system_parties sp JOIN site_parties p ON p.id = sp.party_id
+      WHERE sp.system_id = ? AND p.deleted_at IS NULL
+      ORDER BY p.position, p.id
+    `).all(systemId);
+  },
+  // Remplace l'ensemble des affectations d'un systeme.
+  // `entries` = [{ party_id, responsible_for_works }].
+  setForSystem(systemId, entries) {
+    const tx = db.transaction(() => {
+      db.prepare('DELETE FROM system_parties WHERE system_id = ?').run(systemId);
+      const ins = db.prepare(`
+        INSERT OR IGNORE INTO system_parties (system_id, party_id, responsible_for_works)
+        VALUES (?, ?, ?)
+      `);
+      for (const e of entries || []) {
+        ins.run(systemId, e.party_id, e.responsible_for_works ? 1 : 0);
+      }
+    });
+    tx();
+    return this.listBySystem(systemId);
+  },
+  // Toutes les affectations systeme × partie d'un document (pour le calcul).
+  listByDocument(documentId) {
+    return db.prepare(`
+      SELECT sp.system_id, sp.party_id, sp.responsible_for_works
+      FROM system_parties sp JOIN bacs_audit_systems s ON s.id = sp.system_id
+      WHERE s.document_id = ?
+    `).all(documentId);
+  },
+};
+
+// ── Historique de consommation mensuelle d'un site (item 13) ─────────
+// Base de consommations de reference saisie depuis les factures client /
+// locataires. Soft-delete : entite metier saisie a la main (cf. CLAUDE.md
+// convention soft-delete pattern 1).
+const siteEnergyHistory = {
+  listBySite(siteId, { includeDeleted = false } = {}) {
+    let sql = `
+      SELECT eh.*, p.name AS tenant_name,
+             d.original_name AS invoice_name, d.filename AS invoice_filename
+      FROM site_energy_history eh
+      LEFT JOIN site_parties p ON p.id = eh.tenant_id
+      LEFT JOIN site_documents d ON d.id = eh.invoice_attachment_id
+      WHERE eh.site_id = ?
+    `;
+    if (!includeDeleted) sql += ' AND eh.deleted_at IS NULL';
+    sql += ' ORDER BY eh.energy_type, eh.contract_label, eh.year, eh.month';
+    return db.prepare(sql).all(siteId);
+  },
+  getById(id) {
+    return db.prepare('SELECT * FROM site_energy_history WHERE id = ?').get(id);
+  },
+  create({ siteId, energyType, year, month, quantity, unit, costEur,
+    tenantId, contractLabel, invoiceAttachmentId }) {
+    const r = db.prepare(`
+      INSERT INTO site_energy_history
+        (site_id, energy_type, year, month, quantity, unit, cost_eur,
+         tenant_id, contract_label, invoice_attachment_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      siteId, energyType || 'electricity', year, month,
+      quantity ?? null, unit || 'kWh', costEur ?? null,
+      tenantId ?? null, contractLabel || '', invoiceAttachmentId ?? null,
+    );
+    return this.getById(r.lastInsertRowid);
+  },
+  // Upsert sur la cle d'unicite (site + energy_type + contract_label + year
+  // + month) — utilise par l'import CSV / collage Excel pour eviter les
+  // doublons : une ligne deja presente est mise a jour, pas dupliquee.
+  upsert({ siteId, energyType, year, month, quantity, unit, costEur,
+    tenantId, contractLabel, invoiceAttachmentId }) {
+    const existing = db.prepare(`
+      SELECT id FROM site_energy_history
+      WHERE site_id = ? AND energy_type = ? AND contract_label = ?
+        AND year = ? AND month = ? AND deleted_at IS NULL
+    `).get(siteId, energyType || 'electricity', contractLabel || '', year, month);
+    if (existing) {
+      return this.update(existing.id, {
+        quantity, unit, cost_eur: costEur,
+        tenant_id: tenantId, invoice_attachment_id: invoiceAttachmentId,
+      });
+    }
+    return this.create({
+      siteId, energyType, year, month, quantity, unit, costEur,
+      tenantId, contractLabel, invoiceAttachmentId,
+    });
+  },
+  update(id, fields) {
+    const allowed = ['energy_type', 'year', 'month', 'quantity', 'unit',
+      'cost_eur', 'tenant_id', 'contract_label', 'invoice_attachment_id', 'deleted_at'];
+    const sets = [], params = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (v === undefined) continue;
+      const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
+      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
+    }
+    if (!sets.length) return this.getById(id);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    db.prepare(`UPDATE site_energy_history SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return this.getById(id);
+  },
+  softDelete(id) {
+    const ts = db.prepare("SELECT strftime('%Y-%m-%d %H:%M:%f', 'now') AS ts").get().ts;
+    db.prepare('UPDATE site_energy_history SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL')
+      .run(ts, ts, id);
+  },
+};
+
 // ── Clics sur les liens tracables des livres blancs ──────────────────
 const whitepaperClicks = {
   // Insere un lot de clics (ingestion FTP). Idempotent via hit_uid.
@@ -9165,5 +9971,9 @@ module.exports = {
   bacsAuditChecklist,
   gtbTopicsCatalog,
   bacsAuditGtbObservations,
+  siteParties,
+  zoneParties,
+  systemParties,
+  siteEnergyHistory,
   get db() { return db; },
 };

@@ -145,6 +145,11 @@ Handlebars.registerHelper('boolLabel', (v) => {
   return '—';
 });
 
+// Tri-état (oui / non / non renseigne) pour les questions de conformite
+// dont la valeur peut etre NULL = jamais saisie (cf migration 172).
+Handlebars.registerHelper('triSym', (v) => (v == null ? '—' : (v ? '✓' : '✗')));
+Handlebars.registerHelper('triCls', (v, yes, no, na) => (v == null ? na : (v ? yes : no)));
+
 // Lot 31 — Libelle du contrat requis a partir du service_level d'une section
 Handlebars.registerHelper('requiredContractLabel', (level) => {
   if (!level) return 'Smart ou Premium';

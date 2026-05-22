@@ -2,6 +2,69 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.81",
+      "date": "2026-05-22",
+      "title": "Refonte de la saisie de l'audit BACS : questions claires, complétude, cohérence poste/mobile",
+      "highlights": [
+        {
+          "kind": "improvement",
+          "title": "Cases à cocher remplacées par des boutons Oui / Non",
+          "what": "Les états binaires de l'audit (présence d'un usage, conformité R175-3, équipement de secours, hors service, GTB présente…) se saisissent désormais avec des boutons Oui / Non au lieu de cases à cocher. Tant qu'on n'a pas répondu, aucun bouton n'est sélectionné : on distingue enfin « non répondu » de « Non ». Chaque libellé est une vraie question explicite.",
+          "where": "Audit BACS → sections Identification, Systèmes, GTB et modale d'équipement (poste et mobile).",
+          "how_to_test": "Ouvrir un audit, section Systèmes : les usages et la modale d'un équipement affichent des boutons Oui / Non, vides tant qu'on ne répond pas."
+        },
+        {
+          "kind": "feature",
+          "title": "Équipement « complet » et validation forcée",
+          "what": "Un équipement doit avoir tous ses champs renseignés (identité, énergie, protocole, conformité, état…) pour être considéré complet. Tant qu'un équipement est incomplet, son bouton « Modifier » est rouge et l'étape Systèmes ne peut pas être validée. Pour les cas où une information restera définitivement inconnue, un interrupteur « Forcer la validation » permet de considérer l'équipement validé malgré tout.",
+          "where": "Audit BACS → Systèmes → modale d'un équipement (bandeau de complétude en haut).",
+          "how_to_test": "Ouvrir un équipement incomplet : le bandeau liste ce qui manque. Activer « Forcer la validation » : le bandeau passe au vert."
+        },
+        {
+          "kind": "improvement",
+          "title": "Validation d'étape : raison précise du blocage",
+          "what": "Quand une étape ne peut pas être validée, le message indique précisément ce qui manque (ex : « 3 équipements incomplets », « aucun compteur pointé présent/absent », « solution GTB non renseignée ») au lieu d'un message générique.",
+          "where": "Audit BACS → bouton « Valider » de chaque section.",
+          "how_to_test": "Cliquer « Valider » sur une étape incomplète : le bandeau rouge donne la raison exacte."
+        },
+        {
+          "kind": "fix",
+          "title": "Puissance chaud / froid selon l'usage",
+          "what": "La puissance d'un équipement s'affiche selon l'usage : seulement « chaud » pour un système de chauffage, seulement « froid » pour un système de refroidissement, les deux uniquement pour un équipement réversible. La colonne Puissance d'un usage de refroidissement affiche désormais la puissance froid (et non la puissance chaud comme avant).",
+          "where": "Audit BACS → Systèmes → tableau des équipements et modale d'édition.",
+          "how_to_test": "Sur un usage Refroidissement, ouvrir un équipement : seul « Puissance froid » s'affiche (sauf équipement réversible). La colonne Puissance du tableau affiche la valeur froid."
+        },
+        {
+          "kind": "fix",
+          "title": "La duplication d'un équipement copie tous ses champs",
+          "what": "« Dupliquer » un équipement perdait une partie des informations (puissance froid, quantité, câblage, protocoles, type de calcul de puissance…). La copie reprend désormais tous les champs de l'original, sauf le partage entre usages qui repart à zéro.",
+          "where": "Audit BACS → Systèmes → bouton Dupliquer d'un équipement.",
+          "how_to_test": "Dupliquer un équipement complet : la copie a les mêmes puissances, quantité, protocoles, etc."
+        },
+        {
+          "kind": "improvement",
+          "title": "Boutons d'action plus visibles, regroupés en colonne Actions",
+          "what": "Les boutons d'action des tableaux d'audit (Notes, Photo, Note vocale, Dupliquer, Supprimer…) sont désormais des pastilles nettement visibles plutôt que de discrètes icônes grises, et sont tous regroupés dans une seule colonne « Actions ».",
+          "where": "Audit BACS → tableaux Zones, Compteurs, Systèmes, Régulation thermique.",
+          "how_to_test": "Ouvrir un audit : chaque ligne de zone / compteur / équipement a une colonne Actions avec des boutons encadrés."
+        },
+        {
+          "kind": "improvement",
+          "title": "Audit mobile (PWA) aligné sur le poste",
+          "what": "L'audit sur tablette ou téléphone reprend les mêmes nouveautés : boutons Oui / Non, bandeau de complétude et validation forcée des équipements, puissance chaud/froid selon l'usage, questions de conformité reformulées.",
+          "where": "Audit BACS ouvert sur mobile → onglets Systèmes et GTB.",
+          "how_to_test": "Ouvrir un audit sur mobile, onglet Systèmes : la feuille d'un équipement affiche le bandeau de complétude et des boutons Oui / Non."
+        },
+        {
+          "kind": "fix",
+          "title": "Rapport PDF : question de conformité non répondue affichée « — »",
+          "what": "Dans le rapport PDF, une question de conformité R175-3 (arrêt manuel, reprise autonome) laissée sans réponse s'affiche « — » (non renseigné) au lieu d'une croix rouge qui la faisait passer à tort pour « non conforme ».",
+          "where": "Rapport PDF d'audit BACS et tableaux de synthèse.",
+          "how_to_test": "Exporter le PDF d'un audit en cours : les équipements dont la conformité n'est pas saisie affichent « — »."
+        }
+      ]
+    },
+    {
       "version": "0.1.80",
       "date": "2026-05-22",
       "title": "Ajuster la position GPS du site en déplaçant le pin sur la carte",

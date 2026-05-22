@@ -19,7 +19,7 @@ import {
   getBacsActionItems, regenerateBacsActionItems, updateBacsActionItem,
   getBacsActionItemsCsvUrl, exportBacsPdf, exportBacsTablesPdf, exportBacsChecklistPdf, deliverBacsAudit,
   getBacsPowerCumul, resyncBacsAudit,
-  listZones, createZone, updateZone, deleteZone,
+  listZones, createZone, updateZone, deleteZone, setZoneParties,
   getBacsDevices, getBacsPowerSummary, updateBacsDevice,
   validateBacsAuditStep, listSiteDocuments, listSiteCredentials,
   updateBacsAuditSynthesis, generateBacsAuditSynthesis,
@@ -131,8 +131,7 @@ async function deleteAudit() {
     error(e.response?.data?.detail || 'Suppression impossible')
   }
 }
-import AddDeviceModal from '@/components/AddDeviceModal.vue'
-import LibraryDevicePicker from '@/components/LibraryDevicePicker.vue'
+import DeviceAddModal from '@/components/DeviceAddModal.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import VerticalStepper from '@/components/VerticalStepper.vue'
@@ -172,13 +171,12 @@ const site = ref(null)
 // pose par l'auditeur).
 const showAddZoneModal = ref(false)
 const showAddMeterModal = ref(false)
-const addDeviceModalSystem = ref(null) // { id, system_category, zone_name }
-const libraryDevicePickerSystem = ref(null) // { id, system_category, zone_name }
+const addDeviceSystem = ref(null) // { id, system_category, zone_name } — modale d'ajout d'équipement à 2 onglets
 
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
 // Catalogues d'options partagés (BACS audit) avec icônes + couleurs pour
 // SearchableSelect. Source de vérité unique : `lib/audit-options.js`.
-import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS, ZONE_NATURES, isDeviceComplete } from '@/lib/audit-options'
 
 const showNotConcernedSystems = ref(localStorage.getItem('bacs-show-not-concerned') === '1')
 watch(showNotConcernedSystems, v => localStorage.setItem('bacs-show-not-concerned', v ? '1' : '0'))
@@ -546,7 +544,7 @@ async function addZone(payload) {
   const data = payload || newZone.value
   if (!data.name?.trim() || !document.value?.site_id) return
   try {
-    await createZone({
+    const created = await createZone({
       site_id: document.value.site_id,
       name: data.name.trim(),
       nature: data.nature,
@@ -554,7 +552,17 @@ async function addZone(payload) {
       surface_m2: data.surface_m2 ?? null,
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,
+      occupancy_profile: data.occupancy_profile ?? null,
+      comfort_constraint: data.comfort_constraint ?? null,
     })
+    // Item 5 — occupants choisis à la création de la zone.
+    if (Array.isArray(data.party_ids) && data.party_ids.length && created.data?.zone_id) {
+      try {
+        await setZoneParties(created.data.zone_id, data.party_ids)
+        // Met à jour les zones affectées des parties dans le store partagé.
+        await auditStore.refreshSiteParties()
+      } catch { /* non bloquant : la zone est créée, l'affectation pourra se refaire */ }
+    }
     const z = await listZones(document.value.site_id)
     zones.value = z.data
     await resyncBacsAudit(docId)
@@ -599,64 +607,107 @@ async function refreshSiteCounts() {
   } catch { /* silencieux */ }
 }
 
+// Chaque étape expose `incomplete()` → liste des raisons (texte court) qui
+// empêchent sa validation. Liste vide = étape complète. Ces raisons sont
+// affichées telles quelles à l'auditeur quand il tente de valider.
 const STEP_DEFINITIONS = [
   { key: 'identification',
     label: 'Identification',
     description: 'Site et applicabilite R175-2 renseignes.',
-    isComplete: () => !!site.value && !!document.value?.bacs_applicability_status },
+    incomplete: () => {
+      const r = []
+      if (!site.value) r.push("le site n'est pas rattaché")
+      if (!document.value?.bacs_applicability_status) {
+        r.push("l'applicabilité R175-2 n'est pas déterminée (puissance chauffage + climatisation et date de permis à renseigner)")
+      }
+      return r
+    } },
   { key: 'zones',
     label: 'Zones fonctionnelles',
     description: 'Au moins une zone fonctionnelle saisie.',
-    isComplete: () => zones.value.some(z => (z.kind || 'functional') !== 'technical') },
+    incomplete: () => (zones.value.some(z => (z.kind || 'functional') !== 'technical')
+      ? [] : ["aucune zone fonctionnelle n'a été saisie"]) },
   { key: 'technical-zones',
     label: 'Zones techniques',
     description: 'Inventaire des locaux techniques hors decret BACS (optionnel).',
     descriptionSite: 'Inventaire des locaux techniques du site (optionnel).',
     // Étape optionnelle : jamais bloquante pour la complétion de l'audit.
-    isComplete: () => true },
+    incomplete: () => [] },
   { key: 'systems',
-    label: 'Systemes',
-    description: 'Au moins un systeme present avec un equipement saisi.',
-    isComplete: () => systems.value.some(s => s.present && devices.value.some(d => d.system_id === s.id)) },
+    label: 'Systèmes',
+    description: 'Chaque équipement des systèmes présents doit être complètement renseigné.',
+    incomplete: () => {
+      const presentIds = new Set(systems.value.filter(s => s.present).map(s => s.id))
+      const auditedDevices = devices.value.filter(d => presentIds.has(d.system_id))
+      if (!auditedDevices.length) return ["aucun équipement n'est saisi sur les usages marqués présents"]
+      const catById = {}
+      for (const s of systems.value) catById[s.id] = s.system_category
+      const ko = auditedDevices.filter(d => !isDeviceComplete(d, catById[d.system_id]))
+      if (!ko.length) return []
+      return [ko.length === 1
+        ? '1 équipement incomplet — repérable à son bouton « Modifier » rouge'
+        : `${ko.length} équipements incomplets — repérables à leur bouton « Modifier » rouge`]
+    } },
   { key: 'meters',
     label: 'Compteurs',
     description: 'Compteurs requis revus (presents/absents/HS coches).',
-    isComplete: () => meters.value.length > 0 && meters.value.some(m => m.present_actual !== null) },
+    incomplete: () => {
+      if (!meters.value.length) return ["aucun compteur n'est listé"]
+      if (!meters.value.some(m => m.present_actual !== null)) {
+        return ["aucun compteur n'a été pointé présent ou absent"]
+      }
+      return []
+    } },
   { key: 'thermal',
     label: 'Régulation thermique',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
-    isComplete: () => thermal.value.length > 0 },
+    incomplete: () => (thermal.value.length > 0
+      ? [] : ["aucune régulation thermique R175-6 n'a été saisie"]) },
   // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
     label: 'GTB',
     description: 'Solution GTB + capacites R175-3 + maintenance + formation.',
-    isComplete: () => bms.value?.present === 0 ||
-      (bms.value?.present === 1 && !!bms.value?.existing_solution) },
+    incomplete: () => {
+      if (bms.value?.present == null) return ["indiquez d'abord si une GTB est présente sur le site"]
+      if (bms.value?.present === 1 && !bms.value?.existing_solution) {
+        return ['la solution GTB en place n\'est pas renseignée']
+      }
+      return []
+    } },
   { key: 'inspections',
     label: 'Inspections',
     description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
-    isComplete: () => inspections.value.length > 0 && !!inspections.value[0].last_inspection_date },
+    incomplete: () => ((inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
+      ? [] : ["la date de la dernière inspection périodique R175-5-1 n'est pas renseignée"]) },
   { key: 'docs-checklist',
     label: 'Check-list documentaire',
     description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
-    isComplete: () => checklistAllHandled.value && photoCoverageComplete.value },
+    incomplete: () => {
+      const r = []
+      if (!checklistAllHandled.value) r.push('des éléments de la check-list documentaire sont encore en attente')
+      if (!photoCoverageComplete.value) r.push("des zones, systèmes, compteurs ou la GTB n'ont pas encore de photo")
+      return r
+    } },
   { key: 'documents',
     label: 'Documents',
     description: 'Plans, schemas, datasheets et manuels deposes.',
-    isComplete: () => siteDocCounts.value.doe > 0 },
+    incomplete: () => (siteDocCounts.value.doe > 0
+      ? [] : ["aucun document (plan, schéma, datasheet, manuel) n'a été déposé"]) },
   { key: 'credentials',
     label: 'Credentials',
     description: 'Acces web/SSH/VPN aux GTB et systemes renseignes.',
-    isComplete: () => siteCredCount.value > 0 },
+    incomplete: () => (siteCredCount.value > 0
+      ? [] : ["aucun accès (web, SSH, VPN) n'a été renseigné"]) },
   { key: 'review',
     label: 'Plan & livraison',
     description: 'Plan de mise en conformite relu et annote commercialement.',
     // Le plan n'a plus de champ par action à renseigner : sign-off manuel.
-    isComplete: () => true },
+    incomplete: () => [] },
   { key: 'synthesis',
     label: 'Synthèse',
     description: 'Note de synthese redigee (manuellement ou via Claude).',
-    isComplete: () => !!(document.value?.audit_synthesis_html || '').replace(/<[^>]*>/g, '').trim() },
+    incomplete: () => ((document.value?.audit_synthesis_html || '').replace(/<[^>]*>/g, '').trim()
+      ? [] : ['la note de synthèse est vide']) },
 ]
 
 function stepFor(key) {
@@ -712,11 +763,13 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
   .filter(def => !(def.key === 'inspections' && bms.value?.present === 0))
   .map(def => {
     const p = auditProgress.value?.[def.key] || {}
+    const reasons = def.incomplete ? def.incomplete() : []
     return {
       key: def.key,
       label: def.label,
       description: isBacs.value ? def.description : (def.descriptionSite || def.description.replace(/R175-?[0-9]?\s*(§\s*[0-9]|[0-9]°)?/g, '').replace(/\s+/g, ' ').trim()),
-      complete: def.isComplete(),
+      complete: reasons.length === 0,
+      incompleteReasons: reasons,
       validated: !!p.validated,
       validated_at: p.validated_at || null,
       validated_by_name: p.validated_by_name || null,
@@ -725,8 +778,13 @@ const stepperSteps = computed(() => STEP_DEFINITIONS
 
 async function validateStep(stepKey) {
   // Garde : on ne valide pas une étape dont les infos essentielles manquent.
-  if (!stepFor(stepKey)?.complete) {
-    error('Complétez l\'étape avant de la valider.')
+  // On affiche précisément ce qui bloque (raisons portées par chaque étape).
+  const step = stepFor(stepKey)
+  if (!step?.complete) {
+    const reasons = step?.incompleteReasons || []
+    error(reasons.length
+      ? `Étape « ${step.label} » non validable — ${reasons.join(' ; ')}`
+      : 'Complétez l\'étape avant de la valider.')
     return
   }
   try {
@@ -933,6 +991,10 @@ async function saveNotesModal(html) {
     } else if (m.entityType === 'action_item_alternatives') {
       const { data } = await updateBacsActionItem(m.entityRef.id, { alternative_solutions_html: html || null })
       Object.assign(m.entityRef, data)
+    } else if (m.entityType === 'site_ownership') {
+      // Particularités de la structure juridique : champ `ownership_notes`
+      // de la table `sites` (propagé à FM via le sync existant).
+      await auditStore.updateSiteFields({ [field]: html || null })
     }
     success('Notes enregistrees')
   } catch (e) {
@@ -949,7 +1011,7 @@ function hasNotes(htmlOrText) {
 const APPLICABILITY_LABEL = {
   subject_immediate: { label: 'Soumis (immédiat)', cls: 'sev-blocking' },
   subject_2025: { label: 'Soumis — échéance 1er janvier 2025', cls: 'sev-major' },
-  subject_2027: { label: 'Soumis — échéance 1er janvier 2027', cls: 'sev-minor' },
+  subject_2030: { label: 'Soumis — échéance 1er janvier 2030', cls: 'sev-minor' },
   not_subject: { label: 'Non assujetti (puissance < 70 kW)', cls: 'tone-success' },
 }
 
@@ -1337,6 +1399,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @recompute-power="recomputePowerFromEquipments"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
+        @open-notes="openNotesModal"
       />
 
       <!-- 2. Zones fonctionnelles (R175-1 6°) -->
@@ -1381,8 +1444,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @invalidate-step="invalidateStep"
         @toggle-zone-collapsed="toggleZoneCollapsed"
         @toggle-system-collapsed="toggleSystemCollapsed"
-        @add-device="sys => addDeviceModalSystem = sys"
-        @add-device-from-library="sys => libraryDevicePickerSystem = sys"
+        @add-device="sys => addDeviceSystem = sys"
       />
 
       <!-- 5. Compteurs et mesurage (R175-3 1°) -->
@@ -1555,25 +1617,13 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       @close="showAddMeterModal = false"
       @submit="addMeter"
     />
-    <AddDeviceModal
-      v-if="addDeviceModalSystem"
-      :system-id="addDeviceModalSystem.id"
-      :system-label="addDeviceModalSystem.is_bacs === 0 ? (addDeviceModalSystem.custom_label || 'Usage') : (SYSTEM_LABEL[addDeviceModalSystem.system_category] || addDeviceModalSystem.system_category)"
-      :system-category="addDeviceModalSystem.system_category"
-      :zone-name="addDeviceModalSystem.zone_name || ''"
-      :energy-options="ENERGY_OPTIONS"
-      :role-options="ROLE_OPTIONS"
-      :comm-options="COMM_OPTIONS"
-      @close="addDeviceModalSystem = null"
-      @created="refreshAuditData"
-    />
-    <LibraryDevicePicker
-      v-if="libraryDevicePickerSystem"
-      :system="libraryDevicePickerSystem"
-      :system-label="libraryDevicePickerSystem.is_bacs === 0 ? (libraryDevicePickerSystem.custom_label || 'Usage') : (SYSTEM_LABEL[libraryDevicePickerSystem.system_category] || libraryDevicePickerSystem.system_category)"
-      :zone-name="libraryDevicePickerSystem.zone_name || ''"
-      @close="libraryDevicePickerSystem = null"
-      @added="refreshAuditData"
+    <DeviceAddModal
+      v-if="addDeviceSystem"
+      :system="addDeviceSystem"
+      :system-label="addDeviceSystem.is_bacs === 0 ? (addDeviceSystem.custom_label || 'Usage') : (SYSTEM_LABEL[addDeviceSystem.system_category] || addDeviceSystem.system_category)"
+      :zone-name="addDeviceSystem.zone_name || ''"
+      @close="addDeviceSystem = null"
+      @changed="refreshAuditData"
     />
 
     <BulkPhotoUploadModal

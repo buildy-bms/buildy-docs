@@ -187,16 +187,6 @@ function toggleProtocol(p) {
       </div>
     </div>
 
-    <!-- Bouton Ajouter prominent en haut -->
-    <button
-      type="button"
-      @click="openCreate"
-      class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
-    >
-      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5" />
-      Ajouter un compteur
-    </button>
-
     <!-- Liste -->
     <div v-if="meters.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
       <button
@@ -229,6 +219,14 @@ function toggleProtocol(p) {
       <FontAwesomeIcon :icon="['fas', 'bolt']" class="w-10 h-10 text-gray-300 mx-auto" />
       <p class="text-sm text-gray-500 mt-2">Aucun compteur listé pour l'instant</p>
     </div>
+    <button
+      type="button"
+      @click="openCreate"
+      class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+    >
+      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+      Ajouter un compteur
+    </button>
 
     <MobileSheet
       :open="!!editing"

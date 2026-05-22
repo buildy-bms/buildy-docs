@@ -99,7 +99,7 @@ const GENERATOR_LABEL = {
 const APPLICABILITY_LABEL = {
   subject_immediate: 'Immédiate (bâtiment > 290 kW déjà existant)',
   subject_2025: '1er janvier 2025 (puissance > 290 kW)',
-  subject_2027: '1er janvier 2027 (puissance > 70 kW)',
+  subject_2030: '1er janvier 2030 (puissance entre 70 et 290 kW)',
   not_subject: 'Non assujetti (puissance < 70 kW)',
 };
 
@@ -109,8 +109,9 @@ const COMPLIANCE_LABEL = {
   non_compliant: 'Non conforme',
 };
 
-// Aligne sur ZONE_NATURES dans frontend/src/views/BacsAuditDetailView.vue.
+// Aligne sur ZONE_NATURES dans frontend/src/lib/audit-options.js.
 const ZONE_NATURE_LABEL = {
+  'office': 'Bureaux',
   'shared-office': 'Bureau partagé',
   'private-office': 'Bureau privé',
   'open-space': 'Open-space',
@@ -119,6 +120,7 @@ const ZONE_NATURE_LABEL = {
   'workshop': 'Atelier',
   'switchboard': 'Tableau électrique',
   'technical-area': 'Local technique',
+  'server-room': 'Local informatique',
   'classroom': 'Salle de classe',
   'leasure-space': 'Espace loisirs',
   'foyer': 'Foyer',
@@ -128,6 +130,52 @@ const ZONE_NATURE_LABEL = {
   'shared-space': 'Espace partagé',
   'logistic-cell': 'Cellule logistique',
   'stock': 'Stock',
+  // Item 7b — natures enrichies.
+  'changing-room': 'Vestiaires / douches',
+  'kitchen': 'Cuisine',
+  'refectory': 'Réfectoire',
+  'bedroom': 'Chambre',
+  'care-room': 'Salle de soin',
+  'sports-hall': 'Salle de sport',
+  'boiler-room': 'Chaufferie',
+  'laundry': 'Blanchisserie',
+  'restroom': 'Sanitaires',
+};
+
+// Item 14 — Régime d'activité d'une zone. Aligne sur ZONE_OCCUPANCY_PROFILES
+// (frontend/src/lib/audit-options.js) et le CHECK constraint migration 158.
+const OCCUPANCY_PROFILE_LABEL = {
+  'continu': 'Activité continue (24/7)',
+  'heures_bureau': 'Heures de bureau',
+  'scolaire': 'Rythme scolaire',
+  'intermittent': 'Activité intermittente',
+  'saisonnier': 'Activité saisonnière',
+  'autre': 'Autre régime',
+};
+
+// Item 4 — structure juridique + parties prenantes. Réexportés depuis
+// lib/bacs-liability.js (source de vérité unique). Synchro avec le CHECK
+// des migrations 160/161 et OWNERSHIP_STRUCTURES/PARTY_KINDS du frontend.
+const { OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL } = require('../../lib/bacs-liability');
+
+// Item 13 — types d'énergie de l'historique de consommation. Synchro avec
+// le CHECK de la migration 165, ENERGY_HISTORY_TYPES (routes/sites.js) et
+// ENERGY_HISTORY_TYPES (frontend/src/lib/audit-options.js).
+const ENERGY_HISTORY_TYPE_LABEL = {
+  electricity: 'Électricité',
+  gas: 'Gaz',
+  fuel_oil: 'Fioul',
+  district_heating: 'Réseau de chaleur',
+  other: 'Autre énergie',
+};
+
+// Unité par défaut conseillée selon l'énergie (l'auditeur peut la corriger).
+const ENERGY_HISTORY_DEFAULT_UNIT = {
+  electricity: 'kWh',
+  gas: 'kWh',
+  fuel_oil: 'L',
+  district_heating: 'kWh',
+  other: 'kWh',
 };
 
 module.exports = {
@@ -143,4 +191,9 @@ module.exports = {
   APPLICABILITY_LABEL,
   COMPLIANCE_LABEL,
   ZONE_NATURE_LABEL,
+  OCCUPANCY_PROFILE_LABEL,
+  OWNERSHIP_STRUCTURE_LABEL,
+  PARTY_KIND_LABEL,
+  ENERGY_HISTORY_TYPE_LABEL,
+  ENERGY_HISTORY_DEFAULT_UNIT,
 };

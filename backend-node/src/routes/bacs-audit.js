@@ -11,6 +11,7 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
 const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
+const { computeSystemLiability } = require('../lib/bacs-liability');
 const {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
@@ -64,6 +65,14 @@ async function routes(fastify) {
       meets_r175_3_p4_autonomous: z.boolean().nullable().optional(),
       managed_by_bms: z.boolean().nullable().optional(),
       not_concerned: z.boolean().nullable().optional(),
+      // Item 3 — bouclage ECS (pertinent pour system_category = 'dhw').
+      is_looped: z.enum(['looped', 'not_looped', 'unknown']).nullable().optional(),
+      // Item 1 — règle des 5 % : poste considéré comme négligeable.
+      marked_negligible_under_5pct: z.boolean().nullable().optional(),
+      negligible_justification: z.string().nullable().optional(),
+      // Item 4c/4e — flags d'assujettissement par périmètre.
+      is_district_heating_substation: z.boolean().nullable().optional(),
+      serves_multiple_buildings: z.boolean().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -86,6 +95,11 @@ async function routes(fastify) {
     boolField('meets_r175_3_p4');
     boolField('meets_r175_3_p4_autonomous');
     boolField('managed_by_bms');
+    boolField('marked_negligible_under_5pct');
+    boolField('is_district_heating_substation');
+    boolField('serves_multiple_buildings');
+    if ('is_looped' in body) { sets.push('is_looped = ?'); args.push(body.is_looped); }
+    if ('negligible_justification' in body) { sets.push('negligible_justification = ?'); args.push(body.negligible_justification); }
     if ('notes_html' in body) { sets.push('notes_html = ?'); args.push(body.notes_html); }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
@@ -149,6 +163,65 @@ async function routes(fastify) {
     logBacsAudit(request, 'bacs.system.delete', row.document_id, { systemId: id });
     regenerateActionItems(row.document_id);
     return { deleted: true };
+  });
+
+  // ─── Parties prenantes affectées à un système (item 4c) ────────────
+  // GET /bacs-audit/systems/:id/parties — qui a fait les travaux sur ce
+  // système (clé du cas C : responsible_for_works → preneur assujetti).
+  fastify.get('/bacs-audit/systems/:id/parties', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT document_id FROM bacs_audit_systems WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Système non trouvé' });
+    if (!assertBacsAuditExists(row.document_id, request, reply)) return;
+    return db.systemParties.listBySystem(id);
+  });
+
+  // PUT /bacs-audit/systems/:id/parties — remplace les affectations.
+  // body : { parties: [{ party_id, responsible_for_works }] }.
+  fastify.put('/bacs-audit/systems/:id/parties', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT document_id FROM bacs_audit_systems WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Système non trouvé' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
+    const schema = z.object({
+      parties: z.array(z.object({
+        party_id: z.number().int().positive(),
+        responsible_for_works: z.boolean().optional(),
+      })).default([]),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const links = db.systemParties.setForSystem(id, body.parties);
+    logBacsAudit(request, 'bacs.system.parties.set', row.document_id,
+      { systemId: id, count: body.parties.length });
+    return links;
+  });
+
+  // GET /bacs-audit/:documentId/liability — calcul automatique de
+  // l'assujetti par système (item 4d). Retourne aussi la structure
+  // juridique du site et les parties prenantes pour l'UI.
+  fastify.get('/bacs-audit/:documentId/liability', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, request, reply);
+    if (!af) return;
+    const site = af.site_id ? db.sites.getById(af.site_id) : null;
+    const parties = site ? db.siteParties.listBySite(site.site_id) : [];
+    const systems = db.db.prepare(
+      'SELECT id, zone_id, system_category, is_district_heating_substation, serves_multiple_buildings FROM bacs_audit_systems WHERE document_id = ?'
+    ).all(id);
+    const zonePartyLinks = site ? db.zoneParties.listBySite(site.site_id) : [];
+    const systemPartyLinks = db.systemParties.listByDocument(id);
+    const liabilityMap = computeSystemLiability({
+      site, parties, systems, zonePartyLinks, systemPartyLinks,
+    });
+    const bySystem = {};
+    for (const [sysId, info] of liabilityMap) bySystem[sysId] = info;
+    return {
+      ownership_structure: site?.ownership_structure || null,
+      parties,
+      by_system: bySystem,
+    };
   });
 
   // ─── Meters (R175-3 §1) ────────────────────────────────────────────
@@ -329,6 +402,13 @@ async function routes(fastify) {
       maintenance_responsible: z.string().nullable().optional(),
       operator_training_topics: z.string().nullable().optional(),
       operator_training_provider: z.string().nullable().optional(),
+      // Item 15 — GTB existante : stockage 5 ans + accès aux données (R175-3).
+      data_storage_5y_compliant: z.enum(['yes', 'no', 'unknown']).nullable().optional(),
+      data_storage_location: z.enum(['local', 'cloud_editeur', 'cloud_proprietaire', 'unknown']).nullable().optional(),
+      data_owner_access: z.enum(['yes', 'no', 'partial']).nullable().optional(),
+      gestionnaire_exploitant_access: z.enum(['yes', 'no', 'partial']).nullable().optional(),
+      export_capability: z.enum(['yes', 'no']).nullable().optional(),
+      data_access_notes: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
@@ -477,6 +557,10 @@ async function routes(fastify) {
     const row = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
     const schema = z.object({
+      // Migration 170 : libellé libre du système régulé (« Chaudière gaz +
+      // aérothermes », « DRV Daikin »…). NULL = libellé par défaut côté UI
+      // (« Chauffage » / « Refroidissement »).
+      label: z.string().nullable().optional(),
       // `has_automatic_regulation` se déduit désormais de regulation_type
       // (≠ none) et `generator_exempt_wood` de l'énergie de production —
       // ces colonnes sont dormantes, l'UI ne les saisit plus (Feature J/M).
@@ -528,6 +612,54 @@ async function routes(fastify) {
     }
     regenerateActionItems(row.document_id);
     return db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
+  });
+
+  // POST /bacs-audit/:documentId/thermal-regulation — crée une entrée de
+  // régulation supplémentaire pour une zone × catégorie (mig 170 : une zone
+  // peut être desservie par plusieurs systèmes producteurs distincts).
+  fastify.post('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
+    const documentId = parseInt(request.params.documentId, 10);
+    if (!assertBacsAuditExists(documentId, request, reply)) return;
+    const schema = z.object({
+      zone_id: z.number().int(),
+      category: z.enum(['heating', 'cooling']),
+      label: z.string().nullable().optional(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+    const zone = db.db.prepare('SELECT id FROM zones WHERE id = ?').get(body.zone_id);
+    if (!zone) return reply.code(400).send({ detail: 'Zone introuvable' });
+    const maxPos = db.db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_thermal_regulation WHERE document_id = ?'
+    ).get(documentId).m;
+    const info = db.db.prepare(`
+      INSERT INTO bacs_audit_thermal_regulation
+        (document_id, zone_id, category, label, has_automatic_regulation, position)
+      VALUES (?, ?, ?, ?, 0, ?)
+    `).run(documentId, body.zone_id, body.category, body.label?.trim() || null, maxPos + 10);
+    logBacsAudit(request, 'bacs.thermal.create', documentId,
+      { thermalId: info.lastInsertRowid, zone_id: body.zone_id, category: body.category });
+    regenerateActionItems(documentId);
+    return db.db.prepare(`
+      SELECT t.*, z.name AS zone_name, z.nature AS zone_nature
+      FROM bacs_audit_thermal_regulation t
+      LEFT JOIN zones z ON z.id = t.zone_id
+      WHERE t.id = ?
+    `).get(info.lastInsertRowid);
+  });
+
+  // DELETE /bacs-audit/thermal-regulation/:id — supprime une entrée de
+  // régulation. Si toutes les entrées d'une zone × catégorie « requise »
+  // sont supprimées, le resync en recrée une de base au prochain passage.
+  fastify.delete('/bacs-audit/thermal-regulation/:id', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
+    if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
+    db.db.prepare('DELETE FROM bacs_audit_thermal_regulation WHERE id = ?').run(id);
+    logBacsAudit(request, 'bacs.thermal.delete', row.document_id, { thermalId: id });
+    regenerateActionItems(row.document_id);
+    return { ok: true };
   });
 
   // ─── Action items (plan de mise en conformite) ─────────────────────
@@ -897,8 +1029,9 @@ async function routes(fastify) {
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_system_devices
         (system_id, position, name, brand, model_reference, power_kw, energy_source,
-         device_role, communication_protocol, communication_protocols, location, notes, equipment_template_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         device_role, communication_protocol, communication_protocols, location, notes, equipment_template_id,
+         wired, meets_r175_3_p4, meets_r175_3_p4_autonomous, is_backup, out_of_service)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL)
     `).run(
       sysId, maxPos + 10,
       prefName, body.brand || null, body.model_reference || null, body.power_kw ?? null,
@@ -928,6 +1061,19 @@ async function routes(fastify) {
       brand: z.string().nullable().optional(),
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
+      // Item 8 — puissance frigorifique (équipement thermodynamique) +
+      // type de calcul de puissance + équipement de secours.
+      power_kw_cooling: z.number().nullable().optional(),
+      power_calculation_type: z.enum([
+        'thermodynamic_max', 'boiler_sum', 'joule_sum',
+        'district_heating_substation', 'out_of_scope',
+      ]).nullable().optional(),
+      is_backup: z.boolean().nullable().optional(),
+      // Item 7c — séparabilité du comptage d'un équipement partagé entre
+      // plusieurs zones. Pilote le regroupement en zones fonctionnelles
+      // de suivi (item 7d).
+      metering_separable: z.enum(['yes', 'no', 'partial']).nullable().optional(),
+      metering_separable_note: z.string().nullable().optional(),
       energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
       device_role: deviceRoleSchema,
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
@@ -946,6 +1092,9 @@ async function routes(fastify) {
       // Mig 135 : age en annees du systeme (etait sur thermal_regulation,
       // remonte sur le device).
       age_years: z.number().int().min(0).nullable().optional(),
+      // Mig 172 : validation forcee — l'auditeur considere l'equipement
+      // valide meme si tous les champs ne sont pas renseignes.
+      validation_forced: z.boolean().nullable().optional(),
     });
     const schema = schemaPatch;
     let body;
@@ -980,21 +1129,20 @@ async function routes(fastify) {
       JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouve' });
-    const r = db.db.prepare(`
-      INSERT INTO bacs_audit_system_devices
-        (system_id, position, name, brand, model_reference, power_kw, energy_source,
-         device_role, communication_protocol, location, notes, notes_html,
-         meets_r175_3_p4, meets_r175_3_p4_autonomous, managed_by_bms,
-         out_of_service, bms_integration_out_of_service)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      dev.system_id, (dev.position || 0) + 1,
-      dev.name ? `${dev.name} (copie)` : null,
-      dev.brand, dev.model_reference, dev.power_kw, dev.energy_source,
-      dev.device_role, dev.communication_protocol, dev.location,
-      dev.notes, dev.notes_html, dev.meets_r175_3_p4, dev.meets_r175_3_p4_autonomous,
-      dev.managed_by_bms, dev.out_of_service, dev.bms_integration_out_of_service,
-    );
+    // Copie générique de TOUTES les colonnes du device (hors id / position /
+    // timestamps) : évite de perdre power_kw_cooling, power_calculation_type,
+    // quantity, wired, communication_protocols, is_backup, age_years… à chaque
+    // ajout de colonne. Le partage (extra_system_ids) n'est pas copié — c'est
+    // une table de jonction, une copie démarre donc non partagée.
+    const SKIP_COLS = new Set(['id', 'position', 'document_id', 'created_at', 'updated_at']);
+    const copyCols = Object.keys(dev).filter(c => !SKIP_COLS.has(c));
+    const copyValues = copyCols.map(c => (c === 'name'
+      ? (dev.name ? `${dev.name} (copie)` : null)
+      : dev[c]));
+    const r = db.db.prepare(
+      `INSERT INTO bacs_audit_system_devices (position, ${copyCols.join(', ')})
+       VALUES (?, ${copyCols.map(() => '?').join(', ')})`
+    ).run((dev.position || 0) + 1, ...copyValues);
     regenerateActionItems(dev.document_id);
     db.auditLog.add({ afId: dev.document_id, userId: request.authUser?.id,
       action: 'bacs_device.duplicate', payload: { source_device_id: id, new_device_id: r.lastInsertRowid } });
@@ -1103,7 +1251,24 @@ async function routes(fastify) {
         AND d.power_kw IS NOT NULL
       ORDER BY s.system_category, z.name, d.position, d.id
     `).all(id);
-    return { by_category: byCategory, heating_cooling_total_kw: heatingCooling, heating_cooling_breakdown: breakdown };
+    // Items 5 + 8 — cumul automatique différencié chaud / froid.
+    const { computeAutoPower, resolveTotalPower } = require('../lib/bacs-audit-power');
+    const allDevices = db.db.prepare(`
+      SELECT d.*, s.system_category
+      FROM bacs_audit_system_devices d
+      JOIN bacs_audit_systems s ON s.id = d.system_id
+      WHERE s.document_id = ?
+    `).all(id);
+    const af = db.afs.getById(id);
+    const autoPower = computeAutoPower(allDevices);
+    const powerSummary = resolveTotalPower(af, autoPower);
+    return {
+      by_category: byCategory,
+      heating_cooling_total_kw: heatingCooling,
+      heating_cooling_breakdown: breakdown,
+      // Cumul différencié : chaud / froid / retenu (max) + mode + écart.
+      power_summary: powerSummary,
+    };
   });
 
   // POST /bacs-audit/:documentId/resync — re-synchronise les rows

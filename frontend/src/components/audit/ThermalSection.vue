@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
-import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -78,6 +78,69 @@ async function patchThermal(t, patch) {
     await updateBacsThermal(t.id, patch)
     await audit.refreshActionItems()
   } catch { error('Sauvegarde impossible') }
+}
+
+// ── Ajout / suppression d'entrées de régulation (mig 170) ──
+// Une zone peut porter plusieurs systèmes de chauffage / refroidissement,
+// chacun avec son libellé et son générateur. Les options d'ajout = couples
+// (zone × usage) ayant au moins un système présent dans l'audit.
+function defaultLabel(t) {
+  return (t.category || 'heating') === 'cooling' ? 'Refroidissement' : 'Chauffage'
+}
+
+const addOptions = computed(() => {
+  const opts = []
+  const seen = new Set()
+  for (const s of audit.systems) {
+    if (!s.present) continue
+    if (s.system_category !== 'heating' && s.system_category !== 'cooling') continue
+    const key = `${s.zone_id}:${s.system_category}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    opts.push({
+      value: key,
+      label: `${s.zone_name || 'Zone'} — ${s.system_category === 'cooling' ? 'Refroidissement' : 'Chauffage'}`,
+      zone_id: s.zone_id,
+      category: s.system_category,
+    })
+  }
+  return opts.sort((a, b) => a.label.localeCompare(b.label))
+})
+
+const adding = ref(false)
+const addForm = ref({ zoneCategory: null, label: '' })
+const addBusy = ref(false)
+
+function cancelAdd() {
+  adding.value = false
+  addForm.value = { zoneCategory: null, label: '' }
+}
+
+async function addEntry() {
+  const opt = addOptions.value.find(o => o.value === addForm.value.zoneCategory)
+  if (!opt) return error('Choisissez une zone et un usage')
+  addBusy.value = true
+  try {
+    await audit.addThermalEntry({
+      zone_id: opt.zone_id,
+      category: opt.category,
+      label: addForm.value.label.trim() || null,
+    })
+    cancelAdd()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Ajout impossible')
+  } finally {
+    addBusy.value = false
+  }
+}
+
+async function removeEntry(t) {
+  if (!confirm(`Supprimer le système de régulation « ${t.label || defaultLabel(t)} » de la zone « ${t.zone_name} » ?`)) return
+  try {
+    await audit.removeThermalEntry(t.id)
+  } catch (e) {
+    error(e.response?.data?.detail || 'Suppression impossible')
+  }
 }
 
 // Adapte les devices d'une zone × catégorie au format SearchableSelect,
@@ -202,6 +265,7 @@ onBeforeUnmount(teardownSortable)
           <th class="w-8"></th>
           <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
           <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
+          <th>Système</th>
           <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régulation</DataTableSortHeader>
           <th v-if="anyWoodExempt">Exempté bois</th>
           <th>Production</th>
@@ -210,7 +274,7 @@ onBeforeUnmount(teardownSortable)
           <th>Régulation distribution</th>
           <th>Émission</th>
           <th>Régulation émission</th>
-          <th>Notes</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody v-for="t in sortedThermal" :key="t.id"
@@ -232,6 +296,14 @@ onBeforeUnmount(teardownSortable)
               <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
               {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
             </span>
+          </td>
+          <!-- Libellé libre du système régulé (mig 170) -->
+          <td class="align-middle">
+            <input
+              :value="t.label || ''"
+              @blur="e => (e.target.value.trim() || null) !== (t.label || null) && patchThermal(t, { label: e.target.value.trim() || null })"
+              :placeholder="defaultLabel(t)"
+              class="min-w-36 w-full px-2 py-1 text-sm border border-gray-200 rounded-md bg-white" />
           </td>
           <td class="align-middle">
             <div class="min-w-32">
@@ -281,12 +353,9 @@ onBeforeUnmount(teardownSortable)
               </div>
               <button type="button"
                       @click="emit('open-notes', { title: 'Notes Production — ' + t.zone_name, contextLabel: t.zone_name + ' · Production', entityType: 'thermal', entityRef: t, currentHtml: t.production_notes_html || '', noteField: 'production_notes_html' })"
-                      :class="['shrink-0 p-1 rounded-md',
-                        hasNotes(t.production_notes_html)
-                          ? 'text-indigo-700 bg-indigo-50'
-                          : 'text-gray-300 hover:text-gray-600']"
+                      :class="['btn-icon', hasNotes(t.production_notes_html) && 'is-active']"
                       v-tooltip="hasNotes(t.production_notes_html) ? 'Note production' : 'Ajouter une note production'">
-                <PencilSquareIcon class="w-3.5 h-3.5" />
+                <PencilSquareIcon class="w-4 h-4" />
               </button>
             </div>
           </td>
@@ -316,12 +385,9 @@ onBeforeUnmount(teardownSortable)
               </div>
               <button type="button"
                       @click="emit('open-notes', { title: 'Notes Distribution — ' + t.zone_name, contextLabel: t.zone_name + ' · Distribution', entityType: 'thermal', entityRef: t, currentHtml: t.distribution_notes_html || '', noteField: 'distribution_notes_html' })"
-                      :class="['shrink-0 p-1 rounded-md',
-                        hasNotes(t.distribution_notes_html)
-                          ? 'text-indigo-700 bg-indigo-50'
-                          : 'text-gray-300 hover:text-gray-600']"
+                      :class="['btn-icon', hasNotes(t.distribution_notes_html) && 'is-active']"
                       v-tooltip="hasNotes(t.distribution_notes_html) ? 'Note distribution' : 'Ajouter une note distribution'">
-                <PencilSquareIcon class="w-3.5 h-3.5" />
+                <PencilSquareIcon class="w-4 h-4" />
               </button>
             </div>
           </td>
@@ -351,37 +417,79 @@ onBeforeUnmount(teardownSortable)
               </div>
               <button type="button"
                       @click="emit('open-notes', { title: 'Notes Émission — ' + t.zone_name, contextLabel: t.zone_name + ' · Émission', entityType: 'thermal', entityRef: t, currentHtml: t.emission_notes_html || '', noteField: 'emission_notes_html' })"
-                      :class="['shrink-0 p-1 rounded-md',
-                        hasNotes(t.emission_notes_html)
-                          ? 'text-indigo-700 bg-indigo-50'
-                          : 'text-gray-300 hover:text-gray-600']"
+                      :class="['btn-icon', hasNotes(t.emission_notes_html) && 'is-active']"
                       v-tooltip="hasNotes(t.emission_notes_html) ? 'Note émission' : 'Ajouter une note émission'">
-                <PencilSquareIcon class="w-3.5 h-3.5" />
+                <PencilSquareIcon class="w-4 h-4" />
               </button>
             </div>
           </td>
-          <!-- Notes globales du couple -->
+          <!-- Actions de l'entrée de régulation : notes globales + suppression -->
           <td class="align-middle">
-            <button type="button"
-                    @click="emit('open-notes', {
-                      title: 'Notes régulation thermique',
-                      contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
-                      entityType: 'thermal',
-                      entityRef: t,
-                      currentHtml: t.notes_html || t.notes || '',
-                      noteField: 'notes_html',
-                    })"
-                    :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
-                      hasNotes(t.notes_html || t.notes)
-                        ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                        : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
-                    v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-              <PencilSquareIcon class="w-4 h-4 shrink-0" />
-            </button>
+            <div class="inline-flex items-center gap-1">
+              <button type="button"
+                      @click="emit('open-notes', {
+                        title: 'Notes régulation thermique',
+                        contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                        entityType: 'thermal',
+                        entityRef: t,
+                        currentHtml: t.notes_html || t.notes || '',
+                        noteField: 'notes_html',
+                      })"
+                      :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
+                      v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                <PencilSquareIcon class="w-4 h-4 shrink-0" />
+              </button>
+              <button type="button" @click="removeEntry(t)"
+                      class="btn-icon btn-icon-danger"
+                      v-tooltip="'Supprimer ce système de régulation'">
+                <TrashIcon class="w-4 h-4" />
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
     </table>
+    </div>
+
+    <!-- Ajout d'un système de régulation supplémentaire (mig 170) -->
+    <div class="px-3 pb-3 pt-1">
+      <button v-if="!adding && addOptions.length" type="button" @click="adding = true"
+              class="btn-add">
+        <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un système de régulation
+      </button>
+      <div v-else-if="adding" class="border border-indigo-200 bg-indigo-50/40 rounded-lg p-3 space-y-2">
+        <p class="text-xs text-gray-600 leading-relaxed">
+          Une même zone peut être desservie par plusieurs systèmes producteurs distincts
+          (ex. une chaudière gaz et un DRV). Ajoutez ici une entrée de régulation séparée,
+          avec son libellé propre.
+        </p>
+        <div class="flex flex-wrap items-end gap-2">
+          <div class="min-w-56">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Zone &amp; usage</label>
+            <SearchableSelect
+              v-model="addForm.zoneCategory"
+              :options="addOptions"
+              size="sm" placeholder="— Sélectionner —"
+              search-placeholder="Filtrer…" />
+          </div>
+          <div class="flex-1 min-w-48">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Libellé du système</label>
+            <input v-model="addForm.label" type="text"
+                   placeholder="ex : Chaudière gaz + aérothermes, DRV Daikin…"
+                   class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white" />
+          </div>
+          <div class="flex gap-2">
+            <button type="button" @click="cancelAdd"
+                    class="text-xs font-medium text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-100">
+              Annuler
+            </button>
+            <button type="button" @click="addEntry" :disabled="addBusy || !addForm.zoneCategory"
+                    class="text-xs font-medium text-white bg-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
+              Ajouter
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </CollapsibleSection>
 </template>

@@ -109,11 +109,20 @@ function show(target, opts) {
   if (!text) return
   const placement = typeof opts === 'object' ? (opts.placement || 'top') : 'top'
   ensureEl()
-  // Texte sans l'arrow
-  // Réinjecter texte proprement
-  const textNode = el.firstChild === arrowEl ? null : el.firstChild
-  if (textNode) el.removeChild(textNode)
-  el.insertBefore(document.createTextNode(text), arrowEl)
+  // Vide le contenu précédent (tout sauf l'arrow), puis réinjecte le texte
+  // en gérant les sauts de ligne `\n` → `<br>`. Chaque segment reste un
+  // text node : pas de HTML injecté, donc pas de risque XSS.
+  for (let n = el.firstChild; n; ) {
+    const next = n.nextSibling
+    if (n !== arrowEl) el.removeChild(n)
+    n = next
+  }
+  const frag = document.createDocumentFragment()
+  String(text).split('\n').forEach((line, i) => {
+    if (i > 0) frag.appendChild(document.createElement('br'))
+    frag.appendChild(document.createTextNode(line))
+  })
+  el.insertBefore(frag, arrowEl)
   el.style.display = 'block'
   // Position après render pour avoir les bonnes dimensions
   requestAnimationFrame(() => {

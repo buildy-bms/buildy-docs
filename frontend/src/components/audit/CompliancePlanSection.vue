@@ -171,9 +171,9 @@ function hasNotes(html) {
             <button
               type="button"
               @click="emit('patch-item', { item: it, patch: { status: it.status === 'declined' ? 'open' : 'declined' } })"
-              class="inline-flex items-center justify-center p-1.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition"
+              class="btn-icon"
               v-tooltip="it.status === 'declined' ? 'Réintégrer cette action dans le plan' : 'Écarter cette action du plan et du PDF'">
-              <component :is="it.status === 'declined' ? EyeIcon : EyeSlashIcon" class="w-3.5 h-3.5 shrink-0" />
+              <component :is="it.status === 'declined' ? EyeIcon : EyeSlashIcon" class="w-4 h-4 shrink-0" />
             </button>
           </div>
         </div>

@@ -13,10 +13,12 @@ import MobileSelectSheet from './MobileSelectSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
-import { ZONE_NATURES as ZONE_NATURES_DECORATED, isTechnicalNature } from '@/lib/audit-options'
+import ZoneFunctionalHelpModal from '@/components/audit/ZoneFunctionalHelpModal.vue'
+import ZonePartiesPicker from '@/components/audit/ZonePartiesPicker.vue'
+import { ZONE_NATURES as ZONE_NATURES_DECORATED, ZONE_OCCUPANCY_PROFILES, isTechnicalNature } from '@/lib/audit-options'
 
 const audit = useAuditStore()
-const { document, zones } = storeToRefs(audit)
+const { document, zones, siteParties } = storeToRefs(audit)
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
 
@@ -34,8 +36,14 @@ const technicalZones = computed(() =>
 
 // Sheet state
 const editing = ref(null) // { mode: 'create'|'edit', zone: {...} }
-const editForm = ref({ name: '', nature: null, surface_m2: null, kind: 'functional', latitude: null, longitude: null })
+const editForm = ref({
+  name: '', nature: null, surface_m2: null, kind: 'functional',
+  latitude: null, longitude: null, occupancy_profile: null, comfort_constraint: null,
+})
 const saving = ref(false)
+
+// Modale d'aide pédagogique « Comprendre la zone fonctionnelle » (item 7a).
+const showHelp = ref(false)
 
 // Pré-remplit le type quand la nature est technique (sens unique :
 // jamais de rétrogradation auto vers « fonctionnelle »). Corrigeable.
@@ -47,7 +55,10 @@ watch(() => editForm.value.nature, (nat) => {
 function setKind(k) { kindTouched.value = true; editForm.value.kind = k }
 
 function openCreate(kind = 'functional') {
-  editForm.value = { name: '', nature: null, surface_m2: null, kind, latitude: null, longitude: null }
+  editForm.value = {
+    name: '', nature: null, surface_m2: null, kind,
+    latitude: null, longitude: null, occupancy_profile: null, comfort_constraint: null,
+  }
   kindTouched.value = false
   editing.value = { mode: 'create' }
 }
@@ -56,6 +67,8 @@ function openEdit(z) {
     name: z.name, nature: z.nature, surface_m2: z.surface_m2,
     kind: z.kind || 'functional',
     latitude: z.latitude ?? null, longitude: z.longitude ?? null,
+    occupancy_profile: z.occupancy_profile ?? null,
+    comfort_constraint: z.comfort_constraint ?? null,
   }
   kindTouched.value = true
   editing.value = { mode: 'edit', zone: z }
@@ -90,6 +103,8 @@ async function save() {
         surface_m2: editForm.value.surface_m2 ?? null,
         latitude: editForm.value.latitude ?? null,
         longitude: editForm.value.longitude ?? null,
+        occupancy_profile: editForm.value.occupancy_profile ?? null,
+        comfort_constraint: editForm.value.comfort_constraint ?? null,
       })
       const r = await listZones(document.value.site_id)
       zones.value = r.data
@@ -104,6 +119,8 @@ async function save() {
         surface_m2: editForm.value.surface_m2 ?? null,
         latitude: editForm.value.latitude ?? null,
         longitude: editForm.value.longitude ?? null,
+        occupancy_profile: editForm.value.occupancy_profile ?? null,
+        comfort_constraint: editForm.value.comfort_constraint ?? null,
       }
       const { data } = await updateZone(editing.value.zone.zone_id, patch)
       Object.assign(editing.value.zone, data)
@@ -132,6 +149,7 @@ async function remove(z) {
     zones.value = r.data
     await resyncBacsAudit(document.value.id)
     await audit.refreshAuditCore()
+    await audit.refreshSiteParties()
     if (editing.value?.zone?.zone_id === z.zone_id) close()
   } catch {
     error('Suppression impossible')
@@ -159,16 +177,6 @@ const totalSurface = computed(() =>
       </div>
     </div>
 
-    <!-- Bouton Ajouter prominent en haut -->
-    <button
-      type="button"
-      @click="openCreate('functional')"
-      class="w-full flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-emerald-600 active:bg-emerald-700 rounded-2xl shadow-sm"
-    >
-      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5" />
-      Ajouter une zone
-    </button>
-
     <!-- Zones fonctionnelles -->
     <div>
       <p class="px-1 pb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -193,18 +201,22 @@ const totalSurface = computed(() =>
         </button>
       </div>
       <p v-else class="text-sm text-gray-500 italic px-1 py-2">Aucune zone fonctionnelle</p>
+      <button
+        type="button"
+        @click="openCreate('functional')"
+        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+      >
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+        Ajouter une zone
+      </button>
     </div>
 
     <!-- Zones techniques (hors décret BACS) -->
     <div>
-      <div class="flex items-center justify-between px-1 pb-1.5">
+      <div class="px-1 pb-1.5">
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
           Zones techniques ({{ technicalZones.length }})
         </p>
-        <button type="button" @click="openCreate('technical')"
-                class="tap-target inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-          <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3.5 h-3.5" /> Ajouter
-        </button>
       </div>
       <div v-if="technicalZones.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
         <button
@@ -227,6 +239,14 @@ const totalSurface = computed(() =>
       <p v-else class="text-sm text-gray-500 italic px-1 py-2">
         Aucune zone technique — locaux hors décret BACS (local technique, TGBT…).
       </p>
+      <button
+        type="button"
+        @click="openCreate('technical')"
+        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+      >
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+        Ajouter une zone technique
+      </button>
     </div>
 
     <!-- Sheet édition -->
@@ -270,12 +290,41 @@ const totalSurface = computed(() =>
           />
         </MobileField>
 
+        <!-- Aide pédagogique zone fonctionnelle (item 7a) -->
+        <button v-if="editForm.kind !== 'technical'" type="button" @click="showHelp = true"
+                class="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-200 text-left">
+          <FontAwesomeIcon :icon="['fas', 'circle-question']" class="w-5 h-5 text-indigo-600 shrink-0" />
+          <span class="flex-1 text-sm text-gray-700">Comprendre la zone fonctionnelle — ce n'est pas une pièce.</span>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-4 h-4 text-indigo-400 shrink-0" />
+        </button>
+
         <MobileField label="Nature de la zone" hint="Type d'usage (R175-1 6°). Une zone fonctionnelle = un local ou regroupement de locaux ayant le même type d'utilisation.">
           <MobileSelectSheet
             v-model="editForm.nature"
             :options="ZONE_NATURES"
             title="Nature de la zone"
             placeholder="— Sélectionner —"
+          />
+        </MobileField>
+
+        <MobileField v-if="editForm.kind !== 'technical'" label="Régime d'activité"
+                     hint="Usage temporel de la zone (24/7, heures de bureau, scolaire…). Aide à juger si deux zones ont un usage homogène.">
+          <MobileSelectSheet
+            v-model="editForm.occupancy_profile"
+            :options="ZONE_OCCUPANCY_PROFILES"
+            title="Régime d'activité"
+            placeholder="— Sélectionner —"
+          />
+        </MobileField>
+
+        <MobileField v-if="editForm.kind !== 'technical'" label="Contrainte de confort"
+                     hint="Contrainte spécifique éventuelle : température minimale imposée, exigence de qualité d'air…">
+          <input
+            v-model="editForm.comfort_constraint"
+            type="text"
+            placeholder="ex : température minimale 22 °C"
+            autocapitalize="sentences"
+            class="touch-control w-full"
           />
         </MobileField>
 
@@ -307,6 +356,16 @@ const totalSurface = computed(() =>
           />
         </MobileField>
 
+        <!-- Parties prenantes rattachées à la zone (édition uniquement :
+             la zone doit exister pour porter des affectations). -->
+        <MobileField v-if="editing?.mode === 'edit'" label="Parties prenantes"
+                     hint="Propriétaires, preneurs à bail ou syndicat qui occupent ou contrôlent cette zone. À définir d'abord dans l'identification du site.">
+          <ZonePartiesPicker
+            :zone-id="editing.zone.zone_id"
+            :site-parties="siteParties"
+          />
+        </MobileField>
+
         <MobileField label="Position sur la carte" hint="Place un repère sur le bâtiment. Touchez la carte pour positionner la zone, déplacez le pin pour ajuster.">
           <ZoneMapPicker
             v-model:latitude="editForm.latitude"
@@ -332,5 +391,8 @@ const totalSurface = computed(() =>
         </template>
       </div>
     </MobileSheet>
+
+    <!-- Aide pédagogique « Comprendre la zone fonctionnelle » (item 7a) -->
+    <ZoneFunctionalHelpModal v-if="showHelp" @close="showHelp = false" />
   </div>
 </template>

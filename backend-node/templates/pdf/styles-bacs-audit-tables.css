@@ -313,6 +313,16 @@ table.syn tbody tr.row-hs td {
   opacity: 0.55;
   font-style: italic;
 }
+/* Item 4d — ligne « Assujetti : … » dans le tableau des systèmes */
+table.syn tbody tr.liability-row td {
+  background: #f8fafc !important;
+  color: var(--neutral-700);
+  font-size: 7.2pt;
+  padding: 1.4mm 3mm;
+  white-space: normal;
+  border-bottom: 0.3pt solid var(--neutral-100);
+}
+table.syn tbody tr.liability-row td strong { color: var(--buildy-navy); }
 /* Ligne "compteur requis mais absent" : fond rouge pâle pour signaler le gap */
 table.syn tbody tr.row-missing td {
   background: #fff1f2;
@@ -349,6 +359,19 @@ table.syn td.col-bool { text-align: center; }
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
+/* Item 7f — badge « Partagé entre N zones » sur équipement multi-zones */
+.shared-badge {
+  display: inline-block;
+  background: #d1fae5;
+  color: #047857;
+  font-size: 6.5pt;
+  font-weight: 700;
+  padding: 0.3mm 1.4mm;
+  border-radius: 1.5mm;
+  margin-left: 1mm;
+  white-space: nowrap;
+  vertical-align: middle;
+}
 /* Tag "à installer" pour compteurs requis mais absents */
 .missing-tag {
   display: inline-block;
@@ -366,6 +389,12 @@ table.syn td.col-bool { text-align: center; }
 }
 
 /* Pastille catégorie (icone + label texte court) — colonne Usage table 1 */
+.thermal-row-label {
+  font-size: 6.5pt;
+  color: var(--neutral-500);
+  font-weight: 600;
+  margin-top: 0.3mm;
+}
 .cat-label {
   display: inline-block;
   font-size: 7.5pt;
