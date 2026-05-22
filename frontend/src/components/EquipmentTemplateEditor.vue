@@ -92,7 +92,20 @@ const form = ref({
   default_energy_source: null,
   // Multi-rôle : array (peut être vide). Persisté en JSON array côté DB.
   default_device_role: [],
+  // Item 10 — contre-indications de pilotage BACS : array de codes.
+  bacs_contraindications: [],
 })
+
+// Item 10 — codes de contre-indications de pilotage par type d'équipement.
+const BACS_CONTRAINDICATION_OPTIONS = [
+  { value: 'do_not_cut_power_thermodynamic', label: 'Thermodynamique — ne pas couper l\'alimentation' },
+  { value: 'do_not_cut_power_winter_boiler', label: 'Chaudière hivernale — ne pas couper (hors-gel)' },
+  { value: 'legionella_loop_ecs', label: 'Boucle ECS — arrêt interdit (légionelle)' },
+  { value: 'continuous_ventilation_required', label: 'Ventilation continue requise (EHPAD, hôpitaux…)' },
+  { value: 'aci_tank_no_long_cut', label: 'Ballon ECS à anode ACI — pas de coupure prolongée' },
+  { value: 'circulator_degommage', label: 'Circulateur avec dégommage — ne pas couper en été' },
+  { value: 'lighting_already_optimized', label: 'Éclairage déjà optimisé — pas de gisement BACS' },
+]
 
 const selectedCategory = computed(() =>
   CATEGORIES.value.find(c => c.value === form.value.category) ||
@@ -237,6 +250,9 @@ watch(() => props.template, (t) => {
       default_device_role: Array.isArray(t.default_device_role)
         ? t.default_device_role
         : (t.default_device_role ? [t.default_device_role] : []),
+      // Item 10 — backend retourne un array de codes (jamais null).
+      bacs_contraindications: Array.isArray(t.bacs_contraindications)
+        ? t.bacs_contraindications : [],
     }
   }
 }, { immediate: true })
@@ -299,6 +315,10 @@ async function save({ close = true } = {}) {
       // Multi-rôle : array vide → null (clear), sinon array.
       default_device_role: (Array.isArray(form.value.default_device_role) && form.value.default_device_role.length)
         ? form.value.default_device_role
+        : null,
+      // Item 10 — contre-indications BACS : array vide → null (clear).
+      bacs_contraindications: (Array.isArray(form.value.bacs_contraindications) && form.value.bacs_contraindications.length)
+        ? form.value.bacs_contraindications
         : null,
     }
     let res
@@ -499,6 +519,22 @@ async function destroy() {
               :clearable="true"
               :creatable="true"
             />
+          </div>
+          <!-- Item 10 — contre-indications de pilotage BACS -->
+          <div class="col-span-2">
+            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+              Contre-indications de pilotage BACS <span class="text-gray-400 font-normal">(optionnel)</span>
+            </label>
+            <SearchableSelect
+              v-model="form.bacs_contraindications"
+              :options="BACS_CONTRAINDICATION_OPTIONS"
+              placeholder="Aucune contre-indication…"
+              :multiple="true"
+              :clearable="true"
+            />
+            <p class="text-[10px] text-gray-400 mt-0.5 leading-snug">
+              L'audit BACS ne génère pas d'action « arrêt manuel » contraire à ces contraintes.
+            </p>
           </div>
         </div>
       </fieldset>

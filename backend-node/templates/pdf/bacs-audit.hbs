@@ -88,7 +88,18 @@
       <ol class="applicability-steps">
         <li>
           <span class="step-num">1</span>
-          <span class="step-body">Puissance cumulée chauffage + climatisation : <strong>{{compliance.assujettissement.powerKw}} kW</strong></span>
+          <span class="step-body">
+            Puissance retenue (max chaud / froid) : <strong>{{compliance.assujettissement.powerKw}} kW</strong>
+            {{#if powerSummary}}
+            <span class="power-breakdown">
+              chaud cumulé {{powerSummary.heatKw}} kW · froid cumulé {{powerSummary.coolKw}} kW
+              {{#if (eq powerSummary.source "auto")}} · calcul automatique{{else}} · valeur saisie manuellement{{/if}}
+            </span>
+            {{#if powerSummary.discrepancy}}
+            <span class="power-discrepancy">⚠ Écart de {{powerSummary.discrepancyPct}} % entre la valeur saisie ({{powerSummary.manualKw}} kW) et le cumul calculé ({{powerSummary.autoKw}} kW) — à vérifier.</span>
+            {{/if}}
+            {{/if}}
+          </span>
         </li>
         {{#if compliance.assujettissement.pcDateLabel}}
         <li>
@@ -160,6 +171,56 @@
       {{/each}}
     </ol>
     <p class="essential-footnote">Détail complet {{#if isBacs}}du plan de mise en conformité{{else}}des préconisations Buildy{{/if}} au chapitre 7.</p>
+  </div>
+  {{/if}}
+
+  {{!-- Item 4a — Structure juridique du site (assujettissement) --}}
+  {{#if ownershipStructureLabel}}
+  <div class="callout callout-info essential-ownership">
+    <span class="callout-icon">⚖️</span>
+    <div class="callout-body">
+      <strong>Structure juridique : {{ownershipStructureLabel}}.</strong>
+      L'assujetti au décret BACS est déterminé système par système selon cette structure (cf. chapitre 3).
+      {{#if ownershipNotes}} {{ownershipNotes}}{{/if}}
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- Item 12 — Pont avec le décret tertiaire (bâtiment > 1000 m²) --}}
+  {{#if tertiaryDecreeApplies}}
+  <div class="callout callout-info essential-tertiary">
+    <span class="callout-icon">🔗</span>
+    <div class="callout-body">
+      <strong>Ce site relève également du décret tertiaire</strong> (surface supérieure à 1 000 m²). Les comptages et le suivi énergétique mis en place dans le cadre du décret BACS peuvent alimenter directement vos déclarations sur la plateforme OPERAT.
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- Item 13 — Bandeau « Consommations de référence » (factures client) --}}
+  {{#if energyReference}}
+  <div class="energy-reference">
+    <h3 class="essential-block-title">Consommations de référence — année {{energyReference.referenceYear}}</h3>
+    <div class="energy-ref-cards">
+      {{#each energyReference.energies}}
+      <div class="energy-ref-card">
+        <div class="energy-ref-card-label">{{label}}</div>
+        <div class="energy-ref-card-value">{{totalQuantityFmt}} <span class="energy-ref-card-unit">{{unit}}</span></div>
+        <div class="energy-ref-card-meta">
+          {{#if ratioPerM2Fmt}}{{ratioPerM2Fmt}} {{unit}}/m²{{/if}}
+          {{#if totalCostFmt}}{{#if ratioPerM2Fmt}} · {{/if}}{{totalCostFmt}} € sur l'année{{/if}}
+        </div>
+      </div>
+      {{/each}}
+    </div>
+    {{#if energyMonthlyChartDataUrl}}
+    <div class="energy-ref-chart">
+      <img src="{{energyMonthlyChartDataUrl}}" alt="Répartition mensuelle des consommations" />
+    </div>
+    {{/if}}
+    <p class="energy-ref-footnote">
+      Base de référence saisie depuis les factures fournies par le client / les preneurs.
+      Cette base de référence permettra de mesurer les économies réelles après mise en place du BACS.
+    </p>
   </div>
   {{/if}}
 </section>
@@ -346,6 +407,34 @@
   {{/if}}
 </div>
 
+{{!-- Item 4/5 — Structure juridique & parties prenantes du site --}}
+{{#if siteParties.length}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">Structure juridique &amp; parties prenantes</h3>
+    {{#if ownershipStructureLabel}}
+    <p class="panel-subtitle">Structure de propriété / occupation : <strong>{{ownershipStructureLabel}}</strong>. L'assujetti au décret BACS est déterminé système par système (cf. chapitre 3).</p>
+    {{/if}}
+  </div>
+  <div class="panel-body">
+    <table>
+      <thead>
+        <tr><th>Partie prenante</th><th>Rôle</th><th>Zones rattachées</th></tr>
+      </thead>
+      <tbody>
+        {{#each siteParties}}
+        <tr>
+          <td><strong>{{name}}</strong></td>
+          <td>{{kindLabel}}</td>
+          <td>{{#if zoneNames.length}}{{#each zoneNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}<span class="muted">—</span>{{/if}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{/if}}
+
 {{#if siteMapDataUrl}}
 <div class="map-figure" style="text-align:center;margin:3mm 0 5mm">
   <img src="{{siteMapDataUrl}}" alt="Vue satellite du site"
@@ -402,17 +491,20 @@
 <h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
 {{#if zones.length}}
 <table>
-  <thead><tr><th>Zone</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
+  <thead><tr><th>Zone</th><th>Nature</th><th>Régime d'activité</th><th>Surface (m²)</th></tr></thead>
   <tbody>
     {{#each zones}}
-      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{surface_m2}}</td></tr>
+      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td><td>{{surface_m2}}</td></tr>
     {{/each}}
   </tbody>
 </table>
 {{#each zones}}
-  {{#if (or notes_html notes photos.length)}}
+  {{#if (or notes_html notes photos.length comfort_constraint)}}
     <div class="entity-block">
       <h3>{{name}}</h3>
+      {{#if comfort_constraint}}
+        <p class="muted" style="margin-bottom:1.5mm"><strong>Contrainte de confort :</strong> {{comfort_constraint}}</p>
+      {{/if}}
       {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
       {{else}}{{#if notes}}<p>{{notes}}</p>{{/if}}{{/if}}
       {{#if photos.length}}
@@ -423,6 +515,30 @@
     </div>
   {{/if}}
 {{/each}}
+
+{{!-- Item 7d/7e — zones fonctionnelles de suivi (regroupement BACS) --}}
+{{#if functionalZones.mergedCount}}
+<h2 class="subheading">Zones fonctionnelles de suivi</h2>
+<div class="callout callout-info">
+  <span class="callout-icon">📌</span>
+  <div class="callout-body">Au sens du décret (R175-1 6°), une zone fonctionnelle est une <strong>unité de suivi énergétique</strong>. Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi. Le découpage peut donc différer selon le système technique concerné.</div>
+</div>
+{{#each functionalZones.byCategory}}
+  {{#if (gt functional_zone_count 0)}}
+  <div class="entity-block">
+    <h3>{{categoryLabel}} — {{physical_zone_count}} zone{{#unless (eq physical_zone_count 1)}}s{{/unless}} d'usage → {{functional_zone_count}} zone{{#unless (eq functional_zone_count 1)}}s{{/unless}} fonctionnelle{{#unless (eq functional_zone_count 1)}}s{{/unless}} de suivi</h3>
+    <ul class="method-list">
+      {{#each groups}}
+        <li>
+          <strong>{{label}}</strong>
+          {{#if merged}} — {{justification}}{{/if}}
+        </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
+{{/each}}
+{{/if}}
 {{else}}
 <p class="muted">Aucune zone définie.</p>
 {{/if}}
@@ -443,6 +559,34 @@
         <span class="system-card-count">{{device_count}} équipement{{#if device_count}}{{#unless (eq device_count 1)}}s{{/unless}}{{/if}}</span>
       </div>
       <div class="system-card-body">
+        {{!-- Item 3 — Avertissement légionelles pour les ECS bouclées --}}
+        {{#if (and (eq system_category "dhw") (eq is_looped "looped"))}}
+        <div class="callout callout-warning system-callout">
+          <span class="callout-icon">⚠️</span>
+          <div class="callout-body">
+            <strong>Eau chaude sanitaire bouclée — arrêt interdit.</strong> Conformément à l'arrêté du 30 novembre 2005, une boucle d'eau chaude sanitaire ne peut pas être arrêtée ni mise en veille (risque de prolifération des légionelles). Le pilotage BACS ne doit pas couper ce poste : il assure la surveillance de la température de bouclage (≥ 50 °C en tout point).
+          </div>
+        </div>
+        {{/if}}
+        {{!-- Item 1 — Encart d'exemption pour un poste marqué négligeable (< 5 %) --}}
+        {{#if marked_negligible_under_5pct}}
+        <div class="callout callout-info system-callout">
+          <span class="callout-icon">ℹ️</span>
+          <div class="callout-body">
+            <strong>Poste exempté en application de la règle des 5 %</strong> (FAQ ministère, juin 2025). Un poste représentant moins de 5 % de la consommation totale du bâtiment peut être écarté du raccordement et du comptage.{{#if negligible_justification}} {{negligible_justification}}{{/if}}
+          </div>
+        </div>
+        {{/if}}
+        {{!-- Item 4d — Assujetti calculé pour ce système --}}
+        {{#if liability}}{{#if ../../hasLiabilityData}}
+        <div class="system-liability">
+          <span class="system-liability-icon">⚖️</span>
+          <div class="system-liability-body">
+            <strong>{{liability.label}}.</strong>
+            {{#if liability.explanation}}<span class="muted"> {{liability.explanation}}</span>{{/if}}
+          </div>
+        </div>
+        {{/if}}{{/if}}
         {{#if devices.length}}
           <table class="device-table">
             <thead>
@@ -462,10 +606,19 @@
                   <td>
                     <strong>{{name}}</strong>
                     {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
+                    {{!-- Item 7f — badge équipement partagé entre plusieurs zones --}}
+                    {{#if shared_zone_count}}
+                      <span class="shared-badge" title="Équipement partagé">↔ Partagé entre {{add shared_zone_count 1}} zones</span>
+                    {{/if}}
                   </td>
                   <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
                   <td>{{energyLabel}}</td>
-                  <td>{{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{/if}}{{/if}}</td>
+                  <td>
+                    {{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{/if}}{{/if}}
+                    {{#if power_kw_cooling}}<span class="muted"> · froid {{power_kw_cooling}} kW</span>{{/if}}
+                    {{!-- Item 8 — type de calcul retenu pour la traçabilité --}}
+                    {{#if powerCalc}}{{#if powerCalc.inScope}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else}}<span class="device-power-calc device-power-calc-out">hors cumul</span>{{/if}}{{/if}}
+                  </td>
                   <td>{{roleLabel}}</td>
                   <td>{{commLabel}}</td>
                   <td>{{location}}</td>
@@ -477,11 +630,11 @@
                     <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
                       {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} Interopérable
                     </span>
-                    <span class="r175-3-pill {{#if meets_r175_3_p4}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                      {{#if meets_r175_3_p4}}✓{{else}}✗{{/if}} Arrêt manuel
+                    <span class="r175-3-pill {{triCls meets_r175_3_p4 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym meets_r175_3_p4}} Arrêt manuel
                     </span>
-                    <span class="r175-3-pill {{#if meets_r175_3_p4_autonomous}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                      {{#if meets_r175_3_p4_autonomous}}✓{{else}}✗{{/if}} Autonome
+                    <span class="r175-3-pill {{triCls meets_r175_3_p4_autonomous 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym meets_r175_3_p4_autonomous}} Autonome
                     </span>
                   </td>
                 </tr>
@@ -602,6 +755,7 @@
       <span class="thermal-usage">
         {{{categoryIcon category "12"}}}<span class="thermal-usage-label">{{categoryLabel}}</span>
       </span>
+      {{#if label}}<span class="thermal-system-label">{{label}}</span>{{/if}}
     </div>
     <div class="thermal-head-meta">
       <span class="thermal-meta-item">
@@ -810,6 +964,59 @@
   </div>
 </div>
 
+{{!-- Item 15 — Card R175-3 : conservation 5 ans + accès aux données --}}
+{{#if (or bms.data_storage_5y_compliant bms.data_owner_access bms.gestionnaire_exploitant_access bms.export_capability)}}
+<div class="panel">
+  <div class="panel-head">
+    <h3 class="panel-title">R175-3 — Conservation et accès aux données <span class="panel-title-meta">(archivage 5 ans)</span></h3>
+  </div>
+  <div class="panel-body">
+    <table class="storage-access-table">
+      <thead>
+        <tr><th>Exigence</th><th>État constaté</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Conservation des consommations à l'échelle mensuelle pendant 5 ans</td>
+          <td class="sa-state sa-{{bms.data_storage_5y_compliant}}">
+            {{#if (eq bms.data_storage_5y_compliant "yes")}}✓ Conforme{{else}}{{#if (eq bms.data_storage_5y_compliant "no")}}✗ Non conforme{{else}}? À vérifier{{/if}}{{/if}}
+          </td>
+        </tr>
+        <tr>
+          <td>Localisation du stockage des données</td>
+          <td>
+            {{#if (eq bms.data_storage_location "local")}}Serveur local{{else}}{{#if (eq bms.data_storage_location "cloud_editeur")}}Cloud de l'éditeur de la GTB{{else}}{{#if (eq bms.data_storage_location "cloud_proprietaire")}}Cloud du propriétaire{{else}}Non déterminée{{/if}}{{/if}}{{/if}}
+          </td>
+        </tr>
+        <tr>
+          <td>Accès direct du propriétaire à ses données</td>
+          <td class="sa-state sa-{{bms.data_owner_access}}">
+            {{#if (eq bms.data_owner_access "yes")}}✓ Oui{{else}}{{#if (eq bms.data_owner_access "no")}}✗ Non{{else}}⚠ Partiel{{/if}}{{/if}}
+          </td>
+        </tr>
+        <tr>
+          <td>Accès du gestionnaire et des exploitants aux données</td>
+          <td class="sa-state sa-{{bms.gestionnaire_exploitant_access}}">
+            {{#if (eq bms.gestionnaire_exploitant_access "yes")}}✓ Oui{{else}}{{#if (eq bms.gestionnaire_exploitant_access "no")}}✗ Non{{else}}⚠ Partiel{{/if}}{{/if}}
+          </td>
+        </tr>
+        <tr>
+          <td>Export des données au format standard (CSV / Excel)</td>
+          <td class="sa-state sa-{{bms.export_capability}}">
+            {{#if (eq bms.export_capability "yes")}}✓ Possible{{else}}{{#if (eq bms.export_capability "no")}}✗ Impossible{{else}}—{{/if}}{{/if}}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    {{#if bms.data_access_notes}}
+    <div class="panel-inline-note">
+      <strong>Observations :</strong> {{bms.data_access_notes}}
+    </div>
+    {{/if}}
+  </div>
+</div>
+{{/if}}
+
 {{!-- Card 5 — R175-4 Vérifications périodiques --}}
 <div class="panel">
   <div class="panel-head">
@@ -985,6 +1192,17 @@
 {{!-- ═══════════ Chapitre 7 — Plan de mise en conformité / Préconisations Buildy ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="plan">{{{faIcon "list-check" "#f59e0b" "16"}}} 7. {{#if isBacs}}Plan de mise en conformité{{else}}Préconisations Buildy pour le devis{{/if}}</h1>
 
+{{!-- Item 13 — rappel de la base de consommations de référence --}}
+{{#if energyReference}}
+<div class="callout callout-info">
+  <span class="callout-icon">📊</span>
+  <div class="callout-body">
+    <strong>Base de consommations de référence (année {{energyReference.referenceYear}}) disponible.</strong>
+    Cette base de référence, saisie depuis les factures du site, permettra de mesurer les économies réelles après mise en place du BACS et d'objectiver le retour sur investissement des actions ci-dessous.
+  </div>
+</div>
+{{/if}}
+
 {{#if actionItems.blocking.length}}
 <h2>{{#if isBacs}}Actions bloquantes{{else}}Préconisations essentielles{{/if}}</h2>
 <div class="callout callout-warn">
@@ -1105,12 +1323,86 @@
     <span class="callout-icon">📌</span>
     <div class="callout-body">Cette annexe trace les choix méthodologiques de Buildy. Toute évaluation de conformité du présent rapport repose sur ces hypothèses, librement opposables.</div>
   </div>
+
+  {{!-- Item 6 — Hiérarchie des sources : opposables vs méthodologiques --}}
+  <article class="method-card">
+    <h3 class="method-title">Sources réglementaires opposables</h3>
+    <p class="method-body">Le présent audit s'appuie exclusivement, pour l'évaluation de conformité, sur les textes réglementaires en vigueur. Seules ces sources ont valeur de norme :</p>
+    <ul class="method-list">
+      <li>Articles L. 174-3 et R. 175-1 à R. 175-6 du Code de la construction et de l'habitation — accessibles sur Légifrance.</li>
+      <li>Décret n° 2020-887 du 20 juillet 2020, modifié par le décret n° 2023-259 du 7 avril 2023.</li>
+      <li>Arrêté du 7 avril 2023 (modalités d'inspection des systèmes d'automatisation et de contrôle et modalités de calcul du temps de retour sur investissement).</li>
+    </ul>
+  </article>
+  <article class="method-card">
+    <h3 class="method-title">Références méthodologiques (non opposables, à titre indicatif)</h3>
+    <p class="method-body">Les documents suivants éclairent l'interprétation du décret mais n'ont pas valeur réglementaire. L'audit s'inspire des bonnes pratiques qui y sont décrites sans en faire une exigence :</p>
+    <ul class="method-list">
+      <li>Guide d'application BACS — Ministère de la Transition écologique, mai 2023.</li>
+      <li>FAQ Décret BACS — Ministère de la Transition écologique, juin 2025.</li>
+      <li>Guide pratique d'application du décret BACS — PROFEEL / COSTIC, novembre 2025.</li>
+      <li>Fiche décryptage du décret BACS — Cerema, 2023.</li>
+    </ul>
+    <p class="method-body" style="margin-top: 2mm;">Ces documents sont des supports d'interprétation utiles mais n'ont pas valeur réglementaire. En cas de contradiction avec le texte du décret, le décret prime.</p>
+  </article>
+
   {{#each methodology}}
   <article class="method-card">
     <h3 class="method-title">{{title}}</h3>
     <p class="method-body">{{body}}</p>
   </article>
   {{/each}}
+
+  {{!-- Item 11 — Disclaimer renforcé sur les estimations d'économies --}}
+  <article class="method-card">
+    <h3 class="method-title">Sur les estimations d'économies d'énergie</h3>
+    <p class="method-body">Le présent audit établit la <strong>conformité fonctionnelle</strong> du bâtiment aux exigences de l'article R175-3 du décret BACS. Il ne préjuge ni de la classe atteinte au sens de la norme NF EN ISO 52120-1, ni du montant des économies d'énergie qui seront réellement obtenues après la mise en conformité.</p>
+    <p class="method-body" style="margin-top: 2mm;">Comme le rappelle le guide pratique PROFEEL / COSTIC : <em>« Les économies dépendent beaucoup de la situation de départ. Les pourcentages d'économies annoncés, basés sur la norme NF EN ISO 52120-1, peuvent être très différents de ceux réellement obtenus. »</em></p>
+    <p class="method-body" style="margin-top: 2mm;">En conséquence, Buildy n'affiche aucune estimation chiffrée d'économies et ne réalise aucun calcul de temps de retour sur investissement (TRI) — ce calcul relève de la seule responsabilité du propriétaire, qui s'appuie sur les devis reçus et ses propres hypothèses (cf. clause de dispense de l'article R175-2 et Annexe D).</p>
+  </article>
+
+  {{!-- Item 10 — Contre-indications de pilotage par type d'équipement --}}
+  <article class="method-card">
+    <h3 class="method-title">Contre-indications de pilotage par type d'équipement</h3>
+    <p class="method-body">Certains équipements ne peuvent pas être arrêtés ou coupés sans risque technique ou sanitaire. Lorsqu'un équipement audité est concerné, Buildy ne génère pas d'action « arrêt manuel » contraire à sa nature : le pilotage BACS doit alors être adapté plutôt que suspendu. Les contre-indications retenues sont les suivantes :</p>
+    <ul class="method-list">
+      <li><strong>Eau chaude sanitaire bouclée</strong> — l'arrêt de la boucle est interdit (arrêté du 30 novembre 2005 — risque légionelle).</li>
+      <li><strong>Équipement thermodynamique</strong> (PAC, DRV, climatisation) — ne pas couper l'alimentation électrique en cours de fonctionnement (lubrification du compresseur).</li>
+      <li><strong>Chaudière en période hivernale</strong> — ne pas couper l'alimentation : perte de la protection hors-gel.</li>
+      <li><strong>Ballon ECS à anode à courant imposé (ACI)</strong> — pas de coupure prolongée au-delà de 8 h : perte de la protection anti-corrosion.</li>
+      <li><strong>Circulateur avec fonction de dégommage</strong> — ne pas couper en été : perte de la protection anti-grippage.</li>
+      <li><strong>Ventilation en EHPAD, hôpitaux et locaux sanitaires</strong> — ventilation en continu requise pour la qualité de l'air et l'hygiène.</li>
+      <li><strong>Éclairage déjà optimisé</strong> (détection de présence + LED récentes) — généraliser une commande BACS n'apporte pas de gisement d'économies.</li>
+    </ul>
+    <p class="method-body" style="margin-top: 2mm;">Dans ces cas, le rapport substitue à l'action d'arrêt une recommandation de pilotage adapté (programmation de consigne, surveillance, dérogation contrôlée).</p>
+  </article>
+
+  {{!-- Item 5 — Méthode de cumul des puissances chaud / froid --}}
+  <article class="method-card">
+    <h3 class="method-title">Cumul automatique des puissances chaud et froid</h3>
+    <p class="method-body">La puissance nominale utile servant à l'assujettissement (article R175-2) est calculée automatiquement à partir des équipements relevés sur site. La règle de cumul dépend du type de chaque système (guide PROFEEL / COSTIC, tableau 2) :</p>
+    <ul class="method-list">
+      <li><strong>Systèmes thermodynamiques</strong> (PAC, DRV, climatisation) — la puissance retenue est le maximum déclaré entre puissance calorifique et frigorifique (norme EN 14511) ; la machine ne compte qu'une fois.</li>
+      <li><strong>Chaudières</strong> — somme des puissances nominales constructeur.</li>
+      <li><strong>Effet joule</strong> (radiateurs et batteries électriques) — somme des puissances électriques.</li>
+      <li><strong>Réseau de chaleur ou de froid urbain</strong> — puissance nominale de la sous-station (échangeur primaire).</li>
+      <li><strong>Exclus du cumul</strong> — équipements de secours, systèmes mobiles, appareils indépendants de chauffage au bois, systèmes non destinés au chauffage ou à la climatisation.</li>
+    </ul>
+    <p class="method-body" style="margin-top: 2mm;">La puissance chaud cumulée et la puissance froid cumulée ne s'additionnent pas : la puissance retenue est le maximum des deux. La valeur calculée peut être surchargée manuellement par l'auditeur ; tout écart supérieur à 10 % entre le calcul et la saisie manuelle est signalé.</p>
+  </article>
+
+  {{!-- Item 7 — zone fonctionnelle au sens du décret BACS --}}
+  <article class="method-card">
+    <h3 class="method-title">Zone fonctionnelle au sens du décret BACS</h3>
+    <p class="method-body">Une zone fonctionnelle <strong>n'est pas une pièce</strong> : c'est un ensemble de locaux suivis ensemble du point de vue de l'énergie — une <strong>unité de suivi</strong>. Le décret (R175-1 6°) ne définit pas le niveau de découpage : Buildy applique un test simple — <em>« est-ce que ça a du sens de suivre la consommation de cette zone séparément du reste ? »</em></p>
+    <p class="method-body" style="margin-top: 2mm;">Une zone séparée n'est créée que si les <strong>trois conditions</strong> sont réunies :</p>
+    <ul class="method-list">
+      <li>l'usage est vraiment différent — activité ou horaires différents ;</li>
+      <li>le poste pèse assez lourd pour mériter un suivi (cf. règle des 5 %) ;</li>
+      <li>le suivi séparé est techniquement faisable.</li>
+    </ul>
+    <p class="method-body" style="margin-top: 2mm;">Si une seule condition manque, les locaux sont regroupés. Les vestiaires, sanitaires, circulations et locaux de rangement ne forment jamais une zone fonctionnelle à part. Le découpage <strong>peut varier selon le système technique concerné</strong> : une école peut former une seule zone fonctionnelle pour le chauffage (chaudière et circuit uniques) mais deux pour l'éclairage (tableaux électriques distincts). Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi, avec justification écrite au chapitre Zones.</p>
+  </article>
 </section>
 
 {{!-- ═══════════ Annexe C — Justification des préconisations ═══════════ --}}

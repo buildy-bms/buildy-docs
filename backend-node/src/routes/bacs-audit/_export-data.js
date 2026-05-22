@@ -32,9 +32,18 @@ function getCharts() {
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
-  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL,
+  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, OCCUPANCY_PROFILE_LABEL,
+  OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL,
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
+// Items 5 + 8 — cumul automatique des puissances chaud / froid.
+const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL } = require('../../lib/bacs-audit-power');
+// Item 7 — calcul des zones fonctionnelles de suivi (regroupement BACS).
+const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
+// Item 4 — calcul automatique de l'assujetti par système.
+const { computeSystemLiability } = require('../../lib/bacs-liability');
+// Item 13 — base de consommations mensuelles de référence.
+const { buildEnergyReference } = require('../../lib/bacs-energy-reference');
 
 /**
  * Construit le bundle de donnees a passer au template bacs-audit.hbs.
@@ -57,6 +66,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const zones = (site ? db.zones.listBySite(site.site_id) : []).map(z => ({
     ...z,
     natureLabel: z.nature ? (ZONE_NATURE_LABEL[z.nature] || z.nature) : '—',
+    // Item 14 — régime d'occupation (libellé FR pour le PDF).
+    occupancyLabel: z.occupancy_profile
+      ? (OCCUPANCY_PROFILE_LABEL[z.occupancy_profile] || z.occupancy_profile)
+      : null,
   }));
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
@@ -75,7 +88,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
     LEFT JOIN zones z ON z.id = t.zone_id
     WHERE t.document_id = ?
-    ORDER BY z.position, z.name
+    ORDER BY z.position, z.name,
+             CASE t.category WHEN 'heating' THEN 0 ELSE 1 END,
+             t.position, t.id
   `).all(documentId);
   // On filtre done + declined : ces actions ne doivent pas apparaitre
   // dans le PDF livre aux integrateurs GTB.
@@ -100,8 +115,19 @@ async function buildBacsAuditExportData(af, opts = {}) {
     WHERE s.document_id = ?
     ORDER BY z.position, z.name, s.system_category, d.position, d.id
   `).all(documentId);
+  // Mig 143 — systèmes supplémentaires où chaque device est partagé.
+  // Nécessaire pour le badge « Partagé » (item 7f) et le calcul des zones
+  // fonctionnelles de suivi (item 7d).
+  const deviceExtras = db.bacsAuditDeviceSharedSystems.listExtrasForDocument(documentId);
+  const extrasByDeviceId = new Map();
+  for (const e of deviceExtras) {
+    if (!extrasByDeviceId.has(e.device_id)) extrasByDeviceId.set(e.device_id, []);
+    extrasByDeviceId.get(e.device_id).push(e.system_id);
+  }
   const devicesBySystem = new Map();
   for (const d of devices) {
+    d.extra_system_ids = extrasByDeviceId.get(d.id) || [];
+    d.shared_zone_count = d.extra_system_ids.length;
     d.energyLabel = d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—';
     // Multi-rôle (mig 117) : array → labels FR jointsavec ' / '.
     const roles = parseRoles(d.device_role);
@@ -147,6 +173,42 @@ async function buildBacsAuditExportData(af, opts = {}) {
     systemsByZoneMap.get(k).items.push(s);
   }
   const systemsByZone = [...systemsByZoneMap.values()];
+
+  // ── Item 4 — calcul automatique de l'assujetti par système ──
+  // Charge la structure juridique + parties prenantes + affectations de
+  // périmètre, puis calcule l'assujetti de chaque système (6 cas PROFEEL).
+  const siteParties = site ? db.siteParties.listBySite(site.site_id) : [];
+  const zonePartyLinks = site ? db.zoneParties.listBySite(site.site_id) : [];
+  const systemPartyLinks = db.systemParties.listByDocument(documentId);
+  const liabilityMap = computeSystemLiability({
+    site,
+    parties: siteParties,
+    systems,
+    zonePartyLinks,
+    systemPartyLinks,
+  });
+  for (const sys of enrichedSystems) {
+    sys.liability = liabilityMap.get(sys.id) || null;
+  }
+  // Y a-t-il au moins une affectation d'assujetti à montrer dans le PDF ?
+  const hasLiabilityData = !!(site && site.ownership_structure) || siteParties.length > 0;
+  const ownershipStructureLabel = site && site.ownership_structure
+    ? (OWNERSHIP_STRUCTURE_LABEL[site.ownership_structure] || site.ownership_structure)
+    : null;
+  // Zones rattachées à chaque partie prenante (item 5) — pour la liste
+  // « Parties prenantes » du PDF.
+  const zoneNameById = new Map(zones.map(z => [z.zone_id, z.name]));
+  const zoneNamesByParty = {};
+  for (const l of zonePartyLinks) {
+    const nm = zoneNameById.get(l.zone_id);
+    if (!nm) continue;
+    (zoneNamesByParty[l.party_id] || (zoneNamesByParty[l.party_id] = [])).push(nm);
+  }
+  const sitePartiesEnriched = siteParties.map(p => ({
+    ...p,
+    kindLabel: PARTY_KIND_LABEL[p.kind] || p.kind,
+    zoneNames: (zoneNamesByParty[p.id] || []).sort((a, b) => a.localeCompare(b, 'fr')),
+  }));
 
   // Enrichit meters
   const enrichedMeters = meters.map(m => ({
@@ -267,6 +329,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ...t,
     category: t.category || 'heating',
     categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
+    // Mig 170 : libellé libre du système régulé. NULL → libellé par défaut
+    // (« Chauffage » / « Refroidissement ») pour les audits pré-migration.
+    displayLabel: (t.label && t.label.trim())
+      || SYSTEM_LABEL[t.category || 'heating']
+      || (t.category || 'heating'),
     regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
     // La régulation automatique se déduit du type (≠ none) — la colonne
     // has_automatic_regulation n'est plus saisie (Feature J).
@@ -470,10 +537,41 @@ async function buildBacsAuditExportData(af, opts = {}) {
     metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
   };
 
+  // ── Items 5 + 8 — cumul automatique des puissances ──
+  // Calcule la puissance chaud / froid cumulée à partir des équipements
+  // physiques saisis, en appliquant la règle de calcul de chaque type
+  // (thermodynamique, chaudière, joule, sous-station). La puissance
+  // retenue = max(chaud, froid) — « chaud et froid ne se cumulent pas ».
+  const autoPower = computeAutoPower(devices);
+  const powerSummary = resolveTotalPower(af, autoPower);
+  // Détail par device pour la traçabilité PDF (« Puissance retenue : X kW »).
+  const powerCalcByDeviceId = new Map();
+  for (const d of autoPower.devices) {
+    powerCalcByDeviceId.set(d.id, {
+      ...d._power,
+      typeLabel: POWER_CALC_TYPE_LABEL[d._power.type] || d._power.type,
+    });
+  }
+  for (const sys of enrichedSystems) {
+    for (const d of sys.devices) {
+      const pc = powerCalcByDeviceId.get(d.id);
+      if (pc) d.powerCalc = pc;
+    }
+  }
+
+  // ── Item 7d/7e — zones fonctionnelles de suivi ──
+  // Regroupe, par catégorie technique, les zones desservies par un
+  // équipement partagé non séparable (metering_separable='no'). Chaque
+  // regroupement est accompagné de sa justification écrite pour le PDF.
+  const functionalZones = computeFunctionalZones(devices, systems, { SYSTEM_LABEL });
+
   // Synthese de conformite (cover + page L'essentiel + tableau de bord R175)
+  // La puissance affichée dans le calcul d'assujettissement R175-2 suit le
+  // mode retenu (auto = cumul calculé, manual = valeur saisie).
   const applicabilityLabelForSummary = af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null;
+  const documentForSummary = { ...af, bacs_total_power_kw: powerSummary.effectiveKw };
   const compliance = buildComplianceSummary({
-    document: af,
+    document: documentForSummary,
     actionItems,
     actionItemsRaw: numberedItems,
     bms,
@@ -486,14 +584,52 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // `zones` sert de repli de centrage quand le site n'a pas de coordonnées.
   const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
 
+  // Surface du site pour le pont avec le decret tertiaire (item 12).
+  // Source : sites.surface_m2 si renseignee, sinon cumul des surfaces des
+  // zones. Le decret tertiaire (dispositif Eco Energie Tertiaire / OPERAT)
+  // vise les batiments a usage tertiaire de plus de 1000 m2.
+  const zoneSurfaceTotal = zones.reduce(
+    (sum, z) => sum + (Number(z.surface_m2) || 0), 0);
+  const siteSurfaceM2 = (site && Number(site.surface_m2) > 0)
+    ? Number(site.surface_m2)
+    : (zoneSurfaceTotal > 0 ? zoneSurfaceTotal : null);
+  const tertiaryDecreeApplies = isBacs && siteSurfaceM2 != null && siteSurfaceM2 > 1000;
+
+  // ── Item 13 — base de consommations mensuelles de référence ──
+  // Lignes saisies depuis les factures client/locataires. Agrégées par
+  // énergie sur l'année la mieux renseignée + graphe de répartition.
+  const energyHistoryRows = site
+    ? db.siteEnergyHistory.listBySite(site.site_id)
+    : [];
+  const energyReference = buildEnergyReference(energyHistoryRows, siteSurfaceM2);
+  const energyMonthlyChartDataUrl = energyReference
+    ? await getCharts().energyMonthlyBar({
+      series: energyReference.chartSeries,
+      unit: energyReference.chartUnit,
+    })
+    : null;
+
   return {
     document: af,
     isBacs,
     isSiteAudit: !isBacs,
     site,
     siteMapDataUrl,
+    siteSurfaceM2,
+    // Pont decret tertiaire (item 12) : true si batiment tertiaire > 1000 m2.
+    tertiaryDecreeApplies,
+    // Item 13 — base de consommations de référence (bandeau + graphe).
+    energyReference,
+    energyMonthlyChartDataUrl,
     zones,
     systemsByZone,
+    // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).
+    functionalZones,
+    // Item 4 — structure juridique + assujettissement par périmètre.
+    ownershipStructureLabel,
+    ownershipNotes: site?.ownership_notes || null,
+    siteParties: sitePartiesEnriched,
+    hasLiabilityData,
     compliance,
     meters: enrichedMeters,
     metersWithDetails,
@@ -517,6 +653,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     synthesisHtml: af.audit_synthesis_html || null,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
+    // Items 5 + 8 — cumul automatique des puissances chaud / froid.
+    powerSummary,
     r175_6_applicable,
     complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
     applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,

@@ -466,7 +466,7 @@ defineExpose({ refresh: load })
             </a>
             <span class="text-[11px] text-gray-400 shrink-0">{{ Math.round((f.size_bytes || 0) / 1024) }} ko</span>
             <button type="button" @click="removeFile(f)" v-tooltip="'Supprimer'"
-                    class="text-gray-400 hover:text-red-600 p-1"><XMarkIcon class="w-4 h-4" /></button>
+                    class="btn-icon btn-icon-danger shrink-0"><XMarkIcon class="w-4 h-4" /></button>
           </li>
         </ul>
       </div>

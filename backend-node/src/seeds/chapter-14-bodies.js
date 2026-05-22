@@ -47,9 +47,9 @@ const BODY_14_1_2 = `${cite('R175-2', null, 'Sont munis d\'un système d\'automa
 
 <p><strong>Réponse Buildy.</strong></p>
 <ul>
-  <li><strong>Solution applicable</strong> au champ d'application complet du décret (bâtiments tertiaires &gt; 70 kW depuis 2023, calendrier 2024 / 2027).</li>
+  <li><strong>Solution applicable</strong> au champ d'application complet du décret (bâtiments tertiaires &gt; 70 kW depuis 2023, calendrier 2024 / 2030).</li>
   <li><strong>Calcul du temps de retour sur investissement (TRI 10 ans)</strong> : conformément à la lettre du texte, le TRI est de la responsabilité du <strong>propriétaire</strong>. Buildy ne réalise pas cette étude — elle relève du bureau d'études énergétiques mandaté par le propriétaire.</li>
-  <li><strong>Échéance la plus proche</strong> à connaître : <em>1<sup>er</sup> janvier 2027</em> pour les bâtiments &gt; 70 kW existants, ou <em>renouvellement du système</em> si antérieur.</li>
+  <li><strong>Échéance la plus proche</strong> à connaître : <em>1<sup>er</sup> janvier 2030</em> pour les bâtiments &gt; 70 kW existants, ou <em>renouvellement du système</em> si antérieur.</li>
 </ul>`;
 
 const BODY_14_1_3 = `${cite('R175-3', '§1', 'Les systèmes d\'automatisation et de contrôle des bâtiments mentionnés à l\'article R. 175-2 […] suivent, enregistrent et analysent en continu, par zone fonctionnelle et à un pas de temps horaire, les données de production et de consommation énergétique des systèmes techniques du bâtiment et ajustent les systèmes techniques en conséquence. Ces données sont conservées à l\'échelle mensuelle pendant cinq ans.')}

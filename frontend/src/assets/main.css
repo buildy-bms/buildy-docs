@@ -257,6 +257,55 @@ strong, b { font-weight: 500; }
   .tap-target { min-height: 44px; min-width: 44px; }
 
   /**
+   * Bouton « Ajouter » standard de l'audit : pleine largeur, pointillé
+   * indigo, posé sous la liste des éléments. Source unique de vérité —
+   * tous les boutons d'ajout (zone, usage, équipement, partie prenante,
+   * compteur, régulation, mois de conso…) doivent utiliser cette classe
+   * pour rester cohérents. Tactile : 44px min sur pointeur grossier.
+   */
+  .btn-add {
+    @apply w-full inline-flex items-center justify-center gap-1.5 px-3 py-2
+           text-sm font-medium text-indigo-700 border-2 border-dashed
+           border-indigo-300 rounded-lg whitespace-nowrap transition
+           hover:border-indigo-400 hover:bg-indigo-50;
+  }
+  @media (pointer: coarse) { .btn-add { min-height: 44px; } }
+
+  /**
+   * Bouton d'action icon-only des cards d'audit (Notes, Photo, Voix,
+   * Dupliquer, Supprimer, Partager, Position…). Chip carré visible —
+   * fond gris clair + bordure — pour ne plus être une icône « fantôme »
+   * peu repérable. Source unique de vérité, à utiliser dans toutes les
+   * cards. Variantes : .is-active (rempli indigo), .is-success (photos
+   * présentes, emerald), .btn-icon-danger (survol rouge pour supprimer).
+   */
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-7 h-7 shrink-0
+           rounded-md text-gray-600 bg-gray-100 border border-gray-200
+           transition hover:bg-gray-200 hover:text-gray-900
+           disabled:opacity-40 disabled:cursor-not-allowed
+           disabled:hover:bg-gray-100 disabled:hover:text-gray-600;
+  }
+  .btn-icon.is-active {
+    @apply text-indigo-700 bg-indigo-50 border-indigo-200
+           hover:bg-indigo-100 hover:text-indigo-800;
+  }
+  .btn-icon.is-success {
+    @apply text-emerald-700 bg-emerald-50 border-emerald-200
+           hover:bg-emerald-100 hover:text-emerald-800;
+  }
+  .btn-icon.is-voice {
+    @apply text-violet-700 bg-violet-50 border-violet-200
+           hover:bg-violet-100 hover:text-violet-800;
+  }
+  .btn-icon-danger {
+    @apply hover:text-red-600 hover:bg-red-50 hover:border-red-200;
+  }
+  /* Pointeur tactile : cible un peu plus large (36px) pour rester
+     confortable au doigt sans casser la densité des tableaux. */
+  @media (pointer: coarse) { .btn-icon { @apply w-9 h-9; } }
+
+  /**
    * Data-table : look standard pour tous les tableaux d'audit desktop
    * (systèmes, zones, compteurs, régulation thermique). En-tête fond
    * gris, valeurs centrées, bordures fines, lignes alternées (zebra),

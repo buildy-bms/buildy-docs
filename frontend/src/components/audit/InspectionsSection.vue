@@ -57,11 +57,6 @@ async function removeInspection(ins) {
                      @validate="emit('validate-step', $event)"
                      @invalidate="emit('invalidate-step', $event)">
         <template #subtitle-extra><R175Tooltip article="R175-5-1" /></template>
-        <template #actions>
-          <button @click.stop="addInspection" class="btn-primary text-xs px-2.5 py-1">
-            <PlusIcon class="w-3.5 h-3.5" /> Ajouter
-          </button>
-        </template>
       </SectionHeader>
     </template>
     <template #summary>
@@ -137,6 +132,9 @@ async function removeInspection(ins) {
           </button>
         </div>
       </div>
+      <button @click="addInspection" class="btn-add">
+        <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter une inspection
+      </button>
     </div>
   </CollapsibleSection>
 </template>

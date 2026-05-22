@@ -8,9 +8,9 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
-import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
-import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
+import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
+import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -47,7 +47,7 @@ const showNotConcernedSystems = defineModel('showNotConcernedSystems', { type: B
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step',
   'toggle-zone-collapsed', 'toggle-system-collapsed',
-  'add-device', 'add-device-from-library',
+  'add-device',
 ])
 
 const audit = useAuditStore()
@@ -58,12 +58,78 @@ const { confirm } = useConfirm()
 // Libellé d'un usage : catégorie BACS, ou nom libre si usage manuel.
 function usageLabel(s) { return systemUsageLabel(s) }
 
+// Tri-état pour les SegmentedToggle : null → aucun bouton sélectionné.
+const triState = (v) => (v == null ? null : !!v)
+
 async function patchSystem(s, patch) {
   Object.assign(s, patch)
   try {
     await updateBacsSystem(s.id, patch)
     await audit.refreshActionItems()
   } catch { error('Sauvegarde système impossible') }
+}
+
+// Présence d'un usage : contrôle segmenté binaire « Présent / Non concerné »
+// remplaçant les deux anciennes cases. Tant que rien n'est saisi, aucun
+// bouton n'est sélectionné.
+const PRESENCE_OPTIONS = [
+  { value: 'present', label: 'Présent', tone: 'green' },
+  { value: 'not_concerned', label: 'Non concerné', tone: 'slate' },
+]
+function presenceValue(s) {
+  return s.not_concerned ? 'not_concerned' : (s.present ? 'present' : null)
+}
+function setPresence(s, val) {
+  if (val === 'present') patchSystem(s, { present: true, not_concerned: false })
+  else patchSystem(s, { present: false, not_concerned: true })
+}
+
+// Item 3 — bouclage ECS : 3 états.
+const LOOP_OPTIONS = [
+  { value: 'looped', label: 'Boucle ECS' },
+  { value: 'not_looped', label: 'Pas de boucle' },
+  { value: 'unknown', label: 'Inconnu' },
+]
+
+// Item 1 — poids estimé d'un poste (puissance système / puissance totale
+// site). Aide à la décision : > 10 % → l'auditeur est averti avant
+// d'activer le flag « négligeable ».
+function systemPowerKw(s) {
+  const devs = props.devicesBySystem[s.id] || []
+  return devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0)
+}
+function sitePowerKw() {
+  let total = 0
+  for (const g of props.systemsByZone) {
+    for (const s of g.items) total += systemPowerKw(s)
+  }
+  return total
+}
+function systemWeightPct(s) {
+  const total = sitePowerKw()
+  if (total <= 0) return null
+  const pct = systemPowerKw(s) / total * 100
+  return Math.round(pct * 10) / 10
+}
+async function toggleNegligible(s, checked) {
+  // Avertissement si le poids estimé dépasse 10 % — l'auditeur peut quand
+  // même confirmer (la règle des 5 % se base sur la conso réelle, pas la
+  // puissance ; le poids par puissance n'est qu'une approximation).
+  if (checked) {
+    const pct = systemWeightPct(s)
+    if (pct != null && pct > 10) {
+      const ok = await confirm({
+        title: 'Poste potentiellement significatif',
+        message: `Ce poste représente environ ${pct} % de la puissance du site (estimation par puissance). La règle des 5 % se base sur la consommation réelle — vérifiez avant de l'exempter.`,
+        confirmLabel: 'Marquer quand même négligeable',
+      })
+      if (!ok) return
+    }
+  }
+  await patchSystem(s, {
+    marked_negligible_under_5pct: checked,
+    ...(checked ? {} : { negligible_justification: null }),
+  })
 }
 
 // ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
@@ -197,7 +263,20 @@ onBeforeUnmount(teardownSortables)
           <R175Tooltip article="R175-3" />
         </template>
         <template #actions>
-          <span class="text-xs text-gray-600 whitespace-nowrap">
+          <!-- Item 5 — cumul automatique des puissances chaud / froid -->
+          <span v-if="powerSummary.power_summary" class="text-xs text-gray-600 whitespace-nowrap flex items-center gap-2">
+            <span>Chaud <strong class="font-mono text-red-600">{{ powerSummary.power_summary.heatKw }} kW</strong></span>
+            <span class="text-gray-300">·</span>
+            <span>Froid <strong class="font-mono text-cyan-600">{{ powerSummary.power_summary.coolKw }} kW</strong></span>
+            <span class="text-gray-300">·</span>
+            <span>Retenue <strong class="font-mono text-emerald-700">{{ powerSummary.power_summary.retainedKw }} kW</strong></span>
+            <span v-if="powerSummary.power_summary.discrepancy"
+                  class="text-amber-600 font-medium"
+                  v-tooltip="`Écart de ${powerSummary.power_summary.discrepancyPct} % entre la valeur saisie (${powerSummary.power_summary.manualKw} kW) et le cumul calculé (${powerSummary.power_summary.autoKw} kW).`">
+              ⚠ écart {{ powerSummary.power_summary.discrepancyPct }} %
+            </span>
+          </span>
+          <span v-else class="text-xs text-gray-600 whitespace-nowrap">
             Chauffage + clim :
             <strong class="font-mono text-emerald-700">{{ powerSummary.heating_cooling_total_kw || 0 }} kW</strong>
           </span>
@@ -252,16 +331,12 @@ onBeforeUnmount(teardownSortables)
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'
                                                           : 'border-gray-200 bg-gray-50/40')]">
-                <!-- Header de catégorie : grid à colonnes fixes pour aligner
-                     PARFAITEMENT verticalement « Présent / Pas de XXX » à
-                     travers les rows malgré les longueurs de label différentes.
-                     Avec `auto`, les colonnes s'adaptaient au contenu et
-                     décalaient les lignes entre elles. Largeurs fixes : icon
-                     20px, picto 28px, label 240px (truncate), Présent 90px,
-                     Pas de XXX 240px (couvre « Pas de production photovoltaïque »),
-                     puis 1fr pour pousser les actions à droite. -->
+                <!-- Header de catégorie : grid à colonnes fixes. Largeurs :
+                     drag 20px, chevron 20px, picto 28px, label 240px (truncate),
+                     contrôle segmenté présence en auto, puis 1fr pour pousser
+                     les actions à droite. -->
                 <div class="px-3 py-2 grid items-center gap-3 bg-white"
-                     :style="'grid-template-columns: 20px 20px 28px 240px 90px 240px minmax(0, 1fr);'">
+                     :style="'grid-template-columns: 20px 20px 28px 240px auto minmax(0, 1fr);'">
                   <button type="button"
                           class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                           v-tooltip="'Glisser pour réordonner'">
@@ -279,52 +354,90 @@ onBeforeUnmount(teardownSortables)
                         @click="s.present && emit('toggle-system-collapsed', s.id)">
                     {{ usageLabel(s) }}
                   </span>
-                  <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap">
-                    <input type="checkbox" :checked="!!s.present" :disabled="!!s.not_concerned"
-                           @change="e => patchSystem(s, { present: e.target.checked })"
-                           class="rounded border-gray-300" />
-                    <span class="text-gray-700">Présent</span>
-                  </label>
-                  <!-- Toggle "Non concerne" : column 5 toujours fixée à 240px,
-                       contenu invisible mais place réservée si système présent. -->
-                  <label class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap cursor-pointer truncate"
-                         :class="s.present ? 'invisible' : ''">
-                    <input type="checkbox" :checked="!!s.not_concerned"
-                           @change="e => patchSystem(s, { not_concerned: e.target.checked })"
-                           class="rounded border-gray-300 shrink-0" />
-                    <span class="text-gray-500 italic truncate">{{ systemNegativeLabels[s.system_category] || 'Non concerné' }}</span>
-                  </label>
-                  <div class="flex items-center gap-2 shrink-0 justify-self-end">
+                  <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
+                                   @update:model-value="v => setPresence(s, v)" />
+                  <div class="flex items-center gap-1 shrink-0 justify-self-end">
                     <button
                       type="button"
                       :disabled="!s.present"
                       @click="emit('open-notes', { title: 'Notes systeme', contextLabel: (usageLabel(s)) + ' - ' + g.zone_name, entityType: 'system', entityRef: s, currentHtml: s.notes_html || s.notes || '' })"
-                      :class="['inline-flex items-center justify-center p-1.5 rounded-md transition disabled:opacity-30 disabled:cursor-not-allowed',
-                        hasNotes(s.notes_html || s.notes)
-                          ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                          : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
+                      :class="['btn-icon', hasNotes(s.notes_html || s.notes) && 'is-active']"
                       v-tooltip="hasNotes(s.notes_html || s.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <BacsPhotoButton
-                      v-if="document?.site_uuid && s.present"
-                      :site-uuid="document.site_uuid"
-                      :attach-to="{ system_id: s.id }"
-                      :label="(usageLabel(s)) + ' - ' + g.zone_name" />
-                    <VoiceNoteButton
-                      v-if="document?.site_uuid && s.present"
-                      :site-uuid="document.site_uuid"
-                      :attach-to="{ system_id: s.id }"
-                      :label="(usageLabel(s)) + ' - ' + g.zone_name" />
                     <!-- Suppression : usages manuels (non BACS) uniquement. -->
                     <button v-if="s.is_bacs === 0" type="button"
                             @click="removeUsage(s)"
-                            class="inline-flex items-center justify-center p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                            class="btn-icon btn-icon-danger"
                             v-tooltip="'Supprimer cet usage'">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>
                 </div>
+                <!-- Items 1 & 3 — caractérisation BACS du système (visible
+                     quand le système est présent et déplié) :
+                     · bouclage ECS (catégorie dhw uniquement)
+                     · règle des 5 % — poste considéré négligeable -->
+                <div v-if="s.present && !collapsedSystems.has(s.id)"
+                     class="px-3 py-2.5 border-t border-gray-100 bg-slate-50/60 space-y-2.5">
+                  <!-- Item 3 — bouclage ECS -->
+                  <div v-if="s.system_category === 'dhw'" class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-medium text-gray-600 whitespace-nowrap">Bouclage ECS :</span>
+                    <div class="inline-flex rounded-md overflow-hidden border border-gray-200">
+                      <button v-for="opt in LOOP_OPTIONS" :key="opt.value" type="button"
+                              @click="patchSystem(s, { is_looped: opt.value })"
+                              :class="['px-2.5 py-1 text-xs whitespace-nowrap transition',
+                                       s.is_looped === opt.value
+                                         ? 'bg-indigo-600 text-white font-medium'
+                                         : 'bg-white text-gray-600 hover:bg-gray-50']">
+                        {{ opt.label }}
+                      </button>
+                    </div>
+                    <span v-if="s.is_looped === 'looped'" class="text-[11px] text-amber-700 italic">
+                      Boucle ECS : arrêt interdit (arrêté du 30 nov. 2005 — risque légionelle).
+                    </span>
+                  </div>
+                  <!-- Item 1 — règle des 5 % -->
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-3">
+                      <span class="text-xs text-gray-700">Ce poste est-il négligeable (moins de 5 % de la consommation totale) ?
+                        <template v-if="systemWeightPct(s) != null">
+                          <span :class="['ml-1 font-mono text-[11px]', systemWeightPct(s) > 10 ? 'text-amber-600 font-semibold' : 'text-gray-400']">
+                            (poids estimé ~{{ systemWeightPct(s) }} %)
+                          </span>
+                          <R175Tooltip class="ml-0.5 align-middle">
+                            <div class="font-semibold text-gray-800 mb-1.5">Comment le poids est-il estimé ?</div>
+                            <div class="text-xs text-gray-600 leading-relaxed space-y-2">
+                              <p>Faute de relevés de consommation réels, le poids est approximé à partir de la <strong>puissance installée</strong> :</p>
+                              <div class="rounded-md bg-slate-50 border border-slate-200 px-2.5 py-2 text-center text-[11px] text-slate-700">
+                                <div class="font-medium">puissance cumulée des équipements de ce système</div>
+                                <div class="text-slate-400">(puissance × quantité)</div>
+                                <div class="my-1 border-t border-slate-300"></div>
+                                <div class="font-medium">puissance installée totale de tous les systèmes du site</div>
+                              </div>
+                              <p class="rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-amber-800">
+                                La règle des 5 % du décret repose sur la <strong>consommation réelle</strong> : ce pourcentage n'en est qu'une approximation indicative.
+                              </p>
+                            </div>
+                          </R175Tooltip>
+                        </template>
+                      </span>
+                      <SegmentedToggle :model-value="triState(s.marked_negligible_under_5pct)"
+                                       @update:model-value="v => toggleNegligible(s, v)" />
+                    </div>
+                    <input v-if="s.marked_negligible_under_5pct"
+                           type="text"
+                           :value="s.negligible_justification || ''"
+                           @change="e => patchSystem(s, { negligible_justification: e.target.value })"
+                           placeholder="Justification (ex : petits ballons ECS individuels, groupe de secours…)"
+                           class="w-full text-xs rounded-md border-gray-200 focus:border-indigo-400 focus:ring-indigo-400/30 py-1.5 px-2.5" />
+                  </div>
+                  <!-- Item 4 — assujettissement : parties + flags cas E/F -->
+                  <div class="border-t border-gray-100 pt-2.5">
+                    <SystemPartiesPanel :system="s" />
+                  </div>
+                </div>
+
                 <SystemDevicesTable
                   v-if="s.present && !collapsedSystems.has(s.id)"
                   :system="s"
@@ -339,8 +452,7 @@ onBeforeUnmount(teardownSortables)
                     entityType: 'device', entityRef: d,
                     currentHtml: d.notes_html || d.notes || ''
                   })"
-                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })"
-                  @add-device-from-library="sys => emit('add-device-from-library', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
+                  @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
               </div>
             </template>
             <!-- Ajout manuel d'un usage (hors matrice BACS) — choisir une
@@ -370,7 +482,7 @@ onBeforeUnmount(teardownSortables)
               </div>
             </div>
             <button v-else type="button" @click="startAddUsage(g.zone_id)"
-                    class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 border-2 border-dashed border-indigo-300 hover:border-indigo-400 hover:bg-indigo-50 rounded-lg whitespace-nowrap transition">
+                    class="btn-add">
               <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un usage
             </button>
           </div>

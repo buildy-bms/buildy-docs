@@ -18,7 +18,7 @@ const BACS_INTRO_HTML = `
   <li>Abaissement du seuil de puissance de 290 kW à <strong>70 kW</strong></li>
   <li>Temps de retour sur investissement passé de 6 ans à <strong>10 ans</strong></li>
   <li>Nouvelle obligation d'<strong>inspection périodique</strong> (article R175-5-1)</li>
-  <li>Nouvelles échéances pour les bâtiments &gt; 70 kW : permis déposés après le 8 avril 2024 ou existants au plus tard le 1<sup>er</sup> janvier 2027</li>
+  <li>Nouvelles échéances pour les bâtiments &gt; 70 kW : permis déposés après le 8 avril 2024 ou existants au plus tard le 1<sup>er</sup> janvier 2030 (échéance repoussée de 2027 à 2030 par le décret publié au Journal officiel le 26 décembre 2025)</li>
 </ul>
 `.trim();
 
@@ -60,7 +60,7 @@ const BACS_ARTICLES = [
   <li>Aux bâtiments &gt; <strong>290 kW</strong> dont le permis de construire est déposé après le 21 juillet 2021 ;</li>
   <li>Aux autres bâtiments &gt; 290 kW, au plus tard le <strong>1<sup>er</sup> janvier 2025</strong> ;</li>
   <li><strong>[Nouveau 2023]</strong> Aux bâtiments &gt; <strong>70 kW</strong> dont le permis de construire est déposé après le 8 avril 2024 ;</li>
-  <li><strong>[Nouveau 2023]</strong> Aux autres bâtiments &gt; 70 kW, lors du renouvellement du système ou au plus tard le <strong>1<sup>er</sup> janvier 2027</strong>.</li>
+  <li><strong>[Nouveau 2023]</strong> Aux autres bâtiments &gt; 70 kW, lors du renouvellement du système ou au plus tard le <strong>1<sup>er</sup> janvier 2030</strong> (échéance repoussée de 2027 à 2030 par le décret publié au Journal officiel le 26 décembre 2025).</li>
 </ol>
 <p>Sauf si le propriétaire produit une étude établissant que l'installation d'un système d'automatisation et de contrôle n'est pas réalisable avec un temps de retour sur investissement inférieur à <strong>dix ans</strong>.</p>
 `.trim(),

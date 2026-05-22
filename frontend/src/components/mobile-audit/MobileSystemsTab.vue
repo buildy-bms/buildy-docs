@@ -17,7 +17,30 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
-import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel } from '@/lib/audit-options'
+import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
+import MobileYesNo from './MobileYesNo.vue'
+import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete } from '@/lib/audit-options'
+
+// Item 8 — type de calcul de puissance par équipement. Vide = automatique.
+const POWER_CALC_OPTIONS = [
+  { value: 'thermodynamic_max', label: 'Thermodynamique (max chaud/froid)' },
+  { value: 'boiler_sum', label: 'Chaudière (somme nominales)' },
+  { value: 'joule_sum', label: 'Effet joule (somme élec.)' },
+  { value: 'district_heating_substation', label: 'Sous-station réseau' },
+  { value: 'out_of_scope', label: 'Hors cumul (secours, process…)' },
+]
+// Item 3 — bouclage ECS.
+const LOOP_OPTIONS = [
+  { value: 'looped', label: 'Boucle ECS' },
+  { value: 'not_looped', label: 'Pas de boucle' },
+  { value: 'unknown', label: 'Inconnu' },
+]
+// Item 7c — séparabilité du comptage d'un équipement partagé.
+const MOBILE_METERING_OPTS = [
+  { value: 'yes', label: 'Oui', activeCls: 'bg-emerald-600 text-white border-emerald-600' },
+  { value: 'partial', label: 'Partiel', activeCls: 'bg-amber-500 text-white border-amber-500' },
+  { value: 'no', label: 'Non', activeCls: 'bg-rose-600 text-white border-rose-600' },
+]
 
 const audit = useAuditStore()
 const { document, systems, devices, zones, powerSummary, thermal } = storeToRefs(audit)
@@ -171,6 +194,34 @@ async function patchSystem(s, patch) {
   } catch { error('Sauvegarde impossible') }
 }
 
+// Item 1 — poids estimé d'un poste (puissance système / puissance site).
+function systemPowerKw(s) {
+  return devicesOf(s.id).reduce(
+    (sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0)
+}
+function systemWeightPct(s) {
+  const total = systems.value.reduce((sum, sys) => sum + systemPowerKw(sys), 0)
+  if (total <= 0) return null
+  return Math.round(systemPowerKw(s) / total * 1000) / 10
+}
+async function toggleNegligible(s, checked) {
+  if (checked) {
+    const pct = systemWeightPct(s)
+    if (pct != null && pct > 10) {
+      const ok = await confirm({
+        title: 'Poste potentiellement significatif',
+        message: `Ce poste représente environ ${pct} % de la puissance du site (estimation). La règle des 5 % se base sur la consommation réelle — vérifiez avant de l'exempter.`,
+        confirmLabel: 'Marquer quand même',
+      })
+      if (!ok) return
+    }
+  }
+  await patchSystem(s, {
+    marked_negligible_under_5pct: checked,
+    ...(checked ? {} : { negligible_justification: null }),
+  })
+}
+
 // Device sheet
 const editingDevice = ref(null)
 const deviceForm = ref({})
@@ -285,12 +336,18 @@ function openLibraryDevicePicker(system) {
 function openCreateDevice(system) {
   deviceForm.value = {
     name: '', brand: '', model_reference: '', power_kw: null,
+    // Item 8 — puissance frigorifique + type de calcul + secours.
+    power_kw_cooling: null, power_calculation_type: null, is_backup: null,
     // Multi-rôle (mig 117) : array.
     energy_source: null, device_role: [], location: '',
     // Communication : protocoles multi (string JSON) + câblé.
-    communication_protocols: null, wired: false,
-    // État R175-3 4° + Hors service.
-    meets_r175_3_p4: false, meets_r175_3_p4_autonomous: false, out_of_service: false,
+    communication_protocols: null, wired: null,
+    // État R175-3 4° + Hors service. null = non répondu (cf. mig 172).
+    meets_r175_3_p4: null, meets_r175_3_p4_autonomous: null, out_of_service: null,
+    // Item 7c — séparabilité du comptage (équipement partagé).
+    metering_separable: null, metering_separable_note: '',
+    // Mig 172 — validation forcée manuelle.
+    validation_forced: null,
   }
   editingDevice.value = { mode: 'create', system }
 }
@@ -314,6 +371,11 @@ async function saveDevice() {
       brand: deviceForm.value.brand?.trim() || null,
       model_reference: deviceForm.value.model_reference?.trim() || null,
       power_kw: deviceForm.value.power_kw === '' || deviceForm.value.power_kw === null ? null : Number(deviceForm.value.power_kw),
+      // Item 8 — puissance frigorifique + type de calcul + équipement de secours.
+      power_kw_cooling: deviceForm.value.power_kw_cooling === '' || deviceForm.value.power_kw_cooling === null ? null : Number(deviceForm.value.power_kw_cooling),
+      power_calculation_type: deviceForm.value.power_calculation_type || null,
+      is_backup: triBool(deviceForm.value.is_backup),
+      validation_forced: triBool(deviceForm.value.validation_forced),
       energy_source: deviceForm.value.energy_source,
       device_role: Array.isArray(deviceForm.value.device_role) ? deviceForm.value.device_role : [],
       location: deviceForm.value.location?.trim() || null,
@@ -323,18 +385,26 @@ async function saveDevice() {
       // de vérité côté écriture est désormais `communication_protocols`
       // (cohérent avec patchDevice de SystemDevicesTable).
       communication_protocol: null,
-      wired: !!deviceForm.value.wired,
-      // État R175-3 4° + Hors service.
-      meets_r175_3_p4: !!deviceForm.value.meets_r175_3_p4,
-      meets_r175_3_p4_autonomous: !!deviceForm.value.meets_r175_3_p4_autonomous,
-      out_of_service: !!deviceForm.value.out_of_service,
+      wired: triBool(deviceForm.value.wired),
+      // État R175-3 4° + Hors service. null = non répondu.
+      meets_r175_3_p4: triBool(deviceForm.value.meets_r175_3_p4),
+      meets_r175_3_p4_autonomous: triBool(deviceForm.value.meets_r175_3_p4_autonomous),
+      out_of_service: triBool(deviceForm.value.out_of_service),
+      // Item 7c — séparabilité du comptage (équipement partagé).
+      metering_separable: deviceForm.value.metering_separable || null,
+      metering_separable_note: deviceForm.value.metering_separable_note?.trim() || null,
     }
     if (!payload.name && !payload.brand && !payload.model_reference) {
       error('Renseigne au moins un nom, une marque ou une référence')
       return
     }
     if (editingDevice.value.mode === 'create') {
-      await createBacsDevice(editingDevice.value.system.id, payload)
+      // Le POST /devices ne persiste que les champs de base ; on complète
+      // aussitôt par un PATCH pour enregistrer toggles, puissances et flags
+      // (conformité R175-3, secours, validation forcée…) saisis dans la
+      // même feuille — sinon ces réponses seraient perdues.
+      const { data: created } = await createBacsDevice(editingDevice.value.system.id, payload)
+      if (created?.id) await updateBacsDevice(created.id, payload)
       await audit.refreshAuditCore()
       success('Équipement ajouté')
     } else {
@@ -366,6 +436,44 @@ async function removeDevice(d) {
     error('Suppression impossible')
   }
 }
+
+// Helper tri-état : 0/1/null → false/true/null. Les boutons Oui/Non
+// (MobileYesNo) émettent des booléens ; le payload doit rester booléen|null.
+const triBool = (v) => (v == null ? null : !!v)
+
+// ── Complétude de l'équipement en cours d'édition (logique partagée) ─
+const deviceMissing = computed(() =>
+  editingDevice.value
+    ? deviceMissingFields(deviceForm.value, editingDevice.value.system?.system_category)
+    : [])
+const deviceComplete = computed(() =>
+  editingDevice.value
+    ? isDeviceComplete(deviceForm.value, editingDevice.value.system?.system_category)
+    : false)
+const deviceForced = computed(() => !!deviceForm.value?.validation_forced)
+
+// ── Puissance conditionnelle (chaud / froid selon l'usage desservi) ─
+const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+const servedCategories = computed(() => {
+  const cats = new Set()
+  const sys = editingDevice.value?.system
+  if (sys?.system_category) cats.add(sys.system_category)
+  const extra = editingDevice.value?.device?.extra_system_ids || []
+  for (const s of (systems.value || [])) {
+    if (extra.includes(s.id) && s.system_category) cats.add(s.system_category)
+  }
+  return cats
+})
+const showPowerFields = computed(() => POWER_RELEVANT.has(editingDevice.value?.system?.system_category))
+const hasHeating = computed(() => servedCategories.value.has('heating'))
+const hasCooling = computed(() => servedCategories.value.has('cooling'))
+const showHeatPower = computed(() => showPowerFields.value && (hasHeating.value || !hasCooling.value))
+const showCoolPower = computed(() => showPowerFields.value && hasCooling.value)
+const heatPowerLabel = computed(() => (hasHeating.value ? 'Puissance chaud (kW)' : 'Puissance (kW)'))
+// `power_kw` est la colonne lue par le cumul R175-2 et le PDF ; `power_kw_cooling`
+// n'est qu'un complément réservé aux équipements réversibles. Froid seul →
+// power_kw ; réversible (chaud ET froid) → froid dans power_kw_cooling.
+const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' : 'power_kw'))
 </script>
 
 <template>
@@ -493,7 +601,7 @@ async function removeDevice(d) {
               </div>
             </div>
             <button v-else type="button" @click="startAddUsage(g.zone_id)"
-                    class="w-full min-h-11 inline-flex items-center justify-center gap-2 py-3 text-base font-medium text-indigo-600 bg-indigo-50 rounded-xl">
+                    class="w-full min-h-11 inline-flex items-center justify-center gap-2 px-3 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-xl transition">
               <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un usage
             </button>
           </div>
@@ -518,6 +626,63 @@ async function removeDevice(d) {
           <FontAwesomeIcon :icon="['fas', 'map-pin']" class="w-3.5 h-3.5 shrink-0" />
           <p class="text-sm font-medium">{{ openedUsage.zone_name }}</p>
         </div>
+
+        <!-- Item 3 — bouclage ECS (catégorie dhw) -->
+        <section v-if="openedUsage.system_category === 'dhw'"
+                 class="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Bouclage ECS</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button v-for="opt in LOOP_OPTIONS" :key="opt.value" type="button"
+                    @click="patchSystem(openedUsage, { is_looped: opt.value })"
+                    :class="['tap-target rounded-xl border px-2 py-3 text-sm font-medium transition',
+                             openedUsage.is_looped === opt.value
+                               ? 'bg-indigo-600 border-indigo-600 text-white'
+                               : 'bg-white border-gray-200 text-gray-600 active:bg-gray-50']">
+              {{ opt.label }}
+            </button>
+          </div>
+          <p v-if="openedUsage.is_looped === 'looped'" class="text-xs text-amber-700 leading-relaxed">
+            Boucle ECS : l'arrêt est interdit (arrêté du 30 nov. 2005 — risque légionelle).
+          </p>
+        </section>
+
+        <!-- Item 1 — règle des 5 % : poste considéré comme négligeable -->
+        <section class="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+          <button type="button"
+                  @click="toggleNegligible(openedUsage, !openedUsage.marked_negligible_under_5pct)"
+                  class="w-full text-left tap-target flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-base text-gray-900 font-medium">Poste négligeable (&lt; 5 %)</p>
+              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">
+                Exempté de mise en conformité R175-3
+                <span v-if="systemWeightPct(openedUsage) != null"
+                      :class="systemWeightPct(openedUsage) > 10 ? 'text-amber-600 font-semibold' : ''">
+                  · poids estimé ~{{ systemWeightPct(openedUsage) }} %
+                </span>
+              </p>
+            </div>
+            <span :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
+                           openedUsage.marked_negligible_under_5pct
+                             ? 'bg-emerald-500 border-emerald-500 text-white'
+                             : 'bg-white border-gray-300']" aria-hidden="true">
+              <svg v-if="openedUsage.marked_negligible_under_5pct" viewBox="0 0 16 16" class="w-5 h-5">
+                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </button>
+          <input v-if="openedUsage.marked_negligible_under_5pct"
+                 type="text"
+                 :value="openedUsage.negligible_justification || ''"
+                 @change="e => patchSystem(openedUsage, { negligible_justification: e.target.value })"
+                 placeholder="Justification (ex : petits ballons individuels…)"
+                 class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+        </section>
+
+        <!-- Item 4 — assujettissement : parties prenantes + flags cas E/F -->
+        <section class="bg-white rounded-2xl border border-gray-200 p-4">
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Assujettissement</p>
+          <SystemPartiesPanel :system="openedUsage" />
+        </section>
 
         <!-- Carte Équipements : en-tête / liste séparée / pied d'actions -->
         <section class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -557,18 +722,18 @@ async function removeDevice(d) {
               Aucun équipement — ajoute-en ci-dessous.
             </p>
           </div>
-          <div class="flex items-stretch gap-1.5 p-3 border-t border-gray-200 bg-gray-50">
+          <div class="p-3 border-t border-gray-200 bg-gray-50 space-y-2">
             <button
               @click="openCreateDevice(openedUsage)"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-white bg-emerald-600 active:bg-emerald-700 rounded-xl font-medium whitespace-nowrap"
+              class="w-full tap-target inline-flex items-center justify-center gap-2 px-3 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-xl transition whitespace-nowrap"
             >
-              <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter
+              <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un équipement
             </button>
             <button
               @click="openLibraryDevicePicker(openedUsage)"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3.5 text-base text-emerald-700 bg-white active:bg-emerald-50 border border-emerald-300 rounded-xl font-medium whitespace-nowrap"
+              class="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-emerald-700 bg-white active:bg-emerald-50 border border-emerald-300 rounded-xl font-medium whitespace-nowrap"
             >
-              <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-5 h-5 shrink-0" /> Bibliothèque
+              <FontAwesomeIcon :icon="['fas', 'book-open']" class="w-4 h-4 shrink-0" /> Depuis la bibliothèque
             </button>
           </div>
         </section>
@@ -609,6 +774,29 @@ async function removeDevice(d) {
           {{ usageLabel(editingDevice.system) }} —
           {{ editingDevice.system.zone_name }}
         </p>
+
+        <!-- Complétude de l'équipement (logique partagée avec le desktop) -->
+        <div :class="['rounded-xl px-4 py-3 text-sm flex items-start gap-2',
+                      deviceComplete
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200']">
+          <span class="font-semibold shrink-0">{{ deviceComplete ? '✓' : '⚠' }}</span>
+          <span v-if="deviceForced">
+            Validation forcée manuellement — l'équipement est considéré validé.
+            <template v-if="deviceMissing.length"> Non renseigné : <strong>{{ deviceMissing.join(', ') }}</strong>.</template>
+          </span>
+          <span v-else-if="deviceComplete">Équipement complet — pris en compte dans la validation de l'étape.</span>
+          <span v-else>
+            Équipement incomplet — il reste à renseigner : <strong>{{ deviceMissing.join(', ') }}</strong>.
+          </span>
+        </div>
+
+        <MobileYesNo
+          label="Forcer la validation de cet équipement ?"
+          description="À activer si certaines informations resteront définitivement inconnues. L'équipement sera considéré validé même incomplet."
+          :model-value="deviceForm.validation_forced"
+          @update:model-value="v => deviceForm.validation_forced = v"
+        />
 
         <!-- Photos terrain en TÊTE (mode édition uniquement : un device en
              cours de création n'a pas encore d'id pour rattacher les photos). -->
@@ -663,18 +851,46 @@ async function removeDevice(d) {
           </MobileField>
         </div>
 
-        <MobileField label="Puissance (kW)">
-          <input
-            v-model.number="deviceForm.power_kw"
-            type="number"
-            inputmode="decimal"
-            pattern="[0-9.,]*"
-            min="0"
-            step="0.1"
-            placeholder="—"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
-          />
-        </MobileField>
+        <!-- Puissance conditionnelle : chaud / froid selon l'usage desservi.
+             Les deux champs uniquement pour un équipement réversible
+             (chauffage ET refroidissement). -->
+        <template v-if="showPowerFields">
+          <div :class="showHeatPower && showCoolPower ? 'grid grid-cols-2 gap-3' : ''">
+            <MobileField v-if="showHeatPower" :label="heatPowerLabel">
+              <input
+                v-model.number="deviceForm.power_kw"
+                type="number"
+                inputmode="decimal"
+                pattern="[0-9.,]*"
+                min="0"
+                step="0.1"
+                placeholder="—"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+              />
+            </MobileField>
+            <MobileField v-if="showCoolPower" label="Puissance froid (kW)">
+              <input
+                v-model.number="deviceForm[coolPowerField]"
+                type="number"
+                inputmode="decimal"
+                pattern="[0-9.,]*"
+                min="0"
+                step="0.1"
+                placeholder="—"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+              />
+            </MobileField>
+          </div>
+
+          <MobileField label="Type de calcul de puissance">
+            <MobileSelectSheet
+              v-model="deviceForm.power_calculation_type"
+              :options="POWER_CALC_OPTIONS"
+              title="Type de calcul de puissance"
+              placeholder="— Calcul automatique —"
+            />
+          </MobileField>
+        </template>
 
         <MobileField label="Énergie">
           <MobileSelectSheet
@@ -719,97 +935,41 @@ async function removeDevice(d) {
               @update:modelValue="v => deviceForm.communication_protocols = v"
             />
           </MobileField>
-          <button
-            type="button"
-            @click="deviceForm.wired = !deviceForm.wired"
-            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-          >
-            <div class="flex-1 min-w-0">
-              <p class="text-base text-gray-900 font-medium">Câblé</p>
-              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">
-                Communication câblée vers la GTB
-              </p>
-            </div>
-            <span
-              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                       deviceForm.wired
-                         ? 'bg-emerald-500 border-emerald-500 text-white'
-                         : 'bg-white border-gray-300']"
-              aria-hidden="true"
-            >
-              <svg v-if="deviceForm.wired" viewBox="0 0 16 16" class="w-5 h-5">
-                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
+          <MobileYesNo
+            label="L'équipement est-il relié à la GTB par une liaison câblée ?"
+            description="Liaison câblée dédiée vers la supervision — la base de l'interopérabilité exigée par le décret (R175-3 §3)."
+            :model-value="deviceForm.wired"
+            @update:model-value="v => deviceForm.wired = v"
+          />
         </div>
 
-        <!-- État R175-3 4° + Hors service. Boutons toggle plein-largeur. -->
+        <!-- État & conformité R175-3 4° — boutons Oui / Non tri-état. -->
         <div class="space-y-2">
-          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">État</p>
-          <button
-            type="button"
-            @click="deviceForm.meets_r175_3_p4 = !deviceForm.meets_r175_3_p4"
-            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-          >
-            <div class="flex-1 min-w-0">
-              <p class="text-base text-gray-900 font-medium">Arrêt manuel possible</p>
-              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">R175-3 4° — coupure manuelle</p>
-            </div>
-            <span
-              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                       deviceForm.meets_r175_3_p4
-                         ? 'bg-emerald-500 border-emerald-500 text-white'
-                         : 'bg-white border-gray-300']"
-              aria-hidden="true"
-            >
-              <svg v-if="deviceForm.meets_r175_3_p4" viewBox="0 0 16 16" class="w-5 h-5">
-                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <button
-            type="button"
-            @click="deviceForm.meets_r175_3_p4_autonomous = !deviceForm.meets_r175_3_p4_autonomous"
-            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-          >
-            <div class="flex-1 min-w-0">
-              <p class="text-base text-gray-900 font-medium">Reprise autonome</p>
-              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">R175-3 4° — fonctionne sans la GTB</p>
-            </div>
-            <span
-              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                       deviceForm.meets_r175_3_p4_autonomous
-                         ? 'bg-emerald-500 border-emerald-500 text-white'
-                         : 'bg-white border-gray-300']"
-              aria-hidden="true"
-            >
-              <svg v-if="deviceForm.meets_r175_3_p4_autonomous" viewBox="0 0 16 16" class="w-5 h-5">
-                <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </span>
-          </button>
-          <button
-            type="button"
-            @click="deviceForm.out_of_service = !deviceForm.out_of_service"
-            class="w-full text-left tap-target flex items-start justify-between gap-3 px-4 py-4 bg-white rounded-xl border border-gray-200 active:bg-gray-50"
-          >
-            <div class="flex-1 min-w-0">
-              <p class="text-base font-medium" :class="deviceForm.out_of_service ? 'text-red-700' : 'text-gray-900'">Hors service</p>
-              <p class="text-sm text-gray-500 mt-0.5 leading-relaxed">Ignoré dans le plan d'action</p>
-            </div>
-            <span
-              :class="['mt-1 shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md border-2 transition',
-                       deviceForm.out_of_service
-                         ? 'bg-red-600 border-red-600 text-white'
-                         : 'bg-white border-gray-300']"
-              aria-hidden="true"
-            >
-              <svg v-if="deviceForm.out_of_service" viewBox="0 0 16 16" class="w-5 h-5">
-                <path d="M4 4l8 8M4 12l8-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-              </svg>
-            </span>
-          </button>
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">État &amp; conformité</p>
+          <MobileYesNo
+            label="Peut-on arrêter l'équipement manuellement, sur place ?"
+            description="R175-3 §4 — coupure directe sur place, sans passer par la supervision."
+            :model-value="deviceForm.meets_r175_3_p4"
+            @update:model-value="v => deviceForm.meets_r175_3_p4 = v"
+          />
+          <MobileYesNo
+            label="L'équipement redémarre-t-il de façon autonome après une coupure ?"
+            description="R175-3 §4 — reprise seule après coupure de courant, sans intervention d'un technicien."
+            :model-value="deviceForm.meets_r175_3_p4_autonomous"
+            @update:model-value="v => deviceForm.meets_r175_3_p4_autonomous = v"
+          />
+          <MobileYesNo
+            label="L'équipement est-il hors service ?"
+            description="Équipement hors d'usage — ignoré dans le plan de mise en conformité."
+            :model-value="deviceForm.out_of_service"
+            @update:model-value="v => deviceForm.out_of_service = v"
+          />
+          <MobileYesNo
+            label="Est-ce un équipement de secours ?"
+            description="Non utilisé en fonctionnement normal — exclu du cumul de puissance BACS."
+            :model-value="deviceForm.is_backup"
+            @update:model-value="v => deviceForm.is_backup = v"
+          />
         </div>
 
         <template v-if="editingDevice?.mode === 'edit'">
@@ -851,6 +1011,34 @@ async function removeDevice(d) {
               </p>
             </div>
           </div>
+
+          <!-- Item 7c — séparabilité du comptage : visible uniquement quand
+               l'équipement est partagé entre plusieurs zones / usages. -->
+          <template v-if="(editingDevice.device.extra_system_ids || []).length">
+            <MobileField label="Comptage séparable"
+                         hint="Le comptage de chaque zone desservie par cet équipement partagé peut-il être séparé ? Un comptage non séparable regroupe les zones en une seule zone fonctionnelle de suivi.">
+              <div class="flex gap-2">
+                <button v-for="opt in MOBILE_METERING_OPTS" :key="opt.value" type="button"
+                        @click="deviceForm.metering_separable = deviceForm.metering_separable === opt.value ? null : opt.value"
+                        :class="deviceForm.metering_separable === opt.value
+                          ? opt.activeCls
+                          : 'bg-white text-gray-600 border-gray-200'"
+                        class="flex-1 min-h-11 px-3 rounded-lg border font-medium transition">
+                  {{ opt.label }}
+                </button>
+              </div>
+            </MobileField>
+            <MobileField label="Justification du comptage"
+                         hint="Justification courte : circuit hydraulique unique, colonnes montantes communes, tableaux électriques distincts…">
+              <input
+                v-model="deviceForm.metering_separable_note"
+                type="text"
+                placeholder="ex : circuit hydraulique unique"
+                autocapitalize="sentences"
+                class="touch-control w-full"
+              />
+            </MobileField>
+          </template>
 
           <div class="pt-4 border-t border-gray-200">
             <button

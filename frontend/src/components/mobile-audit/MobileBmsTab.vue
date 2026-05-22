@@ -7,13 +7,37 @@ import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter } from '@/api'
 import MobileField from './MobileField.vue'
+import MobileSelectSheet from './MobileSelectSheet.vue'
 import MobileInspectionsSheet from './MobileInspectionsSheet.vue'
+
+// Item 15 — options des champs « conservation & accès aux données » (R175-3).
+const STORAGE_5Y_OPTIONS = [
+  { value: 'yes', label: 'Oui — conforme' },
+  { value: 'no', label: 'Non — non conforme' },
+  { value: 'unknown', label: 'Inconnu / à vérifier' },
+]
+const STORAGE_LOCATION_OPTIONS = [
+  { value: 'local', label: 'Serveur local' },
+  { value: 'cloud_editeur', label: 'Cloud de l\'éditeur' },
+  { value: 'cloud_proprietaire', label: 'Cloud du propriétaire' },
+  { value: 'unknown', label: 'Inconnue' },
+]
+const ACCESS_OPTIONS = [
+  { value: 'yes', label: 'Oui' },
+  { value: 'partial', label: 'Partiel' },
+  { value: 'no', label: 'Non' },
+]
+const EXPORT_OPTIONS = [
+  { value: 'yes', label: 'Oui' },
+  { value: 'no', label: 'Non' },
+]
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MobileBmsTopicNoteButton from './MobileBmsTopicNoteButton.vue'
+import MobileYesNo from './MobileYesNo.vue'
 
 const audit = useAuditStore()
 const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
@@ -179,23 +203,12 @@ const USAGES = [
 
     <template v-if="bms.present === 1">
     <!-- Hors-service toggle -->
-    <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <label class="flex items-start justify-between gap-3 px-4 py-5 cursor-pointer">
-        <div class="flex-1 min-w-0">
-          <p class="text-base font-medium text-red-600">GTB hors-service</p>
-          <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-            À cocher si la GTB est complètement HS, débranchée ou inutilisable.
-            Le plan d'action ignorera alors toutes les exigences GTB du décret.
-          </p>
-        </div>
-        <input
-          type="checkbox"
-          :checked="!!bms.out_of_service"
-          @change="e => { bms.out_of_service = e.target.checked ? 1 : 0; saveDebounced() }"
-          class="w-7 h-7 mt-1 shrink-0"
-        />
-      </label>
-    </div>
+    <MobileYesNo
+      label="La GTB est-elle hors service ?"
+      description="Si la GTB est complètement HS, débranchée ou inutilisable, le plan d'action ignore toutes les exigences GTB du décret."
+      :model-value="bms.out_of_service"
+      @update:model-value="v => { bms.out_of_service = v ? 1 : 0; saveDebounced() }"
+    />
 
     <!-- Mig 109 : on n'efface plus les sous-blocs quand la GTB est HS,
          on les garde affichés (legerement opaques) pour que l'auditeur
@@ -290,21 +303,12 @@ const USAGES = [
                                       topic-label="R175-3 — Capacités de la solution de supervision" />
           </div>
           <div class="p-4 space-y-4">
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">P1 — Suivi continu</p>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  La GTB enregistre les consos de chaque zone <strong>au pas horaire ou plus fin</strong>,
-                  et conserve les données pendant <strong>5 ans minimum</strong>.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.meets_r175_3_p1"
-                @change="e => { bms.meets_r175_3_p1 = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
+            <MobileYesNo
+              label="P1. La GTB enregistre-t-elle la consommation en continu par zone et conserve-t-elle ces données pendant 5 ans ?"
+              description="Enregistrement au pas horaire ou plus fin, conservation 5 ans minimum."
+              :model-value="bms.meets_r175_3_p1"
+              @update:model-value="v => { bms.meets_r175_3_p1 = v ? 1 : 0; saveDebounced() }"
+            />
             <div v-if="bms.meets_r175_3_p1" class="ml-2 pl-3 border-l-2 border-gray-100 space-y-2">
               <input
                 v-model="bms.r175_3_p1_archival_format"
@@ -313,34 +317,21 @@ const USAGES = [
                 @input="saveDebounced"
                 class="touch-control w-full"
               />
-              <label class="flex items-center justify-between gap-3 cursor-pointer text-xs text-gray-700">
-                <span>Rétention 5 ans vérifiée sur place</span>
-                <input
-                  type="checkbox"
-                  :checked="!!bms.r175_3_p1_retention_verified"
-                  @change="e => { bms.r175_3_p1_retention_verified = e.target.checked ? 1 : 0; saveDebounced() }"
-                  class="w-7 h-7"
-                />
-              </label>
+              <MobileYesNo
+                label="La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?"
+                :model-value="bms.r175_3_p1_retention_verified"
+                @update:model-value="v => { bms.r175_3_p1_retention_verified = v ? 1 : 0; saveDebounced() }"
+              />
             </div>
 
             <div class="border-t border-gray-100 pt-3"></div>
 
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">P2 — Détection des dérives</p>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  La GTB <strong>déclenche des alertes</strong> en cas de surconsommation,
-                  de panne d'équipement ou de dérive de performance (ex : COP qui chute).
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.meets_r175_3_p2"
-                @change="e => { bms.meets_r175_3_p2 = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
+            <MobileYesNo
+              label="P2. La GTB détecte-t-elle les pertes d'efficacité énergétique ?"
+              description="La GTB déclenche des alertes en cas de surconsommation, de panne d'équipement ou de dérive de performance (ex : COP qui chute)."
+              :model-value="bms.meets_r175_3_p2"
+              @update:model-value="v => { bms.meets_r175_3_p2 = v ? 1 : 0; saveDebounced() }"
+            />
             <div v-if="bms.meets_r175_3_p2" class="ml-2 pl-3 border-l-2 border-gray-100">
               <textarea
                 v-model="bms.r175_3_p2_anomaly_rules_html"
@@ -368,30 +359,18 @@ const USAGES = [
               de consommation au gestionnaire et aux exploitants. Coche ci-dessous
               ce qui est documenté sur place (procédure écrite ou démontrée).
             </p>
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">Données envoyées au gestionnaire</p>
-                <p class="text-xs text-gray-500 mt-1">Propriétaire / syndic / exploitant principal du bâtiment.</p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.data_provision_to_manager"
-                @change="e => { bms.data_provision_to_manager = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">Données envoyées aux exploitants</p>
-                <p class="text-xs text-gray-500 mt-1">Mainteneur GTB, mainteneur CVC, intégrateur supervision.</p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.data_provision_to_operators"
-                @change="e => { bms.data_provision_to_operators = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
+            <MobileYesNo
+              label="La procédure de mise à disposition des données au gestionnaire du bâtiment est-elle documentée ?"
+              description="Gestionnaire = propriétaire / syndic / exploitant principal du bâtiment."
+              :model-value="bms.data_provision_to_manager"
+              @update:model-value="v => { bms.data_provision_to_manager = v ? 1 : 0; saveDebounced() }"
+            />
+            <MobileYesNo
+              label="La procédure de transmission des données aux exploitants des systèmes techniques est-elle documentée ?"
+              description="Exploitants = mainteneur GTB, mainteneur CVC, intégrateur supervision."
+              :model-value="bms.data_provision_to_operators"
+              @update:model-value="v => { bms.data_provision_to_operators = v ? 1 : 0; saveDebounced() }"
+            />
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <input
                 v-model="bms.data_provision_frequency"
@@ -411,6 +390,68 @@ const USAGES = [
           </div>
         </div>
 
+        <!-- Item 15 — R175-3 : conservation 5 ans + accès aux données -->
+        <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
+          <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="text-base font-medium text-gray-900">Conservation et accès aux données</h3>
+            <p class="text-xs text-gray-500 mt-0.5">R175-3 — archivage 5 ans</p>
+          </div>
+          <div class="p-4 space-y-4">
+            <MobileField label="Données conservées 5 ans (échelle mensuelle) ?">
+              <MobileSelectSheet
+                :model-value="bms.data_storage_5y_compliant"
+                :options="STORAGE_5Y_OPTIONS"
+                title="Conservation 5 ans"
+                placeholder="— Non renseigné —"
+                @update:model-value="v => { bms.data_storage_5y_compliant = v; saveDebounced() }"
+              />
+            </MobileField>
+            <MobileField label="Localisation du stockage">
+              <MobileSelectSheet
+                :model-value="bms.data_storage_location"
+                :options="STORAGE_LOCATION_OPTIONS"
+                title="Localisation du stockage"
+                placeholder="— Non renseigné —"
+                @update:model-value="v => { bms.data_storage_location = v; saveDebounced() }"
+              />
+            </MobileField>
+            <MobileField label="Accès direct du propriétaire à ses données">
+              <MobileSelectSheet
+                :model-value="bms.data_owner_access"
+                :options="ACCESS_OPTIONS"
+                title="Accès du propriétaire"
+                placeholder="— Non renseigné —"
+                @update:model-value="v => { bms.data_owner_access = v; saveDebounced() }"
+              />
+            </MobileField>
+            <MobileField label="Accès du gestionnaire et des exploitants">
+              <MobileSelectSheet
+                :model-value="bms.gestionnaire_exploitant_access"
+                :options="ACCESS_OPTIONS"
+                title="Accès gestionnaire / exploitants"
+                placeholder="— Non renseigné —"
+                @update:model-value="v => { bms.gestionnaire_exploitant_access = v; saveDebounced() }"
+              />
+            </MobileField>
+            <MobileField label="Export possible (CSV / Excel)">
+              <MobileSelectSheet
+                :model-value="bms.export_capability"
+                :options="EXPORT_OPTIONS"
+                title="Export des données"
+                placeholder="— Non renseigné —"
+                @update:model-value="v => { bms.export_capability = v; saveDebounced() }"
+              />
+            </MobileField>
+            <textarea
+              v-model="bms.data_access_notes"
+              @input="saveDebounced"
+              placeholder="Observations sur l'accès aux données…"
+              rows="2"
+              class="touch-control w-full"
+            ></textarea>
+          </div>
+        </div>
+
         <!-- R175-4 Maintenance -->
         <div :class="['bg-white rounded-2xl border border-gray-200 overflow-hidden', bms.out_of_service ? 'opacity-70' : '']">
           <div class="px-4 py-3 border-b border-gray-100">
@@ -420,21 +461,12 @@ const USAGES = [
             </div>
           </div>
           <div class="p-4 space-y-4">
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">Procédures de maintenance documentées</p>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Existe-t-il un document écrit qui dit qui fait quoi sur la GTB et à quelle fréquence ?
-                  (carnet d'entretien, contrat de maintenance, plan de prévention…)
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.has_maintenance_procedures"
-                @change="e => { bms.has_maintenance_procedures = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
+            <MobileYesNo
+              label="Les maintenances passées ont-elles fait l'objet de consignes écrites ?"
+              description="Document écrit indiquant qui fait quoi sur la GTB et à quelle fréquence (carnet d'entretien, contrat de maintenance, plan de prévention…)."
+              :model-value="bms.has_maintenance_procedures"
+              @update:model-value="v => { bms.has_maintenance_procedures = v ? 1 : 0; saveDebounced() }"
+            />
             <template v-if="bms.has_maintenance_procedures">
               <input
                 v-model="bms.maintenance_periodicity"
@@ -463,22 +495,12 @@ const USAGES = [
             </div>
           </div>
           <div class="p-4 space-y-4">
-            <label class="flex items-start justify-between gap-3 cursor-pointer">
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900">Exploitant formé à la GTB</p>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  La personne en charge de la GTB a-t-elle suivi une formation
-                  (par l'intégrateur, l'éditeur, en interne) lui permettant de
-                  consulter les données et corriger les dérives ?
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                :checked="!!bms.operator_trained"
-                @change="e => { bms.operator_trained = e.target.checked ? 1 : 0; saveDebounced() }"
-                class="w-7 h-7 mt-1 shrink-0"
-              />
-            </label>
+            <MobileYesNo
+              label="L'exploitant a-t-il été formé à l'utilisation de la supervision ?"
+              description="La personne en charge de la GTB a suivi une formation (intégrateur, éditeur, interne) lui permettant de consulter les données et corriger les dérives."
+              :model-value="bms.operator_trained"
+              @update:model-value="v => { bms.operator_trained = v ? 1 : 0; saveDebounced() }"
+            />
             <template v-if="bms.operator_trained">
               <MobileField label="Date de formation">
                 <input

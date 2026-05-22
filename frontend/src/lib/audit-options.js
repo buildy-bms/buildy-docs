@@ -59,6 +59,56 @@ export function isThermalCategory(category) {
   return THERMAL_CATEGORIES.has(category)
 }
 
+/**
+ * Liste des champs encore manquants pour qu'un équipement soit « validé » :
+ * identité, énergie, protocole(s), niveau de régulation (usages thermiques)
+ * et TOUS les boutons Oui/Non de la modale (conformité R175-3, état). Pour
+ * un équipement partagé, le comptage séparable est aussi requis.
+ * Retourne un tableau de libellés courts (vide = complet).
+ */
+export function deviceMissingFields(device, systemCategory) {
+  if (!device) return ['équipement introuvable']
+  const out = []
+  const hasIdentity = !!((device.name || '').trim()
+    || (device.brand || '').trim()
+    || (device.model_reference || '').trim())
+  if (!hasIdentity) out.push('un nom, une marque ou une référence')
+  if (!device.energy_source) out.push("l'énergie")
+  let protocols = []
+  try { protocols = JSON.parse(device.communication_protocols || '[]') } catch { protocols = [] }
+  const hasProtocol = (Array.isArray(protocols) && protocols.length > 0)
+    || (!!device.communication_protocol && device.communication_protocol !== 'non_communicant')
+  if (!hasProtocol) out.push('le(s) protocole(s) de communication')
+  if (isThermalCategory(systemCategory)) {
+    const roles = Array.isArray(device.device_role)
+      ? device.device_role
+      : (device.device_role ? [device.device_role] : [])
+    if (!roles.length) out.push('le niveau de régulation R175-6')
+  }
+  // Tous les boutons Oui/Non doivent être renseignés (null = non répondu).
+  if (device.wired == null) out.push('la communication câblée vers la GTB')
+  if (device.meets_r175_3_p4 == null) out.push("l'arrêt manuel possible")
+  if (device.meets_r175_3_p4_autonomous == null) out.push('le fonctionnement autonome après coupure')
+  if (device.is_backup == null) out.push('équipement de secours (oui/non)')
+  if (device.out_of_service == null) out.push('hors service (oui/non)')
+  const isShared = Array.isArray(device.extra_system_ids) && device.extra_system_ids.length > 0
+  if (isShared && device.metering_separable == null) out.push('le comptage séparable')
+  return out
+}
+
+/**
+ * Un équipement (« système ») est considéré complètement renseigné quand
+ * `deviceMissingFields` ne retourne rien — OU quand l'auditeur a forcé sa
+ * validation (`validation_forced`, pour les infos définitivement inconnues).
+ * Sert au bouton « Modifier » (rouge tant qu'incomplet) et au blocage de
+ * la validation de l'étape Systèmes.
+ */
+export function isDeviceComplete(device, systemCategory) {
+  if (!device) return false
+  if (device.validation_forced) return true
+  return deviceMissingFields(device, systemCategory).length === 0
+}
+
 // Natures de zones — couvre l'enum bacs_requirements_by_zone_nature côté
 // backend (cf. backend-node/src/seeds/bacs-requirements.js). Ajouter une
 // entrée ici sans l'ajouter dans bacs-requirements.js : la nature ne
@@ -78,11 +128,73 @@ export const ZONE_NATURES = [
   { value: 'corridor',         label: 'Couloir',              icon: 'fa-arrows-left-right', color: '#64748b' },
   { value: 'logistic-cell',    label: 'Cellule logistique',   icon: 'fa-boxes-stacked',     color: '#475569' },
   { value: 'stock',            label: 'Stock',                icon: 'fa-warehouse',         color: '#374151' },
+  { value: 'kitchen',          label: 'Cuisine',              icon: 'fa-kitchen-set',       color: '#ea580c' },
+  { value: 'refectory',        label: 'Réfectoire',           icon: 'fa-utensils',          color: '#d97706' },
+  { value: 'changing-room',    label: 'Vestiaires / douches', icon: 'fa-shirt',             color: '#0891b2' },
+  { value: 'restroom',         label: 'Sanitaires',           icon: 'fa-toilet',            color: '#0e7490' },
+  { value: 'bedroom',          label: 'Chambre',              icon: 'fa-bed',               color: '#7c3aed' },
+  { value: 'care-room',        label: 'Salle de soin',        icon: 'fa-suitcase-medical',  color: '#db2777' },
+  { value: 'sports-hall',      label: 'Salle de sport',       icon: 'fa-dumbbell',          color: '#16a34a' },
+  { value: 'laundry',          label: 'Blanchisserie',        icon: 'fa-soap',              color: '#2563eb' },
   { value: 'switchboard',      label: 'Tableau électrique',   icon: 'fa-bolt-lightning',    color: '#eab308', technical: true },
   { value: 'technical-area',   label: 'Local technique',      icon: 'fa-gears',             color: '#6b7280', technical: true },
+  { value: 'boiler-room',      label: 'Chaufferie',           icon: 'fa-fire',              color: '#b91c1c', technical: true },
   { value: 'server-room',      label: 'Local informatique',   icon: 'fa-server',            color: '#0f766e', technical: true },
   { value: 'meters',           label: 'Local compteurs',      icon: 'fa-gauge',             color: '#059669', technical: true },
   { value: 'outdoor',          label: 'Extérieur',            icon: 'fa-tree-city',         color: '#16a34a', technical: true },
+]
+
+// Régime d'occupation d'une zone (item 14). Caractérise l'usage temporel —
+// 2e composante de l'« usage » du décret avec la nature. Enum FERMÉ, doit
+// rester synchro avec ZONE_OCCUPANCY_PROFILES dans backend zones.js.
+export const ZONE_OCCUPANCY_PROFILES = [
+  { value: 'continu',       label: 'Activité continue (24/7)',   icon: 'fa-infinity',       color: '#dc2626' },
+  { value: 'heures_bureau', label: 'Heures de bureau',           icon: 'fa-briefcase',      color: '#1e40af' },
+  { value: 'scolaire',      label: 'Rythme scolaire',            icon: 'fa-graduation-cap', color: '#a855f7' },
+  { value: 'intermittent',  label: 'Activité intermittente',     icon: 'fa-arrows-to-dot',  color: '#f59e0b' },
+  { value: 'saisonnier',    label: 'Activité saisonnière',       icon: 'fa-sun',            color: '#0891b2' },
+  { value: 'autre',         label: 'Autre régime',               icon: 'fa-circle-question', color: '#6b7280' },
+]
+
+// Structure juridique du site (item 4a). Détermine qui est assujetti au
+// décret BACS système par système. Enum FERMÉ, doit rester synchro avec
+// OWNERSHIP_STRUCTURES dans backend routes/sites.js + OWNERSHIP_STRUCTURE_LABEL
+// dans backend lib/bacs-liability.js + CHECK migration 160.
+export const OWNERSHIP_STRUCTURES = [
+  { value: 'single_owner_occupant',        label: 'Propriétaire unique occupant',          icon: 'fa-user',       color: '#1e40af' },
+  { value: 'condominium',                  label: 'Copropriété (avec syndicat)',           icon: 'fa-users',      color: '#7c3aed' },
+  { value: 'owner_with_tenants',           label: 'Propriétaire bailleur et preneurs',     icon: 'fa-handshake',  color: '#0891b2' },
+  { value: 'multiple_independent_tenants', label: 'Preneurs indépendants multiples',       icon: 'fa-people-group', color: '#f59e0b' },
+  { value: 'mixed',                        label: 'Structure mixte',                       icon: 'fa-shuffle',    color: '#6b7280' },
+]
+
+// Genre d'une partie prenante (item 4b). Enum FERMÉ, synchro avec
+// PARTY_KINDS dans backend routes/sites.js + PARTY_KIND_LABEL dans
+// backend lib/bacs-liability.js + CHECK migration 161.
+export const PARTY_KINDS = [
+  { value: 'owner_occupant',   label: 'Propriétaire occupant',     icon: 'fa-user-tie',      color: '#1e40af' },
+  { value: 'co_owner',         label: 'Copropriétaire',            icon: 'fa-user-group',    color: '#7c3aed' },
+  { value: 'tenant',           label: 'Preneur à bail',            icon: 'fa-key',           color: '#0891b2' },
+  { value: 'syndicate',        label: 'Syndicat de copropriété',   icon: 'fa-building-user', color: '#a855f7' },
+  { value: 'network_operator', label: 'Gestionnaire de réseau',    icon: 'fa-fire',          color: '#dc2626' },
+]
+
+// Types d'énergie de l'historique de consommation de référence (item 13).
+// Enum FERMÉ, synchro avec ENERGY_HISTORY_TYPES dans backend routes/sites.js
+// + ENERGY_HISTORY_TYPE_LABEL dans backend routes/bacs-audit/_labels.js
+// + CHECK migration 165.
+export const ENERGY_HISTORY_TYPES = [
+  { value: 'electricity',      label: 'Électricité',        icon: 'fa-bolt',              color: '#6366f1', defaultUnit: 'kWh' },
+  { value: 'gas',              label: 'Gaz',                icon: 'fa-fire-flame-simple', color: '#f97316', defaultUnit: 'kWh' },
+  { value: 'fuel_oil',         label: 'Fioul',              icon: 'fa-droplet',           color: '#64748b', defaultUnit: 'L' },
+  { value: 'district_heating', label: 'Réseau de chaleur',  icon: 'fa-fire',              color: '#0ea5e9', defaultUnit: 'kWh' },
+  { value: 'other',            label: 'Autre énergie',      icon: 'fa-plug',              color: '#8b5cf6', defaultUnit: 'kWh' },
+]
+
+// Mois de l'année (libellés FR) pour les tableaux de saisie mensuelle.
+export const MONTH_LABELS = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
 // Natures considérées « techniques » par défaut : à la saisie d'une zone,

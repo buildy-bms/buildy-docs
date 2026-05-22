@@ -9,11 +9,12 @@
 import { defineStore } from 'pinia'
 import {
   getAf, getBacsSystems, getBacsMeters, getBacsBms, getBacsThermal,
+  createBacsThermal, deleteBacsThermal,
   getBacsActionItems, getBacsDevices, getBacsPowerSummary,
   getBacsInspections, getBacsPhotoCounts, listZones,
   updateBacsBms, updateBacsActionItem, regenerateBacsActionItems,
   createBacsInspection, updateBacsInspection, deleteBacsInspection,
-  getSite, updateSite,
+  getSite, updateSite, getSiteParties,
   getBacsGtbObservations, updateBacsGtbObservation,
 } from '@/api'
 
@@ -38,6 +39,13 @@ export const useAuditStore = defineStore('audit', {
     // Notes par sujet de la carte GTB (mig 109). Tableau de
     // { topic_key, label, observation_html, ... } chargé en parallèle.
     gtbTopicNotes: [],
+    // Parties prenantes du site (item 4/5). Source unique partagée : la
+    // carte Structure juridique, la section Zones, la base de consommations
+    // et la modale d'ajout de zone lisent toutes ce même tableau — évite
+    // les listes locales qui se désynchronisaient. Chaque partie porte son
+    // `zone_ids` (zones affectées).
+    siteParties: [],
+    sitePartiesSuggestion: null,
     // loading=true par defaut : evite que les sous-composants ne se
     // montent avec un state non initialise (notamment BmsComponentsTable
     // qui fetcherait avec docId=null sinon). Passe a false a la fin de
@@ -113,42 +121,93 @@ export const useAuditStore = defineStore('audit', {
             this.site = s.data
           } catch { this.site = null }
         }
-        const [dev, ps, ins, pc, gtb] = await Promise.all([
+        const [dev, ps, ins, pc, gtb, parties] = await Promise.all([
           getBacsDevices(docId),
           getBacsPowerSummary(docId),
           getBacsInspections(docId),
           getBacsPhotoCounts(docId).catch(() => ({ data: { zones: {}, systems: {}, meters: {}, devices: {}, bms: 0, site: 0 } })),
           getBacsGtbObservations(docId).catch(() => ({ data: [] })),
+          d.data.site_uuid
+            ? getSiteParties(d.data.site_uuid).catch(() => ({ data: { parties: [], suggestion: null } }))
+            : Promise.resolve({ data: { parties: [], suggestion: null } }),
         ])
         this.devices = dev.data
         this.powerSummary = ps.data
         this.inspections = ins.data
         this.photoCounts = pc.data
         this.gtbTopicNotes = gtb.data
+        this.siteParties = parties.data.parties || []
+        this.sitePartiesSuggestion = parties.data.suggestion || null
       } finally {
         this.loading = false
       }
     },
 
     async refreshActionItems() {
-      const a = await getBacsActionItems(this.docId)
+      // On rafraîchit aussi le cumul de puissance : une édition système /
+      // device peut faire bouger la puissance retenue (items 5 & 8).
+      const [a, ps] = await Promise.all([
+        getBacsActionItems(this.docId),
+        getBacsPowerSummary(this.docId).catch(() => null),
+      ])
       this.actionItems = a.data
+      if (ps) this.powerSummary = ps.data
     },
 
     /**
-     * Met à jour un champ du site (adresse, nom client, etc) — la source
-     * de vérité est la table `sites`, propagée à FM via la sync. Les
-     * documents héritent de ces valeurs et ne stockent pas de duplicata.
+     * Met à jour un champ du site (adresse, nom client, structure
+     * juridique, etc) — la source de vérité est la table `sites`. Les
+     * champs synchronisés (adresse…) sont propagés à FM par le worker de
+     * sync ; `ownership_structure` / `ownership_notes` (item 4) restent
+     * locaux à Buildy Docs (non poussés vers FM).
      */
     async updateSiteFields(patch) {
-      if (!this.site?.uuid) throw new Error('Site non chargé')
-      const { data } = await updateSite(this.site.uuid, patch)
+      const uuid = this.site?.site_uuid || this.site?.uuid || this.document?.site_uuid
+      if (!uuid) throw new Error('Site non chargé')
+      const { data } = await updateSite(uuid, patch)
       this.site = data
     },
 
     async refreshInspections() {
       const r = await getBacsInspections(this.docId)
       this.inspections = r.data
+    },
+
+    async refreshThermal() {
+      const r = await getBacsThermal(this.docId)
+      this.thermal = r.data
+    },
+
+    // Recharge les parties prenantes du site (avec leurs zones affectées).
+    // Appelée après toute modification des liens partie ↔ zone pour garder
+    // la carte Structure juridique et la section Zones synchronisées.
+    async refreshSiteParties() {
+      const uuid = this.site?.site_uuid || this.site?.uuid || this.document?.site_uuid
+      if (!uuid) { this.siteParties = []; return }
+      try {
+        const { data } = await getSiteParties(uuid)
+        this.siteParties = data.parties || []
+        this.sitePartiesSuggestion = data.suggestion || null
+      } catch { /* garde la liste existante en cas d'échec réseau */ }
+    },
+
+    /**
+     * Régulation thermique multi-systèmes (mig 170) : une zone peut être
+     * desservie par plusieurs systèmes de chauffage / refroidissement, chacun
+     * avec son libellé. `addThermalEntry` crée une entrée supplémentaire,
+     * `removeThermalEntry` la supprime. Les deux régénèrent le plan d'action.
+     */
+    async addThermalEntry({ zone_id, category, label }) {
+      const { data } = await createBacsThermal(this.docId, { zone_id, category, label: label || null })
+      this.thermal.push(data)
+      await this.refreshActionItems()
+      return data
+    },
+
+    async removeThermalEntry(id) {
+      await deleteBacsThermal(id)
+      this.thermal = this.thermal.filter(t => t.id !== id)
+      await this.refreshActionItems()
     },
 
     async refreshAuditCore() {

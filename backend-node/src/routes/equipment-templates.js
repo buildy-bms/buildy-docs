@@ -17,6 +17,18 @@ const ENERGY_SOURCES = ['gas','electric','wood','heat_pump','district_heating','
 // handler normalise via parseRoles + serializeRoles avant le passage en DB.
 const deviceRoleSchema = z.union([z.string(), z.array(z.string()), z.null()]).optional();
 
+// Item 10 — Contre-indications de pilotage par type d'équipement.
+// Enum fermé : le générateur d'actions BACS connaît chaque code.
+const BACS_CONTRAINDICATION_CODES = [
+  'do_not_cut_power_thermodynamic',
+  'do_not_cut_power_winter_boiler',
+  'legionella_loop_ecs',
+  'continuous_ventilation_required',
+  'aci_tank_no_long_cut',
+  'circulator_degommage',
+  'lighting_already_optimized',
+];
+
 const createTemplateSchema = z.object({
   slug: z.string().optional(),
   name: z.string().min(1),
@@ -30,6 +42,8 @@ const createTemplateSchema = z.object({
   preferred_protocols: z.string().nullable().optional(),
   default_energy_source: z.enum(ENERGY_SOURCES).nullable().optional(),
   default_device_role: deviceRoleSchema,
+  // Item 10 — array de codes de contre-indications BACS (ou null).
+  bacs_contraindications: z.array(z.enum(BACS_CONTRAINDICATION_CODES)).nullable().optional(),
 });
 
 // Le slug reste editable (Lot AF QoL) ; verification d'unicite + check
@@ -55,11 +69,20 @@ const pointSchema = z.object({
 // que le frontend recoive toujours un array, jamais un JSON string.
 function inheritBacsFromCategory(template, categoriesByKey) {
   const cat = template.category ? categoriesByKey.get(template.category) : null;
+  // Item 10 — bacs_contraindications stocké en JSON array string → array.
+  let contraindications = [];
+  if (template.bacs_contraindications) {
+    try {
+      const parsed = JSON.parse(template.bacs_contraindications);
+      if (Array.isArray(parsed)) contraindications = parsed;
+    } catch { /* valeur corrompue → tableau vide */ }
+  }
   return {
     ...template,
     bacs_articles: cat?.bacs || null,
     bacs_inherited_from: cat ? { key: cat.key, label: cat.label } : null,
     default_device_role: parseRoles(template.default_device_role),
+    bacs_contraindications: contraindications,
   };
 }
 
@@ -145,6 +168,9 @@ async function routes(fastify) {
       defaultEnergySource: body.default_energy_source,
       // Multi-rôle : array d'entrée → JSON array string en DB.
       defaultDeviceRole: serializeRoles(parseRoles(body.default_device_role)),
+      // Item 10 — contre-indications BACS : array → JSON array string.
+      bacsContraindications: Array.isArray(body.bacs_contraindications)
+        ? JSON.stringify(body.bacs_contraindications) : null,
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -189,6 +215,12 @@ async function routes(fastify) {
       const roles = parseRoles(body.default_device_role);
       defaultDeviceRole = roles.length ? serializeRoles(roles) : '__clear__';
     }
+    // Item 10 — contre-indications BACS : array vide ou null → '__clear__'.
+    let bacsContraindications = undefined;
+    if ('bacs_contraindications' in body) {
+      const codes = Array.isArray(body.bacs_contraindications) ? body.bacs_contraindications : [];
+      bacsContraindications = codes.length ? JSON.stringify(codes) : '__clear__';
+    }
     // Update + tombstone de l'ancien slug en transaction. Le tombstone
     // empeche le seeder de recreer un row a partir du fichier seed
     // (seeds/equipment-templates/<oldSlug>.js) au prochain boot, ce qui
@@ -208,6 +240,7 @@ async function routes(fastify) {
         preferredProtocols: body.preferred_protocols,
         defaultEnergySource,
         defaultDeviceRole,
+        bacsContraindications,
         updatedBy: userId,
       });
       if (nextSlug) {

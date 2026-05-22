@@ -232,17 +232,16 @@ function fmtDate(iso) {
 const btnCls = computed(() => {
   const base = 'inline-flex items-center justify-center rounded-md transition whitespace-nowrap'
   if (!isOnline.value) {
-    const off = `${base} opacity-40 cursor-not-allowed`
-    if (isMobile.value) return `${off} gap-1 px-4 py-3.5 text-base w-full font-medium border bg-gray-200 border-gray-200 text-gray-500`
-    return `${off} relative p-1.5 text-gray-300`
+    if (isMobile.value) return `${base} opacity-40 cursor-not-allowed gap-1 px-4 py-3.5 text-base w-full font-medium border bg-gray-200 border-gray-200 text-gray-500`
+    // Desktop : .btn-icon + attribut :disabled gère l'opacité.
+    return 'btn-icon relative'
   }
   if (isMobile.value) {
     return `${base} gap-1 px-4 py-3.5 text-base w-full font-medium border bg-violet-600 border-violet-600 text-white active:bg-violet-700`
   }
-  const tone = notes.value.length
-    ? 'text-violet-700 bg-violet-50 hover:bg-violet-100'
-    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-  return `${base} relative p-1.5 ${tone}`
+  // Desktop : chip d'action commun (.btn-icon), teinte violette quand
+  // des notes vocales existent.
+  return `btn-icon relative${notes.value.length ? ' is-voice' : ''}`
 })
 </script>
 

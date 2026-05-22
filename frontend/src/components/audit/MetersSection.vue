@@ -157,8 +157,6 @@ onBeforeUnmount(teardownMetersSortable)
           <th>Câblé</th>
           <th>Hors service</th>
           <th>Protocoles</th>
-          <th>Notes</th>
-          <th>Photos</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -242,20 +240,15 @@ onBeforeUnmount(teardownMetersSortable)
               />
             </div>
           </td>
-          <td>
-            <button
-              type="button"
-              @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
-              :class="['inline-flex items-center justify-center p-1.5 rounded-md transition',
-                hasNotes(m.notes_html || m.notes)
-                  ? 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-                  : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100']"
-              v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
-              <PencilSquareIcon class="w-4 h-4" />
-            </button>
-          </td>
-          <td>
-            <div class="inline-flex items-center gap-0.5">
+          <td class="whitespace-nowrap">
+            <div class="inline-flex items-center gap-1">
+              <button
+                type="button"
+                @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
+                :class="['btn-icon', hasNotes(m.notes_html || m.notes) && 'is-active']"
+                v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                <PencilSquareIcon class="w-4 h-4" />
+              </button>
               <BacsPhotoButton
                 v-if="document?.site_uuid"
                 :site-uuid="document.site_uuid"
@@ -268,28 +261,26 @@ onBeforeUnmount(teardownMetersSortable)
                 :attach-to="{ meter_id: m.id }"
                 :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
               />
+              <button @click="dupMeter(m)" class="btn-icon" v-tooltip="'Dupliquer'">
+                <DocumentDuplicateIcon class="w-4 h-4" />
+              </button>
+              <button @click="removeMeter(m)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                <TrashIcon class="w-4 h-4" />
+              </button>
             </div>
           </td>
-          <td class="whitespace-nowrap">
-            <button @click="dupMeter(m)" class="text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition" v-tooltip="'Dupliquer'">
-              <DocumentDuplicateIcon class="w-4 h-4" />
-            </button>
-            <button @click="removeMeter(m)" class="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" v-tooltip="'Supprimer'">
-              <TrashIcon class="w-4 h-4" />
-            </button>
-          </td>
         </PhotoDropTr>
-        <tr class="bg-emerald-50/30">
-          <td colspan="13" class="px-5 py-3 text-center">
-            <button @click="emit('add-meter')" class="btn-success">
-              <PlusIcon class="w-4 h-4" /> Ajouter un compteur
+        <tr>
+          <td colspan="11" class="px-3 py-3">
+            <button @click="emit('add-meter')" class="btn-add">
+              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un compteur
             </button>
           </td>
         </tr>
       </tbody>
       <tfoot v-if="!meters.length">
         <tr>
-          <td colspan="13" class="px-5 py-6 text-center text-xs text-gray-500">
+          <td colspan="11" class="px-5 py-6 text-center text-xs text-gray-500">
             Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
           </td>
         </tr>
@@ -391,8 +382,9 @@ onBeforeUnmount(teardownMetersSortable)
         Aucun compteur listé. Renseigne les compteurs requis à mesure de la visite.
       </div>
       <div class="p-3">
-        <button @click="emit('add-meter')" class="w-full tap-target btn-success justify-center">
-          <PlusIcon class="w-4 h-4" /> Ajouter un compteur
+        <button @click="emit('add-meter')"
+                class="btn-add">
+          <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un compteur
         </button>
       </div>
     </div>

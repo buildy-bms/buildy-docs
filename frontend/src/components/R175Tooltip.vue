@@ -74,7 +74,7 @@ const ARTICLE_SUMMARIES = {
   },
   'R175-2': {
     title: 'R175-2 — Champ d\'application',
-    body: `Le décret BACS s'applique aux bâtiments tertiaires dotés d'une puissance nominale utile <strong>cumulée chauffage + climatisation</strong> :<br/>· <strong>&gt; 290 kW</strong> : échéance 1<sup>er</sup> janvier 2025 (immédiate pour les permis postérieurs au 8 avril 2024)<br/>· <strong>70 à 290 kW</strong> : échéance 1<sup>er</sup> janvier 2027<br/>· <strong>&lt; 70 kW</strong> : non assujetti.<br/><br/>Une clause de dispense existe si le TRI des travaux dépasse 10 ans (à la charge du propriétaire — Buildy ne calcule pas le TRI).`,
+    body: `Le décret BACS s'applique aux bâtiments tertiaires dotés d'une puissance nominale utile <strong>cumulée chauffage + climatisation</strong> :<br/>· <strong>&gt; 290 kW</strong> : échéance 1<sup>er</sup> janvier 2025 (immédiate pour les permis postérieurs au 8 avril 2024)<br/>· <strong>70 à 290 kW</strong> : échéance 1<sup>er</sup> janvier 2030 (report acté au Journal officiel du 26 décembre 2025)<br/>· <strong>&lt; 70 kW</strong> : non assujetti.<br/><br/>Une clause de dispense existe si le TRI des travaux dépasse 10 ans (à la charge du propriétaire — Buildy ne calcule pas le TRI).`,
   },
   'R175-3': {
     title: 'R175-3 — 4 exigences fonctionnelles',
@@ -141,8 +141,8 @@ const data = computed(() => {
              :style="{ top: popupPos.top + 'px', left: popupPos.left + 'px', width: POPUP_WIDTH + 'px' }"
              class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-sm"
              @mouseenter="show" @mouseleave="hideDelayed">
-          <div class="font-semibold text-gray-800 mb-1.5">{{ data?.title || article }}</div>
-          <div class="text-gray-600 text-xs leading-relaxed" v-html="data?.body" />
+          <div v-if="data" class="font-semibold text-gray-800 mb-1.5">{{ data.title || article }}</div>
+          <div v-if="data?.body" class="text-gray-600 text-xs leading-relaxed" v-html="data.body" />
           <slot />
         </div>
       </transition>

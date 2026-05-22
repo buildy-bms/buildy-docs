@@ -1,10 +1,13 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { BuildingOffice2Icon, ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
+import SitePartiesCard from '@/components/audit/SitePartiesCard.vue'
+import EnergyHistoryCard from '@/components/audit/EnergyHistoryCard.vue'
+import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 
 // Section 1 — Identification du site & applicabilité R175-2.
@@ -14,7 +17,7 @@ const props = defineProps({
   active: { type: Boolean, default: false },
 })
 const emit = defineEmits([
-  'save-doc', 'recompute-power', 'validate-step', 'invalidate-step',
+  'save-doc', 'recompute-power', 'validate-step', 'invalidate-step', 'open-notes',
 ])
 
 const audit = useAuditStore()
@@ -59,6 +62,13 @@ const r175_6_applicable = computed(() => {
   if (!pc && !works) return null
   return { applies: false, message: 'R175-6 non applicable — aucun déclencheur (PC ou travaux générateur après 21/07/2021).' }
 })
+
+// Style d'input harmonisé avec les autres cards (focus ring, transitions),
+// hauteur uniforme h-9 (36px). La largeur est définie au cas par cas.
+const inputCls = 'h-9 px-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition'
+
+// Détail du calcul de puissance — replié par défaut (gain de hauteur).
+const showPowerDetail = ref(false)
 </script>
 
 <template>
@@ -82,38 +92,34 @@ const r175_6_applicable = computed(() => {
         {{ document?.client_name || 'Client à renseigner' }}
       </span>
     </template>
-    <div v-if="audit.isBacs" class="px-5 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">
-          Puissance nominale utile cumulée chauffage + climatisation (kW)
-        </label>
-        <div class="flex gap-2">
-          <input type="number" min="0" step="0.1"
-                 :value="document?.bacs_total_power_kw"
-                 @input="e => emit('save-doc', { bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
-                 class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          <button @click="emit('recompute-power')"
-                  class="px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap"
-                  v-tooltip="'Cumul automatique des équipements chauffage + climatisation du site'">
-            <ArrowPathIcon class="w-3.5 h-3.5 inline-block -mt-0.5" /> Auto-calculer
-          </button>
-        </div>
-        <p class="text-[11px] text-gray-500 mt-1">
-          Source : <span class="font-mono">{{ document?.bacs_total_power_source || 'auto' }}</span>
-          <span v-if="document?.bacs_total_power_source === 'manual_override'" class="text-amber-700"> (override manuel)</span>
-        </p>
-        <details v-if="powerSummary?.heating_cooling_breakdown?.length" class="mt-2 group">
-          <summary class="cursor-pointer text-[11px] text-indigo-600 hover:text-indigo-800 font-medium select-none">
-            Détail du calcul auto ({{ powerSummary.heating_cooling_breakdown.length }} équipement{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }} compté{{ powerSummary.heating_cooling_breakdown.length > 1 ? 's' : '' }})
-          </summary>
-          <div class="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
-            <p class="mb-1.5 italic">Somme des puissances des équipements <strong>chauffage</strong> et <strong>climatisation</strong> saisis dans la section 3 :</p>
+    <div v-if="audit.isBacs" class="px-5 py-3.5 space-y-3">
+      <!-- Applicabilité R175-2 : puissance + permis sur une ligne -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-2">
+        <div class="md:col-span-2">
+          <label class="block text-xs font-medium text-gray-700 mb-0.5">
+            Puissance nominale utile cumulée chauffage + climatisation (kW)
+          </label>
+          <div class="flex gap-2">
+            <input type="number" min="0" step="0.1"
+                   :value="document?.bacs_total_power_kw"
+                   @input="e => emit('save-doc', { bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
+                   :class="inputCls" class="flex-1 min-w-0" />
+            <button @click="emit('recompute-power')"
+                    class="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap shrink-0 transition"
+                    v-tooltip="'Cumul automatique des équipements chauffage + climatisation du site'">
+              <ArrowPathIcon class="w-3.5 h-3.5 shrink-0" /> Auto-calculer
+            </button>
+          </div>
+          <p class="text-[11px] text-gray-500 mt-0.5">
+            Source : <span class="font-mono">{{ document?.bacs_total_power_source || 'auto' }}</span><span v-if="document?.bacs_total_power_source === 'manual_override'" class="text-amber-700"> (override manuel)</span><template v-if="powerSummary?.heating_cooling_breakdown?.length"> · <button type="button" @click="showPowerDetail = !showPowerDetail" class="text-indigo-600 hover:text-indigo-800 font-medium">{{ showPowerDetail ? 'Masquer le détail' : 'Détail' }} ({{ powerSummary.heating_cooling_breakdown.length }} éq.)</button></template>
+          </p>
+          <div v-if="showPowerDetail && powerSummary?.heating_cooling_breakdown?.length"
+               class="mt-1 bg-gray-50 border border-gray-200 rounded-lg p-2 text-[11px] text-gray-600">
             <ul class="space-y-0.5 font-mono">
               <li v-for="d in powerSummary.heating_cooling_breakdown" :key="d.id" class="flex justify-between gap-2">
                 <span class="truncate">
                   <span :class="d.system_category === 'heating' ? 'text-orange-600' : 'text-cyan-600'">●</span>
-                  {{ d.name || (d.brand ? d.brand : '—') }}{{ d.model_reference ? ' / ' + d.model_reference : '' }}
-                  <span class="text-gray-400">({{ d.zone_name || '—' }})</span>
+                  {{ d.name || (d.brand ? d.brand : '—') }}<span class="text-gray-400"> ({{ d.zone_name || '—' }})</span>
                 </span>
                 <span class="font-semibold whitespace-nowrap">
                   <template v-if="(d.quantity || 1) > 1">{{ d.quantity }} × {{ d.power_kw }} = {{ Math.round((Number(d.power_kw) || 0) * d.quantity * 10) / 10 }} kW</template>
@@ -121,62 +127,58 @@ const r175_6_applicable = computed(() => {
                 </span>
               </li>
             </ul>
-            <p class="mt-2 pt-1.5 border-t border-gray-200 flex justify-between font-semibold">
+            <p class="mt-1 pt-1 border-t border-gray-200 flex justify-between font-semibold">
               <span>Total chauffage + climatisation :</span>
               <span class="font-mono">{{ powerSummary.heating_cooling_total_kw }} kW</span>
             </p>
           </div>
-        </details>
-      </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Date du permis de construire</label>
-        <input type="date" :value="document?.bacs_building_permit_date || ''"
-               @input="e => emit('save-doc', { bacs_building_permit_date: e.target.value || null })"
-               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-        <p class="text-[11px] text-gray-500 mt-1">
-          Si postérieur au 8 avril 2024, le bâtiment est soumis dès la livraison.
-        </p>
-      </div>
-      <div>
-        <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-          <input type="checkbox" v-model="generatorWorksDone" class="rounded border-gray-300" />
-          <span>Travaux d'installation/remplacement de générateur de chaleur réalisés <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
-        </label>
-        <div v-if="document?.bacs_generator_works_date != null" class="pl-6 border-l-2 border-indigo-100 mt-2">
-          <label class="block text-xs font-medium text-gray-700 mb-1">
-            Date des derniers travaux générateur de chaleur
-          </label>
-          <input type="date" :value="document?.bacs_generator_works_date || ''"
-                 @input="e => emit('save-doc', { bacs_generator_works_date: e.target.value || null })"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-            <strong>R175-6</strong> s'applique si le permis de construire est postérieur au <strong>21/07/2021</strong> ou si des travaux générateur ont été engagés après cette date.
-          </p>
-          <p v-if="r175_6_applicable" class="text-[11px] mt-1.5 px-2 py-1 rounded"
-             :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
-            {{ r175_6_applicable.message }}
-          </p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-0.5">Date du permis de construire</label>
+          <input type="date" :value="document?.bacs_building_permit_date || ''"
+                 @input="e => emit('save-doc', { bacs_building_permit_date: e.target.value || null })"
+                 :class="inputCls" class="w-full"
+                 v-tooltip="'Postérieur au 8 avril 2024 : bâtiment soumis dès la livraison.'" />
         </div>
       </div>
-      <div class="col-span-2 border-t border-gray-100 pt-3">
-        <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-          <input type="checkbox" v-model="districtConnected" class="rounded border-gray-300" />
-          <span>Bâtiment raccordé à un <strong>réseau urbain de chaleur ou de froid</strong></span>
-        </label>
-        <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
-             class="mt-2 pl-6 border-l-2 border-indigo-100">
-          <label class="block text-xs font-medium text-gray-700 mb-1">
-            Puissance de la station d'échange (kW)
-          </label>
-          <input type="number" min="0" step="0.1"
+
+      <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en ligne -->
+      <div class="border-t border-gray-100 pt-2.5 space-y-2">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span class="text-sm text-gray-700">Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
+            <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
+          <SegmentedToggle :model-value="generatorWorksDone" @update:model-value="v => generatorWorksDone = v" />
+          <template v-if="document?.bacs_generator_works_date != null">
+            <input type="date" :value="document?.bacs_generator_works_date || ''"
+                   @input="e => emit('save-doc', { bacs_generator_works_date: e.target.value || null })"
+                   :class="inputCls"
+                   v-tooltip="'Date des derniers travaux de générateur de chaleur'" />
+            <span v-if="r175_6_applicable" class="text-[11px] px-2 py-0.5 rounded"
+                  :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
+              {{ r175_6_applicable.message }}
+            </span>
+          </template>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span class="text-sm text-gray-700">Le bâtiment est-il raccordé à un <strong>réseau urbain de chaleur ou de froid</strong> ?</span>
+          <SegmentedToggle :model-value="districtConnected" @update:model-value="v => districtConnected = v" />
+          <input v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
+                 type="number" min="0" step="0.1"
                  :value="document?.bacs_district_heating_substation_kw"
                  @input="e => emit('save-doc', { bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
-                 placeholder="—"
-                 class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">
-            <strong>R175-2</strong> : « Pour les bâtiments dont la génération de chaleur ou de froid est produite par échange avec un réseau urbain, la <strong>puissance du générateur à considérer est celle de la station d'échange</strong> ». Cette valeur prime sur la puissance cumulée des systèmes en aval pour déterminer l'assujettissement.
-          </p>
+                 placeholder="Puissance station d'échange (kW)"
+                 :class="inputCls" class="w-64"
+                 v-tooltip="'R175-2 : la puissance de la station d\'échange détermine l\'assujettissement (prime sur le cumul des systèmes en aval).'" />
         </div>
+      </div>
+
+      <!-- Item 4 — Structure juridique & parties prenantes -->
+      <div v-if="audit.document?.site_uuid" class="border-t border-gray-100 pt-2.5">
+        <SitePartiesCard flush @open-notes="emit('open-notes', $event)" />
+      </div>
+      <!-- Item 13 — Base de consommations mensuelles de référence -->
+      <div v-if="audit.document?.site_uuid" class="border-t border-gray-100 pt-2.5">
+        <EnergyHistoryCard flush />
       </div>
     </div>
     <div v-if="!audit.isBacs" class="px-5 py-4 text-sm text-gray-500">

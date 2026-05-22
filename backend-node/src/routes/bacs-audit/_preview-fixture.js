@@ -32,10 +32,15 @@ const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
-  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL,
+  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, OCCUPANCY_PROFILE_LABEL,
+  OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL,
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
 const { buildSiteStaticMap } = require('../../lib/static-map');
+const { computeAutoPower, resolveTotalPower, POWER_CALC_TYPE_LABEL } = require('../../lib/bacs-audit-power');
+const { computeFunctionalZones } = require('../../lib/bacs-functional-zones');
+const { computeSystemLiability } = require('../../lib/bacs-liability');
+const { buildEnergyReference } = require('../../lib/bacs-energy-reference');
 
 // Lazy require de pdf-charts (chartjs-node-canvas) — même pattern que
 // _export-data.js pour éviter de polluer require.cache au boot Fastify.
@@ -80,6 +85,10 @@ const DOCUMENT = {
   slug: 'plateforme-atlas-sud-bacs',
   status: 'review',
   bacs_total_power_kw: 522,
+  // Item 5 — la puissance retenue est calculée automatiquement depuis les
+  // équipements saisis ('auto'). Le champ bacs_total_power_kw ci-dessus
+  // ne sert qu'à la comparaison (alerte d'écart auto/manuel).
+  bacs_total_power_source: 'auto',
   bacs_district_heating_substation_kw: null,
   bacs_building_permit_date: '2017-06-15',
   // Travaux generateur post-2021-07-21 declenchent R175-6 (remplacement
@@ -101,6 +110,10 @@ const SITE = {
   address: '12 rue des Chesnes, Parc des Chesnes, 38070 Saint-Quentin-Fallavier',
   latitude: 45.63953,
   longitude: 5.09748,
+  // Item 4a — structure juridique : propriétaire bailleur + preneurs (cas C).
+  ownership_structure: 'owner_with_tenants',
+  ownership_notes: 'Plateforme détenue par la foncière Atlas Foncière SCI, '
+    + 'exploitée sous bail commercial par deux preneurs.',
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -108,21 +121,29 @@ const SITE = {
 // ═══════════════════════════════════════════════════════════════════
 
 const ZONES_RAW = [
-  { zone_id: 1, name: 'Cellules logistiques',  nature: 'logistic-cell',   surface_m2: 38000, position: 1, ref: 'Z-001',
-    notes_html: '<p>6 cellules sec classe A regroupées comme une seule zone fonctionnelle. Chauffage par aérothermes gaz Reznor (12 unités), ventilation naturelle haute via lanterneaux désenfumage + extracteurs en toiture, éclairage LED industrielles 200 W avec détection de présence (~280 luminaires).</p>',
+  { zone_id: 1, name: 'Cellule logistique A',  nature: 'logistic-cell',   surface_m2: 19000, position: 1, ref: 'Z-001',
+    occupancy_profile: 'heures_bureau',
+    notes_html: '<p>Cellule sec classe A — préparation de commandes 6h-21h. Chauffage par aérothermes gaz Reznor partagés avec la cellule B (circuit gaz unique). Ventilation naturelle haute via lanterneaux désenfumage + extracteurs en toiture, éclairage LED industrielles 200 W avec détection de présence.</p>',
     photoFiles: ['P-001.png', 'P-002.png', 'P-003.png', 'P-004.png'] },
   { zone_id: 2, name: 'Bureaux',                nature: 'open-space',      surface_m2:  2000, position: 2, ref: 'Z-002',
+    occupancy_profile: 'heures_bureau',
     notes_html: '<p>Bloc bureaux R+1 multi-services Atlas Logistics (administration, exploitation, sécurité, RH). Climatisation par DRV Daikin VRV IV non communicant avec la GTB.</p>',
     photoFiles: ['P-005.png', 'P-006.png', 'P-007.png'] },
-  { zone_id: 3, name: 'Locaux sociaux',         nature: 'shared-space',    surface_m2:   500, position: 3, ref: 'Z-003',
+  { zone_id: 3, name: 'Locaux sociaux',         nature: 'changing-room',   surface_m2:   500, position: 3, ref: 'Z-003',
+    occupancy_profile: 'continu',
+    comfort_constraint: 'Température minimale 22 °C dans les douches et vestiaires (confort et hygiène).',
     notes_html: '<p>Vestiaires hommes / femmes, réfectoire 80 places, sanitaires. ECS produite par ballon thermodynamique Atlantic 500 L au local technique attenant.</p>',
     photoFiles: ['P-008.png', 'P-009.png', 'P-010.png'] },
-  { zone_id: 4, name: 'Locaux techniques',      nature: 'technical-area',  surface_m2:   300, position: 4, ref: 'Z-004',
+  { zone_id: 4, name: 'Locaux techniques',      nature: 'boiler-room',     surface_m2:   300, position: 4, ref: 'Z-004',
     notes_html: '<p>Local chaufferie + locaux pompes incendie sprinkler + local GTC -1. Accès toiture via échelle fixe (4 m, point d\'attache présent).</p>',
     photoFiles: ['P-011.png', 'P-012.png', 'P-013.png'] },
   { zone_id: 5, name: 'Parkings et abords',     nature: 'outdoor',         surface_m2:  8000, position: 5, ref: 'Z-005',
     notes_html: '<p>Parking VL (visiteurs + collaborateurs) + parking PL (semi-remorques) + voies de circulation + abords éclairés. Ombrière + toiture parking équipées d\'une centrale photovoltaïque ~250 kWc (mise en service 2020).</p>',
     photoFiles: ['P-014.png', 'P-015.png', 'P-016.png'] },
+  { zone_id: 6, name: 'Cellule logistique B',  nature: 'logistic-cell',   surface_m2: 19000, position: 6, ref: 'Z-006',
+    occupancy_profile: 'heures_bureau',
+    notes_html: '<p>Cellule sec classe A — stockage longue durée. Mêmes aérothermes gaz Reznor que la cellule A : circuit hydraulique unique, comptage gaz séparé non réalisable.</p>',
+    photoFiles: ['P-001.png', 'P-002.png'] },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -156,7 +177,7 @@ const SYSTEMS_RAW = [
   { id: 301, zone_id: 3, system_category: 'heating',                present: 0, not_concerned: 1 }, // Chauffé par diffusion bureaux
   { id: 302, zone_id: 3, system_category: 'cooling',                present: 0, not_concerned: 1 },
   { id: 303, zone_id: 3, system_category: 'ventilation',            present: 1, not_concerned: 0, communication: 'modbus_tcp' },
-  { id: 304, zone_id: 3, system_category: 'dhw',                    present: 1, not_concerned: 0, communication: 'absent',
+  { id: 304, zone_id: 3, system_category: 'dhw',                    present: 1, not_concerned: 0, communication: 'absent', is_looped: 'looped',
     notes_html: '<p>Ballon ECS thermodynamique Atlantic 500 L pour vestiaires/sanitaires. Régulation autonome (programmateur intégré). Pas de remontée GTB.</p>' },
   { id: 305, zone_id: 3, system_category: 'lighting_indoor',        present: 1, not_concerned: 0, communication: 'absent' },
   { id: 306, zone_id: 3, system_category: 'lighting_outdoor',       present: 0, not_concerned: 1 },
@@ -164,7 +185,8 @@ const SYSTEMS_RAW = [
   // ─── Z-004 Locaux techniques ───
   { id: 401, zone_id: 4, system_category: 'heating',                present: 0, not_concerned: 1 }, // Hors confort
   { id: 402, zone_id: 4, system_category: 'cooling',                present: 0, not_concerned: 1 },
-  { id: 403, zone_id: 4, system_category: 'ventilation',            present: 1, not_concerned: 0, communication: 'modbus_tcp' },
+  { id: 403, zone_id: 4, system_category: 'ventilation',            present: 1, not_concerned: 0, communication: 'modbus_tcp',
+    marked_negligible_under_5pct: 1, negligible_justification: 'Ventilation de désenfumage des locaux techniques — 1,2 kW, soit moins de 0,5 % de la puissance du site.' },
   { id: 404, zone_id: 4, system_category: 'dhw',                    present: 0, not_concerned: 1 },
   { id: 405, zone_id: 4, system_category: 'lighting_indoor',        present: 1, not_concerned: 0, communication: 'absent' },
   { id: 406, zone_id: 4, system_category: 'lighting_outdoor',       present: 0, not_concerned: 1 },
@@ -179,7 +201,92 @@ const SYSTEMS_RAW = [
     notes_html: '<p>Éclairage extérieur LED commandé par horloge crépusculaire. Pas de zonage par poche de parking, pas de détection de présence.</p>' },
   { id: 507, zone_id: 5, system_category: 'electricity_production', present: 1, not_concerned: 0, communication: 'modbus_tcp',
     notes_html: '<p>Centrale PV 250 kWc en autoconsommation collective. Production remontée sur le portail SMA Sunny Portal mais <strong>non intégrée à la GTB Schneider</strong>.</p>' },
+  // ─── Z-006 Cellule logistique B ───
+  { id: 601, zone_id: 6, system_category: 'heating',                present: 1, not_concerned: 0, communication: 'non_communicant',
+    notes_html: '<p>Chauffage assuré par les mêmes aérothermes gaz Reznor que la cellule A (équipement partagé, circuit gaz unique).</p>' },
+  { id: 602, zone_id: 6, system_category: 'cooling',                present: 0, not_concerned: 1 },
+  { id: 603, zone_id: 6, system_category: 'ventilation',            present: 1, not_concerned: 0, communication: 'non_communicant' },
+  { id: 604, zone_id: 6, system_category: 'dhw',                    present: 0, not_concerned: 1 },
+  { id: 605, zone_id: 6, system_category: 'lighting_indoor',        present: 1, not_concerned: 0, communication: 'non_communicant' },
+  { id: 606, zone_id: 6, system_category: 'lighting_outdoor',       present: 0, not_concerned: 1 },
+  { id: 607, zone_id: 6, system_category: 'electricity_production', present: 0, not_concerned: 1 },
 ];
+
+// Mig 143 — partage d'équipements entre systèmes (zone × usage). Les
+// aérothermes Reznor (E-001, système primaire 101 = cellule A) desservent
+// aussi la cellule B (système 601). Comptage gaz NON séparable → les 2
+// cellules forment une seule zone fonctionnelle de suivi chauffage (item 7).
+const DEVICE_SHARED_SYSTEMS = [
+  { device_id: 1001, system_id: 601 },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// 3 bis. STRUCTURE JURIDIQUE & PARTIES PRENANTES (item 4)
+// ═══════════════════════════════════════════════════════════════════
+// Atlas Sud : un propriétaire bailleur (la foncière) + deux preneurs à
+// bail occupant chacun une partie du site. Cas C du guide PROFEEL.
+const SITE_PARTIES = [
+  { id: 7001, name: 'Atlas Foncière SCI', kind: 'owner_occupant',
+    contact_email: 'gestion@atlas-fonciere.fr', position: 10,
+    notes: 'Propriétaire bailleur de la plateforme — bail commercial sur les cellules.' },
+  { id: 7002, name: 'Atlas Logistics SAS', kind: 'tenant',
+    contact_email: 'exploitation@atlas-logistics.fr', position: 20,
+    notes: 'Preneur à bail principal — exploite les cellules logistiques et les bureaux.' },
+  { id: 7003, name: 'Frais Express SARL', kind: 'tenant',
+    contact_email: 'contact@frais-express.fr', position: 30,
+    notes: 'Preneur à bail secondaire — occupe une partie des locaux sociaux et techniques.' },
+];
+
+// Affectation des zones aux parties (item 4c).
+const ZONE_PARTY_LINKS = [
+  { zone_id: 1, party_id: 7002 }, // Cellule A → Atlas Logistics
+  { zone_id: 2, party_id: 7002 }, // Bureaux → Atlas Logistics
+  { zone_id: 3, party_id: 7003 }, // Locaux sociaux → Frais Express
+  { zone_id: 6, party_id: 7002 }, // Cellule B → Atlas Logistics
+];
+
+// Affectation des systèmes aux parties (item 4c). Le preneur Atlas
+// Logistics a réalisé des travaux preneurs sur la climatisation des
+// bureaux (système 202) → il en devient l'assujetti (cas C).
+const SYSTEM_PARTY_LINKS = [
+  { system_id: 202, party_id: 7002, responsible_for_works: 1 },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// 3 ter. HISTORIQUE DE CONSOMMATION DE RÉFÉRENCE (item 13)
+// ═══════════════════════════════════════════════════════════════════
+// 12 mois de factures 2024 pour l'électricité (compteur général) et le
+// gaz (chaufferie cellules). Saisies à la main depuis les factures du
+// preneur principal. Profil saisonnier marqué pour le gaz (chauffage).
+const ENERGY_HISTORY = (() => {
+  const elecKwh = [
+    142000, 138000, 131000, 118000, 109000, 121000,
+    134000, 130000, 116000, 112000, 125000, 139000,
+  ];
+  const gasKwh = [
+    98000, 91000, 74000, 42000, 18000, 6000,
+    4000, 4500, 14000, 39000, 67000, 89000,
+  ];
+  const rows = [];
+  let id = 8001;
+  for (let m = 1; m <= 12; m++) {
+    rows.push({
+      id: id++, energy_type: 'electricity', year: 2024, month: m,
+      quantity: elecKwh[m - 1], unit: 'kWh',
+      cost_eur: Math.round(elecKwh[m - 1] * 0.176),
+      tenant_id: 7002, tenant_name: 'Atlas Logistics SAS',
+      contract_label: 'Compteur général Enedis — TURPE jaune',
+    });
+    rows.push({
+      id: id++, energy_type: 'gas', year: 2024, month: m,
+      quantity: gasKwh[m - 1], unit: 'kWh',
+      cost_eur: Math.round(gasKwh[m - 1] * 0.092),
+      tenant_id: 7002, tenant_name: 'Atlas Logistics SAS',
+      contract_label: 'Chaufferie cellules — GRDF tarif T3',
+    });
+  }
+  return rows;
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 // 4. EQUIPEMENTS (devices) — marques uniquement sur les significatifs
@@ -188,11 +295,14 @@ const SYSTEMS_RAW = [
 const DEVICES_RAW = [
   // ─── Z-001 Cellules logistiques ───
   { id: 1001, system_id: 101, ref: 'E-001', name: 'Aérothermes gaz cellules', brand: 'Reznor', model_reference: 'UDAP 100 (12 unités)',
-    energy_source: 'gas', power_kw: 360, device_role: 'production',
-    communication_protocol: 'non_communicant', location: '6 cellules logistiques (2 par cellule)',
+    energy_source: 'gas', power_kw: 360, device_role: 'production', power_calculation_type: 'boiler_sum',
+    communication_protocol: 'non_communicant', location: 'Cellules logistiques A et B (6 par cellule)',
     out_of_service: 0, meets_r175_3_p3: 0, meets_r175_3_p4: 0, meets_r175_3_p4_autonomous: 1,
+    // Item 7c — équipement partagé entre les 2 cellules, comptage non séparable.
+    metering_separable: 'no',
+    metering_separable_note: 'circuit gaz unique alimentant les deux cellules, comptage séparé non réalisable',
     photoFiles: ['P-017.png', 'P-018.png', 'P-019.png'],
-    notes_html: '<p>12 aérothermes gaz Reznor 30 kW unitaires (360 kW cumulés). Régulation locale par thermostat d\'ambiance déporté + programmation horaire mécanique. <strong>Aucune interface communicante</strong> (uniquement contacts secs marche/arrêt). Maintenance assurée par Sodexo dans le cadre du contrat global.</p>' },
+    notes_html: '<p>12 aérothermes gaz Reznor 30 kW unitaires (360 kW cumulés) desservant les cellules A et B. Régulation locale par thermostat d\'ambiance déporté + programmation horaire mécanique. <strong>Aucune interface communicante</strong> (uniquement contacts secs marche/arrêt). Maintenance assurée par Sodexo dans le cadre du contrat global.</p>' },
   { id: 1002, system_id: 103, ref: 'E-002', name: 'Extracteurs ventilation cellules', brand: 'Aldes', model_reference: 'VEX 280',
     energy_source: 'electric', power_kw: 18, device_role: 'distribution',
     communication_protocol: 'non_communicant', location: 'Toiture 6 cellules',
@@ -201,15 +311,17 @@ const DEVICES_RAW = [
   // ─── Z-002 Bureaux ───
   { id: 2001, system_id: 201, ref: 'E-003', name: 'DRV Daikin VRV IV — chauffage bureaux', brand: 'Daikin', model_reference: 'RXYQ-T VRV IV',
     energy_source: 'electric', power_kw: 56, device_role: 'production',
+    power_calculation_type: 'thermodynamic_max', power_kw_cooling: 64,
     communication_protocol: 'autre', location: 'Toiture bureaux + UI plafonniers Daikin',
     out_of_service: 0, meets_r175_3_p3: 0, meets_r175_3_p4: 0, meets_r175_3_p4_autonomous: 1,
     photoFiles: ['P-020.png', 'P-021.png', 'P-022.png'],
     notes_html: '<p>Système DRV Daikin VRV IV à récupération de chaleur, 12 UI plafonniers cassettes type Roundflow. Pilotage par télécommandes filaires Daikin BRC1H + supervision via Daikin Cloud Service. <strong>Protocole propriétaire P1/P2 (D-III Net)</strong> — non interopérable nativement avec la GTB Schneider EcoStruxure (BACnet IP). Cas type pour passerelle <strong>CoolMaster Pro</strong> (cf. action BACS-002).</p>' },
   { id: 2002, system_id: 202, ref: 'E-003-bis', name: 'DRV Daikin VRV IV — refroidissement bureaux', brand: 'Daikin', model_reference: 'RXYQ-T VRV IV',
     energy_source: 'electric', power_kw: 64, device_role: 'production',
+    power_calculation_type: 'out_of_scope',
     communication_protocol: 'autre', location: 'Toiture bureaux',
     out_of_service: 0, meets_r175_3_p3: 0, meets_r175_3_p4: 0, meets_r175_3_p4_autonomous: 1,
-    notes_html: '<p>Mode froid du même DRV Daikin (E-003). Comptabilisé séparément ici uniquement pour le calcul de puissance R175-2 (chauffage + climatisation cumulés).</p>' },
+    notes_html: '<p>Mode froid du même DRV Daikin (E-003). La puissance frigorifique est portée par l\'équipement E-003 (calcul thermodynamique max chaud/froid) — ce poste est exclu du cumul pour ne pas compter deux fois la même machine.</p>' },
   { id: 2003, system_id: 203, ref: 'E-004', name: 'CTA double flux bureaux', brand: 'Aldes', model_reference: 'DFE Compact 4500',
     energy_source: 'electric', power_kw: 8, device_role: 'distribution',
     communication_protocol: 'modbus_tcp', location: 'Local CTA toiture R+1',
@@ -343,6 +455,13 @@ const BMS = {
       <li>COP DRV Daikin &lt; 2.5 en mode chaud (calculé indirectement via puissance et température extérieure — partiel car puissance non communicante)</li>
       <li>Dépassement de consigne CO₂ bureaux &gt; 1000 ppm</li>
     </ul>`,
+  // Item 15 — Stockage 5 ans + accès aux données (R175-3)
+  data_storage_5y_compliant: 'no',
+  data_storage_location: 'cloud_editeur',
+  data_owner_access: 'partial',
+  gestionnaire_exploitant_access: 'no',
+  export_capability: 'yes',
+  data_access_notes: 'Historisation limitée à 30 jours dans la config EcoStruxure par défaut. Le property manager Atlas Logistics a un compte de consultation, mais les exploitants des systèmes techniques (Sodexo, mainteneur DRV) n\'ont aucun accès. Export CSV horaire disponible.',
   // R175-3 dernier alinéa — Mise à disposition des données
   data_provision_to_manager: 1,
   data_provision_to_operators: 0,
@@ -550,10 +669,13 @@ const ACTIONS_RAW = [
  * et annexes décret.
  */
 async function buildFixturePreviewData({ user = null } = {}) {
-  // Zones : ajout natureLabel + photos
+  // Zones : ajout natureLabel + occupancyLabel + photos
   const zones = ZONES_RAW.map(z => ({
     ...z,
     natureLabel: ZONE_NATURE_LABEL[z.nature] || z.nature,
+    occupancyLabel: z.occupancy_profile
+      ? (OCCUPANCY_PROFILE_LABEL[z.occupancy_profile] || z.occupancy_profile)
+      : null,
     photos: (z.photoFiles || []).map((f, i) => photoItem(`${z.zone_id}-${i}`, f)).filter(Boolean),
   }));
 
@@ -564,11 +686,20 @@ async function buildFixturePreviewData({ user = null } = {}) {
   // Multi-rôle (mig 117) : si la fixture déclare un scalaire, on le passe
   // en array de 1 élément pour rester cohérent avec le format API.
   const toRolesArr = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  // Mig 143 — systèmes supplémentaires partagés par device.
+  const extrasByDeviceId = new Map();
+  for (const e of DEVICE_SHARED_SYSTEMS) {
+    if (!extrasByDeviceId.has(e.device_id)) extrasByDeviceId.set(e.device_id, []);
+    extrasByDeviceId.get(e.device_id).push(e.system_id);
+  }
   const devices = DEVICES_RAW.map(d => {
     const roles = toRolesArr(d.device_role);
+    const extras = extrasByDeviceId.get(d.id) || [];
     return ({
     ...d,
     device_role: roles,
+    extra_system_ids: extras,
+    shared_zone_count: extras.length,
     energyLabel: d.energy_source ? (ENERGY_LABEL[d.energy_source] || d.energy_source) : '—',
     roleLabel: roles.length ? roles.map(r => ROLE_LABEL[r] || r).join(' / ') : '—',
     commLabel: d.communication_protocol
@@ -777,13 +908,70 @@ async function buildFixturePreviewData({ user = null } = {}) {
     metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
   };
 
+  // ── Items 5 + 8 — cumul automatique des puissances chaud / froid ──
+  const autoPower = computeAutoPower(devices);
+  const powerSummary = resolveTotalPower(DOCUMENT, autoPower);
+  const powerCalcByDeviceId = new Map();
+  for (const d of autoPower.devices) {
+    powerCalcByDeviceId.set(d.id, {
+      ...d._power,
+      typeLabel: POWER_CALC_TYPE_LABEL[d._power.type] || d._power.type,
+    });
+  }
+  for (const sys of enrichedSystems) {
+    for (const d of sys.devices) {
+      const pc = powerCalcByDeviceId.get(d.id);
+      if (pc) d.powerCalc = pc;
+    }
+  }
+
+  // ── Item 7d/7e — zones fonctionnelles de suivi ──
+  const functionalZones = computeFunctionalZones(devices, enrichedSystems, { SYSTEM_LABEL });
+
+  // ── Item 4 — calcul automatique de l'assujetti par système ──
+  const liabilityMap = computeSystemLiability({
+    site: SITE,
+    parties: SITE_PARTIES,
+    systems: SYSTEMS_RAW,
+    zonePartyLinks: ZONE_PARTY_LINKS,
+    systemPartyLinks: SYSTEM_PARTY_LINKS,
+  });
+  for (const sys of enrichedSystems) {
+    sys.liability = liabilityMap.get(sys.id) || null;
+  }
+  const ownershipStructureLabel = OWNERSHIP_STRUCTURE_LABEL[SITE.ownership_structure]
+    || SITE.ownership_structure || null;
+  const sitePartiesEnriched = SITE_PARTIES.map(p => ({
+    ...p,
+    kindLabel: PARTY_KIND_LABEL[p.kind] || p.kind,
+  }));
+
   const document = DOCUMENT;
   const applicabilityLabelForSummary = APPLICABILITY_LABEL[DOCUMENT.bacs_applicability_status] || null;
+  const documentForSummary = { ...DOCUMENT, bacs_total_power_kw: powerSummary.effectiveKw };
   const compliance = buildComplianceSummary({
-    document, actionItems, actionItemsRaw: numberedItems, bms,
+    document: documentForSummary, actionItems, actionItemsRaw: numberedItems, bms,
     r175_6_applicable,
     applicabilityLabel: applicabilityLabelForSummary,
   });
+
+  // Surface du site + pont decret tertiaire (item 12) — meme calcul que
+  // _export-data.js : sites.surface_m2 sinon cumul des zones.
+  const zoneSurfaceTotal = zones.reduce(
+    (sum, z) => sum + (Number(z.surface_m2) || 0), 0);
+  const siteSurfaceM2 = (SITE && Number(SITE.surface_m2) > 0)
+    ? Number(SITE.surface_m2)
+    : (zoneSurfaceTotal > 0 ? zoneSurfaceTotal : null);
+  const tertiaryDecreeApplies = siteSurfaceM2 != null && siteSurfaceM2 > 1000;
+
+  // ── Item 13 — base de consommations mensuelles de référence ──
+  const energyReference = buildEnergyReference(ENERGY_HISTORY, siteSurfaceM2);
+  const energyMonthlyChartDataUrl = energyReference
+    ? await getCharts().energyMonthlyBar({
+      series: energyReference.chartSeries,
+      unit: energyReference.chartUnit,
+    })
+    : null;
 
   return {
     document,
@@ -791,8 +979,20 @@ async function buildFixturePreviewData({ user = null } = {}) {
     isSiteAudit: false,
     site: SITE,
     siteMapDataUrl: await buildSiteStaticMap({ site: SITE }),
+    siteSurfaceM2,
+    tertiaryDecreeApplies,
+    // Item 13 — base de consommations de référence (bandeau + graphe).
+    energyReference,
+    energyMonthlyChartDataUrl,
     zones,
     systemsByZone,
+    // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).
+    functionalZones,
+    // Item 4 — structure juridique + assujettissement par périmètre.
+    ownershipStructureLabel,
+    ownershipNotes: SITE.ownership_notes || null,
+    siteParties: sitePartiesEnriched,
+    hasLiabilityData: true,
     compliance,
     meters: enrichedMeters,
     metersWithDetails,
@@ -817,6 +1017,8 @@ async function buildFixturePreviewData({ user = null } = {}) {
     synthesisHtml: document.audit_synthesis_html,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
+    // Items 5 + 8 — cumul automatique des puissances chaud / froid.
+    powerSummary,
     r175_6_applicable,
     complianceLabel: COMPLIANCE_LABEL[BMS.overall_compliance] || null,
     applicabilityLabel: applicabilityLabelForSummary,

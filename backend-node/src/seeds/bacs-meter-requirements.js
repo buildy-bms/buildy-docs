@@ -26,6 +26,9 @@ const INDOOR_NATURES = [
   'meeting-room', 'workshop', 'switchboard', 'technical-area',
   'classroom', 'leasure-space', 'foyer', 'corridor',
   'meters', 'shared-space', 'logistic-cell', 'stock',
+  // Item 7b — natures enrichies : compteurs zonaux standard par usage.
+  'changing-room', 'kitchen', 'refectory', 'bedroom', 'care-room',
+  'sports-hall', 'boiler-room', 'laundry', 'restroom',
 ];
 
 // Compteurs zonaux requis par defaut pour toutes zones interieures

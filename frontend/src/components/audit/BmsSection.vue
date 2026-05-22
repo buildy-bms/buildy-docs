@@ -16,6 +16,7 @@ import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BmsTopicNoteButton from '@/components/audit/BmsTopicNoteButton.vue'
+import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter, uploadSiteDocument } from '@/api'
@@ -95,6 +96,14 @@ function saveBmsDebounced() {
     try { await audit.saveBms() }
     catch { error('Sauvegarde GTB impossible') }
   }, 500)
+}
+
+// Tri-état pour les SegmentedToggle : null → aucun bouton sélectionné.
+const triState = (v) => (v == null ? null : !!v)
+// Bascule un champ booléen de la GTB (1/0) + sauvegarde debounced.
+function setBmsFlag(field, v) {
+  bms.value[field] = v == null ? null : (v ? 1 : 0)
+  saveBmsDebounced()
 }
 
 async function patchDeviceMb(d, patch) {
@@ -186,22 +195,12 @@ function hasNotes(html) {
       <!-- Présence de la GTB : mêmes cases que présent/non concerné des
            usages (card 4). « Pas de GTB » masque toute la saisie R175. -->
       <div class="px-5 py-5">
-        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">
-          Une GTB est-elle présente sur le site ?
-        </p>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <label class="inline-flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-            <input type="checkbox" :checked="bms.present === 1"
-                   @change="e => setGtbPresent(e.target.checked ? 1 : null)"
-                   class="w-4 h-4 rounded border-gray-300" />
-            <span class="text-gray-700">GTB présente</span>
-          </label>
-          <label class="inline-flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-            <input type="checkbox" :checked="bms.present === 0"
-                   @change="e => setGtbPresent(e.target.checked ? 0 : null)"
-                   class="w-4 h-4 rounded border-gray-300" />
-            <span class="text-gray-500 italic">Pas de GTB</span>
-          </label>
+        <div class="flex flex-wrap items-center gap-3">
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+            Une GTB est-elle présente sur le site ?
+          </p>
+          <SegmentedToggle :model-value="triState(bms.present)"
+                           @update:model-value="v => setGtbPresent(v ? 1 : 0)" />
         </div>
         <p v-if="bms.present == null" class="text-xs text-amber-600 mt-3">
           Indiquez d'abord si une GTB est présente pour saisir la suite.
@@ -258,11 +257,12 @@ function hasNotes(html) {
           </div>
 
           <div class="border-t border-gray-100 pt-3">
-            <label class="flex items-center gap-2 cursor-pointer text-sm">
-              <input type="checkbox" v-model="bms.out_of_service" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
-              <span class="text-gray-700 font-medium">GTB Hors-Service</span>
-              <span class="text-[11px] text-gray-400">— le plan d'action ignore alors les exigences GTB. Les sous-blocs restent saisissables (notes incluses) pour la traçabilité.</span>
-            </label>
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-700 font-medium">La GTB est-elle hors service ?</span>
+              <SegmentedToggle :model-value="triState(bms.out_of_service)"
+                               @update:model-value="v => setBmsFlag('out_of_service', v)" />
+            </div>
+            <p class="text-[11px] text-gray-400 mt-0.5">Le plan d'action ignore alors les exigences GTB. Les sous-blocs restent saisissables (notes incluses) pour la traçabilité.</p>
           </div>
 
           <div class="border-t border-gray-100 pt-3">
@@ -473,28 +473,29 @@ function hasNotes(html) {
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <div class="space-y-2 text-sm">
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.meets_r175_3_p1" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span><strong>P1.</strong> Suivi continu par zone, pas horaire, conservation 5 ans</span>
-              </label>
-              <div v-if="bms.meets_r175_3_p1" class="ml-6 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+              <div class="flex items-center gap-3">
+                <span class="text-gray-800"><strong>P1.</strong> La GTB enregistre-t-elle la consommation en continu par zone et conserve-t-elle ces données pendant 5 ans ?</span>
+                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p1)"
+                                 @update:model-value="v => setBmsFlag('meets_r175_3_p1', v)" />
+              </div>
+              <div v-if="bms.meets_r175_3_p1" class="ml-4 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
                   <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
                          @input="saveBmsDebounced"
                          class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
                 </div>
-                <div class="flex items-end">
-                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-gray-700">
-                    <input type="checkbox" v-model="bms.r175_3_p1_retention_verified" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded" />
-                    Rétention 5 ans vérifiée sur place
-                  </label>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-700">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</span>
+                  <SegmentedToggle :model-value="triState(bms.r175_3_p1_retention_verified)"
+                                   @update:model-value="v => setBmsFlag('r175_3_p1_retention_verified', v)" />
                 </div>
               </div>
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.meets_r175_3_p2" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span><strong>P2.</strong> Détection des pertes d'efficacité</span>
-              </label>
+              <div class="flex items-center gap-3">
+                <span class="text-gray-800"><strong>P2.</strong> La GTB détecte-t-elle les pertes d'efficacité énergétique ?</span>
+                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)"
+                                 @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
+              </div>
               <div v-if="bms.meets_r175_3_p2" class="ml-6">
                 <label class="block text-[11px] text-gray-600 mb-1">Règles / seuils / alertes actives</label>
                 <textarea v-model="bms.r175_3_p2_anomaly_rules_html" @input="saveBmsDebounced"
@@ -516,14 +517,16 @@ function hasNotes(html) {
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <div class="space-y-2 text-sm">
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.data_provision_to_manager" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> documentée</span>
-              </label>
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" v-model="bms.data_provision_to_operators" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> documentée</span>
-              </label>
+              <div class="flex items-center gap-3">
+                <span class="text-gray-800">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</span>
+                <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
+                                 @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-gray-800">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</span>
+                <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
+                                 @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
+              </div>
             </div>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
@@ -548,6 +551,75 @@ function hasNotes(html) {
             </template>
           </div>
 
+          <!-- Item 15 — R175-3 : conservation 5 ans + accès aux données -->
+          <div v-if="audit.isBacs" :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                R175-3 — Conservation et accès aux données
+                <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(archivage 5 ans)</span>
+              </h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Données conservées 5 ans (échelle mensuelle) ?</label>
+                <select v-model="bms.data_storage_5y_compliant" @change="saveBmsDebounced"
+                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                  <option :value="null">— Non renseigné</option>
+                  <option value="yes">Oui — conforme</option>
+                  <option value="no">Non — non conforme</option>
+                  <option value="unknown">Inconnu / à vérifier</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Localisation du stockage</label>
+                <select v-model="bms.data_storage_location" @change="saveBmsDebounced"
+                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                  <option :value="null">— Non renseigné</option>
+                  <option value="local">Serveur local</option>
+                  <option value="cloud_editeur">Cloud de l'éditeur</option>
+                  <option value="cloud_proprietaire">Cloud du propriétaire</option>
+                  <option value="unknown">Inconnue</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Accès direct du propriétaire à ses données</label>
+                <select v-model="bms.data_owner_access" @change="saveBmsDebounced"
+                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                  <option :value="null">— Non renseigné</option>
+                  <option value="yes">Oui</option>
+                  <option value="partial">Partiel</option>
+                  <option value="no">Non</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Accès du gestionnaire et des exploitants</label>
+                <select v-model="bms.gestionnaire_exploitant_access" @change="saveBmsDebounced"
+                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                  <option :value="null">— Non renseigné</option>
+                  <option value="yes">Oui</option>
+                  <option value="partial">Partiel</option>
+                  <option value="no">Non</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Export possible (CSV / Excel)</label>
+                <select v-model="bms.export_capability" @change="saveBmsDebounced"
+                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                  <option :value="null">— Non renseigné</option>
+                  <option value="yes">Oui</option>
+                  <option value="no">Non</option>
+                </select>
+              </div>
+            </div>
+            <div class="mt-2">
+              <label class="block text-[11px] text-gray-600 mb-1">Observations sur l'accès aux données</label>
+              <textarea v-model="bms.data_access_notes" @input="saveBmsDebounced"
+                        placeholder="ex : historisation limitée à 30 j par défaut, compte propriétaire à créer chez l'éditeur…"
+                        rows="2"
+                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
+            </div>
+          </div>
+
           <div v-if="audit.isBacs" :class="['border-t border-gray-100 pt-3 space-y-4', bms.out_of_service ? 'opacity-70' : '']">
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
@@ -555,10 +627,11 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <label class="flex items-start gap-2 cursor-pointer text-sm">
-                <input type="checkbox" v-model="bms.has_maintenance_procedures" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Consignes écrites des maintenances passées</span>
-              </label>
+              <div class="flex items-center gap-3 text-sm">
+                <span class="text-gray-800">Les maintenances passées ont-elles fait l'objet de consignes écrites ?</span>
+                <SegmentedToggle :model-value="triState(bms.has_maintenance_procedures)"
+                                 @update:model-value="v => setBmsFlag('has_maintenance_procedures', v)" />
+              </div>
               <div v-if="bms.has_maintenance_procedures" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Périodicité</label>
@@ -582,10 +655,11 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <label class="flex items-start gap-2 cursor-pointer text-sm">
-                <input type="checkbox" v-model="bms.operator_trained" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="mt-0.5 rounded" />
-                <span>Exploitant formé à l'utilisation de la supervision</span>
-              </label>
+              <div class="flex items-center gap-3 text-sm">
+                <span class="text-gray-800">L'exploitant a-t-il été formé à l'utilisation de la supervision ?</span>
+                <SegmentedToggle :model-value="triState(bms.operator_trained)"
+                                 @update:model-value="v => setBmsFlag('operator_trained', v)" />
+              </div>
               <div v-if="bms.operator_trained" class="ml-6 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-[11px] text-gray-600 mb-1">Date de formation</label>

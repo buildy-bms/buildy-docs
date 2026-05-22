@@ -454,8 +454,8 @@ async function routes(fastify) {
       // Travaux generateur recents → declenche R175-6 sur les zones non
       // exemptees, permet de tester le flux applicabilite + actions.
       bacs_generator_works_date: '2023-09-15',
-      bacs_applicability_status: 'subject_2027',
-      bacs_applicable_deadline: '2027-01-01',
+      bacs_applicability_status: 'subject_2030',
+      bacs_applicable_deadline: '2030-01-01',
       audit_existing_af_status: 'absent',
     });
 

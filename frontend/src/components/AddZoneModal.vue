@@ -1,9 +1,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import ZoneMapPicker from './ZoneMapPicker.vue'
-import { isTechnicalNature } from '@/lib/audit-options'
+import ZoneFunctionalHelpModal from './audit/ZoneFunctionalHelpModal.vue'
+import { isTechnicalNature, ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
+import { useAuditStore } from '@/stores/audit'
 
 const props = defineProps({
   zoneNatures: { type: Array, required: true },
@@ -16,9 +19,27 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'submit'])
 
-const form = ref({ name: '', nature: null, surface_m2: null, kind: props.kind, latitude: null, longitude: null })
+const audit = useAuditStore()
+
+const form = ref({
+  name: '', nature: null, surface_m2: null, kind: props.kind,
+  latitude: null, longitude: null, occupancy_profile: null, comfort_constraint: null,
+  party_ids: [],
+})
 const submitting = ref(false)
 const isTechnical = computed(() => form.value.kind === 'technical')
+const showHelp = ref(false)
+
+// Parties prenantes du site — liste partagée du store (item 5), pour
+// affecter des occupants dès la création de la zone.
+const parties = computed(() => audit.siteParties || [])
+function toggleParty(id, checked) {
+  if (checked) {
+    if (!form.value.party_ids.includes(id)) form.value.party_ids.push(id)
+  } else {
+    form.value.party_ids = form.value.party_ids.filter(x => x !== id)
+  }
+}
 
 // Pré-remplit le type de zone quand la nature choisie est technique
 // (Local technique, TGBT, local compteurs…). Pré-remplissage à sens
@@ -58,12 +79,42 @@ async function submit() {
           class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
         />
       </div>
+      <div v-if="!isTechnical" class="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-2 flex items-center gap-2">
+        <QuestionMarkCircleIcon class="w-5 h-5 text-indigo-600 shrink-0" />
+        <span class="text-xs text-gray-700 flex-1">Une zone fonctionnelle n'est pas une pièce — c'est une unité de suivi énergétique.</span>
+        <button type="button" @click="showHelp = true"
+                class="text-xs font-medium text-indigo-700 hover:text-indigo-900 underline whitespace-nowrap shrink-0">
+          En savoir plus
+        </button>
+      </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Nature de la zone</label>
         <SearchableSelect
           v-model="form.nature"
           :options="zoneNatures"
           placeholder="Sélectionner une nature"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Régime d'activité</label>
+        <SearchableSelect
+          v-model="form.occupancy_profile"
+          :options="ZONE_OCCUPANCY_PROFILES"
+          placeholder="Sélectionner un régime d'activité"
+        />
+        <p class="mt-1 text-xs text-gray-500">
+          Caractérise l'usage temporel de la zone (24/7, heures de bureau, scolaire…).
+        </p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">
+          Contrainte de confort <span class="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <input
+          v-model="form.comfort_constraint"
+          type="text"
+          placeholder="ex : température minimale imposée 22 °C, qualité d'air…"
+          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
         />
       </div>
       <div>
@@ -91,6 +142,25 @@ async function submit() {
           class="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
         />
       </div>
+      <div v-if="parties.length">
+        <label class="block text-xs font-medium text-gray-700 mb-1">
+          Occupants de la zone <span class="text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        <ul class="space-y-0.5 border border-gray-200 rounded-lg p-2">
+          <li v-for="p in parties" :key="p.id">
+            <label class="flex items-center gap-2 cursor-pointer min-h-9 px-1 rounded hover:bg-gray-50">
+              <input type="checkbox"
+                     :checked="form.party_ids.includes(p.id)"
+                     @change="e => toggleParty(p.id, e.target.checked)"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
+              <span class="text-sm text-gray-700">{{ p.name }}</span>
+            </label>
+          </li>
+        </ul>
+        <p class="mt-1 text-xs text-gray-500">
+          Rattache des parties prenantes (preneurs, propriétaires…) à cette zone.
+        </p>
+      </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">
           Position sur la carte <span class="text-gray-400 font-normal">(optionnel)</span>
@@ -115,4 +185,5 @@ async function submit() {
       </div>
     </form>
   </BaseModal>
+  <ZoneFunctionalHelpModal v-if="showHelp" @close="showHelp = false" />
 </template>

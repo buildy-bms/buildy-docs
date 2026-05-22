@@ -33,6 +33,12 @@ const INDOOR_NATURES = [
   'meeting-room', 'workshop', 'switchboard', 'technical-area', 'server-room',
   'classroom', 'leasure-space', 'foyer', 'corridor',
   'meters', 'shared-space', 'logistic-cell', 'stock',
+  // Item 7b — natures enrichies. Toutes intérieures (chauffées ou techniques).
+  // `boiler-room` est un local technique : on l'inclut comme zone intérieure
+  // au même titre que `technical-area` / `meters` (inventaire complet R175-1
+  // §4, l'auditeur coche « Présent » sur les seuls usages observés).
+  'changing-room', 'kitchen', 'refectory', 'bedroom', 'care-room',
+  'sports-hall', 'boiler-room', 'laundry', 'restroom',
 ];
 
 module.exports = [

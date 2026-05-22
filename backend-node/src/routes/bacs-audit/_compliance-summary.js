@@ -71,7 +71,8 @@ const VERDICT_ICON = {
 };
 
 // Calcul d'assujettissement R175-2 : déroulé en 3 lignes (puissance + PC + seuil)
-// pour la page « L'essentiel ». Seuils du décret : 70 kW (2027), 290 kW (2025).
+// pour la page « L'essentiel ». Seuils du décret : 70 kW (échéance 2030, report
+// acté au JO du 26 décembre 2025), 290 kW (2025).
 function buildAssujettissement(document) {
   const power = document.bacs_total_power_kw || 0;
   const pcDate = document.bacs_building_permit_date || null;
@@ -80,12 +81,12 @@ function buildAssujettissement(document) {
   switch (status) {
     case 'subject_immediate': conclusion = 'Bâtiment > 290 kW déjà existant — assujetti immédiatement.'; break;
     case 'subject_2025':      conclusion = 'Puissance > 290 kW — assujetti au 1ᵉʳ janvier 2025.'; break;
-    case 'subject_2027':      conclusion = 'Puissance entre 70 et 290 kW — assujetti au 1ᵉʳ janvier 2027.'; break;
+    case 'subject_2030':      conclusion = 'Puissance entre 70 et 290 kW — assujetti au 1ᵉʳ janvier 2030.'; break;
     case 'not_subject':       conclusion = 'Puissance < 70 kW — non assujetti au décret BACS.'; break;
     default:                  conclusion = 'Statut d\'assujettissement non renseigné.';
   }
   const determined = !!status;
-  const threshold = status === 'subject_2027' ? 70 : 290;
+  const threshold = status === 'subject_2030' ? 70 : 290;
   return {
     powerKw: power,
     pcDate,
@@ -94,7 +95,7 @@ function buildAssujettissement(document) {
     // Tant que le statut n'est pas renseigné, on n'affiche pas un seuil
     // unique trompeur : les deux seuils du décret coexistent.
     determined,
-    thresholdLabel: determined ? `${threshold} kW` : '70 kW (2027) ou 290 kW (2025)',
+    thresholdLabel: determined ? `${threshold} kW` : '70 kW (2030) ou 290 kW (2025)',
     status,
     conclusion,
   };

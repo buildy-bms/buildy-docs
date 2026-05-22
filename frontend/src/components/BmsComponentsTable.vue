@@ -216,16 +216,18 @@ const inputCls = 'w-full px-2 py-1 text-xs border border-gray-200 rounded hover:
                    :class="inputCls" />
           </td>
           <td class="py-1 px-1 text-right whitespace-nowrap">
-            <Tooltip text="Dupliquer">
-              <button @click="dupComponent(c)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition mr-1">
-                <DocumentDuplicateIcon class="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
-            <Tooltip text="Supprimer">
-              <button @click="removeComponent(c)" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 transition">
-                <TrashIcon class="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
+            <div class="inline-flex items-center gap-1">
+              <Tooltip text="Dupliquer">
+                <button @click="dupComponent(c)" class="btn-icon">
+                  <DocumentDuplicateIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip text="Supprimer">
+                <button @click="removeComponent(c)" class="btn-icon btn-icon-danger">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </Tooltip>
+            </div>
           </td>
         </tr>
       </tbody>

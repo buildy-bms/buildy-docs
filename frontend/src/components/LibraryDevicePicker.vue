@@ -31,6 +31,9 @@ const props = defineProps({
   system: { type: Object, required: true },
   systemLabel: { type: String, required: true },
   zoneName: { type: String, default: '' },
+  // Mode onglet : rend le contenu sans son BaseModal ni son footer propre
+  // (utilisé comme panneau de la modale d'ajout d'équipement à 2 onglets).
+  embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close', 'added'])
 const { success, error: notifyError } = useNotification()
@@ -175,10 +178,9 @@ async function pickTemplate(t) {
 </script>
 
 <template>
-  <BaseModal
-    :title="`Bibliothèque — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`"
-    size="xl"
-    :dismiss-on-backdrop="false"
+  <component
+    :is="embedded ? 'div' : BaseModal"
+    v-bind="embedded ? {} : { title: `Bibliothèque — ${systemLabel}${zoneName ? ' / ' + zoneName : ''}`, size: 'xl', dismissOnBackdrop: false }"
     @close="emit('close')"
   >
     <div class="space-y-3">
@@ -333,8 +335,8 @@ async function pickTemplate(t) {
       </div>
       </template>
 
-      <!-- Footer : fermer -->
-      <div class="flex items-center justify-end pt-2 border-t border-gray-100">
+      <!-- Footer : fermer (masqué en mode onglet — la modale parente gère) -->
+      <div v-if="!embedded" class="flex items-center justify-end pt-2 border-t border-gray-100">
         <button
           type="button"
           @click="emit('close')"
@@ -344,5 +346,5 @@ async function pickTemplate(t) {
         </button>
       </div>
     </div>
-  </BaseModal>
+  </component>
 </template>

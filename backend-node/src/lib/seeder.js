@@ -786,8 +786,19 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     if (!presentByZone.has(s.zone_id)) presentByZone.set(s.zone_id, new Set());
     presentByZone.get(s.zone_id).add(s.system_category);
   }
+  // Depuis la migration 170, la contrainte UNIQUE(document_id, zone_id,
+  // category) a été retirée (une zone peut avoir plusieurs systèmes de
+  // chauffage/refroidissement). Le resync ne peut donc plus s'appuyer sur
+  // INSERT OR IGNORE pour rester idempotent : on vérifie explicitement
+  // l'existence d'au moins une entrée pour (zone, catégorie) et on ne crée
+  // que l'entrée de base manquante — les entrées ajoutées manuellement par
+  // l'auditeur ne sont jamais dupliquées.
+  const thermalExists = db.db.prepare(`
+    SELECT 1 FROM bacs_audit_thermal_regulation
+    WHERE document_id = ? AND zone_id = ? AND category = ? LIMIT 1
+  `);
   const insertThermal = db.db.prepare(`
-    INSERT OR IGNORE INTO bacs_audit_thermal_regulation
+    INSERT INTO bacs_audit_thermal_regulation
       (document_id, zone_id, category, has_automatic_regulation)
     VALUES (?, ?, ?, 0)
   `);
@@ -797,8 +808,9 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     const fromSystems = presentByZone.get(z.zone_id) || new Set();
     for (const cat of ['heating', 'cooling']) {
       if (!fromNature.includes(cat) && !fromSystems.has(cat)) continue;
-      const r = insertThermal.run(documentId, z.zone_id, cat);
-      if (r.changes) thermalCount++;
+      if (thermalExists.get(documentId, z.zone_id, cat)) continue;
+      insertThermal.run(documentId, z.zone_id, cat);
+      thermalCount++;
     }
   }
 
