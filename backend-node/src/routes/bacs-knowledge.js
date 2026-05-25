@@ -14,11 +14,16 @@ const db = require('../database');
 
 // Echappe une requete FTS5 en transformant les mots utilisateur en
 // recherche prefixe (ex: "puissance 70 kW" -> "puissance* 70* kW*").
+// IMPORTANT : on splitte aussi sur le tiret. Sinon "R175-6" devient
+// "R175-6*" cote FTS5, qui parse "R175 NOT 6*" (le `-` est l'operateur NOT
+// FTS5) et le `6` solitaire est interprete comme un column qualifier ->
+// erreur "no such column: 6". Avec split sur tiret + strip non-word,
+// "R175-6" devient "R175* 6*" qui matche bien R175-6 dans le corps.
 function ftsQuery(q) {
   if (!q) return '';
   return q.trim()
-    .split(/\s+/)
-    .map(t => t.replace(/[^\wÀ-ſ-]/g, ''))
+    .split(/[\s\-]+/)
+    .map(t => t.replace(/[^\wÀ-ſ]/g, ''))
     .filter(Boolean)
     .map(t => `${t}*`)
     .join(' ');

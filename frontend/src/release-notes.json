@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.91",
+      "date": "2026-05-25",
+      "title": "Recherche base de connaissance : fix « R175-6 → no such column: 6 »",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "La recherche fonctionne maintenant sur les codes R175-X",
+          "what": "Toute requête contenant un terme avec tiret + chiffre isolé (ex: R175-6, R175-5-1) faisait crasher la recherche FTS5 avec « no such column: 6 ». SQLite FTS5 interprétait le tiret comme l'opérateur NOT et le chiffre solitaire comme un index de colonne. Splittage du terme sur le tiret + strip des caractères non-mot → « R175-6 » devient deux tokens préfixés « R175* 6* » qui matchent correctement les articles décret + FAQ + guides.",
+          "where": "API /api/bacs-knowledge/search et son outil MCP bacs_knowledge_search.",
+          "how_to_test": "Depuis Claude : bacs_knowledge_search avec q='R175-6' renvoie les bons articles."
+        }
+      ]
+    },
+    {
       "version": "0.1.90",
       "date": "2026-05-25",
       "title": "GTB : aucun usage coché → aucun équipement listé + fix 429 (rate-limit)",
