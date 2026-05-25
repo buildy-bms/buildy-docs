@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 173;
+const TARGET_VERSION = 174;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6598,6 +6598,153 @@ function runMigrations() {
     `);
     log.info('Migration 173 appliquee : table bacs_knowledge + FTS5 pour la base de connaissance BACS');
     db.pragma('user_version = 173');
+  }
+
+  if (current < 174) {
+    // ── Coherence audit BACS : 4 CHECK constraints manquants ──
+    //
+    // Cf. plan « coherence absolue audit BACS » bloc D. On ajoute les CHECK
+    // au niveau DB pour aligner avec les enums Zod backend + REFERENCE_DATA
+    // MCP + audit-options.js frontend, et fermer la possibilite d'INSERT
+    // direct SQL avec valeurs hors-enum (defense en profondeur, la
+    // validation Zod cote routes etait deja stricte).
+    //
+    // Strategie : PRAGMA writable_schema=ON pour modifier directement le
+    // SQL de sqlite_master sans recreer les tables (officiellement
+    // recommande par SQLite pour ajouter/modifier des CHECK constraints :
+    // https://www.sqlite.org/lang_altertable.html#otheralter ). Aucun
+    // INSERT SELECT, aucun risque de perdre une colonne ou des donnees.
+    //
+    // Pre-audit (fait en local sur snapshot prod 2026-05-25 14h50, commit
+    // 61a870d) : 0 rows hors-enum sur les 7 colonnes ciblees. La migration
+    // ne necessite aucun cleanup prealable.
+    //
+    // 4 modifications :
+    //   1. bacs_audit_systems.communication : etendre CHECK existant pour
+    //      ajouter 'lorawan' (deja accepte par DEVICE_COMM cote backend).
+    //   2. zones.kind : nouveau CHECK ('functional','technical').
+    //   3. zones.nature : nouveau CHECK (28 valeurs ZONE_NATURES).
+    //   4. bacs_audit_action_items.category : nouveau CHECK
+    //      (15 valeurs ACTION_CATEGORIES).
+    //
+    // Apres la migration, le verrou DB protege contre les INSERT directs
+    // hors-enum. La validation Zod cote routes reste la premiere ligne.
+
+    const TARGETS = [
+      {
+        table: 'bacs_audit_systems',
+        // Remplace l'ancien CHECK sur `communication` (10 valeurs) par le
+        // nouveau (11 valeurs avec lorawan).
+        find: /CHECK \(communication IS NULL OR communication IN[^)]*\)\s*\)/m,
+        replace: `CHECK (communication IS NULL OR communication IN
+            ('modbus_tcp','modbus_rtu','bacnet_ip','bacnet_mstp',
+             'knx','mbus','mqtt','lorawan','autre','non_communicant','absent'))`,
+      },
+      {
+        table: 'zones',
+        // Remplace `kind TEXT NOT NULL DEFAULT 'functional'` (sans CHECK)
+        // par la version avec CHECK. Pattern strict avec ', latitude' apres
+        // pour matcher exactement et pas d'autres `kind` ailleurs.
+        find: /kind TEXT NOT NULL DEFAULT 'functional', latitude/,
+        replace: `kind TEXT NOT NULL DEFAULT 'functional' CHECK (kind IN ('functional','technical')), latitude`,
+      },
+      {
+        table: 'zones',
+        // Ajoute CHECK sur `nature` (28 valeurs synchro avec ZONE_NATURES
+        // dans routes/zones.js et REFERENCE_DATA.zone_natures cote MCP).
+        find: /\bnature TEXT,/,
+        replace: `nature TEXT CHECK (nature IS NULL OR nature IN ('office','shared-office','private-office','open-space','meeting-room','commercial-space','classroom','workshop','leasure-space','foyer','shared-space','corridor','logistic-cell','stock','kitchen','refectory','changing-room','restroom','bedroom','care-room','sports-hall','laundry','switchboard','technical-area','boiler-room','server-room','meters','outdoor')),`,
+      },
+      {
+        table: 'bacs_audit_action_items',
+        // Ajoute CHECK sur `category` (15 valeurs ACTION_CATEGORIES).
+        find: /category TEXT NOT NULL,/,
+        replace: `category TEXT NOT NULL CHECK (category IN ('meter_addition','meter_replacement','meter_connection','system_addition','system_replacement','communication_upgrade','bms_upgrade','bms_replacement','bms_addition','data_retention_upgrade','training','documentation','thermal_regulation','thermal_regulation_upgrade','other')),`,
+      },
+    ];
+
+    // Pre-flight check : 0 row hors-enum (sinon on bloque pour eviter de
+    // creer un CHECK qui rendra la table invalide a la prochaine ouverture).
+    const enumChecks = [
+      {
+        sql: `SELECT COUNT(*) AS n FROM bacs_audit_action_items WHERE category NOT IN
+          ('meter_addition','meter_replacement','meter_connection','system_addition','system_replacement','communication_upgrade','bms_upgrade','bms_replacement','bms_addition','data_retention_upgrade','training','documentation','thermal_regulation','thermal_regulation_upgrade','other')`,
+        label: 'bacs_audit_action_items.category',
+      },
+      {
+        sql: `SELECT COUNT(*) AS n FROM zones WHERE kind NOT IN ('functional','technical')`,
+        label: 'zones.kind',
+      },
+      {
+        sql: `SELECT COUNT(*) AS n FROM zones WHERE nature IS NOT NULL AND nature NOT IN
+          ('office','shared-office','private-office','open-space','meeting-room','commercial-space','classroom','workshop','leasure-space','foyer','shared-space','corridor','logistic-cell','stock','kitchen','refectory','changing-room','restroom','bedroom','care-room','sports-hall','laundry','switchboard','technical-area','boiler-room','server-room','meters','outdoor')`,
+        label: 'zones.nature',
+      },
+    ];
+    for (const c of enumChecks) {
+      const n = db.prepare(c.sql).get().n;
+      if (n > 0) {
+        throw new Error(
+          `Migration 174 : ${n} rows hors-enum sur ${c.label}. ` +
+          `Nettoyer les valeurs invalides avant de relancer la migration.`,
+        );
+      }
+    }
+
+    // Application des CHECK via writable_schema (sans recreer les tables).
+    // better-sqlite3 bloque par defaut l'ecriture de sqlite_master meme avec
+    // writable_schema=ON — il faut activer unsafeMode au niveau du wrapper.
+    db.pragma('foreign_keys = OFF');
+    db.unsafeMode(true);
+    try {
+      db.exec('BEGIN');
+      db.pragma('writable_schema = ON');
+
+      for (const t of TARGETS) {
+        // Lecture via prepare OK (read-only), ecriture obligatoire via
+        // db.exec() — better-sqlite3 refuse les prepared statements sur
+        // sqlite_master meme avec writable_schema=ON.
+        const row = db.prepare(
+          "SELECT sql FROM sqlite_master WHERE type='table' AND name = ?"
+        ).get(t.table);
+        if (!row) {
+          throw new Error(`Migration 174 : table ${t.table} introuvable.`);
+        }
+        const oldSql = row.sql;
+        const newSql = oldSql.replace(t.find, t.replace);
+        if (newSql === oldSql) {
+          // Le pattern n'a pas matche : soit la migration a deja ete appliquee,
+          // soit le schema a derive. On loggue mais on continue (idempotence).
+          log.warn(`Migration 174 : pattern non trouve pour ${t.table} (deja patche ou schema modifie ?), skip.`);
+          continue;
+        }
+        // Echappement du SQL pour le passer dans une string litterale.
+        const escaped = newSql.replace(/'/g, "''");
+        db.exec(
+          `UPDATE sqlite_master SET sql = '${escaped}' WHERE type='table' AND name = '${t.table}'`
+        );
+      }
+
+      db.pragma('writable_schema = RESET');
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      db.pragma('writable_schema = RESET');
+      db.unsafeMode(false);
+      db.pragma('foreign_keys = ON');
+      throw e;
+    }
+    db.unsafeMode(false);
+    db.pragma('foreign_keys = ON');
+
+    // Verification d'integrite apres la modification de sqlite_master.
+    const integrity = db.pragma('integrity_check', { simple: true });
+    if (integrity !== 'ok') {
+      throw new Error(`Migration 174 : integrity_check apres modif = ${integrity}`);
+    }
+
+    log.info('Migration 174 appliquee : CHECK constraints sur bacs_audit_systems.communication (lorawan), zones.kind, zones.nature, bacs_audit_action_items.category');
+    db.pragma('user_version = 174');
   }
 
   if (current > TARGET_VERSION) {
