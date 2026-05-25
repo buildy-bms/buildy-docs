@@ -72,7 +72,7 @@ async function main() {
   });
 
   await fastify.register(require('@fastify/rate-limit'), {
-    max: 600,
+    max: 1500,
     timeWindow: '1 minute',
     // On exclut les assets statiques (chunks JS/CSS, logo, fonts, /assets/*)
     // pour eviter de declencher 429 sur le chargement initial de la SPA qui
