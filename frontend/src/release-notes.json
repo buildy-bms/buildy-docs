@@ -2,6 +2,31 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.89",
+      "date": "2026-05-25",
+      "title": "Card GTB : toggles instantanés + filtrage par usages traités",
+      "highlights": [
+        {
+          "kind": "perf",
+          "title": "Toggles Intégré / Opérationnel : réponse instantanée au clic",
+          "what": "Avant, chaque clic sur un toggle attendait le PATCH serveur + le recalcul complet du plan d'action — sur une table de 20 équipements, c'était plusieurs secondes par clic. Maintenant le toggle réagit en local immédiatement, le PATCH part en arrière-plan, et le recalcul du plan est debouncé 800ms (un seul recalcul même si l'utilisateur enchaîne 10 clics).",
+          "where": "Card GTB desktop et mobile, tables Équipements + Compteurs intégrés."
+        },
+        {
+          "kind": "fix",
+          "title": "Bug 400 sur mobile GTB également corrigé",
+          "what": "Le même bug que sur desktop (bms_integration_out_of_service envoyé en entier au lieu de booléen) existait aussi sur la version mobile. Aligné.",
+          "where": "Audit mobile, onglet GTB."
+        },
+        {
+          "kind": "ux",
+          "title": "Listes Équipements / Compteurs filtrées par usages que la GTB traite",
+          "what": "Si l'auditeur a coché par exemple uniquement « Chauffage » et « ECS » dans « Usages traités par la GTB », les tables Équipements et Compteurs intégrés ne listent plus que les équipements de ces deux catégories. Ça évite de demander à intégrer 50 équipements de ventilation à une GTB qui ne gère pas la ventilation. Tant qu'aucun usage n'est coché (état initial), tout reste affiché.",
+          "where": "Card GTB desktop et mobile."
+        }
+      ]
+    },
+    {
       "version": "0.1.88",
       "date": "2026-05-25",
       "title": "Fix 400 Intégré/Opérationnel + toggles compacts dans les tables GTB + reformulations Oui/Non",

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { WrenchScrewdriverIcon, PencilSquareIcon, DocumentArrowUpIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -101,10 +101,62 @@ function saveBmsDebounced() {
 
 // Tri-état pour les SegmentedToggle : null → aucun bouton sélectionné.
 const triState = (v) => (v == null ? null : !!v)
+
+// Filtre les listes "intégrés à la GTB" par les usages que la GTB traite
+// effectivement (toggles "Usages traités" ci-dessus). Si l'auditeur n'a coché
+// AUCUN usage (état initial), on n'applique pas de filtre — sinon on
+// masquerait toute la liste avant qu'il ait commencé à répondre.
+const gtbManagesCategory = (cat) => {
+  if (!bms.value) return true
+  switch (cat) {
+    case 'heating': return !!bms.value.manages_heating
+    case 'cooling': return !!bms.value.manages_cooling
+    case 'ventilation': return !!bms.value.manages_ventilation
+    case 'dhw': return !!bms.value.manages_dhw
+    case 'lighting_indoor':
+    case 'lighting_outdoor': return !!bms.value.manages_lighting
+    default: return true  // electricity_production, autres → on garde
+  }
+}
+const gtbManagesMeterUsage = (usage) => {
+  if (!bms.value) return true
+  switch (usage) {
+    case 'heating': return !!bms.value.manages_heating
+    case 'cooling': return !!bms.value.manages_cooling
+    case 'dhw': return !!bms.value.manages_dhw
+    case 'lighting': return !!bms.value.manages_lighting
+    default: return true  // pv, other → on garde
+  }
+}
+const anyUsageManaged = computed(() => !!bms.value && (
+  bms.value.manages_heating || bms.value.manages_cooling ||
+  bms.value.manages_ventilation || bms.value.manages_dhw ||
+  bms.value.manages_lighting
+))
+const filteredDevices = computed(() => {
+  if (!anyUsageManaged.value) return props.devicesWithMeta
+  return props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category))
+})
+const filteredMeters = computed(() => {
+  if (!anyUsageManaged.value) return props.metersPresent
+  return props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage))
+})
 // Bascule un champ booléen de la GTB (1/0) + sauvegarde debounced.
 function setBmsFlag(field, v) {
   bms.value[field] = v == null ? null : (v ? 1 : 0)
   saveBmsDebounced()
+}
+
+// Le refresh du plan d'action + cumul puissance est debouncé : si l'utilisateur
+// enchaine plusieurs clics rapides (ce qui arrive sur les tables GTB où on coche
+// 10-20 équipements à la suite), on ne déclenche qu'un seul recalcul après 800ms
+// d'inactivité au lieu d'un par clic.
+let actionItemsRefreshTimer = null
+function scheduleActionItemsRefresh() {
+  clearTimeout(actionItemsRefreshTimer)
+  actionItemsRefreshTimer = setTimeout(() => {
+    audit.refreshActionItems().catch(() => {})
+  }, 800)
 }
 
 async function patchDeviceMb(d, patch) {
@@ -116,10 +168,11 @@ async function patchDeviceMb(d, patch) {
     fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(d, fullPatch)
-  try {
-    await updateBacsDevice(d.id, fullPatch)
-    await audit.refreshActionItems()
-  } catch { error('Sauvegarde équipement impossible') }
+  // PATCH non bloquant : le toggle a déjà réagi visuellement via Object.assign,
+  // pas besoin de attendre la réponse serveur pour rendre la main à l'utilisateur.
+  updateBacsDevice(d.id, fullPatch)
+    .then(scheduleActionItemsRefresh)
+    .catch(() => error('Sauvegarde équipement impossible'))
 }
 
 async function patchMeter(m, patch) {
@@ -128,10 +181,9 @@ async function patchMeter(m, patch) {
     fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(m, fullPatch)
-  try {
-    await updateBacsMeter(m.id, fullPatch)
-    await audit.refreshActionItems()
-  } catch { error('Sauvegarde compteur impossible') }
+  updateBacsMeter(m.id, fullPatch)
+    .then(scheduleActionItemsRefresh)
+    .catch(() => error('Sauvegarde compteur impossible'))
 }
 
 function hasNotes(html) {
@@ -364,7 +416,7 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="equipements" topic-label="Équipements intégrés à la GTB"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <table v-if="devicesWithMeta.length" class="w-full text-sm">
+              <table v-if="filteredDevices.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Équipement</th>
@@ -373,7 +425,7 @@ function hasNotes(html) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <tr v-for="d in devicesWithMeta" :key="d.id"
+                  <tr v-for="d in filteredDevices" :key="d.id"
                       :class="[d.out_of_service ? 'opacity-50' : '', d.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
                     <td class="px-2 py-1">
                       <span class="inline-flex items-center gap-2">
@@ -411,7 +463,7 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="compteurs" topic-label="Compteurs intégrés à la GTB"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <table v-if="metersPresent.length" class="w-full text-sm">
+              <table v-if="filteredMeters.length" class="w-full text-sm">
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Compteur</th>
@@ -420,7 +472,7 @@ function hasNotes(html) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <tr v-for="m in metersPresent" :key="m.id"
+                  <tr v-for="m in filteredMeters" :key="m.id"
                       :class="[m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'text-red-700 bg-red-50/40' : '']">
                     <td class="px-2 py-1">
                       <span class="inline-flex items-center gap-2">
