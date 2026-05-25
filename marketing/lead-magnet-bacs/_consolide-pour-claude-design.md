@@ -1,0 +1,1127 @@
+# CONTENU COMPLET DU LEAD MAGNET — La méthode interne d'audit BACS de Buildy
+
+> Document consolidé pour Claude Design. Toutes les notes de production internes ont été retirées. Aucun ajout, aucune invention par rapport aux brouillons source.
+
+
+---
+
+# Préambule
+
+
+
+---
+
+## Page de couverture
+
+*Composition typographique pure, sans image. Fond uniforme bleu navy `#1b2842` plein cadre. Titre et sous-titre en blanc, centrés verticalement. Logo « Buildy » discret en bas, blanc, opacity 0.7. Style de référence : Stripe Atlas, a16z primer, Notion playbooks.*
+
+**La méthode interne d'audit BACS de Buildy**
+
+*La checklist qu'on utilise sur tous nos chantiers — livrée telle quelle, gratuitement.*
+
+---
+
+## Page intérieure 1 — Ce que vous tenez entre les mains
+
+Ce document est la documentation interne de la méthode utilisée par les auditeurs Buildy pour structurer un audit BACS sur un bâtiment tertiaire. **10 étapes, dans cet ordre, sans sauter.**
+
+Tout ce que vous allez lire vient de l'expérience terrain accumulée audit après audit, du décret R175 dans sa lettre, et des contrôles préfectoraux que nos rapports ont déjà passés sans réserve.
+
+C'est *la même structure* que celle utilisée par notre équipe pour produire les rapports d'audit livrés aux propriétaires, asset managers et property managers de bâtiments tertiaires. Rien n'est retenu — pas de version premium cachée, pas de chapitre payant.
+
+Pourquoi le publier ?
+
+À la lecture, vous saurez si vous voulez le faire vous-même ou nous appeler. Les deux choix sont légitimes. Si vous gérez un seul bâtiment et que vous avez le temps, vous avez maintenant la méthode. Si vous gérez plusieurs sites ou que vous voulez aller vite, le pivot final de ce document vous indique comment nous joindre.
+
+> **À qui ce document s'adresse**
+> Propriétaires, asset managers, property managers, exploitants, AMO et bureaux d'études thermiques en charge de bâtiments tertiaires soumis au décret BACS. Pas aux intégrateurs GTB ni aux automaticiens — ce n'est pas la bonne grille de lecture pour eux.
+
+> **Ce que ce document n'est pas**
+> Une plaquette commerciale. Un manuel d'utilisation d'un outil. Un texte juridique opposable. Le rapport d'inspection périodique R175-5-1 (qui doit être réalisé par un organisme tiers indépendant — voir chapitre 8).
+
+---
+
+## Page intérieure 2 — Le décret R175 en une page
+
+Le décret BACS (Building Automation and Control Systems), codifié aux articles R175-1 à R175-6 du Code de la construction et de l'habitation, impose à tous les bâtiments tertiaires de plus de 70 kW de chauffage ou de climatisation d'être équipés d'un système d'automatisation et de contrôle conforme.
+
+**Six articles structurent l'obligation :**
+
+- **R175-1** définit le périmètre — quels domaines de gestion technique sont concernés (chauffage, refroidissement, ventilation, eau chaude sanitaire, éclairage, production photovoltaïque), et ce qu'est une zone fonctionnelle.
+- **R175-2** définit l'assujettissement — au-dessus de 290 kW, échéance immédiate ou au 1ᵉʳ janvier 2025 selon la date du permis de construire ; entre 70 et 290 kW, échéance au 1ᵉʳ janvier 2027. Les propriétaires sont dispensés de calculer le temps de retour sur investissement quand celui-ci dépasse les délais d'amortissement raisonnables.
+- **R175-3** définit les capacités fonctionnelles attendues du système : suivi continu des consommations à pas horaire et conservation des données sur cinq ans, détection des pertes d'efficacité, interopérabilité, possibilité d'arrêt manuel et de fonctionnement autonome, mise à disposition des données aux gestionnaires et aux exploitants.
+- **R175-4** impose des vérifications périodiques formalisées (carnet d'entretien, procédures écrites).
+- **R175-5** impose la formation de l'exploitant à l'utilisation du système.
+- **R175-6** impose une régulation thermique automatique par pièce ou par zone, applicable aux bâtiments dont le permis de construire ou les travaux générateurs sont postérieurs au 21 juillet 2021.
+
+**Ce que le décret n'impose pas** — et qu'il faut savoir distinguer :
+
+- Pas de norme produit obligatoire. La conformité est *fonctionnelle* (on évalue ce que le système fait), pas *certificatoire* (on n'exige pas de certification ISO 52120-1).
+- Pas de marque imposée. Le décret est agnostique sur la solution déployée.
+- Pas de calcul du temps de retour sur investissement systématique. C'est une décision du propriétaire.
+
+**Ce que le décret impose en plus de la mise en conformité technique** :
+
+- Une **inspection périodique R175-5-1** réalisée par un organisme tiers indépendant. *Cet audit Buildy ne s'y substitue pas.* Voir chapitre 8.
+- La **conservation du rapport d'audit pendant 10 ans** et sa présentation lors d'éventuels contrôles préfectoraux.
+
+---
+
+*[Pied de page] Préambule — Le décret R175 en une page*
+
+---
+
+# Chapitre 1 — Identification & cadrage R175-2
+
+
+
+---
+
+## Page 1 — Vérifier que le bâtiment est bien assujetti
+
+Avant tout travail terrain, il faut établir si le bâtiment est concerné par le décret BACS. Cette vérification est apparemment simple — elle ne l'est pas toujours.
+
+L'assujettissement repose sur **la puissance nominale cumulée** des systèmes de chauffage et de climatisation du bâtiment, et sur la **date du permis de construire**. Trois cas de figure :
+
+- **Puissance supérieure à 290 kW**. Le bâtiment est assujetti immédiatement s'il est antérieur au 1ᵉʳ janvier 2025 ; sinon échéance au 1ᵉʳ janvier 2025.
+- **Puissance comprise entre 70 et 290 kW**. Échéance au 1ᵉʳ janvier 2027.
+- **Puissance inférieure à 70 kW**. Le bâtiment n'est pas concerné par le décret.
+
+Cette grille d'analyse, identique pour tous les bâtiments, est la première chose que produit l'auditeur. Elle figure en page de couverture du rapport final, sous forme de verdict d'assujettissement explicite.
+
+---
+
+## Page 2 — Les pièges du calcul de puissance
+
+Le calcul est rarement aussi direct qu'une simple addition de plaques signalétiques. Trois cas particuliers reviennent régulièrement et méritent un examen attentif :
+
+### Bâtiment raccordé à un réseau de chaleur urbain
+
+La puissance à retenir n'est pas la puissance cumulée des émetteurs (radiateurs, planchers chauffants), mais celle de **la sous-station d'échange** qui raccorde le bâtiment au réseau urbain. C'est cette puissance qui figure dans le contrat de fourniture de chaleur — l'auditeur doit la vérifier physiquement et la comparer au document contractuel.
+
+### Pompes à chaleur réversibles
+
+Une PAC réversible cumule chauffage et climatisation. Selon le mode dominant et le dimensionnement, elle peut basculer un bâtiment d'une catégorie à une autre. L'auditeur consigne la puissance nominale en mode chauffage *et* en mode climatisation, et retient la valeur la plus pertinente au regard du calcul d'assujettissement.
+
+### Travaux récents sur les générateurs
+
+Le décret R175-6 (régulation thermique automatique) a une applicabilité spécifique : il s'impose aux bâtiments dont le permis de construire **ou** les travaux générateurs (remplacement de chaudière, installation d'une PAC, etc.) sont postérieurs au 21 juillet 2021. L'auditeur consigne donc deux dates distinctes : permis de construire et derniers travaux générateurs significatifs. Cet écart est souvent oublié dans les pré-diagnostics rapides.
+
+### Dispense de calcul du temps de retour
+
+Le décret R175-2 prévoit que les propriétaires sont dispensés de chiffrer le temps de retour sur investissement (TRI) lorsque celui-ci dépasse les délais d'amortissement raisonnables. La méthode Buildy ne calcule pas ce TRI — c'est une décision du propriétaire, qui en assume la responsabilité. Le rapport d'audit le rappelle explicitement.
+
+> **Vigilance** — Une erreur de calcul sur la puissance assujettissante invalide tout l'audit. C'est la première chose qu'un contrôle préfectoral vérifie. L'auditeur Buildy s'appuie sur les documents officiels (permis de construire, contrats de raccordement, plaques signalétiques relevées physiquement) — jamais sur une déclaration verbale du gestionnaire.
+
+---
+
+## Page 3 — Ce que produit cette étape
+
+À l'issue du cadrage, le dossier d'audit contient :
+
+- La puissance nominale cumulée chauffage et climatisation, justifiée document à l'appui.
+- La date du permis de construire et la date du dernier remplacement générateur significatif.
+- Le statut d'assujettissement : *immédiat*, *1ᵉʳ janvier 2025*, *1ᵉʳ janvier 2027*, ou *non assujetti*.
+- L'échéance réglementaire applicable au bâtiment.
+- L'identification du raccordement éventuel à un réseau de chaleur urbain.
+
+**Si le bâtiment est non assujetti**, l'audit s'arrête ici. Le rapport produit reste utile : il documente le constat d'absence d'obligation et sécurise le propriétaire face à un contrôle ultérieur.
+
+**Si le bâtiment est assujetti**, l'auditeur passe à l'étape 2 — le découpage du bâtiment en zones fonctionnelles, qui conditionne tout le travail terrain.
+
+---
+
+*[Pied de page] Chapitre 1 / 11 — Cadrage R175-2*
+
+---
+
+# Chapitre 2 — Découper le bâtiment en zones fonctionnelles
+
+
+
+---
+
+## Page 1 — Le découpage qui conditionne tout le reste
+
+Le décret R175 ne s'applique pas à un bâtiment pris en bloc. Il s'applique **zone par zone**. Chaque zone fonctionnelle a ses propres systèmes attendus, ses propres compteurs requis, ses propres exigences de régulation.
+
+Découper correctement le bâtiment, c'est donc préparer toutes les étapes suivantes. Un découpage trop grossier (un seul plateau pour tous les bureaux d'un étage) masque des écarts de conformité ; un découpage trop fin (une zone par bureau individuel) dilue l'analyse et rend le rapport illisible.
+
+**La règle pratique** : une zone fonctionnelle est un espace dont l'usage justifie un traitement réglementaire homogène. Un open-space et une salle de réunion attenante ne constituent pas la même zone — l'une a un occupant permanent et continu, l'autre a un usage intermittent. Un parking et un local technique ne constituent pas la même zone — l'un a une logique d'éclairage extérieur, l'autre d'éclairage de service.
+
+---
+
+## Page 2 — La grille des natures de zone
+
+L'auditeur s'appuie sur une grille de **natures de zone** pré-établie, qui couvre les usages les plus fréquents du bâtiment tertiaire français : bureaux partagés, bureaux privés, open-spaces, salles de réunion, espaces commerciaux, ateliers, locaux techniques, salles de classe, espaces de loisirs, foyers, couloirs, espaces extérieurs, locaux compteurs, espaces partagés, cellules logistiques, zones de stockage, et quelques autres cas spécifiques.
+
+Cette grille n'est pas arbitraire : elle découle d'une lecture méthodique du R175-1 §6 et d'un référentiel construit à partir des chantiers réalisés. Chaque nature de zone déclenche **une grille d'attendus** — quels systèmes techniques doivent normalement y être présents, quels compteurs sont requis, quelles exigences de régulation s'y appliquent.
+
+Par exemple :
+
+- Un open-space tertiaire appelle naturellement chauffage, refroidissement, ventilation et éclairage intérieur.
+- Un parking appelle éclairage et éventuellement ventilation mécanique selon le code du travail.
+- Un local technique a un périmètre réduit — souvent juste éclairage de service.
+- Une cellule logistique a un usage saisonnier qui peut justifier des modes de fonctionnement spécifiques.
+
+Cette grille d'attendus n'est pas une vérité absolue : elle aide l'auditeur à ne rien oublier sur le terrain et à justifier explicitement les absences. Si une zone a une nature atypique, elle est documentée comme telle et l'analyse est ajustée.
+
+---
+
+## Page 3 — Pour chaque zone, ce que l'auditeur consigne
+
+Pour chaque zone identifiée, le dossier d'audit comporte :
+
+- **Un nom** — explicite, qui parle à l'exploitant (« Open-space N+1 Est », « Hall d'accueil », pas « Zone-12 »).
+- **Une nature** — choisie dans la grille évoquée page précédente.
+- **Une surface** — relevée si possible, estimée sinon, justifiée document à l'appui (plan, métré, base immobilière).
+- **Des notes terrain** — particularités observées sur place (orientation, hauteur sous plafond, occupation effective, contraintes d'accès).
+- **Des photos** — vues générales de la zone, qui resteront dans le rapport et serviront de mémoire pour le propriétaire et pour les auditeurs ultérieurs.
+
+> **Cas du bâtiment multi-locataires** — Un immeuble de bureaux loué à plusieurs entreprises peut avoir des zones gérées par différents occupants, avec des supervisions distinctes (voire concurrentes). L'auditeur identifie ces frontières opérationnelles, qui ne coïncident pas toujours avec le découpage immobilier. Cette distinction est importante pour l'étape 6 (évaluation de la supervision) et pour l'étape 8 (collecte des contacts d'occupants).
+
+---
+
+## Page 4 — Pièges classiques
+
+- **Confondre zone réglementaire et zone climatique de la GTB**. La supervision existante a souvent un découpage technique (boucles de chauffage, zones de ventilation) qui ne reflète pas le découpage fonctionnel attendu par le décret. L'auditeur applique la grille du décret, pas celle de l'installateur.
+- **Oublier les espaces communs**. Couloirs, halls, sanitaires partagés, locaux à vélos : ils ne génèrent pas toujours d'obligation forte mais doivent être tracés pour justifier la complétude.
+- **Sous-estimer les surfaces**. Une mesure approximative à la fin du chantier vaut mieux qu'une absence de mesure. Le décret n'impose pas une précision millimétrique, mais l'absence totale de surface fragilise le rapport.
+- **Doubler une zone parce qu'elle change d'occupant**. Si la nature de l'usage est identique (un même open-space loué à deux entreprises), une seule zone suffit, avec mention des occupants en notes.
+
+---
+
+## Page 5 — Ce que produit cette étape
+
+À l'issue du découpage, le dossier d'audit comporte :
+
+- La liste exhaustive des zones du bâtiment, nommées et qualifiées par nature.
+- La surface de chaque zone, avec sa source.
+- Les notes terrain et photos associées.
+- Pour chaque zone, la grille d'attendus réglementaires (systèmes attendus, compteurs requis, exigences spécifiques).
+
+Cette grille est l'ossature de tout le travail terrain qui suit. Aux étapes 3, 4 et 5, l'auditeur passera zone par zone, en confrontant systématiquement l'attendu réglementaire à l'observé sur le terrain. Tout écart sera tracé, qualifié, et alimentera le plan d'action de l'étape 9.
+
+---
+
+*[Pied de page] Chapitre 2 / 11 — Zones fonctionnelles*
+
+---
+
+# Chapitre 3 — Inventaire des systèmes techniques et des équipements
+
+
+
+---
+
+## Page 1 — Pourquoi cette étape conditionne tout le reste
+
+C'est ici que se fait le gros du travail d'un audit BACS. Avant de regarder la supervision en place, avant de chiffrer un plan d'action, il faut savoir exactement **ce qu'il y a dans le bâtiment**. Sans cet inventaire, le décret R175-3 ne s'applique sur rien.
+
+Pour chaque zone fonctionnelle découpée à l'étape 2, l'auditeur procède en trois temps :
+
+1. Recenser les **systèmes techniques** présents par catégorie réglementaire (chauffage, refroidissement, etc.).
+2. Pour chaque système, identifier les **équipements concrets** qui le composent (chaudière, pompe à chaleur, centrale de traitement d'air…).
+3. Pour chaque équipement, qualifier sa **conformité au décret** — interopérabilité, possibilité d'arrêt manuel, fonctionnement autonome.
+
+À la fin de l'étape, chaque exigence du R175-3 §3 (interopérabilité) et §4 (arrêt + autonomie) est documentée équipement par équipement. C'est cette granularité qui permet, plus tard, d'élaborer un plan d'action *chiffrable*. Sans elle, vous saurez qu'il y a un problème de conformité, mais vous ne pourrez pas estimer combien il coûtera à corriger.
+
+> **Rappel R175-1 §4** — Les domaines de gestion technique concernés par le décret sont strictement délimités. La méthode d'audit Buildy s'aligne sur cette liste, sans y ajouter d'éléments hors périmètre (sécurité incendie, contrôle d'accès, etc.).
+
+---
+
+## Page 2 — Les sept catégories de systèmes techniques
+
+L'auditeur examine systématiquement chaque zone à la lumière de **sept catégories** de gestion technique : chauffage, refroidissement, ventilation, eau chaude sanitaire, éclairage intérieur, éclairage extérieur, production photovoltaïque. Pour chacune, il détermine si la zone est concernée — et, si oui, dans quelle mesure.
+
+Trois statuts sont possibles : système **présent** (et opérationnel), **absent** (la zone n'en dispose pas), ou **non concerné** (l'absence est justifiée par la nature de la zone — par exemple, un local technique sans éclairage permanent).
+
+Le travail ne s'arrête pas à ce constat. Pour chaque catégorie présente, l'auditeur documente également le degré d'intégration à la supervision existante du bâtiment, et consigne ses observations terrain (typologie, état apparent, contraintes d'accès, anomalies remarquées).
+
+**La nature de la zone (saisie à l'étape 2) oriente l'analyse** : un open-space appelle naturellement chauffage, refroidissement, ventilation et éclairage ; un parking appelle éclairage et éventuellement ventilation ; un local technique a souvent un périmètre réduit. Cette grille d'attendus, construite à partir d'une lecture méthodique du décret, évite à l'auditeur d'oublier des systèmes attendus — et l'aide à justifier les absences.
+
+---
+
+## Page 3 — Le détail des équipements
+
+Lister la catégorie ne suffit pas. Pour que le décret puisse être évalué, il faut descendre à **l'équipement concret**. Pour chaque catégorie marquée présente, l'auditeur recense un ou plusieurs équipements et établit pour chacun une fiche détaillée.
+
+Cette fiche couvre quatre familles d'informations :
+
+- **Identification** : marque, modèle, référence, identifiant interne stable pour le suivi.
+- **Caractéristiques techniques** : puissance nominale, source d'énergie, rôle dans la chaîne thermique (production, distribution, émission, régulation).
+- **Connectivité et supervision** : protocole de communication, mode de raccordement, niveau d'intégration à la supervision existante.
+- **État et conformité réglementaire** : équipement en service ou pas, possibilité d'arrêt manuel, fonctionnement autonome en cas de défaut de la supervision.
+
+Les valeurs autorisées pour chacune de ces dimensions sont volontairement étendues : la méthode couvre l'intégralité du parc tertiaire français — du gaz à la biomasse, de Modbus aux protocoles IP modernes, des installations centralisées aux équipements autonomes. Cette exhaustivité est le prix à payer pour qu'un même livrable soit opposable quel que soit le bâtiment audité.
+
+> **Cas particulier — équipement multi-zones.** Une centrale de traitement d'air alimentant trois plateaux de bureaux, ou un compteur électrique principal couvrant l'ensemble du bâtiment : ces équipements partagés sont identifiés une seule fois et rattachés à toutes les zones qu'ils desservent. C'est un point de vigilance important — un mauvais rattachement génère soit des doublons dans le plan d'action, soit, pire, des oublis.
+
+---
+
+## Page 4 — Comment se déduit la conformité R175-3
+
+Une fois l'inventaire complet, la conformité R175-3 §3 et §4 s'apprécie **équipement par équipement**.
+
+### R175-3 §3 — Interopérabilité
+
+L'équipement est conforme s'il s'intègre à un système d'information du bâtiment via un protocole de communication standard. Il est non conforme s'il fonctionne en îlot, sans liaison avec une supervision (équipement strictement autonome, ou communicant uniquement avec sa propre télécommande propriétaire).
+
+### R175-3 §4 — Arrêt manuel et fonctionnement autonome
+
+Deux exigences distinctes, à apprécier séparément :
+
+- **Arrêt manuel possible** : l'utilisateur peut-il arrêter manuellement l'équipement, sans passer par la supervision (interrupteur physique, bouton sur l'interface locale, vanne d'isolement…) ?
+- **Fonctionnement autonome** : en cas de défaut de la supervision ou d'arrêt manuel, l'équipement assure-t-il une fonction minimale de sécurité (hors gel, ventilation de secours, éclairage de sécurité…) ?
+
+Si l'une des deux exigences n'est pas tenue, l'équipement entre dans le plan d'action de l'étape 9, avec une sévérité majeure.
+
+### Liaison de supervision rompue
+
+Cas fréquent : un équipement est intégré à la supervision sur le papier, mais sur le terrain, plus aucune valeur ne remonte (sonde déconnectée, switch en panne, configuration perdue après remplacement de matériel actif…). La méthode trace ces écarts à part, parce qu'ils relèvent d'une action corrective spécifique — rétablir la liaison existante — distincte d'une absence d'intégration.
+
+---
+
+## Page 5 — Combien d'équipements pour un bâtiment typique
+
+Le volume d'équipements à inventorier dépend strictement de la taille et de la nature du bâtiment, pas d'une moyenne théorique. Quelques ordres de grandeur :
+
+- **Un commerce de centre-ville** : une zone, deux ou trois systèmes, trois à cinq équipements.
+- **Un plateau de bureaux** : trois à cinq zones, cinq systèmes, dix à quinze équipements.
+- **Un siège social de 30 000 m²** : trente à soixante zones, six à sept systèmes, plus d'une centaine d'équipements répartis par étage et par catégorie.
+
+Pour chaque équipement, l'auditeur produit la fiche décrite en page 3, prend une à trois photos, et évalue la conformité R175-3 §3 et §4. C'est cette densité qui fait que **l'étape 3 représente à elle seule entre 30 % et 50 % du temps total de l'audit terrain**.
+
+---
+
+## Page 6 — Pièges classiques
+
+Cette page liste les écarts les plus fréquents entre le déclaratif et la réalité — détectables uniquement parce que l'auditeur descend systématiquement au niveau de l'équipement.
+
+- **Équipement déclaré « communicant » mais non vu de la supervision** → liaison rompue, à tracer comme telle, génère une action corrective spécifique.
+- **Pompe à chaleur ou DRV remplacés récemment** sans mise à jour de l'analyse fonctionnelle → la supervision voit encore l'ancien équipement, l'écart doit être documenté.
+- **Sous-compteur installé mais jamais raccordé** → présent physiquement, non communicant — déclenche l'action « raccorder le compteur » à l'étape suivante.
+- **Centrale de traitement d'air alimentant plusieurs zones** → bien identifier le partage pour ne pas dédoubler les actions correctives.
+- **Équipement « hors service » qui disparaît du dossier** → il doit rester tracé dans l'inventaire et apparaître dans le rapport avec mention explicite. Important pour la traçabilité, et utile au gestionnaire pour planifier le remplacement.
+
+> **Référence R175** — Les exigences évaluées dans cette étape sont les articles R175-1 §4 (périmètre), R175-3 §3 (interopérabilité) et R175-3 §4 (arrêt manuel + autonomie). Le texte intégral de ces articles se trouve dans l'annexe A du rapport d'audit.
+
+---
+
+## Fin du chapitre
+
+À l'issue de l'étape 3, le dossier d'audit comporte :
+
+- Une cartographie complète des systèmes techniques par zone fonctionnelle.
+- Une fiche détaillée par équipement, avec marque, modèle, puissance, source d'énergie, protocole de communication, rôle dans la chaîne thermique.
+- Pour chaque équipement, l'évaluation des R175-3 §3 et §4.
+- Les photos terrain associées à chaque équipement.
+
+Ces données alimentent ensuite :
+
+- L'étape 4 (plan de comptage) — qui doit être cohérente avec les puissances et énergies déclarées ici.
+- L'étape 5 (régulation thermique) — qui s'appuie sur les équipements de chauffage/refroidissement de cette étape.
+- L'étape 6 (supervision existante) — qui évalue dans quelle mesure cet inventaire est effectivement piloté.
+- L'étape 9 (plan d'action) — qui transforme les écarts détectés ici en actions correctives chiffrées.
+
+**Sans cette étape proprement faite, les six suivantes sont fausses.**
+
+---
+
+*[Pied de page] Chapitre 3 / 11 — Inventaire des systèmes techniques*
+
+---
+
+# Chapitre 4 — Plan de comptage et suivi énergétique
+
+
+
+---
+
+## Page 1 — Pourquoi le comptage est le point le plus structurant
+
+Le R175-3 §1 impose un suivi continu des consommations à pas horaire, conservées sur cinq ans. C'est l'exigence la plus simple à formuler du décret — et la plus fréquemment incomplète sur les bâtiments tertiaires existants.
+
+Il y a deux raisons à cela. D'abord, le comptage a longtemps été pensé pour la facturation, pas pour le pilotage : un compteur général en pied d'immeuble suffisait à l'exploitant pour répartir une facture, mais ne permet pas de détecter une dérive zone par zone. Ensuite, la sous-comptage a été ajouté progressivement, par lots, sans logique d'ensemble — on trouve des sous-compteurs installés mais jamais raccordés à la supervision, ou raccordés mais avec un protocole obsolète.
+
+L'étape 4 consiste à confronter méthodiquement **l'exigence du décret** (un compteur par usage et par zone, communicant et conservant cinq ans d'historique) à **la réalité physique** du bâtiment. Chaque écart entre les deux génère, à l'étape 9, une action corrective chiffrable.
+
+---
+
+## Page 2 — La matrice usage × zone
+
+L'auditeur construit une matrice à deux dimensions : **les usages réglementaires en colonnes** (chauffage, refroidissement, eau chaude sanitaire, éclairage, production photovoltaïque, et un usage *général* pour le hors-périmètre), et **les zones fonctionnelles en lignes** (telles que découpées à l'étape 2).
+
+Pour chaque case, deux questions :
+
+1. **Un compteur est-il requis ?** La réponse découle de la nature de la zone et des systèmes présents. Une zone qui n'a pas de chauffage n'appelle pas de compteur de chauffage. Une zone qui a du chauffage et qui dépasse une certaine puissance en appelle un.
+2. **Un compteur est-il physiquement présent ?** Réponse par observation directe sur le terrain.
+
+Ces deux questions construisent la grille de conformité du comptage. La matrice complète, pour un bâtiment moyen, peut compter plusieurs dizaines de cases — chacune devant être examinée, justifiée, et photographiée si un compteur est présent.
+
+> **Compteurs partagés** — Un compteur peut couvrir plusieurs zones (compteur principal d'éclairage extérieur, par exemple). L'auditeur identifie ces compteurs partagés une seule fois, en les rattachant à toutes les zones qu'ils desservent. Cela évite les doublons dans le plan d'action et reflète la réalité du parc compteur.
+
+---
+
+## Page 3 — Pour chaque compteur, ce que l'auditeur consigne
+
+Pour chaque compteur identifié — qu'il soit présent, manquant ou hors service — le dossier comporte :
+
+- **Type de compteur** : électrique, gaz, eau, thermique, électrique de production photovoltaïque.
+- **Usage couvert** : chauffage, refroidissement, ECS, éclairage, production PV, ou général.
+- **Zone(s) desservie(s)** : selon le découpage de l'étape 2.
+- **Présence physique constatée** sur le terrain (observation directe, photo).
+- **Communication effective** : le compteur remonte-t-il réellement ses données vers une supervision, à un pas suffisant ?
+- **Mode de raccordement** : filaire ou sans-fil, protocole utilisé.
+- **Intégration à la supervision existante** : le compteur est-il vu de la GTB, et la liaison est-elle opérationnelle ?
+- **État** : en service, hors service, ou installé mais non raccordé.
+- **Notes terrain** et photos associées.
+
+Cette consignation systématique permet à l'étape suivante (la génération du plan d'action) de qualifier précisément la nature de chaque action requise — installer un compteur manquant, raccorder un compteur existant, remplacer un compteur défaillant, ou mettre à niveau le protocole d'un compteur trop ancien.
+
+---
+
+## Page 4 — Comment se déduit la conformité R175-3 §1
+
+À partir de la matrice complète, le dossier produit automatiquement la liste des actions correctives à mener pour atteindre la conformité. Trois cas se distinguent :
+
+- **Compteur requis mais physiquement absent** → action **bloquante**. Sans ce compteur, l'exigence R175-3 §1 ne peut pas être tenue. Le rapport identifie l'usage et la zone concernés, et propose une typologie de compteur à installer.
+- **Compteur présent mais non communicant** → action **majeure**. L'équipement existe physiquement mais ne remonte pas ses données vers la supervision. La conformité R175-3 §1 (suivi continu) n'est pas tenue tant que la liaison n'est pas établie.
+- **Compteur présent et communicant, mais avec une rétention insuffisante** → action **majeure** également, à traiter dans l'étape 6 (évaluation de la supervision), car c'est la supervision qui porte la conservation cinq ans, pas le compteur lui-même.
+
+Les compteurs hors service sont tracés pour mémoire, mais ne génèrent pas d'action corrective tant qu'aucun compteur ne les remplace.
+
+---
+
+## Page 5 — Pièges classiques
+
+- **Sous-compteur installé mais jamais raccordé**. Cas le plus fréquent. Il faut vérifier physiquement le câblage et le protocole, pas se fier au déclaratif de l'exploitant.
+- **Compteur communicant en local, pas vers la supervision**. Beaucoup de compteurs modernes ont un afficheur local qui suggère qu'ils remontent leurs données — alors qu'ils ne remontent rien à la supervision. Vérifier sur la console GTB, pas sur le compteur.
+- **Compteur partagé entre zones, déclaré sur une seule**. Risque de doublonner les actions correctives. L'auditeur identifie le partage explicitement.
+- **Compteur existant mais avec un protocole obsolète** (ex. boucle d'impulsions sans téléreport). Le compteur est physiquement présent, mais incapable de remonter à pas horaire. C'est une action majeure de mise à niveau.
+- **Confondre comptage et sous-facturation**. Le décret R175-3 §1 vise le pilotage énergétique, pas la facturation aux occupants. Un bâtiment peut être conforme à la sous-facturation (loi Élan) sans être conforme R175-3 §1.
+
+> **Référence R175** — L'exigence évaluée ici est l'article R175-3 §1 (suivi continu, pas horaire, conservation cinq ans). Le texte intégral figure dans l'annexe A du rapport d'audit.
+
+---
+
+## Page 6 — Ce que produit cette étape
+
+À l'issue de l'étape 4, le dossier d'audit comporte :
+
+- La matrice complète usage × zone, renseignée case par case.
+- Pour chaque compteur identifié, sa fiche détaillée (type, usage, zone, état, communication).
+- Les photos terrain associées à chaque compteur présent.
+- La liste préliminaire des actions correctives liées au comptage, classées par sévérité.
+
+Cette liste alimente directement l'étape 9 (plan d'action), où chaque manque sera chiffré. Elle alimente aussi l'étape 6 (supervision existante), où l'on évaluera la capacité de la supervision à exploiter les compteurs présents — conservation cinq ans, restitution graphique, alertes sur dérives.
+
+---
+
+*[Pied de page] Chapitre 4 / 11 — Plan de comptage*
+
+---
+
+# Chapitre 5 — Régulation thermique par zone
+
+
+
+---
+
+## Page 1 — Quand le R175-6 s'applique
+
+Le R175-6 impose une **régulation thermique automatique par pièce ou par zone**. Cette obligation a une applicabilité particulière : elle ne concerne pas tous les bâtiments soumis au décret BACS, mais uniquement ceux dont le permis de construire **ou** les travaux générateurs significatifs sont postérieurs au 21 juillet 2021.
+
+C'est l'une des subtilités du décret. Un bâtiment ancien soumis au R175 par sa puissance peut très bien ne pas être concerné par le R175-6 — son installation thermique antérieure est protégée par la date d'antériorité. Un bâtiment qui a remplacé sa chaudière en 2023 voit en revanche le R175-6 s'imposer à lui, même si le bâtiment lui-même est plus ancien.
+
+L'auditeur consigne donc deux dates au début de cette étape : la date du permis de construire (déjà tracée à l'étape 1) et **la date des derniers travaux générateurs significatifs** — remplacement de chaudière, installation d'une PAC, raccordement à un réseau de chaleur, dépose d'une cuve à fioul. C'est cette seconde date qui déclenche, ou non, l'applicabilité du R175-6.
+
+---
+
+## Page 2 — Les trois niveaux de régulation à examiner
+
+Sur les zones où le R175-6 s'applique, l'auditeur examine la régulation à trois niveaux d'équipement, indépendamment :
+
+- **Production** — comment la chaleur (ou le froid) est-elle générée et modulée ? Régulation TOR sur thermostat d'ambiance, régulation à loi d'eau, asservissement sur sonde extérieure, etc.
+- **Distribution** — comment l'énergie est-elle acheminée vers les zones ? Vannes trois voies, pompes à débit variable, régulation par zone hydraulique.
+- **Émission** — comment l'énergie est-elle restituée dans la pièce ? Robinets thermostatiques sur radiateurs, régulation terminale par sonde locale, ventilo-convecteurs avec sonde de reprise.
+
+Ces trois niveaux sont distincts. Une installation peut être conforme à la production (chaudière à condensation moderne, bien régulée) tout en étant non conforme à l'émission (radiateurs sans robinet thermostatique, donc impossibles à moduler par pièce). Le rapport doit qualifier chacun des trois niveaux.
+
+Pour chaque niveau, l'auditeur identifie également **l'équipement contrôleur** — la régulation est-elle assurée par un thermostat d'ambiance dédié, par un automate intégré à la GTB, par un relais simple ? Cette identification permet de chiffrer les actions correctives à l'étape 9 (changer un thermostat coûte une centaine d'euros ; reconfigurer un automate de GTB est un autre ordre de grandeur).
+
+---
+
+## Page 3 — Les exemptions et cas particuliers
+
+Le R175-6 prévoit explicitement plusieurs exemptions qu'il faut savoir reconnaître pour ne pas générer d'actions inutiles :
+
+- **Générateurs à biomasse** (poêles à granulés, inserts, chaudières bois). Exemption explicite du décret. L'auditeur consigne l'exemption pour traçabilité, mais ne génère aucune action.
+- **Locaux non chauffés ou non climatisés**. Pas de régulation à examiner — l'auditeur consigne l'absence du système.
+- **Locaux à régulation manuelle assumée** (certains ateliers, locaux techniques avec personnel qualifié). À documenter explicitement avec justification, pas à laisser implicite.
+- **Bâtiments en travaux ou en transition** (changement de générateur prévu dans les douze mois). L'auditeur trace l'état actuel et signale la transition à venir, qui pourra rendre certaines actions caduques.
+
+> **Position des sondes** — L'auditeur vérifie systématiquement la position physique des sondes de température. Une sonde mal placée (au-dessus d'un radiateur, en plein soleil, à moins d'un mètre du sol contre une cloison froide) fausse toute la régulation, même si le matériel est récent. C'est un constat fréquent, qui n'apparaît dans aucun document mais qui change la nature de l'action à mener (recalibrer ou repositionner, plutôt que remplacer).
+
+---
+
+## Page 4 — Pièges classiques
+
+- **Confondre conformité du matériel et conformité de la régulation effective**. Une vanne thermostatique installée mais bloquée à l'ouverture maximale par les occupants (pour éviter les courants d'air) ne régule plus rien. L'observation terrain prime sur le déclaratif.
+- **Sous-estimer les générateurs hybrides**. Une PAC en relève d'une chaudière gaz, ou inversement, demande une analyse au cas par cas. La régulation peut être conforme sur l'un et pas sur l'autre.
+- **Oublier la régulation de la climatisation**. Le R175-6 vise *toute* régulation thermique, pas uniquement le chauffage. Une climatisation centralisée sans modulation par zone est non conforme au même titre qu'un chauffage central sans robinet thermostatique.
+- **Considérer l'exemption bois comme automatique**. L'exemption ne s'applique qu'au générateur à biomasse, pas à toute l'installation. Un bâtiment chauffé par chaudière bois plus PAC d'appoint conserve les obligations sur la PAC.
+
+---
+
+## Page 5 — Ce que produit cette étape
+
+À l'issue de l'étape 5, le dossier d'audit comporte :
+
+- L'identification des zones où le R175-6 est applicable, avec date d'applicabilité justifiée.
+- Pour chaque zone applicable, l'examen des trois niveaux (production, distribution, émission), avec identification de l'équipement contrôleur.
+- La consignation des exemptions (biomasse notamment) avec leur justification.
+- Les observations terrain critiques (position des sondes, présence et état des robinets thermostatiques, modulations de zone).
+- La liste préliminaire des actions correctives R175-6, classées par sévérité.
+
+Cette analyse alimente l'étape 9 (plan d'action) et précise les actions des étapes 3 et 4 (équipements, comptages) lorsqu'elles touchent à la chaîne thermique.
+
+---
+
+*[Pied de page] Chapitre 5 / 11 — Régulation thermique*
+
+---
+
+# Chapitre 6 — Évaluer la supervision existante
+
+
+
+---
+
+## Page 1 — Le constat majoritaire : pas de supervision, ou partielle
+
+Sur la majorité des bâtiments tertiaires que nous auditons, **il n'y a pas de supervision GTB en place** — ou il y en a une, mais partielle, ancienne, hors service, ou rachetée par un nouvel exploitant qui n'en a plus le mode d'emploi.
+
+C'est un point important à comprendre avant de plonger dans cette étape : le décret BACS n'oblige pas à *avoir* une GTB nominative. Il oblige à *remplir certaines fonctions* — suivi continu, interopérabilité, détection de dérives, mise à disposition des données. Que ces fonctions soient assurées par une GTB historique de marque connue, par une supervision développée sur mesure, ou par une combinaison de deux outils, le décret reste neutre tant que les fonctions sont effectivement tenues.
+
+L'étape 6 sert donc à deux choses, selon la situation rencontrée :
+
+- **Si une supervision existe** : évaluer méthodiquement sa couverture des exigences R175-3, R175-4 et R175-5, sujet par sujet.
+- **Si aucune supervision n'est en place** : documenter précisément ce qui manque, pour pouvoir le chiffrer à l'étape 9.
+
+Dans les deux cas, le travail produit une cartographie nette de la situation, qui sert de base au plan d'action.
+
+---
+
+## Page 2 — Identifier la supervision en place
+
+Avant d'évaluer, il faut identifier précisément. La supervision est rarement un objet unique et bien étiqueté ; c'est souvent un agrégat de plusieurs systèmes installés à différentes époques. L'auditeur consigne :
+
+- **La solution principale** — nom commercial, marque, version si possible. Plus rarement, l'absence pure et simple.
+- **La localisation physique** des serveurs et automates principaux. Important pour l'accessibilité en cas d'intervention et pour les questions de cybersécurité.
+- **Les modèles d'équipements actifs** — automates programmables, passerelles, gateways protocolaires. Ces références conditionnent la pérennité (matériels en fin de vie commerciale, support constructeur arrêté, etc.).
+- **Les protocoles supportés** — c'est ce qui détermine la capacité de la supervision à dialoguer avec les équipements terrain (étape 3) et les compteurs (étape 4).
+- **L'état général** — en service, hors service, partiellement opérationnel.
+
+Cette identification factuelle évite les jugements hâtifs. Une « vieille GTB qu'on dit obsolète » peut très bien être largement conforme aux exigences R175-3 — l'évaluation se fait sur les fonctions, pas sur l'année du matériel.
+
+---
+
+## Page 3 — Les domaines réellement pilotés
+
+Le R175-1 §4 liste les domaines de gestion technique concernés par le décret. Toutes les installations ne pilotent pas tous ces domaines. L'auditeur examine, pour chaque domaine — chauffage, refroidissement, ventilation, eau chaude sanitaire, éclairage — si la supervision en place le couvre effectivement, et avec quelle profondeur.
+
+Trois cas typiques :
+
+- **Domaine couvert et opérationnel** — la supervision pilote, monitor, journalise. Conformité possible (à examiner sur les exigences R175-3 §1 et §2 ci-dessous).
+- **Domaine couvert sur le papier, défaillant sur le terrain** — la supervision est censée gérer le domaine, mais soit les équipements sont déconnectés (cas évoqué à l'étape 3 avec la liaison rompue), soit les fonctionnalités ne sont plus utilisées (paramètres obsolètes, alarmes désactivées). C'est une non-conformité partielle qui appelle des actions de remise à niveau, généralement moins coûteuses qu'un déploiement complet.
+- **Domaine non couvert** — la supervision ignore le domaine. Soit parce qu'il n'a jamais été intégré, soit parce que l'extension n'a pas suivi un changement d'usage du bâtiment. Action d'extension à chiffrer.
+
+---
+
+## Page 4 — L'évaluation R175-3 §1 et §2
+
+Deux exigences fonctionnelles centrales du décret, à examiner avec précision.
+
+### R175-3 §1 — Suivi continu des consommations
+
+L'auditeur vérifie trois choses :
+
+- **La continuité du suivi** : la supervision enregistre-t-elle effectivement les consommations à un pas suffisant (horaire au minimum) ? Vérification sur la console, pas sur la documentation.
+- **Le format d'archivage** : les données sont-elles stockées dans une base structurée et exportable, ou dans un format propriétaire qui empêcherait toute migration ?
+- **La rétention cinq ans** : l'auditeur vérifie qu'on peut effectivement consulter une courbe de consommation d'il y a quatre ou cinq ans sur la console — pas seulement que la supervision *prétend* conserver cinq ans. Le test concret se fait en demandant à voir une courbe de chauffage de l'hiver précédent, par exemple.
+
+### R175-3 §2 — Détection des pertes d'efficacité
+
+Cette exigence est souvent la plus mal couverte. Elle suppose que la supervision a été configurée avec des **règles d'alerte sur les dérives** — écart anormal de consommation à conditions équivalentes, baisse de COP d'une PAC, surconsommation hors plage horaire. L'auditeur examine la liste des alertes effectivement actives, et si possible un historique des alertes déclenchées dans l'année écoulée. Une supervision sans alerte active depuis 24 mois est, en pratique, non conforme à cette exigence — quel que soit le matériel installé.
+
+---
+
+## Page 5 — La mise à disposition des données et la maintenance
+
+### Mise à disposition des données
+
+Le décret R175-3 prévoit que les données soient mises à disposition de **deux types d'acteurs distincts** : le gestionnaire du bâtiment (asset manager, property manager, propriétaire) et les exploitants des systèmes techniques (bureau d'études, intégrateur, mainteneur). L'auditeur examine les procédures effectives :
+
+- Les données sont-elles accessibles au gestionnaire (rapport mensuel, accès portail, export CSV) ?
+- Les données sont-elles transmises aux exploitants (procédure documentée, fréquence, format) ?
+- Existe-t-il une trace écrite de ces procédures, ou tout repose-t-il sur des habitudes orales ?
+
+Une supervision techniquement excellente peut être non conforme R175-3 si les procédures de mise à disposition n'existent pas formellement.
+
+### R175-4 — Vérifications périodiques
+
+L'auditeur examine le **carnet d'entretien** de la supervision — existe-t-il, est-il à jour, qui le remplit ? Trois éléments factuels sont consignés : l'existence de procédures écrites, la périodicité effective des interventions, le responsable identifié (interne ou prestataire). Une supervision sans aucun document de maintenance formalisé n'est pas conforme R175-4, indépendamment de la qualité technique de l'installation.
+
+### R175-5 — Formation de l'exploitant
+
+L'auditeur cherche **l'attestation de formation** — quand l'exploitant en place a-t-il été formé à l'utilisation de la supervision, par quel organisme, sur quels sujets ? La formation initiale du livreur de l'installation suffit rarement à dix ans d'écart, après changements d'équipe. C'est l'une des non-conformités les plus fréquentes — et l'une des plus simples à corriger.
+
+---
+
+## Page 6 — Notes libres par sujet
+
+Au-delà des exigences strictes du décret, l'auditeur consigne des **observations libres par sujet**, qui complètent l'analyse réglementaire. Huit sujets sont systématiquement examinés :
+
+- L'analyse fonctionnelle existante de la supervision.
+- Les usages réellement pilotés (cohérence avec l'analyse de la page 3).
+- Les équipements intégrés à la supervision.
+- Les compteurs intégrés à la supervision.
+- Les capacités effectives R175-3 (suivi, détection).
+- La mise à disposition des données.
+- Les vérifications périodiques.
+- La formation de l'exploitant.
+
+Pour chaque sujet, l'auditeur écrit librement ce qu'il constate, ce qui pose problème, et ce que Buildy peut éventuellement améliorer. Ces observations enrichissent le rapport au-delà de la stricte évaluation R175. Elles sont reprises dans la synthèse de l'étape 10 et alimentent le dialogue avec le propriétaire.
+
+---
+
+## Page 7 — Ce que produit cette étape
+
+À l'issue de l'étape 6, le dossier d'audit comporte :
+
+- L'identification précise de la supervision en place (ou de son absence).
+- L'évaluation des cinq domaines pilotables (chauffage, refroidissement, ventilation, ECS, éclairage).
+- L'évaluation des exigences R175-3 §1 et §2 (suivi continu, détection de dérives).
+- L'évaluation des procédures de mise à disposition des données.
+- L'évaluation R175-4 (vérifications périodiques) et R175-5 (formation).
+- Les notes libres par sujet, qui complètent l'analyse réglementaire.
+
+Cette analyse alimente l'étape 9 (plan d'action), où chaque non-conformité génère une action chiffrée. Elle alimente aussi la synthèse de l'étape 10, où elle est mise en perspective au regard de l'usage et des objectifs du gestionnaire.
+
+---
+
+*[Pied de page] Chapitre 6 / 11 — Supervision existante*
+
+---
+
+# Chapitre 7 — Check-list documentaire
+
+
+
+---
+
+## Page 1 — Pourquoi cette étape ne peut pas être négligée
+
+Un audit BACS ne se limite pas à ce qui se voit sur le terrain. Il s'appuie aussi sur **les pièces documentaires du bâtiment** — plans, schémas, contrats, accès. Sans ces pièces, deux conséquences :
+
+- Le rapport d'audit reste lacunaire (impossible de croiser les valeurs relevées avec les valeurs de référence).
+- Le contrôle préfectoral éventuel se passe mal — le décret prévoit que le propriétaire doit pouvoir présenter, en plus du rapport, l'historique documentaire de son installation.
+
+L'étape 7 consiste à dresser la liste des pièces requises, à vérifier leur présence effective, et — quand elles manquent — à tracer ce manque pour qu'il alimente le plan d'action. C'est une étape simple sur le papier, qui révèle souvent des trous béants dans la mémoire technique du bâtiment.
+
+---
+
+## Page 2 — La liste des dix pièces à collecter
+
+L'auditeur procède selon une check-list standardisée, identique pour tous les bâtiments :
+
+- **Plans d'étages et de niveaux** — nécessaires au découpage des zones (étape 2) et au repérage des équipements (étape 3).
+- **Schémas électriques** (TGBT et tableaux divisionnaires) — pour comprendre la distribution électrique et identifier les compteurs existants ou à installer.
+- **Synoptique d'architecture de la GTB** — pour comprendre la couverture de la supervision existante.
+- **Plan d'adressage IP** — pour les équipements connectés et les questions de cybersécurité.
+- **Analyse fonctionnelle de la GTB existante** — le document de référence qui décrit comment la supervision a été conçue à l'origine.
+- **Coordonnées des locataires et occupants** — pour les bâtiments multi-locataires, indispensable au cadrage des frontières opérationnelles (étape 2).
+- **Schémas hydrauliques et fluides** — pour comprendre la chaîne thermique (étape 5) et identifier les vannes et pompes régulées.
+- **Carnet d'entretien et contrats de maintenance** — pour évaluer la conformité R175-4 (étape 6).
+- **Accès aux locaux techniques** — badges, codes, contacts qui permettent d'intervenir physiquement.
+- **Photos générales du site** — façades, toiture, vues d'ensemble qui contextualisent le rapport.
+
+Pour chaque pièce, l'auditeur consigne son statut : **disponible** (et alors annexée au dossier), **non disponible** (avec la raison documentée), ou **à fournir** (le propriétaire s'engage à la transmettre dans un délai défini).
+
+---
+
+## Page 3 — Que faire des pièces manquantes
+
+L'absence d'une pièce documentaire n'est pas un blocage. C'est un constat, qui appelle une décision :
+
+- **Pièce reconstituable** (plans à reproduire à partir d'un relevé, schémas à refaire à partir de l'observation terrain) → action corrective à inscrire au plan d'action de l'étape 9.
+- **Pièce remplaçable par une autre source** (un constat sur place qui supplée à un schéma manquant) → tracé dans les notes du dossier, sans action.
+- **Pièce dont l'absence empêche l'audit** (cas rare : l'analyse fonctionnelle complètement absente sur un bâtiment complexe) → l'auditeur signale au propriétaire que certaines parties de l'évaluation seront dégradées tant que la pièce n'est pas fournie.
+
+> **L'analyse fonctionnelle existante** est probablement la pièce la plus souvent manquante ou obsolète. Il n'est pas rare qu'un propriétaire récupère un bâtiment dont le dossier technique a été perdu lors d'un changement d'exploitant. La méthode Buildy reconstitue alors une analyse fonctionnelle de l'existant — c'est une prestation distincte de l'audit BACS, mais souvent indispensable pour pouvoir l'achever.
+
+---
+
+## Page 4 — Ce que produit cette étape
+
+À l'issue de l'étape 7, le dossier d'audit comporte :
+
+- La check-list des dix pièces, avec pour chacune son statut et sa source.
+- Les pièces effectivement disponibles, annexées ou référencées.
+- Les manques documentés, avec qualification (reconstituable, remplaçable, bloquant).
+- Une vue d'ensemble de la maturité documentaire du bâtiment.
+
+Cette vue alimente la synthèse finale (étape 10) et fournit au propriétaire une feuille de route claire pour combler les manques documentaires — souvent indépendamment du plan de mise en conformité technique.
+
+---
+
+*[Pied de page] Chapitre 7 / 11 — Check-list documentaire*
+
+---
+
+# Chapitre 8 — Inspections périodiques R175-5-1 et accès techniques
+
+
+
+---
+
+## Page 1 — Audit Buildy n'est pas inspection R175-5-1
+
+Le décret BACS impose deux démarches distinctes au propriétaire :
+
+- **L'audit fonctionnel de la gestion technique du bâtiment**, qui peut être interne ou externalisé. C'est la prestation que Buildy réalise.
+- **L'inspection périodique R175-5-1**, qui doit être réalisée par un **organisme tiers indépendant** — ni le propriétaire, ni l'exploitant, ni l'intégrateur GTB. Cette inspection est obligatoire à intervalles réguliers, son rapport doit être conservé pendant dix ans, et il peut être exigé en cas de contrôle.
+
+**Ces deux démarches ne se substituent pas l'une à l'autre.** Un audit Buildy aide à préparer une inspection R175-5-1 (en garantissant que le bâtiment est en état d'être inspecté), mais il ne la remplace pas. À l'inverse, une inspection R175-5-1 ne dispense pas d'un audit fonctionnel approfondi — elle vérifie la conformité, elle ne construit pas le plan d'action.
+
+L'étape 8 sert donc à **tracer les inspections officielles déjà réalisées** par des tiers, pour les intégrer au dossier sans les confondre avec l'audit Buildy.
+
+---
+
+## Page 2 — Tracer les inspections officielles existantes
+
+Pour chaque inspection R175-5-1 déjà réalisée sur le bâtiment, le dossier consigne :
+
+- **La date** de l'inspection.
+- **L'organisme** ayant réalisé l'inspection (raison sociale, numéro d'agrément éventuel).
+- **Les anomalies constatées** par l'inspecteur.
+- **Les recommandations** émises.
+- **La date de la prochaine inspection due** selon la périodicité réglementaire applicable au bâtiment.
+- **La référence du rapport** (numéro, archivage), avec la date jusqu'à laquelle il doit être conservé (dix ans après émission).
+
+Si aucune inspection R175-5-1 n'a encore été réalisée sur le bâtiment, le dossier le consigne explicitement et précise la date à laquelle la première inspection est due. C'est une information critique pour le propriétaire : un bâtiment assujetti depuis trois ans sans inspection officielle est en situation irrégulière, indépendamment de la qualité technique de son installation.
+
+---
+
+## Page 3 — Les accès techniques nécessaires à l'exploitation
+
+Au-delà des inspections, le dossier trace également les **accès techniques** indispensables à l'exploitation continue du bâtiment :
+
+- **Identifiants de la supervision** — qui détient les comptes administrateurs, où sont conservés les mots de passe, comment ils sont renouvelés.
+- **Accès distants** — VPN, plateformes web de pilotage, applications mobiles, et leurs dépendances (certificats, clés API).
+- **Contacts opérationnels** — exploitant en titre, mainteneur des équipements terrain, intégrateur de la supervision, support du fournisseur. Un bâtiment dont le mainteneur a quitté l'entreprise il y a deux ans, et dont personne ne sait à qui s'adresser pour un dépannage, est un risque opérationnel majeur — souvent invisible jusqu'à la première panne.
+
+L'auditeur ne consigne pas les mots de passe en clair dans le rapport (question de cybersécurité). Il consigne **qui détient quoi**, et signale les lacunes (compte unique partagé entre cinq personnes, mot de passe inchangé depuis le déploiement initial, certificat expiré, etc.).
+
+---
+
+## Page 4 — Ce que produit cette étape
+
+À l'issue de l'étape 8, le dossier d'audit comporte :
+
+- L'historique des inspections R175-5-1 déjà réalisées, avec leurs constats et recommandations.
+- L'identification claire de la prochaine inspection due et de l'organisme à contacter.
+- La cartographie des accès techniques au bâtiment (sans exposer les credentials eux-mêmes).
+- Les contacts opérationnels indispensables à l'exploitation continue.
+- L'identification des lacunes éventuelles (absence d'inspection, contacts orphelins, accès partagés).
+
+Cette traçabilité protège le propriétaire en cas de contrôle préfectoral, et lui donne la visibilité nécessaire pour piloter la maintenance dans la durée.
+
+---
+
+*[Pied de page] Chapitre 8 / 11 — Inspections R175-5-1 et accès techniques*
+
+---
+
+# Chapitre 9 — Le plan d'action de mise en conformité
+
+
+
+---
+
+## Page 1 — De l'inventaire au plan d'action
+
+Les huit étapes précédentes ont produit, sans hiérarchisation, **la liste exhaustive des écarts** entre la situation observée et les exigences du décret R175. À l'étape 9, l'auditeur transforme cette liste en **plan d'action chiffrable et opposable**.
+
+Le passage est important. Sans hiérarchisation, le propriétaire reçoit une masse d'informations dans laquelle il ne peut pas prioriser. Avec un plan d'action structuré, il dispose d'une feuille de route lisible, qu'il peut remettre tel quel à un intégrateur GTB pour chiffrage, ou utiliser pour arbitrer en interne quelles actions traiter en premier.
+
+La méthode Buildy applique des règles de hiérarchisation **identiques pour tous les bâtiments**. Cette uniformité est essentielle : elle permet à un propriétaire qui possède plusieurs sites de comparer les rapports entre eux et d'organiser un budget pluriannuel cohérent.
+
+---
+
+## Page 2 — Trois niveaux de sévérité
+
+Chaque action corrective est classée selon trois sévérités, qui correspondent à trois niveaux de risque pour le propriétaire :
+
+### Bloquante
+
+L'action concerne une exigence du décret qui n'est **structurellement pas tenue**. Sans cette correction, le bâtiment ne peut pas être déclaré conforme, même partiellement. Exemples typiques :
+
+- Un compteur réglementairement requis est physiquement absent.
+- La supervision n'assure aucun suivi continu des consommations (R175-3 §1).
+- Aucune supervision n'est en place sur un bâtiment soumis à l'obligation.
+
+Les actions bloquantes doivent être traitées en priorité. Le rapport recommande de les engager avant l'échéance applicable au bâtiment (1ᵉʳ janvier 2025 ou 2027 selon la puissance).
+
+### Majeure
+
+L'action concerne une exigence **partiellement tenue**, ou tenue **sur le papier mais pas sur le terrain**. La conformité n'est pas atteinte, mais l'écart est réparable sans refonte profonde. Exemples typiques :
+
+- Un compteur est présent mais non communicant.
+- Un équipement est intégré à la supervision sur le papier, mais sa liaison est cassée.
+- L'exploitant n'a pas été formé.
+- Les procédures de maintenance R175-4 ne sont pas formalisées.
+
+### Mineure
+
+L'action concerne une amélioration **utile mais non critique** au regard du décret. Le bâtiment peut être déclaré conforme sans la traiter, mais le rapport la signale parce qu'elle apporte une valeur opérationnelle réelle (économie d'énergie, fiabilité accrue, simplification de l'exploitation).
+
+---
+
+## Page 3 — Pour chaque action, ce que le rapport contient
+
+Chaque action du plan est détaillée selon une trame fixe, identique pour toutes :
+
+- **Un identifiant stable** (BACS-001, BACS-002, etc.) qui permet de la référencer sans ambiguïté dans les échanges avec les intégrateurs.
+- **Un titre court** qui dit ce qu'il faut faire, sans technicité inutile.
+- **Une description** qui contextualise — d'où vient le constat, sur quelle zone ou quel équipement, quelle observation l'a révélé.
+- **L'article R175 concerné**, cité explicitement. Cela donne à chaque action sa base légale et permet au propriétaire de répondre à un contrôle.
+- **La sévérité** (bloquante, majeure, mineure).
+- **La zone et l'équipement source**, pour que l'intégrateur sache où intervenir.
+- **Une estimation d'effort** (faible, moyen, élevé) que l'auditeur Buildy renseigne en fonction de l'expérience accumulée. Cette estimation **n'est pas un chiffrage** — c'est une indication de magnitude pour aider à la priorisation budgétaire.
+- **Des solutions alternatives**, quand l'action peut être traitée de plusieurs manières (raccorder un compteur existant *vs* le remplacer ; étendre la supervision en place *vs* la remplacer entièrement). Le propriétaire conserve ainsi sa marge d'arbitrage.
+- **Un statut de traitement** (ouverte, devisée, en cours, terminée, écartée) qui permet de suivre l'avancement dans le temps, audit après audit.
+
+---
+
+## Page 4 — Comment se construit le plan, écart par écart
+
+L'auditeur ne « décide » pas arbitrairement de la sévérité. Elle découle de la nature de l'écart constaté, selon une grille systématique :
+
+| Origine de l'écart | Action générée | Sévérité | Article |
+|---|---|---|---|
+| Équipement isolé du système d'information | Rendre l'équipement communicant | Majeure | R175-3 §3 |
+| Équipement sans arrêt manuel | Permettre l'arrêt manuel | Majeure | R175-3 §4 |
+| Équipement sans fonctionnement autonome | Activer le mode autonome | Majeure | R175-3 §4 |
+| Liaison de supervision rompue | Rétablir la liaison | Majeure | R175-3 |
+| Compteur requis absent | Installer le compteur | **Bloquante** | R175-3 §1 |
+| Compteur présent non communicant | Raccorder le compteur | Majeure | R175-3 §1 |
+| Aucune supervision en place | Déployer une supervision | **Bloquante** | R175-3 |
+| Supervision sans détection de dérives | Configurer les alertes | Majeure | R175-3 §2 |
+| Procédures de maintenance non formalisées | Établir les procédures | Majeure | R175-4 |
+| Exploitant non formé | Programmer la formation | Mineure | R175-5 |
+| Régulation thermique manquante (R175-6 applicable) | Selon contexte | Bloquante ou Majeure | R175-6 |
+
+Cette grille rend le plan **reproductible** d'un audit à l'autre — deux auditeurs Buildy intervenant sur le même bâtiment produisent un plan d'action identique. C'est une garantie de fiabilité pour le propriétaire.
+
+> **Cas des équipements hors service** — Un équipement déclaré hors service ne génère pas d'action corrective tant qu'aucun équipement ne le remplace. Il reste tracé dans l'inventaire et dans le rapport, pour mémoire et pour la planification de remplacement.
+
+> **Cas des exemptions** — Un générateur à biomasse exempté du R175-6, par exemple, ne génère aucune action. L'exemption est tracée explicitement dans le rapport pour qu'elle soit défendable face à un contrôle.
+
+---
+
+## Page 5 — Annotations commerciales et solutions alternatives
+
+Le plan d'action n'est pas seulement un constat technique. Il intègre également **des annotations commerciales** que l'auditeur ajoute pour préparer le travail des intégrateurs et de l'équipe commerciale du propriétaire :
+
+- **Notes contextuelles** — particularités d'accès, contraintes d'exploitation, périodes d'arrêt prévues, relation avec le mainteneur en place.
+- **Solutions alternatives** — quand plusieurs approches sont envisageables, l'auditeur les pose à plat. Cela évite que l'intégrateur reçoive une demande étroite et chiffre une seule solution alors qu'une autre serait moins coûteuse ou plus pérenne.
+- **Effort estimé** — magnitude qualitative (faible, moyen, élevé), pour aider à la priorisation budgétaire avant chiffrage précis.
+
+Ces annotations distinguent un audit Buildy d'une simple liste de constats : elles rendent le plan exploitable directement, sans phase intermédiaire d'analyse.
+
+---
+
+## Page 6 — Ce que produit cette étape
+
+À l'issue de l'étape 9, le dossier d'audit comporte :
+
+- Le plan d'action complet, hiérarchisé par sévérité (bloquantes, majeures, mineures).
+- Pour chaque action, sa fiche complète (identifiant, titre, description, article R175, zone, source, effort, alternatives, notes).
+- La traçabilité de chaque action vers l'écart constaté qui l'a générée — un intégrateur peut remonter de l'action à l'observation terrain qui l'a justifiée.
+- Une vue d'ensemble lisible par un décideur non technique, qui pourra arbitrer les priorités.
+
+Ce plan d'action constitue **la valeur métier centrale** de l'audit. C'est sur cette base que le propriétaire engage les travaux, sollicite les intégrateurs, et arbitre son budget de mise en conformité.
+
+---
+
+*[Pied de page] Chapitre 9 / 11 — Plan d'action de mise en conformité*
+
+---
+
+# Chapitre 10 — Synthèse et livraison du rapport
+
+
+
+---
+
+## Page 1 — Le tableau de bord de conformité R175
+
+À l'issue des neuf étapes précédentes, l'auditeur dispose de l'intégralité des éléments pour produire **la synthèse de conformité** du bâtiment au regard du décret R175. Cette synthèse prend la forme d'un tableau de bord à huit lignes, qui couvre l'ensemble des exigences réglementaires :
+
+- **Assujettissement** (R175-2) — ligne informative qui rappelle pourquoi le bâtiment est concerné, à quelle échéance, et avec quelle puissance assujettissante.
+- **Suivi continu** (R175-3 §1) — verdict de conformité sur l'enregistrement à pas horaire et la conservation cinq ans.
+- **Interopérabilité** (R175-3 §3) — verdict consolidé sur l'ensemble des équipements examinés.
+- **Arrêt manuel et fonctionnement autonome** (R175-3 §4) — verdict consolidé.
+- **Mise à disposition des données** (dernier alinéa R175-3) — verdict sur les procédures vers le gestionnaire et les exploitants.
+- **Vérifications périodiques** (R175-4) — verdict sur les procédures de maintenance.
+- **Formation de l'exploitant** (R175-5) — verdict sur les attestations existantes.
+- **Régulation thermique** (R175-6) — verdict, ou mention *non applicable* selon la date de permis et de travaux.
+
+Pour chaque ligne, trois verdicts possibles : **conforme**, **partiellement conforme** ou **non conforme**, justifiés par le détail des étapes correspondantes du rapport. Cette structure rend le rapport directement opposable face à un contrôle préfectoral.
+
+---
+
+## Page 2 — Le verdict global et la note de synthèse
+
+Au-dessus du tableau de bord, le rapport porte un **verdict global** de conformité du bâtiment, selon une logique simple et reproductible :
+
+- S'il existe au moins une action **bloquante** dans le plan, le bâtiment est déclaré **non conforme**.
+- Sinon, s'il existe au moins une action **majeure**, le bâtiment est déclaré **partiellement conforme**.
+- Sinon, le bâtiment est déclaré **conforme**.
+
+Ce verdict figure en page de couverture du rapport et conditionne sa couleur d'identification. Un propriétaire qui présente le rapport à un contrôleur sait immédiatement où il en est.
+
+Le verdict est complété par une **note de synthèse rédigée** de quelques paragraphes, qui contextualise le résultat pour des lecteurs non techniques (asset manager, direction générale, conseil d'administration). Cette note explique en langage clair :
+
+- Pourquoi le bâtiment est dans la situation où il est.
+- Quelles actions sont à engager en priorité et pour quel ordre de grandeur d'effort.
+- Quels sont les risques associés à l'inaction (échéance manquée, contrôle préfectoral, dérive énergétique).
+- Quelles sont les opportunités d'amélioration au-delà du strict décret.
+
+La note de synthèse est l'élément qui circule en interne chez le propriétaire — souvent extrait du rapport pour être présenté à un comité. L'auditeur la rédige avec ce destinataire en tête.
+
+---
+
+## Page 3 — Les quatre annexes obligatoires du rapport
+
+Le rapport d'audit BACS de Buildy comporte systématiquement **quatre annexes** qui le rendent opposable et complet :
+
+### Annexe A — Texte intégral du décret R175
+
+Les articles R175-1 à R175-6 sont reproduits in extenso. Cela permet au lecteur du rapport de croiser chaque action corrective avec l'article exact qui la justifie, sans avoir à consulter le Journal officiel. C'est aussi une garantie face à un contrôle : le rapport contient en lui-même la base légale qu'il invoque.
+
+### Annexe B — Méthodologie Buildy
+
+Les neuf hypothèses méthodologiques qui structurent l'évaluation sont explicitées : périmètre BACS retenu, seuil de puissance applicable, définition de la zone fonctionnelle, modalités d'évaluation du suivi continu, traitement de l'interopérabilité, position sur la régulation thermique, vérifications périodiques, formation, applicabilité.
+
+Cette annexe rend la démarche **auditable**. Un confrère qui prend le rapport en main peut comprendre comment l'auditeur a procédé, et reproduire le raisonnement sur un autre bâtiment.
+
+### Annexe C — Justification des préconisations
+
+Pour chaque action du plan (BACS-001, BACS-002, etc.), un paragraphe spécifique justifie son inscription : quelle observation l'a déclenchée, à quel article du décret elle se rattache, pourquoi la sévérité retenue.
+
+Cette annexe peut paraître redondante avec le plan d'action principal. Elle ne l'est pas : elle isole la traçabilité juridique de la lisibilité opérationnelle. Le plan d'action principal est conçu pour être lu et exploité ; l'annexe C est conçue pour être défendue.
+
+### Annexe D — Mentions légales et disclaimers
+
+Sept clauses qui cadrent la portée du rapport :
+
+- L'audit Buildy ne se substitue pas à l'inspection officielle R175-5-1.
+- L'évaluation est fonctionnelle, pas certificatoire (ISO 52120-1 n'est pas requise).
+- L'audit BACS ne se confond pas avec un dossier CEE BAT-TH-116.
+- Le calcul du temps de retour sur investissement reste sous la responsabilité du propriétaire.
+- L'évolution réglementaire peut modifier la portée des constats à terme.
+- Les recommandations sont indicatives et n'engagent pas leur exécution.
+- Les informations incomplètes communiquées par le propriétaire engagent sa responsabilité.
+
+Ces clauses protègent à la fois le propriétaire (en délimitant ce qu'il a acquis) et l'auditeur (en cadrant ce qu'il a livré).
+
+---
+
+## Page 4 — La livraison et la conservation
+
+Le rapport est livré au format PDF, conforme aux standards de présentation des dossiers techniques. Il comporte une page de couverture (verdict, identité du bâtiment, date), une page d'essentiel (synthèse pour décideur), un tableau de bord (huit lignes R175), les neuf chapitres détaillés, le plan d'action numéroté, et les quatre annexes.
+
+Le rapport doit être **conservé dix ans** par le propriétaire. Cette durée est cohérente avec celle exigée pour le rapport d'inspection officielle R175-5-1, et permet d'avoir à tout moment la mémoire complète des évaluations successives du bâtiment.
+
+En pratique, le propriétaire archive le rapport dans son dossier des ouvrages exécutés (DOE) du bâtiment, dans son système de GED, ou dans le coffre-fort numérique de son contrat de gestion. Le rapport peut être présenté lors d'un contrôle préfectoral, transmis à un acheteur en cas de cession du bâtiment, ou utilisé comme base de référence pour le prochain audit.
+
+---
+
+## Page 5 — Ce que produit cette étape
+
+À l'issue de l'étape 10, le propriétaire dispose :
+
+- Du tableau de bord de conformité R175 en huit lignes.
+- Du verdict global (conforme, partiellement conforme, non conforme).
+- De la note de synthèse rédigée pour les décideurs.
+- Du plan d'action numéroté et hiérarchisé.
+- Des quatre annexes obligatoires (texte du décret, méthodologie, justifications, mentions légales).
+- D'un rapport PDF complet, archivable, présentable en contrôle.
+
+À ce stade, l'audit est livré. Le travail du propriétaire commence — engagement des actions correctives, dialogue avec les intégrateurs, planification de l'inspection officielle R175-5-1 si elle n'a pas encore eu lieu.
+
+---
+
+*[Pied de page] Chapitre 10 / 11 — Synthèse et livraison*
+
+---
+
+# Chapitre 11 — Les pièges à éviter après l'audit
+
+
+
+---
+
+## Page 1 — L'audit n'est qu'un point de départ
+
+Le rapport d'audit que vous tenez n'est pas une fin en soi. C'est le **cahier des charges** à partir duquel les intégrateurs GTB vont vous proposer leurs solutions, et à partir duquel vous allez engager des travaux qui se chiffrent en milliers, voire dizaines de milliers d'euros.
+
+Sur cette dernière étape — du rapport reçu à la mise en conformité effective — quatre pièges reviennent systématiquement. Ils ne concernent pas la méthode d'audit, mais ce que le propriétaire ou le gestionnaire fait du rapport une fois livré. Les éviter, c'est gagner du temps, du budget, et garantir la pérennité de l'installation.
+
+---
+
+## Page 2 — Piège n°1 : ne consulter qu'un seul intégrateur GTB
+
+Le réflexe classique consiste à transmettre le rapport à l'intégrateur en place — celui qui maintient déjà l'installation, celui que le mainteneur connaît, celui qui a fait le devis initial. Réflexe naturel, mais souvent coûteux : sans mise en concurrence, le prix proposé n'est pas comparable, les solutions alternatives n'apparaissent pas, et la marge de négociation disparaît.
+
+**La bonne pratique est de consulter au moins trois intégrateurs GTB distincts.** Le rapport d'audit Buildy a été conçu pour rendre cette consultation simple : chaque action du plan porte un identifiant stable (BACS-001, BACS-002…), une description normée, l'article R175 source, et la sévérité associée. Les trois intégrateurs reçoivent exactement la même liste, et leurs devis peuvent être comparés **action par action**, sans ambiguïté sur ce qui est couvert ou non.
+
+> **Méthode pratique** : transmettez le rapport tel quel, sans le résumer ni le reformuler. Demandez aux intégrateurs de chiffrer **action par action en reprenant les identifiants**. Vous obtiendrez des devis qui se comparent ligne à ligne — ce qui n'est presque jamais le cas quand chaque intégrateur structure son devis selon son propre découpage.
+
+---
+
+## Page 3 — Piège n°2 : confondre fourniture de matériel et solution clé en main
+
+Un intégrateur GTB peut chiffrer ses prestations à plusieurs niveaux d'engagement. Du moins-disant au plus complet :
+
+- **Fourniture seule** — il livre les capteurs, les automates, la passerelle, et c'est tout.
+- **Fourniture et paramétrage** — il livre et configure les équipements, mais ne touche pas à ce qu'il y a autour.
+- **Solution clé en main** — il livre, paramètre, **et prend en charge tout ce qui est nécessaire à la mise en service réelle** : installation électrique (tirage de câbles, raccordements, modifications de tableaux), plomberie (vannes motorisées, sondes immergées, perçages), génie civil (saignées, percements, rebouchages), reprise de la documentation existante.
+
+**Beaucoup de devis sont chiffrés au premier ou au deuxième niveau, sans le dire explicitement.** Le propriétaire pense recevoir une solution complète ; il découvre, après signature, que l'électricien doit intervenir pour câbler les capteurs, que le plombier doit poser les sondes immergées, que les percements ne sont pas inclus. Le budget final dérape de 30 à 50 %.
+
+**Ce qu'il faut exiger dans la consultation** : la mention explicite du niveau d'engagement, et la liste des prestations annexes (électricité, plomberie, génie civil, reprise documentaire) avec leur prise en charge — *inclus*, *à charge du propriétaire*, ou *à chiffrer séparément*. Un intégrateur sérieux acceptera de répondre. Un intégrateur qui esquive la question est un signal.
+
+---
+
+## Page 4 — Piège n°3 : sous-estimer l'expérience d'utilisation de la supervision
+
+L'intégrateur livre rarement la supervision logicielle elle-même. Il intègre une solution existante — la sienne, celle d'un éditeur partenaire, ou une solution sélectionnée par le propriétaire. Cette solution logicielle est ce que l'exploitant utilisera au quotidien pendant les dix prochaines années.
+
+**Trois questions à poser systématiquement avant de retenir une solution de supervision GTB :**
+
+- **Est-elle utilisable par un exploitant non spécialiste ?** Demandez une démonstration sur un cas réel, pas une vidéo commerciale. Demandez à l'exploitant pressenti de manipuler la solution lui-même. Si la prise en main demande une formation lourde, la conformité R175-5 (formation de l'exploitant) sera plus coûteuse, et l'usage réel se dégradera dans le temps.
+- **Est-elle accessible à distance et en mobilité ?** Une supervision uniquement accessible depuis un poste fixe en local technique est, en pratique, sous-utilisée. Vérifiez la disponibilité d'un accès web sécurisé et d'une application mobile pour les déplacements terrain.
+- **Est-elle ouverte ?** Vérifiez que les données peuvent être exportées (au minimum en CSV, idéalement via une API). Une supervision propriétaire qui retient vos données vous lie à son éditeur pour toute la durée de vie de l'installation.
+
+> **Critère parfois oublié** : la pérennité de l'éditeur. Une solution logicielle excellente mais éditée par une petite structure rachetée ou liquidée trois ans après l'installation est un risque opérationnel. Privilégier les éditeurs établis, ou ceux qui s'appuient sur des standards ouverts.
+
+---
+
+## Page 5 — Piège n°4 : supervision isolée plutôt qu'intégrée à une hypervision
+
+La supervision GTB d'un bâtiment est utile pour ce bâtiment. **L'hypervision** est la couche au-dessus, qui consolide les données de tous les bâtiments d'un parc immobilier dans une vue unique : tableaux de bord agrégés, comparaisons inter-sites, alertes consolidées, reporting réglementaire centralisé.
+
+Pour un asset manager ou un property manager qui gère plus d'un site, **disposer d'une hypervision change la nature de l'exploitation** : on ne pilote plus bâtiment par bâtiment, on pilote un parc.
+
+**Avant de retenir une supervision GTB pour un bâtiment, posez la question de l'hypervision :**
+
+- La supervision proposée par l'intégrateur est-elle **compatible** avec une hypervision tierce ?
+- Quels protocoles d'échange supporte-t-elle pour exposer ses données à une couche supérieure ?
+- Si vous gérez un parc immobilier, le choix d'une supervision incompatible avec votre hypervision crée des silos qui seront coûteux à briser plus tard.
+
+> **Le bon réflexe pour un parc immobilier** : choisir d'abord l'hypervision qui consolidera votre parc dans la durée, puis sélectionner pour chaque bâtiment des supervisions GTB compatibles avec elle. L'ordre inverse — supervisions par bâtiment d'abord, hypervision après — multiplie par trois ou quatre le coût d'intégration final. Buildy propose Hyperveez comme couche d'hypervision pour les parcs immobiliers multi-sites — d'autres éditeurs occupent ce marché, le critère essentiel est la compatibilité avec les supervisions de chaque bâtiment.
+
+---
+
+## Page 6 — Ce que ce chapitre vous apporte
+
+À l'issue de la lecture de ces pièges, vous savez :
+
+- Pourquoi consulter trois intégrateurs GTB minimum, et comment leurs devis se comparent action par action grâce aux identifiants normalisés du plan d'action.
+- Comment distinguer une solution clé en main d'une fourniture partielle, et quelles prestations annexes (électricité, plomberie, génie civil) doivent être explicitement chiffrées.
+- Quels critères appliquer à la solution logicielle de supervision : simplicité d'usage, accès distant, ouverture des données, pérennité de l'éditeur.
+- Pourquoi penser hypervision dès le départ quand vous gérez plus d'un bâtiment.
+
+C'est cette dernière étape — du rapport reçu à la mise en service effective — qui détermine la qualité réelle de la mise en conformité. Un bon rapport mal exploité produit une installation moyenne. Un rapport rigoureux confronté à trois intégrateurs sérieux, comparés sur la même grille, produit une installation à la hauteur du budget engagé.
+
+---
+
+*[Pied de page] Chapitre 11 / 11 — Pièges à éviter après l'audit*
+
+---
+
+# Conclusion
+
+
+
+---
+
+## Page 1 — Récapitulatif de ce que vous venez de parcourir
+
+Vous tenez maintenant la méthode complète. Pour mesurer ce qu'elle représente, voici, sans commentaire, l'inventaire de ce qui a été parcouru chapitre par chapitre :
+
+- **10 étapes** de validation à mener dans l'ordre.
+- **7 catégories** de systèmes techniques à inventorier par zone.
+- Une matrice de comptage à compléter sur **6 usages** réglementaires multipliés par autant de zones que le bâtiment en compte.
+- Pour chaque équipement, plusieurs dimensions à qualifier : identification, caractéristiques techniques, connectivité, conformité au décret. Sur un siège social de 30 000 m², ce travail concerne **plus d'une centaine d'équipements**.
+- Une analyse de régulation thermique sur **3 niveaux** (production, distribution, émission), zone par zone, quand le R175-6 s'applique.
+- **8 sujets** à examiner sur la supervision existante, du suivi continu à la formation de l'exploitant.
+- **10 pièces documentaires** à collecter et à classer.
+- Une **logique de hiérarchisation** des actions correctives à appliquer (3 sévérités, 5 statuts de traitement, traçabilité jusqu'à l'observation source).
+- **8 lignes** au tableau de bord R175 final.
+- **4 annexes obligatoires** dans le rapport livré.
+- **10 ans** de conservation légale du rapport.
+
+> *Si vous gérez un seul bâtiment et que vous avez le temps : faites-le. Vous avez maintenant la méthode.*
+>
+> *Si vous gérez plusieurs bâtiments ou que vous voulez aller vite : appelez-nous.*
+
+Les deux choix sont légitimes. C'est pour cela que ce document existe.
+
+---
+
+## Page 2 — Vous préférez nous laisser faire ?
+
+*[Page pleine, design distinct du reste du document. Fond uniforme bleu navy `#1b2842`, texte blanc, espace généreux. À mettre en page comme une page de fin de chapitre dans Stripe Atlas.]*
+
+**Buildy réalise vos audits BACS.**
+
+Notre méthode s'applique à tous types de bâtiments tertiaires assujettis au décret R175 — commerces de centre-ville, plateaux de bureaux, sièges sociaux, cellules logistiques, établissements d'enseignement et de formation. Le rapport livré suit strictement la structure présentée dans ce manuel : tableau de bord R175, plan d'action hiérarchisé, et les quatre annexes obligatoires (texte du décret, méthodologie, justification des préconisations, mentions légales).
+
+**Tarif forfaitaire : entre 4 000 et 5 000 € HT par bâtiment.** C'est le prix qui permet de produire un audit de qualité, opposable face à un contrôle, et exploitable directement par les intégrateurs.
+
+> **Pour demander un devis ou poser une question :** [contact@buildy.fr](mailto:contact@buildy.fr)
+> [buildy.fr/audit-bacs](https://buildy.fr/audit-bacs)
+
+---
+
+## Page 3 — 4ᵉ de couverture
+
+*[Page de dos. Logo Buildy en haut. Coordonnées centrées. Signature texte en bas.]*
+
+**Une question sur ce manuel ?**
+
+Écrivez-moi : [contact@buildy.fr](mailto:contact@buildy.fr)
+
+[buildy.fr/audit-bacs](https://buildy.fr/audit-bacs)
+
+—
+
+**Kévin BROCARD**
+*Fondateur, Buildy*
+
+---
+
+## Mentions de pied (4ᵉ de couverture, petit corps de texte)
+
+Document édité par Buildy. Version 1.0 — mai 2026.
+
+Le contenu de ce document est conforme à l'état du décret R175 du Code de la construction et de l'habitation à la date de publication. Toute évolution réglementaire ultérieure peut en modifier la portée. Ce document ne constitue pas un rapport d'audit ni un avis juridique opposable — il décrit la méthode utilisée par Buildy pour réaliser ses prestations d'audit. La reproduction partielle ou totale est libre à condition de mentionner la source.
+
+---
+
+*[Pied de page] Fin du manuel — La méthode interne d'audit BACS de Buildy*

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 172;
+const TARGET_VERSION = 173;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6543,6 +6543,63 @@ function runMigrations() {
     db.pragma('user_version = 172');
   }
 
+  if (current < 173) {
+    // Base de connaissance BACS : texte des sources opposables/officielles
+    // pour que Claude (via le serveur MCP de FM) puisse repondre avec
+    // citations sourcees. Hierarchie d'autorite : opposable (decret) >
+    // officiel (FAQ ministere, guide ministere) > pro (PROFEEL) > interne.
+    //
+    // `source` : 'decree' | 'gov_faq' | 'gov_guide' | 'profeel'
+    // `authority` : 'opposable' | 'official' | 'professional' | 'internal'
+    // `kind` : 'article' | 'faq_qa' | 'guide_section' | 'glossary_term'
+    // `code` : identifiant stable (R175-3, FAQ-Q12, GUIDE-1.1...)
+    // `r175_refs` : codes R175 mentionnes (CSV, ex "R175-3,R175-6")
+    db.exec(`
+      CREATE TABLE bacs_knowledge (
+        id INTEGER PRIMARY KEY,
+        source TEXT NOT NULL CHECK (source IN ('decree','gov_faq','gov_guide','profeel')),
+        authority TEXT NOT NULL CHECK (authority IN ('opposable','official','professional','internal')),
+        kind TEXT NOT NULL CHECK (kind IN ('article','faq_qa','guide_section','glossary_term')),
+        code TEXT,
+        title TEXT NOT NULL,
+        body_text TEXT NOT NULL,
+        body_html TEXT,
+        r175_refs TEXT,
+        source_url TEXT,
+        source_page INTEGER,
+        version_label TEXT,
+        position INTEGER DEFAULT 0,
+        fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_bacs_knowledge_source ON bacs_knowledge(source);
+      CREATE INDEX idx_bacs_knowledge_kind ON bacs_knowledge(kind);
+      CREATE INDEX idx_bacs_knowledge_code ON bacs_knowledge(code);
+
+      -- Index plein-texte FTS5 sur title + body_text (recherche rapide).
+      CREATE VIRTUAL TABLE bacs_knowledge_fts USING fts5(
+        title, body_text, code, r175_refs,
+        content='bacs_knowledge', content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2'
+      );
+      CREATE TRIGGER bacs_knowledge_ai AFTER INSERT ON bacs_knowledge BEGIN
+        INSERT INTO bacs_knowledge_fts(rowid, title, body_text, code, r175_refs)
+        VALUES (new.id, new.title, new.body_text, new.code, new.r175_refs);
+      END;
+      CREATE TRIGGER bacs_knowledge_ad AFTER DELETE ON bacs_knowledge BEGIN
+        INSERT INTO bacs_knowledge_fts(bacs_knowledge_fts, rowid, title, body_text, code, r175_refs)
+        VALUES('delete', old.id, old.title, old.body_text, old.code, old.r175_refs);
+      END;
+      CREATE TRIGGER bacs_knowledge_au AFTER UPDATE ON bacs_knowledge BEGIN
+        INSERT INTO bacs_knowledge_fts(bacs_knowledge_fts, rowid, title, body_text, code, r175_refs)
+        VALUES('delete', old.id, old.title, old.body_text, old.code, old.r175_refs);
+        INSERT INTO bacs_knowledge_fts(rowid, title, body_text, code, r175_refs)
+        VALUES (new.id, new.title, new.body_text, new.code, new.r175_refs);
+      END;
+    `);
+    log.info('Migration 173 appliquee : table bacs_knowledge + FTS5 pour la base de connaissance BACS');
+    db.pragma('user_version = 173');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7501,13 +7558,22 @@ const afs = {
   restore(id) {
     db.prepare('UPDATE afs SET deleted_at = NULL WHERE id = ?').run(id);
   },
-  countByStatus() {
-    // Compteurs « Mes documents » : exclut les livres blancs (listing séparé).
-    return db.prepare(`
-      SELECT status, COUNT(*) as count FROM afs
-      WHERE deleted_at IS NULL AND kind != 'whitepaper'
-      GROUP BY status
-    `).all();
+  countByStatus(forUserId) {
+    // Compteurs « Mes documents » : exclut les livres blancs (listing séparé)
+    // et filtre par utilisateur quand `forUserId` est fourni — même règle que
+    // `list()` (propriétaire OU permission explicite). Sans filtre, on ne
+    // doit pas exposer le total de tous les documents du système.
+    let sql = `
+      SELECT status, COUNT(*) as count FROM afs a
+      WHERE deleted_at IS NULL AND kind != 'whitepaper'`;
+    const params = [];
+    if (forUserId != null) {
+      sql += ` AND (a.created_by = ?
+        OR EXISTS (SELECT 1 FROM af_permissions p WHERE p.af_id = a.id AND p.user_id = ?))`;
+      params.push(forUserId, forUserId);
+    }
+    sql += ' GROUP BY status';
+    return db.prepare(sql).all(...params);
   },
   // ── Livres blancs (mig 140) ────────────────────────────────────────
   // Liste les livres blancs « parents » (parent_af_id IS NULL) avec le

@@ -1,7 +1,17 @@
 'use strict';
 
+const crypto = require('crypto');
 const config = require('../config');
 const db = require('../database');
+
+/**
+ * Compare deux secrets en temps constant (tolère les longueurs différentes
+ * sans faire planter timingSafeEqual).
+ */
+function safeTokenEqual(presented, expected) {
+  if (!presented || !expected || presented.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+}
 
 /**
  * Cookie options helper — secure en prod ou HTTPS.
@@ -56,6 +66,37 @@ function registerAuthHook(fastify) {
     const isApi = url.startsWith('/api/');
     const isAttachment = url.startsWith('/attachments/');
     if (!isApi && !isAttachment) return;
+
+    // Auth « act-as-user » du serveur MCP de Fleet Manager : Bearer = token de
+    // service partage + identite PocketID de l'utilisateur agissant dans les
+    // headers X-Buildy-Act-*. FM est de confiance ; on resout un VRAI user
+    // Docs et on applique ses permissions normales (aucun bypass).
+    const authz = request.headers['authorization'] || '';
+    if (config.buildyDocsMcpToken && authz.startsWith('Bearer ')
+        && safeTokenEqual(authz.slice(7), config.buildyDocsMcpToken)) {
+      const sub = request.headers['x-buildy-act-sub'];
+      const issuer = request.headers['x-buildy-act-issuer'];
+      if (!sub || !issuer) {
+        return reply.code(401).send({ detail: 'Identite de l\'utilisateur agissant manquante (headers X-Buildy-Act-Sub / -Issuer)' });
+      }
+      let user = db.users.getByOidcSub(sub, issuer);
+      if (!user) {
+        // FM est de confiance : on materialise l'utilisateur Docs comme au
+        // 1er login OIDC. Sans aucun document, il ne verra rien de toute facon.
+        // email / name sont URL-encodes par FM (headers HTTP ASCII-safe).
+        const decode = (v) => { try { return v ? decodeURIComponent(v) : null; } catch { return v || null; } };
+        db.users.createFromOidc({
+          sub, issuer,
+          email: decode(request.headers['x-buildy-act-email']),
+          displayName: decode(request.headers['x-buildy-act-name']),
+        });
+        user = db.users.getByOidcSub(sub, issuer);
+      }
+      if (!user) return reply.code(401).send({ detail: 'Utilisateur agissant introuvable' });
+      request.authUser = { id: user.id, email: user.email, display_name: user.display_name };
+      db.users.touchLastSeen(user.id);
+      return;
+    }
 
     // DEV bypass : injecte un user fictif sans cookie
     if (config.devBypassAuth) {

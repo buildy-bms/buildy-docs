@@ -13,6 +13,8 @@ data/attachments/
 data/exports/
 data/repos/
 data/site-documents/
+data/whitepaper-sources/
+data/*.corrupt-*
 # Securite : si la DB est resolue ailleurs (ex: backend-node/data/) on l'ignore aussi
 **/buildy_af.db
 **/buildy_af.db-shm

@@ -322,6 +322,88 @@ Le drag-drop SortableJS reste disponible en parallele pour les deplacements rapi
 - Distinction explicite decret BACS != CEE BAT-TH-116
 - Annexes obligatoires de chaque PDF audit : A) texte integral R175 / B) methodologie Buildy / C) justification des preconisations / D) disclaimers
 
+## Base de connaissance reglementaire BACS (Lot 173)
+
+Table `bacs_knowledge` + index FTS5 `bacs_knowledge_fts` (migration 173).
+Source unifiee pour : (1) le MCP de Fleet Manager qui pilote Buildy Docs au nom
+de l'utilisateur — outils `bacs_knowledge_*` du domaine `buildy_audit` ;
+(2) les futures fonctionnalites UI (badges decret sur les sections, suggestions
+sourcees, etc.).
+
+### Schema
+- `source ∈ ('decree','gov_faq','gov_guide','profeel')` — la provenance.
+- `authority ∈ ('opposable','official','professional','internal')` — le poids juridique.
+- `kind ∈ ('article','faq_qa','guide_section','glossary_term')` — le type d'entree.
+- `code` (TEXT, unique recommande dans une source) — identifiant stable :
+  `R175-3`, `FAQ-12`, `GUIDE-1.1`, `PROFEEL-3.1.1`.
+- `title`, `body_text` (NOT NULL), `body_html` (HTML conserve pour les FAQ).
+- `r175_refs` (TEXT) — codes R175 cites dans le corps, separes par virgule
+  (extraction regex `extractR175Refs`). Utilise par `authoritative-lookup` pour
+  filtrer par article.
+- `source_url`, `source_page`, `version_label`, `position`, `fetched_at`.
+
+### Hierarchie d'autorite (toujours respecter)
+1. **opposable** — Decret R175 (seule source juridiquement opposable).
+2. **official** — FAQ ministerielle (30 entrees, mise a jour juin 2025) + guide
+   d'application V2 ministere (janvier 2026).
+3. **professional** — Guide PROFEEL v1.1 (novembre 2025), interpretation metier.
+4. **internal** — Methodologie Buildy (lib/bacs-audit-methodology.js, non
+   ingere dans `bacs_knowledge`).
+
+Toute reponse construite par un agent (Claude via MCP, futur assistant UI) doit
+citer le decret EN PREMIER s'il s'applique, puis les sources officielles, puis
+PROFEEL en interpretation. Jamais l'inverse.
+
+### Endpoints `/api/bacs-knowledge/*`
+- `GET /search?q=&source=&kind=&limit=` — recherche FTS5 prefixe, classee par
+  bm25.
+- `GET /by-source/:source?kind=&limit=` — sommaire d'une source.
+- `GET /by-code/:code` — texte integral d'une entree (404 si introuvable).
+- `GET /authoritative-lookup?q=&r175=` — vue hierarchique multi-sources :
+  retourne `{ decree, gov_faq, gov_guide, profeel }` chacun avec les 5 meilleurs
+  extraits.
+- `GET /glossary` — termes `kind='glossary_term'`.
+
+Pas d'auth specifique au-dela des gardes Docs habituelles (cookie OIDC ou
+Bearer `BUILDY_DOCS_MCP_TOKEN` + headers `X-Buildy-Act-*`).
+
+### Ingestion (`backend-node/scripts/bacs-knowledge/`)
+- `decree-articles.json` — texte integral du decret R175 extrait de Notion
+  (9 entrees : R175-1 a R175-6 + analyses historique/ISO 52120).
+- `fetch-gov-faq.mjs` — scrape les 30 FAQ ministerielles
+  (`rt-re-batiment.developpement-durable.gouv.fr/faq-bacs-NN-...html`) via
+  cheerio, ecrit `gov-faq.json`. Liste exhaustive des slugs hardcoded
+  (mise a jour si le ministere en ajoute).
+- `ingest.mjs` — point d'entree unique :
+  1. Charge `decree-articles.json` -> source `decree`, authority `opposable`,
+     kind `article`.
+  2. Charge `gov-faq.json` -> source `gov_faq`, authority `official`,
+     kind `faq_qa`.
+  3. Parse `../docs/guide_bacs_janvier_2026.pdf` (pdf-parse v2 `PDFParse` class
+     API) -> source `gov_guide`.
+  4. Parse `../docs/guide-bacs-profeel.pdf` -> source `profeel`.
+
+**Heuristique de chunking PDF (`chunkByHeadings`)** : detecte deux conventions
+de titres :
+- Avec point (guide ministere) : `1.`, `1.1.`, `1.2.1.` + libelle Capitale.
+- Sans point (PROFEEL) : `1`, `3.1.1` + titre EN MAJUSCULES.
++ filtre `NOISE_RE` qui retire les pieds/entetes recurrents (`-- N of M --`,
+`<num>\tGuide pratique...`, `<num> Guide d'application...`).
++ post-traitement : tout titre qui apparait >= 3 fois est considere comme un
+en-tete de page mal capture — son body est rapatrie dans la section reelle
+precedente.
+
+Ingestion **idempotente** : `DELETE FROM bacs_knowledge WHERE source = ?` avant
+chaque INSERT par source. Rejouer le script ne cree pas de doublons.
+
+**Relancer** apres mise a jour des sources :
+```bash
+cd buildy-docs/backend-node
+node scripts/bacs-knowledge/fetch-gov-faq.mjs   # si la FAQ ministere change
+node scripts/bacs-knowledge/ingest.mjs          # repeuple la table
+```
+Le serveur Docs n'a pas besoin d'etre relance (FTS5 reagit aux triggers AI/AD/AU).
+
 ## Synchro sites avec Fleet Manager
 - Bidirectionnelle via `site_uuid` partage + last-write-wins basé sur `updated_at`
 - Token de service Bearer `BUILDY_SITES_SYNC_TOKEN` (memes valeurs cote FM et Buildy Docs)

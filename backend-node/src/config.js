@@ -83,6 +83,11 @@ const config = Object.freeze({
   // Token Bearer pour pousser l'audit trail Docs vers FM (POST /api/fleet/docs-audit-batch).
   // Token dedie (separation de privileges avec sites-sync) — meme valeur cote FM.
   buildyDocsAuditToken: process.env.BUILDY_DOCS_AUDIT_TOKEN || '',
+  // Token de service pour l'auth « act-as-user » du serveur MCP de Fleet
+  // Manager. FM presente ce Bearer + l'identite PocketID de l'utilisateur
+  // agissant (headers X-Buildy-Act-*). Les permissions appliquees restent
+  // celles de cet utilisateur — aucun bypass. Meme valeur cote FM.
+  buildyDocsMcpToken: process.env.BUILDY_DOCS_MCP_TOKEN || '',
 
   // HTTPS (optionnel — certificats auto-signes pour acces NetBird)
   httpsEnabled: process.env.HTTPS_ENABLED === 'true',
