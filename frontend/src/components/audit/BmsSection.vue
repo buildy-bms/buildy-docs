@@ -17,6 +17,7 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BmsTopicNoteButton from '@/components/audit/BmsTopicNoteButton.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
+import CompactToggle from '@/components/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter, uploadSiteDocument } from '@/api'
@@ -108,10 +109,11 @@ function setBmsFlag(field, v) {
 
 async function patchDeviceMb(d, patch) {
   // Cohérence "Operationnel" : si on decoche Integré, on remet aussi
-  // l'autre flag a 0 pour eviter un etat aberrant.
+  // l'autre flag a false pour eviter un etat aberrant. (Boolean : le
+  // schema serveur z.boolean() refuse les 0/1 et renvoie 400.)
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
-    fullPatch.bms_integration_out_of_service = 0
+    fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(d, fullPatch)
   try {
@@ -123,7 +125,7 @@ async function patchDeviceMb(d, patch) {
 async function patchMeter(m, patch) {
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
-    fullPatch.bms_integration_out_of_service = 0
+    fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(m, fullPatch)
   try {
@@ -315,9 +317,9 @@ function hasNotes(html) {
               ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
             </p>
             <div class="flex items-center gap-3 mt-2">
-              <span class="text-xs text-gray-700">Le document d'analyse fonctionnelle n'existe pas</span>
-              <SegmentedToggle :model-value="document?.audit_existing_af_status === 'absent' ? true : (document?.audit_existing_af_status === null || document?.audit_existing_af_status === undefined ? null : false)"
-                               @update:model-value="v => emit('save-doc', { audit_existing_af_status: v === true ? 'absent' : (v === false ? '' : null) })" />
+              <span class="text-xs text-gray-700">Le document d'analyse fonctionnelle existe-t-il ?</span>
+              <SegmentedToggle :model-value="document?.audit_existing_af_status == null ? null : (document?.audit_existing_af_status === 'absent' ? false : true)"
+                               @update:model-value="v => emit('save-doc', { audit_existing_af_status: v === false ? 'absent' : (v === true ? 'present' : null) })" />
             </div>
           </div>
 
@@ -366,8 +368,8 @@ function hasNotes(html) {
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Équipement</th>
-                    <th class="text-center py-1 font-semibold w-16"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
-                    <th class="text-center py-1 font-semibold w-24"><Tooltip text="L'auditeur a vérifié sur place que la GTB voit cet équipement et que les valeurs remontent correctement."><span>Opérationnel</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB voit cet équipement et que les valeurs remontent correctement."><span>Opérationnel</span></Tooltip></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -383,20 +385,16 @@ function hasNotes(html) {
                       </span>
                     </td>
                     <td class="py-1 text-center">
-                      <div class="inline-block">
-                        <SegmentedToggle :model-value="triState(d.managed_by_bms)"
-                                         :disabled="!!d.out_of_service"
-                                         @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
-                      </div>
+                      <CompactToggle compact :model-value="triState(d.managed_by_bms)"
+                                     :disabled="!!d.out_of_service"
+                                     @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip
-                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : Oui » pour vérifier le bon fonctionnement.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer Oui après avoir vérifié sur place que la GTB voit l\'équipement.'">
-                        <div class="inline-block">
-                          <SegmentedToggle :model-value="(!d.managed_by_bms || !d.wired) ? null : triState(!d.bms_integration_out_of_service)"
-                                           :disabled="!d.managed_by_bms || !d.wired"
-                                           @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
-                        </div>
+                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB voit l\'équipement.'">
+                        <CompactToggle compact :model-value="(!d.managed_by_bms || !d.wired) ? null : triState(!d.bms_integration_out_of_service)"
+                                       :disabled="!d.managed_by_bms || !d.wired"
+                                       @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
                       </Tooltip>
                     </td>
                   </tr>
@@ -417,8 +415,8 @@ function hasNotes(html) {
                 <thead class="text-[10px] uppercase text-gray-500 tracking-wider bg-gray-50">
                   <tr>
                     <th class="text-left px-2 py-1 font-semibold">Compteur</th>
-                    <th class="text-center py-1 font-semibold w-16"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
-                    <th class="text-center py-1 font-semibold w-24"><Tooltip text="L'auditeur a vérifié sur place que la GTB relève bien le compteur et que les index remontent."><span>Opérationnel</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="Intégré à la GTB"><span>Intégré</span></Tooltip></th>
+                    <th class="text-center py-1 font-semibold w-28"><Tooltip text="L.auditeur a vérifié sur place que la GTB relève bien le compteur et que les index remontent."><span>Opérationnel</span></Tooltip></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -435,20 +433,16 @@ function hasNotes(html) {
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
-                        <div class="inline-block">
-                          <SegmentedToggle :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
-                                           :disabled="!!m.out_of_service || !m.communicating"
-                                           @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
-                        </div>
+                        <CompactToggle compact :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
+                                       :disabled="!!m.out_of_service || !m.communicating"
+                                       @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
                       </Tooltip>
                     </td>
                     <td class="py-1 text-center">
-                      <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : Oui » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer Oui après avoir vérifié sur place que la GTB relève le compteur.'">
-                        <div class="inline-block">
-                          <SegmentedToggle :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
-                                           :disabled="!m.managed_by_bms || !m.wired"
-                                           @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
-                        </div>
+                      <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : ✓ » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer ✓ après avoir vérifié sur place que la GTB relève le compteur.'">
+                        <CompactToggle compact :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
+                                       :disabled="!m.managed_by_bms || !m.wired"
+                                       @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
                       </Tooltip>
                     </td>
                   </tr>

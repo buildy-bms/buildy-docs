@@ -2,6 +2,38 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.88",
+      "date": "2026-05-25",
+      "title": "Fix 400 Intégré/Opérationnel + toggles compacts dans les tables GTB + reformulations Oui/Non",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de 400 quand on décoche « Intégré »",
+          "what": "Quand on basculait « Intégré » à Non sur un équipement/compteur de la table GTB, le serveur renvoyait 400 (le code envoyait 0 alors que le serveur attend false strict). Aligné en booléen.",
+          "where": "Card GTB desktop, tables Équipements + Compteurs intégrés.",
+          "how_to_test": "Sur un audit avec équipement intégré, cliquer Non — la sauvegarde aboutit (plus d'erreur console)."
+        },
+        {
+          "kind": "ux",
+          "title": "Tables GTB : toggles ✓/✗ compacts au lieu de Oui/Non qui débordaient",
+          "what": "Les colonnes Intégré + Opérationnel des tables Équipements/Compteurs de la GTB utilisent maintenant un toggle compact avec icônes ✓ / ✗ (au lieu de boutons Oui/Non qui débordaient sur les colonnes étroites). Les colonnes ont été élargies à w-28 pour confort.",
+          "where": "Card GTB desktop, tables Équipements + Compteurs intégrés."
+        },
+        {
+          "kind": "ux",
+          "title": "« Le document d'AF n'existe pas » devient une vraie question",
+          "what": "Le toggle « Le document d'analyse fonctionnelle n'existe pas » était une affirmation déguisée en case à cocher. Reformulé en « Le document d'analyse fonctionnelle existe-t-il ? » avec un toggle Oui/Non explicite (Oui = existe, Non = n'existe pas, neutre = pas répondu).",
+          "where": "Card GTB desktop, section Analyse fonctionnelle."
+        },
+        {
+          "kind": "ux",
+          "title": "Tous les labels de toggles compteurs/site reformulés en questions",
+          "what": "Compteurs (Requis, Présent, Communicant, Câblé GTB, Hors service) et MobileSite (Travaux générateur réalisés, Raccordé à un réseau urbain) deviennent « Requis ? », « Présent ? » etc. — clarifie que c'est une question et non une affirmation.",
+          "where": "Compteurs (table desktop + cards desktop + sheet mobile) + MobileSite."
+        }
+      ]
+    },
+    {
       "version": "0.1.87",
       "date": "2026-05-25",
       "title": "Card GTB sans checkbox : tout passe en boutons explicites Oui / Non",

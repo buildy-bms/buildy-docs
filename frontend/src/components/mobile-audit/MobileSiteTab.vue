@@ -230,7 +230,7 @@ const generatorWorksDone = computed({
       <!-- Toggle : travaux générateur -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <MobileYesNo
-          label="Travaux générateur réalisés"
+          label="Travaux générateur réalisés ?"
           description="Y a-t-il eu des travaux de remplacement / installation d'un générateur (chaudière, PAC…) après le 21/07/2021 ? Si oui, R175-6 (régulation thermique) s'applique en plus."
           :model-value="generatorWorksDone"
           @update:model-value="v => generatorWorksDone = v"
@@ -250,7 +250,7 @@ const generatorWorksDone = computed({
       <!-- Toggle : réseau urbain -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <MobileYesNo
-          label="Raccordé à un réseau urbain"
+          label="Raccordé à un réseau urbain ?"
           description="Le bâtiment reçoit son chauffage ou sa climatisation via une sous-station connectée à un réseau de chaleur / froid de quartier. Dans ce cas, la puissance retenue pour R175-2 = puissance de la station, pas des équipements aval."
           :model-value="districtConnected"
           @update:model-value="v => districtConnected = v"

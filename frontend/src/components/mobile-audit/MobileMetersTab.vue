@@ -300,7 +300,7 @@ function toggleProtocol(p) {
             <template v-if="editing?.mode === 'edit'">
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium text-gray-700">Présent physiquement sur site</p>
+                  <p class="text-base font-medium text-gray-700">Présent physiquement sur site ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur existe et est installé, peu importe s'il communique ou pas.</p>
                 </div>
                 <SegmentedToggle :model-value="!!editForm.present_actual"
@@ -309,7 +309,7 @@ function toggleProtocol(p) {
               <div v-if="editForm.present_actual"
                    class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium text-gray-700">Communicant</p>
+                  <p class="text-base font-medium text-gray-700">Communicant ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
                 </div>
                 <SegmentedToggle :model-value="!!editForm.communicating"
@@ -318,7 +318,7 @@ function toggleProtocol(p) {
               <div v-if="editForm.present_actual"
                    class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium text-gray-700">Câblé vers la GTB</p>
+                  <p class="text-base font-medium text-gray-700">Câblé vers la GTB ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le câble (RS485, Ethernet…) est physiquement raccordé à la GTB du site. Le compteur communique vraiment, pas seulement potentiellement.</p>
                 </div>
                 <SegmentedToggle :model-value="!!editForm.wired"
@@ -326,7 +326,7 @@ function toggleProtocol(p) {
               </div>
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium text-red-600">Hors service</p>
+                  <p class="text-base font-medium text-red-600">Hors service ?</p>
                   <p class="text-xs text-gray-500 mt-1">Compteur HS, débranché, ou inaccessible. Sera ignoré dans le plan d'action.</p>
                 </div>
                 <SegmentedToggle yes-danger :model-value="!!editForm.out_of_service"
