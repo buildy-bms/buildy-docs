@@ -2,6 +2,31 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.99",
+      "date": "2026-05-25",
+      "title": "Audit BACS : verrous DB sur 4 enums (lorawan + catégorie d'action + nature/type de zone)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "LoRaWAN désormais accepté en DB pour le protocole de communication d'un usage",
+          "what": "Avant : si un appel POST/PATCH tentait de saisir `communication = 'lorawan'` sur un usage (system), le serveur Zod l'acceptait mais la DB le rejetait silencieusement (CHECK constraint sur les 10 anciennes valeurs). Maintenant : le CHECK accepte les 11 valeurs (lorawan inclus) — aligné avec les schemas Zod backend, le MCP et l'UI.",
+          "where": "Migration DB 174. Table bacs_audit_systems.communication."
+        },
+        {
+          "kind": "fix",
+          "title": "3 nouveaux verrous DB sur les enums d'audit (filet anti-corruption)",
+          "what": "Ajout de CHECK constraints au niveau DB pour bloquer les valeurs invalides à l'insertion : `zones.kind` (functional/technical), `zones.nature` (28 valeurs synchro avec ZONE_NATURES), `bacs_audit_action_items.category` (15 catégories du plan d'action). Avant : un INSERT SQL direct ou un bug serveur aurait pu stocker n'importe quelle valeur — maintenant la DB refuse. La validation Zod côté routes restait la première ligne de défense ; ces CHECK sont la défense en profondeur.",
+          "where": "Migration DB 174. Tables zones et bacs_audit_action_items."
+        },
+        {
+          "kind": "perf",
+          "title": "Migration sans recréation de table (writable_schema)",
+          "what": "Les 4 CHECK ont été ajoutés via PRAGMA writable_schema (méthode officiellement recommandée par SQLite pour ce cas) au lieu de recréer les 3 tables avec INSERT SELECT. Zéro risque de perte de données, migration en moins d'une seconde. Audit préalable du snapshot prod : 0 rows hors-enum sur les 7 colonnes ciblées.",
+          "where": "Backend `database.js` migration 174."
+        }
+      ]
+    },
+    {
       "version": "0.1.98",
       "date": "2026-05-25",
       "title": "Audit BACS : ternaire `systems.present` accepté côté serveur + labels FR centralisés + script de vérification cohérence",
