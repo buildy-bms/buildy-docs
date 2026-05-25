@@ -2,6 +2,37 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.97",
+      "date": "2026-05-25",
+      "title": "Audit BACS : chiffres cohérents entre PDF et synthèse MCP — un compteur HS n'est plus compté comme manquant",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteurs « manquants » : exclusion des hors-service alignée avec le MCP",
+          "what": "Avant : le PDF des tableaux de synthèse comptait un compteur requis ET hors-service dans la colonne « manquants », alors que la synthèse MCP/Claude l'excluait (gap analysis pure). Maintenant : un compteur hors-service ne figure ni en « présent » ni en « manquant » côté PDF et MCP — un seul gap analysis cohérent partout.",
+          "where": "Backend `_export-data.js` (recapStats.metersMissing) + audit_get_summary MCP."
+        },
+        {
+          "kind": "fix",
+          "title": "Preview PDF des audits : fini le faux gonflement du compteur « intégrés GTB »",
+          "what": "Le preview HTML/PDF des audits fixtures comptait comme « intégré GTB » tout équipement avec un protocole communicant (modbus, bacnet, mqtt…), même si le champ `managed_by_bms` n'avait pas été coché. Conséquence : les chiffres du preview gonflaient artificiellement par rapport à l'export réel. Maintenant aligné sur la même règle que l'export : seul `managed_by_bms = oui` compte.",
+          "where": "Backend `_preview-fixture.js`. URLs `/api/bacs-audit/__preview-fixture` et variantes."
+        },
+        {
+          "kind": "fix",
+          "title": "Verdict couverture GTB : ne collapse plus les non-répondus en non",
+          "what": "Pour les audits Buildy GTB classique (kind=site_audit), le calcul du ratio « équipements intégrés / équipements présents » utilisait un filtre laxiste qui pouvait inclure des null. Maintenant strict (isTrue) — un équipement avec `managed_by_bms = null` (non répondu) n'est plus compté comme intégré ou non intégré dans le verdict.",
+          "where": "Backend `_compliance-summary.js` (buildClassiqueSummary)."
+        },
+        {
+          "kind": "perf",
+          "title": "Helper ternaire centralisé `_ternary.js`",
+          "what": "Tous les comptages ternaires (managed_by_bms, wired, communicating, etc.) passent maintenant par un helper unique `isTrue / isFalse / isUnanswered / ternaryCounts`. Évite la duplication de logique entre _export-data, _compliance-summary, _preview-fixture — toute nouvelle agrégation utilisera cette base.",
+          "where": "Backend `routes/bacs-audit/_ternary.js` (nouveau)."
+        }
+      ]
+    },
+    {
       "version": "0.1.96",
       "date": "2026-05-25",
       "title": "Audit BACS : les chiffres « X intégrés GTB » ne mélangent plus les non-répondus avec les non",

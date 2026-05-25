@@ -29,6 +29,7 @@ const { loadAssetDataUrl } = require('../../lib/pdf');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
+const { isTrue, isFalse } = require('./_ternary');
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
@@ -896,16 +897,23 @@ async function buildFixturePreviewData({ user = null } = {}) {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
-  // Recap chiffre pour le PDF tableaux de synthese (4 tuiles d'en-tete)
+  // Recap chiffre pour le PDF tableaux de synthese (4 tuiles d'en-tete).
+  // ALIGNÉ avec _export-data.js (audit réel) — pas de fallback ad-hoc sur le
+  // protocole de communication (le préfixe `managed_by_bms` est la source de
+  // vérité unique pour l'intégration GTB).
   const recapStats = {
     devicesTotal: devices.length,
     devicesPresent: devices.filter(d => !d.out_of_service).length,
-    devicesIntegrated: devices.filter(d => d.managed_by_bms === 1 || COMMUNICANT_PROTOS.includes(d.communication_protocol)).length,
+    devicesIntegrated: devices.filter(d => isTrue(d.managed_by_bms)).length,
+    devicesIntegratedUnanswered: devices.filter(d => d.managed_by_bms == null).length,
+    devicesIntegratedFalse: devices.filter(d => isFalse(d.managed_by_bms)).length,
     devicesHs: devices.filter(d => d.out_of_service).length,
     metersRequired: enrichedMeters.filter(m => m.required).length,
     metersPresent: enrichedMeters.filter(m => m.present_actual && !m.out_of_service).length,
-    metersIntegrated: enrichedMeters.filter(m => m.managed_by_bms).length,
-    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
+    metersIntegrated: enrichedMeters.filter(m => isTrue(m.managed_by_bms)).length,
+    metersIntegratedUnanswered: enrichedMeters.filter(m => m.managed_by_bms == null).length,
+    metersIntegratedFalse: enrichedMeters.filter(m => isFalse(m.managed_by_bms)).length,
+    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
   };
 
   // ── Items 5 + 8 — cumul automatique des puissances chaud / froid ──
