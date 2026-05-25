@@ -2,6 +2,31 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.96",
+      "date": "2026-05-25",
+      "title": "Audit BACS : les chiffres « X intégrés GTB » ne mélangent plus les non-répondus avec les non",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le verdict R175 d'un audit n'est plus « Conforme » par défaut quand la GTB n'a pas été qualifiée",
+          "what": "Avant : sur un audit où l'auditeur n'avait pas encore répondu à la question « une GTB existe-t-elle ? » (bms.present = null), le tableau de conformité R175 affichait les axes 3°/4°/5° en vert « Conforme » dès qu'aucune action n'était générée — ce qui poussait Claude (et les utilisateurs) à conclure à tort. Maintenant : tant que la présence GTB n'est pas répondue, ces axes affichent un verdict `unknown` libellé « À qualifier », et le verdict global global passe aussi à « À qualifier » si le résultat sans GTB renseignée serait « Conforme ». Nouveau libellé visible dans le tableau de bord PDF et dans le retour MCP.",
+          "where": "lib bacs-audit `_compliance-summary.js` (verdicts dashboard + verdict global). PDF tableau de bord R175. Outils MCP audit_get / audit_compliance_review qui exposent ces verdicts."
+        },
+        {
+          "kind": "fix",
+          "title": "Tuiles PDF « X intégrés GTB » : ajoute « Y non répondu » quand applicable",
+          "what": "Sur le PDF des tableaux de synthèse, les tuiles « Équipements » et « Compteurs » affichaient « 2 intégrés GTB · 1 HS » sans distinguer combien d'équipements/compteurs étaient encore à qualifier. Maintenant : « 2 intégrés GTB · 21 non répondu · 1 HS » si des saisies sont à null. Quand tout est répondu, l'affichage est inchangé.",
+          "where": "PDF des tableaux de synthèse (export Tableaux)."
+        },
+        {
+          "kind": "fix",
+          "title": "Synthèse Claude des audits : règle d'or contre l'agrégation null → non",
+          "what": "Le system prompt envoyé à Claude pour générer la synthèse d'un audit (assistAuditSynthesis) interdit désormais explicitement d'écrire « X équipements intégrés GTB, Y non intégrés » sans tenir compte des champs à null (non répondus). Si plus de 30 % des `managed_by_bms` sont à null, Claude doit écrire « L'intégration GTB reste à qualifier avant de pouvoir conclure » plutôt qu'un chiffre faux.",
+          "where": "Backend lib/claude.js SYSTEM_PROMPT_SYNTHESIS. Régénération de la synthèse côté audit pour bénéficier du fix."
+        }
+      ]
+    },
+    {
       "version": "0.1.95",
       "date": "2026-05-25",
       "title": "Hotfix sécurité : un utilisateur ne peut plus modifier les sous-ressources d'un audit qui ne lui est pas partagé",

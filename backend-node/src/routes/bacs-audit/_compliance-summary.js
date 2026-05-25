@@ -63,11 +63,12 @@ const VERDICT_LABEL = {
   partial:       'Partiellement conforme',
   non_compliant: 'Non conforme',
   na:            'Non applicable',
+  unknown:       'À qualifier',
   info:          'Statut',
 };
 
 const VERDICT_ICON = {
-  compliant: '✓', partial: '⚠', non_compliant: '✗', na: '–', info: 'i',
+  compliant: '✓', partial: '⚠', non_compliant: '✗', na: '–', unknown: '?', info: 'i',
 };
 
 // Calcul d'assujettissement R175-2 : déroulé en 3 lignes (puissance + PC + seuil)
@@ -120,7 +121,12 @@ function buildComplianceSummary({
   const major    = actionItems.major?.length || 0;
   const minor    = actionItems.minor?.length || 0;
 
-  const verdict = verdictFromActions({ blocking, major });
+  let verdict = verdictFromActions({ blocking, major });
+  // Verdict global "compliant" interdit si la GTB n'a pas été qualifiée.
+  // Sans réponse à la question présence GTB, on ne peut pas conclure.
+  if (verdict === 'compliant' && (!bms || bms.present == null)) {
+    verdict = 'unknown';
+  }
 
   // 3 actions phares : 3 premières en sévérité descendante (bloquantes
   // d'abord, puis majeures si moins de 3 bloquantes).
@@ -143,7 +149,11 @@ function buildComplianceSummary({
 
   // Sans GTB sur le site, les exigences qui PORTENT sur la GTB ne peuvent
   // pas être satisfaites — quel que soit le nombre d'actions générées.
+  // Si la GTB n'a pas été QUALIFIÉE (bms.present == null), le verdict des
+  // axes GTB-dépendants est INCONNU (« à qualifier »), surtout pas
+  // « conforme » sous prétexte qu'il n'y a pas d'actions générées.
   const noGtb = !!bms && bms.present === 0;
+  const bmsUnanswered = !bms || bms.present == null;
   const GTB_DEPENDENT_AXES = new Set([
     'r175_3_3', 'r175_3_4', 'r175_3_data', 'r175_4', 'r175_5',
   ]);
@@ -160,6 +170,9 @@ function buildComplianceSummary({
     } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
       // Pas de GTB → exigence GTB non satisfaite par construction.
       v = 'non_compliant';
+    } else if (bmsUnanswered && GTB_DEPENDENT_AXES.has(ex.axis)) {
+      // GTB non qualifiée → verdict indéterminable sur cet axe.
+      v = 'unknown';
     } else {
       v = verdictFromActions({ blocking: bucket.blocking, major: bucket.major });
     }
@@ -171,6 +184,8 @@ function buildComplianceSummary({
       contextSummary = `Non applicable — ${r175_6_applicable.reason}.`;
     } else if (noGtb && GTB_DEPENDENT_AXES.has(ex.axis)) {
       contextSummary = 'Aucune GTB sur le site — exigence non satisfaite.';
+    } else if (bmsUnanswered && GTB_DEPENDENT_AXES.has(ex.axis)) {
+      contextSummary = 'GTB non renseignée — verdict non calculable tant que la question n\'est pas répondue.';
     }
     return {
       code: ex.code,
