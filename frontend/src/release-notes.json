@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.94",
+      "date": "2026-05-25",
+      "title": "Fix calcul puissance : splits/DRV cooling étaient comptés en chaud",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Splits et DRV en catégorie cooling : la puissance saisie va bien en froid",
+          "what": "Un split air-air ou DRV non réversible saisi avec power_kw=3 (et power_kw_cooling laissé vide) dans un système de catégorie cooling était considéré comme un appareil thermodynamique et basculé en CHAUD par la règle « puissance dominante = poste chaud ». Résultat : les 21,7 kW de splits cooling de l'audit Communay étaient ajoutés au total chaud → 133,7 kW retenu au lieu de 112 kW. Fix : pour les équipements en catégorie cooling stricte, la puissance saisie (qu'elle soit dans power_kw ou power_kw_cooling) est toujours classée en froid.",
+          "where": "Backend lib/bacs-audit-power.js devicePowerContribution.",
+          "how_to_test": "Audit avec splits cooling sans power_kw_cooling : la puissance retenue R175-2 doit correspondre à max(chaud, froid), pas à somme."
+        }
+      ]
+    },
+    {
       "version": "0.1.93",
       "date": "2026-05-25",
       "title": "Puissance totale BACS recalculée et persistée à chaque modif d'équipement",
