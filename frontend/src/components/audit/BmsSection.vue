@@ -103,11 +103,11 @@ function saveBmsDebounced() {
 const triState = (v) => (v == null ? null : !!v)
 
 // Filtre les listes "intégrés à la GTB" par les usages que la GTB traite
-// effectivement (toggles "Usages traités" ci-dessus). Si l'auditeur n'a coché
-// AUCUN usage (état initial), on n'applique pas de filtre — sinon on
-// masquerait toute la liste avant qu'il ait commencé à répondre.
+// effectivement (toggles "Usages traités" ci-dessus). Si la GTB ne traite
+// AUCUN usage (rien coché), on n'affiche AUCUN équipement/compteur — la
+// question "intégrés à la GTB" n'a pas de sens.
 const gtbManagesCategory = (cat) => {
-  if (!bms.value) return true
+  if (!bms.value) return false
   switch (cat) {
     case 'heating': return !!bms.value.manages_heating
     case 'cooling': return !!bms.value.manages_cooling
@@ -115,17 +115,17 @@ const gtbManagesCategory = (cat) => {
     case 'dhw': return !!bms.value.manages_dhw
     case 'lighting_indoor':
     case 'lighting_outdoor': return !!bms.value.manages_lighting
-    default: return true  // electricity_production, autres → on garde
+    default: return false
   }
 }
 const gtbManagesMeterUsage = (usage) => {
-  if (!bms.value) return true
+  if (!bms.value) return false
   switch (usage) {
     case 'heating': return !!bms.value.manages_heating
     case 'cooling': return !!bms.value.manages_cooling
     case 'dhw': return !!bms.value.manages_dhw
     case 'lighting': return !!bms.value.manages_lighting
-    default: return true  // pv, other → on garde
+    default: return false
   }
 }
 const anyUsageManaged = computed(() => !!bms.value && (
@@ -133,14 +133,10 @@ const anyUsageManaged = computed(() => !!bms.value && (
   bms.value.manages_ventilation || bms.value.manages_dhw ||
   bms.value.manages_lighting
 ))
-const filteredDevices = computed(() => {
-  if (!anyUsageManaged.value) return props.devicesWithMeta
-  return props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category))
-})
-const filteredMeters = computed(() => {
-  if (!anyUsageManaged.value) return props.metersPresent
-  return props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage))
-})
+const filteredDevices = computed(() =>
+  props.devicesWithMeta.filter(d => gtbManagesCategory(d.system_category)))
+const filteredMeters = computed(() =>
+  props.metersPresent.filter(m => gtbManagesMeterUsage(m.usage)))
 // Bascule un champ booléen de la GTB (1/0) + sauvegarde debounced.
 function setBmsFlag(field, v) {
   bms.value[field] = v == null ? null : (v ? 1 : 0)
@@ -452,7 +448,10 @@ function hasNotes(html) {
                   </tr>
                 </tbody>
               </table>
-              <p v-else class="text-xs text-gray-400 italic">Aucun équipement saisi.</p>
+              <p v-else-if="!anyUsageManaged" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                ⚠ Coche d'abord au moins un usage dans « Usages traités par la GTB » ci-dessus pour voir les équipements concernés.
+              </p>
+              <p v-else class="text-xs text-gray-400 italic">Aucun équipement saisi dans les usages cochés.</p>
             </div>
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
@@ -500,8 +499,11 @@ function hasNotes(html) {
                   </tr>
                 </tbody>
               </table>
+              <p v-else-if="!anyUsageManaged" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                ⚠ Coche d'abord au moins un usage dans « Usages traités par la GTB » ci-dessus pour voir les compteurs concernés.
+              </p>
               <p v-else class="text-xs text-gray-400 italic">
-                Aucun compteur présent à raccorder.
+                Aucun compteur présent dans les usages cochés.
                 <span v-if="meters.length" class="block mt-1">Coche « Présent » dans la section 4 pour rendre les compteurs disponibles ici.</span>
               </p>
             </div>

@@ -136,11 +136,11 @@ const devicesWithMeta = computed(() => {
 
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
 
-// Filtre par usages GTB (si l'auditeur a coché au moins un usage, on ne liste
-// que les équipements/compteurs des catégories correspondantes — sinon on
-// affiche tout pour ne pas masquer la liste avant qu'il commence à répondre).
+// Filtre par usages GTB : si la GTB ne traite AUCUN usage (rien coché), on
+// n'affiche aucun équipement/compteur — la question "intégrés à la GTB" n'a
+// pas de sens dans ce cas. C'est à l'auditeur de cocher les usages d'abord.
 const gtbManagesCategory = (cat) => {
-  if (!bms.value) return true
+  if (!bms.value) return false
   switch (cat) {
     case 'heating': return !!bms.value.manages_heating
     case 'cooling': return !!bms.value.manages_cooling
@@ -148,17 +148,17 @@ const gtbManagesCategory = (cat) => {
     case 'dhw': return !!bms.value.manages_dhw
     case 'lighting_indoor':
     case 'lighting_outdoor': return !!bms.value.manages_lighting
-    default: return true
+    default: return false
   }
 }
 const gtbManagesMeterUsage = (usage) => {
-  if (!bms.value) return true
+  if (!bms.value) return false
   switch (usage) {
     case 'heating': return !!bms.value.manages_heating
     case 'cooling': return !!bms.value.manages_cooling
     case 'dhw': return !!bms.value.manages_dhw
     case 'lighting': return !!bms.value.manages_lighting
-    default: return true
+    default: return false
   }
 }
 const anyUsageManaged = computed(() => !!bms.value && (
@@ -166,14 +166,10 @@ const anyUsageManaged = computed(() => !!bms.value && (
   bms.value.manages_ventilation || bms.value.manages_dhw ||
   bms.value.manages_lighting
 ))
-const filteredDevices = computed(() => {
-  if (!anyUsageManaged.value) return devicesWithMeta.value
-  return devicesWithMeta.value.filter(d => gtbManagesCategory(d.system_category))
-})
-const filteredMeters = computed(() => {
-  if (!anyUsageManaged.value) return metersPresent.value
-  return metersPresent.value.filter(m => gtbManagesMeterUsage(m.usage))
-})
+const filteredDevices = computed(() =>
+  devicesWithMeta.value.filter(d => gtbManagesCategory(d.system_category)))
+const filteredMeters = computed(() =>
+  metersPresent.value.filter(m => gtbManagesMeterUsage(m.usage)))
 
 const USAGES = [
   { key: 'manages_heating', label: 'Chauffage', category: 'heating' },
