@@ -307,29 +307,29 @@ onBeforeUnmount(teardownMetersSortable)
         <!-- État compteur : segmented toggles (présent / absent explicite) -->
         <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
           <label class="flex items-center justify-between gap-2">
-            <span class="text-gray-700">Requis</span>
+            <span class="text-gray-700">Requis ?</span>
             <SegmentedToggle compact :model-value="!!m.required"
                              @update:model-value="v => patchMeter(m, { required: v })" />
           </label>
           <label class="flex items-center justify-between gap-2">
-            <span class="text-gray-700">Présent</span>
+            <span class="text-gray-700">Présent ?</span>
             <SegmentedToggle compact :model-value="!!m.present_actual"
                              @update:model-value="v => patchMeter(m, { present_actual: v })" />
           </label>
           <label v-if="m.present_actual" class="flex items-center justify-between gap-2">
-            <span class="text-gray-700">Communicant</span>
+            <span class="text-gray-700">Communicant ?</span>
             <SegmentedToggle compact :model-value="!!m.communicating"
                              @update:model-value="v => patchMeter(m, v
                                ? { communicating: true }
                                : { communicating: false, communication_protocols: null, communication_protocol: null })" />
           </label>
           <label v-if="m.present_actual" class="flex items-center justify-between gap-2">
-            <span class="text-gray-700">Câblé GTB</span>
+            <span class="text-gray-700">Câblé GTB ?</span>
             <SegmentedToggle compact :model-value="!!m.wired"
                              @update:model-value="v => patchMeter(m, { wired: v })" />
           </label>
           <label class="flex items-center justify-between gap-2 col-span-2">
-            <span class="text-gray-700">Hors service</span>
+            <span class="text-gray-700">Hors service ?</span>
             <SegmentedToggle compact yes-danger :model-value="!!m.out_of_service"
                              @update:model-value="v => patchMeter(m, { out_of_service: v })" />
           </label>
