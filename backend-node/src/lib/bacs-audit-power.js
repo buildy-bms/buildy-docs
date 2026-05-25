@@ -188,10 +188,46 @@ function resolveTotalPower(document, auto) {
   };
 }
 
+/**
+ * Recalcule la puissance totale d'un audit depuis ses devices et la PERSISTE
+ * dans afs.bacs_total_power_kw — uniquement si source='auto' (sinon respecte
+ * la valeur manuelle saisie par l'auditeur).
+ *
+ * À appeler après chaque modif/ajout/suppression de device pour que la
+ * valeur stockée reflète toujours le calcul réel (sinon elle dérive et
+ * l'UI / les readers brut document.bacs_total_power_kw voient une valeur
+ * obsolete — incident audit Communay 2026-05-25).
+ *
+ * @param {object} db — instance better-sqlite3 (db.db ou équivalent).
+ * @param {number} documentId — id de l'AF.
+ */
+function recomputeAndPersistAuditPower(db, documentId) {
+  // Lis tous les devices in-scope de l'audit avec leur catégorie système.
+  const devices = db.prepare(`
+    SELECT d.id, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
+           d.is_backup, d.out_of_service, s.system_category
+    FROM bacs_audit_system_devices d
+    JOIN bacs_audit_systems s ON s.id = d.system_id
+    WHERE s.document_id = ?
+  `).all(documentId);
+  const auto = computeAutoPower(devices);
+
+  const af = db.prepare('SELECT bacs_total_power_source FROM afs WHERE id = ?').get(documentId);
+  if (!af) return null;
+  // Ne touche bacs_total_power_kw QUE si source='auto' (ou null = auto par défaut).
+  // Si source='manual' ou 'manual_override', l'auditeur a saisi à la main → respect.
+  const source = af.bacs_total_power_source || 'auto';
+  if (source === 'auto') {
+    db.prepare('UPDATE afs SET bacs_total_power_kw = ? WHERE id = ?').run(auto.retainedKw, documentId);
+  }
+  return auto;
+}
+
 module.exports = {
   POWER_CALC_TYPE_LABEL,
   inferPowerCalculationType,
   devicePowerContribution,
   computeAutoPower,
   resolveTotalPower,
+  recomputeAndPersistAuditPower,
 };
