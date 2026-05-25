@@ -191,6 +191,7 @@ function computeTargetActions(documentId) {
     // Les devices Hors-Service sont ignores (pas d'action generee).
     const sysDevices = db.db.prepare(`
       SELECT id, name, brand, model_reference, communication_protocol,
+             communication_protocols, wired,
              meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service,
              managed_by_bms, bms_integration_out_of_service, equipment_template_id
       FROM bacs_audit_system_devices WHERE system_id = ?
@@ -230,18 +231,47 @@ function computeTargetActions(documentId) {
       const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
       const devLabel = `${devName} (${catFr}${zoneStr.replace(' en zone', ' —')})`;
 
-      // R175-3 §3 — interoperabilite : inferee de communication_protocol.
-      // Non-communicant si null, 'non_communicant' ou 'absent'.
-      const isNonCommunicating = !d.communication_protocol ||
-        d.communication_protocol === 'non_communicant' ||
-        d.communication_protocol === 'absent';
-      if (isNonCommunicating) {
+      // R175-3 §3 — interoperabilite. Deux cas distincts :
+      //  1. Equipement communicant mais NON cable a la GTB => action de
+      //     raccordement (effort moderé, l'equipement est deja capable).
+      //  2. Equipement NON communicant (aucun protocole) => action de
+      //     remplacement par un equipement communicant (effort important,
+      //     a planifier sur le renouvellement equipement).
+      // Sources protocoles : communication_protocols (multi, JSON array
+      // string — champ courant) en priorite, fallback communication_protocol
+      // (mono, legacy).
+      let protocolsArr = [];
+      if (d.communication_protocols) {
+        try { protocolsArr = JSON.parse(d.communication_protocols); }
+        catch { protocolsArr = []; }
+      }
+      const legacyMono = d.communication_protocol &&
+        d.communication_protocol !== 'non_communicant' &&
+        d.communication_protocol !== 'absent';
+      if (!protocolsArr.length && legacyMono) protocolsArr = [d.communication_protocol];
+      const hasValidProtocol = protocolsArr.some(p =>
+        p && p !== 'non_communicant' && p !== 'absent');
+
+      if (!hasValidProtocol) {
+        // Cas 2 : non communicant — remplacement preconise.
         addTarget({
-          source_device_id: d.id, source_subtype: 'r175_3_p3',
+          source_device_id: d.id, source_subtype: 'r175_3_p3_replace',
           category: 'communication_upgrade', severity: 'major',
           r175_article: 'R175-3 §3',
-          title: `Rendre communicant l'équipement « ${devName} »`,
-          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne satisfait pas l'exigence d'interopérabilité (R175-3 §3). Il devrait exposer au moins un protocole standard ouvert (BACnet, Modbus, KNX, M-Bus, MQTT, LoRaWAN).`,
+          title: `Prévoir le remplacement de « ${devName} » par un équipement communicant`,
+          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne dispose d'aucun protocole de communication et ne peut pas être raccordé au BACS en l'état. Conformément au guide PROFEEL (section 3.1.2), lorsqu'un équipement de régulation existant ne permet pas une communication avec un BACS, son remplacement est à envisager. À planifier lors du prochain remplacement ou renouvellement de l'équipement.`,
+          zone_id: s.zone_id, equipment_id: null,
+        });
+      } else if (!d.wired && !d.managed_by_bms) {
+        // Cas 1 : communicant mais ni cable ni integre a la GTB
+        // (l'equipement parle mais personne ne l'ecoute encore).
+        const protocolList = protocolsArr.join(', ');
+        addTarget({
+          source_device_id: d.id, source_subtype: 'r175_3_p3_connect',
+          category: 'bms_upgrade', severity: 'major',
+          r175_article: 'R175-3 §3',
+          title: `Raccorder « ${devName} » à la GTB`,
+          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) dispose d'un protocole de communication (${protocolList}) mais n'est pas encore intégré à la GTB. À raccorder pour satisfaire R175-3 §3 (interopérabilité).`,
           zone_id: s.zone_id, equipment_id: null,
         });
       }

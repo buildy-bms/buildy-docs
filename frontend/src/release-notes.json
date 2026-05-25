@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.92",
+      "date": "2026-05-25",
+      "title": "Plan d'action R175-3 §3 : distinguer raccorder à la GTB vs remplacer l'équipement",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Deux actions distinctes selon l'état de communication de l'équipement",
+          "what": "Le moteur d'action automatique générait une seule action « Rendre communicant » pour tout équipement sans protocole. Maintenant deux cas distincts : (1) si l'équipement est communicant (≥1 protocole) mais n'est ni câblé ni intégré à la GTB → action « Raccorder à la GTB » (effort modéré, l'équipement est déjà capable) ; (2) si l'équipement n'a aucun protocole → action « Prévoir le remplacement par un équipement communicant » avec citation explicite du guide PROFEEL §3.1.2 (effort important, à planifier sur le renouvellement).",
+          "where": "Plan d'action de mise en conformité, axe R175-3 §3 (interopérabilité). Lecture des champs communication_protocols + wired + managed_by_bms du device.",
+          "how_to_test": "Sur un audit avec un équipement Modbus non câblé : régénérer le plan d'action — l'action est « Raccorder à la GTB » et plus « Rendre communicant ». Sur un équipement sans aucun protocole : action « Prévoir le remplacement »."
+        }
+      ]
+    },
+    {
       "version": "0.1.91",
       "date": "2026-05-25",
       "title": "Recherche base de connaissance : fix « R175-6 → no such column: 6 »",
