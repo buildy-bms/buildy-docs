@@ -49,6 +49,31 @@ async function routes(fastify) {
     `).all(id);
   });
 
+  // GET /bacs-audit/:documentId/full — instantane complet d'un audit en un
+  // seul appel : document, site, zones, systemes, equipements, compteurs,
+  // GTB, regulation thermique, plan d'action, parties, puissances, synthese
+  // de conformite (verdict + tableau R175), methodologie, articles R175.
+  // Reutilise l'assemblage de _export-data.js. Destine au serveur MCP de FM
+  // (outil audit_get) — protege par les memes gardes que les autres routes.
+  fastify.get('/bacs-audit/:documentId/full', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, request, reply);
+    if (!af) return;
+    const { buildBacsAuditExportData } = require('./bacs-audit/_export-data');
+    const data = await buildBacsAuditExportData(af, { user: request.authUser });
+    // On retire les blobs lourds (data URLs de charts / carte / logo) :
+    // inutiles pour un client API et alourdissent la reponse JSON.
+    const HEAVY = new Set([
+      'siteMapDataUrl', 'energyMonthlyChartDataUrl', 'sevDonutDataUrl',
+      'barUsagePowerDataUrl', 'logoDataUrl', 'barItems',
+    ]);
+    const out = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (!HEAVY.has(k)) out[k] = v;
+    }
+    return out;
+  });
+
   fastify.patch('/bacs-audit/systems/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);

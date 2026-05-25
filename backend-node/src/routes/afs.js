@@ -155,9 +155,10 @@ async function routes(fastify) {
     return { af_ids: visibleAfIds, site_hits: siteHits, library_hits: libraryHits };
   });
 
-  // GET /api/afs/stats — counts par status
-  fastify.get('/afs/stats', async () => {
-    const counts = db.afs.countByStatus();
+  // GET /api/afs/stats — counts par status, filtrés sur les documents
+  // visibles par l'utilisateur (mêmes règles que la liste /afs).
+  fastify.get('/afs/stats', async (request) => {
+    const counts = db.afs.countByStatus(request.authUser?.id);
     const out = { redaction: 0, validee: 0, commissioning: 0, commissioned: 0, livree: 0, total: 0 };
     for (const c of counts) { out[c.status] = c.count; out.total += c.count; }
     return out;

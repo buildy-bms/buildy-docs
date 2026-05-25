@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.82",
+      "date": "2026-05-25",
+      "title": "Base de connaissance réglementaire BACS + audits pilotables depuis Claude (act-as-user)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Base de connaissance BACS : décret + FAQ ministère + 2 guides en plein-texte",
+          "what": "Nouvelle table indexée FTS5 qui regroupe 4 sources réglementaires hiérarchisées : décret R175-1 à R175-6 (texte officiel, seule source opposable), 30 entrées FAQ ministérielle scrapées, guide d'application V2 ministère (janvier 2026), guide pratique PROFEEL v1.1 (novembre 2025). Exposée via 5 endpoints /api/bacs-knowledge/* utilisés par Claude (MCP Fleet Manager) pour répondre à toute question BACS avec citation sourcée.",
+          "where": "Backend uniquement pour cette release — UI à venir. Endpoints : /api/bacs-knowledge/search, /by-source/:source, /by-code/:code, /authoritative-lookup, /glossary.",
+          "how_to_test": "Sur prod, curl http://localhost:3100/api/bacs-knowledge/search?q=puissance+nominale renvoie les meilleurs extraits."
+        },
+        {
+          "kind": "feature",
+          "title": "Piloter un audit BACS depuis Claude Desktop — strictement vos documents",
+          "what": "Buildy Docs accepte désormais les requêtes du MCP Fleet Manager qui agit au nom de l'utilisateur connecté (Bearer service token + headers X-Buildy-Act-* PocketID). Chaque utilisateur Claude ne voit et ne modifie que ses propres documents ou ceux explicitement partagés avec lui — les gardes habituelles (requireAfAccess, assertRead/Write, filtre forUserId) s'appliquent sans bypass. Nouveaux endpoints de lecture : audit complet, résumé de conformité R175, complétude par étape, méthodologie.",
+          "where": "Backend transparent pour l'utilisateur. Côté Claude Desktop, ~60 outils audit apparaissent automatiquement.",
+          "how_to_test": "Depuis Claude : « liste mes audits BACS » puis « ouvre l'audit X »."
+        },
+        {
+          "kind": "fix",
+          "title": "Mes Documents : le compteur global affichait le total système",
+          "what": "Le badge en haut de la page Mes Documents montrait le total de tous les documents de l'app (toutes équipes confondues), alors que la liste en dessous était bien filtrée sur l'utilisateur. Corrigé : le compte respecte maintenant le même filtre (documents créés par moi OU partagés avec moi).",
+          "where": "Page Mes Documents (header).",
+          "how_to_test": "Se connecter avec un compte qui voit peu de documents : le compteur doit refléter cette restriction."
+        }
+      ]
+    },
+    {
       "version": "0.1.81",
       "date": "2026-05-22",
       "title": "Refonte de la saisie de l'audit BACS : questions claires, complétude, cohérence poste/mobile",
