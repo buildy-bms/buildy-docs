@@ -13,6 +13,8 @@
 // Utilisé identiquement par _export-data.js (audit réel) et
 // _preview-fixture.js (dataset fictif). Ne dépend pas de la DB.
 
+const { isTrue } = require('./_ternary');
+
 // Mapping exigence R175 → libellé court grand public + référence article
 // pour le tableau de bord. La liste est volontairement courte et tenue.
 const R175_EXIGENCES = [
@@ -230,9 +232,11 @@ function buildClassiqueSummary({ document, actionItems, actionItemsRaw, devices 
   const major    = actionItems.major?.length || 0;
   const minor    = actionItems.minor?.length || 0;
 
-  // Verdict couverture GTB
+  // Verdict couverture GTB. Utilise isTrue strict (centralisé via _ternary.js)
+  // pour ne PAS collapser `null` (non répondu) en `false` dans le décompte
+  // « intégrés GTB ».
   const presentDevices = devices.filter(d => !d.out_of_service);
-  const integratedDevices = presentDevices.filter(d => d.managed_by_bms);
+  const integratedDevices = presentDevices.filter(d => isTrue(d.managed_by_bms));
   const ratio = presentDevices.length ? integratedDevices.length / presentDevices.length : 0;
   let verdict;
   if (!bms || bms.out_of_service) verdict = 'non_compliant';

@@ -404,6 +404,57 @@ node scripts/bacs-knowledge/ingest.mjs          # repeuple la table
 ```
 Le serveur Docs n'a pas besoin d'etre relance (FTS5 reagit aux triggers AI/AD/AU).
 
+## Source unique de vérité pour les chiffres d'un audit (helpers ternaires)
+
+Beaucoup de champs métier de l'audit BACS sont **ternaires** (null / 0/false /
+1/true). L'incident audit Communay (mai 2026) — Claude a présenté « 0 communicants »
+alors qu'aucune question n'avait été répondue — a révélé que chaque consommateur
+(PDF, MCP, UI, _compliance-summary, _preview-fixture) utilisait son propre
+filtre truthy qui collapsait silencieusement `null` en `false`.
+
+### Helper centralisé `_ternary.js`
+
+Tout nouveau compteur d'agrégation sur un champ ternaire DOIT passer par :
+
+```js
+const { isTrue, isFalse, isUnanswered, ternaryCounts } = require('./_ternary');
+
+// Trois compteurs séparés pour le champ managed_by_bms :
+const { true_count, false_count, unanswered_count } = ternaryCounts(devices, 'managed_by_bms');
+```
+
+**Interdiction stricte** d'écrire `arr.filter(x => x.managed_by_bms)` (truthy JS)
+ou `arr.filter(x => x.managed_by_bms === 1)` (oublie `true`) ailleurs. Le helper
+unique est la garantie qu'on ne réintroduira pas le bug Communay.
+
+Côté FM (MCP), équivalent ESM dans
+[`edge-fleet-manager/backend-node/src/lib/audit-ternary.mjs`](../edge-fleet-manager/backend-node/src/lib/audit-ternary.mjs).
+
+### Vérifier la cohérence PDF ↔ MCP avant release
+
+Script [`scripts/verify-audit-coherence.mjs`](scripts/verify-audit-coherence.mjs)
+qui pour un ou plusieurs audits récupère le bundle d'export PDF (recapStats)
+ET recalcule en local le résumé MCP, puis compare chiffre à chiffre :
+
+```bash
+BUILDY_DOCS_TOKEN=<cookie_docs_token> \
+  node scripts/verify-audit-coherence.mjs --audit-ids 43,44,45
+```
+
+Doit retourner « ✓ Tous les audits sont cohérents. » avant toute release qui
+touche aux calculs d'agrégation (`recapStats`, `devices_summary`,
+`meters_summary`, `_compliance-summary`, `_export-data`, `_preview-fixture`).
+
+### Cas connus de ternaires à respecter
+
+| Entité | Champs ternaires (null / 0 / 1) |
+|---|---|
+| `bacs_audit_systems` | `present`, `not_concerned`, `meets_r175_3_p3`, `meets_r175_3_p4`, `meets_r175_3_p4_autonomous`, `managed_by_bms`, `marked_negligible_under_5pct`, `is_district_heating_substation`, `serves_multiple_buildings` |
+| `bacs_audit_system_devices` | `wired`, `meets_r175_3_p4`, `meets_r175_3_p4_autonomous`, `managed_by_bms`, `is_backup`, `out_of_service`, `bms_integration_out_of_service` |
+| `bacs_audit_meters` | `present_actual`, `required`, `communicating`, `managed_by_bms`, `out_of_service` |
+| `bacs_audit_bms` | `present` (singleton GTB), `meets_r175_3_p1`, `meets_r175_3_p2`, `has_maintenance_procedures`, `operator_trained` |
+| `documents` | `audit_existing_af_status` (text ternaire : 'present' / 'absent' / null) |
+
 ## Toggles Oui/Non pour saisies binaires (cf. memoire feedback_segmented_control_for_binary_state)
 
 L'audit BACS expose beaucoup de questions binaires (présent / absent, intégré /

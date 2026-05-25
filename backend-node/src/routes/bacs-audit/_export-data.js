@@ -10,6 +10,7 @@ const db = require('../../database');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const { parseRoles } = require('../../lib/device-roles');
+const { isTrue, isFalse } = require('./_ternary');
 const { buildSiteStaticMap } = require('../../lib/static-map');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
@@ -529,22 +530,24 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // ATTENTION : les champs *Integrated agregent historiquement null + false.
   // Pour les consommateurs qui ont besoin de distinguer "non repondu" de
   // "explicitement non" (synthese Claude / MCP), utiliser les variantes
-  // *_unanswered / *_false ajoutees ci-dessous.
-  const isTrueBool = v => v === 1 || v === true;
-  const isFalseBool = v => v === 0 || v === false;
+  // *_unanswered / *_false ajoutees ci-dessous. Helpers ternaires centralises
+  // dans ./_ternary.js (cf. plan de coherence audit BACS).
   const recapStats = {
     devicesTotal: devices.length,
     devicesPresent: devices.filter(d => !d.out_of_service).length,
-    devicesIntegrated: devices.filter(d => isTrueBool(d.managed_by_bms)).length,
+    devicesIntegrated: devices.filter(d => isTrue(d.managed_by_bms)).length,
     devicesIntegratedUnanswered: devices.filter(d => d.managed_by_bms == null).length,
-    devicesIntegratedFalse: devices.filter(d => isFalseBool(d.managed_by_bms)).length,
+    devicesIntegratedFalse: devices.filter(d => isFalse(d.managed_by_bms)).length,
     devicesHs: devices.filter(d => d.out_of_service).length,
     metersRequired: enrichedMeters.filter(m => m.required).length,
     metersPresent: enrichedMeters.filter(m => m.present_actual && !m.out_of_service).length,
-    metersIntegrated: enrichedMeters.filter(m => isTrueBool(m.managed_by_bms)).length,
+    metersIntegrated: enrichedMeters.filter(m => isTrue(m.managed_by_bms)).length,
     metersIntegratedUnanswered: enrichedMeters.filter(m => m.managed_by_bms == null).length,
-    metersIntegratedFalse: enrichedMeters.filter(m => isFalseBool(m.managed_by_bms)).length,
-    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual).length,
+    metersIntegratedFalse: enrichedMeters.filter(m => isFalse(m.managed_by_bms)).length,
+    // Gap analysis : compteurs requis ET absents. Les compteurs hors-service
+    // sont EXCLUS (un compteur HS n'est pas "manquant", il existe physiquement
+    // mais sera remplace). Aligne avec audit_get_summary cote MCP.
+    metersMissing: enrichedMeters.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
   };
 
   // ── Items 5 + 8 — cumul automatique des puissances ──

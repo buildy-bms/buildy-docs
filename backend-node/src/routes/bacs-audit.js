@@ -82,7 +82,10 @@ async function routes(fastify) {
     if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
 
     const schema = z.object({
-      present: z.boolean().optional(),
+      // Ternaire explicite : true = présent, false = absent, null = partiel /
+      // non répondu. La PWA et l'UI desktop offrent un toggle 3 états ; ce
+      // ternaire doit être préservé bout en bout (cf. plan cohérence audit).
+      present: z.boolean().nullable().optional(),
       communication: z.enum(COMMUNICATION_VALUES).nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
       notes: z.string().nullable().optional(),
@@ -113,7 +116,11 @@ async function routes(fastify) {
         args.push(body[k] == null ? null : (body[k] ? 1 : 0));
       }
     };
-    if (body.present !== undefined) { sets.push('present = ?'); args.push(body.present ? 1 : 0); }
+    // present ternaire : null = partiel/non répondu ; 0 = absent ; 1 = présent.
+    if (body.present !== undefined) {
+      sets.push('present = ?');
+      args.push(body.present == null ? null : (body.present ? 1 : 0));
+    }
     boolField('not_concerned');
     if ('communication' in body) { sets.push('communication = ?'); args.push(body.communication); }
     if ('equipment_id' in body) { sets.push('equipment_id = ?'); args.push(body.equipment_id); }
