@@ -43,7 +43,7 @@ function pick(v) {
        :class="{ 'opacity-50 pointer-events-none': disabled }"
        :title="tooltip">
     <button type="button"
-            class="seg-btn px-2 py-0.5 font-semibold transition select-none"
+            class="seg-btn px-3 py-1 font-semibold transition select-none"
             :class="modelValue === true
               ? (yesDanger ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700')
               : 'bg-white text-gray-300 hover:text-gray-600 hover:bg-gray-50'"
@@ -51,7 +51,7 @@ function pick(v) {
       <span class="font-bold">✓</span><span v-if="!compact" class="ml-1">{{ yesLabel }}</span>
     </button>
     <button type="button"
-            class="seg-btn px-2 py-0.5 font-semibold transition select-none border-l border-gray-200"
+            class="seg-btn px-3 py-1 font-semibold transition select-none border-l border-gray-200"
             :class="modelValue === false
               ? 'bg-red-50 text-red-700'
               : 'bg-white text-gray-300 hover:text-gray-600 hover:bg-gray-50'"
@@ -62,6 +62,6 @@ function pick(v) {
 </template>
 
 <style scoped>
-.seg-btn { min-height: 24px; }
-@media (pointer: coarse) { .seg-btn { min-height: 44px; min-width: 44px; padding: 0 12px; } }
+.seg-btn { min-height: 28px; min-width: 36px; }
+@media (pointer: coarse) { .seg-btn { min-height: 44px; min-width: 48px; padding: 0 14px; } }
 </style>
