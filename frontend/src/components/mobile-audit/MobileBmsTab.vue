@@ -89,28 +89,37 @@ async function setGtbPresent(val) {
   catch { error('Sauvegarde GTB impossible') }
 }
 
+// Refresh plan d'action debouncé (sinon clic-clic-clic = N requêtes serielles).
+let actionItemsRefreshTimer = null
+function scheduleActionItemsRefresh() {
+  clearTimeout(actionItemsRefreshTimer)
+  actionItemsRefreshTimer = setTimeout(() => {
+    audit.refreshActionItems().catch(() => {})
+  }, 800)
+}
+
 async function patchDeviceBms(d, patch) {
+  // Boolean strict (le serveur z.boolean() refuse 0/1 -> 400).
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
-    fullPatch.bms_integration_out_of_service = 0
+    fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(d, fullPatch)
-  try {
-    await updateBacsDevice(d.id, fullPatch)
-    await audit.refreshActionItems()
-  } catch { error('Sauvegarde équipement impossible') }
+  // PATCH non bloquant — le toggle a déjà réagi via Object.assign.
+  updateBacsDevice(d.id, fullPatch)
+    .then(scheduleActionItemsRefresh)
+    .catch(() => error('Sauvegarde équipement impossible'))
 }
 
 async function patchMeterBms(m, patch) {
   const fullPatch = { ...patch }
   if ('managed_by_bms' in patch && patch.managed_by_bms === false) {
-    fullPatch.bms_integration_out_of_service = 0
+    fullPatch.bms_integration_out_of_service = false
   }
   Object.assign(m, fullPatch)
-  try {
-    await updateBacsMeter(m.id, fullPatch)
-    await audit.refreshActionItems()
-  } catch { error('Sauvegarde compteur impossible') }
+  updateBacsMeter(m.id, fullPatch)
+    .then(scheduleActionItemsRefresh)
+    .catch(() => error('Sauvegarde compteur impossible'))
 }
 
 const devicesWithMeta = computed(() => {
@@ -126,6 +135,45 @@ const devicesWithMeta = computed(() => {
 })
 
 const metersPresent = computed(() => meters.value.filter(m => m.present_actual))
+
+// Filtre par usages GTB (si l'auditeur a coché au moins un usage, on ne liste
+// que les équipements/compteurs des catégories correspondantes — sinon on
+// affiche tout pour ne pas masquer la liste avant qu'il commence à répondre).
+const gtbManagesCategory = (cat) => {
+  if (!bms.value) return true
+  switch (cat) {
+    case 'heating': return !!bms.value.manages_heating
+    case 'cooling': return !!bms.value.manages_cooling
+    case 'ventilation': return !!bms.value.manages_ventilation
+    case 'dhw': return !!bms.value.manages_dhw
+    case 'lighting_indoor':
+    case 'lighting_outdoor': return !!bms.value.manages_lighting
+    default: return true
+  }
+}
+const gtbManagesMeterUsage = (usage) => {
+  if (!bms.value) return true
+  switch (usage) {
+    case 'heating': return !!bms.value.manages_heating
+    case 'cooling': return !!bms.value.manages_cooling
+    case 'dhw': return !!bms.value.manages_dhw
+    case 'lighting': return !!bms.value.manages_lighting
+    default: return true
+  }
+}
+const anyUsageManaged = computed(() => !!bms.value && (
+  bms.value.manages_heating || bms.value.manages_cooling ||
+  bms.value.manages_ventilation || bms.value.manages_dhw ||
+  bms.value.manages_lighting
+))
+const filteredDevices = computed(() => {
+  if (!anyUsageManaged.value) return devicesWithMeta.value
+  return devicesWithMeta.value.filter(d => gtbManagesCategory(d.system_category))
+})
+const filteredMeters = computed(() => {
+  if (!anyUsageManaged.value) return metersPresent.value
+  return metersPresent.value.filter(m => gtbManagesMeterUsage(m.usage))
+})
 
 const USAGES = [
   { key: 'manages_heating', label: 'Chauffage', category: 'heating' },
@@ -532,16 +580,16 @@ const USAGES = [
             <h3 class="text-base font-medium text-gray-900">Équipements intégrés à la GTB</h3>
             <MobileBmsTopicNoteButton topic-key="equipements" topic-label="Équipements intégrés à la GTB" />
           </div>
-          <p v-if="devicesWithMeta.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
+          <p v-if="filteredDevices.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
             <strong>Intégré</strong> = l'équipement est connu de la GTB.
             <strong>Opérationnel</strong> = tu as vérifié sur place que la GTB voit
             réellement les valeurs et peut le piloter.
           </p>
           <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun équipement saisi.</p>
         </div>
-        <div v-if="devicesWithMeta.length" class="divide-y divide-gray-100">
+        <div v-if="filteredDevices.length" class="divide-y divide-gray-100">
           <div
-            v-for="d in devicesWithMeta"
+            v-for="d in filteredDevices"
             :key="d.id"
             :class="['px-4 py-4', d.out_of_service ? 'opacity-50' : '', d.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
           >
@@ -577,16 +625,16 @@ const USAGES = [
             <h3 class="text-base font-medium text-gray-900">Compteurs intégrés à la GTB</h3>
             <MobileBmsTopicNoteButton topic-key="compteurs" topic-label="Compteurs intégrés à la GTB" />
           </div>
-          <p v-if="metersPresent.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
+          <p v-if="filteredMeters.length" class="text-xs text-gray-500 mt-1 leading-relaxed">
             Seuls les compteurs marqués « présents » dans l'onglet Compteurs apparaissent ici.
             <strong>Intégré</strong> = la GTB connaît le compteur.
             <strong>Opérationnel</strong> = les index remontent vraiment.
           </p>
           <p v-else class="text-xs text-gray-500 mt-1 italic">Aucun compteur présent à raccorder.</p>
         </div>
-        <div v-if="metersPresent.length" class="divide-y divide-gray-100">
+        <div v-if="filteredMeters.length" class="divide-y divide-gray-100">
           <div
-            v-for="m in metersPresent"
+            v-for="m in filteredMeters"
             :key="m.id"
             :class="['px-4 py-4', m.out_of_service ? 'opacity-50' : '', m.bms_integration_out_of_service ? 'bg-red-50/40' : '']"
           >
