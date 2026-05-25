@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.86",
+      "date": "2026-05-25",
+      "title": "Audit mobile site : toggles Oui/Non explicites pour travaux générateur et réseau urbain",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Travaux générateur réalisés / Raccordé à un réseau urbain — boutons Oui / Non",
+          "what": "Les deux cases à cocher dans l'onglet Site de l'audit mobile sont remplacées par des boutons Oui / Non explicites (composant MobileYesNo, déjà utilisé pour les autres questions binaires de l'audit). Cohérent avec les autres onglets (Systèmes, GTB) et plus tactile.",
+          "where": "Audit BACS / GTB mobile, onglet Site.",
+          "how_to_test": "Ouvrir un audit sur mobile, onglet Site, tapoter sur les boutons : l'option active passe en vert/slate, l'inactive reste neutre."
+        }
+      ]
+    },
+    {
       "version": "0.1.84",
       "date": "2026-05-25",
       "title": "Compteurs : boutons explicites Oui / Non au lieu d'une simple coche",

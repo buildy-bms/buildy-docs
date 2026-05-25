@@ -10,6 +10,7 @@ import MobileField from './MobileField.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import SitePartiesCard from '@/components/audit/SitePartiesCard.vue'
 import EnergyHistoryCard from '@/components/audit/EnergyHistoryCard.vue'
+import MobileYesNo from './MobileYesNo.vue'
 
 const audit = useAuditStore()
 const { document, site, powerSummary } = storeToRefs(audit)
@@ -228,21 +229,12 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : travaux générateur -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-start gap-3 px-4 py-5 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="generatorWorksDone"
-            class="w-7 h-7 mt-1 shrink-0"
-          />
-          <div class="flex-1 min-w-0">
-            <p class="text-base font-medium text-gray-900">Travaux générateur réalisés</p>
-            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-              Y a-t-il eu des travaux de remplacement / installation d'un générateur
-              (chaudière, PAC…) après le 21/07/2021 ? Si oui, R175-6 (régulation thermique)
-              s'applique en plus.
-            </p>
-          </div>
-        </label>
+        <MobileYesNo
+          label="Travaux générateur réalisés"
+          description="Y a-t-il eu des travaux de remplacement / installation d'un générateur (chaudière, PAC…) après le 21/07/2021 ? Si oui, R175-6 (régulation thermique) s'applique en plus."
+          :model-value="generatorWorksDone"
+          @update:model-value="v => generatorWorksDone = v"
+          class="border-0! rounded-none!" />
         <div v-if="document?.bacs_generator_works_date != null" class="px-4 pb-4 border-t border-gray-100 pt-3">
           <MobileField label="Date des derniers travaux">
             <input
@@ -257,21 +249,12 @@ const generatorWorksDone = computed({
 
       <!-- Toggle : réseau urbain -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <label class="flex items-start gap-3 px-4 py-5 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="districtConnected"
-            class="w-7 h-7 mt-1 shrink-0"
-          />
-          <div class="flex-1 min-w-0">
-            <p class="text-base font-medium text-gray-900">Raccordé à un réseau urbain</p>
-            <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-              Le bâtiment reçoit son chauffage ou sa climatisation via une sous-station
-              connectée à un réseau de chaleur / froid de quartier. Dans ce cas, la
-              puissance retenue pour R175-2 = puissance de la station, pas des équipements aval.
-            </p>
-          </div>
-        </label>
+        <MobileYesNo
+          label="Raccordé à un réseau urbain"
+          description="Le bâtiment reçoit son chauffage ou sa climatisation via une sous-station connectée à un réseau de chaleur / froid de quartier. Dans ce cas, la puissance retenue pour R175-2 = puissance de la station, pas des équipements aval."
+          :model-value="districtConnected"
+          @update:model-value="v => districtConnected = v"
+          class="border-0! rounded-none!" />
         <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
              class="px-4 pb-4 border-t border-gray-100 pt-3">
           <MobileField label="Puissance station d'échange (kW)">
