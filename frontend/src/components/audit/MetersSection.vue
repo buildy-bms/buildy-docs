@@ -14,6 +14,7 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -186,48 +187,33 @@ onBeforeUnmount(teardownMetersSortable)
           <td><MeterTypePill :type="m.meter_type" /></td>
           <td><MeterUsagePill :usage="m.usage" /></td>
           <td class="whitespace-nowrap">
-            <button type="button"
-                    @click="patchMeter(m, { required: !m.required })"
-                    :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']"
-                    v-tooltip="m.required ? 'Compteur requis (cliquer pour décocher)' : 'Compteur non requis'">
-              <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span>
-            </button>
+            <SegmentedToggle compact :model-value="!!m.required"
+                             tooltip="Compteur requis par le décret R175"
+                             @update:model-value="v => patchMeter(m, { required: v })" />
           </td>
           <td class="whitespace-nowrap">
-            <button type="button"
-                    @click="patchMeter(m, { present_actual: !m.present_actual })"
-                    :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']"
-                    v-tooltip="m.present_actual ? 'Présent sur site (cliquer pour décocher)' : 'Pas présent sur site'">
-              <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span>
-            </button>
+            <SegmentedToggle compact :model-value="!!m.present_actual"
+                             tooltip="Compteur présent sur site ?"
+                             @update:model-value="v => patchMeter(m, { present_actual: v })" />
           </td>
           <td class="whitespace-nowrap">
-            <button v-if="m.present_actual" type="button"
-                    @click="patchMeter(m, m.communicating
-                      ? { communicating: false, communication_protocols: null, communication_protocol: null }
-                      : { communicating: true })"
-                    :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']"
-                    v-tooltip="m.communicating ? 'Communicant (cliquer pour décocher)' : 'Non communicant'">
-              <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span>
-            </button>
+            <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.communicating"
+                             tooltip="Compteur communicant ?"
+                             @update:model-value="v => patchMeter(m, v
+                               ? { communicating: true }
+                               : { communicating: false, communication_protocols: null, communication_protocol: null })" />
             <span v-else class="text-gray-300">—</span>
           </td>
           <td class="whitespace-nowrap">
-            <button v-if="m.present_actual" type="button"
-                    @click="patchMeter(m, { wired: !m.wired })"
-                    :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']"
-                    v-tooltip="'Communication câblée vers la GTB'">
-              <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span>
-            </button>
+            <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.wired"
+                             tooltip="Communication câblée vers la GTB ?"
+                             @update:model-value="v => patchMeter(m, { wired: v })" />
             <span v-else class="text-gray-300">—</span>
           </td>
           <td class="whitespace-nowrap">
-            <button type="button"
-                    @click="patchMeter(m, { out_of_service: !m.out_of_service })"
-                    :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']"
-                    v-tooltip="m.out_of_service ? 'Compteur hors service — ignoré dans le plan d\'action (cliquer pour réactiver)' : 'Marquer le compteur comme hors service'">
-              <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span>
-            </button>
+            <SegmentedToggle compact yes-danger :model-value="!!m.out_of_service"
+                             tooltip="Compteur hors service ? (HS = ignoré du plan d'action)"
+                             @update:model-value="v => patchMeter(m, { out_of_service: v })" />
           </td>
           <td>
             <div class="min-w-32">
@@ -318,35 +304,35 @@ onBeforeUnmount(teardownMetersSortable)
             </button>
           </div>
         </div>
-        <!-- État compteur : flags -->
-        <div class="flex flex-wrap gap-1.5">
-          <button type="button"
-                  @click="patchMeter(m, { required: !m.required })"
-                  :class="['flag-pill', m.required ? 'flag-on' : 'flag-off']">
-            <span class="flag-ico">{{ m.required ? '✓' : '✗' }}</span> Requis
-          </button>
-          <button type="button"
-                  @click="patchMeter(m, { present_actual: !m.present_actual })"
-                  :class="['flag-pill', m.present_actual ? 'flag-on' : 'flag-off']">
-            <span class="flag-ico">{{ m.present_actual ? '✓' : '✗' }}</span> Présent
-          </button>
-          <button v-if="m.present_actual" type="button"
-                  @click="patchMeter(m, m.communicating
-                    ? { communicating: false, communication_protocols: null, communication_protocol: null }
-                    : { communicating: true })"
-                  :class="['flag-pill', m.communicating ? 'flag-on' : 'flag-off']">
-            <span class="flag-ico">{{ m.communicating ? '✓' : '✗' }}</span> Comm.
-          </button>
-          <button v-if="m.present_actual" type="button"
-                  @click="patchMeter(m, { wired: !m.wired })"
-                  :class="['flag-pill', m.wired ? 'flag-on' : 'flag-off']">
-            <span class="flag-ico">{{ m.wired ? '✓' : '✗' }}</span> Câblé
-          </button>
-          <button type="button"
-                  @click="patchMeter(m, { out_of_service: !m.out_of_service })"
-                  :class="['flag-pill', m.out_of_service ? 'flag-danger-on' : 'flag-off']">
-            <span class="flag-ico">{{ m.out_of_service ? '✓' : '✗' }}</span> HS
-          </button>
+        <!-- État compteur : segmented toggles (présent / absent explicite) -->
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+          <label class="flex items-center justify-between gap-2">
+            <span class="text-gray-700">Requis</span>
+            <SegmentedToggle compact :model-value="!!m.required"
+                             @update:model-value="v => patchMeter(m, { required: v })" />
+          </label>
+          <label class="flex items-center justify-between gap-2">
+            <span class="text-gray-700">Présent</span>
+            <SegmentedToggle compact :model-value="!!m.present_actual"
+                             @update:model-value="v => patchMeter(m, { present_actual: v })" />
+          </label>
+          <label v-if="m.present_actual" class="flex items-center justify-between gap-2">
+            <span class="text-gray-700">Communicant</span>
+            <SegmentedToggle compact :model-value="!!m.communicating"
+                             @update:model-value="v => patchMeter(m, v
+                               ? { communicating: true }
+                               : { communicating: false, communication_protocols: null, communication_protocol: null })" />
+          </label>
+          <label v-if="m.present_actual" class="flex items-center justify-between gap-2">
+            <span class="text-gray-700">Câblé GTB</span>
+            <SegmentedToggle compact :model-value="!!m.wired"
+                             @update:model-value="v => patchMeter(m, { wired: v })" />
+          </label>
+          <label class="flex items-center justify-between gap-2 col-span-2">
+            <span class="text-gray-700">Hors service</span>
+            <SegmentedToggle compact yes-danger :model-value="!!m.out_of_service"
+                             @update:model-value="v => patchMeter(m, { out_of_service: v })" />
+          </label>
         </div>
         <!-- Protocole(s) -->
         <div v-if="m.communicating">

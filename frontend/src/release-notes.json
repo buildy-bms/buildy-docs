@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.84",
+      "date": "2026-05-25",
+      "title": "Compteurs : boutons explicites Oui / Non au lieu d'une simple coche",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Saisie présent / absent / câblé / communicant — choix visible",
+          "what": "Sur les compteurs (desktop et mobile), chaque champ booléen (Requis, Présent, Communicant, Câblé GTB, Hors service) utilise désormais un toggle à deux boutons côte à côte : ✓ vert pour « oui » et ✗ rouge pour « non », l'option choisie est colorée, l'autre reste neutre. Plus de confusion possible avec une checkbox unique où on se demande si la case n'est pas cochée parce que la réponse est « non » ou parce qu'on n'a pas encore répondu.",
+          "where": "Compteurs — tableau desktop et cards mobiles (Audit BACS + GTB classique).",
+          "how_to_test": "Ouvrir un audit, aller sur l'onglet Compteurs, basculer Présent / Communicant / Câblé : le bouton actif change de couleur instantanément, l'inactif reste neutre."
+        }
+      ]
+    },
+    {
       "version": "0.1.83",
       "date": "2026-05-25",
       "title": "Base de connaissance réglementaire BACS + audits pilotables depuis Claude (act-as-user)",
