@@ -46,8 +46,13 @@ function assertBacsAuditExists(documentId, request, reply, { requiredRole = 'rea
     reply.code(404).send({ detail: 'Document non trouve' });
     return null;
   }
-  if (af.kind !== 'bacs_audit') {
-    reply.code(400).send({ detail: 'Document n\'est pas un audit BACS' });
+  // bacs_audit et site_audit partagent toutes les tables bacs_audit_*
+  // (cf. CLAUDE.md : "2 kinds, meme schema. R175 ne s'applique QUE sur
+  // bacs_audit"). Le helper accepte les deux pour les routes de saisie qui
+  // operent sur ces tables ; la distinction kind est faite au niveau du
+  // calcul de conformite, pas du contrôle d'acces.
+  if (af.kind !== 'bacs_audit' && af.kind !== 'site_audit') {
+    reply.code(400).send({ detail: 'Document n\'est pas un audit' });
     return null;
   }
   const userId = request?.authUser?.id;
