@@ -2,6 +2,26 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.93",
+      "date": "2026-05-25",
+      "title": "Puissance totale BACS recalculée et persistée à chaque modif d'équipement",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de valeur obsolète sur la puissance retenue R175-2",
+          "what": "Le champ bacs_total_power_kw stocké en DB pouvait diverger du calcul réel quand on modifiait/supprimait/déplaçait un équipement. Le calcul runtime (computeAutoPower → max(heatKw, coolKw)) était juste, mais la valeur cached restait. Conséquence : l'UI desktop et mobile (page Identification, sheet Site) ainsi que les lecteurs MCP qui lisaient le champ brut affichaient un faux total. Incident audit Communay : 112 kW chaud retenu → cache à 161,3 kW depuis une saisie précédente.",
+          "where": "Tous les écrans qui affichent la puissance totale (page Identification, sheet Site mobile, MCP audit_get document.bacs_total_power_kw).",
+          "how_to_test": "Modifier un équipement, regarder bacs_total_power_kw : doit refléter le calcul max(heat, cool) à jour."
+        },
+        {
+          "kind": "fix",
+          "title": "Nouveau helper recomputeAndPersistAuditPower + hook dans regenerateActionItems",
+          "what": "Helper qui lit tous les devices d'un audit, calcule autoPower et persiste retainedKw dans afs.bacs_total_power_kw — uniquement si source='auto' (respecte les saisies manuelles). Branché dans regenerateActionItems (appelé après chaque modif device/meter/BMS/zone) pour couvrir tous les call sites en un seul hook.",
+          "where": "Backend lib/bacs-audit-power.js + lib/bacs-audit-action-generator.js."
+        }
+      ]
+    },
+    {
       "version": "0.1.92",
       "date": "2026-05-25",
       "title": "Plan d'action R175-3 §3 : distinguer raccorder à la GTB vs remplacer l'équipement",

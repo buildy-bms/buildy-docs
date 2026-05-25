@@ -10,6 +10,7 @@ const { z } = require('zod');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+const { recomputeAndPersistAuditPower } = require('../lib/bacs-audit-power');
 const { resyncBacsAuditWithSiteZones } = require('../lib/seeder');
 const { computeSystemLiability } = require('../lib/bacs-liability');
 const {
@@ -1070,6 +1071,8 @@ async function routes(fastify) {
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
     resyncBacsAuditWithSiteZones(sys.document_id);
     regenerateActionItems(sys.document_id);
+    // Recalcule + persiste bacs_total_power_kw (sinon cache obsolete cf. Communay).
+    recomputeAndPersistAuditPower(db.db, sys.document_id);
     return reply.code(201).send(mapDevice(db.db.prepare('SELECT * FROM bacs_audit_system_devices WHERE id = ?').get(r.lastInsertRowid)));
   });
 

@@ -680,6 +680,19 @@ function regenerateActionItems(documentId) {
   }
 
   log.info(`Regen action items document #${documentId} : +${added} new, ~${updated} synced, ✓${resolved} resolved`);
+
+  // Recalcule + persiste bacs_total_power_kw au passage : c'est le seul hook
+  // appelé après TOUTES les modifs metier (device add/update/delete/move/
+  // duplicate, meter, BMS…), donc on garantit que la puissance stockée reste
+  // synchro avec les devices réels. Incident audit Communay 2026-05-25 :
+  // bacs_total_power_kw=161.3 cached alors que computeAutoPower donnait 112.
+  try {
+    const { recomputeAndPersistAuditPower } = require('./bacs-audit-power');
+    recomputeAndPersistAuditPower(db.db, documentId);
+  } catch (e) {
+    log.warn(`recomputeAndPersistAuditPower échec pour #${documentId} : ${e.message}`);
+  }
+
   return { added, updated, resolved };
 }
 
