@@ -14,6 +14,7 @@ import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const audit = useAuditStore()
 const { document, meters, zones } = storeToRefs(audit)
@@ -297,36 +298,40 @@ function toggleProtocol(p) {
               <input v-model="editForm.required" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
             </label>
             <template v-if="editing?.mode === 'edit'">
-              <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+              <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
                   <p class="text-base font-medium text-gray-700">Présent physiquement sur site</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur existe et est installé, peu importe s'il communique ou pas.</p>
                 </div>
-                <input v-model="editForm.present_actual" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
-              </label>
-              <label v-if="editForm.present_actual"
-                     class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <SegmentedToggle :model-value="!!editForm.present_actual"
+                                 @update:model-value="v => (editForm.present_actual = v)" class="mt-1 shrink-0" />
+              </div>
+              <div v-if="editForm.present_actual"
+                   class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
                   <p class="text-base font-medium text-gray-700">Communicant</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
                 </div>
-                <input v-model="editForm.communicating" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
-              </label>
-              <label v-if="editForm.present_actual"
-                     class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <SegmentedToggle :model-value="!!editForm.communicating"
+                                 @update:model-value="v => (editForm.communicating = v)" class="mt-1 shrink-0" />
+              </div>
+              <div v-if="editForm.present_actual"
+                   class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
                   <p class="text-base font-medium text-gray-700">Câblé vers la GTB</p>
                   <p class="text-xs text-gray-500 mt-1">Le câble (RS485, Ethernet…) est physiquement raccordé à la GTB du site. Le compteur communique vraiment, pas seulement potentiellement.</p>
                 </div>
-                <input v-model="editForm.wired" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
-              </label>
-              <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <SegmentedToggle :model-value="!!editForm.wired"
+                                 @update:model-value="v => (editForm.wired = v)" class="mt-1 shrink-0" />
+              </div>
+              <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">
                   <p class="text-base font-medium text-red-600">Hors service</p>
                   <p class="text-xs text-gray-500 mt-1">Compteur HS, débranché, ou inaccessible. Sera ignoré dans le plan d'action.</p>
                 </div>
-                <input v-model="editForm.out_of_service" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
-              </label>
+                <SegmentedToggle yes-danger :model-value="!!editForm.out_of_service"
+                                 @update:model-value="v => (editForm.out_of_service = v)" class="mt-1 shrink-0" />
+              </div>
             </template>
           </div>
         </MobileField>
