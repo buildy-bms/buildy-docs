@@ -2,7 +2,7 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.82",
+      "version": "0.1.83",
       "date": "2026-05-25",
       "title": "Base de connaissance réglementaire BACS + audits pilotables depuis Claude (act-as-user)",
       "highlights": [
