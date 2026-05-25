@@ -404,6 +404,73 @@ node scripts/bacs-knowledge/ingest.mjs          # repeuple la table
 ```
 Le serveur Docs n'a pas besoin d'etre relance (FTS5 reagit aux triggers AI/AD/AU).
 
+## Toggles Oui/Non pour saisies binaires (cf. memoire feedback_segmented_control_for_binary_state)
+
+L'audit BACS expose beaucoup de questions binaires (présent / absent, intégré /
+non intégré, communicant / non, etc.). On a banni les **checkboxes uniques** au
+profit de **toggles à deux boutons côte à côte** pour éviter l'ambiguïté
+« décoché = non répondu OU réponse non ».
+
+**3 composants, chacun pour son contexte** (tous fonctionnellement équivalents,
+mais avec un look adapté). Pas un doublon problématique — chacun a sa niche :
+
+| Composant | Look | Usage |
+|---|---|---|
+| `components/audit/SegmentedToggle.vue` | Boutons libellés "Oui / Non / Partiel", vert charte Buildy #00cd92 | Formulaires desktop (questions R175 dans BmsSection, IdentificationSection, SystemsSection, DeviceEditModal). Supporte ternaire (`null` = non répondu). Prop `disabled` pour les questions dont le prérequis n'est pas rempli. |
+| `components/mobile-audit/MobileYesNo.vue` | Carte plein largeur, 44px tactile, charte Buildy | Sheets mobiles (MobileBmsTab, MobileSystemsTab, MobileSiteTab). Ternaire idem. |
+| `components/SegmentedToggle.vue` | Compact icônes ✓ / ✗, min-width 36px desktop / 48px tactile | Tables denses (MetersSection desktop + mobile, BmsSection tables Équipements / Compteurs intégrés). Prop `compact`, `yes-danger` pour les "oui rouge" (HS). |
+
+**Patterns d'usage** :
+- Question = label + toggle à droite : `<div class="flex items-center justify-between"><span>Question ?</span><Toggle ... /></div>`.
+- Reformuler les labels en QUESTIONS explicites (pas en affirmations) : `Présent ?` plutôt que `Présent`, sinon le toggle est ambigu (« coché Oui = présent ou pas ? »).
+- Pour les disabled (prérequis manquant) : tooltip `« Réponds d'abord X »` + `:disabled="!prereq"`.
+- Pour les cards multi-select cliquables (5 usages traités par la GTB), faire la **card entière** click-toggle plutôt que de mettre une checkbox dedans.
+
+**Patch côté serveur** : envoyer **boolean strict** (`true`/`false`), pas
+`0`/`1`. Le schema Zod serveur est `z.boolean().nullable().optional()` et
+refuse les entiers → 400 Bad Request silencieux.
+
+## Listes "intégré à la GTB" filtrées par usages traités
+
+Dans la card GTB (`BmsSection.vue` + `MobileBmsTab.vue`), les tables
+« Équipements intégrés » et « Compteurs intégrés » sont filtrées par les
+flags `bms.manages_*` (heating / cooling / ventilation / dhw / lighting).
+Mapping :
+
+| system_category / meter usage | Flag GTB |
+|---|---|
+| `heating` | `manages_heating` |
+| `cooling` | `manages_cooling` |
+| `ventilation` (devices uniquement) | `manages_ventilation` |
+| `dhw` | `manages_dhw` |
+| `lighting_indoor`, `lighting_outdoor`, `lighting` | `manages_lighting` |
+| `electricity_production`, `pv`, `other` | jamais affiché (hors champ GTB) |
+
+**Règle stricte** : si l'auditeur n'a coché **aucun** usage, les tables sont
+**vides** avec un message ambré « ⚠ Coche d'abord un usage ci-dessus ». Pas de
+fallback "tout afficher" — ça suggérait à tort que toutes les catégories
+étaient à intégrer.
+
+## Perfomance — patterns à respecter dans l'audit
+
+**Toggles non bloquants** : les `patchDeviceMb` / `patchMeter` etc. de
+`BmsSection` font `Object.assign(d, fullPatch)` synchroniquement pour mise à
+jour visuelle instantanée, puis lancent le PATCH HTTP en fire-and-forget
+(`.then(scheduleRefresh).catch(...)`). Ne pas remettre des `await` qui bloquent
+la réactivité.
+
+**Debounce du refresh plan d'action** : après chaque PATCH, on **debounce**
+800ms l'appel `audit.refreshActionItems()` (qui fait 2 GET parallèles +
+recalcul serveur). Sans ça, cliquer 10 toggles d'affilée = 10 recalculs
+sérialisés.
+
+**Rate-limit Fastify** : 1500 req/min (`backend-node/src/index.js`). Les
+audits riches (~30 action items × N photos) déclenchent des cascades de
+`GET /api/sites/.../documents?bacs_audit_action_item_id=X` au mount des
+`BacsPhotoButton`. C'est un anti-pattern **N+1 queries** — TODO long terme :
+1 fetch global au store + distribuer aux N enfants. En attendant, le
+rate-limit absorbe.
+
 ## Synchro sites avec Fleet Manager
 - Bidirectionnelle via `site_uuid` partage + last-write-wins basé sur `updated_at`
 - Token de service Bearer `BUILDY_SITES_SYNC_TOKEN` (memes valeurs cote FM et Buildy Docs)

@@ -2,6 +2,26 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.95",
+      "date": "2026-05-25",
+      "title": "Hotfix sécurité : un utilisateur ne peut plus modifier les sous-ressources d'un audit qui ne lui est pas partagé",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "16 endpoints PATCH/DELETE/POST de l'audit BACS vérifient maintenant l'accès au document parent",
+          "what": "Avant ce fix, un utilisateur authentifié (cookie OIDC OU token act-as-user MCP) pouvait modifier ou supprimer un usage, un compteur, un équipement, un composant GTB, une régulation thermique ou une action du plan d'un audit auquel il n'avait pas accès — s'il connaissait l'ID de la sous-ressource. Le filtre forUserId sur la liste GET /afs masquait l'audit, mais l'écriture directe sur la sous-ressource n'était pas contrôlée. Désormais chaque PATCH/DELETE/POST sur systems/:id, meters/:id, bms-components/:id, thermal-regulation/:id, action-items/:id, devices/:id (+ share/move/duplicate) appelle assertBacsAuditExists(document_id, requiredRole: 'write') et renvoie 403 si l'utilisateur n'a pas l'audit ou n'en est que lecteur.",
+          "where": "Backend routes/bacs-audit.js (16 endpoints). Helper réutilisé : routes/bacs-audit/_shared.js assertBacsAuditExists.",
+          "how_to_test": "Avec 2 comptes A et B sans partage croisé : A crée un audit + 1 compteur. B tente PATCH /api/bacs-audit/meters/<id> → 403 Forbidden (avant : 200 OK + altération DB)."
+        },
+        {
+          "kind": "feature",
+          "title": "Création d'un composant GTB via MCP : champ notes_html accepté",
+          "what": "Le POST serveur acceptait déjà notes (texte brut) mais pas notes_html (HTML sanitisé). Maintenant les 2 sont acceptés à la création — alignement avec le PATCH.",
+          "where": "Outil MCP audit_bms_component_add (FM) + route POST /bacs-audit/:documentId/bms-components (Docs)."
+        }
+      ]
+    },
+    {
       "version": "0.1.94",
       "date": "2026-05-25",
       "title": "Fix calcul puissance : splits/DRV cooling étaient comptés en chaud",

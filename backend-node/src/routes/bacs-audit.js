@@ -79,6 +79,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne system non trouvee' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
 
     const schema = z.object({
       present: z.boolean().optional(),
@@ -300,6 +301,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne meter non trouvee' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
       required: z.boolean().optional(),
       present_actual: z.boolean().optional(),
@@ -346,6 +348,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const m = db.db.prepare('SELECT * FROM bacs_audit_meters WHERE id = ?').get(id);
     if (!m) return reply.code(404).send({ detail: 'Compteur non trouve' });
+    if (!assertBacsAuditExists(m.document_id, request, reply, { requiredRole: 'write' })) return;
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_meters
         (document_id, zone_id, usage, meter_type, equipment_id, required,
@@ -367,6 +370,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT document_id FROM bacs_audit_meters WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne meter non trouvee' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     db.db.prepare('DELETE FROM bacs_audit_meters WHERE id = ?').run(id);
     logBacsAudit(request, 'bacs.meter.delete', row.document_id, { meterId: id });
     regenerateActionItems(row.document_id);
@@ -485,6 +489,7 @@ async function routes(fastify) {
       protocols: z.string().nullable().optional(),
       firmware_version: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
+      notes_html: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body || {}); }
@@ -494,13 +499,13 @@ async function routes(fastify) {
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_bms_components
         (document_id, position, component_type, brand, model, location,
-         ip_address, protocols, firmware_version, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ip_address, protocols, firmware_version, notes, notes_html)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       documentId, maxPos + 1,
       body.component_type || null, body.brand || null, body.model || null,
       body.location || null, body.ip_address || null, body.protocols || null,
-      body.firmware_version || null, body.notes || null,
+      body.firmware_version || null, body.notes || null, body.notes_html || null,
     );
     logBacsAudit(request, 'bacs.bms_component.create', documentId, { componentId: r.lastInsertRowid, type: body.component_type });
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(r.lastInsertRowid));
@@ -510,6 +515,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Composant non trouve' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
       component_type: z.enum(BMS_COMPONENT_TYPES).nullable().optional(),
       brand: z.string().nullable().optional(),
@@ -541,6 +547,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const c = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
     if (!c) return reply.code(404).send({ detail: 'Composant non trouve' });
+    if (!assertBacsAuditExists(c.document_id, request, reply, { requiredRole: 'write' })) return;
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_bms_components
         (document_id, position, component_type, brand, model, location,
@@ -558,6 +565,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_bms_components WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Composant non trouve' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     db.db.prepare('DELETE FROM bacs_audit_bms_components WHERE id = ?').run(id);
     logBacsAudit(request, 'bacs.bms_component.delete', row.document_id, { componentId: id });
     return reply.code(204).send();
@@ -582,6 +590,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
       // Migration 170 : libellé libre du système régulé (« Chaudière gaz +
       // aérothermes », « DRV Daikin »…). NULL = libellé par défaut côté UI
@@ -682,6 +691,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_thermal_regulation WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     db.db.prepare('DELETE FROM bacs_audit_thermal_regulation WHERE id = ?').run(id);
     logBacsAudit(request, 'bacs.thermal.delete', row.document_id, { thermalId: id });
     regenerateActionItems(row.document_id);
@@ -740,6 +750,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Item non trouve' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
       title: z.string().min(1).optional(),
       description: z.string().nullable().optional(),
@@ -777,6 +788,7 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT auto_generated, document_id FROM bacs_audit_action_items WHERE id = ?').get(id);
     if (!row) return reply.code(404).send({ detail: 'Item non trouve' });
+    if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     if (row.auto_generated) {
       return reply.code(400).send({ detail: 'Items auto-generes ne peuvent pas etre supprimes (ils disparaitront seuls a la prochaine regen). Utilise status=declined a la place.' });
     }
@@ -912,6 +924,7 @@ async function routes(fastify) {
       WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Équipement non trouvé' });
+    if (!assertBacsAuditExists(dev.document_id, request, reply, { requiredRole: 'write' })) return;
 
     const schema = z.object({
       extra_system_ids: z.array(z.number().int().positive()).default([]),
@@ -959,6 +972,7 @@ async function routes(fastify) {
       WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Équipement non trouvé' });
+    if (!assertBacsAuditExists(dev.document_id, request, reply, { requiredRole: 'write' })) return;
 
     const schema = z.object({ system_id: z.number().int().positive() });
     let body;
@@ -1084,6 +1098,7 @@ async function routes(fastify) {
       JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
+    if (!assertBacsAuditExists(dev.document_id, request, reply, { requiredRole: 'write' })) return;
     const schemaPatch = z.object({
       name: z.string().nullable().optional(),
       brand: z.string().nullable().optional(),
@@ -1157,6 +1172,7 @@ async function routes(fastify) {
       JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouve' });
+    if (!assertBacsAuditExists(dev.document_id, request, reply, { requiredRole: 'write' })) return;
     // Copie générique de TOUTES les colonnes du device (hors id / position /
     // timestamps) : évite de perdre power_kw_cooling, power_calculation_type,
     // quantity, wired, communication_protocols, is_backup, age_years… à chaque
@@ -1184,6 +1200,7 @@ async function routes(fastify) {
       JOIN bacs_audit_systems s ON s.id = d.system_id WHERE d.id = ?
     `).get(id);
     if (!dev) return reply.code(404).send({ detail: 'Device non trouvé' });
+    if (!assertBacsAuditExists(dev.document_id, request, reply, { requiredRole: 'write' })) return;
     db.db.prepare('DELETE FROM bacs_audit_system_devices WHERE id = ?').run(id);
     logBacsAudit(request, 'bacs.device.delete', dev.document_id, { deviceId: id });
     regenerateActionItems(dev.document_id);
