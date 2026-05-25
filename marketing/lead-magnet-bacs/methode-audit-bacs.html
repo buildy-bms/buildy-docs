@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+
+
+<meta charset="UTF-8">
+<title>La méthode interne d'audit BACS de Buildy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://kit.fontawesome.com/e064e536db.js" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --navy:#1b2842;
+    --navy-dark:#0f1a2e;
+    --gray-900:#111827;
+    --gray-600:#4b5563;
+    --gray-300:#d1d5db;
+    --gray-100:#f3f4f6;
+    --gray-50:#fafafa;
+    --accent-warn:#b45309;
+    --accent-tip:#047857;
+    --white:#ffffff;
+    --mint-50:#e6faf3;
+    --mint-100:#c1f4df;
+    --mint-500:#00cd92;
+    --mint-600:#00a578;
+    --mint-700:#007a59;
+    --heat:#dc2626;
+    --heat-bg:#fef2f2;
+    --cool:#2563eb;
+    --cool-bg:#eff6ff;
+    --vent:#0891b2;
+    --vent-bg:#ecfeff;
+    --ecs:#d97706;
+    --ecs-bg:#fffbeb;
+    --light:#ca8a04;
+    --light-bg:#fefce8;
+    --pv:#16a34a;
+    --pv-bg:#f0fdf4;
+    --power:#7c3aed;
+    --power-bg:#f5f3ff;
+  }
+
+  @page{
+    size:A4;
+    margin:0;
+  }
+  @page :first{
+    margin:0;
+  }
+  @page cover{ margin:0; }
+  @page pivot{ margin:0; }
+  @page back{ margin:0; }
+
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--gray-300);
+    font-family:'Manrope',sans-serif;
+    color:var(--gray-900);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* Screen preview: fake A4 pages on a backdrop */
+  .page{
+    position:relative;
+    background:var(--white);
+    width:210mm;
+    min-height:297mm;
+    margin:14mm auto;
+    padding:25mm 18mm 25mm 18mm;
+    position:relative;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    page-break-after:always;
+    break-after:page;
+    overflow:hidden;
+    color:var(--gray-900);
+  }
+  .page.full-bleed{
+    padding:0;
+  }
+  .page::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:url('assets/logo-mark.png');
+    background-repeat:no-repeat;
+    background-position:center;
+    background-size:130mm auto;
+    opacity:0.035;
+    pointer-events:none;
+    z-index:0;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .page > *{ position:relative; z-index:1; }
+  .page:last-child{ page-break-after:auto; }
+
+  @media print{
+    html,body{background:var(--white);}
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    .page{
+      margin:0;
+      width:210mm;
+      min-height:297mm;
+      height:auto;
+      padding:25mm 18mm 25mm 18mm;
+      box-shadow:none;
+      page-break-after:always;
+      break-after:page;
+      overflow:visible;
+    }
+    .page-foot{
+      position:static;
+      margin-top:18mm;
+      left:auto;
+      right:auto;
+      bottom:auto;
+    }
+    .page.full-bleed{
+      width:210mm;
+      height:297mm;
+      padding:0;
+      page-break-after:always;
+    }
+    .cover, .pivot, .back{
+      margin:0 !important;
+      width:210mm !important;
+      height:297mm !important;
+      min-height:297mm !important;
+      box-shadow:none !important;
+      page-break-after:always;
+      break-after:page;
+    }
+    .cover{ padding:30mm 28mm !important; }
+    .pivot{ padding:30mm 28mm !important; }
+    .back{ padding:30mm 28mm !important; }
+  }
+
+  /* === Type scale === */
+  h1.chapter-title{
+    font-family:'Poppins',sans-serif;
+    font-size:36px;
+    line-height:1.08;
+    font-weight:700;
+    color:var(--navy);
+    margin:0 0 4px 0;
+    letter-spacing:-0.025em;
+  }
+  h2{
+    font-family:'Poppins',sans-serif;
+    font-size:22px;
+    line-height:1.25;
+    font-weight:600;
+    color:var(--navy);
+    margin:28px 0 12px 0;
+    letter-spacing:-0.015em;
+  }
+  h3{
+    font-family:'Poppins',sans-serif;
+    font-size:16px;
+    line-height:1.4;
+    font-weight:600;
+    color:var(--navy);
+    margin:22px 0 8px 0;
+    letter-spacing:-0.005em;
+  }
+  p{
+    font-size:11.5pt;
+    line-height:1.55;
+    font-weight:400;
+    margin:0 0 12px 0;
+    max-width:170mm;
+  }
+  ul, ol{
+    font-size:11.5pt;
+    line-height:1.55;
+    margin:0 0 14px 0;
+    padding-left:0;
+    list-style:none;
+    max-width:170mm;
+  }
+  ul li{
+    position:relative;
+    padding-left:18px;
+    margin-bottom:8px;
+  }
+  ul li::before{
+    content:"•";
+    color:var(--navy);
+    position:absolute;
+    left:0;
+    top:-1px;
+    font-size:14pt;
+    line-height:1;
+  }
+  ol{
+    counter-reset:item;
+    padding-left:0;
+  }
+  ol li{
+    counter-increment:item;
+    position:relative;
+    padding-left:22px;
+    margin-bottom:8px;
+  }
+  ol li::before{
+    content:counter(item) ".";
+    position:absolute;
+    left:0;
+    top:0;
+    color:var(--navy);
+    font-weight:600;
+  }
+  strong{ font-weight:600; color:var(--gray-900); }
+  em{ font-style:italic; }
+  a{ color:var(--navy); text-decoration:underline; text-underline-offset:3px; }
+
+  /* === Foot === */
+  .page-foot{
+    position:absolute;
+    left:18mm;
+    right:18mm;
+    bottom:14mm;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'Manrope',sans-serif;
+    font-size:9pt;
+    font-weight:600;
+    line-height:1.4;
+    text-transform:uppercase;
+    letter-spacing:0.18em;
+    color:var(--gray-600);
+    border-top:1px solid var(--gray-300);
+    padding-top:4mm;
+  }
+  .page-foot .chap{ text-transform:lowercase; letter-spacing:0.04em; }
+  .page-foot .num{ font-variant-numeric:tabular-nums; letter-spacing:0.02em; }
+
+  /* === Encadrés === */
+  .callout{
+    border-left:4px solid var(--navy);
+    background:var(--gray-100);
+    padding:14mm 16mm;
+    margin:18px 0;
+    max-width:170mm;
+  }
+  .callout p:last-child{ margin-bottom:0; }
+  .callout p:first-child{ margin-top:0; }
+  .callout.warn{
+    border-left-color:var(--accent-warn);
+  }
+  .callout.tip{
+    border-left-color:var(--accent-tip);
+  }
+  .callout.r175{
+    border-left-color:var(--navy);
+    background:var(--gray-50);
+  }
+  .callout .callout-label{
+    font-size:9.5pt;
+    line-height:1.2;
+    font-weight:600;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--accent-warn);
+    margin-bottom:6px;
+  }
+  .callout.tip .callout-label{ color:var(--accent-tip); }
+  .callout.r175 .callout-label{ color:var(--navy); }
+
+  /* === Cover === */
+  .cover{
+    background:var(--navy);
+    color:var(--white);
+    width:210mm;
+    min-height:297mm;
+    height:297mm;
+    margin:14mm auto;
+    padding:30mm 28mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    page-break-after:always;
+    break-after:page;
+    overflow:hidden;
+  }
+  .cover-eyebrow{
+    font-size:10pt;
+    font-weight:600;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.55);
+    margin-bottom:auto;
+  }
+  .cover-eyebrow .meta{
+    display:block;
+    margin-top:8px;
+    font-weight:400;
+    letter-spacing:0.12em;
+    color:rgba(255,255,255,0.42);
+  }
+  .cover-center{
+    margin:auto 0;
+  }
+  .cover-title{
+    font-family:'Poppins',sans-serif;
+    font-size:60pt;
+    font-weight:800;
+    line-height:1.02;
+    letter-spacing:-0.04em;
+    color:var(--white);
+    margin:0;
+    max-width:165mm;
+  }
+  .cover-sub{
+    margin-top:36px;
+    font-size:18pt;
+    line-height:1.4;
+    font-weight:400;
+    color:rgba(255,255,255,0.85);
+    max-width:160mm;
+    letter-spacing:-0.005em;
+  }
+  .cover-foot{
+    margin-top:auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    color:rgba(255,255,255,0.7);
+  }
+  .cover-foot .wordmark img{
+    height:48px;
+    width:auto;
+    display:block;
+    object-fit:contain;
+    max-width:140px;
+  }
+  .cover-foot .logo-lockup{
+    align-self:flex-end;
+    flex:0 0 auto;
+  }
+  .cover-foot .wordmark .tag{
+    display:block;
+    font-size:8.5pt;
+    font-weight:600;
+    letter-spacing:0.32em;
+    margin-top:10px;
+    color:rgba(255,255,255,0.55);
+  }
+  .cover-foot .edition{
+    font-size:9.5pt;
+    letter-spacing:0.12em;
+    text-align:right;
+    color:rgba(255,255,255,0.55);
+  }
+
+  /* === Chapter opener === */
+  .chap-eyebrow{
+    font-size:10pt;
+    font-weight:600;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--gray-600);
+    margin-bottom:18px;
+  }
+  .chap-rule{
+    width:60mm;
+    height:2px;
+    background:var(--navy);
+    margin:18px 0 28px 0;
+  }
+  .chap-intro{
+    font-size:13.5pt;
+    line-height:1.5;
+    color:var(--gray-900);
+    max-width:170mm;
+    font-weight:400;
+  }
+  .section-label{
+    font-size:10pt;
+    font-weight:600;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--gray-600);
+    margin:0 0 6px 0;
+  }
+
+  /* === Tables === */
+  table{
+    width:100%;
+    max-width:170mm;
+    border-collapse:collapse;
+    margin:18px 0;
+    font-size:10.5pt;
+    line-height:1.4;
+    font-variant-numeric:tabular-nums;
+  }
+  thead th{
+    background:var(--navy);
+    color:var(--white);
+    font-weight:600;
+    text-align:left;
+    padding:10px 12px;
+    border:none;
+    font-size:10pt;
+    letter-spacing:0.01em;
+  }
+  tbody td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--gray-300);
+    vertical-align:top;
+  }
+  tbody tr:nth-child(even) td{
+    background:var(--gray-50);
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.sev{ font-weight:600; white-space:nowrap; }
+  td.sev.bloq{ color:#991b1b; }
+
+  /* === Pivot page === */
+  .pivot{
+    background:var(--navy);
+    color:var(--white);
+    width:210mm;
+    height:297mm;
+    margin:14mm auto;
+    padding:30mm 28mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    page-break-after:always;
+    break-after:page;
+    overflow:hidden;
+  }
+  .pivot-eyebrow{
+    font-size:10pt;
+    font-weight:600;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.55);
+    margin-bottom:30mm;
+  }
+  .pivot h2{
+    font-family:'Poppins',sans-serif;
+    color:var(--white);
+    font-size:32pt;
+    line-height:1.1;
+    letter-spacing:-0.025em;
+    font-weight:700;
+    margin:0 0 24px 0;
+    max-width:170mm;
+  }
+  .pivot p{
+    color:rgba(255,255,255,0.86);
+    font-size:13pt;
+    line-height:1.55;
+    max-width:160mm;
+    margin-bottom:16px;
+  }
+  .pivot .price-block{
+    margin:28px 0 28px 0;
+    padding-top:20px;
+    border-top:1px solid rgba(255,255,255,0.18);
+  }
+  .pivot .price-label{
+    font-size:10pt;
+    font-weight:600;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.5);
+    margin-bottom:14px;
+  }
+  .pivot .price{
+    font-family:'Poppins',sans-serif;
+    font-size:48pt;
+    font-weight:800;
+    line-height:1.05;
+    letter-spacing:-0.035em;
+    color:var(--white);
+    margin:0;
+  }
+  .pivot .price-sub strong{ color:#ffffff; font-weight:600; }
+  .pivot .price-sub{
+    color:rgba(255,255,255,0.78);
+    font-size:11pt;
+    margin-top:8px;
+    letter-spacing:0.02em;
+  }
+  .pivot .cta-block{
+    margin-top:auto;
+    padding-top:30px;
+    border-top:1px solid rgba(255,255,255,0.18);
+  }
+  .pivot .cta-block a{
+    color:var(--white);
+    text-decoration:underline;
+    text-underline-offset:4px;
+    font-size:14pt;
+    display:inline-block;
+    margin-right:24px;
+  }
+  .pivot .cta-block .cta-label{
+    display:block;
+    font-size:9.5pt;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.5);
+    margin-bottom:10px;
+  }
+
+  /* === Back cover === */
+  .back{
+    background:var(--navy);
+    color:var(--white);
+    width:210mm;
+    height:297mm;
+    margin:14mm auto;
+    padding:30mm 28mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    page-break-after:auto;
+    overflow:hidden;
+  }
+  .back .wordmark-top{
+    position:absolute;
+    top:30mm;
+    left:0;
+    right:0;
+    text-align:center;
+  }
+  .back .wordmark-top img{
+    height:52px;
+    width:auto;
+    max-width:180px;
+    display:inline-block;
+    object-fit:contain;
+  }
+  .back .wordmark-top .tag{
+    display:block;
+    font-size:8.5pt;
+    font-weight:600;
+    letter-spacing:0.32em;
+    margin-top:12px;
+    color:rgba(255,255,255,0.55);
+  }
+  .back-center h3{
+    font-family:'Poppins',sans-serif;
+    color:var(--white);
+    font-size:20pt;
+    font-weight:600;
+    margin:0 0 28px 0;
+    letter-spacing:-0.02em;
+  }
+  .back-center .contact{
+    font-size:13pt;
+    margin:0 0 10px 0;
+    color:rgba(255,255,255,0.92);
+  }
+  .back-center .contact a{ color:var(--white); }
+  .back-center .signature{
+    margin-top:40px;
+    color:rgba(255,255,255,0.92);
+  }
+  .back-center .signature .rule{
+    width:24mm;
+    height:1px;
+    background:rgba(255,255,255,0.35);
+    margin:0 auto 24px auto;
+  }
+  .back-center .signature .name{
+    font-size:14pt;
+    font-weight:600;
+    letter-spacing:0.04em;
+  }
+  .back-center .signature .role{
+    font-size:11pt;
+    color:rgba(255,255,255,0.65);
+    margin-top:4px;
+    font-style:italic;
+  }
+  .back-foot{
+    position:absolute;
+    left:28mm;
+    right:28mm;
+    bottom:18mm;
+    font-size:8pt;
+    line-height:1.45;
+    color:var(--gray-300);
+    opacity:0.6;
+    text-align:center;
+  }
+
+  /* === Misc === */
+  .lead{
+    font-size:13pt;
+    line-height:1.5;
+    color:var(--gray-900);
+    max-width:170mm;
+    margin:0 0 18px 0;
+  }
+  .toc-list{
+    max-width:170mm;
+    margin:24px 0 0 0;
+    padding:0;
+    list-style:none;
+  }
+  .toc-list li{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    padding:11px 0;
+    border-bottom:1px solid var(--gray-300);
+    font-size:11.5pt;
+  }
+  .toc-list li::before{ content:none; }
+  .toc-list .num{
+    font-variant-numeric:tabular-nums;
+    color:var(--navy);
+    font-weight:600;
+    width:30px;
+    flex:0 0 30px;
+  }
+  .toc-list .title{ flex:0 1 auto; color:var(--gray-900); white-space:nowrap; }
+  .toc-list .dots{
+    flex:1 1 auto;
+    min-width:20px;
+    border-bottom:1px dotted var(--gray-300);
+    transform:translateY(-4px);
+  }
+  .toc-list a.title{ color:var(--gray-900); text-decoration:none; font-family:'Poppins',sans-serif; font-weight:500; transition:color 120ms; }
+  .toc-list a.title:hover{ color:var(--mint-700); }
+  .toc-list .pg{ color:var(--gray-600); font-variant-numeric:tabular-nums; font-size:10.5pt; }
+
+  .section-divider{
+    height:1px;
+    background:var(--gray-300);
+    margin:28px 0 24px 0;
+    max-width:170mm;
+  }
+  .quote-pull{
+    border-left:4px solid var(--mint-500);
+    background:var(--mint-50);
+    padding:14mm 16mm;
+    margin:18px 0;
+    max-width:170mm;
+    font-style:italic;
+    color:var(--navy-dark);
+  }
+  .quote-pull p{ margin:0 0 8px 0; }
+  .quote-pull p:last-child{ margin-bottom:0; }
+
+  /* === Logo lockup === */
+  .logo-lockup{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .logo-lockup img{ display:block; }
+
+  /* === Pills (colored badges) === */
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 11px;
+    border-radius:999px;
+    font-family:'Manrope',sans-serif;
+    font-size:9.5pt;
+    font-weight:600;
+    letter-spacing:0.01em;
+    line-height:1.2;
+    white-space:nowrap;
+  }
+  .pill i{ font-size:10pt; line-height:1; }
+  .pill-mint{ background:var(--mint-50); color:var(--mint-700); }
+  .pill-heat{ background:var(--heat-bg); color:var(--heat); }
+  .pill-cool{ background:var(--cool-bg); color:var(--cool); }
+  .pill-vent{ background:var(--vent-bg); color:var(--vent); }
+  .pill-ecs{ background:var(--ecs-bg); color:var(--ecs); }
+  .pill-light{ background:var(--light-bg); color:var(--light); }
+  .pill-pv{ background:var(--pv-bg); color:var(--pv); }
+  .pill-power{ background:var(--power-bg); color:var(--power); }
+  .pill-navy{ background:var(--navy); color:var(--white); }
+  .pill-warn{ background:var(--ecs-bg); color:var(--accent-warn); }
+  .pill-alarm{ background:#fee2e2; color:#991b1b; }
+  .pill-warn-soft{ background:#fef3c7; color:#92400e; }
+  .pill-info{ background:var(--cool-bg); color:var(--cool); }
+  .pill-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:8px 0 18px 0;
+    max-width:170mm;
+  }
+
+  /* === Icon chips (large) === */
+  .icon-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:14px;
+    margin:18px 0;
+    max-width:170mm;
+  }
+  .icon-chip{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    padding:12px 14px;
+    border:1px solid var(--gray-300);
+    border-radius:10px;
+    background:var(--white);
+  }
+  .icon-chip .ico{
+    width:36px;
+    height:36px;
+    border-radius:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 36px;
+    font-size:16pt;
+  }
+  .icon-chip .lbl{
+    font-family:'Poppins',sans-serif;
+    font-size:10.5pt;
+    font-weight:600;
+    color:var(--navy);
+    line-height:1.3;
+  }
+  .icon-chip .sub{
+    font-size:9.5pt;
+    color:var(--gray-600);
+    margin-top:2px;
+    line-height:1.35;
+  }
+  .ico-heat{ background:var(--heat-bg); color:var(--heat); }
+  .ico-cool{ background:var(--cool-bg); color:var(--cool); }
+  .ico-vent{ background:var(--vent-bg); color:var(--vent); }
+  .ico-ecs{ background:var(--ecs-bg); color:var(--ecs); }
+  .ico-light{ background:var(--light-bg); color:var(--light); }
+  .ico-pv{ background:var(--pv-bg); color:var(--pv); }
+  .ico-mint{ background:var(--mint-50); color:var(--mint-700); }
+  .ico-navy{ background:var(--navy); color:var(--white); }
+
+  /* === Step number === */
+  .step-num{
+    font-family:'Poppins',sans-serif;
+    font-size:96pt;
+    font-weight:800;
+    line-height:0.9;
+    letter-spacing:-0.06em;
+    color:var(--mint-500);
+    margin:0 0 8px 0;
+    opacity:0.95;
+  }
+  .chap-eyebrow .chip-num{
+    display:inline-block;
+    padding:3px 10px;
+    background:var(--mint-50);
+    color:var(--mint-700);
+    border-radius:999px;
+    margin-right:10px;
+    font-weight:700;
+    letter-spacing:0.04em;
+  }
+
+  /* Sev colored cells in big action table */
+  td.sev.bloq{ color:#991b1b; }
+  td.sev.maj{ color:#b45309; }
+  td.sev.min{ color:var(--mint-700); }
+
+  /* Running header on inner pages */
+  .page-header{
+    position:absolute;
+    top:14mm;
+    left:18mm;
+    right:18mm;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'Manrope',sans-serif;
+    font-size:9pt;
+    font-weight:600;
+    line-height:1.4;
+    text-transform:uppercase;
+    letter-spacing:0.18em;
+    color:var(--gray-600);
+    border-bottom:1px solid var(--gray-300);
+    padding-bottom:4mm;
+  }
+  .page-header .head-chap{ letter-spacing:0.18em; }
+  .page-header .head-mark{
+    height:18px;
+    width:auto;
+    opacity:0.85;
+  }
+</style>
+</head>
+<body>
+<script>
+  // Auto-print once fonts and images are ready
+  window.addEventListener('load', function(){
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function(){
+        setTimeout(function(){ window.print(); }, 600);
+      });
+    } else {
+      setTimeout(function(){ window.print(); }, 800);
+    }
+  });
+</script>
+
+<!-- =============================================== -->
+<!-- COVER                                            -->
+<!-- =============================================== -->
+<section class="cover">
+  <div class="cover-eyebrow">
+    <img src="assets/logo-buildy-white.png" alt="Buildy" style="height:32px; display:block; margin-bottom:24px;">
+    Livre blanc
+    <span class="meta">Audit BACS — Décret R175 · Version 1.0 · Mai 2026</span>
+  </div>
+
+  <div class="cover-center">
+    <h1 class="cover-title">La méthode interne d'audit BACS de Buildy</h1>
+    <p class="cover-sub">La checklist qu'on utilise sur tous nos chantiers — livrée telle quelle, gratuitement.</p>
+  </div>
+
+  <div class="cover-foot">
+    <div class="wordmark logo-lockup">
+      <img src="assets/logo-buildy-white.png" alt="Buildy">
+    </div>
+    <div class="edition">À l'attention des propriétaires<br>et gestionnaires de bâtiments tertiaires</div>
+  </div>
+</section>
+
+<!-- =============================================== -->
+<!-- PRÉAMBULE 1 — Ce que vous tenez                  -->
+<!-- =============================================== -->
+<section class="page">
+  <div class="page-header"><span class="head-chap">Préambule — Ce que vous tenez entre les mains</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow">Préambule</div>
+  <h1 class="chapter-title">Ce que vous tenez entre les mains</h1>
+  <div class="chap-rule"></div>
+
+  <p class="lead">Ce livre blanc est la documentation interne de la méthode utilisée par les auditeurs Buildy pour structurer un audit BACS sur un bâtiment tertiaire. <strong>10 étapes, dans cet ordre, sans sauter.</strong></p>
+
+  <p>Tout ce que vous allez lire vient de l'expérience terrain accumulée audit après audit, du décret R175 dans sa lettre, et des contrôles préfectoraux que nos rapports ont déjà passés sans réserve.</p>
+
+  <p>C'est <em>la même structure</em> que celle utilisée par notre équipe pour produire les rapports d'audit livrés aux propriétaires, asset managers et property managers de bâtiments tertiaires. Rien n'est retenu — pas de version premium cachée, pas de chapitre payant.</p>
+
+  <h3>Pourquoi le publier ?</h3>
+  <p>À la lecture, vous saurez si vous voulez le faire vous-même ou nous appeler. Les deux choix sont légitimes. Si vous gérez un seul bâtiment et que vous avez le temps, vous avez maintenant la méthode. Si vous gérez plusieurs sites ou que vous voulez aller vite, le pivot final de ce document vous indique comment nous joindre.</p>
+
+  <div class="callout tip">
+    <div class="callout-label">À qui ce livre blanc s'adresse</div>
+    <p>Propriétaires, asset managers, property managers, exploitants, AMO et bureaux d'études thermiques en charge de bâtiments tertiaires soumis au décret BACS. Pas aux intégrateurs GTB ni aux automaticiens — ce n'est pas la bonne grille de lecture pour eux.</p>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ Ce que ce livre blanc n'est pas</div>
+    <p>Une plaquette commerciale. Un manuel d'utilisation d'une solution propriétaire. Un texte juridique opposable. Le rapport d'inspection périodique R175-5-1 (qui doit être réalisé par un organisme tiers indépendant — voir chapitre 8).</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a2c1cdccd6c3c1d6e2c0d7cbcec6db8cc4d0">[email&#160;protected]</a></span><span class="num">2</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- PRÉAMBULE 2 — Décret R175                        -->
+<!-- =============================================== -->
+<section class="page">
+  <div class="page-header"><span class="head-chap">Préambule — Le décret R175 en une page</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow">Préambule</div>
+  <h1 class="chapter-title">Le décret R175 en une page</h1>
+  <div class="chap-rule"></div>
+
+  <p>Le décret BACS (Building Automation and Control Systems), codifié aux articles R175-1 à R175-6 du Code de la construction et de l'habitation, impose à tous les bâtiments tertiaires de plus de 70 kW de chauffage ou de climatisation d'être équipés d'un système d'automatisation et de contrôle conforme.</p>
+
+  <h3>Six articles structurent l'obligation</h3>
+  <ul>
+    <li><strong>R175-1</strong> définit le périmètre — quels domaines de gestion technique sont concernés (chauffage, climatisation, ventilation, eau chaude sanitaire, éclairage, production photovoltaïque), et ce qu'est une zone fonctionnelle.</li>
+    <li><strong>R175-2</strong> définit l'assujettissement — au-dessus de 290 kW, échéance immédiate ou au 1ᵉʳ janvier 2025 selon la date du permis de construire ; entre 70 et 290 kW, échéance au 1ᵉʳ janvier 2027. Les propriétaires sont dispensés de calculer le temps de retour sur investissement quand celui-ci dépasse les délais d'amortissement raisonnables.</li>
+    <li><strong>R175-3</strong> définit les capacités fonctionnelles attendues du système : suivi continu des consommations à pas horaire et conservation des données sur cinq ans, détection des pertes d'efficacité, interopérabilité, possibilité d'arrêt manuel et de fonctionnement autonome, mise à disposition des données aux gestionnaires et aux exploitants.</li>
+    <li><strong>R175-4</strong> impose des vérifications périodiques formalisées (carnet d'entretien, procédures écrites).</li>
+    <li><strong>R175-5</strong> impose la formation de l'exploitant à l'utilisation du système.</li>
+    <li><strong>R175-6</strong> impose une régulation thermique automatique par pièce ou par zone, applicable aux bâtiments dont le permis de construire ou les travaux générateurs sont postérieurs au 21 juillet 2021.</li>
+  </ul>
+
+  <h3>Ce que le décret n'impose pas</h3>
+  <ul>
+    <li>Pas de norme produit obligatoire. La conformité est <em>fonctionnelle</em> (on évalue ce que le système fait), pas <em>certificatoire</em> (on n'exige pas de certification ISO 52120-1).</li>
+    <li>Pas de marque imposée. Le décret est agnostique sur la solution déployée.</li>
+    <li>Pas de calcul du temps de retour sur investissement systématique. C'est une décision du propriétaire.</li>
+  </ul>
+
+  <h3>Ce que le décret impose en plus de la mise en conformité technique</h3>
+  <ul>
+    <li>Une <strong>inspection périodique R175-5-1</strong> réalisée par un organisme tiers indépendant. <em>Cet audit Buildy ne s'y substitue pas.</em> Voir chapitre 8.</li>
+    <li>La <strong>conservation du rapport d'audit pendant 10 ans</strong> et sa présentation lors d'éventuels contrôles préfectoraux.</li>
+  </ul>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cba8a4a5bfaaa8bf8ba9bea2a7afb2e5adb9">[email&#160;protected]</a></span><span class="num">3</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 1                                       -->
+<!-- =============================================== -->
+<!-- TOC -->
+<section class="page" id="toc">
+  <div class="page-header"><span class="head-chap">Sommaire</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow">Sommaire</div>
+  <h1 class="chapter-title">Table des matières</h1>
+  <div class="chap-rule"></div>
+  <p class="lead">10 étapes, dans cet ordre, sans sauter. Cliquez pour rejoindre un chapitre.</p>
+  <ul class="toc-list">
+    <li><span class="num">01</span><a class="title" href="#ch1">Identification &amp; cadrage R175-2</a><span class="dots"></span><span class="pg">04</span></li>
+    <li><span class="num">02</span><a class="title" href="#ch2">Découper le bâtiment en zones fonctionnelles</a><span class="dots"></span><span class="pg">07</span></li>
+    <li><span class="num">03</span><a class="title" href="#ch3">Inventaire des systèmes techniques et des équipements</a><span class="dots"></span><span class="pg">11</span></li>
+    <li><span class="num">04</span><a class="title" href="#ch4">Plan de comptage et suivi énergétique</a><span class="dots"></span><span class="pg">17</span></li>
+    <li><span class="num">05</span><a class="title" href="#ch5">Régulation thermique par zone</a><span class="dots"></span><span class="pg">22</span></li>
+    <li><span class="num">06</span><a class="title" href="#ch6">Évaluer la supervision existante</a><span class="dots"></span><span class="pg">26</span></li>
+    <li><span class="num">07</span><a class="title" href="#ch7">Check-list documentaire</a><span class="dots"></span><span class="pg">33</span></li>
+    <li><span class="num">08</span><a class="title" href="#ch8">Inspections périodiques R175-5-1 et accès techniques</a><span class="dots"></span><span class="pg">37</span></li>
+    <li><span class="num">09</span><a class="title" href="#ch9">Le plan d'action de mise en conformité</a><span class="dots"></span><span class="pg">41</span></li>
+    <li><span class="num">10</span><a class="title" href="#ch10">Synthèse et livraison du rapport</a><span class="dots"></span><span class="pg">47</span></li>
+    <li><span class="num">11</span><a class="title" href="#ch11">Les pièges à éviter après l'audit</a><span class="dots"></span><span class="pg">52</span></li>
+    <li><span class="num">→</span><a class="title" href="#conclusion">Conclusion — récapitulatif</a><span class="dots"></span><span class="pg">58</span></li>
+  </ul>
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="30535f5e44515344705245595c54491e5642">[email&#160;protected]</a></span><span class="num">—</span></div>
+</section>
+
+<section class="page" id="ch1">
+  <div class="page-header"><span class="head-chap">Chapitre 1 / 11 — Cadrage R175-2</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">01</span> Chapitre 1 / 11</div>
+  <h1 class="chapter-title">Identification &amp; cadrage R175-2</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Vérifier que le bâtiment est bien assujetti. Avant tout travail terrain, il faut établir si le bâtiment est concerné par le décret BACS. Cette vérification est apparemment simple — elle ne l'est pas toujours.</p>
+
+  <div class="pill-row">
+    <span class="pill pill-navy"><i class="fas fa-bolt"></i> R175-2</span>
+    <span class="pill pill-mint"><i class="fas fa-gauge-high"></i> Puissance nominale</span>
+    <span class="pill pill-info"><i class="fas fa-calendar"></i> Date permis</span>
+    <span class="pill pill-warn-soft"><i class="fas fa-triangle-exclamation"></i> Échéance</span>
+  </div>
+
+  <h2>Vérifier que le bâtiment est bien assujetti</h2>
+
+  <p>L'assujettissement repose sur <strong>la puissance nominale cumulée</strong> des systèmes de chauffage et de climatisation du bâtiment, et sur la <strong>date du permis de construire</strong>. Trois cas de figure :</p>
+
+  <ul>
+    <li><strong>Puissance supérieure à 290 kW.</strong> Le bâtiment est assujetti immédiatement s'il est antérieur au 1ᵉʳ janvier 2025 ; sinon échéance au 1ᵉʳ janvier 2025.</li>
+    <li><strong>Puissance comprise entre 70 et 290 kW.</strong> Échéance au 1ᵉʳ janvier 2027.</li>
+    <li><strong>Puissance inférieure à 70 kW.</strong> Le bâtiment n'est pas concerné par le décret.</li>
+  </ul>
+
+  <p>Cette grille d'analyse, identique pour tous les bâtiments, est la première chose que produit l'auditeur. Elle figure en page de couverture du rapport final, sous forme de verdict d'assujettissement explicite.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="97f4f8f9e3f6f4e3d7f5e2fefbf3eeb9f1e5">[email&#160;protected]</a></span><span class="num">4</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 1 / 11 — Cadrage R175-2</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les pièges du calcul de puissance</h2>
+  <p>Le calcul est rarement aussi direct qu'une simple addition de plaques signalétiques. Trois cas particuliers reviennent régulièrement et méritent un examen attentif.</p>
+
+  <h3>Bâtiment raccordé à un réseau de chaleur urbain</h3>
+  <p>La puissance à retenir n'est pas la puissance cumulée des émetteurs (radiateurs, planchers chauffants), mais celle de <strong>la sous-station d'échange</strong> qui raccorde le bâtiment au réseau urbain. C'est cette puissance qui figure dans le contrat de fourniture de chaleur — l'auditeur doit la vérifier physiquement et la comparer au document contractuel.</p>
+
+  <h3>Pompes à chaleur réversibles</h3>
+  <p>Une PAC réversible cumule chauffage et climatisation. Selon le mode dominant et le dimensionnement, elle peut basculer un bâtiment d'une catégorie à une autre. L'auditeur consigne la puissance nominale en mode chauffage <em>et</em> en mode climatisation, et retient la valeur la plus pertinente au regard du calcul d'assujettissement.</p>
+
+  <h3>Travaux récents sur les générateurs</h3>
+  <p>Le décret R175-6 (régulation thermique automatique) a une applicabilité spécifique : il s'impose aux bâtiments dont le permis de construire <strong>ou</strong> les travaux générateurs (remplacement de chaudière, installation d'une PAC, etc.) sont postérieurs au 21 juillet 2021. L'auditeur consigne donc deux dates distinctes : permis de construire et derniers travaux générateurs significatifs. Cet écart est souvent oublié dans les pré-diagnostics rapides.</p>
+
+  <h3>Dispense de calcul du temps de retour</h3>
+  <p>Le décret R175-2 prévoit que les propriétaires sont dispensés de chiffrer le temps de retour sur investissement (TRI) lorsque celui-ci dépasse les délais d'amortissement raisonnables. La méthode Buildy ne calcule pas ce TRI — c'est une décision du propriétaire, qui en assume la responsabilité. Le rapport d'audit le rappelle explicitement.</p>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ Vigilance</div>
+    <p>Une erreur de calcul sur la puissance assujettissante invalide tout l'audit. C'est la première chose qu'un contrôle préfectoral vérifie. L'auditeur Buildy s'appuie sur les documents officiels (permis de construire, contrats de raccordement, plaques signalétiques relevées physiquement) — jamais sur une déclaration verbale du gestionnaire.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="02616d6c766361764260776b6e667b2c6470">[email&#160;protected]</a></span><span class="num">5</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 1 / 11 — Cadrage R175-2</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+  <p>À l'issue du cadrage, le dossier d'audit contient :</p>
+  <ul>
+    <li>La puissance nominale cumulée chauffage et climatisation, justifiée document à l'appui.</li>
+    <li>La date du permis de construire et la date du dernier remplacement générateur significatif.</li>
+    <li>Le statut d'assujettissement : <em>immédiat</em>, <em>1ᵉʳ janvier 2025</em>, <em>1ᵉʳ janvier 2027</em>, ou <em>non assujetti</em>.</li>
+    <li>L'échéance réglementaire applicable au bâtiment.</li>
+    <li>L'identification du raccordement éventuel à un réseau de chaleur urbain.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-label">À retenir</div>
+    <p><strong>Si le bâtiment est non assujetti</strong>, l'audit s'arrête ici. Le rapport produit reste utile : il documente le constat d'absence d'obligation et sécurise le propriétaire face à un contrôle ultérieur.</p>
+    <p><strong>Si le bâtiment est assujetti</strong>, l'auditeur passe à l'étape 2 — le découpage du bâtiment en zones fonctionnelles, qui conditionne tout le travail terrain.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bad9d5d4cedbd9cefad8cfd3d6dec394dcc8">[email&#160;protected]</a></span><span class="num">6</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 2                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch2">
+  <div class="page-header"><span class="head-chap">Chapitre 2 / 11 — Zones fonctionnelles</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">02</span> Chapitre 2 / 11</div>
+  <h1 class="chapter-title">Découper le bâtiment en zones fonctionnelles</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Le décret R175 ne s'applique pas à un bâtiment pris en bloc. Il s'applique <strong>zone par zone</strong>. Chaque zone fonctionnelle a ses propres systèmes attendus, ses propres compteurs requis, ses propres exigences de régulation.</p>
+
+  <h2>Le découpage qui conditionne tout le reste</h2>
+
+  <p>Découper correctement le bâtiment, c'est donc préparer toutes les étapes suivantes. Un découpage trop grossier (un seul plateau pour tous les bureaux d'un étage) masque des écarts de conformité ; un découpage trop fin (une zone par bureau individuel) dilue l'analyse et rend le rapport illisible.</p>
+
+  <p><strong>La règle pratique</strong> : une zone fonctionnelle est un espace dont l'usage justifie un traitement réglementaire homogène. Un open-space et une salle de réunion attenante ne constituent pas la même zone — l'une a un occupant permanent et continu, l'autre a un usage intermittent. Un parking et un local technique ne constituent pas la même zone — l'un a une logique d'éclairage et de ventilation automatique liée à la détection de présence, l'autre d'éclairage de service ponctuel.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e0838f8e94818394a08295898c8499ce8692">[email&#160;protected]</a></span><span class="num">7</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 2 / 11 — Zones fonctionnelles</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">La grille des natures de zone</h2>
+
+  <p>L'auditeur s'appuie sur une grille de <strong>natures de zone</strong> pré-établie, qui couvre les usages les plus fréquents du bâtiment tertiaire français : bureaux partagés, bureaux privés, open-spaces, salles de réunion, espaces commerciaux, ateliers, locaux techniques, salles de classe, espaces de loisirs, foyers, couloirs, espaces extérieurs, locaux compteurs, espaces partagés, cellules logistiques, zones de stockage, et quelques autres cas spécifiques.</p>
+
+  <p>Cette grille n'est pas arbitraire : elle découle d'une lecture méthodique du R175-1 §6 et d'un référentiel construit à partir des chantiers réalisés. Chaque nature de zone déclenche <strong>une grille d'attendus</strong> — quels systèmes techniques doivent normalement y être présents, quels compteurs sont requis, quelles exigences de régulation s'y appliquent.</p>
+
+  <p>Par exemple :</p>
+  <ul>
+    <li>Un open-space tertiaire appelle naturellement chauffage, climatisation, ventilation et éclairage intérieur.</li>
+    <li>Un parking appelle éclairage et éventuellement ventilation mécanique selon le code du travail.</li>
+    <li>Un local technique a un périmètre réduit — souvent juste éclairage de service.</li>
+    <li>Une cellule logistique a un usage saisonnier qui peut justifier des modes de fonctionnement spécifiques.</li>
+  </ul>
+
+  <p>Cette grille d'attendus n'est pas une vérité absolue : elle aide l'auditeur à ne rien oublier sur le terrain et à justifier explicitement les absences. Si une zone a une nature atypique, elle est documentée comme telle et l'analyse est ajustée.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="06656968726765724664736f6a627f286074">[email&#160;protected]</a></span><span class="num">8</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 2 / 11 — Zones fonctionnelles</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Pour chaque zone, ce que l'auditeur consigne</h2>
+
+  <p>Pour chaque zone identifiée, le dossier d'audit comporte :</p>
+  <ul>
+    <li><strong>Un nom</strong> — explicite, qui parle à l'exploitant (« Open-space N+1 Est », « Hall d'accueil », pas « Zone-12 »).</li>
+    <li><strong>Une nature</strong> — choisie dans la grille évoquée page précédente.</li>
+    <li><strong>Une surface</strong> — relevée si possible, estimée sinon, justifiée document à l'appui (plan, métré, base immobilière).</li>
+    <li><strong>Des notes terrain</strong> — particularités observées sur place (orientation, hauteur sous plafond, occupation effective, contraintes d'accès).</li>
+    <li><strong>Des photos</strong> — vues générales de la zone, qui resteront dans le rapport et serviront de mémoire pour le propriétaire et pour les auditeurs ultérieurs.</li>
+  </ul>
+
+  <div class="callout r175">
+    <div class="callout-label">Cas du bâtiment multi-locataires</div>
+    <p>Un immeuble de bureaux loué à plusieurs entreprises peut avoir des zones gérées par différents occupants, avec des supervisions distinctes (voire concurrentes). L'auditeur identifie ces frontières opérationnelles, qui ne coïncident pas toujours avec le découpage immobilier. Cette distinction est importante pour l'étape 6 (évaluation de la supervision) et pour l'étape 8 (collecte des contacts d'occupants).</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e2818d8c96838196a280978b8e869bcc8490">[email&#160;protected]</a></span><span class="num">9</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 2 / 11 — Zones fonctionnelles</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Pièges classiques</h2>
+  <ul>
+    <li><strong>Confondre zone réglementaire et zone climatique de la GTB.</strong> La supervision existante a souvent un découpage technique (boucles de chauffage, zones de ventilation) qui ne reflète pas le découpage fonctionnel attendu par le décret. L'auditeur applique la grille du décret, pas celle de l'installateur.</li>
+    <li><strong>Oublier les espaces communs.</strong> Couloirs, halls, sanitaires partagés, locaux à vélos : ils ne génèrent pas toujours d'obligation forte mais doivent être tracés pour justifier la complétude.</li>
+    <li><strong>Sous-estimer les surfaces.</strong> Une mesure approximative à la fin du chantier vaut mieux qu'une absence de mesure. Le décret n'impose pas une précision millimétrique, mais l'absence totale de surface fragilise le rapport.</li>
+    <li><strong>Doubler une zone parce qu'elle change d'occupant.</strong> Si la nature de l'usage est identique (un même open-space loué à deux entreprises), une seule zone suffit, avec mention des occupants en notes.</li>
+  </ul>
+
+  <h2>Ce que produit cette étape</h2>
+  <p>À l'issue du découpage, le dossier d'audit comporte :</p>
+  <ul>
+    <li>La liste exhaustive des zones du bâtiment, nommées et qualifiées par nature.</li>
+    <li>La surface de chaque zone, avec sa source.</li>
+    <li>Les notes terrain et photos associées.</li>
+    <li>Pour chaque zone, la grille d'attendus réglementaires (systèmes attendus, compteurs requis, exigences spécifiques).</li>
+  </ul>
+
+  <p>Cette grille est l'ossature de tout le travail terrain qui suit. Aux étapes 3, 4 et 5, l'auditeur passera zone par zone, en confrontant systématiquement l'attendu réglementaire à l'observé sur le terrain. Tout écart sera tracé, qualifié, et alimentera le plan d'action de l'étape 9.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6f0c00011b0e0c1b2f0d1a06030b1641091d">[email&#160;protected]</a></span><span class="num">10</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 3                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch3">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">03</span> Chapitre 3 / 11</div>
+  <h1 class="chapter-title">Inventaire des systèmes techniques et des équipements</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">C'est ici que se fait le gros du travail d'un audit BACS. Avant de regarder la supervision en place, avant de chiffrer un plan d'action, il faut savoir exactement <strong>ce qu'il y a dans le bâtiment</strong>. Sans cet inventaire, le décret R175-3 ne s'applique sur rien.</p>
+
+  <div class="icon-grid">
+    <div class="icon-chip"><div class="ico ico-heat"><i class="fas fa-fire"></i></div><div><div class="lbl">Chauffage</div><div class="sub">Chaudière, PAC, réseau de chaleur</div></div></div>
+    <div class="icon-chip"><div class="ico ico-cool"><i class="fas fa-snowflake"></i></div><div><div class="lbl">Climatisation</div><div class="sub">Groupe froid, DRV, free-cooling</div></div></div>
+    <div class="icon-chip"><div class="ico ico-vent"><i class="fas fa-fan"></i></div><div><div class="lbl">Ventilation</div><div class="sub">CTA, VMC, extraction</div></div></div>
+    <div class="icon-chip"><div class="ico ico-ecs"><i class="fas fa-droplet"></i></div><div><div class="lbl">Eau chaude sanitaire</div><div class="sub">Ballon, instantané, solaire</div></div></div>
+    <div class="icon-chip"><div class="ico ico-light"><i class="fas fa-lightbulb"></i></div><div><div class="lbl">Éclairage intérieur</div><div class="sub">LED, fluo, dimming</div></div></div>
+    <div class="icon-chip"><div class="ico ico-pv"><i class="fas fa-solar-panel"></i></div><div><div class="lbl">Production PV</div><div class="sub">Toiture, ombrières, BIPV</div></div></div>
+    <div class="icon-chip"><div class="ico ico-mint"><i class="fas fa-gauge-high"></i></div><div><div class="lbl">Comptage</div><div class="sub">Sous-comptage par usage et par zone</div></div></div>
+  </div>
+
+  <h2>Pourquoi cette étape conditionne tout le reste</h2>
+
+  <p>Pour chaque zone fonctionnelle découpée à l'étape 2, l'auditeur procède en trois temps :</p>
+  <ol>
+    <li>Recenser les <strong>systèmes techniques</strong> présents par catégorie réglementaire (chauffage, climatisation, etc.).</li>
+    <li>Pour chaque système, identifier les <strong>équipements concrets</strong> qui le composent (chaudière, pompe à chaleur, centrale de traitement d'air…).</li>
+    <li>Pour chaque équipement, qualifier sa <strong>conformité au décret</strong> — interopérabilité, possibilité d'arrêt manuel, fonctionnement autonome.</li>
+  </ol>
+
+  <p>À la fin de l'étape, chaque exigence du R175-3 §3 (interopérabilité) et §4 (arrêt + autonomie) est documentée équipement par équipement. C'est cette granularité qui permet, plus tard, d'élaborer un plan d'action <em>chiffrable</em>. Sans elle, vous saurez qu'il y a un problème de conformité, mais vous ne pourrez pas estimer combien il coûtera à corriger.</p>
+
+  <div class="callout r175">
+    <div class="callout-label">Rappel R175-1 §4</div>
+    <p>Les domaines de gestion technique concernés par le décret sont strictement délimités. La méthode d'audit Buildy s'aligne sur cette liste, sans y ajouter d'éléments hors périmètre (sécurité incendie, contrôle d'accès, etc.).</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="8eede1e0faefedfaceecfbe7e2eaf7a0e8fc">[email&#160;protected]</a></span><span class="num">11</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les six catégories de systèmes techniques</h2>
+
+  <p>L'auditeur examine systématiquement chaque zone à la lumière de <strong>six catégories</strong> de gestion technique : chauffage, climatisation, ventilation, eau chaude sanitaire, éclairage intérieur, production photovoltaïque. Pour chacune, il détermine si la zone est concernée — et, si oui, dans quelle mesure.</p>
+
+  <p>Trois statuts sont possibles : système <strong>présent</strong> (et opérationnel), <strong>absent</strong> (la zone n'en dispose pas), ou <strong>non concerné</strong> (l'absence est justifiée par la nature de la zone — par exemple, un local technique sans éclairage permanent).</p>
+
+  <p>Le travail ne s'arrête pas à ce constat. Pour chaque catégorie présente, l'auditeur documente également le degré d'intégration à la supervision existante du bâtiment, et consigne ses observations terrain (typologie, état apparent, contraintes d'accès, anomalies remarquées).</p>
+
+  <p><strong>La nature de la zone (consignée à l'étape 2) oriente l'analyse</strong> : un open-space appelle naturellement chauffage, climatisation, ventilation et éclairage ; un parking appelle éclairage et éventuellement ventilation ; un local technique a souvent un périmètre réduit. Cette grille d'attendus, construite à partir d'une lecture méthodique du décret, évite à l'auditeur d'oublier des systèmes attendus — et l'aide à justifier les absences.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d0b3bfbea4b1b3a490b2a5b9bcb4a9feb6a2">[email&#160;protected]</a></span><span class="num">12</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Le détail des équipements</h2>
+
+  <p>Lister la catégorie ne suffit pas. Pour que le décret puisse être évalué, il faut descendre à <strong>l'équipement concret</strong>. Pour chaque catégorie marquée présente, l'auditeur recense un ou plusieurs équipements et établit pour chacun une fiche détaillée.</p>
+
+  <p>Cette fiche couvre quatre familles d'informations :</p>
+  <ul>
+    <li><strong>Identification</strong> : marque, modèle, référence, identifiant interne stable pour le suivi.</li>
+    <li><strong>Caractéristiques techniques</strong> : puissance nominale, source d'énergie, rôle dans la chaîne thermique (production, distribution, émission, régulation).</li>
+    <li><strong>Connectivité et supervision</strong> : protocole de communication, mode de raccordement, niveau d'intégration à la supervision existante.</li>
+    <li><strong>État et conformité réglementaire</strong> : équipement en service ou pas, possibilité d'arrêt manuel, fonctionnement autonome en cas de défaut de la supervision.</li>
+  </ul>
+
+  <p>Les valeurs autorisées pour chacune de ces dimensions sont volontairement étendues : la méthode couvre l'intégralité du parc tertiaire français — du gaz à la biomasse, de Modbus aux protocoles IP modernes, des installations centralisées aux équipements autonomes. Cette exhaustivité est le prix à payer pour qu'un même livrable soit opposable quel que soit le bâtiment audité.</p>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ Cas particulier — équipement multi-zones</div>
+    <p>Une centrale de traitement d'air alimentant trois plateaux de bureaux, ou un compteur électrique principal couvrant l'ensemble du bâtiment : ces équipements partagés sont identifiés une seule fois et rattachés à toutes les zones qu'ils desservent. C'est un point de vigilance important — un mauvais rattachement génère soit des doublons dans le plan d'action, soit, pire, des oublis.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f4979b9a80959780b496819d98908dda9286">[email&#160;protected]</a></span><span class="num">13</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Comment se déduit la conformité R175-3</h2>
+
+  <p>Une fois l'inventaire complet, la conformité R175-3 §3 et §4 s'apprécie <strong>équipement par équipement</strong>.</p>
+
+  <h3>R175-3 §3 — Interopérabilité</h3>
+  <p>L'équipement est conforme s'il s'intègre à un système d'information du bâtiment via un protocole de communication standard. Il est non conforme s'il fonctionne en îlot, sans liaison avec une supervision (équipement strictement autonome, ou communicant uniquement avec sa propre télécommande propriétaire).</p>
+
+  <h3>R175-3 §4 — Arrêt manuel et fonctionnement autonome</h3>
+  <p>Deux exigences distinctes, à apprécier séparément :</p>
+  <ul>
+    <li><strong>Arrêt manuel possible</strong> : l'utilisateur peut-il arrêter manuellement l'équipement, sans passer par la supervision (interrupteur physique, commande locale sur l'équipement, vanne d'isolement…) ?</li>
+    <li><strong>Fonctionnement autonome</strong> : en cas de défaut de la supervision ou d'arrêt manuel, l'équipement assure-t-il une fonction minimale de sécurité (hors gel, ventilation de secours, éclairage de sécurité…) ?</li>
+  </ul>
+
+  <p>Si l'une des deux exigences n'est pas tenue, l'équipement entre dans le plan d'action de l'étape 9, avec une sévérité majeure.</p>
+
+  <h3>Liaison de supervision rompue</h3>
+  <p>Cas fréquent : un équipement est intégré à la supervision sur le papier, mais sur le terrain, plus aucune valeur ne remonte (sonde déconnectée, switch en panne, configuration perdue après remplacement de matériel actif…). La méthode trace ces écarts à part, parce qu'ils relèvent d'une action corrective spécifique — rétablir la liaison existante — distincte d'une absence d'intégration.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="40232f2e34212334002235292c24396e2632">[email&#160;protected]</a></span><span class="num">14</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Combien d'équipements pour un bâtiment typique</h2>
+
+  <p>Le volume d'équipements à inventorier dépend strictement de la taille et de la nature du bâtiment, pas d'une moyenne théorique. Quelques ordres de grandeur :</p>
+
+  <ul>
+    <li><strong>Un commerce de centre-ville</strong> : une zone, deux ou trois systèmes, trois à cinq équipements.</li>
+    <li><strong>Un plateau de bureaux</strong> : trois à cinq zones, cinq systèmes, dix à quinze équipements.</li>
+    <li><strong>Un siège social de 30 000 m²</strong> : trente à soixante zones, six à sept systèmes, plus d'une centaine d'équipements répartis par étage et par catégorie.</li>
+  </ul>
+
+  <p>Pour chaque équipement, l'auditeur produit la fiche décrite en page 3, prend une à trois photos, et évalue la conformité R175-3 §3 et §4. C'est cette densité qui fait que <strong>l'étape 3 représente à elle seule entre 30 % et 50 % du temps total de l'audit terrain</strong>.</p>
+
+  <h2>Pièges classiques</h2>
+  <p>Cette page liste les écarts les plus fréquents entre le déclaratif et la réalité — détectables uniquement parce que l'auditeur descend systématiquement au niveau de l'équipement.</p>
+  <ul>
+    <li><strong>Équipement déclaré « communicant » mais non vu de la supervision</strong> → liaison rompue, à tracer comme telle, génère une action corrective spécifique.</li>
+    <li><strong>Pompe à chaleur ou DRV remplacés récemment</strong> sans mise à jour de l'analyse fonctionnelle → la supervision voit encore l'ancien équipement, l'écart doit être documenté.</li>
+    <li><strong>Sous-compteur installé mais jamais raccordé</strong> → présent physiquement, non communicant — déclenche l'action « raccorder le compteur » à l'étape suivante.</li>
+    <li><strong>Centrale de traitement d'air alimentant plusieurs zones</strong> → bien identifier le partage pour ne pas dédoubler les actions correctives.</li>
+    <li><strong>Équipement « hors service » qui disparaît du dossier</strong> → il doit rester tracé dans l'inventaire et apparaître dans le rapport avec mention explicite. Important pour la traçabilité, et utile au gestionnaire pour planifier le remplacement.</li>
+  </ul>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6f0c00011b0e0c1b2f0d1a06030b1641091d">[email&#160;protected]</a></span><span class="num">15</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 3 / 11 — Inventaire des systèmes techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="callout r175">
+    <div class="callout-label">Référence R175</div>
+    <p>Les exigences évaluées dans cette étape sont les articles R175-1 §4 (périmètre), R175-3 §3 (interopérabilité) et R175-3 §4 (arrêt manuel + autonomie). Le texte intégral de ces articles se trouve dans l'annexe A du rapport d'audit.</p>
+  </div>
+
+  <h2>Fin du chapitre — ce que l'étape produit</h2>
+
+  <p>À l'issue de l'étape 3, le dossier d'audit comporte :</p>
+  <ul>
+    <li>Une cartographie complète des systèmes techniques par zone fonctionnelle.</li>
+    <li>Une fiche détaillée par équipement, avec marque, modèle, puissance, source d'énergie, protocole de communication, rôle dans la chaîne thermique.</li>
+    <li>Pour chaque équipement, l'évaluation des R175-3 §3 et §4.</li>
+    <li>Les photos terrain associées à chaque équipement.</li>
+  </ul>
+
+  <p>Ces données alimentent ensuite :</p>
+  <ul>
+    <li>L'étape 4 (plan de comptage) — qui doit être cohérente avec les puissances et énergies déclarées ici.</li>
+    <li>L'étape 5 (régulation thermique) — qui s'appuie sur les équipements de chauffage/climatisation de cette étape.</li>
+    <li>L'étape 6 (supervision existante) — qui évalue dans quelle mesure cet inventaire est effectivement piloté.</li>
+    <li>L'étape 9 (plan d'action) — qui transforme les écarts détectés ici en actions correctives chiffrées.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-label">À retenir</div>
+    <p><strong>Sans cette étape proprement faite, les six suivantes sont fausses.</strong></p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d6b5b9b8a2b7b5a296b4a3bfbab2aff8b0a4">[email&#160;protected]</a></span><span class="num">16</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 4                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch4">
+  <div class="page-header"><span class="head-chap">Chapitre 4 / 11 — Plan de comptage</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">04</span> Chapitre 4 / 11</div>
+  <h1 class="chapter-title">Plan de comptage et suivi énergétique</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Le R175-3 §1 impose un suivi continu des consommations à pas horaire, conservées sur cinq ans. C'est l'exigence la plus simple à formuler du décret — et la plus fréquemment incomplète sur les bâtiments tertiaires existants.</p>
+
+  <h2>Pourquoi le comptage est le point le plus structurant</h2>
+
+  <p>Il y a deux raisons à cela. D'abord, le comptage a longtemps été pensé pour la facturation, pas pour le pilotage : un compteur général en pied d'immeuble suffisait à l'exploitant pour répartir une facture, mais ne permet pas de détecter une dérive zone par zone. Ensuite, la sous-comptage a été ajouté progressivement, par lots, sans logique d'ensemble — on trouve des sous-compteurs installés mais jamais raccordés à la supervision, ou raccordés mais avec un protocole obsolète.</p>
+
+  <p>L'étape 4 consiste à confronter méthodiquement <strong>l'exigence du décret</strong> (un compteur par usage et par zone, communicant et conservant cinq ans d'historique) à <strong>la réalité physique</strong> du bâtiment. Chaque écart entre les deux génère, à l'étape 9, une action corrective chiffrable.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2a4945445e4b495e6a485f43464e53044c58">[email&#160;protected]</a></span><span class="num">17</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 4 / 11 — Plan de comptage</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">La matrice usage × zone</h2>
+
+  <p>L'auditeur construit une matrice à deux dimensions : <strong>les usages réglementaires en colonnes</strong> (chauffage, climatisation, eau chaude sanitaire, éclairage, production photovoltaïque, et un usage <em>général</em> pour le hors-périmètre), et <strong>les zones fonctionnelles en lignes</strong> (telles que découpées à l'étape 2).</p>
+
+  <p>Pour chaque case, deux questions :</p>
+  <ol>
+    <li><strong>Un compteur est-il requis ?</strong> La réponse découle de la nature de la zone et des systèmes présents. Une zone qui n'a pas de chauffage n'appelle pas de compteur de chauffage. Une zone qui a du chauffage et qui dépasse une certaine puissance en appelle un.</li>
+    <li><strong>Un compteur est-il physiquement présent ?</strong> Réponse par observation directe sur le terrain.</li>
+  </ol>
+
+  <p>Ces deux questions construisent la grille de conformité du comptage. La matrice complète, pour un bâtiment moyen, peut compter plusieurs dizaines de cases — chacune devant être examinée, justifiée, et photographiée si un compteur est présent.</p>
+
+  <div class="callout r175">
+    <div class="callout-label">Compteurs partagés</div>
+    <p>Un compteur peut couvrir plusieurs zones (compteur principal de chauffage qui dessert plusieurs étages, par exemple). L'auditeur identifie ces compteurs partagés une seule fois, en les rattachant à toutes les zones qu'ils desservent. Cela évite les doublons dans le plan d'action et reflète la réalité du parc compteur.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e98a86879d888a9da98b9c80858d90c78f9b">[email&#160;protected]</a></span><span class="num">18</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 4 / 11 — Plan de comptage</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Pour chaque compteur, ce que l'auditeur consigne</h2>
+
+  <p>Pour chaque compteur identifié — qu'il soit présent, manquant ou hors service — le dossier comporte :</p>
+  <ul>
+    <li><strong>Type de compteur</strong> : électrique, gaz, eau, thermique, électrique de production photovoltaïque.</li>
+    <li><strong>Usage couvert</strong> : chauffage, climatisation, ECS, éclairage, production PV, ou général.</li>
+    <li><strong>Zone(s) desservie(s)</strong> : selon le découpage de l'étape 2.</li>
+    <li><strong>Présence physique constatée</strong> sur le terrain (observation directe, photo).</li>
+    <li><strong>Communication effective</strong> : le compteur remonte-t-il réellement ses données vers une supervision, à un pas suffisant ?</li>
+    <li><strong>Mode de raccordement</strong> : filaire ou sans-fil, protocole utilisé.</li>
+    <li><strong>Intégration à la supervision existante</strong> : le compteur est-il vu de la GTB, et la liaison est-elle opérationnelle ?</li>
+    <li><strong>État</strong> : en service, hors service, ou installé mais non raccordé.</li>
+    <li><strong>Notes terrain</strong> et photos associées.</li>
+  </ul>
+
+  <p>Cette consignation systématique permet à l'étape suivante (l'élaboration du plan d'action) de qualifier précisément la nature de chaque action requise — installer un compteur manquant, raccorder un compteur existant, remplacer un compteur défaillant, ou mettre à niveau le protocole d'un compteur trop ancien.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="791a16170d181a0d391b0c10151d00571f0b">[email&#160;protected]</a></span><span class="num">19</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 4 / 11 — Plan de comptage</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Comment se déduit la conformité R175-3 §1</h2>
+
+  <p>À partir de la matrice complète, le dossier consolide la liste des actions correctives à mener pour atteindre la conformité. Trois cas se distinguent :</p>
+
+  <ul>
+    <li><strong>Compteur requis mais physiquement absent</strong> → action <strong>bloquante</strong>. Sans ce compteur, l'exigence R175-3 §1 ne peut pas être tenue. Le rapport identifie l'usage et la zone concernés, et propose une typologie de compteur à installer.</li>
+    <li><strong>Compteur présent mais non communicant</strong> → action <strong>majeure</strong>. L'équipement existe physiquement mais ne remonte pas ses données vers la supervision. La conformité R175-3 §1 (suivi continu) n'est pas tenue tant que la liaison n'est pas établie.</li>
+    <li><strong>Compteur présent et communicant, mais avec une rétention insuffisante</strong> → action <strong>majeure</strong> également, à traiter dans l'étape 6 (évaluation de la supervision), car c'est la supervision qui porte la conservation cinq ans, pas le compteur lui-même.</li>
+  </ul>
+
+  <p>Les compteurs hors service sont tracés pour mémoire, mais ne génèrent pas d'action corrective tant qu'aucun compteur ne les remplace.</p>
+
+  <h2>Pièges classiques</h2>
+  <ul>
+    <li><strong>Sous-compteur installé mais jamais raccordé.</strong> Cas le plus fréquent. Il faut vérifier physiquement le câblage et le protocole, pas se fier au déclaratif de l'exploitant.</li>
+    <li><strong>Compteur communicant en local, pas vers la supervision.</strong> Beaucoup de compteurs modernes ont un afficheur local qui suggère qu'ils remontent leurs données — alors qu'ils ne remontent rien à la supervision. Vérification à faire sur la console GTB, pas sur le compteur.</li>
+    <li><strong>Compteur partagé entre zones, déclaré sur une seule.</strong> Risque de doublonner les actions correctives. L'auditeur identifie le partage explicitement.</li>
+    <li><strong>Compteur existant mais avec un protocole obsolète</strong> (ex. boucle d'impulsions sans téléreport). Le compteur est physiquement présent, mais incapable de remonter à pas horaire. C'est une action majeure de mise à niveau.</li>
+    <li><strong>Confondre comptage et sous-facturation.</strong> Le décret R175-3 §1 vise le pilotage énergétique, pas la facturation aux occupants. Un bâtiment peut être conforme à la sous-facturation (loi Élan) sans être conforme R175-3 §1.</li>
+  </ul>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="8fece0e1fbeeecfbcfedfae6e3ebf6a1e9fd">[email&#160;protected]</a></span><span class="num">20</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 4 / 11 — Plan de comptage</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="callout r175">
+    <div class="callout-label">Référence R175</div>
+    <p>L'exigence évaluée ici est l'article R175-3 §1 (suivi continu, pas horaire, conservation cinq ans). Le texte intégral figure dans l'annexe A du rapport d'audit.</p>
+  </div>
+
+  <h2>Ce que produit cette étape</h2>
+  <p>À l'issue de l'étape 4, le dossier d'audit comporte :</p>
+  <ul>
+    <li>La matrice complète usage × zone, renseignée case par case.</li>
+    <li>Pour chaque compteur identifié, sa fiche détaillée (type, usage, zone, état, communication).</li>
+    <li>Les photos terrain associées à chaque compteur présent.</li>
+    <li>La liste préliminaire des actions correctives liées au comptage, classées par sévérité.</li>
+  </ul>
+
+  <p>Cette liste alimente directement l'étape 9 (plan d'action), où chaque manque sera chiffré. Elle alimente aussi l'étape 6 (supervision existante), où l'on évaluera la capacité de la supervision à exploiter les compteurs présents — conservation cinq ans, restitution graphique, alertes sur dérives.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f1929e9f85909285b19384989d9588df9783">[email&#160;protected]</a></span><span class="num">21</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 5                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch5">
+  <div class="page-header"><span class="head-chap">Chapitre 5 / 11 — Régulation thermique</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">05</span> Chapitre 5 / 11</div>
+  <h1 class="chapter-title">Régulation thermique par zone</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Le R175-6 impose une <strong>régulation thermique automatique par pièce ou par zone</strong>. Cette obligation a une applicabilité particulière : elle ne concerne pas tous les bâtiments soumis au décret BACS, mais uniquement ceux dont le permis de construire <strong>ou</strong> les travaux générateurs significatifs sont postérieurs au 21 juillet 2021.</p>
+
+  <h2>Quand le R175-6 s'applique</h2>
+
+  <p>C'est l'une des subtilités du décret. Un bâtiment ancien soumis au R175 par sa puissance peut très bien ne pas être concerné par le R175-6 — son installation thermique antérieure est protégée par la date d'antériorité. Un bâtiment qui a remplacé sa chaudière en 2023 voit en revanche le R175-6 s'imposer à lui, même si le bâtiment lui-même est plus ancien.</p>
+
+  <p>L'auditeur consigne donc deux dates au début de cette étape : la date du permis de construire (déjà tracée à l'étape 1) et <strong>la date des derniers travaux générateurs significatifs</strong> — remplacement de chaudière, installation d'une PAC, raccordement à un réseau de chaleur, dépose d'une cuve à fioul. C'est cette seconde date qui déclenche, ou non, l'applicabilité du R175-6.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f3909c9d87929087b391869a9f978add9581">[email&#160;protected]</a></span><span class="num">22</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 5 / 11 — Régulation thermique</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les trois niveaux de régulation à examiner</h2>
+
+  <p>Sur les zones où le R175-6 s'applique, l'auditeur examine la régulation à trois niveaux d'équipement, indépendamment :</p>
+
+  <ul>
+    <li><strong>Production</strong> — comment la chaleur (ou le froid) est-elle générée et modulée ? Régulation TOR sur thermostat d'ambiance, régulation à loi d'eau, asservissement sur sonde extérieure, etc.</li>
+    <li><strong>Distribution</strong> — comment l'énergie est-elle acheminée vers les zones ? Vannes trois voies, pompes à débit variable, régulation par zone hydraulique.</li>
+    <li><strong>Émission</strong> — comment l'énergie est-elle restituée dans la pièce ? Robinets thermostatiques sur radiateurs, régulation terminale par sonde locale, ventilo-convecteurs avec sonde de reprise.</li>
+  </ul>
+
+  <p>Ces trois niveaux sont distincts. Une installation peut être conforme à la production (chaudière à condensation moderne, bien régulée) tout en étant non conforme à l'émission (radiateurs sans robinet thermostatique, donc impossibles à moduler par pièce). Le rapport doit qualifier chacun des trois niveaux.</p>
+
+  <p>Pour chaque niveau, l'auditeur identifie également <strong>l'équipement contrôleur</strong> — la régulation est-elle assurée par un thermostat d'ambiance dédié, par un automate intégré à la GTB, par un relais simple ? Cette identification permet de chiffrer les actions correctives à l'étape 9 (changer un thermostat coûte une centaine d'euros ; reconfigurer un automate de GTB est un autre ordre de grandeur).</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="77141819031614033715021e1b130e591105">[email&#160;protected]</a></span><span class="num">23</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 5 / 11 — Régulation thermique</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les exemptions et cas particuliers</h2>
+
+  <p>Le R175-6 prévoit explicitement plusieurs exemptions qu'il faut savoir reconnaître pour ne pas générer d'actions inutiles :</p>
+
+  <ul>
+    <li><strong>Générateurs à biomasse</strong> (poêles à granulés, inserts, chaudières bois). Exemption explicite du décret. L'auditeur consigne l'exemption pour traçabilité, mais ne génère aucune action.</li>
+    <li><strong>Locaux non chauffés ou non climatisés.</strong> Pas de régulation à examiner — l'auditeur consigne l'absence du système.</li>
+    <li><strong>Locaux à régulation manuelle assumée</strong> (certains ateliers, locaux techniques avec personnel qualifié). À documenter explicitement avec justification, pas à laisser implicite.</li>
+    <li><strong>Bâtiments en travaux ou en transition</strong> (changement de générateur prévu dans les douze mois). L'auditeur trace l'état actuel et signale la transition à venir, qui pourra rendre certaines actions caduques.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ Position des sondes</div>
+    <p>L'auditeur vérifie systématiquement la position physique des sondes de température. Une sonde mal placée (au-dessus d'un radiateur, en plein soleil, à moins d'un mètre du sol contre une cloison froide) fausse toute la régulation, même si le matériel est récent. C'est un constat fréquent, qui n'apparaît dans aucun document mais qui change la nature de l'action à mener (recalibrer ou repositionner, plutôt que remplacer).</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a5c6cacbd1c4c6d1e5c7d0ccc9c1dc8bc3d7">[email&#160;protected]</a></span><span class="num">24</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 5 / 11 — Régulation thermique</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Pièges classiques</h2>
+  <ul>
+    <li><strong>Confondre conformité du matériel et conformité de la régulation effective.</strong> Une vanne thermostatique installée mais bloquée à l'ouverture maximale par les occupants (pour éviter les courants d'air) ne régule plus rien. L'observation terrain prime sur le déclaratif.</li>
+    <li><strong>Sous-estimer les générateurs hybrides.</strong> Une PAC en relève d'une chaudière gaz, ou inversement, demande une analyse au cas par cas. La régulation peut être conforme sur l'un et pas sur l'autre.</li>
+    <li><strong>Oublier la régulation de la climatisation.</strong> Le R175-6 vise <em>toute</em> régulation thermique, pas uniquement le chauffage. Une climatisation centralisée sans modulation par zone est non conforme au même titre qu'un chauffage central sans robinet thermostatique.</li>
+    <li><strong>Considérer l'exemption bois comme automatique.</strong> L'exemption ne s'applique qu'au générateur à biomasse, pas à toute l'installation. Un bâtiment chauffé par chaudière bois plus PAC d'appoint conserve les obligations sur la PAC.</li>
+  </ul>
+
+  <h2>Ce que produit cette étape</h2>
+  <p>À l'issue de l'étape 5, le dossier d'audit comporte :</p>
+  <ul>
+    <li>L'identification des zones où le R175-6 est applicable, avec date d'applicabilité justifiée.</li>
+    <li>Pour chaque zone applicable, l'examen des trois niveaux (production, distribution, émission), avec identification de l'équipement contrôleur.</li>
+    <li>La consignation des exemptions (biomasse notamment) avec leur justification.</li>
+    <li>Les observations terrain critiques (position des sondes, présence et état des robinets thermostatiques, modulations de zone).</li>
+    <li>La liste préliminaire des actions correctives R175-6, classées par sévérité.</li>
+  </ul>
+
+  <p>Cette analyse alimente l'étape 9 (plan d'action) et précise les actions des étapes 3 et 4 (équipements, comptages) lorsqu'elles touchent à la chaîne thermique.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="15767a7b617476615577607c79716c3b7367">[email&#160;protected]</a></span><span class="num">25</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 6                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch6">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">06</span> Chapitre 6 / 11</div>
+  <h1 class="chapter-title">Évaluer la supervision existante</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Sur la majorité des bâtiments tertiaires que nous auditons, <strong>il n'y a pas de supervision GTB en place</strong> — ou il y en a une, mais partielle, ancienne, hors service, ou rachetée par un nouvel exploitant qui n'en a plus le mode d'emploi.</p>
+
+  <h2>Le constat majoritaire : pas de supervision, ou partielle</h2>
+
+  <p>C'est un point important à comprendre avant de plonger dans cette étape : le décret BACS n'oblige pas à <em>avoir</em> une GTB nominative. Il oblige à <em>remplir certaines fonctions</em> — suivi continu, interopérabilité, détection de dérives, mise à disposition des données. Que ces fonctions soient assurées par une GTB historique de marque connue, par une supervision développée sur mesure, ou par une combinaison de deux solutions, le décret reste neutre tant que les fonctions sont effectivement tenues.</p>
+
+  <p>L'étape 6 sert donc à deux choses, selon la situation rencontrée :</p>
+  <ul>
+    <li><strong>Si une supervision existe</strong> : évaluer méthodiquement sa couverture des exigences R175-3, R175-4 et R175-5, sujet par sujet.</li>
+    <li><strong>Si aucune supervision n'est en place</strong> : documenter précisément ce qui manque, pour pouvoir le chiffrer à l'étape 9.</li>
+  </ul>
+
+  <p>Dans les deux cas, le travail produit une cartographie nette de la situation, qui sert de base au plan d'action.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="5c3f3332283d3f281c3e2935303825723a2e">[email&#160;protected]</a></span><span class="num">26</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Identifier la supervision en place</h2>
+
+  <p>Avant d'évaluer, il faut identifier précisément. La supervision est rarement un objet unique et bien étiqueté ; c'est souvent un agrégat de plusieurs systèmes installés à différentes époques. L'auditeur consigne :</p>
+
+  <ul>
+    <li><strong>La solution principale</strong> — nom commercial, marque, version si possible. Plus rarement, l'absence pure et simple.</li>
+    <li><strong>La localisation physique</strong> des serveurs et automates principaux. Important pour l'accessibilité en cas d'intervention et pour les questions de cybersécurité.</li>
+    <li><strong>Les modèles d'équipements actifs</strong> — automates programmables, passerelles, gateways protocolaires. Ces références conditionnent la pérennité (matériels en fin de vie commerciale, support constructeur arrêté, etc.).</li>
+    <li><strong>Les protocoles supportés</strong> — c'est ce qui détermine la capacité de la supervision à dialoguer avec les équipements terrain (étape 3) et les compteurs (étape 4).</li>
+    <li><strong>L'état général</strong> — en service, hors service, partiellement opérationnel.</li>
+  </ul>
+
+  <p>Cette identification factuelle évite les jugements hâtifs. Une « vieille GTB qu'on dit obsolète » peut très bien être largement conforme aux exigences R175-3 — l'évaluation se fait sur les fonctions, pas sur l'année du matériel.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ceada1a0baafadba8eacbba7a2aab7e0a8bc">[email&#160;protected]</a></span><span class="num">27</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les domaines réellement pilotés</h2>
+
+  <p>Le R175-1 §4 liste les domaines de gestion technique concernés par le décret. Toutes les installations ne pilotent pas tous ces domaines. L'auditeur examine, pour chaque domaine — chauffage, climatisation, ventilation, eau chaude sanitaire, éclairage — si la supervision en place le couvre effectivement, et avec quelle profondeur.</p>
+
+  <p>Trois cas typiques :</p>
+  <ul>
+    <li><strong>Domaine couvert et opérationnel</strong> — la supervision pilote, monitor, journalise. Conformité possible (à examiner sur les exigences R175-3 §1 et §2 ci-dessous).</li>
+    <li><strong>Domaine couvert sur le papier, défaillant sur le terrain</strong> — la supervision est censée gérer le domaine, mais soit les équipements sont déconnectés (cas évoqué à l'étape 3 avec la liaison rompue), soit les fonctionnalités ne sont plus utilisées (paramètres obsolètes, alarmes désactivées). C'est une non-conformité partielle qui appelle des actions de remise à niveau, généralement moins coûteuses qu'un déploiement complet.</li>
+    <li><strong>Domaine non couvert</strong> — la supervision ignore le domaine. Soit parce qu'il n'a jamais été intégré, soit parce que l'extension n'a pas suivi un changement d'usage du bâtiment. Action d'extension à chiffrer.</li>
+  </ul>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="90f3fffee4f1f3e4d0f2e5f9fcf4e9bef6e2">[email&#160;protected]</a></span><span class="num">28</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">L'évaluation R175-3 §1 et §2</h2>
+
+  <p>Deux exigences fonctionnelles centrales du décret, à examiner avec précision.</p>
+
+  <h3>R175-3 §1 — Suivi continu des consommations</h3>
+  <p>L'auditeur vérifie trois choses :</p>
+  <ul>
+    <li><strong>La continuité du suivi</strong> : la supervision enregistre-t-elle effectivement les consommations à un pas suffisant (horaire au minimum) ? Vérification sur la console, pas sur la documentation.</li>
+    <li><strong>Le format d'archivage</strong> : les données sont-elles stockées dans une base structurée et exportable, ou dans un format propriétaire qui empêcherait toute migration ?</li>
+    <li><strong>La rétention cinq ans</strong> : l'auditeur vérifie qu'on peut effectivement consulter une courbe de consommation d'il y a quatre ou cinq ans sur la console — pas seulement que la supervision <em>prétend</em> conserver cinq ans. Le test concret se fait en demandant à voir une courbe de chauffage de l'hiver précédent, par exemple.</li>
+  </ul>
+
+  <h3>R175-3 §2 — Détection des pertes d'efficacité</h3>
+  <p>Cette exigence est souvent la plus mal couverte. Elle suppose que la supervision a été configurée avec des <strong>règles d'alerte sur les dérives</strong> — écart anormal de consommation à conditions équivalentes, baisse de COP d'une PAC, surconsommation hors plage horaire. L'auditeur examine la liste des alertes effectivement actives, et si possible un historique des alertes déclenchées dans l'année écoulée. Une supervision sans alerte active depuis 24 mois est, en pratique, non conforme à cette exigence — quel que soit le matériel installé.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="88ebe7e6fce9ebfcc8eafde1e4ecf1a6eefa">[email&#160;protected]</a></span><span class="num">29</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">La mise à disposition des données et la maintenance</h2>
+
+  <h3>Mise à disposition des données</h3>
+  <p>Le décret R175-3 prévoit que les données soient mises à disposition de <strong>deux types d'acteurs distincts</strong> : le gestionnaire du bâtiment (asset manager, property manager, propriétaire) et les exploitants des systèmes techniques (bureau d'études, intégrateur, mainteneur). L'auditeur examine les procédures effectives :</p>
+  <ul>
+    <li>Les données sont-elles accessibles au gestionnaire (rapport mensuel, accès portail, export CSV) ?</li>
+    <li>Les données sont-elles transmises aux exploitants (procédure documentée, fréquence, format) ?</li>
+    <li>Existe-t-il une trace écrite de ces procédures, ou tout repose-t-il sur des habitudes orales ?</li>
+  </ul>
+  <p>Une supervision techniquement excellente peut être non conforme R175-3 si les procédures de mise à disposition n'existent pas formellement.</p>
+
+  <h3>R175-4 — Vérifications périodiques</h3>
+  <p>L'auditeur examine le <strong>carnet d'entretien</strong> de la supervision — existe-t-il, est-il à jour, qui le remplit ? Trois éléments factuels sont consignés : l'existence de procédures écrites, la périodicité effective des interventions, le responsable identifié (interne ou prestataire). Une supervision sans aucun document de maintenance formalisé n'est pas conforme R175-4, indépendamment de la qualité technique de l'installation.</p>
+
+  <h3>R175-5 — Formation de l'exploitant</h3>
+  <p>L'auditeur cherche <strong>l'attestation de formation</strong> — quand l'exploitant en place a-t-il été formé à l'utilisation de la supervision, par quel organisme, sur quels sujets ? La formation initiale du livreur de l'installation suffit rarement à dix ans d'écart, après changements d'équipe. C'est l'une des non-conformités les plus fréquentes — et l'une des plus simples à corriger.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fe9d91908a9f9d8abe9c8b97929a87d0988c">[email&#160;protected]</a></span><span class="num">30</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Notes libres par sujet</h2>
+
+  <p>Au-delà des exigences strictes du décret, l'auditeur consigne des <strong>observations libres par sujet</strong>, qui complètent l'analyse réglementaire. Huit sujets sont systématiquement examinés :</p>
+  <ul>
+    <li>L'analyse fonctionnelle existante de la supervision.</li>
+    <li>Les usages réellement pilotés (cohérence avec l'analyse de la page précédente).</li>
+    <li>Les équipements intégrés à la supervision.</li>
+    <li>Les compteurs intégrés à la supervision.</li>
+    <li>Les capacités effectives R175-3 (suivi, détection).</li>
+    <li>La mise à disposition des données.</li>
+    <li>Les vérifications périodiques.</li>
+    <li>La formation de l'exploitant.</li>
+  </ul>
+
+  <p>Pour chaque sujet, l'auditeur écrit librement ce qu'il constate, ce qui pose problème, et ce que Buildy peut éventuellement améliorer. Ces observations enrichissent le rapport au-delà de la stricte évaluation R175. Elles sont reprises dans la synthèse de l'étape 10 et alimentent le dialogue avec le propriétaire.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="16757978627775625674637f7a726f387064">[email&#160;protected]</a></span><span class="num">31</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 6 / 11 — Supervision existante</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+  <p>À l'issue de l'étape 6, le dossier d'audit comporte :</p>
+  <ul>
+    <li>L'identification précise de la supervision en place (ou de son absence).</li>
+    <li>L'évaluation des cinq domaines pilotables (chauffage, climatisation, ventilation, ECS, éclairage).</li>
+    <li>L'évaluation des exigences R175-3 §1 et §2 (suivi continu, détection de dérives).</li>
+    <li>L'évaluation des procédures de mise à disposition des données.</li>
+    <li>L'évaluation R175-4 (vérifications périodiques) et R175-5 (formation).</li>
+    <li>Les notes libres par sujet, qui complètent l'analyse réglementaire.</li>
+  </ul>
+
+  <p>Cette analyse alimente l'étape 9 (plan d'action), où chaque non-conformité génère une action chiffrée. Elle alimente aussi la synthèse de l'étape 10, où elle est mise en perspective au regard de l'usage et des objectifs du gestionnaire.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c6a5a9a8b2a7a5b286a4b3afaaa2bfe8a0b4">[email&#160;protected]</a></span><span class="num">32</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 7                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch7">
+  <div class="page-header"><span class="head-chap">Chapitre 7 / 11 — Check-list documentaire</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">07</span> Chapitre 7 / 11</div>
+  <h1 class="chapter-title">Check-list documentaire</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Un audit BACS ne se limite pas à ce qui se voit sur le terrain. Il s'appuie aussi sur <strong>les pièces documentaires du bâtiment</strong> — plans, schémas, contrats, accès.</p>
+
+  <h2>Pourquoi cette étape ne peut pas être négligée</h2>
+
+  <p>Sans ces pièces, deux conséquences :</p>
+  <ul>
+    <li>Le rapport d'audit reste lacunaire (impossible de croiser les valeurs relevées avec les valeurs de référence).</li>
+    <li>Le contrôle préfectoral éventuel se passe mal — le décret prévoit que le propriétaire doit pouvoir présenter, en plus du rapport, l'historique documentaire de son installation.</li>
+  </ul>
+
+  <p>L'étape 7 consiste à dresser la liste des pièces requises, à vérifier leur présence effective, et — quand elles manquent — à tracer ce manque pour qu'il alimente le plan d'action. C'est une étape simple sur le papier, qui révèle souvent des trous béants dans la mémoire technique du bâtiment.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bfdcd0d1cbdedccbffddcad6d3dbc691d9cd">[email&#160;protected]</a></span><span class="num">33</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 7 / 11 — Check-list documentaire</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">La liste des dix pièces à collecter</h2>
+
+  <p>L'auditeur procède selon une check-list standardisée, identique pour tous les bâtiments :</p>
+  <ul>
+    <li><strong>Plans d'étages et de niveaux</strong> — nécessaires au découpage des zones (étape 2) et au repérage des équipements (étape 3).</li>
+    <li><strong>Schémas électriques</strong> (TGBT et tableaux divisionnaires) — pour comprendre la distribution électrique et identifier les compteurs existants ou à installer.</li>
+    <li><strong>Synoptique d'architecture de la GTB</strong> — pour comprendre la couverture de la supervision existante.</li>
+    <li><strong>Plan d'adressage IP</strong> — pour les équipements connectés et les questions de cybersécurité.</li>
+    <li><strong>Analyse fonctionnelle de la GTB existante</strong> — le document de référence qui décrit comment la supervision a été conçue à l'origine.</li>
+    <li><strong>Coordonnées des locataires et occupants</strong> — pour les bâtiments multi-locataires, indispensable au cadrage des frontières opérationnelles (étape 2).</li>
+    <li><strong>Schémas hydrauliques et fluides</strong> — pour comprendre la chaîne thermique (étape 5) et identifier les vannes et pompes régulées.</li>
+    <li><strong>Carnet d'entretien et contrats de maintenance</strong> — pour évaluer la conformité R175-4 (étape 6).</li>
+    <li><strong>Accès aux locaux techniques</strong> — badges, codes, contacts qui permettent d'intervenir physiquement.</li>
+    <li><strong>Photos générales du site</strong> — façades, toiture, vues d'ensemble qui contextualisent le rapport.</li>
+  </ul>
+
+  <p>Pour chaque pièce, l'auditeur consigne son statut : <strong>disponible</strong> (et alors annexée au dossier), <strong>non disponible</strong> (avec la raison documentée), ou <strong>à fournir</strong> (le propriétaire s'engage à la transmettre dans un délai défini).</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="60030f0e14010314200215090c04194e0612">[email&#160;protected]</a></span><span class="num">34</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 7 / 11 — Check-list documentaire</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Que faire des pièces manquantes</h2>
+
+  <p>L'absence d'une pièce documentaire n'est pas un blocage. C'est un constat, qui appelle une décision :</p>
+  <ul>
+    <li><strong>Pièce reconstituable</strong> (plans à reproduire à partir d'un relevé, schémas à refaire à partir de l'observation terrain) → action corrective à inscrire au plan d'action de l'étape 9.</li>
+    <li><strong>Pièce remplaçable par une autre source</strong> (un constat sur place qui supplée à un schéma manquant) → tracé dans les notes du dossier, sans action.</li>
+    <li><strong>Pièce dont l'absence empêche l'audit</strong> (cas rare : l'analyse fonctionnelle complètement absente sur un bâtiment complexe) → l'auditeur signale au propriétaire que certaines parties de l'évaluation seront dégradées tant que la pièce n'est pas fournie.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ L'analyse fonctionnelle existante</div>
+    <p>C'est probablement la pièce la plus souvent manquante ou obsolète. Il n'est pas rare qu'un propriétaire récupère un bâtiment dont le dossier technique a été perdu lors d'un changement d'exploitant. La méthode Buildy reconstitue alors une analyse fonctionnelle de l'existant — c'est une prestation distincte de l'audit BACS, mais souvent indispensable pour pouvoir l'achever.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ddbeb2b3a9bcbea99dbfa8b4b1b9a4f3bbaf">[email&#160;protected]</a></span><span class="num">35</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 7 / 11 — Check-list documentaire</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+  <p>À l'issue de l'étape 7, le dossier d'audit comporte :</p>
+  <ul>
+    <li>La check-list des dix pièces, avec pour chacune son statut et sa source.</li>
+    <li>Les pièces effectivement disponibles, annexées ou référencées.</li>
+    <li>Les manques documentés, avec qualification (reconstituable, remplaçable, bloquant).</li>
+    <li>Une vue d'ensemble de la maturité documentaire du bâtiment.</li>
+  </ul>
+
+  <p>Cette vue alimente la synthèse finale (étape 10) et fournit au propriétaire une feuille de route claire pour combler les manques documentaires — souvent indépendamment du plan de mise en conformité technique.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="11727e7f65707265517364787d75683f7763">[email&#160;protected]</a></span><span class="num">36</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 8                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch8">
+  <div class="page-header"><span class="head-chap">Chapitre 8 / 11 — Inspections R175-5-1 et accès techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">08</span> Chapitre 8 / 11</div>
+  <h1 class="chapter-title">Inspections périodiques R175-5-1 et accès techniques</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Le décret BACS impose deux démarches distinctes au propriétaire — qu'il ne faut pas confondre.</p>
+
+  <h2>Audit Buildy n'est pas inspection R175-5-1</h2>
+
+  <ul>
+    <li><strong>L'audit fonctionnel de la gestion technique du bâtiment</strong>, qui peut être interne ou externalisé. C'est la prestation que Buildy réalise.</li>
+    <li><strong>L'inspection périodique R175-5-1</strong>, qui doit être réalisée par un <strong>organisme tiers indépendant</strong> — ni le propriétaire, ni l'exploitant, ni l'intégrateur GTB. Cette inspection est obligatoire à intervalles réguliers, son rapport doit être conservé pendant dix ans, et il peut être exigé en cas de contrôle.</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-label">⚠ Deux démarches qui ne se substituent pas</div>
+    <p>Un audit Buildy aide à préparer une inspection R175-5-1 (en garantissant que le bâtiment est en état d'être inspecté), mais il ne la remplace pas. À l'inverse, une inspection R175-5-1 ne dispense pas d'un audit fonctionnel approfondi — elle vérifie la conformité, elle ne construit pas le plan d'action.</p>
+  </div>
+
+  <p>L'étape 8 sert donc à <strong>tracer les inspections officielles déjà réalisées</strong> par des tiers, pour les intégrer au dossier sans les confondre avec l'audit Buildy.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="06656968726765724664736f6a627f286074">[email&#160;protected]</a></span><span class="num">37</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 8 / 11 — Inspections R175-5-1 et accès techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Tracer les inspections officielles existantes</h2>
+
+  <p>Pour chaque inspection R175-5-1 déjà réalisée sur le bâtiment, le dossier consigne :</p>
+  <ul>
+    <li><strong>La date</strong> de l'inspection.</li>
+    <li><strong>L'organisme</strong> ayant réalisé l'inspection (raison sociale, numéro d'agrément éventuel).</li>
+    <li><strong>Les anomalies constatées</strong> par l'inspecteur.</li>
+    <li><strong>Les recommandations</strong> émises.</li>
+    <li><strong>La date de la prochaine inspection due</strong> selon la périodicité réglementaire applicable au bâtiment.</li>
+    <li><strong>La référence du rapport</strong> (numéro, archivage), avec la date jusqu'à laquelle il doit être conservé (dix ans après émission).</li>
+  </ul>
+
+  <p>Si aucune inspection R175-5-1 n'a encore été réalisée sur le bâtiment, le dossier le consigne explicitement et précise la date à laquelle la première inspection est due. C'est une information critique pour le propriétaire : un bâtiment assujetti depuis trois ans sans inspection officielle est en situation irrégulière, indépendamment de la qualité technique de son installation.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e685898892878592a684938f8a829fc88094">[email&#160;protected]</a></span><span class="num">38</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 8 / 11 — Inspections R175-5-1 et accès techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les accès techniques nécessaires à l'exploitation</h2>
+
+  <p>Au-delà des inspections, le dossier trace également les <strong>accès techniques</strong> indispensables à l'exploitation continue du bâtiment :</p>
+
+  <ul>
+    <li><strong>Identifiants de la supervision</strong> — qui détient les comptes administrateurs, où sont conservés les mots de passe, comment ils sont renouvelés.</li>
+    <li><strong>Accès distants</strong> — VPN, plateformes web de pilotage, accès mobiles, et leurs dépendances (certificats, clés API).</li>
+    <li><strong>Contacts opérationnels</strong> — exploitant en titre, mainteneur des équipements terrain, intégrateur de la supervision, support du fournisseur. Un bâtiment dont le mainteneur a quitté l'entreprise il y a deux ans, et dont personne ne sait à qui s'adresser pour un dépannage, est un risque opérationnel majeur — souvent invisible jusqu'à la première panne.</li>
+  </ul>
+
+  <p>L'auditeur ne consigne pas les mots de passe en clair dans le rapport (question de cybersécurité). Il consigne <strong>qui détient quoi</strong>, et signale les lacunes (compte unique partagé entre cinq personnes, mot de passe inchangé depuis le déploiement initial, certificat expiré, etc.).</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="482b27263c292b3c082a3d21242c31662e3a">[email&#160;protected]</a></span><span class="num">39</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 8 / 11 — Inspections R175-5-1 et accès techniques</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+
+  <p>À l'issue de l'étape 8, le dossier d'audit comporte :</p>
+  <ul>
+    <li>L'historique des inspections R175-5-1 déjà réalisées, avec leurs constats et recommandations.</li>
+    <li>L'identification claire de la prochaine inspection due et de l'organisme à contacter.</li>
+    <li>La cartographie des accès techniques au bâtiment (sans exposer les credentials eux-mêmes).</li>
+    <li>Les contacts opérationnels indispensables à l'exploitation continue.</li>
+    <li>L'identification des lacunes éventuelles (absence d'inspection, contacts orphelins, accès partagés).</li>
+  </ul>
+
+  <p>Cette traçabilité protège le propriétaire en cas de contrôle préfectoral, et lui donne la visibilité nécessaire pour piloter la maintenance dans la durée.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a3c0cccdd7c2c0d7e3c1d6cacfc7da8dc5d1">[email&#160;protected]</a></span><span class="num">40</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 9                                       -->
+<!-- =============================================== -->
+<section class="page" id="ch9">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">09</span> Chapitre 9 / 11</div>
+  <h1 class="chapter-title">Le plan d'action de mise en conformité</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Les huit étapes précédentes ont produit, sans hiérarchisation, <strong>la liste exhaustive des écarts</strong> entre la situation observée et les exigences du décret R175. À l'étape 9, l'auditeur transforme cette liste en <strong>plan d'action chiffrable et opposable</strong>.</p>
+
+  <div class="pill-row">
+    <span class="pill pill-alarm"><i class="fas fa-circle-exclamation"></i> Bloquante</span>
+    <span class="pill pill-warn-soft"><i class="fas fa-triangle-exclamation"></i> Majeure</span>
+    <span class="pill pill-mint"><i class="fas fa-circle-check"></i> Mineure</span>
+  </div>
+
+  <h2>De l'inventaire au plan d'action</h2>
+
+  <p>Le passage est important. Sans hiérarchisation, le propriétaire reçoit une masse d'informations dans laquelle il ne peut pas prioriser. Avec un plan d'action structuré, il dispose d'une feuille de route lisible, qu'il peut remettre tel quel à un intégrateur GTB pour chiffrage, ou utiliser pour arbitrer en interne quelles actions traiter en premier.</p>
+
+  <p>La méthode Buildy applique des règles de hiérarchisation <strong>identiques pour tous les bâtiments</strong>. Cette uniformité est essentielle : elle permet à un propriétaire qui possède plusieurs sites de comparer les rapports entre eux et d'organiser un budget pluriannuel cohérent.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e0838f8e94818394a08295898c8499ce8692">[email&#160;protected]</a></span><span class="num">41</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Trois niveaux de sévérité</h2>
+
+  <p>Chaque action corrective est classée selon trois sévérités, qui correspondent à trois niveaux de risque pour le propriétaire.</p>
+
+  <h3>Bloquante</h3>
+  <p>L'action concerne une exigence du décret qui n'est <strong>structurellement pas tenue</strong>. Sans cette correction, le bâtiment ne peut pas être déclaré conforme, même partiellement. Exemples typiques :</p>
+  <ul>
+    <li>Un compteur réglementairement requis est physiquement absent.</li>
+    <li>La supervision n'assure aucun suivi continu des consommations (R175-3 §1).</li>
+    <li>Aucune supervision n'est en place sur un bâtiment soumis à l'obligation.</li>
+  </ul>
+  <p>Les actions bloquantes doivent être traitées en priorité. Le rapport recommande de les engager avant l'échéance applicable au bâtiment (1ᵉʳ janvier 2025 ou 2027 selon la puissance).</p>
+
+  <h3>Majeure</h3>
+  <p>L'action concerne une exigence <strong>partiellement tenue</strong>, ou tenue <strong>sur le papier mais pas sur le terrain</strong>. La conformité n'est pas atteinte, mais l'écart est réparable sans refonte profonde. Exemples typiques :</p>
+  <ul>
+    <li>Un compteur est présent mais non communicant.</li>
+    <li>Un équipement est intégré à la supervision sur le papier, mais sa liaison est cassée.</li>
+    <li>L'exploitant n'a pas été formé.</li>
+    <li>Les procédures de maintenance R175-4 ne sont pas formalisées.</li>
+  </ul>
+
+  <h3>Mineure</h3>
+  <p>L'action concerne une amélioration <strong>utile mais non critique</strong> au regard du décret. Le bâtiment peut être déclaré conforme sans la traiter, mais le rapport la signale parce qu'elle apporte une valeur opérationnelle réelle (économie d'énergie, fiabilité accrue, simplification de l'exploitation).</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a3c0cccdd7c2c0d7e3c1d6cacfc7da8dc5d1">[email&#160;protected]</a></span><span class="num">42</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Pour chaque action, ce que le rapport contient</h2>
+
+  <p>Chaque action du plan est détaillée selon une trame fixe, identique pour toutes :</p>
+  <ul>
+    <li><strong>Un identifiant stable</strong> (BACS-001, BACS-002, etc.) qui permet de la référencer sans ambiguïté dans les échanges avec les intégrateurs.</li>
+    <li><strong>Un titre court</strong> qui dit ce qu'il faut faire, sans technicité inutile.</li>
+    <li><strong>Une description</strong> qui contextualise — d'où vient le constat, sur quelle zone ou quel équipement, quelle observation l'a révélé.</li>
+    <li><strong>L'article R175 concerné</strong>, cité explicitement. Cela donne à chaque action sa base légale et permet au propriétaire de répondre à un contrôle.</li>
+    <li><strong>La sévérité</strong> (bloquante, majeure, mineure).</li>
+    <li><strong>La zone et l'équipement source</strong>, pour que l'intégrateur sache où intervenir.</li>
+    <li><strong>Une estimation d'effort</strong> (faible, moyen, élevé) que l'auditeur Buildy renseigne en fonction de l'expérience accumulée. Cette estimation <strong>n'est pas un chiffrage</strong> — c'est une indication de magnitude pour aider à la priorisation budgétaire.</li>
+    <li><strong>Des solutions alternatives</strong>, quand l'action peut être traitée de plusieurs manières (raccorder un compteur existant <em>vs</em> le remplacer ; étendre la supervision en place <em>vs</em> la remplacer entièrement). Le propriétaire conserve ainsi sa marge d'arbitrage.</li>
+    <li><strong>Un statut de traitement</strong> (ouverte, devisée, en cours, terminée, écartée) qui permet de suivre l'avancement dans le temps, audit après audit.</li>
+  </ul>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="492a26273d282a3d092b3c20252d30672f3b">[email&#160;protected]</a></span><span class="num">43</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Comment se construit le plan, écart par écart</h2>
+
+  <p>L'auditeur ne « décide » pas arbitrairement de la sévérité. Elle découle de la nature de l'écart constaté, selon une grille systématique :</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Origine de l'écart</th>
+        <th>Action générée</th>
+        <th>Sévérité</th>
+        <th>Article</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Équipement isolé du système d'information</td><td>Rendre l'équipement communicant</td><td class="sev maj">Majeure</td><td>R175-3 §3</td></tr>
+      <tr><td>Équipement sans arrêt manuel</td><td>Permettre l'arrêt manuel</td><td class="sev maj">Majeure</td><td>R175-3 §4</td></tr>
+      <tr><td>Équipement sans fonctionnement autonome</td><td>Activer le mode autonome</td><td class="sev maj">Majeure</td><td>R175-3 §4</td></tr>
+      <tr><td>Liaison de supervision rompue</td><td>Rétablir la liaison</td><td class="sev maj">Majeure</td><td>R175-3</td></tr>
+      <tr><td>Compteur requis absent</td><td>Installer le compteur</td><td class="sev bloq">Bloquante</td><td>R175-3 §1</td></tr>
+      <tr><td>Compteur présent non communicant</td><td>Raccorder le compteur</td><td class="sev maj">Majeure</td><td>R175-3 §1</td></tr>
+      <tr><td>Aucune supervision en place</td><td>Déployer une supervision</td><td class="sev bloq">Bloquante</td><td>R175-3</td></tr>
+      <tr><td>Supervision sans détection de dérives</td><td>Configurer les alertes</td><td class="sev maj">Majeure</td><td>R175-3 §2</td></tr>
+      <tr><td>Procédures de maintenance non formalisées</td><td>Établir les procédures</td><td class="sev maj">Majeure</td><td>R175-4</td></tr>
+      <tr><td>Exploitant non formé</td><td>Programmer la formation</td><td class="sev min">Mineure</td><td>R175-5</td></tr>
+      <tr><td>Régulation thermique manquante (R175-6 applicable)</td><td>Selon contexte</td><td class="sev bloq">Bloquante / Majeure</td><td>R175-6</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cette grille rend le plan <strong>reproductible</strong> d'un audit à l'autre — deux auditeurs Buildy intervenant sur le même bâtiment produisent un plan d'action identique. C'est une garantie de fiabilité pour le propriétaire.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="096a66677d686a7d496b7c60656d70276f7b">[email&#160;protected]</a></span><span class="num">44</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="callout r175">
+    <div class="callout-label">Cas des équipements hors service</div>
+    <p>Un équipement déclaré hors service ne génère pas d'action corrective tant qu'aucun équipement ne le remplace. Il reste tracé dans l'inventaire et dans le rapport, pour mémoire et pour la planification de remplacement.</p>
+  </div>
+
+  <div class="callout r175">
+    <div class="callout-label">Cas des exemptions</div>
+    <p>Un générateur à biomasse exempté du R175-6, par exemple, ne génère aucune action. L'exemption est tracée explicitement dans le rapport pour qu'elle soit défendable face à un contrôle.</p>
+  </div>
+
+  <h2>Annotations commerciales et solutions alternatives</h2>
+
+  <p>Le plan d'action n'est pas seulement un constat technique. Il intègre également <strong>des annotations commerciales</strong> que l'auditeur ajoute pour préparer le travail des intégrateurs et de l'équipe commerciale du propriétaire :</p>
+  <ul>
+    <li><strong>Notes contextuelles</strong> — particularités d'accès, contraintes d'exploitation, périodes d'arrêt prévues, relation avec le mainteneur en place.</li>
+    <li><strong>Solutions alternatives</strong> — quand plusieurs approches sont envisageables, l'auditeur les pose à plat. Cela évite que l'intégrateur reçoive une demande étroite et chiffre une seule solution alors qu'une autre serait moins coûteuse ou plus pérenne.</li>
+    <li><strong>Effort estimé</strong> — magnitude qualitative (faible, moyen, élevé), pour aider à la priorisation budgétaire avant chiffrage précis.</li>
+  </ul>
+
+  <p>Ces annotations distinguent un audit Buildy d'une simple liste de constats : elles rendent le plan exploitable directement, sans phase intermédiaire d'analyse.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="8ae9e5e4feebe9fecae8ffe3e6eef3a4ecf8">[email&#160;protected]</a></span><span class="num">45</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 9 / 11 — Plan d'action</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+  <p>À l'issue de l'étape 9, le dossier d'audit comporte :</p>
+  <ul>
+    <li>Le plan d'action complet, hiérarchisé par sévérité (bloquantes, majeures, mineures).</li>
+    <li>Pour chaque action, sa fiche complète (identifiant, titre, description, article R175, zone, source, effort, alternatives, notes).</li>
+    <li>La traçabilité de chaque action vers l'écart constaté qui l'a générée — un intégrateur peut remonter de l'action à l'observation terrain qui l'a justifiée.</li>
+    <li>Une vue d'ensemble lisible par un décideur non technique, qui pourra arbitrer les priorités.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-label">À retenir</div>
+    <p>Ce plan d'action constitue <strong>la valeur métier centrale</strong> de l'audit. C'est sur cette base que le propriétaire engage les travaux, sollicite les intégrateurs, et arbitre son budget de mise en conformité.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b1d2dedfc5d0d2c5f1d3c4d8ddd5c89fd7c3">[email&#160;protected]</a></span><span class="num">46</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 10                                      -->
+<!-- =============================================== -->
+<section class="page" id="ch10">
+  <div class="page-header"><span class="head-chap">Chapitre 10 / 11 — Synthèse et livraison</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">10</span> Chapitre 10 / 11</div>
+  <h1 class="chapter-title">Synthèse et livraison du rapport</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">À l'issue des neuf étapes précédentes, l'auditeur dispose de l'intégralité des éléments pour produire <strong>la synthèse de conformité</strong> du bâtiment au regard du décret R175.</p>
+
+  <h2>Le tableau de bord de conformité R175</h2>
+
+  <p>Cette synthèse prend la forme d'un tableau de bord à huit lignes, qui couvre l'ensemble des exigences réglementaires :</p>
+
+  <ul>
+    <li><strong>Assujettissement</strong> (R175-2) — ligne informative qui rappelle pourquoi le bâtiment est concerné, à quelle échéance, et avec quelle puissance assujettissante.</li>
+    <li><strong>Suivi continu</strong> (R175-3 §1) — verdict de conformité sur l'enregistrement à pas horaire et la conservation cinq ans.</li>
+    <li><strong>Interopérabilité</strong> (R175-3 §3) — verdict consolidé sur l'ensemble des équipements examinés.</li>
+    <li><strong>Arrêt manuel et fonctionnement autonome</strong> (R175-3 §4) — verdict consolidé.</li>
+    <li><strong>Mise à disposition des données</strong> (dernier alinéa R175-3) — verdict sur les procédures vers le gestionnaire et les exploitants.</li>
+    <li><strong>Vérifications périodiques</strong> (R175-4) — verdict sur les procédures de maintenance.</li>
+    <li><strong>Formation de l'exploitant</strong> (R175-5) — verdict sur les attestations existantes.</li>
+    <li><strong>Régulation thermique</strong> (R175-6) — verdict, ou mention <em>non applicable</em> selon la date de permis et de travaux.</li>
+  </ul>
+
+  <p>Pour chaque ligne, trois verdicts possibles : <strong>conforme</strong>, <strong>partiellement conforme</strong> ou <strong>non conforme</strong>, justifiés par le détail des étapes correspondantes du rapport. Cette structure rend le rapport directement opposable face à un contrôle préfectoral.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e1828e8f95808295a18394888d8598cf8793">[email&#160;protected]</a></span><span class="num">47</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 10 / 11 — Synthèse et livraison</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Le verdict global et la note de synthèse</h2>
+
+  <p>Au-dessus du tableau de bord, le rapport porte un <strong>verdict global</strong> de conformité du bâtiment, selon une logique simple et reproductible :</p>
+  <ul>
+    <li>S'il existe au moins une action <strong>bloquante</strong> dans le plan, le bâtiment est déclaré <strong>non conforme</strong>.</li>
+    <li>Sinon, s'il existe au moins une action <strong>majeure</strong>, le bâtiment est déclaré <strong>partiellement conforme</strong>.</li>
+    <li>Sinon, le bâtiment est déclaré <strong>conforme</strong>.</li>
+  </ul>
+
+  <p>Ce verdict figure en page de couverture du rapport et conditionne sa couleur d'identification. Un propriétaire qui présente le rapport à un contrôleur sait immédiatement où il en est.</p>
+
+  <p>Le verdict est complété par une <strong>note de synthèse rédigée</strong> de quelques paragraphes, qui contextualise le résultat pour des lecteurs non techniques (asset manager, direction générale, conseil d'administration). Cette note explique en langage clair :</p>
+  <ul>
+    <li>Pourquoi le bâtiment est dans la situation où il est.</li>
+    <li>Quelles actions sont à engager en priorité et pour quel ordre de grandeur d'effort.</li>
+    <li>Quels sont les risques associés à l'inaction (échéance manquée, contrôle préfectoral, dérive énergétique).</li>
+    <li>Quelles sont les opportunités d'amélioration au-delà du strict décret.</li>
+  </ul>
+
+  <p>La note de synthèse est l'élément qui circule en interne chez le propriétaire — souvent extrait du rapport pour être présenté à un comité. L'auditeur la rédige avec ce destinataire en tête.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="71121e1f05101205311304181d15085f1703">[email&#160;protected]</a></span><span class="num">48</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 10 / 11 — Synthèse et livraison</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Les quatre annexes obligatoires du rapport</h2>
+
+  <p>Le rapport d'audit BACS de Buildy comporte systématiquement <strong>quatre annexes</strong> qui le rendent opposable et complet.</p>
+
+  <h3>Annexe A — Texte intégral du décret R175</h3>
+  <p>Les articles R175-1 à R175-6 sont reproduits in extenso. Cela permet au lecteur du rapport de croiser chaque action corrective avec l'article exact qui la justifie, sans avoir à consulter le Journal officiel. C'est aussi une garantie face à un contrôle : le rapport contient en lui-même la base légale qu'il invoque.</p>
+
+  <h3>Annexe B — Méthodologie Buildy</h3>
+  <p>Les neuf hypothèses méthodologiques qui structurent l'évaluation sont explicitées : périmètre BACS retenu, seuil de puissance applicable, définition de la zone fonctionnelle, modalités d'évaluation du suivi continu, traitement de l'interopérabilité, position sur la régulation thermique, vérifications périodiques, formation, applicabilité.</p>
+  <p>Cette annexe rend la démarche <strong>auditable</strong>. Un confrère qui prend le rapport en main peut comprendre comment l'auditeur a procédé, et reproduire le raisonnement sur un autre bâtiment.</p>
+
+  <h3>Annexe C — Justification des préconisations</h3>
+  <p>Pour chaque action du plan (BACS-001, BACS-002, etc.), un paragraphe spécifique justifie son inscription : quelle observation l'a déclenchée, à quel article du décret elle se rattache, pourquoi la sévérité retenue.</p>
+  <p>Cette annexe peut paraître redondante avec le plan d'action principal. Elle ne l'est pas : elle isole la traçabilité juridique de la lisibilité opérationnelle. Le plan d'action principal est conçu pour être lu et exploité ; l'annexe C est conçue pour être défendue.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b9dad6d7cdd8dacdf9dbccd0d5ddc097dfcb">[email&#160;protected]</a></span><span class="num">49</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 10 / 11 — Synthèse et livraison</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h3 style="margin-top:0;">Annexe D — Mentions légales et disclaimers</h3>
+
+  <p>Sept clauses qui cadrent la portée du rapport :</p>
+  <ul>
+    <li>L'audit Buildy ne se substitue pas à l'inspection officielle R175-5-1.</li>
+    <li>L'évaluation est fonctionnelle, pas certificatoire (ISO 52120-1 n'est pas requise).</li>
+    <li>L'audit BACS ne se confond pas avec un dossier CEE BAT-TH-116.</li>
+    <li>Le calcul du temps de retour sur investissement reste sous la responsabilité du propriétaire.</li>
+    <li>L'évolution réglementaire peut modifier la portée des constats à terme.</li>
+    <li>Les recommandations sont indicatives et n'engagent pas leur exécution.</li>
+    <li>Les informations incomplètes communiquées par le propriétaire engagent sa responsabilité.</li>
+  </ul>
+
+  <p>Ces clauses protègent à la fois le propriétaire (en délimitant ce qu'il a acquis) et l'auditeur (en cadrant ce qu'il a livré).</p>
+
+  <h2>La livraison et la conservation</h2>
+
+  <p>Le rapport est livré au format PDF, conforme aux standards de présentation des dossiers techniques. Il comporte une page de couverture (verdict, identité du bâtiment, date), une page d'essentiel (synthèse pour décideur), un tableau de bord (huit lignes R175), les neuf chapitres détaillés, le plan d'action numéroté, et les quatre annexes.</p>
+
+  <p>Le rapport doit être <strong>conservé dix ans</strong> par le propriétaire. Cette durée est cohérente avec celle exigée pour le rapport d'inspection officielle R175-5-1, et permet d'avoir à tout moment la mémoire complète des évaluations successives du bâtiment.</p>
+
+  <p>En pratique, le propriétaire archive le rapport dans son dossier des ouvrages exécutés (DOE) du bâtiment, dans son système de GED, ou dans le coffre-fort numérique de son contrat de gestion. Le rapport peut être présenté lors d'un contrôle préfectoral, transmis à un acheteur en cas de cession du bâtiment, ou utilisé comme base de référence pour le prochain audit.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="13707c7d677270675371667a7f776a3d7561">[email&#160;protected]</a></span><span class="num">50</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 10 / 11 — Synthèse et livraison</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <h2 style="margin-top:0;">Ce que produit cette étape</h2>
+
+  <p>À l'issue de l'étape 10, le propriétaire dispose :</p>
+  <ul>
+    <li>Du tableau de bord de conformité R175 en huit lignes.</li>
+    <li>Du verdict global (conforme, partiellement conforme, non conforme).</li>
+    <li>De la note de synthèse rédigée pour les décideurs.</li>
+    <li>Du plan d'action numéroté et hiérarchisé.</li>
+    <li>Des quatre annexes obligatoires (texte du décret, méthodologie, justifications, mentions légales).</li>
+    <li>D'un rapport PDF complet, archivable, présentable en contrôle.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-label">À retenir</div>
+    <p>À ce stade, l'audit est livré. Le travail du propriétaire commence — engagement des actions correctives, dialogue avec les intégrateurs, planification de l'inspection officielle R175-5-1 si elle n'a pas encore eu lieu.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="492a26273d282a3d092b3c20252d30672f3b">[email&#160;protected]</a></span><span class="num">51</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CHAPITRE 11                                      -->
+<!-- =============================================== -->
+<section class="page" id="ch11">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">11</span> Chapitre 11 / 11</div>
+  <h1 class="chapter-title">Les pièges à éviter après l'audit</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Le rapport d'audit n'est pas une fin en soi. C'est le <strong>cahier des charges</strong> à partir duquel les intégrateurs GTB vont vous proposer leurs solutions, et à partir duquel vous allez engager des travaux qui se chiffrent en milliers, voire dizaines de milliers d'euros.</p>
+
+  <p>Sur cette dernière étape — du rapport reçu à la mise en conformité effective — sept pièges reviennent systématiquement. Ils ne concernent pas la méthode d'audit, mais ce que le propriétaire ou le gestionnaire fait du rapport une fois livré. Les éviter, c'est gagner du temps, du budget, et garantir la pérennité de l'installation.</p>
+
+  <h2>Piège n°1 — L'auditeur vous affirme qu'une classe ISO 52120 est exigée pour être conforme</h2>
+
+  <p>Une affirmation revient régulièrement dans la bouche d'auditeurs ou d'intégrateurs&nbsp;: <em>« Pour être conforme au décret BACS, votre GTB doit être de classe C (ou B, ou A) au sens de la norme NF EN ISO 52120-1. »</em> C'est faux. Le décret R175 et son arrêté d'application du 7 avril 2023 <strong>ne citent pas la norme ISO 52120-1</strong> et n'imposent aucune classe de performance. Le législateur a retenu une approche fondée sur les <strong>résultats attendus</strong>, pas sur une certification.</p>
+
+  <p>Ce qui est réellement exigible se trouve uniquement à l'article R175-3&nbsp;: suivi continu et conservation des consommations, détection des dérives, interopérabilité, possibilité d'arrêt manuel et de fonctionnement autonome. Une GTB qui délivre ces quatre exigences est conforme — indépendamment de la classe ISO qu'on voudrait lui attribuer.</p>
+
+  <div class="callout r175">
+    <div class="callout-label">D'où vient la confusion</div>
+    <p>Deux sources alimentent l'amalgame. D'une part, la <strong>fiche CEE BAT-TH-116</strong> (prime aux économies d'énergie) exige une GTB de classe A ou B selon ISO 52120-1. Mais c'est une condition d'éligibilité à la prime, pas à la conformité au décret. D'autre part, la <strong>FAQ gouvernementale</strong> (rt-re-batiment.developpement-durable.gouv.fr) interprète qu'une classe C serait insuffisante. Une FAQ administrative n'a pas valeur de texte réglementaire&nbsp;: elle ne peut pas créer d'obligation au-delà du décret. En cas de contradiction, le texte du décret prime.</p>
+  </div>
+
+  <p>Pourquoi ce piège coûte cher&nbsp;: justifier une « mise à niveau vers la classe B » peut transformer une mise en conformité raisonnable en chantier surdimensionné, sur la base d'une exigence qui n'est pas opposable. Si l'auditeur invoque une classe ISO comme obligation légale, demandez-lui l'article précis du Code de la construction et de l'habitation qui la mentionne. Il n'existe pas.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="14777b7a607577605476617d78706d3a7266">[email&#160;protected]</a></span><span class="num">52</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+
+  <h2 style="margin-top:0;">Piège n°2 — Accepter un audit BACS qui ne suit pas la méthode décrite ici</h2>
+
+  <p>La plupart des rapports d'audit BACS que nous avons examinés ne respectent pas la méthode décrite dans ce livre blanc. Le décret R175 y est survolé, parfois cité de mémoire, parfois — c'est plus fréquent qu'on ne le pense — manifestement jamais lu en intégralité par l'auditeur. Les zones fonctionnelles ne sont pas définies, les équipements ne sont pas qualifiés individuellement, le plan d'action est une liste générique sans identifiants stables ni références aux articles du décret. C'est grave, parce que ce sont précisément les rapports qui ne tiennent pas devant un contrôle préfectoral, et qui ne sont pas exploitables par les intégrateurs en aval.</p>
+
+  <p>Ce type d'audit est souvent <strong>gratuit ou très peu cher</strong>. C'est rarement un hasard. Un audit BACS qui respecte la méthode décrite dans ce document mobilise plusieurs jours d'auditeur expérimenté, deux visites sur site, un travail documentaire substantiel et la production d'un rapport directement opposable. Cela a un coût. Un audit livré pour quelques centaines d'euros, ou offert dans le cadre d'un devis d'intégration, n'a pas pu être produit selon ces standards — et l'expérience montre qu'il ne l'est pas.</p>
+
+  <p>Quelques signaux à vérifier avant de retenir un auditeur :</p>
+  <ul>
+    <li>Le rapport contient-il le <strong>texte intégral des articles R175</strong> applicables, ou seulement une mention générique du décret&nbsp;?</li>
+    <li>Le bâtiment est-il découpé en <strong>zones fonctionnelles</strong> identifiées, ou traité comme un tout indifférencié&nbsp;?</li>
+    <li>Chaque équipement est-il <strong>inventorié individuellement</strong> avec sa puissance, son protocole, et son verdict de conformité&nbsp;?</li>
+    <li>Les actions correctives portent-elles un <strong>identifiant stable</strong>, une sévérité, et un article R175 source&nbsp;?</li>
+    <li>L'auditeur est-il capable d'expliquer la <strong>différence entre R175-3 §3 et R175-3 §4</strong> sans hésiter&nbsp;?</li>
+  </ul>
+
+  <p>Si la réponse est non à plus d'une de ces questions, le rapport produit ne sera pas exploitable. <em>Vous en aurez pour votre argent.</em></p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="30535f5e44515344705245595c54491e5642">[email&#160;protected]</a></span><span class="num">53</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+
+  <h2 style="margin-top:0;">Piège n°3 — Confier l'audit à un acteur qui n'aura pas à assumer ses préconisations</h2>
+
+  <p>Un bureau d'études techniques généraliste et un intégrateur GTB spécialisé peuvent l'un comme l'autre produire un audit BACS conforme à la méthode décrite dans ce livre blanc. Le critère discriminant n'est pas le statut de l'auditeur, mais sa <strong>responsabilité dans la chaîne</strong>&nbsp;: signe-t-il ses préconisations en sachant qu'il devra, lui ou ses confrères directs, les mettre en œuvre&nbsp;?</p>
+
+  <p>Un BET généraliste qui réalise l'audit mais ne fait pas les travaux ensuite n'a pas d'incitation forte à vérifier que ses préconisations sont <strong>réalisables sur ce bâtiment précis</strong>, dans ce budget, dans les délais où le décret s'applique. Le rapport peut être techniquement irréprochable et opérationnellement inutilisable — actions chiffrées au jugé, équipements préconisés sans vérification de compatibilité avec l'existant, calendrier de mise en œuvre déconnecté de la réalité d'exploitation.</p>
+
+  <p>À l'inverse, un intégrateur GTB qui réalise lui-même l'audit, sachant qu'il aura à porter ou à transmettre les travaux à un confrère, écrit chaque ligne du plan d'action en sachant qu'il pourra avoir à la défendre devant un chiffrage. Cette tension produit un audit plus dur sur les critères techniques (parce qu'il ne veut pas se faire piéger plus tard), et surtout plus juste sur la faisabilité (parce qu'il connaît le coût réel des préconisations).</p>
+
+  <div class="callout">
+    <div class="callout-label">Le critère à exiger, quelle que soit la nature de l'auditeur</div>
+    <p>Qu'il <strong>s'engage à assumer la responsabilité de ce qu'il écrit dans le rapport</strong>, et qu'il soit techniquement capable — ou en lien direct avec un intégrateur — de chiffrer chaque action préconisée si on lui demande de le faire. Un auditeur qui se réfugie derrière la formule «&nbsp;à chiffrer par l'entreprise retenue&nbsp;» pour la totalité des actions n'a pas fait son travail.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f5969a9b81949681b597809c99918cdb9387">[email&#160;protected]</a></span><span class="num">54</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+
+  <h2 style="margin-top:0;">Piège n°4 — Laisser l'auditeur calculer le TRI d'exemption à votre place</h2>
+
+  <p>Le décret R175 prévoit explicitement une <strong>exemption fondée sur le temps de retour sur investissement</strong>. Deux articles l'évoquent dans des termes similaires.</p>
+
+  <div class="callout r175">
+    <div class="callout-label">R175-2, dernier alinéa</div>
+    <p><em>« Sauf si le propriétaire produit une étude établissant que l'installation d'un système d'automatisation et de contrôle n'est pas réalisable avec un temps de retour sur investissement inférieur à dix ans. »</em></p>
+    <div class="callout-label" style="margin-top:10px;">R175-6, II 2°</div>
+    <p><em>« …sauf si les propriétaires produisent une étude établissant que l'installation d'un système automatique de régulation… n'est pas réalisable avec un temps de retour sur investissement inférieur à dix ans. »</em></p>
+  </div>
+
+  <p><strong>Notez le sujet de la phrase</strong>&nbsp;: c'est le propriétaire qui produit l'étude. Pas l'auditeur, pas l'intégrateur. En cas de contrôle préfectoral, c'est lui qui devra défendre les hypothèses retenues. Si elles ne tiennent pas, l'exemption tombe et le bâtiment est requalifié comme non conforme.</p>
+
+  <p>Le piège&nbsp;: laisser l'auditeur intégrer dans son rapport un calcul de TRI fondé sur <strong>ses propres hypothèses</strong> — coût d'investissement estimé au doigt, économies projetées orientées selon son intérêt, tarif énergie figé à un instant donné, durée d'amortissement arbitraire. Un calcul utile pour l'auditeur, peu défendable pour le propriétaire.</p>
+
+  <p><strong>La bonne pratique</strong>&nbsp;: le propriétaire produit son propre calcul de TRI, après obtention du rapport d'audit complet et après consultation de plusieurs intégrateurs GTB pour disposer de coûts d'investissement réels. Le calcul suit les <strong>recommandations officielles du ministère</strong> (<a href="https://rt-re-batiment.developpement-durable.gouv.fr/faq-bacs-20-comment-le-tri-se-calcule-t-il-a953.html">rt-re-batiment.developpement-durable.gouv.fr — FAQ BACS-20</a>) — méthode, hypothèses de prix de l'énergie, périmètre des économies à prendre en compte. Cette démarche protège le propriétaire en cas de contrôle&nbsp;: il défend une étude qu'il a commandée et signée, avec des hypothèses qu'il peut justifier ligne à ligne.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cfaca0a1bbaeacbb8fadbaa6a3abb6e1a9bd">[email&#160;protected]</a></span><span class="num">55</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+
+  <h2 style="margin-top:0;">Piège n°5 — Confondre fourniture de matériel et solution clé en main</h2>
+
+  <p>Un intégrateur GTB peut chiffrer ses prestations à plusieurs niveaux d'engagement. Du moins-disant au plus complet :</p>
+  <ul>
+    <li><strong>Fourniture seule</strong> — il livre les capteurs, les automates, la passerelle, et c'est tout.</li>
+    <li><strong>Fourniture et paramétrage</strong> — il livre et configure les équipements, mais ne touche pas à ce qu'il y a autour.</li>
+    <li><strong>Solution clé en main</strong> — il livre, paramètre, <strong>et prend en charge tout ce qui est nécessaire à la mise en service réelle</strong> : installation électrique (tirage de câbles, raccordements, modifications de tableaux), plomberie (vannes motorisées, sondes immergées, perçages), génie civil (saignées, percements, rebouchages), reprise de la documentation existante.</li>
+  </ul>
+
+  <p>Beaucoup de devis sont chiffrés au premier ou au deuxième niveau, <strong>sans le dire explicitement</strong>. Le propriétaire pense recevoir une solution complète ; il découvre, après signature, que l'électricien doit intervenir pour câbler les capteurs, que le plombier doit poser les sondes immergées, que les percements ne sont pas inclus. Le budget final dérape de 30 à 50&nbsp;%.</p>
+
+  <div class="callout warn">
+    <div class="callout-label">À exiger dans la consultation</div>
+    <p>La mention explicite du niveau d'engagement, et la liste des prestations annexes (électricité, plomberie, génie civil, reprise documentaire) avec leur prise en charge — <em>inclus</em>, <em>à charge du propriétaire</em>, ou <em>à chiffrer séparément</em>. Un intégrateur sérieux acceptera de répondre. Un intégrateur qui esquive la question est un signal.</p>
+  </div>
+
+  <h2>Piège n°6 — Sous-estimer l'expérience d'utilisation de la supervision</h2>
+
+  <p>L'intégrateur livre rarement la supervision logicielle elle-même. Il intègre une solution existante — la sienne, celle d'un éditeur partenaire, ou une solution sélectionnée par le propriétaire. Cette solution logicielle est ce que l'exploitant utilisera <strong>au quotidien pendant les dix prochaines années</strong>.</p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="5e3d31302a3f3d2a1e3c2b37323a2770382c">[email&#160;protected]</a></span><span class="num">56</span></div>
+</section>
+
+<section class="page">
+  <div class="page-header"><span class="head-chap">Chapitre 11 / 11 — Pièges à éviter</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+
+  <p>Trois questions à poser systématiquement avant de retenir une solution de supervision GTB :</p>
+  <ul>
+    <li><strong>Est-elle utilisable par un exploitant non spécialiste&nbsp;?</strong> Demandez une démonstration sur un cas réel, pas une vidéo commerciale. Demandez à l'exploitant pressenti de manipuler la solution lui-même. Si la prise en main demande une formation lourde, la conformité R175-5 (formation de l'exploitant) sera plus coûteuse, et l'usage réel se dégradera dans le temps.</li>
+    <li><strong>Est-elle accessible à distance et en mobilité&nbsp;?</strong> Une supervision uniquement accessible depuis un poste fixe en local technique est, en pratique, sous-utilisée. Vérifiez la disponibilité d'un accès web sécurisé et d'une application mobile pour les déplacements terrain.</li>
+    <li><strong>Est-elle ouverte&nbsp;?</strong> Vérifiez que les données peuvent être exportées (au minimum en CSV, idéalement via une API). Une supervision propriétaire qui retient vos données vous lie à son éditeur pour toute la durée de vie de l'installation.</li>
+  </ul>
+
+  <div class="callout">
+    <div class="callout-label">Critère parfois oublié</div>
+    <p>La pérennité de l'éditeur. Une solution logicielle excellente mais éditée par une petite structure rachetée ou liquidée trois ans après l'installation est un risque opérationnel. Privilégier les éditeurs établis, ou ceux qui s'appuient sur des standards ouverts.</p>
+  </div>
+
+  <h2>Piège n°7 — Supervision isolée plutôt qu'intégrée à une hypervision</h2>
+
+  <p>La supervision GTB d'un bâtiment est utile pour ce bâtiment. <strong>L'hypervision</strong> est la couche au-dessus, qui consolide les données de tous les bâtiments d'un parc immobilier dans une vue unique : tableaux de bord agrégés, comparaisons inter-sites, alertes consolidées, reporting réglementaire centralisé.</p>
+
+  <p>Pour un asset manager ou un property manager qui gère plus d'un site, <strong>disposer d'une hypervision change la nature de l'exploitation</strong> : on ne pilote plus bâtiment par bâtiment, on pilote un parc.</p>
+
+  <p>Avant de retenir une supervision GTB pour un bâtiment, posez la question de l'hypervision :</p>
+  <ul>
+    <li>La supervision proposée par l'intégrateur est-elle <strong>compatible</strong> avec une hypervision tierce&nbsp;?</li>
+    <li>Quels protocoles d'échange supporte-t-elle pour exposer ses données à une couche supérieure&nbsp;?</li>
+    <li>Si vous gérez un parc immobilier, le choix d'une supervision incompatible avec votre hypervision crée des silos qui seront coûteux à briser plus tard.</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-label">Le bon réflexe pour un parc immobilier</div>
+    <p>Choisir d'abord l'hypervision qui consolidera votre parc dans la durée, puis sélectionner pour chaque bâtiment des supervisions GTB compatibles avec elle. L'ordre inverse — supervisions par bâtiment d'abord, hypervision après — multiplie par trois ou quatre le coût d'intégration final.</p>
+    <p>Buildy propose <strong>Hyperveez</strong> comme couche d'hypervision pour les parcs immobiliers multi-sites — d'autres éditeurs occupent ce marché, le critère essentiel est la compatibilité avec les supervisions de chaque bâtiment.</p>
+  </div>
+
+  <h2>Ce que ce chapitre vous apporte</h2>
+  <ul>
+    <li>Pourquoi exiger qu'une classe ISO 52120 soit atteinte n'est pas une obligation réglementaire, et comment repérer cette confusion lorsqu'elle vous est présentée comme telle.</li>
+    <li>Quels signaux concrets permettent de juger, avant de retenir un auditeur, si son rapport suivra la méthode décrite dans ce livre blanc ou s'il se contentera de survoler le décret.</li>
+    <li>Pourquoi le statut de l'auditeur (BET généraliste ou intégrateur GTB) compte moins que sa capacité à assumer la responsabilité de ses préconisations et leur faisabilité réelle.</li>
+    <li>Pourquoi le calcul du TRI d'exemption (R175-2 et R175-6) doit être produit par le propriétaire lui-même, selon la méthode officielle du ministère, et non délégué à l'auditeur.</li>
+    <li>Comment distinguer une fourniture de matériel d'une solution clé en main, et quelles prestations annexes doivent être explicitement chiffrées dans le devis d'intégration.</li>
+    <li>Quels critères appliquer à la solution logicielle de supervision : simplicité d'usage, accès distant, ouverture des données, pérennité de l'éditeur.</li>
+    <li>Pourquoi penser hypervision dès le départ quand vous gérez plus d'un bâtiment, et pourquoi l'ordre inverse coûte trois à quatre fois plus cher.</li>
+  </ul>
+
+  <p><em>Un audit rigoureux peut être ruiné par sept erreurs en aval. Les connaître, c'est s'épargner les surcoûts qu'elles entraînent — surdimensionnement injustifié, rapport non opposable, préconisations irréalisables, TRI d'exemption indéfendable, intégration incomplète, supervision impraticable, isolement par rapport au parc immobilier.</em></p>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="beddd1d0cadfddcafedccbd7d2dac790d8cc">[email&#160;protected]</a></span><span class="num">57</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- CONCLUSION                                       -->
+<!-- =============================================== -->
+<section class="page" id="conclusion">
+  <div class="page-header"><span class="head-chap">Conclusion</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow"><span class="chip-num">FIN</span> Conclusion</div>
+  <h1 class="chapter-title">Récapitulatif de ce que vous venez de parcourir</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Vous tenez maintenant la méthode complète. Pour mesurer ce qu'elle représente, voici, sans commentaire, l'inventaire de ce qui a été parcouru chapitre par chapitre.</p>
+
+  <ul>
+    <li><strong>10 étapes</strong> de validation à mener dans l'ordre.</li>
+    <li><strong>6 catégories</strong> de systèmes techniques à inventorier par zone.</li>
+    <li>Une matrice de comptage à compléter sur <strong>6 usages</strong> réglementaires multipliés par autant de zones que le bâtiment en compte.</li>
+    <li>Pour chaque équipement, plusieurs dimensions à qualifier : identification, caractéristiques techniques, connectivité, conformité au décret. Sur un siège social de 30 000 m², ce travail concerne <strong>plus d'une centaine d'équipements</strong>.</li>
+    <li>Une analyse de régulation thermique sur <strong>3 niveaux</strong> (production, distribution, émission), zone par zone, quand le R175-6 s'applique.</li>
+    <li><strong>8 sujets</strong> à examiner sur la supervision existante, du suivi continu à la formation de l'exploitant.</li>
+    <li><strong>10 pièces documentaires</strong> à collecter et à classer.</li>
+    <li>Une <strong>logique de hiérarchisation</strong> des actions correctives à appliquer (3 sévérités, 5 statuts de traitement, traçabilité jusqu'à l'observation source).</li>
+    <li><strong>8 lignes</strong> au tableau de bord R175 final.</li>
+    <li><strong>4 annexes obligatoires</strong> dans le rapport livré.</li>
+    <li><strong>10 ans</strong> de conservation légale du rapport.</li>
+  </ul>
+
+  <div class="quote-pull">
+    <p><em>Si vous gérez un seul bâtiment et que vous avez le temps : faites-le. Vous avez maintenant la méthode.</em></p>
+    <p><em>Si vous gérez plusieurs bâtiments ou que vous voulez aller vite : appelez-nous.</em></p>
+    <p>Les deux choix sont légitimes. C'est pour cela que ce livre blanc existe.</p>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c4a7abaab0a5a7b084a6b1ada8a0bdeaa2b6">[email&#160;protected]</a></span><span class="num">57</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- PIVOT — Tarif                                    -->
+<!-- =============================================== -->
+<section class="pivot">
+  <div class="pivot-eyebrow">Vous préférez nous laisser faire ?</div>
+
+  <h2>Buildy réalise vos audits BACS.</h2>
+
+  <p>Notre méthode s'applique à tous types de bâtiments tertiaires assujettis au décret R175 — commerces de centre-ville, plateaux de bureaux, sièges sociaux, cellules logistiques, établissements d'enseignement et de formation.</p>
+
+  <p>Le rapport livré suit strictement la structure présentée dans ce livre blanc : tableau de bord R175, plan d'action hiérarchisé, et les quatre annexes obligatoires (texte du décret, méthodologie, justification des préconisations, mentions légales).</p>
+
+  <div class="price-block">
+    <div class="price-label">Tarif forfaitaire</div>
+    <p class="price">4 000 — 5 000 € HT</p>
+    <p class="price-sub">par bâtiment, <strong>frais de déplacement inclus</strong> (généralement deux visites sur site). Le prix qui permet de produire un audit de qualité, opposable face à un contrôle, et exploitable directement par les intégrateurs.</p>
+  </div>
+
+  <div class="cta-block">
+    <span class="cta-label">Pour demander un devis ou poser une question</span>
+    <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>
+    <a href="https://www.buildy.fr">www.buildy.fr</a>
+  </div>
+</section>
+
+<!-- =============================================== -->
+<!-- 4ème de couverture                               -->
+<!-- =============================================== -->
+<section class="back">
+  <div class="wordmark-top">
+    <img src="assets/logo-buildy-white.png" alt="Buildy">
+  </div>
+
+  <div class="back-center">
+    <h3>Une question sur ce livre blanc&nbsp;?</h3>
+    <p class="contact">Écrivez-moi : <a href="mailto:contact@buildy.fr">contact@buildy.fr</a></p>
+    <p class="contact"><a href="https://www.buildy.fr">www.buildy.fr</a></p>
+
+    <div class="signature">
+      <div class="rule"></div>
+      <div class="name">Kévin BROCARD</div>
+      <div class="role">Fondateur, Buildy</div>
+    </div>
+  </div>
+
+  <div class="back-foot">
+    Livre blanc édité par Buildy. Version 1.0 — mai 2026. Le contenu de ce document est conforme à l'état du décret R175 du Code de la construction et de l'habitation à la date de publication. Toute évolution réglementaire ultérieure peut en modifier la portée. Ce document ne constitue pas un rapport d'audit ni un avis juridique opposable — il décrit la méthode utilisée par Buildy pour réaliser ses prestations d'audit. La reproduction partielle ou totale est libre à condition de mentionner la source.
+  </div>
+</section>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body>
+</html>

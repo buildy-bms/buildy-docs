@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Audit BACS — la checklist en 1 page · Buildy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1b2842;
+    --navy-dark:#0f1a2e;
+    --gray-900:#111827;
+    --gray-700:#374151;
+    --gray-600:#4b5563;
+    --gray-400:#9ca3af;
+    --gray-300:#d1d5db;
+    --gray-200:#e5e7eb;
+    --gray-100:#f3f4f6;
+    --gray-50:#fafafa;
+    --white:#ffffff;
+    --mint-500:#00cd92;
+    --mint-600:#00a578;
+    --mint-700:#007a59;
+    --warn:#b45309;
+  }
+
+  @page{ size:A4; margin:0; }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--gray-300);
+    font-family:'Manrope',sans-serif;
+    color:var(--gray-900);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* Mode export Puppeteer */
+  body.puppeteer-export #export-btn{ display:none !important; }
+
+  /* Bouton flottant (ecran uniquement) */
+  #export-btn{
+    position:fixed; top:16px; right:16px; z-index:9999;
+    background:var(--mint-500); color:var(--navy-dark);
+    border:0; border-radius:10px;
+    padding:10px 16px; font:600 13px/1 'Manrope',sans-serif;
+    box-shadow:0 6px 20px rgba(15,26,46,.25);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  #export-btn:hover{ background:var(--mint-600); color:var(--white); }
+  @media print{ #export-btn{ display:none !important; } }
+
+  @media print{
+    html,body{ background:var(--white); }
+    .page, .pivot, .back{ margin:0 !important; box-shadow:none !important; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  }
+
+  .page{
+    position:relative;
+    background:var(--white);
+    width:210mm;
+    height:297mm;
+    margin:14mm auto;
+    padding:0;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* === Header band === */
+  .head{
+    background:var(--navy);
+    color:var(--white);
+    padding:14mm 18mm 12mm 18mm;
+    flex:0 0 auto;
+  }
+  .head-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14mm;
+    margin:0 0 12px 0;
+  }
+  .head-logo{
+    height:28px;
+    width:auto;
+    flex:0 0 auto;
+    opacity:0.95;
+  }
+  .head-eyebrow{
+    font-size:9pt;
+    font-weight:600;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.55);
+    margin:0;
+  }
+  .head-eyebrow .accent{ color:#2fe0a7; }
+  .head h1{
+    font-family:'Poppins',sans-serif;
+    font-size:30px;
+    line-height:1.1;
+    font-weight:700;
+    letter-spacing:-0.02em;
+    margin:0 0 4px 0;
+  }
+  .head h1 .y{ color:var(--mint-500); }
+  .head .sub{
+    font-size:11pt;
+    font-weight:400;
+    line-height:1.45;
+    color:rgba(255,255,255,0.78);
+    margin:8px 0 0 0;
+    max-width:160mm;
+  }
+
+  /* === Body === */
+  .body{
+    padding:8mm 18mm 0 18mm;
+    flex:1 1 auto;
+    overflow:hidden;
+  }
+
+  .section{ margin-bottom:3.5mm; break-inside:avoid; }
+  .section-title{
+    font-family:'Poppins',sans-serif;
+    font-size:12pt;
+    line-height:1.2;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:-0.01em;
+    margin:0 0 2.5mm 0;
+    display:flex; align-items:center; gap:9px;
+  }
+  .section-num{
+    display:inline-flex;
+    align-items:center; justify-content:center;
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--navy);
+    color:var(--white);
+    font-family:'Poppins',sans-serif;
+    font-size:9.5pt;
+    font-weight:700;
+    flex:0 0 auto;
+  }
+  .section-num.mint{ background:var(--mint-500); color:var(--navy-dark); }
+
+  .check-list{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  .check-list li{
+    position:relative;
+    padding:0 0 0 19px;
+    margin:0 0 3.5px 0;
+    font-size:9.5pt;
+    line-height:1.4;
+    color:var(--gray-900);
+  }
+  .check-list li::before{
+    content:"";
+    position:absolute;
+    left:0;
+    top:3px;
+    width:11px; height:11px;
+    border:1.5px solid var(--navy);
+    border-radius:3px;
+    background:var(--white);
+  }
+  .check-list li strong{
+    font-weight:700;
+    color:var(--navy);
+  }
+  .check-list li .badge{
+    display:inline-block;
+    font-size:7.5pt;
+    font-weight:700;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding:1px 6px;
+    border-radius:3px;
+    margin-left:5px;
+    background:var(--gray-100);
+    color:var(--navy);
+  }
+  .check-list li .badge.warn{
+    background:#fef3c7;
+    color:var(--warn);
+  }
+  .check-list li .badge.ok{
+    background:rgba(0,205,146,0.15);
+    color:var(--mint-700);
+  }
+
+  /* === Footer CTA === */
+  .foot{
+    background:var(--navy);
+    color:var(--white);
+    padding:8mm 18mm;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12mm;
+  }
+  .foot-left{
+    font-family:'Poppins',sans-serif;
+    font-size:11pt;
+    line-height:1.35;
+    font-weight:500;
+    color:rgba(255,255,255,0.85);
+  }
+  .foot-left .big{
+    font-family:'Poppins',sans-serif;
+    font-size:14pt;
+    font-weight:800;
+    color:var(--white);
+    letter-spacing:-0.01em;
+  }
+  .foot-left .big .y{ color:#2fe0a7; }
+  .foot-right{
+    text-align:right;
+    font-size:10pt;
+    line-height:1.45;
+    font-weight:500;
+    color:rgba(255,255,255,0.85);
+  }
+  .foot-right .url{
+    font-family:'Poppins',sans-serif;
+    font-size:13pt;
+    font-weight:700;
+    color:var(--white);
+    letter-spacing:-0.01em;
+  }
+  .foot-right .url .y{ color:#2fe0a7; }
+  .foot-right > div > .y{ color:#2fe0a7; }
+  .foot-right .price{
+    font-size:9.5pt;
+    color:rgba(255,255,255,0.7);
+    margin-top:2px;
+  }
+
+  /* ============================================================ */
+  /* Pages annexes — portees du livre blanc (logos + pivot + 4e)   */
+  /* ============================================================ */
+  .wp-page{
+    position:relative;
+    background:var(--white);
+    width:210mm;
+    height:297mm;
+    margin:14mm auto;
+    padding:25mm 18mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    page-break-after:always;
+    break-after:page;
+    overflow:hidden;
+    display:block;
+    color:var(--gray-900);
+  }
+  .wp-page::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:url('assets/logo-mark.png');
+    background-repeat:no-repeat; background-position:center;
+    background-size:130mm auto;
+    opacity:0.035; pointer-events:none; z-index:0;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .wp-page > *{ position:relative; z-index:1; }
+  .wp-page .page-header{
+    position:absolute; top:14mm; left:18mm; right:18mm;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Manrope',sans-serif; font-size:9pt; font-weight:600;
+    line-height:1.4; text-transform:uppercase; letter-spacing:0.18em;
+    color:var(--gray-600); border-bottom:1px solid var(--gray-300); padding-bottom:4mm;
+  }
+  .wp-page .page-header .head-mark{ height:18px; width:auto; opacity:0.85; }
+  .wp-page .page-foot{
+    position:absolute; left:18mm; right:18mm; bottom:14mm;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Manrope',sans-serif; font-size:9pt; font-weight:600;
+    line-height:1.4; text-transform:uppercase; letter-spacing:0.18em;
+    color:var(--gray-600); border-top:1px solid var(--gray-300); padding-top:4mm;
+  }
+  .wp-page .page-foot .chap{ text-transform:lowercase; letter-spacing:0.04em; }
+  .chap-eyebrow{
+    font-size:10pt; font-weight:600; letter-spacing:0.22em;
+    text-transform:uppercase; color:var(--gray-600); margin-bottom:18px;
+  }
+  h1.chapter-title{
+    font-family:'Poppins',sans-serif; font-size:36px; line-height:1.08;
+    font-weight:700; color:var(--navy); margin:0 0 4px 0; letter-spacing:-0.025em;
+  }
+  .chap-rule{ width:60mm; height:2px; background:var(--navy); margin:18px 0 28px 0; }
+  .chap-intro{
+    font-size:13.5pt; line-height:1.5; color:var(--gray-900);
+    max-width:170mm; font-weight:400;
+  }
+  .logos-grid{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin-top:7mm;
+  }
+  .logo-cell{
+    height:33mm; background:var(--white); border:1px solid var(--gray-300);
+    border-radius:9px; display:flex; align-items:center; justify-content:center; padding:5mm;
+  }
+  .logo-cell img{
+    max-width:40mm; max-height:16mm; width:auto; height:auto; object-fit:contain;
+  }
+  .logo-cell.lw img{ max-width:46mm; max-height:11mm; }
+  .logo-cell.lc img{ max-width:27mm; max-height:21mm; }
+
+  /* === Pivot === */
+  .pivot{
+    background:var(--navy); color:var(--white);
+    width:210mm; height:297mm; margin:14mm auto; padding:30mm 28mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    position:relative; display:flex; flex-direction:column;
+    page-break-after:always; break-after:page; overflow:hidden;
+  }
+  .pivot-eyebrow{
+    font-size:10pt; font-weight:600; letter-spacing:0.22em;
+    text-transform:uppercase; color:rgba(255,255,255,0.55); margin-bottom:7mm;
+  }
+  .pivot h2{
+    font-family:'Poppins',sans-serif; color:var(--white);
+    font-size:32pt; line-height:1.1; letter-spacing:-0.025em;
+    font-weight:700; margin:0 0 14px 0; max-width:170mm;
+  }
+  .pivot p{
+    color:rgba(255,255,255,0.86); font-size:12.5pt; line-height:1.5;
+    max-width:160mm; margin-bottom:9px;
+  }
+  .pivot-steps{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:7mm; margin:4px 0 2px 0;
+  }
+  .pivot-step{ border-top:2px solid var(--mint-500); padding-top:9px; }
+  .pivot-step .step-num{
+    font-family:'Poppins',sans-serif; font-size:12pt; font-weight:800;
+    color:var(--mint-500); line-height:1;
+  }
+  .pivot-step .step-txt{
+    margin-top:6px; font-size:10pt; line-height:1.4; color:rgba(255,255,255,0.82);
+  }
+  .pivot-step .step-txt strong{
+    color:#fff; font-weight:600; display:block; margin-bottom:2px; font-size:10.5pt;
+  }
+  .pivot .price-block{
+    margin:14px 0; padding-top:13px; border-top:1px solid rgba(255,255,255,0.18);
+  }
+  .pivot .price-label{
+    font-size:10pt; font-weight:600; letter-spacing:0.22em;
+    text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:14px;
+  }
+  .pivot .price{
+    font-family:'Poppins',sans-serif; font-size:37pt; font-weight:800;
+    line-height:1.05; letter-spacing:-0.035em; color:var(--white); margin:0;
+  }
+  .pivot .price-sub strong{ color:#ffffff; font-weight:600; }
+  .pivot .price-sub{
+    color:rgba(255,255,255,0.78); font-size:11pt; margin-top:8px; letter-spacing:0.02em;
+  }
+  .pivot .cta-block{
+    margin-top:auto; padding-top:18px; border-top:1px solid rgba(255,255,255,0.18);
+  }
+  .pivot .cta-block a{
+    color:var(--white); text-decoration:underline; text-underline-offset:4px;
+    font-size:14pt; display:inline-block; margin-right:24px;
+  }
+  .pivot .cta-block .cta-label{
+    display:block; font-size:9.5pt; letter-spacing:0.2em;
+    text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:10px;
+  }
+
+  /* === 4e de couverture === */
+  .back{
+    background:var(--navy); color:var(--white);
+    width:210mm; height:297mm; margin:14mm auto; padding:30mm 28mm;
+    box-shadow:0 8px 30px rgba(15,26,46,0.18);
+    position:relative; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    page-break-after:auto; overflow:hidden;
+  }
+  .back .wordmark-top{
+    position:absolute; top:30mm; left:0; right:0; text-align:center;
+  }
+  .back .wordmark-top img{
+    height:52px; width:auto; max-width:180px; display:inline-block; object-fit:contain;
+  }
+  .back-center h3{
+    font-family:'Poppins',sans-serif; color:var(--white);
+    font-size:20pt; font-weight:600; margin:0 0 28px 0; letter-spacing:-0.02em;
+  }
+  .back-center .contact{
+    font-size:13pt; margin:0 0 10px 0; color:rgba(255,255,255,0.92);
+  }
+  .back-center .contact a{ color:var(--white); }
+  .back-center .signature{ margin-top:40px; color:rgba(255,255,255,0.92); }
+  .back-center .signature .rule{
+    width:24mm; height:1px; background:rgba(255,255,255,0.35); margin:0 auto 24px auto;
+  }
+  .back-center .signature .name{
+    font-size:14pt; font-weight:600; letter-spacing:0.04em;
+  }
+  .back-center .signature .role{
+    font-size:11pt; color:rgba(255,255,255,0.65); margin-top:4px; font-style:italic;
+  }
+  .back-foot{
+    position:absolute; left:28mm; right:28mm; bottom:18mm;
+    font-size:8pt; line-height:1.45; color:var(--gray-300);
+    opacity:0.6; text-align:center;
+  }
+</style>
+</head>
+<body>
+<button id="export-btn" type="button" onclick="window.print()" aria-label="Enregistrer en PDF">Enregistrer en PDF</button>
+
+<section class="page">
+  <div class="head">
+    <div class="head-top">
+      <p class="head-eyebrow">Méthode d'audit <span class="accent">·</span> Décret BACS R175</p>
+      <img class="head-logo" src="assets/logo-buildy-blanc.png" alt="Buildy">
+    </div>
+    <h1>Audit BACS — la checklist en 1 page</h1>
+    <p class="sub">Les questions à se poser avant d'engager un audit BACS et les critères pour repérer un audit sérieux d'un audit complaisant. Extrait condensé du livre blanc Build<span style="color:#2fe0a7">y</span>.</p>
+  </div>
+
+  <div class="body">
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-num">1</span> Suis-je concerné par le décret&nbsp;?</h2>
+      <ul class="check-list">
+        <li><strong>Puissance CVC &gt; 290&nbsp;kW</strong> — assujetti depuis le 1ᵉʳ janvier 2025. <span class="badge warn">en retard si non engagé</span></li>
+        <li><strong>Puissance CVC entre 70 et 290&nbsp;kW</strong> — échéance au 1ᵉʳ janvier 2027. <span class="badge">à planifier</span></li>
+        <li><strong>Puissance CVC &lt; 70&nbsp;kW</strong> — bâtiment non assujetti. <span class="badge ok">hors décret</span></li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-num">2</span> Six critères pour juger une offre d'audit</h2>
+      <ul class="check-list">
+        <li>La proposition ou l'auditeur me parle-t-il d'une classe ISO 52120-1 (ex&nbsp;: classe C) comme minimum obligatoire&nbsp;? <span class="badge warn">Si oui, mauvais signe</span> Le décret BACS n'impose aucune classe de performance.</li>
+        <li>L'auditeur prévoit-il de calculer le TRI d'exemption à ma place&nbsp;? <span class="badge warn">Mauvais signe</span> Ce calcul relève de la responsabilité du propriétaire (R175-2 et R175-6).</li>
+        <li>L'auditeur prévoit-il de travailler à distance, sans visite physique complète et sans relevé sur place&nbsp;? <span class="badge warn">Si oui, mauvais signe</span> Sans relevé sur site, l'audit se résume au déclaratif de l'exploitant et passe à côté des écarts entre plans et réalité.</li>
+        <li>L'audit prévoit-il un inventaire équipement par équipement, et non un échantillon&nbsp;? <span class="badge ok">Bon signe</span> Un audit sur échantillon laisse des zones d'ombre invisibles dans le rapport final.</li>
+        <li>Le rapport justifie-t-il chaque préconisation au regard des exigences précises du décret R175&nbsp;? <span class="badge ok">Bon signe</span> Sans cette traçabilité exigence&nbsp;↔&nbsp;action, le rapport n'est pas défendable face à un contrôle.</li>
+        <li>Le plan de mise en conformité est-il directement exploitable par un intégrateur GTB&nbsp;? <span class="badge ok">Bon signe</span> Une consultation cohérente et comparable, action par action.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-num">3</span> Ce qu'un audit BACS sérieux livre</h2>
+      <ul class="check-list">
+        <li><strong>Inventaire complet</strong> des zones fonctionnelles, systèmes techniques et équipements, qualifiés sur l'interopérabilité, l'arrêt manuel et le fonctionnement autonome.</li>
+        <li><strong>Plan d'action hiérarchisé</strong> par sévérité (bloquant / majeur / mineur), traçable jusqu'à l'observation source de chaque action.</li>
+        <li><strong>Tableau de bord visuel</strong> qui note, pour chaque exigence du décret (suivi continu, interopérabilité, régulation thermique, formation de l'exploitant…), un verdict <em>conforme / partiel / non conforme</em> — votre statut R175 en un coup d'œil.</li>
+        <li><strong>Plan détaillé de mise en conformité</strong> pour une consultation simplifiée et cohérente des intégrateurs GTB, dont Buildy.</li>
+        <li><strong>Quatre annexes recommandées</strong> — texte du décret, méthodologie, justification des préconisations, mentions légales — et conservation 10 ans du rapport.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <div class="foot-left">
+      <div class="big">La méthode complète, en 60 pages.</div>
+      <div>Téléchargez le livre blanc Build<span class="y">y</span> gratuitement.</div>
+    </div>
+    <div class="foot-right">
+      <div class="url">build<span class="y">y</span>.fr</div>
+      <div>contact@build<span class="y">y</span>.fr</div>
+      <div class="price">Audit forfaitaire par bâtiment</div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================== -->
+<!-- RÉFÉRENCES — Logos clients                       -->
+<!-- =============================================== -->
+<section class="page wp-page">
+  <div class="page-header"><span class="head-chap">Références — Ils nous font confiance</span><img src="assets/logo-mark.png" class="head-mark" alt=""></div>
+  <div class="chap-eyebrow">Références</div>
+  <h1 class="chapter-title">Ils nous font confiance</h1>
+  <div class="chap-rule"></div>
+
+  <p class="chap-intro">Des propriétaires, gestionnaires de parc et acteurs de l'immobilier tertiaire travaillent déjà avec Buildy — pour leurs audits BACS comme pour le déploiement et l'exploitation de notre solution de supervision.</p>
+
+  <div class="logos-grid">
+    <div class="logo-cell lw"><img src="assets/logos/logo-cbre.png" alt="CBRE"></div>
+    <div class="logo-cell lw"><img src="assets/logos/logo-eiffage.png" alt="Eiffage"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-spie.png" alt="SPIE"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-vinted.png" alt="Vinted"></div>
+    <div class="logo-cell lc"><img src="assets/logos/logo-id-logistics-1.png" alt="ID Logistics"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-gse.png" alt="GSE"></div>
+    <div class="logo-cell lw"><img src="assets/logos/logo-ceva.png" alt="Ceva Logistics"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-itron.png" alt="Itron"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-rexel.png" alt="Rexel"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-dimo.png" alt="Dimo"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-cpmo.png" alt="CPMO"></div>
+    <div class="logo-cell"><img src="assets/logos/logo-roiret.png" alt="Roiret"></div>
+    <div class="logo-cell lw"><img src="assets/logos/logo-demouselle.png" alt="Demouselle"></div>
+    <div class="logo-cell lc"><img src="assets/logos/logo-virtuo.png" alt="Virtuo"></div>
+    <div class="logo-cell lc"><img src="assets/logos/logo-jmg-partners.png" alt="JMG Partners"></div>
+  </div>
+
+  <div class="page-foot"><span class="chap">buildy.fr · contact@buildy.fr</span><span class="num">—</span></div>
+</section>
+
+<!-- =============================================== -->
+<!-- PIVOT — Tarif                                    -->
+<!-- =============================================== -->
+<section class="pivot">
+  <div class="pivot-eyebrow">Vous préférez nous laisser faire ?</div>
+
+  <h2>Buildy réalise vos audits BACS.</h2>
+
+  <p>Notre méthode s'applique à tous types de bâtiments tertiaires assujettis au décret R175 — commerces, plateaux de bureaux, sièges sociaux, cellules logistiques, établissements d'enseignement. Éditeur, intégrateur et mainteneur de notre propre solution de supervision, nous connaissons le décret BACS des deux côtés : l'audit et la mise en conformité.</p>
+
+  <p>Le rapport livré suit la méthode détaillée dans notre livre blanc, jusqu'aux quatre annexes recommandées (texte du décret, méthodologie, justifications, mentions légales).</p>
+
+  <div class="pivot-steps">
+    <div class="pivot-step"><div class="step-num">1</div><div class="step-txt"><strong>Échange</strong>On cadre votre besoin et votre bâtiment en quelques minutes.</div></div>
+    <div class="pivot-step"><div class="step-num">2</div><div class="step-txt"><strong>Deux visites</strong>Relevé exhaustif sur site, puis validation.</div></div>
+    <div class="pivot-step"><div class="step-num">3</div><div class="step-txt"><strong>Rapport + plan</strong>Livrés en quelques semaines.</div></div>
+  </div>
+
+  <div class="price-block">
+    <div class="price-label">Tarif forfaitaire</div>
+    <p class="price">à partir de 2 500 € HT</p>
+    <p class="price-sub">par bâtiment, <strong>frais de déplacement inclus</strong>. Devis dédié selon la taille et la complexité du bâtiment.</p>
+  </div>
+
+  <div class="cta-block">
+    <span class="cta-label">Pour demander un devis ou poser une question</span>
+    <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>
+    <a href="tel:+33428390334">04 28 39 03 34</a>
+    <a href="https://www.linkedin.com/in/kevin-brocard/">Buildy sur LinkedIn</a>
+  </div>
+</section>
+
+<!-- =============================================== -->
+<!-- 4ème de couverture                               -->
+<!-- =============================================== -->
+<section class="back">
+  <div class="wordmark-top">
+    <img src="assets/logo-buildy-white.png" alt="Buildy">
+  </div>
+
+  <div class="back-center">
+    <h3>Une question, un audit BACS à programmer&nbsp;?</h3>
+    <p class="contact">Écrivez-nous : <a href="mailto:contact@buildy.fr">contact@buildy.fr</a></p>
+    <p class="contact">Tél. 04 28 39 03 34</p>
+    <p class="contact"><a href="https://www.linkedin.com/in/kevin-brocard/">Buildy sur LinkedIn</a> &nbsp;·&nbsp; <a href="https://www.buildy.fr">www.buildy.fr</a></p>
+
+    <div class="signature">
+      <div class="rule"></div>
+      <div class="name">Buildy</div>
+      <div class="role" style="max-width:135mm;margin:4px auto 0;">Éditeur, intégrateur et mainteneur de solutions de supervision pour le bâtiment tertiaire</div>
+    </div>
+  </div>
+
+  <div class="back-foot">
+    Document édité par Buildy. Version 1.0 — mai 2026. Le contenu de ce document est conforme à l'état du décret R175 du Code de la construction et de l'habitation à la date de publication. Toute évolution réglementaire ultérieure peut en modifier la portée. Ce document ne constitue pas un rapport d'audit ni un avis juridique opposable — il décrit la méthode utilisée par Buildy pour réaliser ses prestations d'audit. La reproduction partielle ou totale est libre à condition de mentionner la source.
+  </div>
+</section>
+
+</body>
+</html>
