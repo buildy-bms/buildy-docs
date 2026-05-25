@@ -178,6 +178,102 @@ const ENERGY_HISTORY_DEFAULT_UNIT = {
   other: 'kWh',
 };
 
+// Recommandation sur un compteur — synchro RECOMMENDATIONS (_shared.js +
+// CHECK DB bacs_audit_meters.recommendation).
+const METER_RECOMMENDATION_LABEL = {
+  to_add: 'À ajouter',
+  to_replace: 'À remplacer',
+  to_connect: 'À raccorder à la GTB',
+  compliant: 'Conforme',
+};
+
+// Methode de calcul de puissance R175-2 — synchro POWER_CALC_TYPES côté
+// lib/bacs-audit-power.js et REFERENCE_DATA.power_calculation_types côté MCP.
+const POWER_CALC_TYPE_LABEL = {
+  thermodynamic_max: 'Thermodynamique (max chaud/froid)',
+  boiler_sum: 'Chaudière (somme des puissances)',
+  joule_sum: 'Effet Joule (somme des puissances)',
+  district_heating_substation: 'Sous-station réseau de chaleur',
+  out_of_scope: 'Hors champ R175',
+};
+
+// Comptage individualisable d'un équipement — synchro METERING_SEPARABLE
+// côté MCP REFERENCE_DATA.
+const METERING_SEPARABLE_LABEL = {
+  yes: 'Sous-comptage propre',
+  partial: 'Partagé (clé de répartition)',
+  no: 'Pas de comptage individuel',
+};
+
+// Catégorie d'une action du plan de mise en conformité. Synchro avec :
+//   - bacs_audit_action_items.category (TEXT, pas de CHECK actuellement — à
+//     ajouter dans une session migration dédiée, cf. plan Bloc D différé).
+//   - Source de vérité métier dans lib/bacs-audit-action-generator.js.
+const ACTION_CATEGORY_LABEL = {
+  meter_addition: 'Ajout de compteur',
+  meter_replacement: 'Remplacement de compteur',
+  meter_connection: 'Raccordement de compteur à la GTB',
+  system_addition: 'Ajout d\'équipement',
+  system_replacement: 'Remplacement d\'équipement',
+  communication_upgrade: 'Mise à niveau communication',
+  bms_upgrade: 'Mise à niveau GTB',
+  bms_replacement: 'Remplacement GTB',
+  bms_addition: 'Installation GTB',
+  data_retention_upgrade: 'Conservation 5 ans des données',
+  training: 'Formation exploitant',
+  documentation: 'Documentation / consignes écrites',
+  thermal_regulation: 'Régulation thermique R175-6',
+  thermal_regulation_upgrade: 'Mise à niveau régulation thermique',
+  other: 'Autre',
+};
+
+// Sévérités du plan d'action — synchro avec
+// bacs_audit_action_items.severity CHECK ('blocking','major','minor').
+const ACTION_SEVERITY_LABEL = {
+  blocking: 'Bloquant',
+  major: 'Majeur',
+  minor: 'Mineur',
+};
+
+// Statuts du plan d'action — synchro avec bacs_audit_action_items.status
+// CHECK ('open','quoted','in_progress','done','declined').
+const ACTION_STATUS_LABEL = {
+  open: 'Ouvert',
+  quoted: 'Chiffré (devis envoyé)',
+  in_progress: 'En cours',
+  done: 'Terminé',
+  declined: 'Décliné',
+};
+
+// Effort estimé — synchro avec bacs_audit_action_items.estimated_effort
+// CHECK ('low','medium','high').
+const ACTION_EFFORT_LABEL = {
+  low: 'Faible',
+  medium: 'Modéré',
+  high: 'Important',
+};
+
+// Bouclage ECS (system_category = 'dhw'). Synchro avec
+// bacs_audit_systems.is_looped et le SegmentedToggle desktop.
+const IS_LOOPED_LABEL = {
+  looped: 'ECS bouclée',
+  not_looped: 'ECS non bouclée',
+  unknown: 'ECS — à qualifier',
+};
+
+// Labels FR pour les ternaires métier des systèmes (questions R175-3).
+// Utile au PDF (badges) et aux descriptions MCP — évite que Claude présente
+// du `meets_r175_3_p4: 0` sans contexte. Clé null = libellé pour "non répondu".
+const SYSTEM_TERNARY_LABEL = {
+  meets_r175_3_p3: { true: 'Interopérabilité conforme', false: 'Non conforme R175-3 §3', null: 'À qualifier' },
+  meets_r175_3_p4: { true: 'Arrêt manuel conforme', false: 'Non conforme R175-3 §4', null: 'À qualifier' },
+  meets_r175_3_p4_autonomous: { true: 'Reprise autonome conforme', false: 'Non conforme', null: 'À qualifier' },
+  managed_by_bms: { true: 'Intégré à la GTB', false: 'Non intégré', null: 'À qualifier' },
+  marked_negligible_under_5pct: { true: 'Négligeable < 5 %', false: 'Non négligeable', null: 'À qualifier' },
+  is_district_heating_substation: { true: 'Sous-station réseau de chaleur', false: 'Pas une sous-station', null: 'À qualifier' },
+  serves_multiple_buildings: { true: 'Dessert plusieurs bâtiments', false: 'Bâtiment unique', null: 'À qualifier' },
+};
+
 module.exports = {
   SYSTEM_LABEL,
   SYSTEM_NEGATIVE_LABEL,
@@ -196,4 +292,13 @@ module.exports = {
   PARTY_KIND_LABEL,
   ENERGY_HISTORY_TYPE_LABEL,
   ENERGY_HISTORY_DEFAULT_UNIT,
+  METER_RECOMMENDATION_LABEL,
+  POWER_CALC_TYPE_LABEL,
+  METERING_SEPARABLE_LABEL,
+  ACTION_CATEGORY_LABEL,
+  ACTION_SEVERITY_LABEL,
+  ACTION_STATUS_LABEL,
+  ACTION_EFFORT_LABEL,
+  IS_LOOPED_LABEL,
+  SYSTEM_TERNARY_LABEL,
 };

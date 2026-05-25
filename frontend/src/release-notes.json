@@ -2,6 +2,37 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.98",
+      "date": "2026-05-25",
+      "title": "Audit BACS : ternaire `systems.present` accepté côté serveur + labels FR centralisés + script de vérification cohérence",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "PATCH système : accepte explicitement `present = null` (réinit via MCP)",
+          "what": "Le schéma Zod du PATCH `/bacs-audit/systems/:id` validait `present: z.boolean().optional()` et refusait `null`. Un appel MCP qui voulait remettre un usage à « pas répondu » (par exemple après une saisie erronée) recevait une 400. Maintenant `present: z.boolean().nullable().optional()` — un usage peut être remis explicitement à null pour figurer comme « non répondu » plutôt que « répondu non ».",
+          "where": "Backend `routes/bacs-audit.js` PATCH /bacs-audit/systems/:id."
+        },
+        {
+          "kind": "feature",
+          "title": "Labels FR centralisés dans `_labels.js` pour 8 enums supplémentaires",
+          "what": "Avant : les libellés FR de RECOMMENDATIONS, POWER_CALC_TYPES, METERING_SEPARABLE, ACTION_CATEGORIES (14 valeurs), ACTION_SEVERITY, ACTION_STATUS, ACTION_EFFORT, IS_LOOPED, SYSTEM_TERNARY étaient dispersés (en dur dans des composants Vue, dans `lib/bacs-audit-power.js`, ou inexistants — le PDF affichait alors des codes anglais). Maintenant tous centralisés dans `_labels.js` — source de vérité unique pour le PDF et l'UI.",
+          "where": "Backend `routes/bacs-audit/_labels.js`."
+        },
+        {
+          "kind": "perf",
+          "title": "PWA MobileYesNo : prop `allowPartial` pour ternaire métier",
+          "what": "Le composant tactile Oui/Non gagne un 3e bouton « Partiel » optionnel (prop `allowPartial`) qui émet `null` explicitement. Prêt pour les champs ternaires métier où l'absence de réponse a une sémantique distincte du « Non » (couleur ambre, à 44px tactile).",
+          "where": "Frontend `components/mobile-audit/MobileYesNo.vue`."
+        },
+        {
+          "kind": "feature",
+          "title": "Script de vérification cohérence PDF ↔ MCP",
+          "what": "Nouveau script `scripts/verify-audit-coherence.mjs` qui compare chiffre à chiffre les agrégations exposées par le PDF (recapStats) et celles que le MCP `audit_get_summary` produirait pour le même audit. À lancer avant chaque release qui touche aux calculs. Détecte les divergences sur devicesIntegrated, metersPresent, metersMissing, etc. Documenté dans CLAUDE.md.",
+          "where": "Scripts `scripts/verify-audit-coherence.mjs` + section `Source unique de vérité` dans CLAUDE.md."
+        }
+      ]
+    },
+    {
       "version": "0.1.97",
       "date": "2026-05-25",
       "title": "Audit BACS : chiffres cohérents entre PDF et synthèse MCP — un compteur HS n'est plus compté comme manquant",
