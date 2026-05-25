@@ -93,12 +93,17 @@ function devicePowerContribution(device) {
     // Une machine thermodynamique compte UNE fois, sur sa puissance la plus
     // élevée. On la rattache au poste correspondant (chaud OU froid).
     const cat = device.system_category;
-    if (COOL_CATEGORIES.has(cat) && !pHeat) {
-      return { heat: 0, cool: Math.max(pHeat, pCool), type, inScope: true };
+    // Catégorie FROID (split, DRV non réversible) : la puissance saisie
+    // (qu'elle soit en power_kw ou power_kw_cooling) est celle du poste
+    // FROID. Bug Communay 2026-05-25 : sans cette branche, un split avec
+    // power_kw=3 (pCool=0) en catégorie cooling était basculé en chaud par
+    // la règle pHeat>=pCool — résultat heat=21.7 cumulé à tort.
+    if (COOL_CATEGORIES.has(cat)) {
+      return { heat: 0, cool: pCool || pHeat, type, inScope: true };
     }
-    // Réversible / chauffage : la puissance dominante est portée par le poste
-    // chaud (cas le plus fréquent d'une PAC en chauffage). Si seule la
-    // frigorifique est saisie, elle bascule en froid.
+    // Réversible (cat heating/mixte) : la puissance dominante est portée
+    // par le poste chaud (cas le plus fréquent d'une PAC en chauffage).
+    // Si seule la frigorifique est saisie, elle bascule en froid.
     if (pHeat >= pCool) return { heat: pHeat, cool: 0, type, inScope: true };
     return { heat: 0, cool: pCool, type, inScope: true };
   }
