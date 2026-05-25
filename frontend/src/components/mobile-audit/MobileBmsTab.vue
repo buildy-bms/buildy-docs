@@ -38,6 +38,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MobileBmsTopicNoteButton from './MobileBmsTopicNoteButton.vue'
 import MobileYesNo from './MobileYesNo.vue'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const audit = useAuditStore()
 const { document, bms, devices, meters, systems, inspections, todayIso } = storeToRefs(audit)
@@ -274,23 +275,23 @@ const USAGES = [
             Les usages absents du bâtiment ne sont pas concernés.
           </p>
         </div>
-        <div class="p-2">
-          <label
+        <div class="p-2 space-y-1">
+          <button
             v-for="u in USAGES"
-            :key="u.key"
-            class="flex items-center justify-between gap-3 px-3 py-4 cursor-pointer rounded-xl active:bg-gray-50"
+            :key="u.key" type="button"
+            @click="bms[u.key] = bms[u.key] ? 0 : 1; saveDebounced()"
+            :class="['w-full flex items-center justify-between gap-3 px-3 py-4 rounded-xl border-2 transition active:scale-[0.99]',
+                     bms[u.key]
+                       ? 'border-[#00cd92] bg-emerald-50/60'
+                       : 'border-gray-200 bg-white']"
           >
             <div class="flex items-center gap-3 min-w-0">
               <SystemCategoryIcon :category="u.category" size="md" />
-              <span class="text-base text-gray-800 font-medium">{{ u.label }}</span>
+              <span :class="['text-base font-medium', bms[u.key] ? 'text-gray-800' : 'text-gray-400']">{{ u.label }}</span>
             </div>
-            <input
-              type="checkbox"
-              :checked="!!bms[u.key]"
-              @change="e => { bms[u.key] = e.target.checked ? 1 : 0; saveDebounced() }"
-              class="w-7 h-7 shrink-0"
-            />
-          </label>
+            <span v-if="bms[u.key]" class="text-[#00cd92] text-xl font-bold">✓</span>
+            <span v-else class="text-gray-300 text-xl font-bold">✗</span>
+          </button>
         </div>
       </div>
 
@@ -552,36 +553,18 @@ const USAGES = [
             </div>
             <p class="text-sm text-gray-500 mb-3">{{ SYSTEM_LABEL[d.system_category] || d.system_category }} · {{ d.zone_name }}</p>
             <div class="grid grid-cols-2 gap-2">
-              <label
-                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
-                         d.managed_by_bms ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200',
-                         d.out_of_service ? 'opacity-40' : '']"
-              >
-                <span class="text-base font-medium text-gray-800">Intégré</span>
-                <input
-                  type="checkbox"
-                  :checked="!!d.managed_by_bms"
-                  :disabled="d.out_of_service"
-                  @change="e => patchDeviceBms(d, { managed_by_bms: e.target.checked })"
-                  class="w-7 h-7 shrink-0"
-                />
-              </label>
-              <label
-                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
-                         (d.managed_by_bms && d.wired && !d.bms_integration_out_of_service)
-                           ? 'bg-emerald-50 border-emerald-300'
-                           : 'bg-white border-gray-200',
-                         (!d.managed_by_bms || !d.wired) ? 'opacity-40' : '']"
-              >
-                <span class="text-base font-medium text-gray-800">Opérationnel</span>
-                <input
-                  type="checkbox"
-                  :checked="d.managed_by_bms && d.wired && !d.bms_integration_out_of_service"
-                  :disabled="!d.managed_by_bms || !d.wired"
-                  @change="e => patchDeviceBms(d, { bms_integration_out_of_service: !e.target.checked })"
-                  class="w-7 h-7 shrink-0 accent-emerald-500"
-                />
-              </label>
+              <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
+                <span class="text-sm font-medium text-gray-800">Intégré ?</span>
+                <SegmentedToggle :model-value="!!d.managed_by_bms"
+                                 :disabled="!!d.out_of_service"
+                                 @update:model-value="v => patchDeviceBms(d, { managed_by_bms: v })" />
+              </div>
+              <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
+                <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
+                <SegmentedToggle :model-value="(!d.managed_by_bms || !d.wired) ? null : !d.bms_integration_out_of_service"
+                                 :disabled="!d.managed_by_bms || !d.wired"
+                                 @update:model-value="v => patchDeviceBms(d, { bms_integration_out_of_service: !v })" />
+              </div>
             </div>
           </div>
         </div>
@@ -613,36 +596,18 @@ const USAGES = [
               <span class="text-sm text-gray-500">{{ m.zone_name || 'général' }}</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
-              <label
-                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
-                         m.managed_by_bms ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200',
-                         (m.out_of_service || !m.communicating) ? 'opacity-40' : '']"
-              >
-                <span class="text-base font-medium text-gray-800">Intégré</span>
-                <input
-                  type="checkbox"
-                  :checked="!!m.managed_by_bms"
-                  :disabled="m.out_of_service || !m.communicating"
-                  @change="e => patchMeterBms(m, { managed_by_bms: e.target.checked })"
-                  class="w-7 h-7 shrink-0"
-                />
-              </label>
-              <label
-                :class="['flex items-center justify-between gap-2 px-4 py-4 rounded-xl cursor-pointer border-2 transition',
-                         (m.managed_by_bms && m.wired && !m.bms_integration_out_of_service)
-                           ? 'bg-emerald-50 border-emerald-300'
-                           : 'bg-white border-gray-200',
-                         (!m.managed_by_bms || !m.wired) ? 'opacity-40' : '']"
-              >
-                <span class="text-base font-medium text-gray-800">Opérationnel</span>
-                <input
-                  type="checkbox"
-                  :checked="m.managed_by_bms && m.wired && !m.bms_integration_out_of_service"
-                  :disabled="!m.managed_by_bms || !m.wired"
-                  @change="e => patchMeterBms(m, { bms_integration_out_of_service: !e.target.checked })"
-                  class="w-7 h-7 shrink-0 accent-emerald-500"
-                />
-              </label>
+              <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
+                <span class="text-sm font-medium text-gray-800">Intégré ?</span>
+                <SegmentedToggle :model-value="(m.out_of_service || !m.communicating) ? null : !!m.managed_by_bms"
+                                 :disabled="!!m.out_of_service || !m.communicating"
+                                 @update:model-value="v => patchMeterBms(m, { managed_by_bms: v })" />
+              </div>
+              <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
+                <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
+                <SegmentedToggle :model-value="(!m.managed_by_bms || !m.wired) ? null : !m.bms_integration_out_of_service"
+                                 :disabled="!m.managed_by_bms || !m.wired"
+                                 @update:model-value="v => patchMeterBms(m, { bms_integration_out_of_service: !v })" />
+              </div>
             </div>
           </div>
         </div>

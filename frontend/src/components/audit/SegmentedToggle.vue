@@ -16,6 +16,10 @@ defineProps({
       { value: false, label: 'Non', tone: 'slate' },
     ],
   },
+  // Si vrai, le toggle est non cliquable et grisé (utilisé quand la question
+  // dépend d'un prérequis pas encore rempli — ex. « Opérationnel ? » est
+  // disabled tant que « Intégré ? » n'est pas Oui).
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -27,12 +31,14 @@ const TONE = {
 </script>
 
 <template>
-  <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+  <div :class="['inline-flex rounded-lg border border-gray-200 overflow-hidden shrink-0',
+                disabled ? 'opacity-40 pointer-events-none' : '']">
     <button
       v-for="(opt, i) in options"
       :key="String(opt.value)"
       type="button"
-      @click="emit('update:modelValue', opt.value)"
+      :disabled="disabled"
+      @click="!disabled && emit('update:modelValue', opt.value)"
       :class="['h-7 px-3 text-xs font-medium transition whitespace-nowrap',
                i > 0 ? 'border-l border-gray-200' : '',
                modelValue === opt.value

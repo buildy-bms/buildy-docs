@@ -314,13 +314,11 @@ function hasNotes(html) {
             <p v-else class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               ⚠ Aucun document d'<strong>analyse fonctionnelle</strong> n'est disponible pour la GTB existante.
             </p>
-            <label class="inline-flex items-center gap-1.5 text-xs cursor-pointer mt-2 text-gray-600">
-              <input type="checkbox"
-                     :checked="document?.audit_existing_af_status === 'absent'"
-                     @change="e => emit('save-doc', { audit_existing_af_status: e.target.checked ? 'absent' : null })"
-                     class="rounded" />
-              Le document d'analyse fonctionnelle n'existe pas
-            </label>
+            <div class="flex items-center gap-3 mt-2">
+              <span class="text-xs text-gray-700">Le document d'analyse fonctionnelle n'existe pas</span>
+              <SegmentedToggle :model-value="document?.audit_existing_af_status === 'absent' ? true : (document?.audit_existing_af_status === null || document?.audit_existing_af_status === undefined ? null : false)"
+                               @update:model-value="v => emit('save-doc', { audit_existing_af_status: v === true ? 'absent' : (v === false ? '' : null) })" />
+            </div>
           </div>
 
           <div v-if="audit.docId" :class="['border-t border-gray-100 pt-3', bms.out_of_service ? 'opacity-70' : '']">
@@ -334,22 +332,23 @@ function hasNotes(html) {
                                   @open-notes="emit('open-notes', $event)" />
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
-              <label v-for="u in [
-                       { key: 'manages_heating', cat: 'heating', label: 'Chauffage' },
-                       { key: 'manages_cooling', cat: 'cooling', label: 'Refroidissement' },
-                       { key: 'manages_ventilation', cat: 'ventilation', label: 'Ventilation' },
-                       { key: 'manages_dhw', cat: 'dhw', label: 'ECS' },
-                       { key: 'manages_lighting', cat: 'lighting_indoor', label: 'Éclairage' },
-                     ]"
-                     :key="u.key"
-                     :class="['flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition whitespace-nowrap',
-                              bms[u.key]
-                                ? 'border-indigo-200 bg-indigo-50/60 hover:bg-indigo-50'
-                                : 'border-gray-200 bg-white hover:border-gray-300']">
-                <input type="checkbox" v-model="bms[u.key]" :true-value="1" :false-value="0" @change="saveBmsDebounced" class="rounded shrink-0" />
+              <button v-for="u in [
+                        { key: 'manages_heating', cat: 'heating', label: 'Chauffage' },
+                        { key: 'manages_cooling', cat: 'cooling', label: 'Refroidissement' },
+                        { key: 'manages_ventilation', cat: 'ventilation', label: 'Ventilation' },
+                        { key: 'manages_dhw', cat: 'dhw', label: 'ECS' },
+                        { key: 'manages_lighting', cat: 'lighting_indoor', label: 'Éclairage' },
+                      ]"
+                      :key="u.key" type="button"
+                      @click="bms[u.key] = bms[u.key] ? 0 : 1; saveBmsDebounced()"
+                      :class="['flex items-center gap-2 px-2.5 py-2 rounded-lg border-2 transition whitespace-nowrap text-left',
+                               bms[u.key]
+                                 ? 'border-[#00cd92] bg-emerald-50/60 hover:bg-emerald-50'
+                                 : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600']">
                 <SystemCategoryIcon :category="u.cat" size="sm" />
-                <span class="text-gray-700">{{ u.label }}</span>
-              </label>
+                <span :class="bms[u.key] ? 'text-gray-800 font-medium' : ''">{{ u.label }}</span>
+                <span v-if="bms[u.key]" class="ml-auto text-[#00cd92] font-bold">✓</span>
+              </button>
             </div>
           </div>
 
@@ -384,19 +383,20 @@ function hasNotes(html) {
                       </span>
                     </td>
                     <td class="py-1 text-center">
-                      <input type="checkbox" :checked="!!d.managed_by_bms"
-                             :disabled="d.out_of_service"
-                             @change="e => patchDeviceMb(d, { managed_by_bms: e.target.checked })"
-                             class="rounded disabled:opacity-30" />
+                      <div class="inline-block">
+                        <SegmentedToggle :model-value="triState(d.managed_by_bms)"
+                                         :disabled="!!d.out_of_service"
+                                         @update:model-value="v => patchDeviceMb(d, { managed_by_bms: !!v })" />
+                      </div>
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip
-                        :text="!d.managed_by_bms ? 'Coche d\'abord « Intégré » pour vérifier le bon fonctionnement.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Cocher après avoir vérifié sur place que la GTB voit l\'équipement.'">
-                        <input type="checkbox"
-                               :checked="d.managed_by_bms && d.wired && !d.bms_integration_out_of_service"
-                               :disabled="!d.managed_by_bms || !d.wired"
-                               @change="e => patchDeviceMb(d, { bms_integration_out_of_service: !e.target.checked })"
-                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed accent-emerald-500" />
+                        :text="!d.managed_by_bms ? 'Réponds d\'abord « Intégré : Oui » pour vérifier le bon fonctionnement.' : !d.wired ? 'Équipement non câblé — par définition non opérationnel dans la GTB.' : 'Marquer Oui après avoir vérifié sur place que la GTB voit l\'équipement.'">
+                        <div class="inline-block">
+                          <SegmentedToggle :model-value="(!d.managed_by_bms || !d.wired) ? null : triState(!d.bms_integration_out_of_service)"
+                                           :disabled="!d.managed_by_bms || !d.wired"
+                                           @update:model-value="v => patchDeviceMb(d, { bms_integration_out_of_service: !v })" />
+                        </div>
                       </Tooltip>
                     </td>
                   </tr>
@@ -435,19 +435,20 @@ function hasNotes(html) {
                     </td>
                     <td class="py-1 text-center">
                       <Tooltip :text="!m.communicating ? 'Compteur non communicant — il ne peut pas être intégré à la GTB.' : ''">
-                        <input type="checkbox" :checked="!!m.managed_by_bms"
-                               :disabled="m.out_of_service || !m.communicating"
-                               @change="e => patchMeter(m, { managed_by_bms: e.target.checked })"
-                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed" />
+                        <div class="inline-block">
+                          <SegmentedToggle :model-value="(!m.communicating || m.out_of_service) ? null : triState(m.managed_by_bms)"
+                                           :disabled="!!m.out_of_service || !m.communicating"
+                                           @update:model-value="v => patchMeter(m, { managed_by_bms: !!v })" />
+                        </div>
                       </Tooltip>
                     </td>
                     <td class="py-1 text-center">
-                      <Tooltip :text="!m.managed_by_bms ? 'Coche d\'abord « Intégré » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Cocher après avoir vérifié sur place que la GTB relève le compteur.'">
-                        <input type="checkbox"
-                               :checked="m.managed_by_bms && m.wired && !m.bms_integration_out_of_service"
-                               :disabled="!m.managed_by_bms || !m.wired"
-                               @change="e => patchMeter(m, { bms_integration_out_of_service: !e.target.checked })"
-                               class="rounded disabled:opacity-30 disabled:cursor-not-allowed accent-emerald-500" />
+                      <Tooltip :text="!m.managed_by_bms ? 'Réponds d\'abord « Intégré : Oui » pour vérifier le bon fonctionnement.' : !m.wired ? 'Compteur non câblé — par définition non opérationnel dans la GTB.' : 'Marquer Oui après avoir vérifié sur place que la GTB relève le compteur.'">
+                        <div class="inline-block">
+                          <SegmentedToggle :model-value="(!m.managed_by_bms || !m.wired) ? null : triState(!m.bms_integration_out_of_service)"
+                                           :disabled="!m.managed_by_bms || !m.wired"
+                                           @update:model-value="v => patchMeter(m, { bms_integration_out_of_service: !v })" />
+                        </div>
                       </Tooltip>
                     </td>
                   </tr>
