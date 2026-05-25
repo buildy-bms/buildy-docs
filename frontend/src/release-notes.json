@@ -2,6 +2,37 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.87",
+      "date": "2026-05-25",
+      "title": "Card GTB sans checkbox : tout passe en boutons explicites Oui / Non",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Document d'analyse fonctionnelle existe ? — Oui / Non",
+          "what": "L'ancienne case à cocher « Le document d'analyse fonctionnelle n'existe pas » devient un toggle Oui / Non explicite. Plus de confusion entre « pas coché car répondu non » vs « pas coché car pas encore répondu ».",
+          "where": "Card GTB desktop, section Analyse fonctionnelle."
+        },
+        {
+          "kind": "ux",
+          "title": "Usages traités par la GTB — boutons cliquables",
+          "what": "Les 5 cards (Chauffage / Refroidissement / Ventilation / ECS / Éclairage) sont maintenant entièrement cliquables (tap n'importe où sur la card pour basculer), avec une coche ✓ verte Buildy quand sélectionné et une croix ✗ grise sinon. Plus besoin de viser la petite checkbox.",
+          "where": "Card GTB desktop + mobile (onglet GTB), section Usages traités."
+        },
+        {
+          "kind": "ux",
+          "title": "Tables Intégré / Opérationnel : Oui / Non au lieu de cases à cocher",
+          "what": "Les colonnes Intégré et Opérationnel des tables Équipements et Compteurs (desktop) utilisent désormais des toggles Oui / Non. Quand un prérequis manque (équipement pas intégré, ou pas câblé), le toggle Opérationnel est grisé avec son tooltip d'explication.",
+          "where": "Card GTB desktop, tables Équipements + Compteurs intégrés."
+        },
+        {
+          "kind": "ux",
+          "title": "Mobile GTB : Intégré / Opérationnel en boutons compacts ✓ / ✗",
+          "what": "Sur les cards de chaque équipement et compteur en bas de l'onglet GTB mobile, les 4 checkboxes deviennent des SegmentedToggle compacts (✓ vert / ✗ rouge) parfaitement tactiles.",
+          "where": "Audit BACS / GTB mobile, onglet GTB."
+        }
+      ]
+    },
+    {
       "version": "0.1.86",
       "date": "2026-05-25",
       "title": "Audit mobile site : toggles Oui/Non explicites pour travaux générateur et réseau urbain",
