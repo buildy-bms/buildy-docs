@@ -41,12 +41,12 @@
   <div class="tile">
     <span class="tile-label">Équipements</span>
     <span class="tile-value">{{recapStats.devicesPresent}}<span class="tile-of"> / {{recapStats.devicesTotal}}</span></span>
-    <span class="tile-sub">{{recapStats.devicesIntegrated}} intégrés GTB · {{recapStats.devicesHs}} HS</span>
+    <span class="tile-sub">{{recapStats.devicesIntegrated}} intégrés GTB{{#if recapStats.devicesIntegratedUnanswered}} · {{recapStats.devicesIntegratedUnanswered}} non répondu{{/if}} · {{recapStats.devicesHs}} HS</span>
   </div>
   <div class="tile">
     <span class="tile-label">Compteurs</span>
     <span class="tile-value">{{recapStats.metersPresent}}<span class="tile-of"> / {{recapStats.metersRequired}}</span></span>
-    <span class="tile-sub">{{recapStats.metersIntegrated}} intégrés GTB · {{recapStats.metersMissing}} à installer</span>
+    <span class="tile-sub">{{recapStats.metersIntegrated}} intégrés GTB{{#if recapStats.metersIntegratedUnanswered}} · {{recapStats.metersIntegratedUnanswered}} non répondu{{/if}} · {{recapStats.metersMissing}} à installer</span>
   </div>
   <div class="tile">
     <span class="tile-label">{{#if isBacs}}Plan d'action{{else}}Préconisations Buildy{{/if}}</span>
