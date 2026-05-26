@@ -33,7 +33,7 @@ function getCharts() {
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
-  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, OCCUPANCY_PROFILE_LABEL,
+  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, TECHNICAL_ZONE_NATURES, OCCUPANCY_PROFILE_LABEL,
   OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL,
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
@@ -71,7 +71,20 @@ async function buildBacsAuditExportData(af, opts = {}) {
     occupancyLabel: z.occupancy_profile
       ? (OCCUPANCY_PROFILE_LABEL[z.occupancy_profile] || z.occupancy_profile)
       : null,
+    // Distingue zones fonctionnelles BACS vs locaux techniques (tableaux
+    // électriques, locaux compteurs, locaux techniques). Affichés dans des
+    // blocs séparés du PDF (ch.2) pour clarté.
+    isTechnical: z.nature ? TECHNICAL_ZONE_NATURES.has(z.nature) : false,
   }));
+  // Split en deux listes pour le PDF — l'ordre interne (par position)
+  // est préservé. `zonesFunctional` est la liste R175-1 6° au sens strict.
+  const zonesFunctional = zones.filter(z => !z.isTechnical);
+  const zonesTechnical = zones.filter(z => z.isTechnical);
+  // Flags pour conditionner l'affichage du sous-bloc "Notes terrain par
+  // zone" dans le PDF (évite un h3 orphelin si aucune zone n'a de note).
+  const hasZoneNotes = (z) => !!(z.notes_html || z.notes || (z.photos && z.photos.length) || z.comfort_constraint);
+  const zonesFunctionalHaveNotes = zonesFunctional.some(hasZoneNotes);
+  const zonesTechnicalHaveNotes = zonesTechnical.some(hasZoneNotes);
   const systems = db.db.prepare(`
     SELECT s.*, z.name AS zone_name, z.nature AS zone_nature
     FROM bacs_audit_systems s LEFT JOIN zones z ON z.id = s.zone_id
@@ -107,12 +120,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // PDF sous chaque sous-section du chapitre 6 GTB.
   const bmsTopicNotes = db.bacsAuditGtbObservations.notesByTopic(documentId);
 
-  // Charge tous les devices du document (joints au systeme parent)
+  // Charge tous les devices du document (joints au systeme parent +
+  // au modèle bibliothèque pour récupérer le slug — nécessaire au calcul
+  // de puissance qui distingue sous-station vs émetteurs aval, et à la
+  // dérivation du cas E d'assujettissement).
   const devices = db.db.prepare(`
-    SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name
+    SELECT d.*, s.system_category, s.zone_id, z.name AS zone_name,
+           t.slug AS equipment_template_slug
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN zones z ON z.id = s.zone_id
+    LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
     WHERE s.document_id = ?
     ORDER BY z.position, z.name, s.system_category, d.position, d.id
   `).all(documentId);
@@ -148,12 +166,59 @@ async function buildBacsAuditExportData(af, opts = {}) {
     devicesBySystem.get(d.system_id).push(d);
   }
 
-  // Enrichit systems avec devices + sums et group par zone
+  // Refactor 2026-05-26 — Dérivation des flags d'assujettissement E/F
+  // depuis les devices au lieu d'une saisie système :
+  //  · is_district_heating_substation = au moins un device a le modèle
+  //    d'équipement slug='sous-station-reseau-urbain' (seed dédié).
+  //  · serves_multiple_buildings = au moins un device a le flag à 1
+  //    (nouvelle colonne ajoutée par mig 175).
+  // La colonne legacy sur le système est conservée pour compat : on garde
+  // sa valeur si le dérivé ne s'applique pas (aucun device porteur).
+  const SUBSTATION_SLUG = 'sous-station-reseau-urbain';
+  const substationTplRow = db.db.prepare(
+    'SELECT id FROM equipment_templates WHERE slug = ?'
+  ).get(SUBSTATION_SLUG);
+  const substationTplId = substationTplRow ? substationTplRow.id : null;
+
+  // Propagation des flags d'assujettissement via metering_separable='no'.
+  // Un device sous-station / multi-bâtiments dans le système A, partagé sur le
+  // système B avec un comptage NON séparable, fait que B hérite du même cas
+  // d'assujettissement (E ou F). Sans ça, le PDF affichait « Locaux sociaux 1 /
+  // Chauffage : Cas A » alors que le même circuit alimente « Bureaux 1 /
+  // Chauffage : Cas E » — incohérence relevée dans l'audit de cohérence v14.
+  const sharedSubstationSystemIds = new Set();
+  const sharedMultiBuildingSystemIds = new Set();
+  for (const d of devices) {
+    if (d.metering_separable !== 'no') continue;
+    const isSub = substationTplId && d.equipment_template_id === substationTplId;
+    const isMulti = d.serves_multiple_buildings === 1;
+    if (!isSub && !isMulti) continue;
+    for (const sid of d.extra_system_ids || []) {
+      if (isSub) sharedSubstationSystemIds.add(sid);
+      if (isMulti) sharedMultiBuildingSystemIds.add(sid);
+    }
+  }
+
+  // Enrichit systems avec devices + sums + flags dérivés et group par zone
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
     const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
+    const derivedSubstation = (substationTplId
+      ? devs.some(d => d.equipment_template_id === substationTplId)
+      : false)
+      || sharedSubstationSystemIds.has(s.id);
+    const derivedMultiBuildings = devs.some(d => d.serves_multiple_buildings === 1)
+      || sharedMultiBuildingSystemIds.has(s.id);
     return {
       ...s,
+      // Override (ou complément) des flags système avec les valeurs dérivées
+      // des devices. Le legacy reste actif si rien n'est dérivé.
+      is_district_heating_substation: derivedSubstation
+        ? 1
+        : s.is_district_heating_substation,
+      serves_multiple_buildings: derivedMultiBuildings
+        ? 1
+        : s.serves_multiple_buildings,
       categoryLabel: s.is_bacs === 0
         ? (s.custom_label || 'Usage')
         : (SYSTEM_LABEL[s.system_category] || s.system_category),
@@ -175,6 +240,22 @@ async function buildBacsAuditExportData(af, opts = {}) {
   }
   const systemsByZone = [...systemsByZoneMap.values()];
 
+  // Zones fonctionnelles sans système thermique présent → hors périmètre
+  // R175-2 (assujettissement BACS calé sur chauffage/clim/ECS). Affichées
+  // sous forme de note pédagogique en tête du chapitre 3 pour qu'un
+  // lecteur exigeant (BE, organisme tiers R175-5-1) sache pourquoi
+  // ces zones n'apparaissent pas dans l'inventaire des systèmes.
+  const THERMAL_CATS = new Set(['heating', 'cooling', 'dhw']);
+  const zonesWithThermal = new Set();
+  for (const s of enrichedSystems) {
+    if (s.zone_id != null && THERMAL_CATS.has(s.system_category) && s.present === 1) {
+      zonesWithThermal.add(s.zone_id);
+    }
+  }
+  const zonesOutOfBacsScope = zonesFunctional
+    .filter(z => !zonesWithThermal.has(z.zone_id))
+    .map(z => ({ name: z.name, natureLabel: z.natureLabel, surface_m2: z.surface_m2 || null }));
+
   // ── Item 4 — calcul automatique de l'assujetti par système ──
   // Charge la structure juridique + parties prenantes + affectations de
   // périmètre, puis calcule l'assujetti de chaque système (6 cas PROFEEL).
@@ -184,7 +265,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const liabilityMap = computeSystemLiability({
     site,
     parties: siteParties,
-    systems,
+    // Utilise les systèmes enrichis : ils portent les flags dérivés
+    // (is_district_heating_substation / serves_multiple_buildings)
+    // calculés depuis les devices, pas la saisie système legacy.
+    systems: enrichedSystems,
     zonePartyLinks,
     systemPartyLinks,
   });
@@ -218,6 +302,13 @@ async function buildBacsAuditExportData(af, opts = {}) {
     usageLabel: METER_USAGE_LABEL[m.usage] || m.usage,
     zoneLabel: m.zone_name || 'Général bâtiment',
   }));
+  // Liste affichée dans le PDF chapitre 4 : on retire les compteurs ni
+  // requis, ni présents, ni HS — ces lignes n'ont aucune valeur
+  // informative pour l'intégrateur et bruitent le tableau. Les autres
+  // consommateurs (enrichedMeters, recapStats, bms*) gardent la vue
+  // complète pour ne pas fausser les agrégations.
+  const metersForPdf = enrichedMeters.filter(m =>
+    m.required || m.present_actual || m.out_of_service);
 
   // ── Photos ────────────────────────────────────────────────────────
   if (site) {
@@ -395,6 +486,118 @@ async function buildBacsAuditExportData(af, opts = {}) {
     total: actionItems.blocking.length + actionItems.major.length + actionItems.minor.length,
   };
 
+  // ── Groupement des actions repetitives par type (refonte v2.x) ──
+  // Les audits genèrent souvent 10-20 actions identiques (ex : ajouter
+  // un compteur électrique en zone X — éclairage). On les présente en
+  // 1 carte groupée avec tableau interne plutôt qu'en N cartes répétitives.
+  // Décision de groupement = même clé + au moins 3 items.
+  // `devicesById` est déjà construite plus haut (cf. backfill thermal).
+  const metersById = new Map(meters.map(m => [m.id, m]));
+  const GROUP_LABELS = {
+    meter_addition: {
+      label: 'Ajouter les compteurs manquants pour le suivi continu',
+      columns: ['zone', 'usage', 'meter_type'],
+    },
+    meter_connection: {
+      label: 'Raccorder les compteurs présents mais non communicants',
+      columns: ['zone', 'usage', 'meter_type'],
+    },
+    r175_3_p4: {
+      label: 'Permettre l\'arrêt manuel des équipements',
+      columns: ['zone', 'system', 'device'],
+    },
+    r175_3_p4_autonomous: {
+      label: 'Activer le fonctionnement autonome des équipements',
+      columns: ['zone', 'system', 'device'],
+    },
+    r175_3_p3_replace: {
+      label: 'Prévoir le remplacement des équipements non communicants',
+      columns: ['zone', 'system', 'device'],
+    },
+    r175_3_p3_connect: {
+      label: 'Raccorder les équipements communicants à la GTB',
+      columns: ['zone', 'system', 'device'],
+    },
+  };
+  function deriveGroupKey(item) {
+    // Compteurs : clé par category (subtype rarement set)
+    if (item.source_meter_id && item.category === 'meter_addition') return 'meter_addition';
+    if (item.source_meter_id && item.category === 'meter_connection') return 'meter_connection';
+    // Devices : subtype explicite
+    if (item.source_device_id && item.source_subtype) {
+      if (GROUP_LABELS[item.source_subtype]) return item.source_subtype;
+    }
+    return null; // non groupable
+  }
+  function enrichItemForGroup(item) {
+    const out = {
+      display_number: item.display_number,
+      zone_name: item.zone_name || '—',
+      r175_article: item.r175_article,
+      meter_type_label: '',
+      meter_usage_label: '',
+      device_name: '',
+      device_brand: '',
+      system_label: '',
+    };
+    if (item.source_meter_id) {
+      const m = metersById.get(item.source_meter_id);
+      if (m) {
+        out.meter_type_label = METER_TYPE_LABEL[m.meter_type] || m.meter_type || '—';
+        out.meter_usage_label = METER_USAGE_LABEL[m.usage] || m.usage || '—';
+        if (!item.zone_name && !m.zone_id) out.zone_name = 'Général bâtiment';
+      }
+    }
+    if (item.source_device_id) {
+      const d = devicesById.get(item.source_device_id);
+      if (d) {
+        out.device_name = d.name || '—';
+        out.device_brand = d.brand || '';
+        out.system_label = SYSTEM_LABEL[d.system_category] || d.system_category || '—';
+      }
+    }
+    return out;
+  }
+  function buildGroupedPlan(items) {
+    const buckets = new Map();
+    const result = [];
+    // Étape 1 : remplir les buckets
+    for (const it of items) {
+      const key = deriveGroupKey(it);
+      if (!key) {
+        result.push({ kind: 'single', item: it });
+        continue;
+      }
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(it);
+    }
+    // Étape 2 : décider grouper ou aplatir
+    for (const [key, list] of buckets) {
+      if (list.length >= 3) {
+        const cfg = GROUP_LABELS[key];
+        result.push({
+          kind: 'group',
+          key,
+          label: cfg.label,
+          columns: cfg.columns,
+          count: list.length,
+          r175_article: list[0].r175_article,
+          first_number: list[0].display_number,
+          last_number: list[list.length - 1].display_number,
+          items: list.map(enrichItemForGroup),
+        });
+      } else {
+        for (const it of list) result.push({ kind: 'single', item: it });
+      }
+    }
+    return result;
+  }
+  const actionItemsGrouped = {
+    blocking: buildGroupedPlan(actionItems.blocking),
+    major: buildGroupedPlan(actionItems.major),
+    minor: buildGroupedPlan(actionItems.minor),
+  };
+
   // Justifications (Annexe C). La source est derivee de la FK non-NULL
   // (mig 125) pour rester lisible dans le PDF.
   function actionSourceLabel(a) {
@@ -448,10 +651,15 @@ async function buildBacsAuditExportData(af, opts = {}) {
           : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021') }
     : { applies: false, reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)' };
 
-  // Detail du calcul auto chauffage + clim
+  // Detail du calcul auto chauffage + clim — initial sans contributions.
+  // Les contributions effectives (heat_contrib / cool_contrib / inScope)
+  // sont ajoutees plus bas apres computeAutoPower() pour pouvoir afficher
+  // dans le PDF page 7 ce que CHAQUE device apporte vraiment au cumul
+  // R175-2 (ex : un radiateur eau chaude « hors cumul » a contrib = 0).
   const heatingCoolingBreakdown = devices
     .filter(d => ['heating','cooling'].includes(d.system_category) && d.power_kw != null)
     .map(d => ({
+      id: d.id,
       name: d.name, brand: d.brand, model_reference: d.model_reference,
       power_kw: d.power_kw, quantity: d.quantity,
       total_power_kw: d.total_power_kw, has_multiple: d.has_multiple,
@@ -571,6 +779,30 @@ async function buildBacsAuditExportData(af, opts = {}) {
       if (pc) d.powerCalc = pc;
     }
   }
+  // Enrichi le breakdown avec les contributions effectives R175-2 : un
+  // device peut être inscrit (power_kw > 0) mais ne PAS être additionné
+  // au cumul (cas réseau urbain aval, secours, bois). Sans cette
+  // distinction, la somme brute affichée prête à confusion (incident
+  // analyse v12 : 241 kW affiché alors que la puissance retenue est 192).
+  for (const row of heatingCoolingBreakdown) {
+    const pc = powerCalcByDeviceId.get(row.id);
+    if (pc) {
+      row.heat_contrib = Math.round((pc.heat || 0) * 10) / 10;
+      row.cool_contrib = Math.round((pc.cool || 0) * 10) / 10;
+      row.in_scope = !!pc.inScope;
+      row.calc_type_label = pc.typeLabel;
+    } else {
+      row.heat_contrib = 0;
+      row.cool_contrib = 0;
+      row.in_scope = false;
+    }
+  }
+  // Vue récapitulative : 3 chiffres pour le pied du tableau page 7.
+  const powerRecap = {
+    heatRetained: Math.round((autoPower.heatKw || 0) * 10) / 10,
+    coolRetained: Math.round((autoPower.coolKw || 0) * 10) / 10,
+    retained: Math.round((autoPower.retainedKw || 0) * 10) / 10,
+  };
 
   // ── Item 7d/7e — zones fonctionnelles de suivi ──
   // Regroupe, par catégorie technique, les zones desservies par un
@@ -635,7 +867,15 @@ async function buildBacsAuditExportData(af, opts = {}) {
     energyReference,
     energyMonthlyChartDataUrl,
     zones,
+    // Split fonctionnelles BACS vs techniques (tableaux/compteurs) pour
+    // affichage en deux blocs distincts dans le PDF ch.2.
+    zonesFunctional,
+    zonesTechnical,
+    zonesFunctionalHaveNotes,
+    zonesTechnicalHaveNotes,
     systemsByZone,
+    // Zones fonctionnelles sans système thermique présent (hors R175-2).
+    zonesOutOfBacsScope,
     // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).
     functionalZones,
     // Item 4 — structure juridique + assujettissement par périmètre.
@@ -645,6 +885,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     hasLiabilityData,
     compliance,
     meters: enrichedMeters,
+    // Vue filtrée pour le tableau du chapitre 4 (sans les compteurs ni
+    // requis ni présents — bruit pour l'intégrateur).
+    metersForPdf,
     metersWithDetails,
     thermal,
     bms,
@@ -656,6 +899,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     recapStats,
     buildySolution,
     actionItems,
+    // Plan d'action groupé par subtype pour le PDF (ch.7) — réduit le
+    // nombre de cartes en condensant les actions répétitives.
+    actionItemsGrouped,
     actionStats,
     bmsTopicNotes,
     // actionItemsRaw expose en realite les items NUMEROTES (BACS-XXX) pour
@@ -666,6 +912,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     synthesisHtml: af.audit_synthesis_html || null,
     heatingCoolingBreakdown,
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
+    // Vue récapitulative R175-2 (chaud retenu, froid retenu, max retenu).
+    powerRecap,
     // Items 5 + 8 — cumul automatique des puissances chaud / froid.
     powerSummary,
     r175_6_applicable,

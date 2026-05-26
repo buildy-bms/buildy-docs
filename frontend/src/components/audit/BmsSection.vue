@@ -521,37 +521,33 @@ function hasNotes(html) {
                                   topic-label="R175-3 — Capacités de la solution de supervision"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center gap-3">
-                <span class="text-gray-800"><strong>P1.</strong> La GTB enregistre-t-elle la consommation en continu par zone et conserve-t-elle ces données pendant 5 ans ?</span>
-                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p1)"
-                                 @update:model-value="v => setBmsFlag('meets_r175_3_p1', v)" />
+            <div class="qa-grid text-sm">
+              <div class="qa-question"><strong>P1.</strong> La GTB enregistre-t-elle la consommation en continu par zone et conserve-t-elle ces données pendant 5 ans ?</div>
+              <SegmentedToggle :model-value="triState(bms.meets_r175_3_p1)"
+                               @update:model-value="v => setBmsFlag('meets_r175_3_p1', v)" />
+              <div class="qa-question"><strong>P2.</strong> La GTB détecte-t-elle les pertes d'efficacité énergétique ?</div>
+              <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)"
+                               @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
+            </div>
+            <div v-if="bms.meets_r175_3_p1" class="ml-4 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
+                <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
+                       @input="saveBmsDebounced"
+                       class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
               </div>
-              <div v-if="bms.meets_r175_3_p1" class="ml-4 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                <div>
-                  <label class="block text-[11px] text-gray-600 mb-1">Format d'archivage</label>
-                  <input v-model="bms.r175_3_p1_archival_format" type="text" placeholder="ex : CSV, base SQL, API InfluxDB"
-                         @input="saveBmsDebounced"
-                         class="w-full text-xs px-2 py-1 border border-gray-200 rounded" />
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="text-xs text-gray-700">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</span>
-                  <SegmentedToggle :model-value="triState(bms.r175_3_p1_retention_verified)"
-                                   @update:model-value="v => setBmsFlag('r175_3_p1_retention_verified', v)" />
-                </div>
+              <div class="qa-grid">
+                <div class="qa-question text-xs">La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?</div>
+                <SegmentedToggle :model-value="triState(bms.r175_3_p1_retention_verified)"
+                                 @update:model-value="v => setBmsFlag('r175_3_p1_retention_verified', v)" />
               </div>
-              <div class="flex items-center gap-3">
-                <span class="text-gray-800"><strong>P2.</strong> La GTB détecte-t-elle les pertes d'efficacité énergétique ?</span>
-                <SegmentedToggle :model-value="triState(bms.meets_r175_3_p2)"
-                                 @update:model-value="v => setBmsFlag('meets_r175_3_p2', v)" />
-              </div>
-              <div v-if="bms.meets_r175_3_p2" class="ml-6">
-                <label class="block text-[11px] text-gray-600 mb-1">Règles / seuils / alertes actives</label>
-                <textarea v-model="bms.r175_3_p2_anomaly_rules_html" @input="saveBmsDebounced"
-                          placeholder="ex : alerte si ΔT > 5 °C, surconso > 20% j-1, COP < 2.5…"
-                          rows="2"
-                          class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
-              </div>
+            </div>
+            <div v-if="bms.meets_r175_3_p2" class="ml-6 mt-2">
+              <label class="block text-[11px] text-gray-600 mb-1">Règles / seuils / alertes actives</label>
+              <textarea v-model="bms.r175_3_p2_anomaly_rules_html" @input="saveBmsDebounced"
+                        placeholder="ex : alerte si ΔT > 5 °C, surconso > 20% j-1, COP < 2.5…"
+                        rows="2"
+                        class="w-full text-xs px-2 py-1 border border-gray-200 rounded"></textarea>
             </div>
           </div>
 
@@ -565,17 +561,13 @@ function hasNotes(html) {
                                   topic-label="R175-3 — Mise à disposition des données"
                                   @open-notes="emit('open-notes', $event)" />
             </div>
-            <div class="space-y-2 text-sm">
-              <div class="flex items-center gap-3">
-                <span class="text-gray-800">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</span>
-                <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
-                                 @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="text-gray-800">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</span>
-                <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
-                                 @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
-              </div>
+            <div class="qa-grid text-sm">
+              <div class="qa-question">La procédure de mise à disposition des données au <strong>gestionnaire du bâtiment</strong> est-elle documentée ?</div>
+              <SegmentedToggle :model-value="triState(bms.data_provision_to_manager)"
+                               @update:model-value="v => setBmsFlag('data_provision_to_manager', v)" />
+              <div class="qa-question">La procédure de transmission des données aux <strong>exploitants des systèmes techniques</strong> est-elle documentée ?</div>
+              <SegmentedToggle :model-value="triState(bms.data_provision_to_operators)"
+                               @update:model-value="v => setBmsFlag('data_provision_to_operators', v)" />
             </div>
             <template v-if="bms.data_provision_to_manager || bms.data_provision_to_operators">
               <textarea v-model="bms.notes_data_provision" @input="saveBmsDebounced"
@@ -608,57 +600,62 @@ function hasNotes(html) {
                 <span class="font-normal normal-case text-gray-500 text-[10px] ml-1">(archivage 5 ans)</span>
               </h3>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Données conservées 5 ans (échelle mensuelle) ?</label>
-                <select v-model="bms.data_storage_5y_compliant" @change="saveBmsDebounced"
-                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
-                  <option :value="null">— Non renseigné</option>
-                  <option value="yes">Oui — conforme</option>
-                  <option value="no">Non — non conforme</option>
-                  <option value="unknown">Inconnu / à vérifier</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Localisation du stockage</label>
-                <select v-model="bms.data_storage_location" @change="saveBmsDebounced"
-                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
-                  <option :value="null">— Non renseigné</option>
-                  <option value="local">Serveur local</option>
-                  <option value="cloud_editeur">Cloud de l'éditeur</option>
-                  <option value="cloud_proprietaire">Cloud du propriétaire</option>
-                  <option value="unknown">Inconnue</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Accès direct du propriétaire à ses données</label>
-                <select v-model="bms.data_owner_access" @change="saveBmsDebounced"
-                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
-                  <option :value="null">— Non renseigné</option>
-                  <option value="yes">Oui</option>
-                  <option value="partial">Partiel</option>
-                  <option value="no">Non</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Accès du gestionnaire et des exploitants</label>
-                <select v-model="bms.gestionnaire_exploitant_access" @change="saveBmsDebounced"
-                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
-                  <option :value="null">— Non renseigné</option>
-                  <option value="yes">Oui</option>
-                  <option value="partial">Partiel</option>
-                  <option value="no">Non</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] text-gray-600 mb-1">Export possible (CSV / Excel)</label>
-                <select v-model="bms.export_capability" @change="saveBmsDebounced"
-                        class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
-                  <option :value="null">— Non renseigné</option>
-                  <option value="yes">Oui</option>
-                  <option value="no">Non</option>
-                </select>
-              </div>
+            <div class="qa-grid text-sm">
+              <!-- Q1 — Conservation 5 ans (3 valeurs : oui / non / inconnu) -->
+              <div class="qa-question">Les données sont-elles conservées 5 ans à l'échelle mensuelle ?</div>
+              <SegmentedToggle
+                :model-value="bms.data_storage_5y_compliant"
+                :options="[
+                  { value: 'yes', label: 'Oui', tone: 'green' },
+                  { value: 'no', label: 'Non', tone: 'slate' },
+                  { value: 'unknown', label: 'Inconnu', tone: 'amber' },
+                ]"
+                @update:model-value="v => { bms.data_storage_5y_compliant = v; saveBmsDebounced() }"
+              />
+              <!-- Q3 — Accès propriétaire (ternaire Oui / Partiel / Non) -->
+              <div class="qa-question">Le propriétaire accède-t-il directement à ses données ?</div>
+              <SegmentedToggle
+                :model-value="bms.data_owner_access"
+                :options="[
+                  { value: 'yes', label: 'Oui', tone: 'green' },
+                  { value: 'partial', label: 'Partiel', tone: 'amber' },
+                  { value: 'no', label: 'Non', tone: 'slate' },
+                ]"
+                @update:model-value="v => { bms.data_owner_access = v; saveBmsDebounced() }"
+              />
+              <!-- Q4 — Accès gestionnaire / exploitants (idem ternaire) -->
+              <div class="qa-question">Le gestionnaire et les exploitants ont-ils accès aux données ?</div>
+              <SegmentedToggle
+                :model-value="bms.gestionnaire_exploitant_access"
+                :options="[
+                  { value: 'yes', label: 'Oui', tone: 'green' },
+                  { value: 'partial', label: 'Partiel', tone: 'amber' },
+                  { value: 'no', label: 'Non', tone: 'slate' },
+                ]"
+                @update:model-value="v => { bms.gestionnaire_exploitant_access = v; saveBmsDebounced() }"
+              />
+              <!-- Q5 — Export CSV/Excel (binaire) -->
+              <div class="qa-question">Les données sont-elles exportables (CSV / Excel) ?</div>
+              <SegmentedToggle
+                :model-value="bms.export_capability"
+                :options="[
+                  { value: 'yes', label: 'Oui', tone: 'green' },
+                  { value: 'no', label: 'Non', tone: 'slate' },
+                ]"
+                @update:model-value="v => { bms.export_capability = v; saveBmsDebounced() }"
+              />
+            </div>
+            <!-- Q2 — Localisation du stockage (4 choix exclusifs) : select pleine largeur sous le grid -->
+            <div class="mt-3">
+              <label class="block text-[11px] text-gray-600 mb-1">Où sont stockées les données ?</label>
+              <select v-model="bms.data_storage_location" @change="saveBmsDebounced"
+                      class="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-md">
+                <option :value="null">— Non renseigné</option>
+                <option value="local">Serveur local</option>
+                <option value="cloud_editeur">Cloud de l'éditeur</option>
+                <option value="cloud_proprietaire">Cloud du propriétaire</option>
+                <option value="unknown">Inconnue</option>
+              </select>
             </div>
             <div class="mt-2">
               <label class="block text-[11px] text-gray-600 mb-1">Observations sur l'accès aux données</label>
@@ -676,8 +673,8 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="r175_4" topic-label="R175-4 — Vérifications périodiques"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <div class="flex items-center gap-3 text-sm">
-                <span class="text-gray-800">Les maintenances passées ont-elles fait l'objet de consignes écrites ?</span>
+              <div class="qa-grid text-sm">
+                <div class="qa-question">Les maintenances passées ont-elles fait l'objet de consignes écrites ?</div>
                 <SegmentedToggle :model-value="triState(bms.has_maintenance_procedures)"
                                  @update:model-value="v => setBmsFlag('has_maintenance_procedures', v)" />
               </div>
@@ -704,8 +701,8 @@ function hasNotes(html) {
                 <BmsTopicNoteButton topic-key="r175_5" topic-label="R175-5 — Formation exploitant"
                                     @open-notes="emit('open-notes', $event)" />
               </div>
-              <div class="flex items-center gap-3 text-sm">
-                <span class="text-gray-800">L'exploitant a-t-il été formé à l'utilisation de la supervision ?</span>
+              <div class="qa-grid text-sm">
+                <div class="qa-question">L'exploitant a-t-il été formé à l'utilisation de la supervision ?</div>
                 <SegmentedToggle :model-value="triState(bms.operator_trained)"
                                  @update:model-value="v => setBmsFlag('operator_trained', v)" />
               </div>

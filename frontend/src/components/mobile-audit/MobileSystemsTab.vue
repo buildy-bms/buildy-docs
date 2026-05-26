@@ -348,6 +348,8 @@ function openCreateDevice(system) {
     metering_separable: null, metering_separable_note: '',
     // Mig 172 — validation forcée manuelle.
     validation_forced: null,
+    // Mig 175 — équipement multi-bâtiments (déplacé du système).
+    serves_multiple_buildings: null,
   }
   editingDevice.value = { mode: 'create', system }
 }
@@ -393,6 +395,8 @@ async function saveDevice() {
       // Item 7c — séparabilité du comptage (équipement partagé).
       metering_separable: deviceForm.value.metering_separable || null,
       metering_separable_note: deviceForm.value.metering_separable_note?.trim() || null,
+      // Mig 175 — équipement dessert plusieurs bâtiments (cas F).
+      serves_multiple_buildings: triBool(deviceForm.value.serves_multiple_buildings),
     }
     if (!payload.name && !payload.brand && !payload.model_reference) {
       error('Renseigne au moins un nom, une marque ou une référence')
@@ -969,6 +973,15 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             description="Non utilisé en fonctionnement normal — exclu du cumul de puissance BACS."
             :model-value="deviceForm.is_backup"
             @update:model-value="v => deviceForm.is_backup = v"
+          />
+          <!-- Mig 175 — multi-bâtiments déplacé du système vers le device.
+               Chaudière commune, GPC, sous-station… qui dessert plusieurs
+               bâtiments du site (cas F d'assujettissement). -->
+          <MobileYesNo
+            label="Cet équipement dessert-il plusieurs bâtiments du site ?"
+            description="Chaudière commune, groupe de production de chaleur, sous-station… Tous les propriétaires du site deviennent alors assujettis ensemble (cas F)."
+            :model-value="deviceForm.serves_multiple_buildings"
+            @update:model-value="v => deviceForm.serves_multiple_buildings = v"
           />
         </div>
 

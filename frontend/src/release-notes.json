@@ -2,6 +2,73 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.100",
+      "date": "2026-05-26",
+      "title": "Audit BACS : refonte PDF (densité ch.3 + groupage ch.7), dérivation cas E/F via équipement, toggles Oui/Non sur les questions binaires",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "PDF audit : chapitre 3 « Systèmes techniques » passé en cartes lisibles, plus de tableau dense écrasé",
+          "what": "Avant : tableau 7 colonnes avec 3-4 lignes de wrap par cellule (« Interop… », « Arrêt… » tronqués) sur ~30 pages. Maintenant : une carte par équipement avec les R175-3 §3/§4 en pictos clairs, le badge « ↔ Partagé entre N zones » lisible, et les notes terrain intégrées dans la carte (plus de doublon de titre). Aucune troncature résiduelle.",
+          "where": "Backend `templates/pdf/bacs-audit.hbs` ch.3, `styles-bacs-audit.css`. Visible dans tout export PDF audit BACS."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit : chapitre 7 « Plan d'action » regroupé par type d'action",
+          "what": "Les 21 actions « Ajouter compteur X en zone Y », 30 « Permettre arrêt manuel » / « Activer autonome », 21 « Remplacement équipement non communicant » sont désormais condensées en cartes de groupe avec un tableau interne listant les paramètres qui diffèrent. ~75 cartes → ~10 cartes + tableaux. Gain : ~9 pages.",
+          "where": "Backend `templates/pdf/bacs-audit.hbs` ch.7, nouveau partial `_action-group.hbs`."
+        },
+        {
+          "kind": "feat",
+          "title": "Détail du calcul de puissance R175-2 — contributions effectives + récap retenu",
+          "what": "Le tableau page 7 du PDF affiche désormais une colonne « Pris en compte » par équipement (`+360 kW chaud`, `+64 kW froid`, `Hors cumul`) et un récap clair en pied : cumul chaud retenu, cumul froid retenu, **Puissance retenue R175-2 (max chaud / froid)**. Avant : un total brut prêtait à confusion (somme de devices hors cumul incluse).",
+          "where": "Backend `_export-data.js` enrichissement `heatingCoolingBreakdown` + `powerRecap`. PDF page 7 chapitre 1."
+        },
+        {
+          "kind": "refactor",
+          "title": "Cas E / F d'assujettissement dérivés des équipements, plus saisis au niveau système",
+          "what": "Avant : deux questions au niveau usage (`Sous-station de réseau urbain`, `Centralisé multi-bâtiments`) qui n'avaient pas de sens pour tous les usages. Maintenant : (1) Cas E déclenché par la présence d'un équipement « Sous-station de réseau urbain » (nouveau modèle bibliothèque). Auto-créé dans le 1er système chauffage présent quand l'auditeur coche la question au niveau site et saisit la puissance station. L'auditeur peut ensuite le déplacer manuellement. (2) Cas F déclenché par le flag `serves_multiple_buildings` au niveau du device (un système peut contenir devices inter-bâtiments + locaux).",
+          "where": "Migration DB 175 (nouvelle colonne `bacs_audit_system_devices.serves_multiple_buildings`). Nouveau seed `equipment-templates/sous-station-reseau-urbain.js`. Nouveau lib `bacs-district-heating.js` (auto-création). Hooks dans `routes/afs.js` (PATCH AF) et `bacs-audit-power.js` (slug-based detection)."
+        },
+        {
+          "kind": "fix",
+          "title": "Propagation cas E/F aux systèmes partageant un comptage non séparable",
+          "what": "Si une sous-station alimente plusieurs systèmes via un device partagé en `metering_separable='no'`, tous les systèmes raccordés héritent du cas E (idem cas F pour multi-bâtiments). Avant : seul le système primaire du device était marqué, les autres tombaient en cas A par défaut → incohérence relevée dans l'audit Communay.",
+          "where": "Backend `_export-data.js` : nouvelles `sharedSubstationSystemIds` / `sharedMultiBuildingSystemIds`."
+        },
+        {
+          "kind": "feat",
+          "title": "Modale « Paramètres » au niveau système : poste négligeable 5 % + parties prenantes",
+          "what": "La question du poste négligeable (R175-2) et la surcharge des parties assujetties par système ont été déplacées dans une modale ouverte via l'icône engrenage de chaque carte système. Avant : ces questions encombraient le formulaire principal et étaient affichées même sur les usages où elles n'avaient pas de sens.",
+          "where": "Nouveau composant `SystemSettingsModal.vue`. Bouton engrenage sur chaque carte dans `SystemsSection.vue`."
+        },
+        {
+          "kind": "feat",
+          "title": "Audit desktop & mobile : toutes les questions binaires en boutons « Oui / Non »",
+          "what": "BmsSection (R175-3/4/5), DeviceEditModal, Conservation des données : remplacement systématique des `<select>` et checkboxes par des SegmentedToggle (Oui / Non / null). Labels reformulés en questions explicites (« Présent ? » au lieu de « Présent »). Layout `qa-grid` aligne tous les toggles sans débordement, descriptions sous la question pour économiser la largeur. Mobile : nouveau composant `MobileSegmented` pour ternaires custom.",
+          "where": "Frontend `BmsSection.vue`, `DeviceEditModal.vue`, `IdentificationSection.vue`, `SystemsSection.vue`, `MobileBmsTab.vue`, `MobileSystemsTab.vue`. CSS utilitaire `.qa-grid` dans `main.css`."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF chapitre 2 : zones fonctionnelles vs locaux techniques séparés",
+          "what": "Avant : toutes les zones étaient mélangées sous un même chapitre. Maintenant : « Inventaire des zones fonctionnelles » et « Locaux techniques » dans deux blocs distincts avec sous-titres, plus un callout pédagogique pour les zones fonctionnelles sans système thermique (hors périmètre R175-2). Notes terrain regroupées sous « Notes terrain par zone ».",
+          "where": "Backend `_export-data.js` (split `zonesFunctional`/`zonesTechnical`/`zonesOutOfBacsScope`). PDF ch.2."
+        },
+        {
+          "kind": "fix",
+          "title": "Aucune troncature résiduelle dans le PDF (interdiction stricte text-overflow ellipsis)",
+          "what": "Suppression des 6 dernières occurrences `text-overflow: ellipsis` dans `styles-bacs-audit.css` et `styles-bacs-audit-tables.css`. Aucune cellule ne tronque jamais son contenu — un PDF d'audit ne doit introduire aucune ambiguïté.",
+          "where": "Frontend CSS PDF."
+        },
+        {
+          "kind": "feat",
+          "title": "MCP : tools BACS mis à jour pour la nouvelle dérivation",
+          "what": "`audit_system_update` retire `is_district_heating_substation` + `serves_multiple_buildings` du schéma (champs maintenant dérivés). `audit_device_update` / `audit_device_add` exposent `serves_multiple_buildings` (boolean ternaire). `audit_reference_data` documente la nouvelle architecture E/F + l'auto-création de la sous-station + la propagation via metering_separable.",
+          "where": "edge-fleet-manager `mcp/tools/buildy-audit-entities.mjs` + `buildy-audit-read.mjs`."
+        }
+      ]
+    },
+    {
       "version": "0.1.99",
       "date": "2026-05-25",
       "title": "Audit BACS : verrous DB sur 4 enums (lorawan + catégorie d'action + nature/type de zone)",

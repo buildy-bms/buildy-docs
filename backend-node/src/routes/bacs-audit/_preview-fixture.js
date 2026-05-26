@@ -33,7 +33,7 @@ const { isTrue, isFalse } = require('./_ternary');
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
-  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, OCCUPANCY_PROFILE_LABEL,
+  APPLICABILITY_LABEL, COMPLIANCE_LABEL, ZONE_NATURE_LABEL, TECHNICAL_ZONE_NATURES, OCCUPANCY_PROFILE_LABEL,
   OWNERSHIP_STRUCTURE_LABEL, PARTY_KIND_LABEL,
 } = require('./_labels');
 const { buildComplianceSummary } = require('./_compliance-summary');
@@ -677,8 +677,14 @@ async function buildFixturePreviewData({ user = null } = {}) {
     occupancyLabel: z.occupancy_profile
       ? (OCCUPANCY_PROFILE_LABEL[z.occupancy_profile] || z.occupancy_profile)
       : null,
+    isTechnical: z.nature ? TECHNICAL_ZONE_NATURES.has(z.nature) : false,
     photos: (z.photoFiles || []).map((f, i) => photoItem(`${z.zone_id}-${i}`, f)).filter(Boolean),
   }));
+  const zonesFunctional = zones.filter(z => !z.isTechnical);
+  const zonesTechnical = zones.filter(z => z.isTechnical);
+  const hasZoneNotes = (z) => !!(z.notes_html || z.notes || (z.photos && z.photos.length) || z.comfort_constraint);
+  const zonesFunctionalHaveNotes = zonesFunctional.some(hasZoneNotes);
+  const zonesTechnicalHaveNotes = zonesTechnical.some(hasZoneNotes);
 
   // Devices : enrichissements (energyLabel, roleLabel, commLabel, photos,
   // managed_by_bms derive du protocole de communication pour le fixture).
@@ -881,10 +887,13 @@ async function buildFixturePreviewData({ user = null } = {}) {
           : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021') }
     : { applies: false, reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)' };
 
-  // Heating/cooling breakdown pour le détail puissance
+  // Heating/cooling breakdown pour le détail puissance — enrichi en aval avec
+  // les contributions effectives (heat_contrib/cool_contrib/in_scope) après
+  // computeAutoPower(), pour aligner sur _export-data.js (audit réel).
   const heatingCoolingBreakdown = devices
     .filter(d => ['heating', 'cooling'].includes(d.system_category) && d.power_kw != null)
     .map(d => ({
+      id: d.id,
       name: d.name, brand: d.brand, model_reference: d.model_reference,
       power_kw: d.power_kw, zone_name: d.zone_name,
       category: d.system_category,
@@ -932,6 +941,26 @@ async function buildFixturePreviewData({ user = null } = {}) {
       if (pc) d.powerCalc = pc;
     }
   }
+  // Enrichi le breakdown avec les contributions effectives R175-2 (aligné
+  // sur _export-data.js — page 7 du PDF audit réel).
+  for (const row of heatingCoolingBreakdown) {
+    const pc = powerCalcByDeviceId.get(row.id);
+    if (pc) {
+      row.heat_contrib = Math.round((pc.heat || 0) * 10) / 10;
+      row.cool_contrib = Math.round((pc.cool || 0) * 10) / 10;
+      row.in_scope = !!pc.inScope;
+      row.calc_type_label = pc.typeLabel;
+    } else {
+      row.heat_contrib = 0;
+      row.cool_contrib = 0;
+      row.in_scope = false;
+    }
+  }
+  const powerRecap = {
+    heatRetained: Math.round((autoPower.heatKw || 0) * 10) / 10,
+    coolRetained: Math.round((autoPower.coolKw || 0) * 10) / 10,
+    retained: Math.round((autoPower.retainedKw || 0) * 10) / 10,
+  };
 
   // ── Item 7d/7e — zones fonctionnelles de suivi ──
   const functionalZones = computeFunctionalZones(devices, enrichedSystems, { SYSTEM_LABEL });
@@ -993,6 +1022,10 @@ async function buildFixturePreviewData({ user = null } = {}) {
     energyReference,
     energyMonthlyChartDataUrl,
     zones,
+    zonesFunctional,
+    zonesTechnical,
+    zonesFunctionalHaveNotes,
+    zonesTechnicalHaveNotes,
     systemsByZone,
     // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).
     functionalZones,
@@ -1027,6 +1060,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
     heatingCoolingTotal: Math.round(heatingCoolingTotal * 10) / 10,
     // Items 5 + 8 — cumul automatique des puissances chaud / froid.
     powerSummary,
+    powerRecap,
     r175_6_applicable,
     complianceLabel: COMPLIANCE_LABEL[BMS.overall_compliance] || null,
     applicabilityLabel: applicabilityLabelForSummary,

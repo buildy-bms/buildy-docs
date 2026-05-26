@@ -142,33 +142,41 @@ const showPowerDetail = ref(false)
         </div>
       </div>
 
-      <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en ligne -->
-      <div class="border-t border-gray-100 pt-2.5 space-y-2">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span class="text-sm text-gray-700">Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
-            <span class="text-[11px] text-gray-500">(déclencheur R175-6)</span></span>
+      <!-- Déclencheurs réglementaires : Oui / Non, conditionnels en dessous -->
+      <div class="border-t border-gray-100 pt-2.5">
+        <div class="qa-grid text-sm">
+          <div class="qa-question">
+            Des travaux d'installation ou de remplacement d'un générateur de chaleur ont-ils été réalisés ?
+            <span class="qa-desc">Déclencheur R175-6 (régulation thermique automatique par zone).</span>
+          </div>
           <SegmentedToggle :model-value="generatorWorksDone" @update:model-value="v => generatorWorksDone = v" />
-          <template v-if="document?.bacs_generator_works_date != null">
+
+          <div class="qa-question">
+            Le bâtiment est-il raccordé à un <strong>réseau urbain de chaleur ou de froid</strong> ?
+            <span class="qa-desc">Si oui, la puissance retenue pour R175-2 est celle de la station d'échange (prime sur le cumul aval).</span>
+          </div>
+          <SegmentedToggle :model-value="districtConnected" @update:model-value="v => districtConnected = v" />
+        </div>
+        <!-- Champs conditionnels (en pleine largeur sous le grid, alignés avec le label de question) -->
+        <template v-if="document?.bacs_generator_works_date != null">
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <label class="text-xs text-gray-600">Date des derniers travaux générateur :</label>
             <input type="date" :value="document?.bacs_generator_works_date || ''"
                    @input="e => emit('save-doc', { bacs_generator_works_date: e.target.value || null })"
-                   :class="inputCls"
-                   v-tooltip="'Date des derniers travaux de générateur de chaleur'" />
+                   :class="inputCls" />
             <span v-if="r175_6_applicable" class="text-[11px] px-2 py-0.5 rounded"
                   :class="r175_6_applicable.applies ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'">
               {{ r175_6_applicable.message }}
             </span>
-          </template>
-        </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span class="text-sm text-gray-700">Le bâtiment est-il raccordé à un <strong>réseau urbain de chaleur ou de froid</strong> ?</span>
-          <SegmentedToggle :model-value="districtConnected" @update:model-value="v => districtConnected = v" />
-          <input v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
-                 type="number" min="0" step="0.1"
+          </div>
+        </template>
+        <div v-if="document?.bacs_district_heating_substation_kw !== null && document?.bacs_district_heating_substation_kw !== undefined"
+             class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <label class="text-xs text-gray-600">Puissance station d'échange (kW) :</label>
+          <input type="number" min="0" step="0.1"
                  :value="document?.bacs_district_heating_substation_kw"
                  @input="e => emit('save-doc', { bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
-                 placeholder="Puissance station d'échange (kW)"
-                 :class="inputCls" class="w-64"
-                 v-tooltip="'R175-2 : la puissance de la station d\'échange détermine l\'assujettissement (prime sur le cumul des systèmes en aval).'" />
+                 :class="inputCls" class="w-40" />
         </div>
       </div>
 

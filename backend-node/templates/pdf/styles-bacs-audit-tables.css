@@ -74,16 +74,12 @@ h1, h2, h3 { font-family: 'Poppins', sans-serif; font-weight: 600; margin: 0; }
   font-weight: 700;
   color: var(--buildy-navy);
   letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Pas de troncature : si le titre depasse, on wrap au lieu de couper. */
 }
 .doc-header-sub {
   font-size: 8.5pt;
   color: var(--neutral-500);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Pas de troncature. */
 }
 .doc-header-right { display: flex; flex-direction: column; gap: 1.5mm; align-items: flex-end; flex-shrink: 0; }
 .doc-header-tag {
@@ -299,10 +295,12 @@ table.syn tr.zone-row th {
 table.syn tbody td {
   padding: 1.6mm 2mm;
   border-bottom: 0.3pt solid var(--neutral-100);
-  vertical-align: middle;
-  white-space: nowrap;            /* default : pas de retour ligne */
-  overflow: hidden;
-  text-overflow: ellipsis;
+  vertical-align: top;
+  /* Regle « jamais de troncature silencieuse » : si la cellule deborde,
+     le texte wrap au lieu d'etre coupe par un ellipsis. Le tableau peut
+     gagner en hauteur, mais aucune info n'est masquee. */
+  overflow-wrap: break-word;
+  word-break: normal;
   line-height: 1.3;
 }
 table.syn tbody tr:nth-child(odd) td { background: #fafbfc; }

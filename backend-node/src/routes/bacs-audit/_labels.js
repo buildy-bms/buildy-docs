@@ -142,6 +142,18 @@ const ZONE_NATURE_LABEL = {
   'restroom': 'Sanitaires',
 };
 
+// Natures de zone qui ne sont PAS des zones fonctionnelles au sens BACS
+// (R175-1 6° = espace homogène pour le suivi énergétique). Les tableaux
+// électriques, locaux compteurs et locaux techniques sont des contenants
+// d'équipements de mesure / coupure, pas des unités de suivi. Affichés
+// dans un bloc séparé du PDF (ch.2) pour ne pas polluer la liste des
+// vraies zones fonctionnelles.
+const TECHNICAL_ZONE_NATURES = new Set([
+  'switchboard',     // Tableau électrique
+  'meters',          // Local compteurs
+  'technical-area',  // Local technique générique
+]);
+
 // Item 14 — Régime d'activité d'une zone. Aligne sur ZONE_OCCUPANCY_PROFILES
 // (frontend/src/lib/audit-options.js) et le CHECK constraint migration 158.
 const OCCUPANCY_PROFILE_LABEL = {
@@ -287,6 +299,7 @@ module.exports = {
   APPLICABILITY_LABEL,
   COMPLIANCE_LABEL,
   ZONE_NATURE_LABEL,
+  TECHNICAL_ZONE_NATURES,
   OCCUPANCY_PROFILE_LABEL,
   OWNERSHIP_STRUCTURE_LABEL,
   PARTY_KIND_LABEL,

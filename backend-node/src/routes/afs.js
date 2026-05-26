@@ -432,6 +432,53 @@ async function routes(fastify) {
     } catch (err) {
       log.error({ err }, `PATCH /afs/${id} auditLog.add failed: ${err.message}`);
     }
+
+    // ── Auto-création / sync équipement sous-station ─────────────
+    // Quand l'auditeur saisit ou modifie la puissance de la station
+    // d'échange au site (bacs_district_heating_substation_kw != null),
+    // on (re)synchronise l'équipement « Sous-station réseau de chaleur
+    // urbain » dans le 1er système chauffage présent :
+    //   - création initiale si pas encore présent ;
+    //   - sync de la puissance si déjà présent (user a modifié la
+    //     valeur au site après coup).
+    // La présence de cet équipement déclenche le cas E d'assujettissement
+    // (gestionnaire de réseau exclu, propriétaire assujetti).
+    if ('bacs_district_heating_substation_kw' in body
+        && body.bacs_district_heating_substation_kw != null
+        && (af.kind === 'bacs_audit' || af.kind === 'site_audit')) {
+      try {
+        const { ensureDistrictHeatingSubstationDevice } = require('../lib/bacs-district-heating');
+        const result = ensureDistrictHeatingSubstationDevice(db.db, id);
+        if (result.created) {
+          log.info(`[doc ${id}] Auto-création équipement sous-station (device #${result.deviceId} dans système #${result.systemId})`);
+          db.auditLog.add({
+            afId: id, userId, action: 'bacs.substation.auto_create',
+            payload: { device_id: result.deviceId, system_id: result.systemId, template_name: result.templateName },
+          });
+        } else if (result.reason === 'already-exists') {
+          log.info(`[doc ${id}] Sous-station : puissance resynchronisée sur device #${result.deviceId}`);
+        } else if (result.reason === 'no-heating-system') {
+          log.info(`[doc ${id}] Sous-station non créée : aucun système chauffage présent dans le document`);
+        }
+        // Refresh action items + puissance d'assujettissement systématiquement :
+        // - une création ou une resync de puissance peut générer/modifier
+        //   les actions R175-3 §3 (sous-station non communicante par défaut).
+        // - le cumul de puissance R175-2 doit refléter la valeur de la
+        //   station d'échange (pas du cumul aval).
+        if (result.created || result.reason === 'already-exists') {
+          try {
+            const { regenerateActionItems } = require('../lib/bacs-audit-action-generator');
+            regenerateActionItems(id);
+          } catch (e) {
+            log.warn(`[doc ${id}] regenerateActionItems après sous-station échec : ${e.message}`);
+          }
+        }
+      } catch (err) {
+        // Best-effort : si la création auto échoue, on n'empêche pas
+        // le PATCH de réussir (l'auditeur ajoutera l'équipement à la main).
+        log.warn({ err }, `[doc ${id}] Auto-création sous-station échouée : ${err.message}`);
+      }
+    }
     return updated;
   });
 

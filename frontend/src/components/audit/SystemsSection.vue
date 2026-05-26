@@ -2,14 +2,14 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
-import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
+import SystemSettingsModal from '@/components/audit/SystemSettingsModal.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -148,6 +148,13 @@ const categoryOptions = computed(() => categoryLibrary.value.map(c => ({
   icon: c.icon_value,
   color: c.icon_color,
 })))
+
+// Modale paramètres système (poste négligeable 5 % + surcharge parties).
+// Cf. SystemSettingsModal.vue — les 2 anciens flags sous-station /
+// multi-bâtiments sont supprimés au niveau système (dérivés ailleurs).
+const settingsSystem = ref(null)
+function openSystemSettings(s) { settingsSystem.value = s }
+function closeSystemSettings() { settingsSystem.value = null }
 
 const addingUsageZone = ref(null)   // zone_id en cours de saisie
 const newUsageValue = ref(null)     // key de catégorie OU texte libre
@@ -357,6 +364,15 @@ onBeforeUnmount(teardownSortables)
                   <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
                                    @update:model-value="v => setPresence(s, v)" />
                   <div class="flex items-center gap-1 shrink-0 justify-self-end">
+                    <!-- Paramètres système : poste négligeable + surcharge parties -->
+                    <button
+                      type="button"
+                      :disabled="!s.present"
+                      @click="openSystemSettings(s)"
+                      class="btn-icon"
+                      v-tooltip="'Paramètres du système (poste négligeable, parties assujetties)'">
+                      <Cog6ToothIcon class="w-4 h-4" />
+                    </button>
                     <button
                       type="button"
                       :disabled="!s.present"
@@ -397,44 +413,19 @@ onBeforeUnmount(teardownSortables)
                       Boucle ECS : arrêt interdit (arrêté du 30 nov. 2005 — risque légionelle).
                     </span>
                   </div>
-                  <!-- Item 1 — règle des 5 % -->
-                  <div class="space-y-1.5">
-                    <div class="flex items-center gap-3">
-                      <span class="text-xs text-gray-700">Ce poste est-il négligeable (moins de 5 % de la consommation totale) ?
-                        <template v-if="systemWeightPct(s) != null">
-                          <span :class="['ml-1 font-mono text-[11px]', systemWeightPct(s) > 10 ? 'text-amber-600 font-semibold' : 'text-gray-400']">
-                            (poids estimé ~{{ systemWeightPct(s) }} %)
-                          </span>
-                          <R175Tooltip class="ml-0.5 align-middle">
-                            <div class="font-semibold text-gray-800 mb-1.5">Comment le poids est-il estimé ?</div>
-                            <div class="text-xs text-gray-600 leading-relaxed space-y-2">
-                              <p>Faute de relevés de consommation réels, le poids est approximé à partir de la <strong>puissance installée</strong> :</p>
-                              <div class="rounded-md bg-slate-50 border border-slate-200 px-2.5 py-2 text-center text-[11px] text-slate-700">
-                                <div class="font-medium">puissance cumulée des équipements de ce système</div>
-                                <div class="text-slate-400">(puissance × quantité)</div>
-                                <div class="my-1 border-t border-slate-300"></div>
-                                <div class="font-medium">puissance installée totale de tous les systèmes du site</div>
-                              </div>
-                              <p class="rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-amber-800">
-                                La règle des 5 % du décret repose sur la <strong>consommation réelle</strong> : ce pourcentage n'en est qu'une approximation indicative.
-                              </p>
-                            </div>
-                          </R175Tooltip>
-                        </template>
-                      </span>
-                      <SegmentedToggle :model-value="triState(s.marked_negligible_under_5pct)"
-                                       @update:model-value="v => toggleNegligible(s, v)" />
+                  <!-- Items 1 & 4 (poste négligeable + surcharge parties)
+                       déplacés dans SystemSettingsModal (bouton ⚙️ au-dessus).
+                       Affichage en lecture seule des deux indicateurs clés
+                       (badge négligeable + badge assujetti) si renseignés,
+                       pour que le contenu de la modal reste visible d'un
+                       coup d'œil sur la card. -->
+                  <div v-if="s.marked_negligible_under_5pct"
+                       class="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5">
+                    <span class="text-sm">ℹ️</span>
+                    <div class="text-[11px] text-amber-800 leading-snug">
+                      <strong>Poste négligeable (&lt; 5 %)</strong>
+                      <span v-if="s.negligible_justification" class="text-amber-700"> — {{ s.negligible_justification }}</span>
                     </div>
-                    <input v-if="s.marked_negligible_under_5pct"
-                           type="text"
-                           :value="s.negligible_justification || ''"
-                           @change="e => patchSystem(s, { negligible_justification: e.target.value })"
-                           placeholder="Justification (ex : petits ballons ECS individuels, groupe de secours…)"
-                           class="w-full text-xs rounded-md border-gray-200 focus:border-indigo-400 focus:ring-indigo-400/30 py-1.5 px-2.5" />
-                  </div>
-                  <!-- Item 4 — assujettissement : parties + flags cas E/F -->
-                  <div class="border-t border-gray-100 pt-2.5">
-                    <SystemPartiesPanel :system="s" />
                   </div>
                 </div>
 
@@ -492,5 +483,12 @@ onBeforeUnmount(teardownSortables)
         Aucune zone définie pour ce site. Ajoute-en depuis la section ci-dessus.
       </div>
     </div>
+    <!-- Modale paramètres système : 5 % + surcharge parties assujetties -->
+    <SystemSettingsModal
+      v-if="settingsSystem"
+      :system="settingsSystem"
+      :system-weight-pct="systemWeightPct(settingsSystem)"
+      @close="closeSystemSettings"
+      @patched="refreshAuditData" />
   </CollapsibleSection>
 </template>

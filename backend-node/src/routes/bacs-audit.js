@@ -100,7 +100,11 @@ async function routes(fastify) {
       // Item 1 — règle des 5 % : poste considéré comme négligeable.
       marked_negligible_under_5pct: z.boolean().nullable().optional(),
       negligible_justification: z.string().nullable().optional(),
-      // Item 4c/4e — flags d'assujettissement par périmètre.
+      // Refactor 2026-05-26 — is_district_heating_substation /
+      // serves_multiple_buildings ne sont plus saisis sur le système :
+      // dérivés du modèle d'équipement (slug 'sous-station-reseau-urbain')
+      // et du flag `serves_multiple_buildings` sur le device (mig 175).
+      // Champs schéma laissés tolérants pour compat descendante client.
       is_district_heating_substation: z.boolean().nullable().optional(),
       serves_multiple_buildings: z.boolean().nullable().optional(),
     });
@@ -130,8 +134,10 @@ async function routes(fastify) {
     boolField('meets_r175_3_p4_autonomous');
     boolField('managed_by_bms');
     boolField('marked_negligible_under_5pct');
-    boolField('is_district_heating_substation');
-    boolField('serves_multiple_buildings');
+    // Refactor 2026-05-26 — les 2 anciens flags d'assujettissement
+    // (E sous-station / F multi-bâtiments) ne sont plus persistés
+    // au niveau système : dérivés des devices côté lecture.
+    // Si un client legacy envoie quand même, on ignore silencieusement.
     if ('is_looped' in body) { sets.push('is_looped = ?'); args.push(body.is_looped); }
     if ('negligible_justification' in body) { sets.push('negligible_justification = ?'); args.push(body.negligible_justification); }
     if ('notes_html' in body) { sets.push('notes_html = ?'); args.push(body.notes_html); }
@@ -244,10 +250,39 @@ async function routes(fastify) {
     const systems = db.db.prepare(
       'SELECT id, zone_id, system_category, is_district_heating_substation, serves_multiple_buildings FROM bacs_audit_systems WHERE document_id = ?'
     ).all(id);
+    // Refactor 2026-05-26 — dérive is_district_heating_substation et
+    // serves_multiple_buildings depuis les devices (mig 175). Le slug
+    // 'sous-station-reseau-urbain' identifie le modèle d'équipement marqueur.
+    const substationTplRow = db.db.prepare(
+      "SELECT id FROM equipment_templates WHERE slug = 'sous-station-reseau-urbain'"
+    ).get();
+    const substationTplId = substationTplRow ? substationTplRow.id : null;
+    const allDevices = db.db.prepare(
+      'SELECT system_id, equipment_template_id, serves_multiple_buildings FROM bacs_audit_system_devices WHERE system_id IN (SELECT id FROM bacs_audit_systems WHERE document_id = ?)'
+    ).all(id);
+    const devicesBySystem = new Map();
+    for (const d of allDevices) {
+      if (!devicesBySystem.has(d.system_id)) devicesBySystem.set(d.system_id, []);
+      devicesBySystem.get(d.system_id).push(d);
+    }
+    const enrichedSystems = systems.map(s => {
+      const devs = devicesBySystem.get(s.id) || [];
+      const derivedSubstation = substationTplId
+        ? devs.some(d => d.equipment_template_id === substationTplId)
+        : false;
+      const derivedMultiBuildings = devs.some(d => d.serves_multiple_buildings === 1);
+      return {
+        ...s,
+        is_district_heating_substation: derivedSubstation
+          ? 1 : s.is_district_heating_substation,
+        serves_multiple_buildings: derivedMultiBuildings
+          ? 1 : s.serves_multiple_buildings,
+      };
+    });
     const zonePartyLinks = site ? db.zoneParties.listBySite(site.site_id) : [];
     const systemPartyLinks = db.systemParties.listByDocument(id);
     const liabilityMap = computeSystemLiability({
-      site, parties, systems, zonePartyLinks, systemPartyLinks,
+      site, parties, systems: enrichedSystems, zonePartyLinks, systemPartyLinks,
     });
     const bySystem = {};
     for (const [sysId, info] of liabilityMap) bySystem[sysId] = info;
@@ -1145,6 +1180,11 @@ async function routes(fastify) {
       // Mig 172 : validation forcee — l'auditeur considere l'equipement
       // valide meme si tous les champs ne sont pas renseignes.
       validation_forced: z.boolean().nullable().optional(),
+      // Mig 175 : l'equipement dessert plusieurs batiments (chaudiere
+      // centrale, GPC, sous-station…). Deplace depuis le niveau systeme
+      // — c'est l'equipement physique qui a cette caracteristique, pas
+      // l'usage en abstrait.
+      serves_multiple_buildings: z.boolean().nullable().optional(),
     });
     const schema = schemaPatch;
     let body;

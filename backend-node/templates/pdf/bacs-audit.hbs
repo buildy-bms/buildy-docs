@@ -445,16 +445,25 @@
 {{#if isBacs}}{{#if heatingCoolingBreakdown.length}}
 <div class="panel">
   <div class="panel-head">
-    <h3 class="panel-title">Détail du calcul automatique de la puissance</h3>
+    <h3 class="panel-title">Détail du calcul automatique de la puissance R175-2</h3>
     <p class="panel-subtitle">
-      Somme des puissances nominales utiles des équipements saisis dans les catégories
-      <strong>chauffage</strong> et <strong>climatisation</strong> (chapitre 3).
+      Cumul des puissances nominales utiles chaud et froid déclarées dans le chapitre 3.
+      Certains équipements (réseau urbain aval, secours, biomasse) sont saisis mais
+      <strong>hors cumul R175-2</strong> — leur ligne « Pris en compte » est marquée.
+      La puissance retenue est le <strong>maximum</strong> entre le cumul chaud et le cumul froid.
     </p>
   </div>
   <div class="panel-body">
     <table>
       <thead>
-        <tr><th>Équipement</th><th>Marque / référence</th><th>Catégorie</th><th>Zone</th><th>Puissance</th></tr>
+        <tr>
+          <th>Équipement</th>
+          <th>Marque / référence</th>
+          <th>Catégorie</th>
+          <th>Zone</th>
+          <th style="text-align:right">Puissance nominale</th>
+          <th style="text-align:right">Pris en compte</th>
+        </tr>
       </thead>
       <tbody>
         {{#each heatingCoolingBreakdown}}
@@ -463,12 +472,29 @@
             <td>{{brand}}{{#if model_reference}} / {{model_reference}}{{/if}}</td>
             <td>{{categoryLabel}}</td>
             <td>{{zone_name}}</td>
-            <td><strong>{{#if has_multiple}}{{total_power_kw}}{{else}}{{power_kw}}{{/if}} kW</strong>{{#if has_multiple}} ({{quantity}}&times;{{power_kw}}){{/if}}</td>
+            <td style="text-align:right">{{#if has_multiple}}{{total_power_kw}}{{else}}{{power_kw}}{{/if}} kW{{#if has_multiple}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{/if}}</td>
+            <td style="text-align:right">
+              {{#if in_scope}}
+                {{#if heat_contrib}}<strong>+{{heat_contrib}} kW</strong> chaud{{/if}}
+                {{#if cool_contrib}}{{#if heat_contrib}}<br>{{/if}}<strong>+{{cool_contrib}} kW</strong> froid{{/if}}
+                {{#unless heat_contrib}}{{#unless cool_contrib}}<span class="muted">0 kW</span>{{/unless}}{{/unless}}
+              {{else}}
+                <span class="muted">Hors cumul</span>
+              {{/if}}
+            </td>
           </tr>
         {{/each}}
         <tr class="total-row">
-          <td colspan="4" style="text-align:right"><strong>Total chauffage + climatisation</strong></td>
-          <td><strong>{{heatingCoolingTotal}} kW</strong></td>
+          <td colspan="5" style="text-align:right"><strong>Cumul chaud retenu</strong></td>
+          <td style="text-align:right"><strong>{{powerRecap.heatRetained}} kW</strong></td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="5" style="text-align:right"><strong>Cumul froid retenu</strong></td>
+          <td style="text-align:right"><strong>{{powerRecap.coolRetained}} kW</strong></td>
+        </tr>
+        <tr class="total-row" style="background:#eef2ff">
+          <td colspan="5" style="text-align:right"><strong>Puissance retenue R175-2 (max chaud / froid)</strong></td>
+          <td style="text-align:right"><strong style="color:#1b2842">{{powerRecap.retained}} kW</strong></td>
         </tr>
       </tbody>
     </table>
@@ -490,18 +516,27 @@
 {{!-- ═══════════ Chapitre 2 — Zones fonctionnelles ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="zones">{{{faIcon "map-pin" "#1b2842" "16"}}} 2. Zones fonctionnelles{{#if isBacs}} (R175-1 6°){{/if}}</h1>
 {{#if zones.length}}
+{{!-- ── Bloc 1 — Inventaire des zones fonctionnelles BACS ──
+     Espaces de vie/usage homogènes au sens R175-1 6°. --}}
+{{#if zonesFunctional.length}}
+<h2 class="subheading">Inventaire des zones fonctionnelles</h2>
 <table>
   <thead><tr><th>Zone</th><th>Nature</th><th>Régime d'activité</th><th>Surface (m²)</th></tr></thead>
   <tbody>
-    {{#each zones}}
-      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td><td>{{surface_m2}}</td></tr>
+    {{#each zonesFunctional}}
+      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td><td>{{#if surface_m2}}{{surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
     {{/each}}
   </tbody>
 </table>
-{{#each zones}}
+{{!-- Notes terrain par zone (uniquement si au moins une zone a une note
+     ou photo). Regroupées sous un sous-titre dédié pour que les blocs
+     individuels n'apparaissent pas hors contexte. --}}
+{{#if zonesFunctionalHaveNotes}}
+<h3 class="subheading-3">Notes terrain par zone</h3>
+{{#each zonesFunctional}}
   {{#if (or notes_html notes photos.length comfort_constraint)}}
     <div class="entity-block">
-      <h3>{{name}}</h3>
+      <h4>{{name}}</h4>
       {{#if comfort_constraint}}
         <p class="muted" style="margin-bottom:1.5mm"><strong>Contrainte de confort :</strong> {{comfort_constraint}}</p>
       {{/if}}
@@ -515,10 +550,50 @@
     </div>
   {{/if}}
 {{/each}}
+{{/if}}
+{{/if}}
 
-{{!-- Item 7d/7e — zones fonctionnelles de suivi (regroupement BACS) --}}
+{{!-- ── Bloc 2 — Locaux techniques (hors périmètre R175-1 6°) ──
+     Tableaux électriques, locaux compteurs : inventoriés pour rattacher
+     les organes de mesure / coupure à un emplacement physique. --}}
+{{#if zonesTechnical.length}}
+<h2 class="subheading">Locaux techniques</h2>
+<div class="callout callout-info">
+  <span class="callout-icon">📌</span>
+  <div class="callout-body">Les locaux techniques (tableaux électriques, locaux compteurs, locaux techniques) ne sont <strong>pas des zones fonctionnelles au sens du décret BACS</strong>. Ils sont listés ici à titre d'inventaire pour rattacher les compteurs et organes de coupure à un emplacement physique.</div>
+</div>
+<table>
+  <thead><tr><th>Local</th><th>Nature</th><th>Surface (m²)</th></tr></thead>
+  <tbody>
+    {{#each zonesTechnical}}
+      <tr><td>{{name}}</td><td>{{natureLabel}}</td><td>{{#if surface_m2}}{{surface_m2}}{{else}}<span class="muted">—</span>{{/if}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if zonesTechnicalHaveNotes}}
+<h3 class="subheading-3">Notes terrain par local technique</h3>
+{{#each zonesTechnical}}
+  {{#if (or notes_html notes photos.length)}}
+    <div class="entity-block">
+      <h4>{{name}}</h4>
+      {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
+      {{else}}{{#if notes}}<p>{{notes}}</p>{{/if}}{{/if}}
+      {{#if photos.length}}
+        <div class="photo-grid">
+          {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+        </div>
+      {{/if}}
+    </div>
+  {{/if}}
+{{/each}}
+{{/if}}
+{{/if}}
+
+{{!-- ── Bloc 3 — Regroupement R175 par usage technique ──
+     Items 7d/7e : zones d'usage regroupées en "zones fonctionnelles de
+     suivi" lorsqu'un équipement partagé empêche le comptage séparé. --}}
 {{#if functionalZones.mergedCount}}
-<h2 class="subheading">Zones fonctionnelles de suivi</h2>
+<h2 class="subheading">Regroupement par usage technique</h2>
 <div class="callout callout-info">
   <span class="callout-icon">📌</span>
   <div class="callout-body">Au sens du décret (R175-1 6°), une zone fonctionnelle est une <strong>unité de suivi énergétique</strong>. Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi. Le découpage peut donc différer selon le système technique concerné.</div>
@@ -526,7 +601,7 @@
 {{#each functionalZones.byCategory}}
   {{#if (gt functional_zone_count 0)}}
   <div class="entity-block">
-    <h3>{{categoryLabel}} — {{physical_zone_count}} zone{{#unless (eq physical_zone_count 1)}}s{{/unless}} d'usage → {{functional_zone_count}} zone{{#unless (eq functional_zone_count 1)}}s{{/unless}} fonctionnelle{{#unless (eq functional_zone_count 1)}}s{{/unless}} de suivi</h3>
+    <h3 class="fz-heading">{{{categoryIcon category "14"}}} <span>{{categoryLabel}} — {{physical_zone_count}} zone{{#unless (eq physical_zone_count 1)}}s{{/unless}} d'usage → {{functional_zone_count}} zone{{#unless (eq functional_zone_count 1)}}s{{/unless}} fonctionnelle{{#unless (eq functional_zone_count 1)}}s{{/unless}} de suivi</span></h3>
     <ul class="method-list">
       {{#each groups}}
         <li>
@@ -545,6 +620,22 @@
 
 {{!-- ═══════════ Chapitre 3 — Systèmes techniques ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="systems">{{{faIcon "wrench" "#1b2842" "16"}}} 3. Systèmes techniques par zone{{#if isBacs}} (R175-1 4°){{/if}}</h1>
+{{!-- Zones fonctionnelles sans système thermique présent : hors
+     périmètre R175-2 (pas de chauffage / climatisation / ECS). Listées
+     ici pour clarifier pourquoi elles n'apparaissent pas dans
+     l'inventaire ci-dessous. --}}
+{{#if zonesOutOfBacsScope.length}}
+<div class="callout callout-info">
+  <span class="callout-icon">📌</span>
+  <div class="callout-body">
+    <strong>Zones hors périmètre R175-2 :</strong> aucun système de
+    chauffage, climatisation ou ECS n'est présent dans
+    {{#each zonesOutOfBacsScope}}<strong>{{name}}</strong>{{#unless @last}}, {{/unless}}{{/each}}.
+    Ces zones ne sont donc pas listées ci-dessous et n'entrent pas dans
+    le cumul de puissance d'assujettissement.
+  </div>
+</div>
+{{/if}}
 {{#each systemsByZone}}
 <h2 class="zone-heading">{{zone_name}}</h2>
 {{#each items}}
@@ -588,47 +679,30 @@
         </div>
         {{/if}}{{/if}}
         {{#if devices.length}}
-          <table class="device-table">
-            <thead>
-              <tr>
-                <th style="width:24%">Équipement</th>
-                <th style="width:20%">Marque / réf.</th>
-                <th style="width:9%">Énergie</th>
-                <th style="width:8%">Puiss.</th>
-                <th style="width:11%">Nature</th>
-                <th style="width:14%">Communication</th>
-                <th style="width:14%">Localisation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{#each devices}}
-                <tr {{#if out_of_service}}style="opacity:0.5"{{/if}}>
-                  <td>
+          {{!--
+            Refonte v2.x : passage du tableau dense (qui wrap mal en
+            colonnes étroites) à une série de cards par équipement.
+            Header : nom + brand/ref + badge partagé · R175-3 pills à droite.
+            Body : grille d'attributs horizontaux (Énergie, Puissance,
+            Nature, Communication, Localisation) — lisible quel que soit
+            le nombre d'équipements (cohérence demandée).
+          --}}
+          <div class="device-cards">
+            {{#each devices}}
+              <div class="device-card" {{#if out_of_service}}style="opacity:0.55"{{/if}}>
+                <div class="device-card-head">
+                  <div class="device-card-title">
                     <strong>{{name}}</strong>
-                    {{#if out_of_service}}<span style="color:#b91c1c;font-weight:600"> · HS</span>{{/if}}
-                    {{!-- Item 7f — badge équipement partagé entre plusieurs zones --}}
+                    {{#if brand}}<span class="device-card-ref"> · {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}
+                    {{#if out_of_service}}<span class="device-card-hs">HS</span>{{/if}}
                     {{#if shared_zone_count}}
-                      <span class="shared-badge" title="Équipement partagé">↔ Partagé entre {{add shared_zone_count 1}} zones</span>
+                      <span class="shared-badge" title="Équipement partagé">↔ {{add shared_zone_count 1}} zones</span>
                     {{/if}}
-                  </td>
-                  <td>{{brand}}{{#if model_reference}} <span class="muted">/ {{model_reference}}</span>{{/if}}</td>
-                  <td>{{energyLabel}}</td>
-                  <td>
-                    {{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{/if}}{{/if}}
-                    {{#if power_kw_cooling}}<span class="muted"> · froid {{power_kw_cooling}} kW</span>{{/if}}
-                    {{!-- Item 8 — type de calcul retenu pour la traçabilité --}}
-                    {{#if powerCalc}}{{#if powerCalc.inScope}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else}}<span class="device-power-calc device-power-calc-out">hors cumul</span>{{/if}}{{/if}}
-                  </td>
-                  <td>{{roleLabel}}</td>
-                  <td>{{commLabel}}</td>
-                  <td>{{location}}</td>
-                </tr>
-                {{#if ../is_bacs}}
-                <tr class="r175-3-row" {{#if out_of_service}}style="opacity:0.5"{{/if}}>
-                  <td colspan="7" style="padding-top:0.5mm;padding-bottom:2mm;font-size:7.5pt;border-bottom:1px solid #f3f4f6">
-                    <span class="r175-3-label">R175-3 :</span>
-                    <span class="r175-3-pill {{#if meets_r175_3_p3}}r175-3-ok{{else}}r175-3-ko{{/if}}">
-                      {{#if meets_r175_3_p3}}✓{{else}}✗{{/if}} Interopérable
+                  </div>
+                  {{#if ../is_bacs}}
+                  <div class="device-card-r175">
+                    <span class="r175-3-pill {{triCls meets_r175_3_p3 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
+                      {{triSym meets_r175_3_p3}} Interopérable
                     </span>
                     <span class="r175-3-pill {{triCls meets_r175_3_p4 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4}} Arrêt manuel
@@ -636,15 +710,55 @@
                     <span class="r175-3-pill {{triCls meets_r175_3_p4_autonomous 'r175-3-ok' 'r175-3-ko' 'r175-3-na'}}">
                       {{triSym meets_r175_3_p4_autonomous}} Autonome
                     </span>
-                  </td>
-                </tr>
+                  </div>
+                  {{/if}}
+                </div>
+                <div class="device-card-attrs">
+                  <div class="device-attr">
+                    <span class="device-attr-label">Énergie</span>
+                    <span class="device-attr-value">{{energyLabel}}</span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Puissance</span>
+                    <span class="device-attr-value">
+                      {{#if has_multiple}}{{total_power_kw}} kW <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}} kW{{else}}—{{/if}}{{/if}}{{#if power_kw_cooling}} <span class="muted">· froid {{power_kw_cooling}} kW</span>{{/if}}
+                      {{#if powerCalc}}{{#if powerCalc.inScope}}<span class="device-power-calc">{{powerCalc.typeLabel}}</span>{{else}}<span class="device-power-calc device-power-calc-out">hors cumul</span>{{/if}}{{/if}}
+                    </span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Nature</span>
+                    <span class="device-attr-value">{{roleLabel}}</span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Communication</span>
+                    <span class="device-attr-value">{{commLabel}}</span>
+                  </div>
+                  <div class="device-attr">
+                    <span class="device-attr-label">Localisation</span>
+                    <span class="device-attr-value">{{#if location}}{{location}}{{else}}—{{/if}}</span>
+                  </div>
+                </div>
+                {{!-- Notes et photos du device, integrees dans la card pour eviter
+                     le bloc separe avec titre dupliqué. --}}
+                {{#if (or notes_html photos.length)}}
+                <div class="device-card-notes">
+                  {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
+                  {{#if photos.length}}
+                    <div class="photo-grid">
+                      {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
+                    </div>
+                  {{/if}}
+                </div>
                 {{/if}}
-              {{/each}}
-            </tbody>
-          </table>
+              </div>
+            {{/each}}
+          </div>
         {{else}}
           <p class="muted">Système marqué présent mais aucun équipement détaillé n'a été saisi.</p>
         {{/if}}
+        {{!-- Notes/photos au niveau systeme (commentaires globaux sur la
+             categorie, distincts des notes par equipement integrees dans
+             chaque device-card). --}}
         {{#if (or notes_html notes photos.length)}}
         <div class="system-card-notes">
           {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>
@@ -656,19 +770,6 @@
           {{/if}}
         </div>
         {{/if}}
-        {{#each devices}}
-          {{#if (or notes_html photos.length)}}
-            <div class="device-notes">
-              <strong class="muted">{{name}}{{#if brand}} — {{brand}}{{/if}}{{#if model_reference}} {{model_reference}}{{/if}}</strong>
-              {{#if notes_html}}<div class="rich-notes">{{{notes_html}}}</div>{{/if}}
-              {{#if photos.length}}
-                <div class="photo-grid">
-                  {{#each photos}}<img src="{{dataUrl}}" alt="" />{{/each}}
-                </div>
-              {{/if}}
-            </div>
-          {{/if}}
-        {{/each}}
       </div>
     </div>
   {{else}}
@@ -683,7 +784,7 @@
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "16"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
-{{#if meters.length}}
+{{#if metersForPdf.length}}
 <table>
   <thead>
     <tr>
@@ -692,7 +793,7 @@
     </tr>
   </thead>
   <tbody>
-    {{#each meters}}
+    {{#each metersForPdf}}
       <tr>
         <td>{{zoneLabel}}</td>
         <td>{{{meterUsagePill usage}}}</td>
@@ -706,6 +807,13 @@
     {{/each}}
   </tbody>
 </table>
+{{#if (gt meters.length metersForPdf.length)}}
+<p class="muted" style="font-size: 7pt; margin-top: 1mm">
+  Note : {{minus meters.length metersForPdf.length}} compteur{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
+  ni requis ni présent{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}} non listé{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
+  dans ce tableau (zéro information actionnable).
+</p>
+{{/if}}
 {{#if metersWithDetails.length}}
 <h3 class="subheading">Notes terrain & photos</h3>
 <p class="muted" style="margin: -1mm 0 2mm">Détails relevés par l'auditeur sur les compteurs du tableau ci-dessus.</p>
@@ -1203,33 +1311,41 @@
 </div>
 {{/if}}
 
+{{!--
+  Plan d'action — refonte v2.x : les actions répétitives (≥3 du même
+  source_subtype) sont condensées en cartes groupées avec tableau interne.
+  Les actions isolées conservent l'affichage carte classique.
+  Le helper `actionItemsGrouped` est construit côté _export-data.js.
+--}}
 {{#if actionItems.blocking.length}}
 <h2>{{#if isBacs}}Actions bloquantes{{else}}Préconisations essentielles{{/if}}</h2>
 <div class="callout callout-warn">
   <span class="callout-icon">⚠️</span>
   <div class="callout-body">{{#if isBacs}}Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.{{else}}Préconisations à intégrer en priorité dans le devis Buildy — extension critique de la couverture GTB.{{/if}}</div>
 </div>
-{{#each actionItems.blocking}}
-<div class="action-card">
-  <div class="action-card-head">
-    <span class="action-num">{{display_number}}</span>
-    <span class="sev sev-blocking">Bloquante</span>
-    <span class="muted action-card-article">{{r175_article}}</span>
-    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
-  </div>
-  <div class="action-card-title"><strong>{{title}}</strong></div>
-  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-  {{#if alternative_solutions_html}}
-    <div class="alt-solutions">
-      <p class="alt-solutions-label">Préconisations Buildy :</p>
-      {{{alternative_solutions_html}}}
-    </div>
+{{#each actionItemsGrouped.blocking}}
+  {{#if (eq kind "group")}}
+    {{> _action-group sev="blocking" sevLabel="Bloquantes" sevClass="sev-blocking"}}
   {{else}}
-    <div class="alt-solutions-missing">
-      ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
+    {{#with item}}
+    <div class="action-card">
+      <div class="action-card-head">
+        <span class="action-num">{{display_number}}</span>
+        <span class="sev sev-blocking">Bloquante</span>
+        <span class="muted action-card-article">{{r175_article}}</span>
+        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+      </div>
+      <div class="action-card-title"><strong>{{title}}</strong></div>
+      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+      {{#if alternative_solutions_html}}
+        <div class="alt-solutions">
+          <p class="alt-solutions-label">Préconisations Buildy :</p>
+          {{{alternative_solutions_html}}}
+        </div>
+      {{/if}}
     </div>
+    {{/with}}
   {{/if}}
-</div>
 {{/each}}
 {{/if}}
 
@@ -1239,27 +1355,29 @@
   <span class="callout-icon">📖</span>
   <div class="callout-body">{{#if isBacs}}Impact direct sur les exigences fonctionnelles R175-3.{{else}}Améliorations significatives de la couverture GTB recommandées dans le devis.{{/if}}</div>
 </div>
-{{#each actionItems.major}}
-<div class="action-card">
-  <div class="action-card-head">
-    <span class="action-num">{{display_number}}</span>
-    <span class="sev sev-major">{{#if ../isBacs}}Majeure{{else}}Recommandée{{/if}}</span>
-    {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
-  </div>
-  <div class="action-card-title"><strong>{{title}}</strong></div>
-  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-  {{#if alternative_solutions_html}}
-    <div class="alt-solutions">
-      <p class="alt-solutions-label">Préconisations Buildy :</p>
-      {{{alternative_solutions_html}}}
-    </div>
+{{#each actionItemsGrouped.major}}
+  {{#if (eq kind "group")}}
+    {{> _action-group sev="major" sevLabel="Majeures" sevClass="sev-major"}}
   {{else}}
-    <div class="alt-solutions-missing">
-      ⚠ <strong>Aucune préconisation renseignée pour cette action.</strong>
+    {{#with item}}
+    <div class="action-card">
+      <div class="action-card-head">
+        <span class="action-num">{{display_number}}</span>
+        <span class="sev sev-major">{{#if ../../isBacs}}Majeure{{else}}Recommandée{{/if}}</span>
+        {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
+        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+      </div>
+      <div class="action-card-title"><strong>{{title}}</strong></div>
+      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+      {{#if alternative_solutions_html}}
+        <div class="alt-solutions">
+          <p class="alt-solutions-label">Préconisations Buildy :</p>
+          {{{alternative_solutions_html}}}
+        </div>
+      {{/if}}
     </div>
+    {{/with}}
   {{/if}}
-</div>
 {{/each}}
 {{/if}}
 
@@ -1269,17 +1387,23 @@
   <span class="callout-icon">📌</span>
   <div class="callout-body">{{#if isBacs}}Bonnes pratiques, hors strict décret.{{else}}Bonnes pratiques optionnelles, à proposer en option dans le devis.{{/if}}</div>
 </div>
-{{#each actionItems.minor}}
-<div class="action-card action-card-minor">
-  <div class="action-card-head">
-    <span class="action-num">{{display_number}}</span>
-    <span class="sev sev-minor">{{#if ../isBacs}}Mineure{{else}}Optimisation{{/if}}</span>
-    {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-    {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
-  </div>
-  <div class="action-card-title"><strong>{{title}}</strong></div>
-  {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-</div>
+{{#each actionItemsGrouped.minor}}
+  {{#if (eq kind "group")}}
+    {{> _action-group sev="minor" sevLabel="Optimisations" sevClass="sev-minor"}}
+  {{else}}
+    {{#with item}}
+    <div class="action-card action-card-minor">
+      <div class="action-card-head">
+        <span class="action-num">{{display_number}}</span>
+        <span class="sev sev-minor">{{#if ../../isBacs}}Mineure{{else}}Optimisation{{/if}}</span>
+        {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
+        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+      </div>
+      <div class="action-card-title"><strong>{{title}}</strong></div>
+      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+    </div>
+    {{/with}}
+  {{/if}}
 {{/each}}
 {{/if}}
 
@@ -1385,7 +1509,7 @@
       <li><strong>Systèmes thermodynamiques</strong> (PAC, DRV, climatisation) — la puissance retenue est le maximum déclaré entre puissance calorifique et frigorifique (norme EN 14511) ; la machine ne compte qu'une fois.</li>
       <li><strong>Chaudières</strong> — somme des puissances nominales constructeur.</li>
       <li><strong>Effet joule</strong> (radiateurs et batteries électriques) — somme des puissances électriques.</li>
-      <li><strong>Réseau de chaleur ou de froid urbain</strong> — puissance nominale de la sous-station (échangeur primaire).</li>
+      <li><strong>Réseau de chaleur ou de froid urbain</strong> — puissance nominale de la sous-station (échangeur primaire). Les <strong>émetteurs aval</strong> alimentés par cette sous-station (radiateurs eau chaude, ventilo-convecteurs sur boucle secondaire, batteries CTA alimentées en eau du réseau urbain) ne sont <strong>pas additionnés</strong> au cumul — seule la puissance de l'échangeur est retenue, conformément à R175-2 §I.</li>
       <li><strong>Exclus du cumul</strong> — équipements de secours, systèmes mobiles, appareils indépendants de chauffage au bois, systèmes non destinés au chauffage ou à la climatisation.</li>
     </ul>
     <p class="method-body" style="margin-top: 2mm;">La puissance chaud cumulée et la puissance froid cumulée ne s'additionnent pas : la puissance retenue est le maximum des deux. La valeur calculée peut être surchargée manuellement par l'auditeur ; tout écart supérieur à 10 % entre le calcul et la saisie manuelle est signalé.</p>
