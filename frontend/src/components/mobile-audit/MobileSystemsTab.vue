@@ -81,10 +81,30 @@ function openThermalSheet(zoneId, category) {
 }
 function closeThermalSheet() { thermalSheetTarget.value = null }
 
+// ── Navigation drill-down (N1 zones → N2 usages → N3 détail usage) ──
+// L'ancienne liste plate dépliait toutes les zones d'un coup, ce qui
+// remplissait l'écran. Maintenant on entre par la liste des zones puis
+// dans les usages d'une zone, et seulement ensuite dans le détail.
+const currentView = ref('zones') // 'zones' | 'usages'
+const selectedZoneId = ref(null)
+const selectedZone = computed(() =>
+  (zones.value || []).find(z => z.zone_id === selectedZoneId.value) || null,
+)
+const absentUsagesCollapsed = ref(true)
+function goToZone(zoneId) {
+  selectedZoneId.value = zoneId
+  absentUsagesCollapsed.value = true
+  currentView.value = 'usages'
+  // Repart en haut sur la nouvelle vue, sinon on hérite du scroll précédent.
+  nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+}
+function goBackToZones() {
+  currentView.value = 'zones'
+  selectedZoneId.value = null
+}
+
 // ── Drill-down par usage ────────────────────────────────────────────
-// La liste par zone n'affiche que les usages + leur présent/absent.
-// Taper un usage présent ouvre une page dédiée avec ses équipements et
-// sa régulation thermique.
+// Taper un usage présent ouvre la page dédiée (équipements + régulation).
 const openedUsageId = ref(null)
 const openedUsage = computed(() =>
   systems.value.find(s => s.id === openedUsageId.value) || null,
@@ -121,18 +141,17 @@ const ROLE_OPTIONS = ROLE_OPTIONS_DECORATED
 // Libellé d'un usage : catégorie BACS, ou nom libre si usage manuel.
 function usageLabel(s) { return systemUsageLabel(s) }
 
-const collapsedZones = ref(new Set())
-
-// Focus inter-tab : MobileChecklistTab navigue ici avec un system_id à
-// mettre en avant. On déplie la zone, scrolle vers la card, et applique
-// un anneau ambre temporaire pour l'identifier visuellement.
+// Focus inter-tab : MobileChecklistTab (KPIs) bascule ici avec un
+// system_id à mettre en avant. En mode drill-down on navigue directement
+// dans la zone du système puis on ouvre son détail (présent) ou on le
+// laisse visible (à renseigner / absent).
 const focusedSystemId = ref(null)
 watch(() => audit.pendingFocus, (focus) => {
   if (!focus || focus.kind !== 'systems' || focus.id == null) return
   const sys = systems.value.find(s => s.id === focus.id)
   if (sys) {
-    collapsedZones.value.delete(sys.zone_id)
-    collapsedZones.value = new Set(collapsedZones.value)
+    selectedZoneId.value = sys.zone_id
+    currentView.value = 'usages'
     focusedSystemId.value = sys.id
     nextTick(() => {
       const el = window.document.querySelector(`[data-system-id="${sys.id}"]`)
@@ -142,12 +161,6 @@ watch(() => audit.pendingFocus, (focus) => {
   }
   audit.pendingFocus = null
 }, { immediate: true })
-
-function toggleZone(zoneId) {
-  const s = new Set(collapsedZones.value)
-  if (s.has(zoneId)) s.delete(zoneId); else s.add(zoneId)
-  collapsedZones.value = s
-}
 
 // Toutes les zones (fonctionnelles + techniques), même sans usage : on
 // peut y ajouter des usages manuels (zones techniques incluses).
@@ -169,6 +182,66 @@ const systemsByZone = computed(() => {
   }
   return groups
 })
+
+// ── KPI par zone pour le niveau 1 ───────────────────────────────────
+// Une zone affiche : la rangée d'icônes des usages présents (lecture
+// visuelle rapide) + une pastille rouge si au moins un usage reste « à
+// renseigner » (ni présent ni absent décidé).
+function zoneCard(g) {
+  const presentCategories = []
+  const seenCats = new Set()
+  let toRenseigner = 0
+  for (const s of g.items) {
+    if (s.present && !s.not_concerned) {
+      // un usage manuel (is_bacs=0) n'a pas de catégorie BACS → on
+      // affiche quand même une icône fallback unique
+      const key = s.system_category || `manual:${s.id}`
+      if (!seenCats.has(key)) {
+        seenCats.add(key)
+        presentCategories.push({ key, category: s.system_category, isManual: s.is_bacs === 0, label: usageLabel(s) })
+      }
+    }
+    if (!s.present && !s.not_concerned) toRenseigner++
+  }
+  return {
+    ...g,
+    presentCategories,
+    presentCount: g.items.filter(i => i.present && !i.not_concerned).length,
+    totalCount: g.items.length,
+    toRenseigner,
+  }
+}
+const functionalZoneCards = computed(() =>
+  systemsByZone.value.filter(g => g.zone_kind !== 'technical').map(zoneCard))
+const technicalZoneCards = computed(() =>
+  systemsByZone.value.filter(g => g.zone_kind === 'technical').map(zoneCard))
+
+// ── Drill-down niveau 2 : liste des usages d'une zone sélectionnée ──
+const selectedZoneGroup = computed(() => {
+  if (!selectedZoneId.value) return null
+  return systemsByZone.value.find(g => g.zone_id === selectedZoneId.value) || null
+})
+// Décompose en 3 buckets : présents, à renseigner, absents (repliés en bas).
+const selectedZoneUsages = computed(() => {
+  const g = selectedZoneGroup.value
+  if (!g) return { present: [], pending: [], absent: [] }
+  const present = [], pending = [], absent = []
+  for (const s of g.items) {
+    if (s.not_concerned) absent.push(s)
+    else if (s.present) present.push(s)
+    else pending.push(s)
+  }
+  return { present, pending, absent }
+})
+function usageKpi(s) {
+  const devs = devicesOf(s.id)
+  const power = devs.reduce((sum, d) =>
+    sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0)
+  return {
+    deviceCount: devs.length,
+    powerKw: Math.round(power * 10) / 10,
+  }
+}
 
 function devicesOf(systemId) {
   const own = devices.value.filter(d => d.system_id === systemId)
@@ -482,141 +555,281 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
 
 <template>
   <div class="p-3 space-y-3">
-    <!-- Stat puissance -->
-    <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
-      <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
-        <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
+    <!-- ───────────────── N1 — Liste des zones ───────────────── -->
+    <template v-if="currentView === 'zones'">
+      <!-- Stat puissance globale -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center">
+          <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-6 h-6" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-2xl font-medium text-gray-900 leading-none">
+            {{ powerSummary.heating_cooling_total_kw || 0 }} <span class="text-sm text-gray-500">kW</span>
+          </p>
+          <p class="text-xs text-gray-500 mt-1">Chauffage + climatisation cumulé</p>
+        </div>
       </div>
-      <div class="flex-1 min-w-0">
-        <p class="text-2xl font-medium text-gray-900 leading-none">
-          {{ powerSummary.heating_cooling_total_kw || 0 }} <span class="text-sm text-gray-500">kW</span>
-        </p>
-        <p class="text-xs text-gray-500 mt-1">Chauffage + climatisation cumulé</p>
+
+      <!-- Zones fonctionnelles -->
+      <div v-if="functionalZoneCards.length">
+        <div class="px-1 pb-1.5">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Zones fonctionnelles ({{ functionalZoneCards.length }})
+          </p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          <button
+            v-for="g in functionalZoneCards"
+            :key="g.zone_id"
+            type="button"
+            @click="goToZone(g.zone_id)"
+            class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
+                <span v-if="g.toRenseigner > 0"
+                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700"
+                      :title="`${g.toRenseigner} usage(s) à renseigner`">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                  {{ g.toRenseigner }} à renseigner
+                </span>
+              </div>
+              <div class="mt-2 flex items-center gap-2 flex-wrap">
+                <span v-for="cat in g.presentCategories" :key="cat.key"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50"
+                      :title="cat.label">
+                  <SystemCategoryIcon v-if="cat.category" :category="cat.category" size="sm" :with-tooltip="false" />
+                  <FontAwesomeIcon v-else :icon="['fas', 'circle-question']" class="w-4 h-4 text-gray-400" />
+                </span>
+                <span v-if="!g.presentCategories.length" class="text-xs text-gray-400 italic">
+                  Aucun usage renseigné
+                </span>
+              </div>
+            </div>
+            <div class="flex flex-col items-end shrink-0">
+              <span class="text-sm font-medium text-gray-600">{{ g.presentCount }}/{{ g.totalCount }}</span>
+              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 mt-1" />
+            </div>
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- Liste par zone -->
-    <div v-if="systemsByZone.length" class="space-y-3">
-      <div
-        v-for="g in systemsByZone"
-        :key="g.zone_id"
-        class="bg-white rounded-2xl border border-gray-200 overflow-hidden"
-      >
-        <!-- Header zone -->
-        <button
-          type="button"
-          @click="toggleZone(g.zone_id)"
-          class="w-full flex items-center gap-2 px-4 py-3 border-b border-gray-100 active:bg-gray-50"
-        >
-          <FontAwesomeIcon :icon="['fas', 'chevron-down']"
-            :class="['w-4 h-4 text-gray-500 transition-transform shrink-0',
-                     collapsedZones.has(g.zone_id) ? '-rotate-90' : '']"
-          />
-          <p class="flex-1 min-w-0 text-base font-medium text-gray-900 truncate text-left">{{ g.zone_name }}</p>
-          <span class="text-xs text-gray-500 shrink-0">{{ g.items.filter(i => i.present).length }}/{{ g.items.length }}</span>
-        </button>
-
-        <!-- Systèmes -->
-        <div v-show="!collapsedZones.has(g.zone_id)" class="divide-y divide-gray-100">
-          <div v-for="s in g.items" :key="s.id"
-               :data-system-id="s.id"
-               :class="['px-4 py-4 transition',
-                        s.not_concerned ? 'opacity-50 bg-gray-50' : '',
-                        focusedSystemId === s.id ? 'bg-amber-50 ring-2 ring-amber-300' : '']">
-            <div class="flex items-center gap-3">
-              <SystemCategoryIcon :category="s.system_category" size="md" />
-              <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-900 truncate leading-tight">
-                  {{ usageLabel(s) }}
-                </p>
-                <p v-if="s.not_concerned" class="text-sm text-gray-500 mt-1 italic">
-                  {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? "Usage non concerné" : "Non concerné") }}
-                </p>
-                <p v-else-if="!s.present" class="text-xs text-gray-500 mt-1">
-                  À renseigner : présent ou absent ?
-                </p>
+      <!-- Zones techniques -->
+      <div v-if="technicalZoneCards.length">
+        <div class="px-1 pb-1.5">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Zones techniques ({{ technicalZoneCards.length }})
+          </p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          <button
+            v-for="g in technicalZoneCards"
+            :key="g.zone_id"
+            type="button"
+            @click="goToZone(g.zone_id)"
+            class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
+          >
+            <div class="flex-1 min-w-0">
+              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
+              <div class="mt-2 flex items-center gap-2 flex-wrap">
+                <span v-for="cat in g.presentCategories" :key="cat.key"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50"
+                      :title="cat.label">
+                  <SystemCategoryIcon v-if="cat.category" :category="cat.category" size="sm" :with-tooltip="false" />
+                  <FontAwesomeIcon v-else :icon="['fas', 'circle-question']" class="w-4 h-4 text-gray-400" />
+                </span>
+                <span v-if="!g.presentCategories.length" class="text-xs text-gray-400 italic">
+                  Hors décret BACS
+                </span>
               </div>
-              <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
-                      class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
-                      aria-label="Supprimer cet usage">
-                <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
-              </button>
             </div>
-            <!-- Segmented control 2 états : Présent / Absent (= not_concerned).
-                 Le présent/absent concerne l'usage, donc reste sur cette liste. -->
-            <div class="mt-3 grid grid-cols-2 gap-2">
-              <button type="button"
-                      @click="patchSystem(s, { present: true, not_concerned: false })"
-                      :class="['min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 transition',
-                               s.present && !s.not_concerned
-                                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                 : 'border-gray-200 bg-white text-gray-600']">
-                ✓ Présent
-              </button>
-              <button type="button"
-                      @click="patchSystem(s, { present: false, not_concerned: true })"
-                      :class="['min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 transition',
-                               s.not_concerned
-                                 ? 'border-gray-400 bg-gray-100 text-gray-700'
-                                 : 'border-gray-200 bg-white text-gray-600']">
-                ✕ Absent
-              </button>
+            <div class="flex flex-col items-end shrink-0">
+              <span v-if="g.totalCount" class="text-sm font-medium text-gray-600">{{ g.presentCount }}/{{ g.totalCount }}</span>
+              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 mt-1" />
             </div>
+          </button>
+        </div>
+      </div>
 
-            <!-- Drill-in : ouvre la page dédiée de l'usage (équipements +
-                 régulation thermique). Visible seulement si l'usage est présent. -->
-            <button v-if="s.present" type="button" @click="openUsage(s)"
-                    class="mt-2 w-full flex items-center gap-3 px-3 py-3.5 bg-gray-50 active:bg-gray-100 rounded-xl text-left">
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-800">
-                  {{ devicesOf(s.id).length }} équipement{{ devicesOf(s.id).length > 1 ? 's' : '' }}
-                </p>
-                <p v-if="isBacs && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
-                   :class="['text-xs mt-0.5 truncate',
-                            thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
-                            thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
-                  Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
-                </p>
-                <p v-else class="text-xs text-gray-500 mt-0.5">Voir les équipements</p>
-              </div>
-              <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+      <!-- Empty global -->
+      <div v-if="!functionalZoneCards.length && !technicalZoneCards.length"
+           class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
+        <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-10 h-10 text-gray-300 mx-auto" />
+        <p class="text-sm text-gray-500 mt-3">Pas encore de systèmes</p>
+        <p class="text-xs text-gray-500 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
+      </div>
+    </template>
+
+    <!-- ───────────────── N2 — Liste des usages d'une zone ───────────────── -->
+    <template v-else-if="currentView === 'usages' && selectedZoneGroup">
+      <!-- Header sticky : retour + nom de zone + compteur -->
+      <div class="sticky top-0 -mx-3 -mt-3 px-3 pt-3 pb-2 bg-white z-10 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <button type="button" @click="goBackToZones"
+                  class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
+                  aria-label="Retour aux zones">
+            <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
+          </button>
+          <div class="flex-1 min-w-0">
+            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Zones › {{ selectedZoneGroup.zone_kind === 'technical' ? 'Technique' : 'Fonctionnelle' }}</p>
+            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedZoneGroup.zone_name }}</p>
+          </div>
+          <span class="shrink-0 text-xs text-gray-500">
+            {{ selectedZoneUsages.present.length }}/{{ selectedZoneGroup.items.length }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Usages présents -->
+      <div v-if="selectedZoneUsages.present.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <div v-for="s in selectedZoneUsages.present" :key="s.id"
+             :data-system-id="s.id"
+             :class="['px-4 py-4 transition',
+                      focusedSystemId === s.id ? 'bg-amber-50 ring-2 ring-amber-300' : '']">
+          <div class="flex items-center gap-3">
+            <SystemCategoryIcon :category="s.system_category" size="md" />
+            <div class="flex-1 min-w-0">
+              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                <span>{{ usageKpi(s).deviceCount }} équipement{{ usageKpi(s).deviceCount > 1 ? 's' : '' }}</span>
+                <span v-if="usageKpi(s).powerKw > 0"> · {{ usageKpi(s).powerKw }} kW</span>
+              </p>
+            </div>
+            <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
+                    class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
+                    aria-label="Supprimer cet usage">
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
             </button>
           </div>
-          <!-- Ajout manuel d'un usage (hors décret BACS / zones techniques) -->
-          <div class="px-4 py-3">
-            <div v-if="addingUsageZone === g.zone_id" class="space-y-2">
-              <p class="text-xs text-gray-500">Choisir une catégorie ou saisir un nom libre</p>
-              <MobileSelectSheet
-                v-model="newUsageValue"
-                :options="categoryOptions"
-                :creatable="true"
-                title="Catégorie d'usage"
-                placeholder="— Catégorie ou nom —"
-              />
-              <div class="flex gap-2">
-                <button type="button" @click="confirmAddUsage(g.zone_id)" :disabled="!newUsageValue"
-                        class="flex-1 min-h-11 py-3 text-base font-medium text-white bg-emerald-600 disabled:opacity-50 rounded-xl">
-                  Ajouter
-                </button>
-                <button type="button" @click="cancelAddUsage"
-                        class="px-4 min-h-11 py-3 text-base text-gray-600 bg-gray-100 rounded-xl">
-                  Annuler
-                </button>
-              </div>
+          <button type="button" @click="openUsage(s)"
+                  class="mt-3 w-full flex items-center gap-3 px-3 py-3 bg-gray-50 active:bg-gray-100 rounded-xl text-left">
+            <div class="flex-1 min-w-0">
+              <p v-if="isBacs && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
+                 :class="['text-xs truncate',
+                          thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
+                          thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
+                Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
+              </p>
+              <p v-else class="text-xs text-gray-600">Voir le détail et les équipements</p>
             </div>
-            <button v-else type="button" @click="startAddUsage(g.zone_id)"
-                    class="w-full min-h-11 inline-flex items-center justify-center gap-2 px-3 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-xl transition">
-              <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un usage
+            <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+          </button>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <button type="button"
+                    @click="patchSystem(s, { present: true, not_concerned: false })"
+                    class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700">
+              ✓ Présent
+            </button>
+            <button type="button"
+                    @click="patchSystem(s, { present: false, not_concerned: true })"
+                    class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+              ✕ Marquer absent
             </button>
           </div>
         </div>
       </div>
-    </div>
-    <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
-      <FontAwesomeIcon :icon="['fas', 'screwdriver-wrench']" class="w-10 h-10 text-gray-300 mx-auto" />
-      <p class="text-sm text-gray-500 mt-3">Pas encore de systèmes</p>
-      <p class="text-xs text-gray-500 mt-1">Crée d'abord des zones, les systèmes apparaîtront ici</p>
-    </div>
+
+      <!-- Usages à renseigner -->
+      <div v-if="selectedZoneUsages.pending.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <div class="px-4 py-2.5 bg-amber-50 border-b border-amber-200">
+          <p class="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+            À renseigner ({{ selectedZoneUsages.pending.length }})
+          </p>
+        </div>
+        <div v-for="s in selectedZoneUsages.pending" :key="s.id"
+             :data-system-id="s.id"
+             :class="['px-4 py-4 transition',
+                      focusedSystemId === s.id ? 'bg-amber-50 ring-2 ring-amber-300' : '']">
+          <div class="flex items-center gap-3">
+            <SystemCategoryIcon :category="s.system_category" size="md" />
+            <div class="flex-1 min-w-0">
+              <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
+              <p class="text-xs text-gray-500 mt-0.5">Présent ou absent dans cette zone ?</p>
+            </div>
+            <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
+                    class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
+                    aria-label="Supprimer cet usage">
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
+            </button>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button type="button"
+                    @click="patchSystem(s, { present: true, not_concerned: false })"
+                    class="min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+              ✓ Présent
+            </button>
+            <button type="button"
+                    @click="patchSystem(s, { present: false, not_concerned: true })"
+                    class="min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+              ✕ Absent
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ajout manuel d'un usage -->
+      <div>
+        <div v-if="addingUsageZone === selectedZoneGroup.zone_id" class="bg-white rounded-2xl border border-gray-200 p-4 space-y-2">
+          <p class="text-xs text-gray-500">Choisir une catégorie ou saisir un nom libre</p>
+          <MobileSelectSheet
+            v-model="newUsageValue"
+            :options="categoryOptions"
+            :creatable="true"
+            title="Catégorie d'usage"
+            placeholder="— Catégorie ou nom —"
+          />
+          <div class="flex gap-2">
+            <button type="button" @click="confirmAddUsage(selectedZoneGroup.zone_id)" :disabled="!newUsageValue"
+                    class="flex-1 min-h-11 py-3 text-base font-medium text-white bg-emerald-600 disabled:opacity-50 rounded-xl">
+              Ajouter
+            </button>
+            <button type="button" @click="cancelAddUsage"
+                    class="px-4 min-h-11 py-3 text-base text-gray-600 bg-gray-100 rounded-xl">
+              Annuler
+            </button>
+          </div>
+        </div>
+        <button v-else type="button" @click="startAddUsage(selectedZoneGroup.zone_id)"
+                class="w-full min-h-11 inline-flex items-center justify-center gap-2 px-3 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition">
+          <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un usage personnalisé
+        </button>
+      </div>
+
+      <!-- Section repliée : usages absents -->
+      <div v-if="selectedZoneUsages.absent.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <button type="button"
+                @click="absentUsagesCollapsed = !absentUsagesCollapsed"
+                class="w-full flex items-center gap-2 px-4 py-3 active:bg-gray-50">
+          <FontAwesomeIcon :icon="['fas', 'chevron-down']"
+                           :class="['w-4 h-4 text-gray-500 transition-transform shrink-0',
+                                    absentUsagesCollapsed ? '-rotate-90' : '']" />
+          <p class="flex-1 text-left text-sm font-medium text-gray-700">
+            Usages absents ({{ selectedZoneUsages.absent.length }})
+          </p>
+        </button>
+        <div v-show="!absentUsagesCollapsed" class="divide-y divide-gray-100 border-t border-gray-100">
+          <div v-for="s in selectedZoneUsages.absent" :key="s.id"
+               :data-system-id="s.id"
+               class="px-4 py-3 opacity-60">
+            <div class="flex items-center gap-3">
+              <SystemCategoryIcon :category="s.system_category" size="sm" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-700 truncate leading-tight">{{ usageLabel(s) }}</p>
+                <p class="text-xs text-gray-500 mt-0.5 italic">
+                  {{ SYSTEM_NEGATIVE_LABEL[s.system_category] || (s.is_bacs === 0 ? 'Usage non concerné' : 'Non concerné') }}
+                </p>
+              </div>
+              <button type="button"
+                      @click="patchSystem(s, { present: true, not_concerned: false })"
+                      class="shrink-0 min-h-11 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl">
+                Réactiver
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Page dédiée d'un usage : équipements + régulation thermique. -->
     <MobileSheet
