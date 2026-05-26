@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.101",
+      "date": "2026-05-26",
+      "title": "Audit PWA : navigation drill-down sur les onglets Systèmes et Compteurs (ergonomie smartphone)",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Onglet Systèmes : tu commences par la liste des zones, tu rentres dedans pour voir leurs usages",
+          "what": "Avant, l'onglet Systèmes affichait toutes les zones dépliées avec tous leurs usages d'un coup — l'écran se remplissait vite et tu scrollais beaucoup. Maintenant tu vois d'abord la liste des zones (fonctionnelles puis techniques, comme l'onglet Zones), chaque zone affichant la rangée d'icônes des usages renseignés et une pastille rouge si certains usages restent à renseigner. Tu cliques sur une zone pour voir ses usages, et tu cliques sur un usage présent pour entrer dans son détail (équipements + régulation thermique). Les usages absents sont regroupés dans une section repliée en bas pour ne pas encombrer.",
+          "where": "Onglet Systèmes de l'audit BACS en PWA (mobile / tablette). Le détail d'un usage et l'édition d'un équipement ne changent pas.",
+          "how": "Ouvre un audit sur ton iPhone, onglet Systèmes. Tu vois la liste des zones avec les icônes des usages. Clique sur une zone → tu vois les 7 usages BACS + tes usages manuels. Clique sur un usage présent → détail comme avant. Bouton « ← » en haut pour remonter."
+        },
+        {
+          "kind": "feat",
+          "title": "Onglet Compteurs : tu entres par l'énergie, et tu choisis de voir les compteurs par usage ou par zone",
+          "what": "Avant, l'onglet Compteurs listait tous les compteurs à plat — impossible de saisir ton plan de comptage d'un coup d'œil. Maintenant tu vois d'abord les 5 énergies (Électrique, Élec. production, Gaz, Eau, Thermique) avec le nombre de compteurs et le gap réglementaire pour chacune. Un toggle global « Par usage / Par zone » te laisse choisir l'angle d'analyse : tu navigues soit Énergie → Usage → Compteurs, soit Énergie → Zone → Compteurs. Le toggle est persisté entre les sessions.",
+          "where": "Onglet Compteurs de l'audit BACS en PWA (mobile / tablette). L'édition d'un compteur ne change pas.",
+          "how": "Ouvre l'onglet Compteurs sur ton iPhone, change le toggle « Par usage / Par zone » en haut, puis clique une énergie. Vérifie que les compteurs filtrés s'affichent. Ferme et rouvre la PWA : le toggle reste sur le même mode."
+        }
+      ]
+    },
+    {
       "version": "0.1.100",
       "date": "2026-05-26",
       "title": "Audit BACS : refonte PDF (densité ch.3 + groupage ch.7), dérivation cas E/F via équipement, toggles Oui/Non sur les questions binaires",

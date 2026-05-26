@@ -1,7 +1,7 @@
 <script setup>
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
@@ -20,6 +20,47 @@ const audit = useAuditStore()
 const { document, meters, zones } = storeToRefs(audit)
 const { error, success } = useNotification()
 const { confirm } = useConfirm()
+
+// ── Navigation drill-down (N1 énergies → N2 group → N3 liste) ───────
+// Avant : liste plate des compteurs. Maintenant : on entre par l'énergie
+// (élec / gaz / eau / thermique), puis on choisit de filtrer « Par usage »
+// ou « Par zone » via un toggle global persisté (localStorage), puis on
+// voit les compteurs filtrés. L'édition reste dans le MobileSheet existant.
+const GROUP_BY_STORAGE_KEY = 'audit.meters.groupBy'
+const currentView = ref('energies') // 'energies' | 'group' | 'list'
+const selectedEnergy = ref(null)    // meter_type ∈ METER_TYPES
+const selectedGroupKey = ref(null)  // usage ('heating'…) ou zone_id (number)
+const groupBy = ref('usage')        // 'usage' | 'zone' — persisté
+onMounted(() => {
+  try {
+    const v = window.localStorage.getItem(GROUP_BY_STORAGE_KEY)
+    if (v === 'usage' || v === 'zone') groupBy.value = v
+  } catch { /* localStorage indispo en SSR / private */ }
+})
+function setGroupBy(v) {
+  groupBy.value = v
+  try { window.localStorage.setItem(GROUP_BY_STORAGE_KEY, v) } catch { /* idem */ }
+}
+function goToEnergy(energy) {
+  selectedEnergy.value = energy
+  selectedGroupKey.value = null
+  currentView.value = 'group'
+  nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+}
+function goToList(groupKey) {
+  selectedGroupKey.value = groupKey
+  currentView.value = 'list'
+  nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+}
+function goBackToEnergies() {
+  currentView.value = 'energies'
+  selectedEnergy.value = null
+  selectedGroupKey.value = null
+}
+function goBackToGroup() {
+  currentView.value = 'group'
+  selectedGroupKey.value = null
+}
 
 // Décorées (icon + color) pour rendu visuel dans MobileSelectSheet.
 // Couleurs cohérentes avec MeterUsagePill / MeterTypePill (rendu liste).
@@ -63,6 +104,94 @@ const stats = computed(() => ({
   present: meters.value.filter(m => m.present_actual).length,
   missing: meters.value.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
 }))
+
+// ── KPI niveau 1 : une card par énergie + compteur général ──────────
+// On affiche TOUTES les énergies (même celles à 0 compteur) pour montrer
+// le plan de comptage complet ; les énergies sans compteur sont grisées.
+function metersOfEnergy(energy) {
+  return meters.value.filter(m => m.meter_type === energy)
+}
+const energyCards = computed(() => METER_TYPES.map(et => {
+  const arr = metersOfEnergy(et.value)
+  return {
+    ...et,
+    total: arr.length,
+    present: arr.filter(m => m.present_actual).length,
+    missing: arr.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+  }
+}))
+// Compteurs « généraux » = zone_id null, tous types confondus.
+const generalMeters = computed(() => meters.value.filter(m => !m.zone_id))
+
+// ── N2 — groupes (usage ou zone) à l'intérieur d'une énergie ────────
+const selectedEnergyMeta = computed(() =>
+  METER_TYPES.find(et => et.value === selectedEnergy.value) || null)
+const selectedEnergyMeters = computed(() =>
+  selectedEnergy.value ? metersOfEnergy(selectedEnergy.value) : [])
+
+function buildGroups() {
+  const list = selectedEnergyMeters.value
+  if (groupBy.value === 'usage') {
+    // Un bucket par catégorie présente dans les compteurs de l'énergie.
+    const map = new Map()
+    for (const m of list) {
+      const key = m.usage || 'other'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(m)
+    }
+    return METER_USAGES
+      .filter(u => map.has(u.value))
+      .map(u => ({
+        key: u.value,
+        label: u.label,
+        icon: u.icon,
+        color: u.color,
+        meters: map.get(u.value) || [],
+      }))
+  }
+  // groupBy === 'zone' : zones fonctionnelles puis techniques (uniquement
+  // celles qui ont au moins 1 compteur de cette énergie). Compteurs
+  // « généraux » regroupés dans un bucket spécial en tête.
+  const map = new Map()
+  let general = []
+  for (const m of list) {
+    if (!m.zone_id) { general.push(m); continue }
+    if (!map.has(m.zone_id)) map.set(m.zone_id, [])
+    map.get(m.zone_id).push(m)
+  }
+  const groups = []
+  if (general.length) {
+    groups.push({ key: '__general__', label: 'Compteur général de site', kind: 'general', meters: general })
+  }
+  for (const z of (zones.value || [])) {
+    if (!map.has(z.zone_id)) continue
+    groups.push({
+      key: z.zone_id,
+      label: z.name,
+      kind: z.kind || 'functional',
+      meters: map.get(z.zone_id) || [],
+    })
+  }
+  return groups
+}
+const energyGroups = computed(() => (selectedEnergy.value ? buildGroups() : []))
+
+// ── N3 — liste des compteurs filtrés (énergie + groupe) ─────────────
+const filteredMeters = computed(() => {
+  if (!selectedEnergy.value || selectedGroupKey.value == null) return []
+  const list = selectedEnergyMeters.value
+  if (groupBy.value === 'usage') {
+    return list.filter(m => (m.usage || 'other') === selectedGroupKey.value)
+  }
+  if (selectedGroupKey.value === '__general__') {
+    return list.filter(m => !m.zone_id)
+  }
+  return list.filter(m => m.zone_id === selectedGroupKey.value)
+})
+const selectedGroupLabel = computed(() => {
+  const g = energyGroups.value.find(x => x.key === selectedGroupKey.value)
+  return g?.label || ''
+})
 
 // Sheet
 const editing = ref(null)
@@ -169,65 +298,228 @@ function toggleProtocol(p) {
 
 <template>
   <div class="p-3 space-y-3">
-    <!-- Stats -->
-    <div class="grid grid-cols-3 gap-2">
-      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
-        <p class="text-3xl font-medium text-gray-900 leading-none">{{ stats.total }}</p>
-        <p class="text-sm text-gray-500 mt-1.5">Total</p>
+    <!-- ───────────────── N1 — Liste des énergies ───────────────── -->
+    <template v-if="currentView === 'energies'">
+      <!-- Stats globales -->
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <p class="text-3xl font-medium text-gray-900 leading-none">{{ stats.total }}</p>
+          <p class="text-sm text-gray-500 mt-1.5">Total</p>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+          <p class="text-3xl font-medium text-emerald-700 leading-none">{{ stats.present }}</p>
+          <p class="text-sm text-emerald-600 mt-1.5">Présents</p>
+        </div>
+        <div :class="['rounded-xl border p-4 text-center',
+                      stats.missing > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200']">
+          <p :class="['text-3xl font-medium leading-none', stats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
+            {{ stats.missing }}
+          </p>
+          <p :class="['text-sm mt-1.5', stats.missing > 0 ? 'text-red-600' : 'text-gray-500']">Manquants</p>
+        </div>
       </div>
-      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-        <p class="text-3xl font-medium text-emerald-700 leading-none">{{ stats.present }}</p>
-        <p class="text-sm text-emerald-600 mt-1.5">Présents</p>
-      </div>
-      <div :class="['rounded-xl border p-4 text-center',
-                    stats.missing > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200']">
-        <p :class="['text-3xl font-medium leading-none', stats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
-          {{ stats.missing }}
-        </p>
-        <p :class="['text-sm mt-1.5', stats.missing > 0 ? 'text-red-600' : 'text-gray-500']">Manquants</p>
-      </div>
-    </div>
 
-    <!-- Liste -->
-    <div v-if="meters.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-      <button
-        v-for="m in meters"
-        :key="m.id"
-        type="button"
-        @click="openEdit(m)"
-        :class="['w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50',
-                 m.out_of_service ? 'opacity-50' : '',
-                 m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '']"
-      >
-        <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']"
-          v-if="m.required && !m.present_actual && !m.out_of_service"
-          class="w-6 h-6 text-red-500 shrink-0"
-        />
+      <!-- Toggle Par usage / Par zone (persisté localStorage) -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-1.5 flex gap-1">
+        <button type="button" @click="setGroupBy('usage')"
+                :class="['flex-1 min-h-11 px-3 py-2.5 text-sm font-medium rounded-xl transition',
+                         groupBy === 'usage' ? 'bg-indigo-600 text-white' : 'text-gray-600 active:bg-gray-50']">
+          Par usage
+        </button>
+        <button type="button" @click="setGroupBy('zone')"
+                :class="['flex-1 min-h-11 px-3 py-2.5 text-sm font-medium rounded-xl transition',
+                         groupBy === 'zone' ? 'bg-indigo-600 text-white' : 'text-gray-600 active:bg-gray-50']">
+          Par zone
+        </button>
+      </div>
+
+      <!-- Cards énergies -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <button
+          v-for="e in energyCards"
+          :key="e.value"
+          type="button"
+          @click="e.total > 0 && goToEnergy(e.value)"
+          :disabled="e.total === 0"
+          :class="['w-full flex items-center gap-3 px-4 py-4 text-left transition',
+                   e.total > 0 ? 'active:bg-gray-50' : 'opacity-50']"
+        >
+          <span class="w-11 h-11 rounded-xl inline-flex items-center justify-center shrink-0"
+                :style="{ background: e.color + '1a', color: e.color }">
+            <FontAwesomeIcon :icon="['fas', e.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ e.label }}</p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              <span v-if="e.total === 0">Aucun compteur</span>
+              <template v-else>
+                <span>{{ e.total }} compteur{{ e.total > 1 ? 's' : '' }}</span>
+                <span class="mx-1 text-gray-300">·</span>
+                <span class="text-emerald-700 font-medium">{{ e.present }} présent{{ e.present > 1 ? 's' : '' }}</span>
+                <template v-if="e.missing > 0">
+                  <span class="mx-1 text-gray-300">·</span>
+                  <span class="text-red-700 font-medium">{{ e.missing }} manquant{{ e.missing > 1 ? 's' : '' }}</span>
+                </template>
+              </template>
+            </p>
+          </div>
+          <FontAwesomeIcon v-if="e.total > 0" :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+        </button>
+      </div>
+
+      <!-- Compteurs généraux (raccourci, hors énergie) -->
+      <button v-if="generalMeters.length"
+              type="button"
+              @click="openEdit(generalMeters[0])"
+              class="w-full bg-white rounded-2xl border border-gray-200 px-4 py-3.5 flex items-center gap-3 text-left active:bg-gray-50">
+        <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-5 h-5 text-gray-500 shrink-0" />
         <div class="flex-1 min-w-0">
-          <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
-          <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-            <MeterTypePill :type="m.meter_type" />
-            <MeterUsagePill :usage="m.usage" />
-            <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
-            <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
-            <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
+          <p class="text-sm font-medium text-gray-800">Compteur général de site</p>
+          <p class="text-xs text-gray-500 mt-0.5">{{ generalMeters.length }} compteur{{ generalMeters.length > 1 ? 's' : '' }} non rattaché à une zone</p>
+        </div>
+        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-4 h-4 text-gray-300 shrink-0" />
+      </button>
+
+      <button
+        type="button"
+        @click="openCreate"
+        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+      >
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+        Ajouter un compteur
+      </button>
+    </template>
+
+    <!-- ───────────────── N2 — Groupes (usage ou zone) ───────────────── -->
+    <template v-else-if="currentView === 'group' && selectedEnergyMeta">
+      <!-- Header sticky : retour + énergie -->
+      <div class="sticky top-0 -mx-3 -mt-3 px-3 pt-3 pb-2 bg-white z-10 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <button type="button" @click="goBackToEnergies"
+                  class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
+                  aria-label="Retour aux énergies">
+            <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
+          </button>
+          <span class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
+                :style="{ background: selectedEnergyMeta.color + '1a', color: selectedEnergyMeta.color }">
+            <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Énergies › {{ groupBy === 'usage' ? 'Par usage' : 'Par zone' }}</p>
+            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedEnergyMeta.label }}</p>
           </div>
         </div>
-        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-6 h-6 text-gray-300 shrink-0" />
+      </div>
+
+      <!-- Toggle Par usage / Par zone (reproduit en N2 pour switcher rapidement) -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-1.5 flex gap-1">
+        <button type="button" @click="setGroupBy('usage')"
+                :class="['flex-1 min-h-11 px-3 py-2.5 text-sm font-medium rounded-xl transition',
+                         groupBy === 'usage' ? 'bg-indigo-600 text-white' : 'text-gray-600 active:bg-gray-50']">
+          Par usage
+        </button>
+        <button type="button" @click="setGroupBy('zone')"
+                :class="['flex-1 min-h-11 px-3 py-2.5 text-sm font-medium rounded-xl transition',
+                         groupBy === 'zone' ? 'bg-indigo-600 text-white' : 'text-gray-600 active:bg-gray-50']">
+          Par zone
+        </button>
+      </div>
+
+      <!-- Liste des groupes -->
+      <div v-if="energyGroups.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <button
+          v-for="g in energyGroups"
+          :key="g.key"
+          type="button"
+          @click="goToList(g.key)"
+          class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-base font-medium text-gray-900 truncate leading-tight">
+              {{ g.label }}
+              <span v-if="g.kind === 'technical'" class="ml-1 text-xs font-normal text-gray-400">(technique)</span>
+            </p>
+            <p class="text-xs text-gray-500 mt-0.5">
+              <span>{{ g.meters.length }} compteur{{ g.meters.length > 1 ? 's' : '' }}</span>
+              <span class="mx-1 text-gray-300">·</span>
+              <span class="text-emerald-700 font-medium">{{ g.meters.filter(m => m.present_actual).length }} présent{{ g.meters.filter(m => m.present_actual).length > 1 ? 's' : '' }}</span>
+            </p>
+          </div>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+        </button>
+      </div>
+      <div v-else class="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-300">
+        <FontAwesomeIcon :icon="['fas', 'bolt']" class="w-8 h-8 text-gray-300 mx-auto" />
+        <p class="text-sm text-gray-500 mt-2">Aucun compteur de cette énergie</p>
+      </div>
+    </template>
+
+    <!-- ───────────────── N3 — Liste des compteurs filtrés ───────────────── -->
+    <template v-else-if="currentView === 'list' && selectedEnergyMeta">
+      <!-- Header sticky : retour + énergie › groupe -->
+      <div class="sticky top-0 -mx-3 -mt-3 px-3 pt-3 pb-2 bg-white z-10 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <button type="button" @click="goBackToGroup"
+                  class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
+                  aria-label="Retour aux groupes">
+            <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
+          </button>
+          <span class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
+                :style="{ background: selectedEnergyMeta.color + '1a', color: selectedEnergyMeta.color }">
+            <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
+              {{ selectedEnergyMeta.label }} › {{ groupBy === 'usage' ? 'Usage' : 'Zone' }}
+            </p>
+            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
+          </div>
+          <span class="shrink-0 text-xs text-gray-500">{{ filteredMeters.length }}</span>
+        </div>
+      </div>
+
+      <!-- Liste des compteurs -->
+      <div v-if="filteredMeters.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        <button
+          v-for="m in filteredMeters"
+          :key="m.id"
+          type="button"
+          @click="openEdit(m)"
+          :class="['w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50',
+                   m.out_of_service ? 'opacity-50' : '',
+                   m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '']"
+        >
+          <FontAwesomeIcon :icon="['fas', 'triangle-exclamation']"
+            v-if="m.required && !m.present_actual && !m.out_of_service"
+            class="w-6 h-6 text-red-500 shrink-0"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ m.zone_name || 'Compteur général' }}</p>
+            <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+              <MeterTypePill :type="m.meter_type" />
+              <MeterUsagePill :usage="m.usage" />
+              <span v-if="m.present_actual" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">Présent</span>
+              <span v-if="m.communicating" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">Communicant</span>
+              <span v-if="m.out_of_service" class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-200 text-gray-600">HS</span>
+            </div>
+          </div>
+          <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
+        </button>
+      </div>
+      <div v-else class="text-center py-8 bg-white rounded-2xl border border-dashed border-gray-300">
+        <FontAwesomeIcon :icon="['fas', 'bolt']" class="w-8 h-8 text-gray-300 mx-auto" />
+        <p class="text-sm text-gray-500 mt-2">Aucun compteur dans ce groupe</p>
+      </div>
+
+      <button
+        type="button"
+        @click="openCreate"
+        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+      >
+        <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
+        Ajouter un compteur
       </button>
-    </div>
-    <div v-else class="text-center py-6">
-      <FontAwesomeIcon :icon="['fas', 'bolt']" class="w-10 h-10 text-gray-300 mx-auto" />
-      <p class="text-sm text-gray-500 mt-2">Aucun compteur listé pour l'instant</p>
-    </div>
-    <button
-      type="button"
-      @click="openCreate"
-      class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
-    >
-      <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
-      Ajouter un compteur
-    </button>
+    </template>
 
     <MobileSheet
       :open="!!editing"
