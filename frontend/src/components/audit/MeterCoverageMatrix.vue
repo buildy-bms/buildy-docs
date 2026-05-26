@@ -12,9 +12,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
-import MeterTypePill from '@/components/MeterTypePill.vue'
-import MeterUsagePill from '@/components/MeterUsagePill.vue'
-import { METER_TYPES, METER_USAGES } from '@/lib/meter-options'
+import { METER_TYPES, METER_USAGES, getMeterUsageMeta, getMeterTypeMeta } from '@/lib/meter-options'
 
 const props = defineProps({
   meters: { type: Array, required: true },
@@ -105,6 +103,25 @@ function cellState(meters) {
 function onCellClick(meter) {
   if (meter?.id != null) emit('cell-click', meter)
 }
+
+// Helpers de rendu : pour un compteur donné, on récupère le pictogramme
+// de l'usage (mode énergie) ou de l'énergie (mode zone).
+function usageBadge(meter) {
+  const meta = getMeterUsageMeta(meter.usage) || { icon: 'fa-circle-question', color: '#6b7280', label: meter.usage || 'Autre' }
+  return meta
+}
+function typeBadge(meter) {
+  const meta = getMeterTypeMeta(meter.meter_type) || { icon: 'fa-gauge', color: '#6b7280', label: meter.meter_type || '—' }
+  return meta
+}
+function badgeTitle(meter, meta) {
+  const parts = []
+  if (meta?.label) parts.push(meta.label)
+  if (meter.zone_name) parts.push(meter.zone_name)
+  if (meter.required && !meter.present_actual && !meter.out_of_service) parts.push('Requis manquant')
+  if (meter.out_of_service) parts.push('Hors service')
+  return parts.join(' · ')
+}
 function onAddInCell({ zone, energy, usage }) {
   emit('add-meter', {
     zone_id: zone?.zone_id ?? null,
@@ -168,23 +185,23 @@ function onAddInCell({ zone, energy, usage }) {
             </td>
             <td v-for="cell in row.cells" :key="(row.zone.zone_id || 0) + '-' + cell.energy.value"
                 class="px-2 py-1.5 align-middle text-center group">
-              <div v-if="cell.meters.length" class="inline-flex flex-wrap items-center justify-center gap-1">
+              <div v-if="cell.meters.length" class="inline-flex flex-wrap items-center justify-center gap-1.5">
                 <button v-for="m in cell.meters" :key="m.id"
                         type="button"
                         @click="onCellClick(m)"
-                        :class="['inline-flex items-center px-0.5 py-0.5 rounded-md transition',
-                                 cellState([m]) === 'missing' ? 'ring-1 ring-red-300 ring-offset-1' : '',
-                                 cellState([m]) === 'present' ? '' : '',
-                                 m.out_of_service ? 'opacity-50' : '']"
-                        :title="(m.zone_name || 'Général') + ' — ' + (m.usage || '')">
-                  <MeterUsagePill :usage="m.usage" />
+                        :class="['w-8 h-8 rounded-lg inline-flex items-center justify-center transition hover:scale-110',
+                                 cellState([m]) === 'missing' ? 'ring-2 ring-red-300 ring-offset-1' : '',
+                                 m.out_of_service ? 'opacity-40 grayscale' : '']"
+                        :style="{ background: usageBadge(m).color + '1a', color: usageBadge(m).color }"
+                        v-tooltip="badgeTitle(m, usageBadge(m))">
+                  <FontAwesomeIcon :icon="['fas', usageBadge(m).icon.replace(/^fa-/, '')]" class="w-4 h-4" />
                 </button>
               </div>
               <button v-else type="button"
                       @click="onAddInCell({ zone: row.zone, energy: cell.energy })"
-                      class="opacity-0 group-hover:opacity-100 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                      class="opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
                       v-tooltip="`Ajouter un compteur ${cell.energy.label.toLowerCase()} en zone ${row.zone.name}`">
-                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3 h-3" />
+                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3.5 h-3.5" />
               </button>
             </td>
           </tr>
@@ -227,22 +244,23 @@ function onAddInCell({ zone, energy, usage }) {
             <td v-for="cell in row.cells" :key="row.usage.value + '-' + (cell.zone.zone_id || 0)"
                 :class="['px-2 py-1.5 align-middle text-center group',
                          cell.zone.kind === 'general' ? 'bg-gray-50/60' : '']">
-              <div v-if="cell.meters.length" class="inline-flex flex-wrap items-center justify-center gap-1">
+              <div v-if="cell.meters.length" class="inline-flex flex-wrap items-center justify-center gap-1.5">
                 <button v-for="m in cell.meters" :key="m.id"
                         type="button"
                         @click="onCellClick(m)"
-                        :class="['inline-flex items-center px-0.5 py-0.5 rounded-md transition',
-                                 cellState([m]) === 'missing' ? 'ring-1 ring-red-300 ring-offset-1' : '',
-                                 m.out_of_service ? 'opacity-50' : '']"
-                        :title="(m.zone_name || 'Général') + ' — ' + (m.meter_type || '')">
-                  <MeterTypePill :type="m.meter_type" />
+                        :class="['w-8 h-8 rounded-lg inline-flex items-center justify-center transition hover:scale-110',
+                                 cellState([m]) === 'missing' ? 'ring-2 ring-red-300 ring-offset-1' : '',
+                                 m.out_of_service ? 'opacity-40 grayscale' : '']"
+                        :style="{ background: typeBadge(m).color + '1a', color: typeBadge(m).color }"
+                        v-tooltip="badgeTitle(m, typeBadge(m))">
+                  <FontAwesomeIcon :icon="['fas', typeBadge(m).icon.replace(/^fa-/, '')]" class="w-4 h-4" />
                 </button>
               </div>
               <button v-else type="button"
                       @click="onAddInCell({ zone: cell.zone, usage: row.usage })"
-                      class="opacity-0 group-hover:opacity-100 w-6 h-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                      class="opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
                       v-tooltip="`Ajouter un compteur ${row.usage.label.toLowerCase()} en zone ${cell.zone.name}`">
-                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3 h-3" />
+                <FontAwesomeIcon :icon="['fas', 'plus']" class="w-3.5 h-3.5" />
               </button>
             </td>
           </tr>

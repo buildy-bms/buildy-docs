@@ -2,16 +2,16 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.103",
+      "version": "0.1.104",
       "date": "2026-05-27",
       "title": "Audit BACS desktop : « Plan de comptage » lisible et visuel (matrice + sections par énergie)",
       "highlights": [
         {
           "kind": "feat",
           "title": "Vue desktop des compteurs refondue en plan de comptage panoramique",
-          "what": "Avant, l'onglet Compteurs côté desktop affichait tous les compteurs dans une table dense de 11 colonnes — il fallait scroller pour comprendre la couverture. Maintenant la section commence par 4 cards de stats (Total / Présents / Communicants / Requis manquants), puis une matrice visuelle « Plan de comptage » qui montre d'un coup d'œil quels usages sont mesurés dans quelles zones avec quelles énergies. Sous la matrice, 5 sections par énergie (Électrique / Élec. prod. / Gaz / Eau / Thermique) chacune avec son header coloré, son KPI compact et une table compacte 6 colonnes pour l'édition inline (toggles Présent / Communicant / Câblé / HS, protocoles, actions Notes / Photos / Voice / Dupliquer / Supprimer).",
+          "what": "Avant, l'onglet Compteurs côté desktop affichait tous les compteurs dans une table dense de 11 colonnes — il fallait scroller pour comprendre la couverture. Maintenant la section commence par 4 cards de stats (Total / Présents / Communicants / Requis manquants), puis une matrice visuelle « Plan de comptage » avec des icônes colorées en cellules (tooltip au survol pour le label complet). Sous la matrice, 5 sections par énergie (Électrique / Élec. prod. / Gaz / Eau / Thermique) chacune avec son header coloré, son KPI compact et une table compacte 6 colonnes pour l'édition inline (toggles Présent / Communicant / Câblé / HS, protocoles, actions Notes / Photos / Voice / Dupliquer / Supprimer).",
           "where": "Audit BACS desktop (≥1024px), section « Compteurs et mesurage » (chapitre 5 du stepper). La PWA mobile ne change pas (déjà refondue en 0.1.102).",
-          "how": "Ouvre un audit BACS en desktop. La matrice en haut a un toggle « Par énergie / Par zone » (persisté localStorage, cohérent avec la PWA). Clique sur une pill de la matrice : la section concernée se highlight 2 s en ambre. Clique sur une cellule vide : le bouton « + » au hover ouvre la modale création avec zone et énergie pré-remplies. Les sections vides sont repliées par défaut pour réduire le bruit."
+          "how": "Ouvre un audit BACS en desktop. La matrice en haut a un toggle « Par énergie / Par zone » (persisté localStorage, cohérent avec la PWA). Chaque compteur est un badge-icône coloré : survole pour voir l'usage et l'état, clique pour scroller vers la ligne dans la section détaillée (highlight ambre 2 s). Clique sur une cellule vide : le bouton « + » au hover ouvre la modale création avec zone et énergie pré-remplies. Les sections vides sont repliées par défaut pour réduire le bruit."
         }
       ]
     },
