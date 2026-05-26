@@ -160,6 +160,37 @@ strong, b { font-weight: 500; }
  * l'extension Tailwind ad-hoc.
  */
 @layer components {
+  /* Grid « question / réponse » pour cards d'audit desktop.
+     2 colonnes :
+       1. label = max-content de la plus longue question de la card.
+       2. réponse (SegmentedToggle, select, etc.) = max-content du
+          contrôle (pas `auto` : sinon la cellule s'étend jusqu'au bord
+          droit de la card, laissant un grand espace blanc visible).
+
+     Les toggles sont donc collés à droite de la question la plus longue
+     de la card — alignés verticalement entre eux dans la card, mais
+     PAS plaqués au bord droit, et PAS étalés sur toute la largeur.
+
+     Pas d'alignement transversal entre cards : c'est volontaire, chaque
+     card a son propre rythme selon la longueur de ses questions.
+
+     Les descriptions optionnelles vont en dessous via `.qa-desc`. */
+  .qa-grid {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    align-items: start;
+    column-gap: 1.5rem;
+    row-gap: 0.75rem;
+  }
+  .qa-question {
+    @apply text-gray-800 leading-snug;
+    align-self: start;
+    padding-top: 0.25rem;       /* aligne visuellement avec le SegmentedToggle h-7 */
+    max-width: 80ch;            /* coupe les questions très longues */
+  }
+  .qa-desc {
+    @apply block text-xs text-gray-500 mt-1 leading-relaxed;
+  }
   .btn-primary {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
            text-white bg-indigo-600 rounded-lg hover:bg-indigo-700

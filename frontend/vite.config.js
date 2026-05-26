@@ -14,7 +14,8 @@ function isBackendHttps() {
 }
 
 const httpsEnabled = isBackendHttps()
-const backendUrl = httpsEnabled ? 'https://localhost:3100' : 'http://localhost:3100'
+const backendPort = process.env.BACKEND_PORT || '3100'
+const backendUrl = httpsEnabled ? `https://localhost:${backendPort}` : `http://localhost:${backendPort}`
 
 const serverHttps = httpsEnabled
   ? {

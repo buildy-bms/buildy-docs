@@ -22,6 +22,7 @@
 module.exports = [
   require('./cta'),
   require('./chaudiere'),
+  require('./sous-station-reseau-urbain'),
   require('./aerotherme'),
   require('./destratificateur'),
   require('./drv'),

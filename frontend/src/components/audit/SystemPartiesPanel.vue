@@ -1,15 +1,20 @@
 <script setup>
-// Item 4c/4d — Affectation des parties prenantes à un système + flags
-// d'assujettissement (sous-station réseau, multi-bâtiments) + affichage
-// de l'assujetti calculé.
-import { ref, computed, onMounted, watch } from 'vue'
+// Item 4c/4d — Affectation des parties prenantes à un système (surcharge
+// de l'héritage zone) + affichage de l'assujetti calculé.
+//
+// Refactor 2026-05-26 — Les 2 anciennes questions « sous-station de
+// réseau urbain » et « système multi-bâtiments » ont été supprimées :
+//  · sous-station = dérivée du modèle d'équipement choisi (slug
+//    'sous-station-reseau-urbain', cf. _export-data.js)
+//  · multi-bâtiments = flag déplacé sur l'équipement (mig 175)
+// Sur desktop, ce panel n'est plus utilisé directement — il vit dans
+// SystemSettingsModal. Sur mobile, il reste utilisé inline.
+import { ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import {
   getSystemParties, setSystemParties, getBacsLiability,
-  updateBacsSystem,
 } from '@/api'
 import { PARTY_KINDS } from '@/lib/audit-options'
 
@@ -81,20 +86,6 @@ function toggleWorks(partyId, checked) {
   const link = linkFor(partyId)
   if (link) { link.responsible_for_works = checked ? 1 : 0; persistLinks() }
 }
-
-async function patchFlag(field, checked) {
-  try {
-    await updateBacsSystem(props.system.id, { [field]: checked })
-    props.system[field] = checked ? 1 : 0
-    const liab = await getBacsLiability(document.value.id)
-    liability.value = liab.data.by_system?.[props.system.id] || null
-  } catch {
-    error('Sauvegarde impossible')
-  }
-}
-
-const isSubstation = computed(() => !!props.system.is_district_heating_substation)
-const servesMulti = computed(() => !!props.system.serves_multiple_buildings)
 </script>
 
 <template>
@@ -138,20 +129,5 @@ const servesMulti = computed(() => !!props.system.serves_multiple_buildings)
     <p v-else class="text-[11px] text-gray-400 italic">
       Aucune partie prenante définie pour le site (section Identification).
     </p>
-
-    <!-- Flags cas E / F -->
-    <div class="space-y-2 border-t border-gray-100 pt-2">
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-700">Ce système est-il une sous-station de réseau de chaleur urbain ?
-          <span class="text-[10px] text-gray-400">(le gestionnaire de réseau n'est pas assujetti)</span></span>
-        <SegmentedToggle :model-value="isSubstation"
-                         @update:model-value="v => patchFlag('is_district_heating_substation', v)" />
-      </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-700">Ce système centralisé dessert-il plusieurs bâtiments ?</span>
-        <SegmentedToggle :model-value="servesMulti"
-                         @update:model-value="v => patchFlag('serves_multiple_buildings', v)" />
-      </div>
-    </div>
   </div>
 </template>

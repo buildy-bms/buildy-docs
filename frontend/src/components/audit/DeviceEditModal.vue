@@ -132,13 +132,10 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
 
       <!-- Forçage manuel de la validation : pour les infos définitivement
            inconnues (équipement ancien, documentation perdue…). -->
-      <div class="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2">
-        <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium text-gray-800">Forcer la validation de cet équipement ?</div>
-          <div class="text-xs text-gray-500 leading-snug mt-0.5">
-            À activer si certaines informations resteront définitivement inconnues.
-            L'équipement sera considéré validé même incomplet.
-          </div>
+      <div class="qa-grid rounded-lg border border-gray-200 px-3 py-2">
+        <div class="qa-question text-sm font-medium">
+          Forcer la validation de cet équipement ?
+          <span class="qa-desc">À activer si certaines informations resteront définitivement inconnues. L'équipement sera considéré validé même incomplet.</span>
         </div>
         <SegmentedToggle :model-value="triState(device.validation_forced)" :options="YESNO"
                          @update:model-value="v => patch({ validation_forced: v })" />
@@ -238,90 +235,83 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             communique avec aucun protocole ne peut être ni piloté ni suivi à distance.
           </p>
         </div>
-        <div class="divide-y divide-gray-100 border-t border-gray-100">
-          <div class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-medium text-gray-800">L'équipement est-il relié à la GTB par une liaison câblée ?
-                <span class="font-normal text-gray-400">· R175-3 §3</span></span>
-              <SegmentedToggle :model-value="triState(device.wired)" :options="YESNO"
-                               @update:model-value="v => patch({ wired: v })" />
-            </div>
-            <div class="text-xs text-gray-500 leading-snug mt-0.5">
-              L'équipement est relié à la supervision par un câble dédié — la base de
-              l'interopérabilité exigée par le décret.
-            </div>
+        <div class="qa-grid border-t border-gray-100 px-3 py-3" style="row-gap: 1.5rem">
+          <div class="qa-question text-sm font-medium">
+            L'équipement est-il relié à la GTB par une liaison câblée ?
+            <span class="font-normal text-gray-400 ml-1">· R175-3 §3</span>
+            <span class="qa-desc">L'équipement est relié à la supervision par un câble dédié — la base de l'interopérabilité exigée par le décret.</span>
           </div>
-          <div class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-medium text-gray-800">Peut-on arrêter l'équipement manuellement, sur place ?
-                <span class="font-normal text-gray-400">· R175-3 §4</span></span>
-              <SegmentedToggle :model-value="triState(device.meets_r175_3_p4)" :options="YESNO"
-                               @update:model-value="v => patch({ meets_r175_3_p4: v })" />
-            </div>
-            <div class="text-xs text-gray-500 leading-snug mt-0.5">
-              On peut arrêter l'équipement directement sur place, sans passer par la supervision.
-            </div>
+          <SegmentedToggle :model-value="triState(device.wired)" :options="YESNO"
+                           @update:model-value="v => patch({ wired: v })" />
+
+          <div class="qa-question text-sm font-medium">
+            Peut-on arrêter l'équipement manuellement, sur place ?
+            <span class="font-normal text-gray-400 ml-1">· R175-3 §4</span>
+            <span class="qa-desc">On peut arrêter l'équipement directement sur place, sans passer par la supervision.</span>
           </div>
-          <div class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-medium text-gray-800">L'équipement redémarre-t-il de façon autonome après une coupure ?
-                <span class="font-normal text-gray-400">· R175-3 §4</span></span>
-              <SegmentedToggle :model-value="triState(device.meets_r175_3_p4_autonomous)" :options="YESNO"
-                               @update:model-value="v => patch({ meets_r175_3_p4_autonomous: v })" />
-            </div>
-            <div class="text-xs text-gray-500 leading-snug mt-0.5">
-              Après une coupure de courant ou un redémarrage de la GTB, l'équipement repart
-              seul, sans intervention d'un technicien.
-            </div>
+          <SegmentedToggle :model-value="triState(device.meets_r175_3_p4)" :options="YESNO"
+                           @update:model-value="v => patch({ meets_r175_3_p4: v })" />
+
+          <div class="qa-question text-sm font-medium">
+            L'équipement redémarre-t-il de façon autonome après une coupure ?
+            <span class="font-normal text-gray-400 ml-1">· R175-3 §4</span>
+            <span class="qa-desc">Après une coupure de courant ou un redémarrage de la GTB, l'équipement repart seul, sans intervention d'un technicien.</span>
           </div>
+          <SegmentedToggle :model-value="triState(device.meets_r175_3_p4_autonomous)" :options="YESNO"
+                           @update:model-value="v => patch({ meets_r175_3_p4_autonomous: v })" />
         </div>
       </section>
 
-      <!-- Suivi énergétique BACS — comptage séparable (équipements partagés) -->
-      <section v-if="isShared" class="rounded-xl border border-gray-200 overflow-hidden">
+      <!-- Suivi énergétique BACS — comptage séparable + équipement centralisé multi-bâtiments -->
+      <section class="rounded-xl border border-gray-200 overflow-hidden">
         <h4 :class="headCls">Suivi énergétique BACS</h4>
-        <div class="p-3">
-          <div class="flex items-center gap-3">
-            <span class="text-sm font-medium text-gray-800">Le comptage de cet équipement est-il séparable par zone ?</span>
+        <div class="qa-grid px-3 py-3" style="row-gap: 1.5rem">
+          <!-- Comptage séparable : visible uniquement pour les équipements
+               partagés entre plusieurs systèmes/zones. -->
+          <template v-if="isShared">
+            <div class="qa-question text-sm font-medium">
+              Le comptage de cet équipement est-il séparable par zone ?
+              <span class="qa-desc">La consommation de chaque zone desservie par cet équipement partagé peut être relevée séparément.</span>
+            </div>
             <SegmentedToggle :model-value="device.metering_separable || null" :options="METERING_OPTS"
                              @update:model-value="v => patch({ metering_separable: v })" />
+          </template>
+          <!-- Multi-bâtiments — visible sur tous les équipements (chaudière
+               centrale, GPC, sous-station…). Déplacé depuis le niveau
+               système (refactor 2026-05-26, mig 175). Détermine le cas F
+               d'assujettissement : tous les propriétaires du site sont
+               assujettis ensemble. -->
+          <div class="qa-question text-sm font-medium">
+            Cet équipement dessert-il plusieurs bâtiments du site ?
+            <span class="qa-desc">Chaudière commune, groupe de production de chaleur, sous-station : un équipement central qui sert plusieurs bâtiments du site. Tous les propriétaires du site deviennent alors assujettis ensemble (cas F du décret).</span>
           </div>
-          <div class="text-xs text-gray-500 leading-snug mt-0.5">
-            La consommation de chaque zone desservie par cet équipement partagé peut être
-            relevée séparément.
-          </div>
-          <input type="text" :value="device.metering_separable_note || ''" placeholder="Justification courte…"
+          <SegmentedToggle :model-value="triState(device.serves_multiple_buildings)" :options="YESNO"
+                           @update:model-value="v => patch({ serves_multiple_buildings: v })" />
+        </div>
+        <div v-if="isShared" class="px-3 pb-3">
+          <input type="text" :value="device.metering_separable_note || ''" placeholder="Justification courte sur la séparabilité du comptage…"
                  @blur="e => patchInput('metering_separable_note', e.target.value)"
-                 :class="inputCls" class="w-full mt-1.5" />
+                 :class="inputCls" class="w-full" />
         </div>
       </section>
 
       <!-- État de l'équipement -->
       <section class="rounded-xl border border-gray-200 overflow-hidden">
         <h4 :class="headCls">État de l'équipement</h4>
-        <div class="divide-y divide-gray-100">
-          <div class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-medium text-gray-800">Est-ce un équipement de secours ?</span>
-              <SegmentedToggle :model-value="triState(device.is_backup)" :options="YESNO"
-                               @update:model-value="v => patch({ is_backup: v })" />
-            </div>
-            <div class="text-xs text-gray-500 leading-snug mt-0.5">
-              Équipement de secours, non utilisé en fonctionnement normal — sa puissance
-              n'entre pas dans le calcul d'assujettissement au décret.
-            </div>
+        <div class="qa-grid px-3 py-3" style="row-gap: 1.5rem">
+          <div class="qa-question text-sm font-medium">
+            Est-ce un équipement de secours ?
+            <span class="qa-desc">Équipement de secours, non utilisé en fonctionnement normal — sa puissance n'entre pas dans le calcul d'assujettissement au décret.</span>
           </div>
-          <div class="px-3 py-2">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-medium text-gray-800">L'équipement est-il hors service ?</span>
-              <SegmentedToggle :model-value="triState(device.out_of_service)" :options="YESNO"
-                               @update:model-value="v => patch({ out_of_service: v })" />
-            </div>
-            <div class="text-xs text-gray-500 leading-snug mt-0.5">
-              Équipement hors d'usage : il n'est pas pris en compte dans le plan de mise
-              en conformité.
-            </div>
+          <SegmentedToggle :model-value="triState(device.is_backup)" :options="YESNO"
+                           @update:model-value="v => patch({ is_backup: v })" />
+
+          <div class="qa-question text-sm font-medium">
+            L'équipement est-il hors service ?
+            <span class="qa-desc">Équipement hors d'usage : il n'est pas pris en compte dans le plan de mise en conformité.</span>
           </div>
+          <SegmentedToggle :model-value="triState(device.out_of_service)" :options="YESNO"
+                           @update:model-value="v => patch({ out_of_service: v })" />
         </div>
       </section>
 

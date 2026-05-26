@@ -158,7 +158,12 @@ async function routes(fastify) {
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
     const data = await buildBacsAuditExportData(af, { user, previewMode: true });
-    const html = renderHtml({ template: 'bacs-audit', styles: 'styles-bacs-audit', data });
+    // En dev, recharge templates + partials a chaque appel — cohérent
+    // avec la route POST /export-pdf et avec la fixture preview.
+    const devFresh = process.env.DEV_BYPASS_AUTH === '1';
+    const html = renderHtml({
+      template: 'bacs-audit', styles: 'styles-bacs-audit', data, fresh: devFresh,
+    });
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
   });
 
@@ -315,6 +320,12 @@ async function routes(fastify) {
     const WATERMARK_PATH = path.resolve(__dirname, '../../../templates/pdf/assets/watermark-buildy.png');
     const BUILDY_WATERMARK = { imagePath: WATERMARK_PATH, widthRatio: 0.85, heightRatio: 0.85, opacity: 0.03 };
 
+    // En dev (DEV_BYPASS_AUTH actif), recharger templates + partials a
+    // chaque export — sinon les modifs .hbs/.css ne sont prises en compte
+    // qu'au prochain pm2 restart (cf. incident 2026-05-26 ou refonte ch.3
+    // n'apparaissait pas sur exports reels alors que la fixture preview
+    // affichait bien la version a jour grace au flag fresh:true).
+    const devFresh = process.env.DEV_BYPASS_AUTH === '1';
     let result;
     try {
       result = await renderPdf({
@@ -327,6 +338,7 @@ async function routes(fastify) {
         skipFirstPageHeaderFooter: true,
         coverFullBleed: true,
         closingFullBleed: true,
+        fresh: devFresh,
         watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, skipLastPage: true },
         pdfOptions: buildHeaderFooter({
           clientName: af.client_name,
@@ -397,6 +409,8 @@ async function routes(fastify) {
 
     const logoSmall = loadAssetDataUrl('logo-buildy.svg');
 
+    // Idem export-pdf principal : fresh:true en dev pour hot reload.
+    const devFreshT = process.env.DEV_BYPASS_AUTH === '1';
     let result;
     try {
       result = await renderPdf({
@@ -406,6 +420,7 @@ async function routes(fastify) {
         outputPath,
         pageFormat: 'A3',
         pageOrientation: 'landscape',
+        fresh: devFreshT,
         pdfOptions: buildHeaderFooter({
           clientName: af.client_name,
           projectName: af.project_name,

@@ -8,6 +8,7 @@ import { useNotification } from '@/composables/useNotification'
 import { updateBacsDevice, updateBacsMeter } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
+import MobileSegmented from './MobileSegmented.vue'
 import MobileInspectionsSheet from './MobileInspectionsSheet.vue'
 
 // Item 15 — options des champs « conservation & accès aux données » (R175-3).
@@ -441,17 +442,20 @@ const USAGES = [
             <h3 class="text-base font-medium text-gray-900">Conservation et accès aux données</h3>
             <p class="text-xs text-gray-500 mt-0.5">R175-3 — archivage 5 ans</p>
           </div>
-          <div class="p-4 space-y-4">
-            <MobileField label="Données conservées 5 ans (échelle mensuelle) ?">
-              <MobileSelectSheet
-                :model-value="bms.data_storage_5y_compliant"
-                :options="STORAGE_5Y_OPTIONS"
-                title="Conservation 5 ans"
-                placeholder="— Non renseigné —"
-                @update:model-value="v => { bms.data_storage_5y_compliant = v; saveDebounced() }"
-              />
-            </MobileField>
-            <MobileField label="Localisation du stockage">
+          <div class="p-4 space-y-3">
+            <!-- Q1 — Conservation 5 ans (3 valeurs : oui / non / inconnu) -->
+            <MobileSegmented
+              label="Les données sont-elles conservées 5 ans à l'échelle mensuelle ?"
+              :model-value="bms.data_storage_5y_compliant"
+              :options="[
+                { value: 'yes', label: 'Oui', tone: 'green' },
+                { value: 'no', label: 'Non', tone: 'slate' },
+                { value: 'unknown', label: 'Inconnu', tone: 'amber' },
+              ]"
+              @update:model-value="v => { bms.data_storage_5y_compliant = v; saveDebounced() }"
+            />
+            <!-- Q2 — Localisation du stockage (4 choix exclusifs) : bottom sheet justifié -->
+            <MobileField label="Où sont stockées les données ?">
               <MobileSelectSheet
                 :model-value="bms.data_storage_location"
                 :options="STORAGE_LOCATION_OPTIONS"
@@ -460,33 +464,38 @@ const USAGES = [
                 @update:model-value="v => { bms.data_storage_location = v; saveDebounced() }"
               />
             </MobileField>
-            <MobileField label="Accès direct du propriétaire à ses données">
-              <MobileSelectSheet
-                :model-value="bms.data_owner_access"
-                :options="ACCESS_OPTIONS"
-                title="Accès du propriétaire"
-                placeholder="— Non renseigné —"
-                @update:model-value="v => { bms.data_owner_access = v; saveDebounced() }"
-              />
-            </MobileField>
-            <MobileField label="Accès du gestionnaire et des exploitants">
-              <MobileSelectSheet
-                :model-value="bms.gestionnaire_exploitant_access"
-                :options="ACCESS_OPTIONS"
-                title="Accès gestionnaire / exploitants"
-                placeholder="— Non renseigné —"
-                @update:model-value="v => { bms.gestionnaire_exploitant_access = v; saveDebounced() }"
-              />
-            </MobileField>
-            <MobileField label="Export possible (CSV / Excel)">
-              <MobileSelectSheet
-                :model-value="bms.export_capability"
-                :options="EXPORT_OPTIONS"
-                title="Export des données"
-                placeholder="— Non renseigné —"
-                @update:model-value="v => { bms.export_capability = v; saveDebounced() }"
-              />
-            </MobileField>
+            <!-- Q3 — Accès propriétaire (ternaire Oui / Partiel / Non) -->
+            <MobileSegmented
+              label="Le propriétaire accède-t-il directement à ses données ?"
+              :model-value="bms.data_owner_access"
+              :options="[
+                { value: 'yes', label: 'Oui', tone: 'green' },
+                { value: 'partial', label: 'Partiel', tone: 'amber' },
+                { value: 'no', label: 'Non', tone: 'slate' },
+              ]"
+              @update:model-value="v => { bms.data_owner_access = v; saveDebounced() }"
+            />
+            <!-- Q4 — Accès gestionnaire / exploitants (idem ternaire) -->
+            <MobileSegmented
+              label="Le gestionnaire et les exploitants ont-ils accès aux données ?"
+              :model-value="bms.gestionnaire_exploitant_access"
+              :options="[
+                { value: 'yes', label: 'Oui', tone: 'green' },
+                { value: 'partial', label: 'Partiel', tone: 'amber' },
+                { value: 'no', label: 'Non', tone: 'slate' },
+              ]"
+              @update:model-value="v => { bms.gestionnaire_exploitant_access = v; saveDebounced() }"
+            />
+            <!-- Q5 — Export CSV/Excel (binaire) -->
+            <MobileSegmented
+              label="Les données sont-elles exportables (CSV / Excel) ?"
+              :model-value="bms.export_capability"
+              :options="[
+                { value: 'yes', label: 'Oui', tone: 'green' },
+                { value: 'no', label: 'Non', tone: 'slate' },
+              ]"
+              @update:model-value="v => { bms.export_capability = v; saveDebounced() }"
+            />
             <textarea
               v-model="bms.data_access_notes"
               @input="saveDebounced"

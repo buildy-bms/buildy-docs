@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 174;
+const TARGET_VERSION = 175;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6745,6 +6745,25 @@ function runMigrations() {
 
     log.info('Migration 174 appliquee : CHECK constraints sur bacs_audit_systems.communication (lorawan), zones.kind, zones.nature, bacs_audit_action_items.category');
     db.pragma('user_version = 174');
+  }
+
+  if (current < 175) {
+    // Refactor 2026-05-26 — Flag `serves_multiple_buildings` deplace du
+    // systeme (bacs_audit_systems) vers l'equipement (bacs_audit_system_devices).
+    // C'est l'equipement physique central (chaudiere commune, GPC, sous-station)
+    // qui dessert N batiments — pas l'usage en abstrait. Idem `is_district_
+    // heating_substation` : derive du modele d'equipement (slug
+    // 'sous-station-reseau-urbain') et plus saisi manuellement.
+    //
+    // Colonnes legacy sur bacs_audit_systems : conservees pour compat
+    // descendante (les valeurs existantes restent lues par bacs-liability.js
+    // tant qu'aucun device ne porte le flag derive). A retirer dans une mig
+    // ulterieure quand les donnees auront ete migrees.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN serves_multiple_buildings INTEGER DEFAULT NULL;
+    `);
+    log.info('Migration 175 appliquee : bacs_audit_system_devices.serves_multiple_buildings (deplace depuis systems)');
+    db.pragma('user_version = 175');
   }
 
   if (current > TARGET_VERSION) {

@@ -40,15 +40,33 @@ const MIXED_CATEGORIES = new Set(['ventilation']);
  * Infère le type de calcul de puissance d'un device quand il n'est pas
  * explicitement renseigné. Heuristique conservatrice.
  *
- * @param {object} device — { system_category, energy_source, is_backup }
+ * Refactor 2026-05-26 — Le type `district_heating_substation` n'est plus
+ * inféré depuis `energy_source='district_heating'` (qui peut être porté
+ * par un radiateur eau chaude en aval d'un réseau urbain). Il est
+ * désormais déclenché EXCLUSIVEMENT par l'usage du modèle bibliothèque
+ * `sous-station-reseau-urbain` (l'échangeur primaire est la seule
+ * puissance retenue R175-2 — les émetteurs aval ne sont pas additionnés).
+ *
+ * @param {object} device — { system_category, energy_source, is_backup,
+ *                            equipment_template_slug? }
  * @returns {string} un power_calculation_type
  */
 function inferPowerCalculationType(device) {
   if (device.is_backup) return 'out_of_scope';
   const energy = device.energy_source || null;
   const cat = device.system_category || null;
-  // Réseau de chaleur urbain → sous-station.
-  if (energy === 'district_heating') return 'district_heating_substation';
+  const tplSlug = device.equipment_template_slug || null;
+  // Sous-station de réseau urbain : déclenchée par le slug du modèle
+  // bibliothèque uniquement. Évite que les radiateurs aval (energy_source
+  // = 'district_heating' par défaut sur le template radiateur) soient
+  // qualifiés à tort comme sous-station — sinon double comptage R175-2.
+  if (tplSlug === 'sous-station-reseau-urbain') return 'district_heating_substation';
+  // Émetteurs aval de réseau urbain (radiateurs, ventilo-convecteurs,
+  // batterie CTA alimentés en eau chaude / glacée par une sous-station) :
+  // leur puissance ne doit PAS être additionnée au cumul (R175-2 : la
+  // puissance retenue est celle de la station d'échange, pas du cumul
+  // aval). On les rend explicitement hors cumul.
+  if (energy === 'district_heating') return 'out_of_scope';
   // Bois (appareil indépendant) → hors périmètre.
   if (energy === 'wood' || energy === 'biomass') return 'out_of_scope';
   // Thermodynamique : PAC (heat_pump) ou catégorie froid.
@@ -207,12 +225,16 @@ function resolveTotalPower(document, auto) {
  * @param {number} documentId — id de l'AF.
  */
 function recomputeAndPersistAuditPower(db, documentId) {
-  // Lis tous les devices in-scope de l'audit avec leur catégorie système.
+  // Lis tous les devices in-scope de l'audit avec leur catégorie système +
+  // le slug du modèle bibliothèque (pour que inferPowerCalculationType
+  // puisse distinguer sous-station vs émetteur aval — refactor 2026-05-26).
   const devices = db.prepare(`
     SELECT d.id, d.power_kw, d.power_kw_cooling, d.power_calculation_type,
-           d.is_backup, d.out_of_service, s.system_category
+           d.energy_source, d.is_backup, d.out_of_service,
+           s.system_category, t.slug AS equipment_template_slug
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
+    LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
     WHERE s.document_id = ?
   `).all(documentId);
   const auto = computeAutoPower(devices);

@@ -1,0 +1,50 @@
+{{!--
+  Carte groupée pour le plan d'action (ch.7).
+  Affiche une seule carte pour N actions du même source_subtype, avec
+  un tableau interne listant les paramètres qui diffèrent (zone, usage,
+  type compteur ou nom équipement).
+
+  Variables attendues dans le contexte (groupe construit par
+  buildGroupedPlan() côté _export-data.js) :
+    label, columns, count, r175_article, first_number, last_number, items
+
+  Arguments passés via {{> _action-group sev="..." sevLabel="..." sevClass="..."}} :
+    sevClass = sev-blocking | sev-major | sev-minor
+    sevLabel = "Bloquantes" | "Majeures" | "Optimisations"
+--}}
+<div class="action-card action-card-grouped {{#if (eq sev "minor")}}action-card-minor{{/if}}">
+  <div class="action-card-head">
+    <span class="action-num action-num-range">{{first_number}} → {{last_number}}</span>
+    <span class="sev {{sevClass}}">{{sevLabel}} × {{count}}</span>
+    {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
+  </div>
+  <div class="action-card-title"><strong>{{label}}</strong></div>
+  <table class="action-group-table">
+    <thead>
+      <tr>
+        <th class="agt-num">N°</th>
+        {{#each columns}}
+          {{#if (eq this "zone")}}<th>Zone</th>{{/if}}
+          {{#if (eq this "usage")}}<th>Usage</th>{{/if}}
+          {{#if (eq this "meter_type")}}<th>Type</th>{{/if}}
+          {{#if (eq this "system")}}<th>Système</th>{{/if}}
+          {{#if (eq this "device")}}<th>Équipement</th>{{/if}}
+        {{/each}}
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+        <tr>
+          <td class="agt-num"><span class="agt-bacs-num">{{display_number}}</span></td>
+          {{#each ../columns}}
+            {{#if (eq this "zone")}}<td>{{../zone_name}}</td>{{/if}}
+            {{#if (eq this "usage")}}<td>{{../meter_usage_label}}</td>{{/if}}
+            {{#if (eq this "meter_type")}}<td>{{../meter_type_label}}</td>{{/if}}
+            {{#if (eq this "system")}}<td>{{../system_label}}</td>{{/if}}
+            {{#if (eq this "device")}}<td><strong>{{../device_name}}</strong>{{#if ../device_brand}} <span class="muted">· {{../device_brand}}</span>{{/if}}</td>{{/if}}
+          {{/each}}
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
