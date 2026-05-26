@@ -8,13 +8,17 @@ const props = defineProps({
   zones: { type: Array, required: true },
   usages: { type: Array, required: true },
   types: { type: Array, required: true },
+  // Préfill optionnel (depuis la matrice « Plan de comptage » ou un bouton
+  // « + Ajouter un compteur <énergie> » d'une section). Le formulaire reste
+  // entièrement éditable — c'est juste un raccourci de saisie.
+  prefill: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'submit'])
 
 const form = ref({
-  zone_id: null,
-  usage: 'heating',
-  meter_type: 'thermal',
+  zone_id: props.prefill?.zone_id ?? null,
+  usage: props.prefill?.usage || 'heating',
+  meter_type: props.prefill?.meter_type || 'thermal',
   required: true,
 })
 const submitting = ref(false)

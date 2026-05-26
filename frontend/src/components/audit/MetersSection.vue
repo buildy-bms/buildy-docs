@@ -1,21 +1,18 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
-import Sortable from 'sortablejs'
-import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { BoltIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
-import Tooltip from '@/components/Tooltip.vue'
-import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
-import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
-import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
-import { useTableSort } from '@/composables/useTableSort'
+import MeterCoverageMatrix from '@/components/audit/MeterCoverageMatrix.vue'
+import MeterEnergyGroup from '@/components/audit/MeterEnergyGroup.vue'
+import { METER_TYPES as ENERGY_METAS } from '@/lib/meter-options'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
@@ -34,9 +31,47 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { meters, document } = storeToRefs(audit)
+const { meters, document, zones } = storeToRefs(audit)
 const { error } = useNotification()
 const { confirm } = useConfirm()
+
+// ── Plan de comptage : agrégations par énergie pour les 5 sections ──
+function metersOfEnergy(energy) {
+  return meters.value.filter(m => m.meter_type === energy)
+}
+const energySections = computed(() =>
+  ENERGY_METAS.map(et => ({ energy: et, meters: metersOfEnergy(et.value) })),
+)
+const globalStats = computed(() => {
+  const arr = meters.value
+  return {
+    total: arr.length,
+    present: arr.filter(m => m.present_actual).length,
+    communicating: arr.filter(m => m.communicating).length,
+    missing: arr.filter(m => m.required && !m.present_actual && !m.out_of_service).length,
+  }
+})
+
+// Highlight temporaire d'une ligne quand l'utilisateur clique sur une
+// pill de la matrice : on scrolle vers la section concernée et on met
+// un ring ambre 2 s pour identifier visuellement la ligne.
+const highlightId = ref(null)
+function focusMeterFromMatrix(meter) {
+  if (!meter?.id) return
+  highlightId.value = meter.id
+  nextTick(() => {
+    const el = window.document.querySelector(`[data-id="${meter.id}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+  setTimeout(() => { highlightId.value = null }, 2000)
+}
+
+// Ajout d'un compteur avec préfill éventuel (clic sur cellule vide ou
+// bouton « + Ajouter un compteur <énergie> »). Le parent (BacsAuditDetailView)
+// reçoit le payload via `@add-meter` et l'utilise pour pré-remplir la modale.
+function onAddMeter(payload) {
+  emit('add-meter', payload || {})
+}
 
 async function patchMeter(m, patch) {
   Object.assign(m, patch)
@@ -44,6 +79,49 @@ async function patchMeter(m, patch) {
     await updateBacsMeter(m.id, patch)
     await audit.refreshActionItems()
   } catch { error('Sauvegarde impossible') }
+}
+
+// Handlers pour MeterEnergyGroup (qui passe { meter, patch } en payload).
+function onPatchMeterFromGroup({ meter, patch }) {
+  return patchMeter(meter, patch)
+}
+function onOpenNotesFromGroup(m) {
+  emit('open-notes', {
+    title: 'Notes compteur',
+    contextLabel: (m.zone_name || 'Compteur général') + ' — '
+      + (props.meterUsages.find(u => u.value === m.usage)?.label || m.usage),
+    entityType: 'meter',
+    entityRef: m,
+    currentHtml: m.notes_html || m.notes || '',
+  })
+}
+
+// Réordonnage intra-énergie : on remet les compteurs de l'énergie dans
+// l'ordre demandé puis on appelle reorderBacsMeters sur la liste complète
+// (les autres énergies gardent leur ordre relatif).
+async function onReorderFromGroup({ energy, ids }) {
+  const idSet = new Set(ids)
+  const others = meters.value.filter(m => m.meter_type !== energy || !idSet.has(m.id))
+  const reordered = ids.map(id => meters.value.find(m => m.id === id)).filter(Boolean)
+  const fullOrder = []
+  let reorderedIdx = 0
+  for (const m of meters.value) {
+    if (m.meter_type === energy && idSet.has(m.id)) {
+      fullOrder.push(reordered[reorderedIdx++])
+    } else {
+      fullOrder.push(m)
+    }
+  }
+  // Note : on conserve les positions globales des autres énergies, on
+  // ne réordonne que les compteurs de l'énergie active.
+  try {
+    await reorderBacsMeters(audit.docId, fullOrder.map(m => m.id))
+    await audit.refreshAuditCore()
+  } catch {
+    error('Réorganisation impossible')
+    await audit.refreshAuditCore()
+  }
+  void others // marqueur lint (variable construite pour la lisibilité)
 }
 
 async function removeMeter(m) {
@@ -66,58 +144,10 @@ async function dupMeter(m) {
   } catch { error('Duplication impossible') }
 }
 
-function refreshAuditData() { return audit.refreshAuditCore() }
-
-// Tri data-table (clic en-tête, asc → desc → off).
-const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
-function sortMeterValue(m, key) {
-  if (key === 'zone') return (m.zone_name || '').toLowerCase()
-  if (key === 'meter_type') return (m.meter_type || '').toLowerCase()
-  if (key === 'usage') return (m.usage || '').toLowerCase()
-  return ''
-}
-const sortedMeters = computed(() => sortedRows(meters.value, sortMeterValue))
-
 function hasNotes(html) {
   if (!html) return false
   return html.replace(/<[^>]*>/g, '').trim().length > 0
 }
-
-// Drag & drop des compteurs (desktop). API : reorderBacsMeters(docId, ids).
-const metersBodyRef = ref(null)
-let metersSortable = null
-function teardownMetersSortable() {
-  if (metersSortable) { try { metersSortable.destroy() } catch { /* ignore */ } metersSortable = null }
-}
-function setupMetersSortable() {
-  teardownMetersSortable()
-  const el = metersBodyRef.value
-  if (!el) return
-  metersSortable = Sortable.create(el, {
-    draggable: 'tr.meter-row',
-    handle: '.drag-handle',
-    animation: 150,
-    ghostClass: 'sortable-ghost',
-    onEnd: async (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
-      const ids = Array.from(el.querySelectorAll('tr.meter-row'))
-        .map(tr => parseInt(tr.getAttribute('data-id'), 10))
-        .filter(Boolean)
-      try {
-        await reorderBacsMeters(audit.docId, ids)
-        await audit.refreshAuditCore()
-      } catch {
-        error('Réorganisation impossible')
-        await audit.refreshAuditCore()
-      }
-    },
-  })
-}
-watch(meters, async () => {
-  await nextTick()
-  setupMetersSortable()
-}, { immediate: true, flush: 'post' })
-onBeforeUnmount(teardownMetersSortable)
 </script>
 
 <template>
@@ -141,137 +171,68 @@ onBeforeUnmount(teardownMetersSortable)
       </span>
       <span v-else class="italic">Aucun compteur listé</span>
     </template>
-    <!-- Desktop : data-table aligné (>=768px). Flags split en 5 colonnes
-         (Req. / Prés. / Comm. / Câbl. / HS), chacune triable visuellement
-         et cliquable individuellement. -->
-    <div class="hidden md:block overflow-x-auto">
-    <table class="data-table w-full text-sm">
-      <thead>
-        <tr>
-          <th class="w-8"></th>
-          <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
-          <DataTableSortHeader sort-key="meter_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
-          <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <th>Requis</th>
-          <th>Présent</th>
-          <th>Communicant</th>
-          <th>Câblé</th>
-          <th>Hors service</th>
-          <th>Protocoles</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody ref="metersBodyRef">
-        <PhotoDropTr v-for="m in sortedMeters" :key="m.id"
-                     :row-class="['meter-row',
-                       m.out_of_service ? 'opacity-50' : '',
-                       m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : ''
-                     ].join(' ')"
-                     :data-id="m.id"
-                     :site-uuid="document?.site_uuid || ''"
-                     :attach-to="{ meter_id: m.id }"
-                     :enabled="!!document?.site_uuid"
-                     @changed="refreshAuditData">
-          <td class="align-middle">
-            <button type="button"
-                    class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                    v-tooltip="'Glisser pour réordonner'">
-              <Bars3Icon class="w-4 h-4" />
-            </button>
-          </td>
-          <td class="text-gray-700 whitespace-nowrap">
-            <span v-if="m.required && !m.present_actual && !m.out_of_service"
-                  class="text-red-600 mr-1" v-tooltip="'Compteur requis non présent'">⚠</span>
-            {{ m.zone_name || 'Compteur général' }}
-          </td>
-          <td><MeterTypePill :type="m.meter_type" /></td>
-          <td><MeterUsagePill :usage="m.usage" /></td>
-          <td class="whitespace-nowrap">
-            <SegmentedToggle compact :model-value="!!m.required"
-                             tooltip="Compteur requis par le décret R175"
-                             @update:model-value="v => patchMeter(m, { required: v })" />
-          </td>
-          <td class="whitespace-nowrap">
-            <SegmentedToggle compact :model-value="!!m.present_actual"
-                             tooltip="Compteur présent sur site ?"
-                             @update:model-value="v => patchMeter(m, { present_actual: v })" />
-          </td>
-          <td class="whitespace-nowrap">
-            <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.communicating"
-                             tooltip="Compteur communicant ?"
-                             @update:model-value="v => patchMeter(m, v
-                               ? { communicating: true }
-                               : { communicating: false, communication_protocols: null, communication_protocol: null })" />
-            <span v-else class="text-gray-300">—</span>
-          </td>
-          <td class="whitespace-nowrap">
-            <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.wired"
-                             tooltip="Communication câblée vers la GTB ?"
-                             @update:model-value="v => patchMeter(m, { wired: v })" />
-            <span v-else class="text-gray-300">—</span>
-          </td>
-          <td class="whitespace-nowrap">
-            <SegmentedToggle compact yes-danger :model-value="!!m.out_of_service"
-                             tooltip="Compteur hors service ? (HS = ignoré du plan d'action)"
-                             @update:model-value="v => patchMeter(m, { out_of_service: v })" />
-          </td>
-          <td>
-            <div class="min-w-32">
-              <ProtocolMultiPicker
-                :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
-                :disabled="!m.communicating"
-                :options="protocolOptions"
-                size="xs"
-                @update:modelValue="v => patchMeter(m, { communication_protocols: v, communication_protocol: null })"
-              />
-            </div>
-          </td>
-          <td class="whitespace-nowrap">
-            <div class="inline-flex items-center gap-1">
-              <button
-                type="button"
-                @click="emit('open-notes', { title: 'Notes compteur', contextLabel: (m.zone_name || 'Compteur général') + ' — ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage), entityType: 'meter', entityRef: m, currentHtml: m.notes_html || m.notes || '' })"
-                :class="['btn-icon', hasNotes(m.notes_html || m.notes) && 'is-active']"
-                v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-              <BacsPhotoButton
-                v-if="document?.site_uuid"
-                :site-uuid="document.site_uuid"
-                :attach-to="{ meter_id: m.id }"
-                :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
-              />
-              <VoiceNoteButton
-                v-if="document?.site_uuid"
-                :site-uuid="document.site_uuid"
-                :attach-to="{ meter_id: m.id }"
-                :label="(m.zone_name || 'Général') + ' / ' + (meterUsages.find(u => u.value === m.usage)?.label || m.usage)"
-              />
-              <button @click="dupMeter(m)" class="btn-icon" v-tooltip="'Dupliquer'">
-                <DocumentDuplicateIcon class="w-4 h-4" />
-              </button>
-              <button @click="removeMeter(m)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
-                <TrashIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-        </PhotoDropTr>
-        <tr>
-          <td colspan="11" class="px-3 py-3">
-            <button @click="emit('add-meter')" class="btn-add">
-              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un compteur
-            </button>
-          </td>
-        </tr>
-      </tbody>
-      <tfoot v-if="!meters.length">
-        <tr>
-          <td colspan="11" class="px-5 py-6 text-center text-xs text-gray-500">
-            Aucun compteur listé. Renseigne les compteurs requis (R175-3 1°) à mesure de la visite.
-          </td>
-        </tr>
-      </tfoot>
-    </table>
+    <!-- Desktop : « Plan de comptage » en 3 étages (≥768px) -->
+    <div class="hidden md:block space-y-4 p-3">
+      <!-- Étage 3 — Stats globales -->
+      <div class="grid grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl border border-gray-200 p-4">
+          <p class="text-2xl font-semibold text-gray-900 leading-none">{{ globalStats.total }}</p>
+          <p class="text-xs text-gray-500 mt-1.5">Compteurs total</p>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+          <p class="text-2xl font-semibold text-emerald-700 leading-none">{{ globalStats.present }}</p>
+          <p class="text-xs text-emerald-600 mt-1.5">Présents</p>
+        </div>
+        <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+          <p class="text-2xl font-semibold text-indigo-700 leading-none">{{ globalStats.communicating }}</p>
+          <p class="text-xs text-indigo-600 mt-1.5">Communicants</p>
+        </div>
+        <div :class="['rounded-2xl border p-4',
+                      globalStats.missing > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200']">
+          <p :class="['text-2xl font-semibold leading-none',
+                      globalStats.missing > 0 ? 'text-red-700' : 'text-gray-700']">
+            {{ globalStats.missing }}
+          </p>
+          <p :class="['text-xs mt-1.5', globalStats.missing > 0 ? 'text-red-600' : 'text-gray-500']">
+            Requis manquants
+          </p>
+        </div>
+      </div>
+
+      <!-- Étage 1 — Matrice de couverture visuelle -->
+      <MeterCoverageMatrix
+        :meters="meters"
+        :zones="zones"
+        @cell-click="focusMeterFromMatrix"
+        @add-meter="onAddMeter"
+      />
+
+      <!-- Étage 2 — Sections par énergie -->
+      <div class="space-y-3">
+        <MeterEnergyGroup
+          v-for="section in energySections"
+          :key="section.energy.value"
+          :energy="section.energy"
+          :meters="section.meters"
+          :document="document"
+          :protocol-options="protocolOptions"
+          :meter-usages="meterUsages"
+          :highlight-id="highlightId"
+          @patch-meter="onPatchMeterFromGroup"
+          @duplicate-meter="dupMeter"
+          @remove-meter="removeMeter"
+          @open-notes="onOpenNotesFromGroup"
+          @add-meter="onAddMeter"
+          @reorder="onReorderFromGroup"
+        />
+      </div>
+
+      <!-- Empty state (aucune zone créée encore) -->
+      <div v-if="!meters.length && !zones.length"
+           class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center text-xs text-gray-500">
+        Crée d'abord des zones — le plan de comptage apparaîtra ensuite. Renseigne les
+        compteurs requis (R175-3 1°) à mesure de la visite.
+      </div>
     </div>
 
     <!-- Mobile : cards empilées (<768px) -->

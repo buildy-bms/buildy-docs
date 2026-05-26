@@ -171,6 +171,14 @@ const site = ref(null)
 // pose par l'auditeur).
 const showAddZoneModal = ref(false)
 const showAddMeterModal = ref(false)
+// Préfill de la modale création compteur quand l'auditeur clique sur une
+// cellule vide de la matrice « Plan de comptage » ou sur le bouton
+// « + Ajouter un compteur <énergie> » d'une section. Forme : { zone_id?, meter_type?, usage? }
+const meterAddPrefill = ref(null)
+function openMeterAddModal(prefill) {
+  meterAddPrefill.value = prefill && typeof prefill === 'object' ? prefill : null
+  showAddMeterModal.value = true
+}
 const addDeviceSystem = ref(null) // { id, system_category, zone_name } — modale d'ajout d'équipement à 2 onglets
 
 // Options pour AddDeviceModal (memes que SystemDevicesTable.vue)
@@ -1456,7 +1464,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
         @open-notes="openNotesModal"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"
-        @add-meter="showAddMeterModal = true"
+        @add-meter="openMeterAddModal"
       />
 
       <!-- 6. Régulation thermique automatique (R175-6) -->
@@ -1614,7 +1622,8 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       :zones="zones"
       :usages="METER_USAGES"
       :types="METER_TYPES"
-      @close="showAddMeterModal = false"
+      :prefill="meterAddPrefill"
+      @close="showAddMeterModal = false; meterAddPrefill = null"
       @submit="addMeter"
     />
     <DeviceAddModal
