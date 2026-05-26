@@ -52,12 +52,26 @@ function goToList(groupKey) {
   currentView.value = 'list'
   nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
 }
+// Raccourci « Compteur général de site » depuis N1 : liste directement
+// les compteurs sans zone_id, toutes énergies confondues (mode dédié).
+function goToGeneralList() {
+  selectedEnergy.value = '__general__'
+  selectedGroupKey.value = null
+  currentView.value = 'list'
+  nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+}
 function goBackToEnergies() {
   currentView.value = 'energies'
   selectedEnergy.value = null
   selectedGroupKey.value = null
 }
 function goBackToGroup() {
+  // Depuis la liste des compteurs généraux, le retour remonte à N1
+  // (pas de N2 « groupes » pour ce raccourci).
+  if (selectedEnergy.value === '__general__') {
+    goBackToEnergies()
+    return
+  }
   currentView.value = 'group'
   selectedGroupKey.value = null
 }
@@ -178,6 +192,11 @@ const energyGroups = computed(() => (selectedEnergy.value ? buildGroups() : []))
 
 // ── N3 — liste des compteurs filtrés (énergie + groupe) ─────────────
 const filteredMeters = computed(() => {
+  // Raccourci « Compteur général de site » : tous les compteurs sans
+  // zone, toutes énergies confondues.
+  if (selectedEnergy.value === '__general__') {
+    return generalMeters.value
+  }
   if (!selectedEnergy.value || selectedGroupKey.value == null) return []
   const list = selectedEnergyMeters.value
   if (groupBy.value === 'usage') {
@@ -189,9 +208,11 @@ const filteredMeters = computed(() => {
   return list.filter(m => m.zone_id === selectedGroupKey.value)
 })
 const selectedGroupLabel = computed(() => {
+  if (selectedEnergy.value === '__general__') return 'Compteur général de site'
   const g = energyGroups.value.find(x => x.key === selectedGroupKey.value)
   return g?.label || ''
 })
+const isGeneralListMode = computed(() => selectedEnergy.value === '__general__')
 
 // Sheet
 const editing = ref(null)
@@ -370,7 +391,7 @@ function toggleProtocol(p) {
       <!-- Compteurs généraux (raccourci, hors énergie) -->
       <button v-if="generalMeters.length"
               type="button"
-              @click="openEdit(generalMeters[0])"
+              @click="goToGeneralList()"
               class="w-full bg-white rounded-2xl border border-gray-200 px-4 py-3.5 flex items-center gap-3 text-left active:bg-gray-50">
         <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-5 h-5 text-gray-500 shrink-0" />
         <div class="flex-1 min-w-0">
@@ -434,6 +455,18 @@ function toggleProtocol(p) {
           @click="goToList(g.key)"
           class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
         >
+          <!-- Icône colorée à gauche : par usage = icône d'usage colorée,
+               par zone = pictogramme générique de zone (gris). -->
+          <span v-if="groupBy === 'usage' && g.icon"
+                class="w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0"
+                :style="{ background: g.color + '1a', color: g.color }">
+            <FontAwesomeIcon :icon="['fas', g.icon.replace(/^fa-/, '')]" class="w-5 h-5" />
+          </span>
+          <span v-else
+                :class="['w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0',
+                         g.kind === 'technical' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600']">
+            <FontAwesomeIcon :icon="['fas', g.kind === 'general' ? 'gauge' : g.kind === 'technical' ? 'screwdriver-wrench' : 'map-pin']" class="w-5 h-5" />
+          </span>
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-gray-900 truncate leading-tight">
               {{ g.label }}
@@ -455,21 +488,29 @@ function toggleProtocol(p) {
     </template>
 
     <!-- ───────────────── N3 — Liste des compteurs filtrés ───────────────── -->
-    <template v-else-if="currentView === 'list' && selectedEnergyMeta">
-      <!-- Header sticky : retour + énergie › groupe -->
+    <template v-else-if="currentView === 'list' && (selectedEnergyMeta || isGeneralListMode)">
+      <!-- Header sticky : retour + énergie › groupe (ou « Compteur général ») -->
       <div class="sticky top-0 -mx-3 -mt-3 px-3 pt-3 pb-2 bg-white z-10 border-b border-gray-100">
         <div class="flex items-center gap-2">
           <button type="button" @click="goBackToGroup"
                   class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-700 active:bg-gray-100"
-                  aria-label="Retour aux groupes">
+                  aria-label="Retour">
             <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
           </button>
-          <span class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
+          <span v-if="isGeneralListMode"
+                class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0 bg-gray-100 text-gray-600">
+            <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-4 h-4" />
+          </span>
+          <span v-else
+                class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
                 :style="{ background: selectedEnergyMeta.color + '1a', color: selectedEnergyMeta.color }">
             <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
+            <p v-if="isGeneralListMode" class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
+              Hors zone · toutes énergies
+            </p>
+            <p v-else class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
               {{ selectedEnergyMeta.label }} › {{ groupBy === 'usage' ? 'Usage' : 'Zone' }}
             </p>
             <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
@@ -580,15 +621,16 @@ function toggleProtocol(p) {
 
         <MobileField label="État du compteur">
           <div class="space-y-2">
-            <label class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl cursor-pointer">
+            <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
               <div class="flex-1 min-w-0">
-                <p class="text-base font-medium text-gray-700">Requis par R175</p>
+                <p class="text-base font-medium text-gray-700">Requis par R175 ?</p>
                 <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Coche si ce compteur EST requis.
+                  Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Répondre Oui si ce compteur EST requis par le décret.
                 </p>
               </div>
-              <input v-model="editForm.required" type="checkbox" class="w-7 h-7 mt-1 shrink-0" />
-            </label>
+              <SegmentedToggle :model-value="!!editForm.required"
+                               @update:model-value="v => (editForm.required = v)" class="mt-1 shrink-0" />
+            </div>
             <template v-if="editing?.mode === 'edit'">
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
                 <div class="flex-1 min-w-0">

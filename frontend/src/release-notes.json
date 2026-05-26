@@ -2,7 +2,7 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.101",
+      "version": "0.1.102",
       "date": "2026-05-26",
       "title": "Audit PWA : navigation drill-down sur les onglets Systèmes et Compteurs (ergonomie smartphone)",
       "highlights": [
@@ -16,9 +16,9 @@
         {
           "kind": "feat",
           "title": "Onglet Compteurs : tu entres par l'énergie, et tu choisis de voir les compteurs par usage ou par zone",
-          "what": "Avant, l'onglet Compteurs listait tous les compteurs à plat — impossible de saisir ton plan de comptage d'un coup d'œil. Maintenant tu vois d'abord les 5 énergies (Électrique, Élec. production, Gaz, Eau, Thermique) avec le nombre de compteurs et le gap réglementaire pour chacune. Un toggle global « Par usage / Par zone » te laisse choisir l'angle d'analyse : tu navigues soit Énergie → Usage → Compteurs, soit Énergie → Zone → Compteurs. Le toggle est persisté entre les sessions.",
+          "what": "Avant, l'onglet Compteurs listait tous les compteurs à plat — impossible de saisir ton plan de comptage d'un coup d'œil. Maintenant tu vois d'abord les 5 énergies (Électrique, Élec. production, Gaz, Eau, Thermique) avec le nombre de compteurs et le gap réglementaire pour chacune. Un toggle global « Par usage / Par zone » te laisse choisir l'angle d'analyse : tu navigues soit Énergie → Usage → Compteurs, soit Énergie → Zone → Compteurs. Le toggle est persisté entre les sessions. La card « Compteur général de site » liste désormais réellement les compteurs hors zone (et chaque ligne de groupe usage/zone affiche son icône colorée).",
           "where": "Onglet Compteurs de l'audit BACS en PWA (mobile / tablette). L'édition d'un compteur ne change pas.",
-          "how": "Ouvre l'onglet Compteurs sur ton iPhone, change le toggle « Par usage / Par zone » en haut, puis clique une énergie. Vérifie que les compteurs filtrés s'affichent. Ferme et rouvre la PWA : le toggle reste sur le même mode."
+          "how": "Ouvre l'onglet Compteurs sur ton iPhone, change le toggle « Par usage / Par zone » en haut, puis clique une énergie : chaque ligne d'usage/zone porte son icône colorée. Clique sur « Compteur général de site » : tu vois la liste des compteurs sans zone, pas l'édition directe. Ferme et rouvre la PWA : le toggle reste sur le même mode."
         }
       ]
     },
