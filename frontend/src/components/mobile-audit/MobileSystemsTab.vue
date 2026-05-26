@@ -681,13 +681,15 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         </div>
       </div>
 
-      <!-- Usages présents -->
+      <!-- Usages présents : toute la card est cliquable (drill-in détail). -->
       <div v-if="selectedZoneUsages.present.length" class="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
         <div v-for="s in selectedZoneUsages.present" :key="s.id"
              :data-system-id="s.id"
-             :class="['px-4 py-4 transition',
+             :class="['transition',
                       focusedSystemId === s.id ? 'bg-amber-50 ring-2 ring-amber-300' : '']">
-          <div class="flex items-center gap-3">
+          <!-- Zone cliquable principale : icône + label + KPI + régulation -->
+          <button type="button" @click="openUsage(s)"
+                  class="w-full flex items-center gap-3 px-4 pt-4 pb-3 text-left active:bg-gray-50">
             <SystemCategoryIcon :category="s.system_category" size="md" />
             <div class="flex-1 min-w-0">
               <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ usageLabel(s) }}</p>
@@ -695,34 +697,30 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 <span>{{ usageKpi(s).deviceCount }} équipement{{ usageKpi(s).deviceCount > 1 ? 's' : '' }}</span>
                 <span v-if="usageKpi(s).powerKw > 0"> · {{ usageKpi(s).powerKw }} kW</span>
               </p>
-            </div>
-            <button v-if="s.is_bacs === 0" type="button" @click.stop="removeUsage(s)"
-                    class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600"
-                    aria-label="Supprimer cet usage">
-              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
-            </button>
-          </div>
-          <button type="button" @click="openUsage(s)"
-                  class="mt-3 w-full flex items-center gap-3 px-3 py-3 bg-gray-50 active:bg-gray-100 rounded-xl text-left">
-            <div class="flex-1 min-w-0">
               <p v-if="isBacs && (s.system_category === 'heating' || s.system_category === 'cooling') && thermalFor(s.zone_id, s.system_category)"
-                 :class="['text-xs truncate',
+                 :class="['text-xs truncate mt-0.5',
                           thermalStatus(s.zone_id, s.system_category).tone === 'warn' ? 'text-red-600 font-medium' :
                           thermalStatus(s.zone_id, s.system_category).tone === 'ok' ? 'text-emerald-700' : 'text-gray-500']">
                 Régulation thermique · {{ thermalStatus(s.zone_id, s.system_category).label }}
               </p>
-              <p v-else class="text-xs text-gray-600">Voir le détail et les équipements</p>
             </div>
+            <span v-if="s.is_bacs === 0" role="button" tabindex="0"
+                  @click.stop="removeUsage(s)" @keydown.enter.stop="removeUsage(s)"
+                  class="shrink-0 w-10 h-10 inline-flex items-center justify-center rounded-xl text-gray-500 active:bg-red-50 active:text-red-600 cursor-pointer"
+                  aria-label="Supprimer cet usage">
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
+            </span>
             <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
           </button>
-          <div class="mt-2 grid grid-cols-2 gap-2">
+          <!-- Actions secondaires : changer le statut sans entrer dans le détail -->
+          <div class="px-4 pb-3 grid grid-cols-2 gap-2">
             <button type="button"
-                    @click="patchSystem(s, { present: true, not_concerned: false })"
+                    @click.stop="patchSystem(s, { present: true, not_concerned: false })"
                     class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700">
               ✓ Présent
             </button>
             <button type="button"
-                    @click="patchSystem(s, { present: false, not_concerned: true })"
+                    @click.stop="patchSystem(s, { present: false, not_concerned: true })"
                     class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
               ✕ Marquer absent
             </button>
