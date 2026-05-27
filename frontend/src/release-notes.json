@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.107",
+      "date": "2026-05-27",
+      "title": "Zones : régimes d'activité 3×8 et 2×8 ajoutés",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "2 nouveaux régimes d'activité pour les zones : 3×8 (24h/24) et 2×8 (16h/24)",
+          "what": "Les régimes industriels manquaient. La liste passe de 6 à 8 entrées, avec un ordre logique : Continue 24/7 → 3×8 → 2×8 → Heures de bureau → Scolaire → Intermittente → Saisonnière → Autre. Migration 178 qui étend le CHECK constraint en DB (safe via writable_schema + unsafeMode, pas de recréation de table).",
+          "where": "Audit BACS, édition d'une zone fonctionnelle, champ « Régime d'activité ».",
+          "how": "Ouvre l'édition d'une zone : les options 3×8 et 2×8 apparaissent en deuxième et troisième position dans la liste."
+        }
+      ]
+    },
+    {
       "version": "0.1.106",
       "date": "2026-05-27",
       "title": "Audit BACS desktop : header sticky compact au scroll, scroll-spy précis, scroll rapide vers les étapes",

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 177;
+const TARGET_VERSION = 178;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6788,6 +6788,31 @@ function runMigrations() {
     db.exec("UPDATE equipment_templates SET icon_kind = 'fa' WHERE icon_kind = 'fontawesome';");
     log.info('Migration 177 appliquee : equipment_templates.icon_kind normalisé (fontawesome -> fa)');
     db.pragma('user_version = 177');
+  }
+
+  if (current < 178) {
+    // Étend l'enum CHECK de zones.occupancy_profile pour accepter les
+    // rythmes industriels 3×8 (24h/24, 3 équipes) et 2×8 (16h/24, 2 équipes)
+    // demandés par les auditeurs. Migration safe via writable_schema +
+    // unsafeMode (better-sqlite3) — cf. mémoire
+    // feedback_sqlite_check_constraint_safe_migration.
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = 1');
+      const stmt = db.prepare(
+        "UPDATE sqlite_master SET sql = REPLACE(sql, ?, ?) " +
+        "WHERE type = 'table' AND name = 'zones'"
+      );
+      stmt.run(
+        "occupancy_profile IN\n          ('continu','heures_bureau','scolaire','intermittent','saisonnier','autre')",
+        "occupancy_profile IN\n          ('continu','3x8','2x8','heures_bureau','scolaire','intermittent','saisonnier','autre')",
+      );
+      db.pragma('writable_schema = 0');
+    } finally {
+      db.unsafeMode(false);
+    }
+    log.info('Migration 178 appliquee : zones.occupancy_profile enum étendu (3x8, 2x8)');
+    db.pragma('user_version = 178');
   }
 
   if (current > TARGET_VERSION) {
