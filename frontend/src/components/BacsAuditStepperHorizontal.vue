@@ -42,8 +42,8 @@ function connectorClass(s) {
 
 <template>
   <nav class="bg-white border border-gray-200 rounded-lg shadow-sm">
-    <!-- Barre de progression compacte en tête -->
-    <div class="px-3 py-2 border-b border-gray-100 flex items-center gap-3">
+    <!-- Barre de progression compacte en tête (masquée au scroll compact). -->
+    <div class="stepper-progress px-3 py-2 border-b border-gray-100 flex items-center gap-3">
       <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
         Progression
       </span>

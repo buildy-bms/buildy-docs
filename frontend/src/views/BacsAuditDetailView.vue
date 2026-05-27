@@ -839,41 +839,77 @@ const SECTION_ID_TO_STEP = Object.fromEntries(
   Object.entries(STEP_TO_SECTION_ID).map(([k, v]) => [v, k])
 )
 
+// Scroll JS animé : durée fixe ~280 ms avec easing easeOutCubic. Plus
+// réactif que le `behavior: 'smooth'` natif qui peut prendre 1-2 s sur
+// les longues distances (audit BACS = ~10 sections sur ~30 écrans).
+function fastScrollTo(targetY) {
+  const startY = window.scrollY
+  const dist = targetY - startY
+  if (Math.abs(dist) < 4) { window.scrollTo(0, targetY); return }
+  const duration = Math.min(450, Math.max(200, Math.abs(dist) * 0.35))
+  const t0 = performance.now()
+  function step(now) {
+    const t = Math.min(1, (now - t0) / duration)
+    const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
+    window.scrollTo(0, startY + dist * eased)
+    if (t < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
 function onStepClick(key) {
   activeStepKey.value = key
   const targetId = STEP_TO_SECTION_ID[key]
-  if (targetId) {
-    const el = window.document.getElementById(targetId)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  if (!targetId) return
+  const el = window.document.getElementById(targetId)
+  if (!el) return
+  // Compense la hauteur du header sticky pour que le titre de la section
+  // n'apparaisse pas masqué dessous. On lit la hauteur courante du wrapper
+  // (peut être plein ou compact selon le scroll actuel).
+  const header = window.document.querySelector('.audit-sticky-header')
+  const headerH = header ? header.getBoundingClientRect().height : 0
+  const y = el.getBoundingClientRect().top + window.scrollY - headerH - 12
+  fastScrollTo(y)
 }
 
-// Scroll-spy : observe les sections qui entrent/sortent du viewport et
-// promote la plus haute visible comme step actif. Ainsi le stepper et la
-// bordure indigo gauche restent synchronisés avec la position de scroll.
+// Scroll-spy : promote la section dont le titre se trouve juste sous le
+// header sticky comme step actif. On observe l'ensemble des sections puis
+// on choisit, à chaque tick, celle dont le `top` est positif et le plus
+// proche du bas du header (= la section "en cours de lecture"). Si aucune
+// n'est sous le header, on prend la dernière section dont le top est
+// négatif (celle qui couvre encore l'écran).
 let _spyObserver = null
+function pickActiveSection() {
+  const header = window.document.querySelector('.audit-sticky-header')
+  const headerH = header ? header.getBoundingClientRect().height : 0
+  const sections = Object.values(STEP_TO_SECTION_ID)
+    .map(id => ({ id, el: window.document.getElementById(id) }))
+    .filter(s => s.el)
+  if (!sections.length) return
+  const measured = sections.map(s => ({ id: s.id, top: s.el.getBoundingClientRect().top }))
+  // Sections qui ont leur titre sous le header (top >= headerH - quelques px)
+  // = candidates principales, on prend la plus haute.
+  const belowHeader = measured.filter(s => s.top >= headerH - 8)
+  let chosen = null
+  if (belowHeader.length) {
+    chosen = belowHeader.sort((a, b) => a.top - b.top)[0]
+  } else {
+    // Toutes les sections ont leur top au-dessus du header (= on est dans
+    // la dernière). On prend celle dont le top négatif est le plus proche
+    // de 0 = la plus récente que l'on a dépassée.
+    chosen = measured.sort((a, b) => b.top - a.top)[0]
+  }
+  if (chosen) activeStepKey.value = SECTION_ID_TO_STEP[chosen.id] || activeStepKey.value
+}
 function setupScrollSpy() {
   if (_spyObserver) _spyObserver.disconnect()
   const sections = Object.values(STEP_TO_SECTION_ID)
     .map(id => window.document.getElementById(id))
     .filter(Boolean)
   if (!sections.length) return
-  const visible = new Set()
-  _spyObserver = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (e.isIntersecting) visible.add(e.target.id)
-      else visible.delete(e.target.id)
-    }
-    // Choisis la section visible la plus haute dans la page.
-    const topId = [...visible]
-      .map(id => ({ id, top: window.document.getElementById(id)?.getBoundingClientRect().top ?? Infinity }))
-      .sort((a, b) => a.top - b.top)[0]?.id
-    if (topId) activeStepKey.value = SECTION_ID_TO_STEP[topId] || activeStepKey.value
-  }, {
-    // Marge haute négative pour que la section "active" se déclenche
-    // dès qu'elle dépasse le 1/3 supérieur du viewport.
-    rootMargin: '-30% 0px -60% 0px',
-    threshold: [0, 0.1, 0.5],
+  _spyObserver = new IntersectionObserver(pickActiveSection, {
+    rootMargin: '0px 0px -60% 0px',
+    threshold: [0, 0.1, 0.5, 1],
   })
   sections.forEach(s => _spyObserver.observe(s))
 }
@@ -1233,17 +1269,52 @@ onBeforeUnmount(() => {
 
 onMounted(() => window.document.addEventListener('mousedown', onDocClickSettings))
 onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClickSettings))
+
+// ── Topbar compact au scroll ──────────────────────────────────────────
+// Pattern « hide-on-scroll-down, show-on-scroll-up » avec hystérésis pour
+// éviter les bascules nerveuses quand on scrolle finement autour du seuil :
+//   - bascule en compact dès qu'on dépasse 120 px en descendant
+//   - revient en plein dès qu'on remonte de 8 px (delta minimum) ou
+//     qu'on est sous les 50 px
+// Le scroll handler est throttle par requestAnimationFrame pour éviter
+// d'overcaler le DOM à chaque pixel.
+const isScrolledDown = ref(false)
+let lastScrollY = 0
+let scrollRaf = 0
+function processScroll() {
+  scrollRaf = 0
+  const y = window.scrollY
+  const delta = y - lastScrollY
+  lastScrollY = y
+  if (y < 50) { isScrolledDown.value = false; return }
+  if (delta < -8) { isScrolledDown.value = false; return }      // remontée nette
+  if (delta > 0 && y > 120) { isScrolledDown.value = true; return } // descente nette
+}
+function onScrollY() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(processScroll)
+}
+onMounted(() => {
+  window.addEventListener('scroll', onScrollY, { passive: true })
+  lastScrollY = window.scrollY
+  processScroll()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScrollY)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+})
 </script>
 
 <template>
   <div class="w-full mx-auto px-3 pb-12" :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
     <!-- Bloc sticky desktop : breadcrumb + titre + actions + stepper.
          Reste visible en haut tout au long du scroll de l'audit. -->
-    <div class="lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:pt-3 lg:pb-2 lg:border-b lg:border-gray-100 lg:mb-3">
+    <div :class="['audit-sticky-header lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:border-b lg:border-gray-100 lg:mb-6 lg:transition-all',
+                  isScrolledDown ? 'lg:pt-1.5 lg:pb-2 audit-topbar-compact' : 'lg:pt-3 lg:pb-3']">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2 text-xs text-gray-500 mb-0.5 flex-wrap">
+        <div class="audit-breadcrumb flex items-center gap-2 text-xs text-gray-500 mb-0.5 flex-wrap">
           <button @click="router.push('/')" class="hover:text-gray-700 inline-flex items-center gap-1">
             <ArrowLeftIcon class="w-3.5 h-3.5" /> Audits
           </button>
@@ -1257,7 +1328,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
             ✓ Livré le {{ formatDate(document.delivered_at) }}
           </span>
         </div>
-        <h1 class="text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
+        <h1 class="audit-title text-lg font-semibold text-gray-800 flex items-center gap-2 min-w-0">
           <FireIcon v-if="isBacs" class="w-5 h-5 text-orange-500 shrink-0" />
           <BuildingOffice2Icon v-else class="w-5 h-5 text-emerald-600 shrink-0" />
           <input
@@ -1268,7 +1339,7 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
             class="min-w-0 bg-transparent text-lg font-semibold text-gray-800 px-1 py-0.5 rounded border border-transparent hover:border-gray-200 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             :style="{ width: ((document?.project_name?.length || 12) + 2) + 'ch' }"
           />
-          <span class="text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
+          <span class="audit-subtitle text-sm font-normal text-gray-500 truncate">— {{ document?.client_name }}</span>
         </h1>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
@@ -1694,4 +1765,34 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 <style scoped>
 .slide-enter-active, .slide-leave-active { transition: transform 200ms ease; }
 .slide-enter-from, .slide-leave-to { transform: translateX(110%); }
+
+/* ── Mode compact du topbar (au scroll) ─────────────────────────────
+ * Transitions fluides via max-height + opacity + overflow (display:none
+ * provoque un flash brusque). Le bloc passe d'environ 150 px à environ
+ * 70 px de hauteur en douceur. */
+@media (min-width: 1024px) {
+  :deep(.audit-breadcrumb),
+  :deep(.audit-subtitle),
+  :deep(.stepper-progress) {
+    max-height: 4rem;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 180ms ease, opacity 150ms ease, margin 180ms ease;
+  }
+  .audit-topbar-compact :deep(.audit-breadcrumb),
+  .audit-topbar-compact :deep(.audit-subtitle),
+  .audit-topbar-compact :deep(.stepper-progress) {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+  }
+  :deep(.audit-title) {
+    transition: font-size 180ms ease, line-height 180ms ease;
+  }
+  .audit-topbar-compact :deep(.audit-title) {
+    font-size: 1rem;
+    line-height: 1.25rem;
+  }
+}
 </style>

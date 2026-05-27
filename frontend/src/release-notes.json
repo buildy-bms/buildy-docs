@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.106",
+      "date": "2026-05-27",
+      "title": "Audit BACS desktop : header sticky compact au scroll, scroll-spy précis, scroll rapide vers les étapes",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Header sticky qui se compacte au scroll (et réapparaît dès qu'on remonte)",
+          "what": "Pattern « hide on scroll down, show on scroll up » sur le bloc sticky de la vue audit BACS desktop. Quand on descend de plus de 120 px, le breadcrumb, le sous-titre et la barre de progression du stepper s'effacent en douceur ; le titre passe d'une taille lg à base. Dès qu'on remonte de quelques pixels (delta > 8 px), le bloc reprend sa hauteur normale pour ré-afficher le breadcrumb. Transitions fluides (max-height + opacity sur 180 ms) — plus de flash brusque. Hystérésis (compact > 120 px, plein < 50 px) pour éviter les bascules nerveuses autour du seuil.",
+          "where": "Audit BACS desktop (≥ 1024 px), top de la page.",
+          "how": "Ouvre un audit, scrolle vers le bas : breadcrumb et progress se replient au-delà de 120 px. Scrolle vers le haut : ils réapparaissent immédiatement."
+        },
+        {
+          "kind": "fix",
+          "title": "Clic sur une étape du stepper : la section ciblée n'est plus masquée par le header",
+          "what": "Le scroll JS compense désormais la hauteur exacte du header sticky (mode plein ou compact selon la position) + une marge de 12 px, pour que le titre de la section atterrisse pile sous le header au lieu d'être caché derrière. Animation rapide (easeOutCubic 200-450 ms) — beaucoup plus réactif que le `behavior: 'smooth'` natif qui pouvait prendre 1-2 s sur les longues distances.",
+          "where": "Audit BACS desktop, stepper horizontal en haut.",
+          "how": "Clique sur n'importe quelle étape : la section atterrit juste sous le header, en moins d'une seconde."
+        },
+        {
+          "kind": "fix",
+          "title": "Scroll-spy précis : la bonne étape est marquée comme active selon ta position de lecture",
+          "what": "Avant, en lecture de la section GTB, le stepper marquait parfois encore « Régulation » comme active (l'algorithme prenait la section au top le plus négatif). Maintenant on choisit la section dont le titre est juste sous le header — celle effectivement en cours de lecture. Quand tu cliques sur une étape, le stepper se synchronise immédiatement avec la position réelle.",
+          "where": "Audit BACS desktop, stepper horizontal.",
+          "how": "Scrolle dans l'audit : l'étape active suit fidèlement ta lecture. Clique sur GTB : c'est bien « GTB » qui se met en évidence, pas « Régulation »."
+        }
+      ]
+    },
+    {
       "version": "0.1.105",
       "date": "2026-05-27",
       "title": "Plan de comptage propagé au PDF + PWA · localisation des compteurs · 26 nouveaux modèles d'équipement · topbar sticky · fixes",
