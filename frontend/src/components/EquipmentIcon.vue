@@ -1,7 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { resolveFaIconName } from '@/lib/equipment-icons'
+
+// Note : depuis le chargement complet de la lib FA Pro Solid au démarrage
+// (cf. main.js — import('@fortawesome/pro-solid-svg-icons') + library.add),
+// toutes les icônes sont disponibles dans la `library` globale. Plus besoin
+// de passer par `resolveFaIconName` (registre curé) qui tombait sur le
+// fallback `cube` pour toute icône non listée — d'où les hexagones rouges
+// qui apparaissaient en édition de template.
 
 const props = defineProps({
   template: { type: Object, required: true },
@@ -15,7 +21,8 @@ const sizeClass = computed(() => ({
 const iconKind = computed(() => props.template?.icon_kind || 'fa')
 const iconValue = computed(() => props.template?.icon_value || 'fa-cube')
 const iconColor = computed(() => props.template?.icon_color || '#6b7280')
-const faName = computed(() => resolveFaIconName(iconValue.value))
+// Strip du préfixe `fa-` si présent — FontAwesomeIcon attend le nom seul.
+const faName = computed(() => (iconValue.value || '').replace(/^fa-/, '') || 'cube')
 </script>
 
 <template>

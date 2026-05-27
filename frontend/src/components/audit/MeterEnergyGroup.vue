@@ -7,7 +7,7 @@
 // couverture au-dessus (qui scrolle ici quand on clique sur une pill).
 // Drag-drop intra-énergie via SortableJS (on ne change pas un compteur
 // d'énergie par drag — l'énergie est une propriété stable).
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
@@ -15,18 +15,38 @@ import { PencilSquareIcon, TrashIcon, DocumentDuplicateIcon, PlusIcon, Bars3Icon
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
+import SearchableSelect from '@/components/SearchableSelect.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
-import { meterUsageLabel } from '@/lib/meter-options'
+import { meterUsageLabel, METER_USAGES, getMeterUsageMeta } from '@/lib/meter-options'
 
 const props = defineProps({
   energy: { type: Object, required: true }, // { value, label, icon, color }
   meters: { type: Array, required: true },
+  zones: { type: Array, default: () => [] },
   document: { type: Object, default: null },
   protocolOptions: { type: Array, required: true },
   meterUsages: { type: Array, required: true }, // pour le contextLabel des notes
   highlightId: { type: Number, default: null }, // surligne temporairement une ligne
 })
+
+// Options du SearchableSelect « Localisation » : zones techniques d'abord
+// (un compteur est généralement installé dans un local technique / TGBT /
+// armoire), puis zones fonctionnelles. Le hint affiche le type pour la
+// recherche au clavier.
+const locationOptions = computed(() => {
+  const tech = []
+  const fnal = []
+  for (const z of (props.zones || [])) {
+    if ((z.kind || 'functional') === 'technical') tech.push(z)
+    else fnal.push(z)
+  }
+  return [
+    ...tech.map(z => ({ value: z.zone_id, label: z.name, icon: 'fa-screwdriver-wrench', color: '#64748b' })),
+    ...fnal.map(z => ({ value: z.zone_id, label: z.name, icon: 'fa-map-pin', color: '#6366f1' })),
+  ]
+})
+
 const emit = defineEmits([
   'patch-meter', 'duplicate-meter', 'remove-meter', 'open-notes',
   'add-meter', 'reorder',
@@ -40,6 +60,79 @@ watch(() => props.meters.length, (n, prev) => {
 })
 
 function toggle() { collapsed.value = !collapsed.value }
+
+// ── Groupage interne de la table : aucun (= liste à plat), par zone, ou
+// par usage. Aide à structurer l'audit quand une énergie a beaucoup de
+// compteurs (~10+ électriques). Persisté par énergie pour ne pas pénaliser
+// les énergies qui n'ont que quelques compteurs.
+const GROUP_KEY = `audit.meters.section.groupBy.${props.energy.value}`
+const groupBy = ref('zone') // 'none' | 'zone' | 'usage' — défaut zone (lecture terrain par local)
+onMounted(() => {
+  try {
+    const v = window.localStorage.getItem(GROUP_KEY)
+    if (v === 'none' || v === 'zone' || v === 'usage') groupBy.value = v
+  } catch { /* indispo */ }
+})
+function setGroupBy(v) {
+  groupBy.value = v
+  try { window.localStorage.setItem(GROUP_KEY, v) } catch { /* indispo */ }
+}
+
+// Construit la liste affichée : soit à plat (groupBy = 'none'), soit
+// avec des subheaders inline (un objet { kind: 'header', label, count }
+// suivi des compteurs du groupe). Le drag-drop n'est actif qu'en mode
+// 'none' (sinon il faudrait reranger en respectant les groupes).
+const displayRows = computed(() => {
+  if (groupBy.value === 'none') {
+    return props.meters.map(m => ({ kind: 'meter', meter: m }))
+  }
+  const groups = new Map()
+  if (groupBy.value === 'zone') {
+    for (const m of props.meters) {
+      const key = m.zone_id || '__general__'
+      const label = m.zone_name || 'Compteur général'
+      const isGeneral = !m.zone_id
+      if (!groups.has(key)) groups.set(key, {
+        label,
+        icon: isGeneral ? 'fa-building-circle-arrow-right' : null,
+        color: isGeneral ? '#6b7280' : null,
+        items: [],
+      })
+      groups.get(key).items.push(m)
+    }
+  } else { // 'usage'
+    for (const m of props.meters) {
+      const key = m.usage || 'other'
+      const meta = getMeterUsageMeta(key) || { label: key, icon: 'fa-circle-question', color: '#6b7280' }
+      if (!groups.has(key)) groups.set(key, { label: meta.label, icon: meta.icon, color: meta.color, items: [] })
+      groups.get(key).items.push(m)
+    }
+  }
+  // Tri stable des groupes : usages dans l'ordre canonique BACS. Pour
+  // les zones, on force « Compteur général » (zone_id NULL) en tête,
+  // puis les autres zones dans leur ordre d'insertion.
+  let orderedKeys
+  if (groupBy.value === 'usage') {
+    orderedKeys = METER_USAGES.map(u => u.value).filter(k => groups.has(k))
+  } else {
+    const allKeys = Array.from(groups.keys())
+    orderedKeys = allKeys.includes('__general__')
+      ? ['__general__', ...allKeys.filter(k => k !== '__general__')]
+      : allKeys
+  }
+  const rows = []
+  for (const key of orderedKeys) {
+    const g = groups.get(key)
+    if (!g) continue
+    rows.push({ kind: 'header', label: g.label, count: g.items.length, icon: g.icon, color: g.color })
+    for (const m of g.items) rows.push({ kind: 'meter', meter: m })
+  }
+  return rows
+})
+
+// Drag-drop : désactivé quand un groupage est appliqué (sinon les
+// subheaders se mélangent et l'expérience devient confuse).
+const dragEnabled = computed(() => groupBy.value === 'none')
 
 const stats = computed(() => {
   const arr = props.meters
@@ -69,7 +162,7 @@ function teardownSortable() {
 function setupSortable() {
   teardownSortable()
   const el = tbodyRef.value
-  if (!el || collapsed.value) return
+  if (!el || collapsed.value || !dragEnabled.value) return
   sortable = Sortable.create(el, {
     draggable: 'tr.meter-row',
     handle: '.drag-handle',
@@ -84,7 +177,7 @@ function setupSortable() {
     },
   })
 }
-watch([() => props.meters, collapsed], async () => {
+watch([() => props.meters, collapsed, groupBy], async () => {
   await nextTick()
   setupSortable()
 }, { immediate: true, flush: 'post' })
@@ -122,6 +215,27 @@ onBeforeUnmount(teardownSortable)
 
     <!-- Table compacte des compteurs (visible si déplié) -->
     <div v-show="!collapsed" class="border-t border-gray-100">
+      <!-- Mini toolbar : groupage interne -->
+      <div v-if="meters.length > 1" class="px-3 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center gap-2 text-xs">
+        <span class="text-gray-500">Grouper&nbsp;:</span>
+        <div class="inline-flex gap-0.5 p-0.5 bg-white border border-gray-200 rounded-md">
+          <button type="button" @click="setGroupBy('none')"
+                  :class="['px-2 py-1 text-xs font-medium rounded transition',
+                           groupBy === 'none' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700']">
+            Aucun
+          </button>
+          <button type="button" @click="setGroupBy('zone')"
+                  :class="['px-2 py-1 text-xs font-medium rounded transition',
+                           groupBy === 'zone' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700']">
+            Par zone
+          </button>
+          <button type="button" @click="setGroupBy('usage')"
+                  :class="['px-2 py-1 text-xs font-medium rounded transition',
+                           groupBy === 'usage' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700']">
+            Par usage
+          </button>
+        </div>
+      </div>
       <div v-if="meters.length" class="overflow-x-auto">
         <table class="data-table w-full text-sm">
           <thead>
@@ -131,20 +245,39 @@ onBeforeUnmount(teardownSortable)
               <th>Usage</th>
               <th>Requis</th>
               <th>Présent</th>
+              <th>Localisation</th>
               <th>Communicant</th>
+              <th>Protocoles</th>
               <th>Câblé</th>
               <th>Hors service</th>
-              <th>Protocoles</th>
-              <th class="text-right">Actions</th>
+              <th class="text-center">Actions</th>
             </tr>
           </thead>
           <tbody ref="tbodyRef">
-            <tr v-for="m in meters" :key="m.id"
-                :data-id="m.id"
+            <template v-for="(row, idx) in displayRows" :key="row.kind === 'header' ? 'h-' + row.label + '-' + idx : 'm-' + row.meter.id">
+              <!-- Subheader de groupe (zone ou usage) -->
+              <tr v-if="row.kind === 'header'" class="group-header">
+                <td colspan="11" class="px-3 py-2 bg-gray-100/70 border-t border-gray-200 text-left">
+                  <div class="flex items-center gap-2">
+                    <span v-if="row.icon"
+                          class="w-5 h-5 rounded-md inline-flex items-center justify-center shrink-0"
+                          :style="{ background: row.color + '1a', color: row.color }">
+                      <FontAwesomeIcon :icon="['fas', row.icon.replace(/^fa-/, '')]" class="w-3 h-3" />
+                    </span>
+                    <span class="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                      {{ row.label }}
+                    </span>
+                    <span class="text-xs text-gray-400">— {{ row.count }} compteur{{ row.count > 1 ? 's' : '' }}</span>
+                  </div>
+                </td>
+              </tr>
+              <!-- Ligne compteur -->
+              <tr v-else
+                :data-id="row.meter.id"
                 :class="['meter-row',
-                  m.out_of_service ? 'opacity-50' : '',
-                  m.required && !m.present_actual && !m.out_of_service ? 'bg-red-50/40' : '',
-                  highlightId === m.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']">
+                  row.meter.out_of_service ? 'opacity-50' : '',
+                  row.meter.required && !row.meter.present_actual && !row.meter.out_of_service ? 'bg-red-50/40' : '',
+                  highlightId === row.meter.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']">
               <td class="align-middle">
                 <button type="button"
                         class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
@@ -153,81 +286,96 @@ onBeforeUnmount(teardownSortable)
                 </button>
               </td>
               <td class="text-gray-700 whitespace-nowrap">
-                <span v-if="m.required && !m.present_actual && !m.out_of_service"
+                <span v-if="row.meter.required && !row.meter.present_actual && !row.meter.out_of_service"
                       class="text-red-600 mr-1" v-tooltip="'Compteur requis non présent'">⚠</span>
-                {{ m.zone_name || 'Compteur général' }}
+                {{ row.meter.zone_name || 'Compteur général' }}
               </td>
-              <td><MeterUsagePill :usage="m.usage" /></td>
+              <td>
+                <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
+                <span v-else class="text-xs text-gray-400 italic">—</span>
+              </td>
               <td class="whitespace-nowrap">
-                <SegmentedToggle compact :model-value="!!m.required"
+                <SegmentedToggle compact :model-value="!!row.meter.required"
                                  tooltip="Compteur requis par le décret R175"
-                                 @update:model-value="v => emit('patch-meter', { meter: m, patch: { required: v } })" />
+                                 @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { required: v } })" />
               </td>
               <td class="whitespace-nowrap">
-                <SegmentedToggle compact :model-value="!!m.present_actual"
+                <SegmentedToggle compact :model-value="!!row.meter.present_actual"
                                  tooltip="Compteur présent sur site ?"
-                                 @update:model-value="v => emit('patch-meter', { meter: m, patch: { present_actual: v } })" />
+                                 @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { present_actual: v } })" />
+              </td>
+              <td class="whitespace-nowrap min-w-44">
+                <SearchableSelect v-if="row.meter.present_actual"
+                  :model-value="row.meter.location_zone_id ?? null"
+                  :options="locationOptions"
+                  size="sm"
+                  placeholder="— Non précisée"
+                  search-placeholder="Rechercher un local…"
+                  @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { location_zone_id: v ?? null } })"
+                />
+                <span v-else class="text-gray-300 text-xs">—</span>
               </td>
               <td class="whitespace-nowrap">
-                <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.communicating"
+                <SegmentedToggle v-if="row.meter.present_actual" compact :model-value="!!row.meter.communicating"
                                  tooltip="Compteur communicant ?"
-                                 @update:model-value="v => emit('patch-meter', { meter: m, patch: v
+                                 @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: v
                                    ? { communicating: true }
                                    : { communicating: false, communication_protocols: null, communication_protocol: null } })" />
                 <span v-else class="text-gray-300">—</span>
               </td>
-              <td class="whitespace-nowrap">
-                <SegmentedToggle v-if="m.present_actual" compact :model-value="!!m.wired"
-                                 tooltip="Communication câblée vers la GTB ?"
-                                 @update:model-value="v => emit('patch-meter', { meter: m, patch: { wired: v } })" />
-                <span v-else class="text-gray-300">—</span>
-              </td>
-              <td class="whitespace-nowrap">
-                <SegmentedToggle compact yes-danger :model-value="!!m.out_of_service"
-                                 tooltip="Compteur hors service ? (HS = ignoré du plan d'action)"
-                                 @update:model-value="v => emit('patch-meter', { meter: m, patch: { out_of_service: v } })" />
-              </td>
               <td>
                 <div class="min-w-32">
                   <ProtocolMultiPicker
-                    :model-value="m.communication_protocols || (m.communication_protocol && m.communication_protocol !== 'non_communicant' ? JSON.stringify([m.communication_protocol]) : null)"
-                    :disabled="!m.communicating"
+                    :model-value="row.meter.communication_protocols || (row.meter.communication_protocol && row.meter.communication_protocol !== 'non_communicant' ? JSON.stringify([row.meter.communication_protocol]) : null)"
+                    :disabled="!row.meter.communicating"
                     :options="protocolOptions"
                     size="xs"
-                    @update:modelValue="v => emit('patch-meter', { meter: m, patch: { communication_protocols: v, communication_protocol: null } })"
+                    @update:modelValue="v => emit('patch-meter', { meter: row.meter, patch: { communication_protocols: v, communication_protocol: null } })"
                   />
                 </div>
               </td>
-              <td class="whitespace-nowrap text-right">
+              <td class="whitespace-nowrap">
+                <SegmentedToggle v-if="row.meter.present_actual" compact :model-value="!!row.meter.wired"
+                                 tooltip="Communication câblée vers la GTB ?"
+                                 @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { wired: v } })" />
+                <span v-else class="text-gray-300">—</span>
+              </td>
+              <td class="whitespace-nowrap">
+                <SegmentedToggle compact yes-danger :model-value="!!row.meter.out_of_service"
+                                 tooltip="Compteur hors service ? (HS = ignoré du plan d'action)"
+                                 @update:model-value="v => emit('patch-meter', { meter: row.meter, patch: { out_of_service: v } })" />
+              </td>
+              <td class="whitespace-nowrap text-center">
                 <div class="inline-flex items-center gap-1">
                   <button
                     type="button"
-                    @click="emit('open-notes', m)"
-                    :class="['btn-icon', hasNotes(m.notes_html || m.notes) && 'is-active']"
-                    v-tooltip="hasNotes(m.notes_html || m.notes) ? 'Modifier les notes' : 'Ajouter une note'">
+                    @click="emit('open-notes', row.meter)"
+                    :class="['btn-icon', hasNotes(row.meter.notes_html || row.meter.notes) && 'is-active']"
+                    v-tooltip="hasNotes(row.meter.notes_html || row.meter.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                     <PencilSquareIcon class="w-4 h-4" />
                   </button>
                   <BacsPhotoButton
                     v-if="document?.site_uuid"
                     :site-uuid="document.site_uuid"
-                    :attach-to="{ meter_id: m.id }"
-                    :label="meterContextLabel(m)"
+                    :attach-to="{ meter_id: row.meter.id }"
+                    :label="meterContextLabel(row.meter)"
                   />
                   <VoiceNoteButton
                     v-if="document?.site_uuid"
                     :site-uuid="document.site_uuid"
-                    :attach-to="{ meter_id: m.id }"
-                    :label="meterContextLabel(m)"
+                    :attach-to="{ meter_id: row.meter.id }"
+                    :label="meterContextLabel(row.meter)"
                   />
-                  <button @click="emit('duplicate-meter', m)" class="btn-icon" v-tooltip="'Dupliquer'">
+                  <button @click="emit('duplicate-meter', row.meter)" class="btn-icon" v-tooltip="'Dupliquer'">
                     <DocumentDuplicateIcon class="w-4 h-4" />
                   </button>
-                  <button @click="emit('remove-meter', m)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
+                  <button @click="emit('remove-meter', row.meter)" class="btn-icon btn-icon-danger" v-tooltip="'Supprimer'">
                     <TrashIcon class="w-4 h-4" />
                   </button>
                 </div>
               </td>
             </tr>
+            </template>
           </tbody>
         </table>
       </div>

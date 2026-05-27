@@ -113,6 +113,21 @@ const ZONE_OPTIONS = computed(() => [
   ...zones.value.map(z => ({ value: z.zone_id, label: z.name })),
 ])
 
+// Options de localisation physique : zones techniques en tête (un compteur
+// est généralement installé dans un local technique), puis fonctionnelles.
+const LOCATION_OPTIONS = computed(() => {
+  const tech = []
+  const fnal = []
+  for (const z of (zones.value || [])) {
+    if ((z.kind || 'functional') === 'technical') tech.push(z)
+    else fnal.push(z)
+  }
+  return [
+    ...tech.map(z => ({ value: z.zone_id, label: z.name, icon: 'fa-screwdriver-wrench', color: '#64748b' })),
+    ...fnal.map(z => ({ value: z.zone_id, label: z.name, icon: 'fa-map-pin', color: '#6366f1' })),
+  ]
+})
+
 const stats = computed(() => ({
   total: meters.value.length,
   present: meters.value.filter(m => m.present_actual).length,
@@ -245,10 +260,15 @@ watch(() => audit.pendingFocus, (focus) => {
 async function save() {
   saving.value = true
   try {
+    // Compteur général (zone_id null) : la notion d'usage n'a pas de
+    // sens (un compteur de tête mesure toute l'énergie du site, pas un
+    // usage particulier). On force « other » à la sauvegarde — cohérent
+    // avec le desktop.
+    const usage = editForm.value.zone_id ? editForm.value.usage : 'other'
     if (editing.value.mode === 'create') {
       await createBacsMeter(document.value.id, {
         zone_id: editForm.value.zone_id || null,
-        usage: editForm.value.usage,
+        usage,
         meter_type: editForm.value.meter_type,
         required: !!editForm.value.required,
       })
@@ -257,13 +277,18 @@ async function save() {
     } else {
       const patch = {
         zone_id: editForm.value.zone_id || null,
-        usage: editForm.value.usage,
+        usage,
         meter_type: editForm.value.meter_type,
         required: !!editForm.value.required,
         present_actual: !!editForm.value.present_actual,
         communicating: !!editForm.value.communicating,
         wired: !!editForm.value.wired,
         out_of_service: !!editForm.value.out_of_service,
+        // Localisation physique (zone technique d'installation),
+        // saisie uniquement si le compteur est présent.
+        location_zone_id: editForm.value.present_actual
+          ? (editForm.value.location_zone_id || null)
+          : null,
         communication_protocols: editForm.value.communication_protocols || null,
         notes_html: editForm.value.notes_html || null,
       }
@@ -393,7 +418,7 @@ function toggleProtocol(p) {
               type="button"
               @click="goToGeneralList()"
               class="w-full bg-white rounded-2xl border border-gray-200 px-4 py-3.5 flex items-center gap-3 text-left active:bg-gray-50">
-        <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-5 h-5 text-gray-500 shrink-0" />
+        <FontAwesomeIcon :icon="['fas', 'building-circle-arrow-right']" class="w-5 h-5 text-gray-500 shrink-0" />
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-gray-800">Compteur général de site</p>
           <p class="text-xs text-gray-500 mt-0.5">{{ generalMeters.length }} compteur{{ generalMeters.length > 1 ? 's' : '' }} non rattaché à une zone</p>
@@ -465,7 +490,7 @@ function toggleProtocol(p) {
           <span v-else
                 :class="['w-10 h-10 rounded-xl inline-flex items-center justify-center shrink-0',
                          g.kind === 'technical' ? 'bg-slate-100 text-slate-600' : 'bg-indigo-50 text-indigo-600']">
-            <FontAwesomeIcon :icon="['fas', g.kind === 'general' ? 'gauge' : g.kind === 'technical' ? 'screwdriver-wrench' : 'map-pin']" class="w-5 h-5" />
+            <FontAwesomeIcon :icon="['fas', g.kind === 'general' ? 'building-circle-arrow-right' : g.kind === 'technical' ? 'screwdriver-wrench' : 'map-pin']" class="w-5 h-5" />
           </span>
           <div class="flex-1 min-w-0">
             <p class="text-base font-medium text-gray-900 truncate leading-tight">
@@ -499,7 +524,7 @@ function toggleProtocol(p) {
           </button>
           <span v-if="isGeneralListMode"
                 class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0 bg-gray-100 text-gray-600">
-            <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-4 h-4" />
+            <FontAwesomeIcon :icon="['fas', 'building-circle-arrow-right']" class="w-4 h-4" />
           </span>
           <span v-else
                 class="w-9 h-9 rounded-xl inline-flex items-center justify-center shrink-0"
@@ -601,7 +626,8 @@ function toggleProtocol(p) {
           />
         </MobileField>
 
-        <MobileField label="Type d'énergie" hint="Quelle énergie ce compteur mesure : électrique, gaz, eau, ou thermique (kWh chaud/froid via débit + ΔT).">
+        <MobileField :label="editForm.zone_id ? 'Type d\'énergie' : 'Énergie mesurée'"
+                     hint="Quelle énergie ce compteur mesure : électrique, gaz, eau, ou thermique (kWh chaud/froid via débit + ΔT).">
           <MobileSelectSheet
             v-model="editForm.meter_type"
             :options="METER_TYPES"
@@ -610,7 +636,10 @@ function toggleProtocol(p) {
           />
         </MobileField>
 
-        <MobileField label="Catégorie" hint="À quoi sert l'énergie mesurée : chauffage, climatisation, ECS (eau chaude sanitaire), production photovoltaïque, éclairage…">
+        <!-- Compteur général (zone null) : pas d'usage à choisir, la notion
+             n'a pas de sens pour un compteur de tête de site (cohérent avec
+             le desktop). -->
+        <MobileField v-if="editForm.zone_id" label="Catégorie" hint="À quoi sert l'énergie mesurée : chauffage, climatisation, ECS (eau chaude sanitaire), production photovoltaïque, éclairage…">
           <MobileSelectSheet
             v-model="editForm.usage"
             :options="METER_USAGES"
@@ -668,6 +697,19 @@ function toggleProtocol(p) {
               </div>
             </template>
           </div>
+        </MobileField>
+
+        <!-- Localisation physique (zone technique d'installation),
+             visible uniquement si Présent. Utile pour le ratissage terrain. -->
+        <MobileField v-if="editing?.mode === 'edit' && editForm.present_actual"
+                     label="Localisation"
+                     hint="Où le compteur est-il physiquement installé (local technique, TGBT, armoire…) ? Distinct de la zone desservie.">
+          <MobileSelectSheet
+            v-model="editForm.location_zone_id"
+            :options="LOCATION_OPTIONS"
+            title="Localisation physique"
+            placeholder="— Non précisée"
+          />
         </MobileField>
 
         <MobileField v-if="editing?.mode === 'edit' && editForm.communicating" label="Protocoles">

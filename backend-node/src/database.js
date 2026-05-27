@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 175;
+const TARGET_VERSION = 177;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6764,6 +6764,30 @@ function runMigrations() {
     `);
     log.info('Migration 175 appliquee : bacs_audit_system_devices.serves_multiple_buildings (deplace depuis systems)');
     db.pragma('user_version = 175');
+  }
+
+  if (current < 176) {
+    // Localisation physique d'un compteur (distincte de la zone desservie).
+    // `zone_id` = zone fonctionnelle desservie (chauffage Bureaux 1 …).
+    // `location_zone_id` = local technique où le compteur est physiquement
+    // installé (TGBT, Local technique, …). Utile pour le ratissage terrain.
+    db.exec(`
+      ALTER TABLE bacs_audit_meters ADD COLUMN location_zone_id INTEGER REFERENCES zones(id) ON DELETE SET NULL;
+    `);
+    log.info('Migration 176 appliquee : bacs_audit_meters.location_zone_id (zone technique d\'installation)');
+    db.pragma('user_version = 176');
+  }
+
+  if (current < 177) {
+    // Normalise `equipment_templates.icon_kind` : le seed-extra-equipment-templates
+    // initial avait écrit 'fontawesome' au lieu de la valeur canonique 'fa'
+    // attendue par le schema Zod et le rendu FontAwesomeIcon côté front
+    // (icon_kind ∈ {'fa', 'svg-hyperveez', 'svg-custom'}). Migration idempotente
+    // qui fixe les rows existants ; le seed lui-même a été corrigé pour
+    // écrire 'fa' directement à partir de cette version.
+    db.exec("UPDATE equipment_templates SET icon_kind = 'fa' WHERE icon_kind = 'fontawesome';");
+    log.info('Migration 177 appliquee : equipment_templates.icon_kind normalisé (fontawesome -> fa)');
+    db.pragma('user_version = 177');
   }
 
   if (current > TARGET_VERSION) {

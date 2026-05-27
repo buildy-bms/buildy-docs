@@ -298,8 +298,12 @@ async function routes(fastify) {
     const id = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(id, request, reply)) return;
     return db.db.prepare(`
-      SELECT m.*, z.name AS zone_name FROM bacs_audit_meters m
+      SELECT m.*,
+             z.name AS zone_name,
+             zl.name AS location_zone_name
+      FROM bacs_audit_meters m
       LEFT JOIN zones z ON z.id = m.zone_id
+      LEFT JOIN zones zl ON zl.id = m.location_zone_id
       WHERE m.document_id = ?
       ORDER BY z.position NULLS LAST, m.position, m.usage, m.meter_type
     `).all(id);
@@ -345,6 +349,10 @@ async function routes(fastify) {
     if (!row) return reply.code(404).send({ detail: 'Ligne meter non trouvee' });
     if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
+      zone_id: z.number().int().positive().nullable().optional(),
+      location_zone_id: z.number().int().positive().nullable().optional(),
+      usage: z.enum(METER_USAGES).optional(),
+      meter_type: z.enum(METER_TYPES).optional(),
       required: z.boolean().optional(),
       present_actual: z.boolean().optional(),
       communicating: z.boolean().optional(),

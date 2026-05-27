@@ -53,7 +53,88 @@
   </footer>
 </section>
 
-{{!-- ═══════════ Page L'essentiel — synthèse en 1 page (page 2) ═══════════ --}}
+{{!-- ═══════════ Table des matieres — page 2 (juste après la cover) ═══════════ --}}
+{{!-- Cover + L'essentiel + Tableau de bord conformite sont des pages de
+     synthese hors sommaire (frontmatter) — le sommaire ne liste que les
+     chapitres numerotés. La TOC vient AVANT L'essentiel pour faciliter la
+     navigation rapide dans un livrable de 30+ pages. --}}
+<section class="toc">
+  <h1>Sommaire</h1>
+  <ul class="toc-list">
+    {{#if synthesisHtml}}
+    <li class="toc-row lvl-1" data-toc-link="synthesis">
+      <a href="#synthesis" class="toc-link">
+        <span class="toc-num">00</span>
+        <span class="toc-title">Note de synthèse</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{/if}}
+    <li class="toc-row lvl-1" data-toc-link="identification">
+      <a href="#identification" class="toc-link">
+        <span class="toc-num">1</span>
+        <span class="toc-title">Identification du site</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="zones">
+      <a href="#zones" class="toc-link">
+        <span class="toc-num">2</span>
+        <span class="toc-title">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 6°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="systems">
+      <a href="#systems" class="toc-link">
+        <span class="toc-num">3</span>
+        <span class="toc-title">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 4°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    <li class="toc-row lvl-1" data-toc-link="meters">
+      <a href="#meters" class="toc-link">
+        <span class="toc-num">4</span>
+        <span class="toc-title">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 1°</span>{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{#if isBacs}}
+    <li class="toc-row lvl-1" data-toc-link="thermal">
+      <a href="#thermal" class="toc-link">
+        <span class="toc-num">5</span>
+        <span class="toc-title">Régulation thermique automatique <span class="toc-ref">R175-6</span></span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{/if}}
+    <li class="toc-row lvl-1" data-toc-link="bms">
+      <a href="#bms" class="toc-link">
+        <span class="toc-num">{{#if isBacs}}6{{else}}5{{/if}}</span>
+        <span class="toc-title">{{#if isBacs}}Solution GTB / GTC <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{#if isBacs}}
+    <li class="toc-row lvl-1" data-toc-link="plan">
+      <a href="#plan" class="toc-link">
+        <span class="toc-num">7</span>
+        <span class="toc-title">Plan de mise en conformité</span>
+        <span class="toc-dots"></span>
+        <span class="toc-page">···</span>
+      </a>
+    </li>
+    {{/if}}
+  </ul>
+</section>
+
+{{!-- ═══════════ Page L'essentiel — synthèse en 1 page (page 3) ═══════════ --}}
 <section class="essential">
   <header class="essential-header">
     <span class="essential-eyebrow">L'essentiel</span>
@@ -223,86 +304,6 @@
     </p>
   </div>
   {{/if}}
-</section>
-
-{{!-- ═══════════ Table des matieres (charte AF/Synthèse) ═══════════ --}}
-{{!-- Cover + L'essentiel + Tableau de bord conformite sont des pages de
-     synthese hors sommaire (frontmatter) — le sommaire ne liste que les
-     chapitres numerotés. --}}
-<section class="toc">
-  <h1>Sommaire</h1>
-  <ul class="toc-list">
-    {{#if synthesisHtml}}
-    <li class="toc-row lvl-1" data-toc-link="synthesis">
-      <a href="#synthesis" class="toc-link">
-        <span class="toc-num">00</span>
-        <span class="toc-title">Note de synthèse</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{/if}}
-    <li class="toc-row lvl-1" data-toc-link="identification">
-      <a href="#identification" class="toc-link">
-        <span class="toc-num">1</span>
-        <span class="toc-title">Identification du site</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    <li class="toc-row lvl-1" data-toc-link="zones">
-      <a href="#zones" class="toc-link">
-        <span class="toc-num">2</span>
-        <span class="toc-title">Zones fonctionnelles{{#if isBacs}} <span class="toc-ref">R175-1 6°</span>{{/if}}</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    <li class="toc-row lvl-1" data-toc-link="systems">
-      <a href="#systems" class="toc-link">
-        <span class="toc-num">3</span>
-        <span class="toc-title">Systèmes techniques par zone{{#if isBacs}} <span class="toc-ref">R175-1 4°</span>{{/if}}</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    <li class="toc-row lvl-1" data-toc-link="meters">
-      <a href="#meters" class="toc-link">
-        <span class="toc-num">4</span>
-        <span class="toc-title">Compteurs et mesurage{{#if isBacs}} <span class="toc-ref">R175-3 1°</span>{{/if}}</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{#if isBacs}}
-    <li class="toc-row lvl-1" data-toc-link="thermal">
-      <a href="#thermal" class="toc-link">
-        <span class="toc-num">5</span>
-        <span class="toc-title">Régulation thermique automatique <span class="toc-ref">R175-6</span></span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{/if}}
-    <li class="toc-row lvl-1" data-toc-link="bms">
-      <a href="#bms" class="toc-link">
-        <span class="toc-num">{{#if isBacs}}6{{else}}5{{/if}}</span>
-        <span class="toc-title">{{#if isBacs}}Solution GTB / GTC <span class="toc-ref">R175-3, R175-4, R175-5</span>{{else}}Solution de supervision en place{{/if}}</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{#if isBacs}}
-    <li class="toc-row lvl-1" data-toc-link="plan">
-      <a href="#plan" class="toc-link">
-        <span class="toc-num">7</span>
-        <span class="toc-title">Plan de mise en conformité</span>
-        <span class="toc-dots"></span>
-        <span class="toc-page">···</span>
-      </a>
-    </li>
-    {{/if}}
-  </ul>
 </section>
 
 {{!-- ═══════════ Tableau de bord conformité R175 (après sommaire) ═══════════ --}}
@@ -784,34 +785,117 @@
 
 {{!-- ═══════════ Chapitre 4 — Compteurs ═══════════ --}}
 <h1 class="chapter" data-toc-anchor="meters">{{{faIcon "gauge" "#10b981" "16"}}} 4. Compteurs et mesurage{{#if isBacs}} (R175-3 1°){{/if}}</h1>
-{{#if metersForPdf.length}}
-<table>
-  <thead>
-    <tr>
-      <th>Zone</th><th>Usage</th><th>Type</th>
-      <th>Requis</th><th>Présent</th><th>Communicant</th><th>Intégré GTB</th><th>HS</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{#each metersForPdf}}
+
+{{#if meterCoverageMatrix.rows.length}}
+{{!-- ─── Matrice de couverture du plan de comptage ────────────────────
+     Grille zones × énergies pour visualiser le plan de comptage en un
+     coup d'œil. Cellule = badges-icônes d'usage (ou d'énergie pour le
+     compteur général). Dot vert/rouge/noir pour l'état. --}}
+<div class="coverage-matrix">
+  <div class="coverage-matrix-head">{{{faIcon "gauge" "#10b981" "12"}}} Plan de comptage — vue d'ensemble de la couverture</div>
+  <table class="coverage-table">
+    <thead>
       <tr>
-        <td>{{zoneLabel}}</td>
-        <td>{{{meterUsagePill usage}}}</td>
-        <td>{{{meterTypePill meter_type}}}</td>
-        <td class="bool-cell"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
-        <td class="bool-cell"><span class="{{#if present_actual}}bool-yes{{else}}bool-no{{/if}}">{{#if present_actual}}✓{{else}}✗{{/if}}</span></td>
-        <td class="bool-cell"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
-        <td class="bool-cell"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
-        <td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>
+        <th class="coverage-zone-head">Zone</th>
+        {{#each meterCoverageMatrix.energies}}
+          <th class="coverage-energy-head{{#unless used}} coverage-energy-empty{{/unless}}">
+            <span class="coverage-energy-cell">
+              <span class="coverage-energy-icon" style="background:{{color}}1a;color:{{color}}">{{{faIcon icon color "9"}}}</span>
+              <span class="coverage-energy-label">{{label}}</span>
+            </span>
+          </th>
+        {{/each}}
       </tr>
-    {{/each}}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {{#each meterCoverageMatrix.rows}}
+        <tr class="coverage-row{{#if (eq zone.kind "general")}} coverage-row-general{{/if}}">
+          <td class="coverage-zone-cell">
+            {{#if (eq zone.kind "general")}}{{{faIcon "building-circle-arrow-right" "#6b7280" "10"}}} {{/if}}{{zone.name}}{{#if (eq zone.kind "technical")}} <span class="coverage-zone-kind">(technique)</span>{{/if}}
+          </td>
+          {{#each cells}}
+            <td class="coverage-cell{{#unless energy.used}} coverage-cell-empty{{/unless}}">
+              {{#each meters}}
+                <span class="coverage-badge coverage-badge-{{state}}" style="background:{{color}}1a;color:{{color}}">
+                  {{{faIcon icon color "10"}}}
+                  <span class="coverage-dot coverage-dot-{{state}}"></span>
+                </span>
+              {{/each}}
+            </td>
+          {{/each}}
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  <div class="coverage-legend">
+    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-present"></span>Présent</span>
+    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-missing"></span>Requis manquant</span>
+    <span class="coverage-legend-item"><span class="coverage-dot-lg coverage-dot-hs"></span>Hors service</span>
+  </div>
+</div>
+{{/if}}
+
+{{#if meterEnergyGroups.length}}
+{{!-- ─── Sections détaillées par énergie, compteurs groupés par zone
+     (cohérent avec la vue desktop MeterEnergyGroup) ─────────────────── --}}
+{{#each meterEnergyGroups}}
+<div class="energy-section">
+  <div class="energy-section-head">
+    <span class="energy-section-icon" style="background:{{energy.color}}1a;color:{{energy.color}}">{{{faIcon energy.icon energy.color "10"}}}</span>
+    <span class="energy-section-title">{{energy.label}}</span>
+    <span class="energy-section-stats">
+      <span>{{stats.total}} compteur{{#unless (eq stats.total 1)}}s{{/unless}}</span>
+      <span class="energy-sep">·</span>
+      <span class="energy-stat-present">{{stats.present}} présent{{#unless (eq stats.present 1)}}s{{/unless}}</span>
+      {{#if stats.missing}}
+        <span class="energy-sep">·</span>
+        <span class="energy-stat-missing">{{stats.missing}} requis manquant{{#unless (eq stats.missing 1)}}s{{/unless}}</span>
+      {{/if}}
+    </span>
+  </div>
+  <table class="energy-section-table">
+    <thead>
+      <tr>
+        <th>Zone</th><th>Usage</th><th>Localisation</th>
+        <th class="bool-cell">Req.</th><th class="bool-cell">Prés.</th>
+        <th class="bool-cell">Comm.</th><th class="bool-cell">Câblé</th>
+        <th class="bool-cell">HS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each zones}}
+        {{!-- Subheader de zone (regroupement visuel) --}}
+        <tr class="energy-subheader{{#if is_general}} energy-subheader-general{{/if}}">
+          <td colspan="8">
+            {{#if is_general}}{{{faIcon "building-circle-arrow-right" "#6b7280" "9"}}} {{/if}}{{zone_name}}
+            <span class="energy-subheader-count">— {{items.length}} compteur{{#unless (eq items.length 1)}}s{{/unless}}</span>
+          </td>
+        </tr>
+        {{#each items}}
+          <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}">
+            <td>{{zoneLabel}}</td>
+            <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage}}}{{/if}}</td>
+            <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="bool-cell"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell"><span class="{{#if present_actual}}bool-yes{{else}}bool-no{{/if}}">{{#if present_actual}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell"><span class="{{#if wired}}bool-yes{{else}}bool-no{{/if}}">{{#if wired}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>
+          </tr>
+        {{/each}}
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+{{/each}}
+{{/if}}
+
+{{#if metersForPdf.length}}
 {{#if (gt meters.length metersForPdf.length)}}
 <p class="muted" style="font-size: 7pt; margin-top: 1mm">
   Note : {{minus meters.length metersForPdf.length}} compteur{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
   ni requis ni présent{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}} non listé{{#unless (eq (minus meters.length metersForPdf.length) 1)}}s{{/unless}}
-  dans ce tableau (zéro information actionnable).
+  ci-dessus (zéro information actionnable).
 </p>
 {{/if}}
 {{#if metersWithDetails.length}}

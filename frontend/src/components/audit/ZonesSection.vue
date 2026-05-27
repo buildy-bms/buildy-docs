@@ -19,7 +19,7 @@ import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones } from '@/api'
+import { updateZone, deleteZone, listZones, resyncBacsAudit, reorderBacsZones, duplicateZone } from '@/api'
 import { ZONE_OCCUPANCY_PROFILES } from '@/lib/audit-options'
 
 // Section Zones — rendue deux fois selon `kind` :
@@ -107,11 +107,16 @@ async function removeZone(z) {
 }
 
 async function dupZone(z) {
-  // Simple : crée une nouvelle zone avec un nom suffixé, même type de zone.
-  emit('add-zone', {
-    name: `${z.name} (copie)`, nature: z.nature,
-    surface_m2: z.surface_m2, kind: z.kind || 'functional',
-  })
+  // Duplication serveur : copie TOUS les champs métier (nom suffixé,
+  // nature, surface, kind, régime d'activité, contrainte de confort,
+  // notes, position…) via POST /api/site-zones/:id/duplicate. Évite le
+  // bug où l'on ne reportait que les champs visibles du formulaire de
+  // création (manquait notamment `occupancy_profile`).
+  try {
+    await duplicateZone(z.zone_id)
+    await resyncBacsAudit(audit.docId)
+    await audit.refreshAuditCore()
+  } catch { error('Duplication impossible') }
 }
 
 // Positionnement de la zone sur la carte Google Maps (modale dédiée).

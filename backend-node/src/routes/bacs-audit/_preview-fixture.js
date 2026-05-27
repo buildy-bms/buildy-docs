@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadAssetDataUrl } = require('../../lib/pdf');
 const bacsArticlesData = require('../../seeds/bacs-articles');
+const { buildMeterCoverage } = require('./_meter-coverage');
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 const { isTrue, isFalse } = require('./_ternary');
@@ -828,6 +829,13 @@ async function buildFixturePreviewData({ user = null } = {}) {
     return 0;
   });
 
+  // Matrice de couverture + sections par énergie (logique partagée avec
+  // _export-data.js pour cohérence preview/prod).
+  const { meterCoverageMatrix, meterEnergyGroups } = buildMeterCoverage(
+    enrichedMeters,
+    ZONES_RAW,
+  );
+
   // Actions : numérotation BACS-XXX par sévérité (bloq → maj → min)
   const actionItemsRaw = ACTIONS_RAW.map(a => ({
     ...a,
@@ -1044,6 +1052,8 @@ async function buildFixturePreviewData({ user = null } = {}) {
     bmsManagedMeters,
     bmsUnmanagedMeters,
     metersByZone,
+    meterCoverageMatrix,
+    meterEnergyGroups,
     recapStats,
     buildySolution,
     actionItems,

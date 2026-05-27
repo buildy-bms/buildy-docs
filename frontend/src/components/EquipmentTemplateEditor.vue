@@ -279,12 +279,26 @@ function toggleProtocol(p) {
   else form.value.preferred_protocols.push(p)
 }
 
-// Picker icône — recherche prédictive dans toute la base FA Solid Pro
+// Picker icône — recherche prédictive dans toute la base FA Solid Pro.
+// Match par MOT ENTIER (segment séparé par `-`) plutôt que par substring
+// brute, sinon « heat » fait remonter « wheat » et « theater-masks » qui
+// n'ont aucun rapport sémantique avec la chaleur. Ordre de pertinence :
+// exact > segment-prefix > segment-contient.
 const iconSearch = ref('')
 const filteredIcons = computed(() => {
   const q = iconSearch.value.trim().toLowerCase()
-  if (!q) return [] // pas d'affichage par defaut : la grille n'apparait qu'a la recherche
-  return ALL_FA_NAMES.value.filter(n => n.includes(q)).slice(0, 60)
+  if (!q) return []
+  const exact = []
+  const prefix = []
+  const wordMatch = []
+  for (const n of ALL_FA_NAMES.value) {
+    if (n === q) { exact.push(n); continue }
+    const segments = n.split('-')
+    if (segments[0].startsWith(q)) prefix.push(n)
+    else if (segments.some(s => s === q || s.startsWith(q))) wordMatch.push(n)
+    if (exact.length + prefix.length + wordMatch.length > 100) break
+  }
+  return [...exact, ...prefix, ...wordMatch].slice(0, 60)
 })
 
 function selectIconName(name) {

@@ -214,6 +214,7 @@ function hasNotes(html) {
           :key="section.energy.value"
           :energy="section.energy"
           :meters="section.meters"
+          :zones="zones"
           :document="document"
           :protocol-options="protocolOptions"
           :meter-usages="meterUsages"
