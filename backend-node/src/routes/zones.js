@@ -23,7 +23,7 @@ const ZONE_NATURES = [
 // avec frontend/src/lib/audit-options.js ZONE_OCCUPANCY_PROFILES (libellés FR)
 // et le CHECK constraint de la migration 158.
 const ZONE_OCCUPANCY_PROFILES = [
-  'continu', 'heures_bureau', 'scolaire', 'intermittent', 'saisonnier', 'autre',
+  'continu', '3x8', '2x8', 'heures_bureau', 'scolaire', 'intermittent', 'saisonnier', 'autre',
 ];
 
 // Une zone est soit « fonctionnelle » (assujettie au decret BACS, alimente

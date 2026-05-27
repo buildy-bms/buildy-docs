@@ -158,6 +158,8 @@ const TECHNICAL_ZONE_NATURES = new Set([
 // (frontend/src/lib/audit-options.js) et le CHECK constraint migration 158.
 const OCCUPANCY_PROFILE_LABEL = {
   'continu': 'Activité continue (24/7)',
+  '3x8': 'Activité en 3×8 (24h/24, 3 équipes)',
+  '2x8': 'Activité en 2×8 (16h/24, 2 équipes)',
   'heures_bureau': 'Heures de bureau',
   'scolaire': 'Rythme scolaire',
   'intermittent': 'Activité intermittente',
