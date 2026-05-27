@@ -390,29 +390,30 @@ onBeforeUnmount(teardownSortables)
       </span>
       <span v-else class="italic">Pas encore de systèmes saisis</span>
     </template>
-    <div class="px-3 py-3 bg-gray-50">
-      <!-- Filtres par usage : pills cliquables qui masquent les systèmes
-           dont la system_category n'est pas dans le set actif. État local
-           uniquement (pas persisté), reset à l'ouverture de l'audit.
-           Tous activés par défaut = aucun filtre = tout affiché. -->
-      <div class="flex items-center flex-wrap gap-1.5 mb-3 px-1">
+    <!-- Filtres par usage : pills cliquables dans le header sticky pour
+         rester visibles au scroll. Tous activés par défaut = aucun filtre.
+         Couleurs douces (gray-50 + ring indigo pour l'actif) pour ne pas
+         écraser visuellement le contenu de la section. -->
+    <template #headerExtra>
+      <div class="flex items-center flex-wrap gap-1.5">
         <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mr-1">Filtrer :</span>
         <button v-for="cat in usageFilterOptions" :key="cat.value"
                 type="button" @click="toggleUsageFilter(cat.value)"
-                :class="['inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition whitespace-nowrap border',
+                :class="['inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition whitespace-nowrap border',
                          usageFilter.has(cat.value)
-                           ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                           : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
-          <SystemCategoryIcon :category="cat.value" size="sm" />
+                           ? 'bg-white text-gray-800 border-gray-300 shadow-sm'
+                           : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-white hover:text-gray-600']">
+          <SystemCategoryIcon :category="cat.value" size="sm" :class="usageFilter.has(cat.value) ? '' : 'opacity-50 grayscale'" />
           {{ cat.label }}
         </button>
         <button v-if="usageFilter.size < usageFilterOptions.length" type="button"
                 @click="resetUsageFilter"
-                class="ml-2 text-[10px] text-gray-500 hover:text-indigo-600 underline transition">
+                class="ml-1 text-[10px] text-gray-500 hover:text-indigo-600 underline transition">
           Tout afficher
         </button>
       </div>
-
+    </template>
+    <div class="px-3 py-3 bg-gray-50">
       <!-- Les usages "non concerné" restent toujours visibles (grisés et
            atténués via la classe opacity-60 + bordure dashed sur la card),
            pour permettre à l'auditeur de les remettre actifs facilement
