@@ -361,6 +361,24 @@ onBeforeUnmount(teardownSortables)
           <R175Tooltip article="R175-1 4°" />
           <R175Tooltip article="R175-3" />
         </template>
+        <!-- Filtres usage centrés dans la rangée du header. Restent
+             visibles dans le sticky au scroll. Couleurs douces : actif
+             = white + bordure + icône colorée, inactif = gray-50
+             grayscale. -->
+        <template #center>
+          <div class="flex items-center flex-wrap gap-1 justify-center">
+            <button v-for="cat in usageFilterOptions" :key="cat.value"
+                    type="button" @click="toggleUsageFilter(cat.value)"
+                    :class="['inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition whitespace-nowrap border',
+                             usageFilter.has(cat.value)
+                               ? 'bg-white text-gray-700 border-gray-300 shadow-sm'
+                               : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-white hover:text-gray-600']"
+                    v-tooltip="usageFilter.has(cat.value) ? `Masquer « ${cat.label} »` : `Afficher « ${cat.label} »`">
+              <SystemCategoryIcon :category="cat.value" size="sm" :class="usageFilter.has(cat.value) ? '' : 'opacity-50 grayscale'" />
+              {{ cat.label }}
+            </button>
+          </div>
+        </template>
         <template #actions>
           <!-- Item 5 — cumul automatique des puissances chaud / froid -->
           <span v-if="powerSummary.power_summary" class="text-xs text-gray-600 whitespace-nowrap flex items-center gap-2">
@@ -389,29 +407,6 @@ onBeforeUnmount(teardownSortables)
         <span v-if="hiddenNotConcernedCount"> · {{ hiddenNotConcernedCount }} non concerné{{ hiddenNotConcernedCount > 1 ? 's' : '' }}</span>
       </span>
       <span v-else class="italic">Pas encore de systèmes saisis</span>
-    </template>
-    <!-- Filtres par usage : pills cliquables dans le header sticky pour
-         rester visibles au scroll. Tous activés par défaut = aucun filtre.
-         Couleurs douces (gray-50 + ring indigo pour l'actif) pour ne pas
-         écraser visuellement le contenu de la section. -->
-    <template #headerExtra>
-      <div class="flex items-center flex-wrap gap-1.5">
-        <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mr-1">Filtrer :</span>
-        <button v-for="cat in usageFilterOptions" :key="cat.value"
-                type="button" @click="toggleUsageFilter(cat.value)"
-                :class="['inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition whitespace-nowrap border',
-                         usageFilter.has(cat.value)
-                           ? 'bg-white text-gray-800 border-gray-300 shadow-sm'
-                           : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-white hover:text-gray-600']">
-          <SystemCategoryIcon :category="cat.value" size="sm" :class="usageFilter.has(cat.value) ? '' : 'opacity-50 grayscale'" />
-          {{ cat.label }}
-        </button>
-        <button v-if="usageFilter.size < usageFilterOptions.length" type="button"
-                @click="resetUsageFilter"
-                class="ml-1 text-[10px] text-gray-500 hover:text-indigo-600 underline transition">
-          Tout afficher
-        </button>
-      </div>
     </template>
     <div class="px-3 py-3 bg-gray-50">
       <!-- Les usages "non concerné" restent toujours visibles (grisés et
