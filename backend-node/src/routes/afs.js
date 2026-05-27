@@ -57,11 +57,24 @@ const updateAfSchema = z.object({
  * - 70 kW <= puissance < 290 kW => subject_2030 (echeance 1er janvier 2030,
  *   report acte par le decret publie au JO le 26 decembre 2025)
  *
- * Retourne { status, deadline } ou null si la puissance n'est pas renseignee.
+ * **Regle protective** (3eme arg `incompletePowerCount`) : si la puissance
+ * calculee est sous 70 kW MAIS des equipements thermiques in-scope n'ont
+ * pas de puissance saisie, on PRESUME l'assujettissement (subject_2030)
+ * plutot que de classer 'not_subject' a tort. L'auditeur peut completer
+ * les puissances ; le statut sera recalcule au prochain PATCH.
+ *
+ * Retourne { status, deadline, presumed? } ou null si la puissance n'est
+ * pas renseignee du tout.
  */
-function computeBacsApplicability(powerKw, buildingPermitDate) {
+function computeBacsApplicability(powerKw, buildingPermitDate, incompletePowerCount = 0) {
   if (powerKw == null || isNaN(powerKw)) return null;
   if (powerKw < 70) {
+    if (incompletePowerCount > 0) {
+      // Protective : on suppose qu'avec les puissances manquantes complétées
+      // l'audit pourrait dépasser le seuil. Verdict 'subject_2030' présumé
+      // (le moins défavorable des deux états subject_*).
+      return { status: 'subject_2030', deadline: '2030-01-01', presumed: true };
+    }
     return { status: 'not_subject', deadline: null };
   }
   if (powerKw >= 290) {
@@ -406,7 +419,18 @@ async function routes(fastify) {
     if (touchesApplicability) {
       const powerKw = body.bacs_total_power_kw !== undefined ? body.bacs_total_power_kw : af.bacs_total_power_kw;
       const pcDate = body.bacs_building_permit_date !== undefined ? body.bacs_building_permit_date : af.bacs_building_permit_date;
-      const applic = computeBacsApplicability(powerKw, pcDate);
+      // Compte les équipements thermiques sans puissance saisie pour la
+      // règle protective d'assujettissement (incident audit Communay :
+      // total faible parce que des power_kw manquent → on présume subject).
+      const { computeAutoPower } = require('../lib/bacs-audit-power');
+      const devices = db.db.prepare(`
+        SELECT d.*, s.system_category
+        FROM bacs_audit_system_devices d
+        JOIN bacs_audit_systems s ON s.id = d.system_id
+        WHERE s.document_id = ?
+      `).all(id);
+      const auto = computeAutoPower(devices);
+      const applic = computeBacsApplicability(powerKw, pcDate, auto.incompletePowerCount);
       if (applic) {
         fields.bacs_applicability_status = applic.status;
         fields.bacs_applicable_deadline = applic.deadline;

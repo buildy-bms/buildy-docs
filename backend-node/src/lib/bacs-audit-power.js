@@ -152,6 +152,7 @@ function devicePowerContribution(device) {
  */
 function computeAutoPower(devices) {
   let heat = 0, cool = 0;
+  let incompletePowerCount = 0;
   const detailed = [];
   for (const d of devices || []) {
     // Les équipements Hors-Service ne comptent pas dans le cumul.
@@ -163,12 +164,25 @@ function computeAutoPower(devices) {
     heat += contrib.heat;
     cool += contrib.cool;
     detailed.push({ ...d, _power: contrib });
+    // Détection « puissance manquante » : équipement in-scope chaud/froid
+    // sans aucune puissance saisie (ni power_kw ni power_kw_cooling). Sert
+    // à la règle protective d'assujettissement (cf. resolveTotalPower) :
+    // si le cumul auto est sous le seuil 70 kW MAIS des équipements ont
+    // une puissance non saisie, on présume l'assujettissement plutôt que
+    // de classer « non assujetti » à tort.
+    if (contrib.inScope && !d.is_backup) {
+      const cat = d.system_category;
+      const isThermalCat = cat === 'heating' || cat === 'cooling' || cat === 'ventilation' || cat === 'dhw';
+      const noPower = (d.power_kw == null || d.power_kw === 0) && (d.power_kw_cooling == null || d.power_kw_cooling === 0);
+      if (isThermalCat && noPower) incompletePowerCount++;
+    }
   }
   const round = (n) => Math.round(n * 10) / 10;
   return {
     heatKw: round(heat),
     coolKw: round(cool),
     retainedKw: round(Math.max(heat, cool)),
+    incompletePowerCount,
     devices: detailed,
   };
 }
@@ -199,6 +213,15 @@ function resolveTotalPower(document, auto) {
     discrepancyPct = Math.round(Math.abs(manualKw - autoKw) / autoKw * 100);
     discrepancy = discrepancyPct > 10;
   }
+  // Règle protective d'assujettissement : si le cumul auto est sous le
+  // seuil 70 kW MAIS des équipements ont une puissance non saisie, on
+  // considère l'audit comme potentiellement assujetti par défaut (le
+  // total réel pourrait dépasser le seuil une fois les puissances
+  // complétées). Le client UI affiche un warning, et computeBacsApplicability
+  // (routes/afs.js) bascule de 'not_subject' à 'subject_2030' tant que
+  // l'auditeur n'a pas complété les saisies.
+  const incompletePowerCount = auto.incompletePowerCount || 0;
+  const presumedSubjectDueToMissingData = incompletePowerCount > 0 && effectiveKw < 70;
   return {
     source,
     effectiveKw,
@@ -214,6 +237,8 @@ function resolveTotalPower(document, auto) {
     coolKw: auto.coolKw,
     discrepancy,
     discrepancyPct,
+    incompletePowerCount,
+    presumedSubjectDueToMissingData,
   };
 }
 
@@ -245,7 +270,7 @@ function recomputeAndPersistAuditPower(db, documentId) {
   `).all(documentId);
   const auto = computeAutoPower(devices);
 
-  const af = db.prepare('SELECT bacs_total_power_source FROM afs WHERE id = ?').get(documentId);
+  const af = db.prepare('SELECT bacs_total_power_source, bacs_building_permit_date, bacs_total_power_kw FROM afs WHERE id = ?').get(documentId);
   if (!af) return null;
   // Ne touche bacs_total_power_kw QUE si source='auto' (ou null = auto par défaut).
   // Si source='manual' ou 'manual_override', l'auditeur a saisi à la main → respect.
@@ -253,7 +278,40 @@ function recomputeAndPersistAuditPower(db, documentId) {
   if (source === 'auto') {
     db.prepare('UPDATE afs SET bacs_total_power_kw = ? WHERE id = ?').run(auto.retainedKw, documentId);
   }
+  // Recalcul du statut d'assujettissement intégrant la règle protective :
+  // si la puissance effective est sous 70 kW mais qu'il manque des
+  // puissances saisies, on présume subject_2030 (au lieu de not_subject).
+  const powerKw = source === 'auto' ? auto.retainedKw : af.bacs_total_power_kw;
+  const applic = computeBacsApplicabilityFromPower(powerKw, af.bacs_building_permit_date, auto.incompletePowerCount);
+  if (applic) {
+    db.prepare('UPDATE afs SET bacs_applicability_status = ?, bacs_applicable_deadline = ? WHERE id = ?')
+      .run(applic.status, applic.deadline, documentId);
+  } else {
+    db.prepare('UPDATE afs SET bacs_applicability_status = NULL, bacs_applicable_deadline = NULL WHERE id = ?').run(documentId);
+  }
   return auto;
+}
+
+/**
+ * Mêmes règles d'applicabilité R175-2 que routes/afs.js mais accessible
+ * depuis le helper power (évite l'import circulaire avec les routes).
+ * Cf. computeBacsApplicability(routes/afs.js) pour la doc complète.
+ */
+function computeBacsApplicabilityFromPower(powerKw, buildingPermitDate, incompletePowerCount = 0) {
+  if (powerKw == null || isNaN(powerKw)) return null;
+  if (powerKw < 70) {
+    if (incompletePowerCount > 0) {
+      return { status: 'subject_2030', deadline: '2030-01-01', presumed: true };
+    }
+    return { status: 'not_subject', deadline: null };
+  }
+  if (powerKw >= 290) {
+    if (buildingPermitDate && Date.parse(buildingPermitDate) >= Date.parse('2024-04-08')) {
+      return { status: 'subject_immediate', deadline: buildingPermitDate };
+    }
+    return { status: 'subject_2025', deadline: '2025-01-01' };
+  }
+  return { status: 'subject_2030', deadline: '2030-01-01' };
 }
 
 module.exports = {

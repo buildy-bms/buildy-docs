@@ -403,6 +403,14 @@ onBeforeUnmount(teardownSortables)
                   v-tooltip="`Écart de ${powerSummary.power_summary.discrepancyPct} % entre la valeur saisie (${powerSummary.power_summary.manualKw} kW) et le cumul calculé (${powerSummary.power_summary.autoKw} kW).`">
               ⚠ écart {{ powerSummary.power_summary.discrepancyPct }} %
             </span>
+            <!-- Règle protective d'assujettissement : warning si des
+                 puissances manquent et que le total auto est sous le
+                 seuil 70 kW. L'audit est présumé assujetti par défaut. -->
+            <span v-if="powerSummary.power_summary.presumedSubjectDueToMissingData"
+                  class="text-amber-700 font-medium"
+                  v-tooltip="`${powerSummary.power_summary.incompletePowerCount} équipement(s) thermique(s) sans puissance saisie. L'audit est présumé assujetti par défaut (au-dessus du seuil 70 kW). Compléter les puissances pour affiner le verdict.`">
+              ⚠ {{ powerSummary.power_summary.incompletePowerCount }} sans puissance
+            </span>
           </span>
           <span v-else class="text-xs text-gray-600 whitespace-nowrap">
             Chauffage + clim :
