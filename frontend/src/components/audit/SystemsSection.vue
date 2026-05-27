@@ -152,9 +152,13 @@ function openSystemSettings(s) { settingsSystem.value = s }
 function closeSystemSettings() { settingsSystem.value = null }
 
 // ─── Filtre par usage (catégorie BACS) ─────────────────────────────────
-// Pills cliquables en haut de la card 03. Tous activés par défaut →
-// aucun filtre actif. Désélectionner ≥1 catégorie filtre l'affichage.
-// État local Pinia non persisté : redécouvert à chaque ouverture audit.
+// Sémantique « inclusive » : par défaut le set est VIDE → aucun filtre
+// actif → tout est affiché. Cliquer un pill l'AJOUTE au filtre : la card
+// montre alors uniquement les catégories du filtre (équivalent OR multi-
+// sélection). Re-cliquer un pill actif le retire ; quand le set redevient
+// vide, on retombe sur l'affichage complet par défaut. Plus intuitif
+// qu'une logique « tout-puis-on-désélectionne » (incident 2026-05-27 où
+// l'auditeur cliquait Chauffage pour le filtrer ET cachait Chauffage).
 const USAGE_FILTER_OPTIONS = [
   { value: 'heating',                 label: 'Chauffage' },
   { value: 'cooling',                 label: 'Refroidissement' },
@@ -165,27 +169,34 @@ const USAGE_FILTER_OPTIONS = [
   { value: 'electricity_production',  label: 'Production PV' },
 ]
 const usageFilterOptions = USAGE_FILTER_OPTIONS
-const usageFilter = ref(new Set(USAGE_FILTER_OPTIONS.map(o => o.value)))
+const usageFilter = ref(new Set()) // vide par défaut = aucun filtre
 function toggleUsageFilter(v) {
+  // Préserve la position du header dans le viewport (sans ça, le retrait
+  // de rows raccourcit la page et le navigateur clamp le scroll vers le
+  // haut, faisant sauter le sticky).
+  const headerEl = window.document.querySelector('#section-systems header')
+  const beforeTop = headerEl ? headerEl.getBoundingClientRect().top : null
   const s = new Set(usageFilter.value)
-  if (s.has(v)) {
-    // Empêche de tout désactiver d'un coup — au moins 1 doit rester actif.
-    if (s.size === 1) { resetUsageFilter(); return }
-    s.delete(v)
-  } else {
-    s.add(v)
-  }
+  if (s.has(v)) s.delete(v); else s.add(v)
   usageFilter.value = s
+  if (beforeTop != null && headerEl) {
+    nextTick(() => {
+      const afterTop = headerEl.getBoundingClientRect().top
+      const delta = afterTop - beforeTop
+      if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' })
+    })
+  }
 }
 function resetUsageFilter() {
-  usageFilter.value = new Set(USAGE_FILTER_OPTIONS.map(o => o.value))
+  usageFilter.value = new Set()
 }
 
-// Applique le filtre sur systemsByZone : on garde tout système BACS dont
-// la catégorie est dans le set actif, + tous les usages non BACS (toujours
-// visibles — ils n'ont pas de catégorie « standard » à filtrer).
+// Applique le filtre : si vide → tout affiché ; sinon → on garde tout
+// usage non BACS (toujours visible) + les usages BACS dont la catégorie
+// est dans le filtre.
 const filteredSystemsByZone = computed(() => {
   const active = usageFilter.value
+  if (!active.size) return props.systemsByZone
   return props.systemsByZone
     .map(g => ({
       ...g,
@@ -366,14 +377,14 @@ onBeforeUnmount(teardownSortables)
              = white + bordure + icône colorée, inactif = gray-50
              grayscale. -->
         <template #center>
-          <div class="flex items-center flex-wrap gap-1 justify-center">
+          <div class="flex items-center flex-wrap gap-1 justify-center" @click.stop>
             <button v-for="cat in usageFilterOptions" :key="cat.value"
-                    type="button" @click="toggleUsageFilter(cat.value)"
+                    type="button" @click.stop="toggleUsageFilter(cat.value)"
                     :class="['inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition whitespace-nowrap border',
                              usageFilter.has(cat.value)
-                               ? 'bg-white text-gray-700 border-gray-300 shadow-sm'
+                               ? 'bg-white text-indigo-700 border-indigo-300 shadow-sm'
                                : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-white hover:text-gray-600']"
-                    v-tooltip="usageFilter.has(cat.value) ? `Masquer « ${cat.label} »` : `Afficher « ${cat.label} »`">
+                    v-tooltip="usageFilter.has(cat.value) ? `Retirer « ${cat.label} » du filtre` : `Filtrer sur « ${cat.label} »`">
               <SystemCategoryIcon :category="cat.value" size="sm" :class="usageFilter.has(cat.value) ? '' : 'opacity-50 grayscale'" />
               {{ cat.label }}
             </button>
