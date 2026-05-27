@@ -229,6 +229,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
       categoryLabel: s.is_bacs === 0
         ? (s.custom_label || 'Usage')
         : (SYSTEM_LABEL[s.system_category] || s.system_category),
+      // Mig 182 : N systèmes BACS de même catégorie autorisés par zone.
+      // displayLabel = libellé catégorie + nom du système entre parens si
+      // saisi (« Chauffage (Chaudière gaz centrale) »). Pour les usages
+      // non-BACS, c'est juste le custom_label (déjà capturé par
+      // categoryLabel). Utilisé par les templates PDF chap 3 + synthèse
+      // pour distinguer 2 systèmes Chauffage dans la même zone.
+      displayLabel: s.is_bacs === 0
+        ? (s.custom_label || 'Usage')
+        : (s.custom_label && s.custom_label.trim()
+            ? `${SYSTEM_LABEL[s.system_category] || s.system_category} (${s.custom_label.trim()})`
+            : (SYSTEM_LABEL[s.system_category] || s.system_category)),
       negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
       commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
       devices: devs,

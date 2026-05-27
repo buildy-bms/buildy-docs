@@ -50,6 +50,7 @@ import {
   faHeat, faBox, faSnowBlowing, faAirConditioner, faTemperatureLow,
   // Base de consommations de référence (item 13)
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
+  faClone,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -79,6 +80,7 @@ const ICONS = [
   faSquare, faArrowRight, faBatteryThreeQuarters,
   faHeat, faBox, faSnowBlowing, faAirConditioner, faTemperatureLow,
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
+  faClone,
 ]
 
 library.add(...ICONS)

@@ -50,12 +50,11 @@ const captionModal = ref({ open: false, photos: [] }) // photos = [{ id, dataUrl
 const previewPhoto = ref(null)
 const rootEl = ref(null)
 
-function onDocClick(e) {
-  if (!showGallery.value) return
-  if (rootEl.value && !rootEl.value.contains(e.target)) {
-    showGallery.value = false
-  }
-}
+// Anciennement : fermeture sur click document hors de rootEl. Désactivé
+// depuis que la galerie est en Teleport (toute interaction dans la modale
+// est techniquement hors de rootEl, donc fermait la modale au moindre
+// clic sur une miniature). Fermeture désormais via backdrop @click.self
+// + Échap (cf. onKeydown).
 
 const filterParams = computed(() => {
   const p = {}
@@ -82,14 +81,21 @@ async function refresh() {
 }
 
 function onDocsChanged() { refresh() }
+// Échap ferme la lightbox plein écran puis la modale galerie (priorité
+// à la lightbox si elle est ouverte au-dessus).
+function onKeydown(e) {
+  if (e.key !== 'Escape') return
+  if (previewPhoto.value) { previewPhoto.value = null; return }
+  if (showGallery.value) { showGallery.value = false }
+}
 onMounted(() => {
   refresh()
   window.addEventListener('site-documents:changed', onDocsChanged)
-  document.addEventListener('mousedown', onDocClick)
+  document.addEventListener('keydown', onKeydown)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('site-documents:changed', onDocsChanged)
-  document.removeEventListener('mousedown', onDocClick)
+  document.removeEventListener('keydown', onKeydown)
 })
 // On watch la sérialisation des params plutôt que l'objet pour éviter
 // les refetches en boucle quand le parent recrée l'objet attachTo à
@@ -336,62 +342,75 @@ function exifTooltip(p) {
       @change="onFileChosen"
     />
 
-    <!-- Desktop : Galerie inline (popover absolute) -->
-    <div
-      v-if="showGallery && !isMobile"
-      class="absolute right-0 top-full mt-1 z-30 w-72 bg-white border border-gray-200 rounded-lg shadow-xl p-3"
-      @click.stop
-    >
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-gray-700">
-          Photos {{ label ? `- ${label}` : '' }}
-        </span>
-        <button
-          @click="pickFile"
-          :disabled="uploading"
-          class="px-2 py-1 text-[11px] font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {{ uploading ? 'Envoi…' : '+ Ajouter' }}
-        </button>
-      </div>
+    <!-- Desktop : modale centrée (au lieu d'un popover absolute mal placé
+         qui dépassait des tables et coupait les miniatures). Teleport
+         to body + backdrop sombre + close sur clic backdrop ou Échap. -->
+    <Teleport to="body">
+      <div v-if="showGallery && !isMobile"
+           class="fixed inset-0 z-110 bg-black/50 flex items-center justify-center px-4 py-6"
+           @click.self="showGallery = false">
+        <div role="dialog" aria-modal="true"
+             class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+             @click.stop>
+          <div class="px-5 py-3 flex items-center justify-between border-b border-gray-100 shrink-0">
+            <h3 class="text-base font-semibold text-gray-800">
+              Photos<span v-if="label" class="text-gray-500 font-normal"> · {{ label }}</span>
+              <span v-if="photos.length" class="ml-2 text-xs text-gray-400 font-normal">({{ photos.length }})</span>
+            </h3>
+            <div class="flex items-center gap-2">
+              <button
+                @click="pickFile"
+                :disabled="uploading"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+              >
+                <CameraIcon class="w-4 h-4" />
+                {{ uploading ? 'Envoi…' : 'Ajouter une photo' }}
+              </button>
+              <button
+                @click="showGallery = false"
+                class="p-1 -mr-1 text-gray-400 hover:text-gray-700"
+                aria-label="Fermer">
+                <XMarkIcon class="w-5 h-5" />
+              </button>
+            </div>
+          </div>
 
-      <div v-if="loading" class="text-center text-xs text-gray-500 py-3">Chargement…</div>
-      <div v-else-if="!photos.length" class="text-center text-xs text-gray-500 py-3 italic">
-        Aucune photo. Glisse des images sur l'icone ou clique sur <strong>+ Ajouter</strong>.
-      </div>
-      <div v-else class="grid grid-cols-3 gap-1.5">
-        <div v-for="p in photos" :key="p.id" class="relative group" v-tooltip="exifTooltip(p)">
-          <button type="button" @click="previewPhoto = p" class="block w-full">
-            <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
-                 loading="lazy" decoding="async"
-                 class="w-full h-16 object-cover rounded border border-gray-200 hover:border-indigo-400 transition cursor-zoom-in" />
-          </button>
-          <a v-if="gpsMapUrl(p)" :href="gpsMapUrl(p)" target="_blank" rel="noopener" @click.stop
-             class="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/55 hover:bg-indigo-600 text-white flex items-center justify-center transition"
-             v-tooltip="`Voir sur Google Maps — ${exifTooltip(p)}`">
-            <MapPinIcon class="w-3 h-3" />
-          </a>
-          <button
-            @click="removePhoto(p)"
-            class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center"
-            v-tooltip="'Supprimer'"
-          >
-            <TrashIcon class="w-3 h-3" />
-          </button>
-          <span v-if="p.taken_at"
-                class="absolute bottom-1 left-1 inline-flex items-center gap-0.5 px-1 py-px rounded bg-black/55 text-white text-[9px] font-medium">
-            <ClockIcon class="w-2.5 h-2.5" />
-            {{ fmtTakenAtShort(p.taken_at) }}
-          </span>
-          <p v-if="p.title" class="text-[9px] text-gray-500 truncate mt-0.5" v-tooltip="p.title">{{ p.title }}</p>
+          <div class="p-5 overflow-y-auto flex-1 min-h-0">
+            <div v-if="loading" class="text-center text-sm text-gray-500 py-12">Chargement…</div>
+            <div v-else-if="!photos.length" class="text-center text-sm text-gray-500 py-12 italic">
+              Aucune photo pour le moment.<br>
+              Clique sur <strong>« Ajouter une photo »</strong> ou glisse-dépose des images sur l'icone caméra.
+            </div>
+            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div v-for="p in photos" :key="p.id" class="relative group" v-tooltip="exifTooltip(p)">
+                <button type="button" @click="previewPhoto = p" class="block w-full">
+                  <img :src="thumbUrl(p)" :alt="p.title || p.original_name || 'Photo'"
+                       loading="lazy" decoding="async"
+                       class="w-full h-32 object-cover rounded-lg border border-gray-200 hover:border-indigo-400 transition cursor-zoom-in shadow-sm" />
+                </button>
+                <a v-if="gpsMapUrl(p)" :href="gpsMapUrl(p)" target="_blank" rel="noopener" @click.stop
+                   class="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/55 hover:bg-indigo-600 text-white flex items-center justify-center transition"
+                   v-tooltip="`Voir sur Google Maps — ${exifTooltip(p)}`">
+                  <MapPinIcon class="w-3.5 h-3.5" />
+                </a>
+                <button
+                  @click="removePhoto(p)"
+                  class="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 hover:bg-red-700 transition flex items-center justify-center shadow"
+                  v-tooltip="'Supprimer'">
+                  <TrashIcon class="w-3.5 h-3.5" />
+                </button>
+                <span v-if="p.taken_at"
+                      class="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/55 text-white text-[10px] font-medium">
+                  <ClockIcon class="w-3 h-3" />
+                  {{ fmtTakenAtShort(p.taken_at) }}
+                </span>
+                <p v-if="p.title" class="text-[10px] text-gray-500 truncate mt-1" v-tooltip="p.title">{{ p.title }}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <button
-        @click="showGallery = false"
-        class="mt-2 w-full text-[11px] text-gray-500 hover:text-gray-700"
-      >Fermer</button>
-    </div>
+    </Teleport>
 
     <!-- Mobile : Galerie en sheet plein-écran (Teleport pour éviter overflow parent) -->
     <Teleport to="body">
@@ -532,9 +551,10 @@ function exifTooltip(p) {
       </div>
     </div>
 
-    <!-- Lightbox preview -->
+    <!-- Lightbox preview (z-120 pour passer au-dessus de la modale galerie
+         desktop qui est en z-110) -->
     <div v-if="previewPhoto"
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+         class="fixed inset-0 z-120 flex items-center justify-center bg-black/80 p-6"
          @click.self="previewPhoto = null">
       <div class="relative max-w-6xl max-h-[90vh] w-full flex flex-col">
         <header class="flex items-center justify-between text-white mb-3">

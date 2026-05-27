@@ -2,7 +2,9 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import '@/lib/equipment-icons'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -556,7 +558,7 @@ onBeforeUnmount(teardownSortables)
                             @click="openCreateSystemLike(s, g)"
                             class="btn-icon"
                             v-tooltip="'Ajouter un système similaire dans cette zone'">
-                      <DocumentDuplicateIcon class="w-4 h-4" />
+                      <FontAwesomeIcon :icon="['fas', 'clone']" class="w-4 h-4" />
                     </button>
                     <!-- Suppression : usages manuels (non BACS) toujours,
                          OU systèmes BACS dupliqués (au moins 1 sibling). -->

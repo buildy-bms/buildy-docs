@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, PlusIcon, CameraIcon, PencilSquareIcon, DocumentDuplicateIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, PlusIcon, PencilSquareIcon, DocumentDuplicateIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice, duplicateBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -12,6 +12,7 @@ import PhotoDropTr from './PhotoDropTr.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import DeviceMoveShare from './DeviceMoveShare.vue'
 import VoiceNoteButton from './VoiceNoteButton.vue'
+import BacsPhotoButton from './BacsPhotoButton.vue'
 import DataTableSortHeader from './DataTableSortHeader.vue'
 import DeviceEditModal from './audit/DeviceEditModal.vue'
 import { useTableSort } from '@/composables/useTableSort'
@@ -139,48 +140,9 @@ async function refreshPhotos() {
     photosByDevice.value = out
   } catch { /* silencieux */ }
 }
-const fileInputs = ref({})
-function pickPhotoFor(deviceId) {
-  fileInputs.value[deviceId]?.click()
-}
-async function onPhotoSelected(d, e) {
-  const file = e.target.files?.[0]
-  e.target.value = ''
-  if (!file) return
-  if (!props.siteUuid) {
-    error('Audit non rattaché à un site, impossible d\'uploader des photos')
-    return
-  }
-  try {
-    const fd = new FormData()
-    fd.append('file', file)
-    const title = `Photo ${d.name || d.brand || `équipement #${d.id}`} — ${file.name}`
-    await uploadSiteDocument(props.siteUuid, fd, {
-      title,
-      category: 'autre',
-      bacs_audit_system_id: d.system_id,
-      bacs_audit_device_id: d.id,
-    })
-    success('Photo ajoutée')
-    refreshPhotos()
-  } catch (err) {
-    error(err.response?.data?.detail || 'Upload impossible')
-  }
-}
-async function removePhoto(photo) {
-  const ok = await confirm({
-    title: 'Supprimer cette photo ?',
-    message: photo.title,
-    confirmLabel: 'Supprimer', danger: true,
-  })
-  if (!ok) return
-  try {
-    await deleteSiteDocument(photo.id)
-    refreshPhotos()
-  } catch {
-    error('Suppression impossible')
-  }
-}
+// Upload / suppression photos déléguées à BacsPhotoButton (qui gère
+// la galerie + lightbox + drag&drop). On garde juste photosByDevice
+// pour afficher le compteur dans le bouton.
 
 watch(() => props.siteUuid, refreshPhotos)
 watch(() => props.devices.length, refreshPhotos)
@@ -410,20 +372,16 @@ async function removeDevice(d) {
                         v-tooltip="hasNotes(d.notes_html || d.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                   <PencilSquareIcon class="w-4 h-4" />
                 </button>
-                <input type="file" accept="image/*" class="hidden"
-                       :ref="el => { if (el) fileInputs[d.id] = el }"
-                       @change="e => onPhotoSelected({ ...d, system_id: system.id }, e)" />
-                <button @click="pickPhotoFor(d.id)"
-                        :class="['btn-icon relative', (photosByDevice[d.id] || []).length && 'is-success']"
-                        v-tooltip="(photosByDevice[d.id] || []).length
-                          ? `${(photosByDevice[d.id] || []).length} photo${(photosByDevice[d.id] || []).length > 1 ? 's' : ''}`
-                          : 'Ajouter une photo'">
-                  <CameraIcon class="w-4 h-4" />
-                  <span v-if="(photosByDevice[d.id] || []).length"
-                        class="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[9px] font-semibold bg-emerald-600 text-white rounded-full">
-                    {{ (photosByDevice[d.id] || []).length }}
-                  </span>
-                </button>
+                <!-- BacsPhotoButton : galerie popover (miniatures cliquables
+                     → lightbox plein écran + GPS + EXIF) + drag&drop. L'ancien
+                     bouton « click → file picker direct » a été remplacé pour
+                     restaurer le visionnage des photos déjà uploadées. -->
+                <BacsPhotoButton
+                  v-if="siteUuid"
+                  :site-uuid="siteUuid"
+                  :attach-to="{ device_id: d.id, system_id: system.id }"
+                  :label="d.name || d.brand || `Équipement #${d.id}`"
+                  @changed="refreshPhotos" />
                 <VoiceNoteButton
                   v-if="siteUuid"
                   :site-uuid="siteUuid"
