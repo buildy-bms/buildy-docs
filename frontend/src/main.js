@@ -49,6 +49,20 @@ app.directive('tooltip', tooltipDirective)
 app.directive('truncate-tooltip', truncateTooltipDirective)
 app.mount('#app')
 
+// Charge la totalité de la lib FA Pro Solid en arrière-plan, après le
+// 1er paint. Le chunk `fa-pro-solid` (~2,5 Mo) est isolé via vite.config
+// manualChunks → 0 impact sur le bundle initial du chemin AF. Après ~1 s,
+// toutes les icônes FA Pro deviennent disponibles dans `library`, ce qui
+// évite d'avoir à maintenir le registre curé `lib/equipment-icons.js`
+// pour chaque nouvelle icône utilisée dans la biblio ou ailleurs.
+window.requestIdleCallback?.(() => {
+  import('@fortawesome/pro-solid-svg-icons').then(async (mod) => {
+    const { library } = await import('@fortawesome/fontawesome-svg-core')
+    const icons = Object.values(mod).filter(i => i && i.iconName && i.icon)
+    library.add(...icons)
+  }).catch(() => { /* silencieux : le registre curé reste en fallback */ })
+}, { timeout: 3000 })
+
 // Service worker : PWA install standalone iOS / Android.
 // SW minimal (cache assets statiques uniquement, pas d'interception
 // nav/api/auth). Voir public/sw.js. On register en prod uniquement —

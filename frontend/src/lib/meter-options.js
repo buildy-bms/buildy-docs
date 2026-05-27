@@ -8,12 +8,16 @@
 // 5 types d'énergie reconnus par le décret BACS et l'audit. Icônes
 // FontAwesome (registered dans `lib/equipment-icons.js`) + couleurs hex
 // cohérentes avec MeterTypePill.vue.
+//
+// Ordre canonique d'affichage : énergies « principales » en premier
+// (élec, gaz, thermique = les comptages les plus fréquents R175-3 1°),
+// puis production PV et eau en fin (cas spécifiques).
 export const METER_TYPES = [
   { value: 'electric',            label: 'Électrique',            icon: 'fa-bolt',                color: '#eab308' },
-  { value: 'electric_production', label: 'Électrique production', icon: 'fa-solar-panel',         color: '#facc15' },
   { value: 'gas',                 label: 'Gaz',                   icon: 'fa-fire-flame-curved',   color: '#f97316' },
-  { value: 'water',               label: 'Eau',                   icon: 'fa-droplet',             color: '#0ea5e9' },
   { value: 'thermal',             label: 'Thermique',             icon: 'fa-temperature-half',    color: '#dc2626' },
+  { value: 'electric_production', label: 'Électrique production', icon: 'fa-solar-panel',         color: '#facc15' },
+  { value: 'water',               label: 'Eau',                   icon: 'fa-droplet',             color: '#0ea5e9' },
 ]
 
 // 6 usages BACS pour le sous-comptage R175-3 1°.

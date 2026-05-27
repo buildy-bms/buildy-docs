@@ -2518,3 +2518,213 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   font-size: 9pt;
   color: rgba(255, 255, 255, 0.78);
 }
+
+/* ─── Plan de comptage — matrice de couverture (ch.4) ──────────────── */
+.coverage-matrix {
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 2mm;
+  overflow: hidden;
+  margin: 0 0 5mm 0;
+  page-break-inside: avoid;
+}
+.coverage-matrix-head {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  padding: 2mm 3mm;
+  border-bottom: 0.4pt solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: #374151;
+}
+.coverage-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 7.5pt;
+}
+.coverage-table th,
+.coverage-table td {
+  padding: 1.5mm 2mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+}
+.coverage-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.coverage-zone-head {
+  text-align: left;
+  font-size: 6.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #fafafa;
+}
+.coverage-energy-head {
+  text-align: center;
+  background: #fafafa;
+  white-space: nowrap;
+}
+.coverage-energy-head.coverage-energy-empty {
+  background: #f3f4f6;
+}
+.coverage-energy-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 1mm;
+  font-size: 7pt;
+  font-weight: 600;
+  color: #374151;
+}
+.coverage-energy-empty .coverage-energy-cell { color: #9ca3af; }
+.coverage-energy-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5mm;
+  height: 3.5mm;
+  border-radius: 1mm;
+}
+.coverage-row-general { background: rgba(249, 250, 251, 0.5); }
+.coverage-zone-cell {
+  font-size: 7.5pt;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+}
+.coverage-zone-kind {
+  font-size: 6.5pt;
+  color: #9ca3af;
+  font-weight: 400;
+}
+.coverage-cell {
+  text-align: center;
+  vertical-align: middle;
+  min-width: 14mm;
+}
+.coverage-cell-empty { background: rgba(243, 244, 246, 0.3); }
+.coverage-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5mm;
+  height: 4.5mm;
+  border-radius: 1mm;
+  margin: 0 0.4mm;
+}
+.coverage-badge-hs { opacity: 0.4; filter: grayscale(1); }
+.coverage-dot {
+  position: absolute;
+  top: -0.6mm;
+  right: -0.6mm;
+  width: 1.8mm;
+  height: 1.8mm;
+  border-radius: 50%;
+  border: 0.4pt solid #ffffff;
+}
+.coverage-dot-present { background: #10b981; }
+.coverage-dot-missing { background: #ef4444; }
+.coverage-dot-hs { background: #111827; }
+.coverage-dot-neutral { display: none; }
+.coverage-legend {
+  display: flex;
+  gap: 4mm;
+  padding: 1.5mm 3mm;
+  border-top: 0.3pt solid #f3f4f6;
+  background: rgba(249, 250, 251, 0.6);
+  font-size: 6.5pt;
+  color: #6b7280;
+}
+.coverage-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1mm;
+}
+.coverage-dot-lg {
+  display: inline-block;
+  width: 2.2mm;
+  height: 2.2mm;
+  border-radius: 50%;
+  border: 0.4pt solid #ffffff;
+  box-shadow: 0 0 0 0.3pt #d1d5db;
+}
+
+/* ─── Sections détaillées par énergie (ch.4) ─────────────────────── */
+.energy-section {
+  border: 0.4pt solid #e5e7eb;
+  border-radius: 2mm;
+  overflow: hidden;
+  margin: 0 0 3mm 0;
+  page-break-inside: avoid;
+}
+.energy-section-head {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  padding: 2mm 3mm;
+  background: #fafafa;
+  border-bottom: 0.4pt solid #e5e7eb;
+}
+.energy-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4mm;
+  height: 4mm;
+  border-radius: 1mm;
+}
+.energy-section-title {
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: #1f2937;
+}
+.energy-section-stats {
+  font-size: 7pt;
+  color: #6b7280;
+  margin-left: auto;
+}
+.energy-sep { color: #d1d5db; margin: 0 1mm; }
+.energy-stat-present { color: #047857; font-weight: 600; }
+.energy-stat-missing { color: #b91c1c; font-weight: 600; }
+.energy-section-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 7.5pt;
+}
+.energy-section-table th,
+.energy-section-table td {
+  padding: 1.2mm 2mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+}
+.energy-section-table tbody tr:last-child td { border-bottom: none; }
+.energy-section-table thead th {
+  background: #fafafa;
+  font-size: 6.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+.energy-section-table thead th.bool-cell { text-align: center; }
+.energy-subheader td {
+  background: #f3f4f6;
+  font-size: 7pt;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1.5mm 2mm;
+}
+.energy-subheader-general td { background: #e5e7eb; }
+.energy-subheader-count {
+  font-weight: 400;
+  color: #9ca3af;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 1.5mm;
+}
+.meter-row-hs td { opacity: 0.5; }

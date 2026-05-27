@@ -2,16 +2,72 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.103",
+      "version": "0.1.105",
+      "date": "2026-05-27",
+      "title": "Plan de comptage propagé au PDF + PWA · localisation des compteurs · 26 nouveaux modèles d'équipement · topbar sticky · fixes",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "PDF d'audit : matrice de couverture + sections par énergie cohérentes avec la vue desktop",
+          "what": "Le chapitre 4 « Compteurs et mesurage » commence désormais par la matrice visuelle (icônes d'usage par zone × énergie, dots vert/rouge/noir pour l'état présent/manquant/HS), suivie d'une section par énergie avec les compteurs groupés par zone et un sous-header par zone. Le récapitulatif global plat a été retiré (redondant). La table des matières a été remontée juste après la cover (page 2) pour une navigation rapide. Les compteurs hors zone affichent l'icône d'énergie (pas un point d'interrogation) et leur usage devient « — » (la notion d'usage n'a pas de sens pour un compteur de tête).",
+          "where": "Export PDF d'un audit BACS (Rapport).",
+          "how": "Génère le PDF d'un audit (bouton Rapport). Chapitre 4 : matrice visuelle + 5 sections par énergie. Sommaire en page 2."
+        },
+        {
+          "kind": "feat",
+          "title": "PWA Compteurs : champ Localisation + masquage du champ Usage pour le compteur général",
+          "what": "Le sheet d'édition d'un compteur PWA propose désormais un champ « Localisation » (avec sélecteur des zones techniques et fonctionnelles) qui n'apparaît que si le compteur est marqué Présent — utile pour le ratissage terrain. Quand on crée un compteur général de site (sans zone), le champ Usage est masqué et l'usage est forcé à « other » à la sauvegarde, car la notion d'usage n'a pas de sens pour un compteur de tête.",
+          "where": "PWA audit BACS, onglet Compteurs → sheet d'édition.",
+          "how": "Sur un compteur, marque Présent : un champ Localisation apparaît. Crée un compteur sans zone : le champ Usage disparaît, l'énergie devient « Énergie mesurée »."
+        },
+        {
+          "kind": "feat",
+          "title": "Section Compteurs desktop : colonne Localisation + segmented toggles plus lisibles + sections groupées par zone par défaut",
+          "what": "Une colonne « Localisation » a été ajoutée dans les tables des sections d'énergie : un select recherchable avec les zones techniques en tête (pertinent puisqu'un compteur est généralement installé dans un local technique), visible uniquement si le compteur est Présent. Les toggles Oui/Non (Requis / Présent / Communicant / Câblé / HS) ont leur état actif rendu plus contrasté (fond pastel + texte foncé) pour distinguer immédiatement la réponse. Les sections d'énergie sont désormais groupées par zone par défaut (avec « Compteur général » toujours en tête), et la matrice de couverture distingue présent/manquant/HS par un dot vert/rouge/noir sur les badges-icônes.",
+          "where": "Audit BACS desktop, section « Compteurs et mesurage ».",
+          "how": "Ouvre la matrice : chaque compteur a un dot d'état. Déplie une section d'énergie : compteurs groupés par zone, colonne Localisation visible sur les présents."
+        },
+        {
+          "kind": "feat",
+          "title": "Audit BACS desktop : topbar sticky + stepper horizontal en haut (plus de largeur pour le contenu)",
+          "what": "Tout le bloc « breadcrumb + titre de l'audit + Aperçu / Rapport / Synthèse / Livrer / Plus + stepper » reste désormais sticky en haut de la page lors du scroll. Le stepper, jusqu'ici vertical à gauche (occupant ~200 px), passe en horizontal sous le topbar — la colonne principale gagne en largeur. Labels raccourcis (« Régulation » au lieu de « Régulation thermique », « Check-list » au lieu de « Check-list documentaire », « Plan » au lieu de « Plan & livraison »).",
+          "where": "Audit BACS desktop (≥ 1024 px). La PWA ne change pas.",
+          "how": "Ouvre un audit en desktop : barre supérieure reste fixe au scroll. Plus de sidebar à gauche."
+        },
+        {
+          "kind": "feat",
+          "title": "Bibliothèque enrichie : 26 nouveaux modèles d'équipement (radiateurs, FCU, VMC, ECS, sondes, BSO, onduleur PV, etc.)",
+          "what": "Création de 26 modèles en base (dev + prod) à partir d'une liste de manques fréquents en audit tertiaire : 6 modèles chauffage (radiateur eau chaude, radiateur élec. fil-pilote / sans fil-pilote, convecteur, PCBT eau, PCBT élec.), 4 thermique mixte (ventilo-convecteur, cassette plafonnière, split/multi-split, groupe d'eau glacée), 3 ventilation (VMC double flux, VMC simple flux, extracteur d'air), 3 ECS (ballon élec., chauffe-eau thermodynamique, boucle ECS), 2 éclairage (détecteur de présence et de luminosité), 1 QAI (sonde CO₂), 1 occultation (BSO), 2 comptage (compteur fioul, sous-compteur élec. TGBT/TD), 2 PV (onduleur photovoltaïque, batterie stationnaire), 2 autres (passerelle Modbus/BACnet, onduleur ASI). Toutes les descriptions respectent la charte rédactionnelle (agnostiques marques et protocoles, pas de références à des locaux, régulation portée par l'équipement, Buildy supervise sans réguler). Statut BACS séparé dans le champ dédié.",
+          "where": "Bibliothèque → Systèmes techniques (`/library/equipments`).",
+          "how": "Ouvre la biblio : tous les modèles sont en statut « Brouillon » pour validation manuelle. Tu peux affiner les descriptions / icônes / protocoles avant de les valider."
+        },
+        {
+          "kind": "fix",
+          "title": "Bug duplication zone : le régime d'activité et la contrainte de confort sont maintenant copiés",
+          "what": "La duplication d'une zone (bouton Dupliquer dans la section Zones de l'audit) ne reportait que le nom, la nature, la surface et le type. Le régime d'activité, la contrainte de confort, la position géographique et les notes étaient perdus. Maintenant la duplication passe par la route serveur dédiée qui copie tous les champs métier de la zone d'origine.",
+          "where": "Audit BACS desktop, section Zones, bouton « Dupliquer ».",
+          "how": "Sur une zone qui a un régime d'activité paramétré, clique Dupliquer : la copie hérite du même régime."
+        },
+        {
+          "kind": "fix",
+          "title": "Icônes des templates : toute la lib FontAwesome Pro Solid disponible (plus besoin d'enrichir le registre à chaque ajout)",
+          "what": "Le chargement de la full lib FA Pro Solid est désormais déclenché en arrière-plan dès le démarrage de l'app (`requestIdleCallback`), sans impact sur le 1er paint (chunk déjà séparé). Toutes les icônes Pro sont donc immédiatement disponibles partout : éditeur de template, icône du modèle, picker, tables de la biblio. Plus de fallback cube hexagonal sur les icônes valides mais non listées dans le registre curé. Migration 177 qui normalise `icon_kind` (« fontawesome » → « fa ») pour les modèles créés par le seed initial. Recherche d'icônes dans le picker fonctionne par mot entier (segment `-`) au lieu de substring brute : taper « heat » ne fait plus remonter « wheat » ni « theater-masks ».",
+          "where": "Tous les rendus d'icônes Buildy Docs.",
+          "how": "Ouvre un modèle de la biblio : son icône s'affiche correctement. Édite-la et tape « heat » dans le picker : tu vois `heat` et `dryer-heat`, sans plus de `wheat-…` parasites."
+        }
+      ]
+    },
+    {
+      "version": "0.1.104",
       "date": "2026-05-27",
       "title": "Audit BACS desktop : « Plan de comptage » lisible et visuel (matrice + sections par énergie)",
       "highlights": [
         {
           "kind": "feat",
           "title": "Vue desktop des compteurs refondue en plan de comptage panoramique",
-          "what": "Avant, l'onglet Compteurs côté desktop affichait tous les compteurs dans une table dense de 11 colonnes — il fallait scroller pour comprendre la couverture. Maintenant la section commence par 4 cards de stats (Total / Présents / Communicants / Requis manquants), puis une matrice visuelle « Plan de comptage » qui montre d'un coup d'œil quels usages sont mesurés dans quelles zones avec quelles énergies. Sous la matrice, 5 sections par énergie (Électrique / Élec. prod. / Gaz / Eau / Thermique) chacune avec son header coloré, son KPI compact et une table compacte 6 colonnes pour l'édition inline (toggles Présent / Communicant / Câblé / HS, protocoles, actions Notes / Photos / Voice / Dupliquer / Supprimer).",
+          "what": "Avant, l'onglet Compteurs côté desktop affichait tous les compteurs dans une table dense de 11 colonnes — il fallait scroller pour comprendre la couverture. Maintenant la section commence par 4 cards de stats (Total / Présents / Communicants / Requis manquants), puis une matrice visuelle « Plan de comptage » avec des icônes colorées en cellules (tooltip au survol pour le label complet). Sous la matrice, 5 sections par énergie (Électrique / Élec. prod. / Gaz / Eau / Thermique) chacune avec son header coloré, son KPI compact et une table compacte 6 colonnes pour l'édition inline (toggles Présent / Communicant / Câblé / HS, protocoles, actions Notes / Photos / Voice / Dupliquer / Supprimer).",
           "where": "Audit BACS desktop (≥1024px), section « Compteurs et mesurage » (chapitre 5 du stepper). La PWA mobile ne change pas (déjà refondue en 0.1.102).",
-          "how": "Ouvre un audit BACS en desktop. La matrice en haut a un toggle « Par énergie / Par zone » (persisté localStorage, cohérent avec la PWA). Clique sur une pill de la matrice : la section concernée se highlight 2 s en ambre. Clique sur une cellule vide : le bouton « + » au hover ouvre la modale création avec zone et énergie pré-remplies. Les sections vides sont repliées par défaut pour réduire le bruit."
+          "how": "Ouvre un audit BACS en desktop. La matrice en haut a un toggle « Par énergie / Par zone » (persisté localStorage, cohérent avec la PWA). Chaque compteur est un badge-icône coloré : survole pour voir l'usage et l'état, clique pour scroller vers la ligne dans la section détaillée (highlight ambre 2 s). Clique sur une cellule vide : le bouton « + » au hover ouvre la modale création avec zone et énergie pré-remplies. Les sections vides sont repliées par défaut pour réduire le bruit."
         }
       ]
     },

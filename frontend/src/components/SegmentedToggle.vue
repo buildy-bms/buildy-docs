@@ -45,16 +45,16 @@ function pick(v) {
     <button type="button"
             class="seg-btn px-3 py-1 font-semibold transition select-none"
             :class="modelValue === true
-              ? (yesDanger ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700')
-              : 'bg-white text-gray-300 hover:text-gray-600 hover:bg-gray-50'"
+              ? (yesDanger ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800')
+              : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50'"
             @click="pick(true)">
       <span class="font-bold">✓</span><span v-if="!compact" class="ml-1">{{ yesLabel }}</span>
     </button>
     <button type="button"
             class="seg-btn px-3 py-1 font-semibold transition select-none border-l border-gray-200"
             :class="modelValue === false
-              ? 'bg-red-50 text-red-700'
-              : 'bg-white text-gray-300 hover:text-gray-600 hover:bg-gray-50'"
+              ? 'bg-red-100 text-red-700'
+              : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50'"
             @click="pick(false)">
       <span class="font-bold">✗</span><span v-if="!compact" class="ml-1">{{ noLabel }}</span>
     </button>

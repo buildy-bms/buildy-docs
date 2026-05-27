@@ -27,7 +27,11 @@ async function submit() {
   if (submitting.value) return
   submitting.value = true
   try {
-    await emit('submit', { ...form.value })
+    // Compteur général : on force usage = 'other' (la notion d'usage
+    // n'a pas de sens pour un compteur de tête de site).
+    const payload = { ...form.value }
+    if (payload.zone_id === null) payload.usage = 'other'
+    await emit('submit', payload)
     emit('close')
   } finally {
     submitting.value = false
@@ -46,8 +50,11 @@ async function submit() {
           <option v-for="z in zones" :key="z.zone_id" :value="z.zone_id">{{ z.name }}</option>
         </select>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+      <div :class="form.zone_id === null ? '' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'">
+        <!-- Pour un compteur général de site, la notion d'usage n'a pas
+             de sens (un compteur de tête mesure toute l'énergie du site,
+             pas un usage particulier). On masque le champ. -->
+        <div v-if="form.zone_id !== null">
           <label class="block text-xs font-medium text-gray-700 mb-1">Usage</label>
           <select v-model="form.usage"
                   class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
@@ -56,7 +63,7 @@ async function submit() {
           <div class="mt-2"><MeterUsagePill :usage="form.usage" /></div>
         </div>
         <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Type de compteur</label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">{{ form.zone_id === null ? 'Énergie mesurée' : 'Type de compteur' }}</label>
           <select v-model="form.meter_type"
                   class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500">
             <option v-for="t in types" :key="t.value" :value="t.value">{{ t.label }}</option>

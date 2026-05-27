@@ -45,7 +45,9 @@ import {
   faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
   faMapPin, faShare, faEllipsis,
   // Structure juridique & parties prenantes (item 4)
-  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faKey, faShuffle,
+  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faBuildingCircleArrowRight, faKey, faShuffle,
+  faSquare, faArrowRight, faBatteryThreeQuarters,
+  faHeat, faBox, faSnowBlowing, faAirConditioner, faTemperatureLow,
   // Base de consommations de référence (item 13)
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
 } from '@fortawesome/pro-solid-svg-icons'
@@ -73,7 +75,9 @@ const ICONS = [
   faBookOpen, faClock, faSignalSlash, faIdCard, faClipboardList, faClipboardCheck,
   faList, faGear, faTrash, faArrowsRotate, faUserPlus, faCamera, faFile,
   faMapPin, faShare, faEllipsis,
-  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faKey, faShuffle,
+  faScaleBalanced, faUser, faUserGroup, faBuildingUser, faBuildingCircleArrowRight, faKey, faShuffle,
+  faSquare, faArrowRight, faBatteryThreeQuarters,
+  faHeat, faBox, faSnowBlowing, faAirConditioner, faTemperatureLow,
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
 ]
 

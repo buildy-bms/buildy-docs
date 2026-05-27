@@ -39,19 +39,25 @@ const validIcon = computed(() => {
   return v && knownNames.value.has(v) ? v : null
 })
 
-// Suggestions filtrees : prefixe d'abord, puis substring
+// Suggestions filtrees : match par MOT ENTIER (segment séparé par `-`),
+// pas par substring brute. Évite que « heat » fasse remonter « wheat »
+// ou « theater-masks » qui n'ont aucun rapport sémantique.
+//
+// Ordre de pertinence : exact > segment-prefix > segment-contient
 const suggestions = computed(() => {
   const q = (query.value || '').trim().toLowerCase()
   if (!q) return allNames.value.slice(0, 30)
+  const exact = []
   const prefix = []
-  const sub = []
+  const wordMatch = []
   for (const n of allNames.value) {
-    if (n === q) continue
-    if (n.startsWith(q)) prefix.push(n)
-    else if (n.includes(q)) sub.push(n)
-    if (prefix.length + sub.length > 60) break
+    if (n === q) { exact.push(n); continue }
+    const segments = n.split('-')
+    if (segments[0].startsWith(q)) prefix.push(n)
+    else if (segments.some(s => s === q || s.startsWith(q))) wordMatch.push(n)
+    if (exact.length + prefix.length + wordMatch.length > 60) break
   }
-  return [...prefix, ...sub].slice(0, 30)
+  return [...exact, ...prefix, ...wordMatch].slice(0, 30)
 })
 
 function pick(name) {

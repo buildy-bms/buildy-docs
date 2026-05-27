@@ -11,6 +11,7 @@ const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const { parseRoles } = require('../../lib/device-roles');
 const { isTrue, isFalse } = require('./_ternary');
+const { buildMeterCoverage } = require('./_meter-coverage');
 const { buildSiteStaticMap } = require('../../lib/static-map');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
@@ -295,12 +296,18 @@ async function buildBacsAuditExportData(af, opts = {}) {
     zoneNames: (zoneNamesByParty[p.id] || []).sort((a, b) => a.localeCompare(b, 'fr')),
   }));
 
-  // Enrichit meters
+  // Enrichit meters. Pour les compteurs généraux (zone_id null), la
+  // notion d'usage n'a pas de sens (un compteur de tête mesure toute
+  // l'énergie du site, pas un usage particulier) — on remplace par '—'
+  // côté PDF/affichage. Le champ `location_zone_name` (mig 176) vient
+  // du JOIN dans la route GET /bacs-audit/:id/meters.
   const enrichedMeters = meters.map(m => ({
     ...m,
     typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
-    usageLabel: METER_USAGE_LABEL[m.usage] || m.usage,
-    zoneLabel: m.zone_name || 'Général bâtiment',
+    usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
+    zoneLabel: m.zone_name || 'Compteur général',
+    locationLabel: m.location_zone_name || null,
+    isGeneral: !m.zone_id,
   }));
   // Liste affichée dans le PDF chapitre 4 : on retire les compteurs ni
   // requis, ni présents, ni HS — ces lignes n'ont aucune valeur
@@ -396,6 +403,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (b.zone_id == null) return -1;
     return 0;
   });
+
+  // ── Matrice de couverture + sections par énergie du plan de comptage
+  // (logique partagée avec la preview-fixture via `_meter-coverage.js`).
+  const { meterCoverageMatrix, meterEnergyGroups } = buildMeterCoverage(enrichedMeters, zones);
   // Compteurs avec notes ou photos : pour le sous-bloc "Notes terrain"
   // de la section 4 (sinon on n'affiche rien, plutot que des cards vides).
   const metersWithDetails = enrichedMeters.filter(m => m.notes_html || m.notes || (m.photos && m.photos.length));
@@ -896,6 +907,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bmsManagedMeters,
     bmsUnmanagedMeters,
     metersByZone,
+    meterCoverageMatrix,
+    meterEnergyGroups,
     recapStats,
     buildySolution,
     actionItems,

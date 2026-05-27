@@ -33,6 +33,7 @@ import R175Tooltip from '@/components/R175Tooltip.vue'
 import NotesEditorModal from '@/components/NotesEditorModal.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import BacsAuditStepper from '@/components/BacsAuditStepper.vue'
+import BacsAuditStepperHorizontal from '@/components/BacsAuditStepperHorizontal.vue'
 import StepValidateBadge from '@/components/StepValidateBadge.vue'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -667,7 +668,7 @@ const STEP_DEFINITIONS = [
       return []
     } },
   { key: 'thermal',
-    label: 'Régulation thermique',
+    label: 'Régulation',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
     incomplete: () => (thermal.value.length > 0
       ? [] : ["aucune régulation thermique R175-6 n'a été saisie"]) },
@@ -688,7 +689,7 @@ const STEP_DEFINITIONS = [
     incomplete: () => ((inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
       ? [] : ["la date de la dernière inspection périodique R175-5-1 n'est pas renseignée"]) },
   { key: 'docs-checklist',
-    label: 'Check-list documentaire',
+    label: 'Check-list',
     description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
     incomplete: () => {
       const r = []
@@ -707,7 +708,7 @@ const STEP_DEFINITIONS = [
     incomplete: () => (siteCredCount.value > 0
       ? [] : ["aucun accès (web, SSH, VPN) n'a été renseigné"]) },
   { key: 'review',
-    label: 'Plan & livraison',
+    label: 'Plan',
     description: 'Plan de mise en conformite relu et annote commercialement.',
     // Le plan n'a plus de champ par action à renseigner : sign-off manuel.
     incomplete: () => [] },
@@ -1236,6 +1237,9 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 
 <template>
   <div class="w-full mx-auto px-3 pb-12" :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
+    <!-- Bloc sticky desktop : breadcrumb + titre + actions + stepper.
+         Reste visible en haut tout au long du scroll de l'audit. -->
+    <div class="lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:pt-3 lg:pb-2 lg:border-b lg:border-gray-100 lg:mb-3">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">
       <div class="min-w-0 flex-1">
@@ -1367,24 +1371,21 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
       </div>
     </div>
 
+    <!-- Stepper horizontal (à l'intérieur du bloc sticky : reste collé sous le header). -->
+    <BacsAuditStepperHorizontal
+      v-if="!loading"
+      :steps="stepperSteps"
+      :active-step-key="activeStepKey"
+      @step-click="onStepClick"
+      class="hidden lg:block"
+    />
+    </div>
+    <!-- /Fin du wrapper sticky desktop -->
+
     <div v-if="loading" class="text-center py-12 text-gray-400 text-sm">Chargement…</div>
 
-    <div v-else
-         :class="['grid grid-cols-1 gap-4 items-start',
-                  stepperCollapsed ? 'lg:grid-cols-[56px_1fr]' : 'lg:grid-cols-[200px_1fr]']">
-      <!-- Stepper vertical sticky : visible tout au long du scroll de la page (desktop uniquement) -->
-      <BacsAuditStepper
-        :steps="stepperSteps"
-        :active-step-key="activeStepKey"
-        :collapsed="stepperCollapsed"
-        @step-click="onStepClick"
-        @validate-step="validateStep"
-        @invalidate-step="invalidateStep"
-        @toggle-collapsed="toggleStepperCollapsed"
-        class="hidden lg:block sticky top-4 self-start"
-      />
-
-      <!-- Colonne principale : contenu de l'audit -->
+    <div v-else>
+      <!-- Colonne principale : contenu de l'audit pleine largeur -->
       <div class="space-y-6 min-w-0">
       <!-- Synthese severities (compactee) — hors site_audit (pas de plan d'actions) -->
       <div v-if="isBacs" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
