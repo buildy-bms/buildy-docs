@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -156,11 +156,82 @@ function closeSystemSettings() { settingsSystem.value = null }
 // non BACS via custom:uuid. Désormais on peut créer N systèmes BACS de
 // même catégorie dans une même zone (ex: 2 chaudières indépendantes).
 const createSystemForZone = ref(null) // { id, name } ou null
-function openCreateSystem(zone) { createSystemForZone.value = zone }
-function closeCreateSystem() { createSystemForZone.value = null }
+const createSystemInitial = ref(null) // { category, label } ou null pour le raccourci « + similaire »
+function openCreateSystem(zone) {
+  createSystemForZone.value = zone
+  createSystemInitial.value = null
+}
+function openCreateSystemLike(s, g) {
+  // Pré-remplit la modale avec la catégorie du système source et un nom
+  // suggéré (le custom_label + suffixe « (2) » si déjà numéroté, sinon le
+  // label de catégorie + « (2) »). L'auditeur peut tout réécrire.
+  const base = (s.custom_label && s.custom_label.trim()) || usageLabel(s) || 'Système'
+  const m = base.match(/^(.*)\((\d+)\)\s*$/)
+  const suggestion = m ? `${m[1].trim()} (${parseInt(m[2], 10) + 1})` : `${base} (2)`
+  // Pour les non-BACS (system_category = 'custom:<uuid>'), on ne peut pas
+  // dupliquer la catégorie telle quelle — fallback sur l'option « Autre
+  // usage » côté modale. Pour les BACS standard, on passe la catégorie.
+  const category = s.is_bacs ? s.system_category : '__custom__'
+  createSystemForZone.value = { id: g.zone_id, name: g.zone_name }
+  createSystemInitial.value = { category, label: suggestion }
+}
+function closeCreateSystem() {
+  createSystemForZone.value = null
+  createSystemInitial.value = null
+}
 async function onSystemCreated() {
   closeCreateSystem()
   await audit.refreshAuditCore()
+}
+
+// ─── Renommage inline du custom_label d'un système ────────────────────
+// Le nom apparaît entre parenthèses à côté de la catégorie pour les
+// systèmes BACS standard (« Chauffage (Chaudière gaz centrale) »), ou en
+// libellé principal pour les usages personnalisés. Clic sur la zone →
+// input → blur ou Enter pour saver, Échap pour annuler.
+const editingNameId = ref(null)
+const editingNameValue = ref('')
+const nameInputRefs = new Map()
+function setNameInputRef(id, el) {
+  if (el) nameInputRefs.set(id, el)
+  else nameInputRefs.delete(id)
+}
+function startEditName(s) {
+  editingNameId.value = s.id
+  editingNameValue.value = s.custom_label || ''
+  nextTick(() => nameInputRefs.get(s.id)?.focus?.())
+}
+function cancelEditName() {
+  editingNameId.value = null
+  editingNameValue.value = ''
+}
+// Suppression d'un système autorisée si :
+//  - usage non BACS (is_bacs=0) : toujours
+//  - usage BACS : seulement si au moins un autre système BACS de même
+//    (zone × catégorie) existe (= doublon). On garde toujours 1 racine
+//    pour préserver la matrice R175.
+function canDeleteSystem(s, g) {
+  if (s.is_bacs === 0) return true
+  const siblings = (g.items || []).filter(x =>
+    x.id !== s.id && x.is_bacs === 1 && x.system_category === s.system_category
+  )
+  return siblings.length > 0
+}
+
+async function saveSystemName(s) {
+  // Pas de save si on a déjà reset (blur post-Enter).
+  if (editingNameId.value !== s.id) return
+  const next = editingNameValue.value.trim() || null
+  const current = s.custom_label || null
+  editingNameId.value = null
+  editingNameValue.value = ''
+  if (next === current) return
+  try {
+    await updateBacsSystem(s.id, { custom_label: next })
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Renommage impossible')
+  }
 }
 async function removeUsage(s) {
   const ok = await confirm({
@@ -321,7 +392,7 @@ onBeforeUnmount(teardownSortables)
                      contrôle segmenté présence en auto, puis 1fr pour pousser
                      les actions à droite. -->
                 <div class="px-3 py-2 grid items-center gap-3 bg-white"
-                     :style="'grid-template-columns: 20px 20px 28px 240px auto minmax(0, 1fr);'">
+                     :style="'grid-template-columns: 20px 20px 28px minmax(240px, auto) auto minmax(0, 1fr);'">
                   <button type="button"
                           class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                           v-tooltip="'Glisser pour réordonner'">
@@ -335,10 +406,49 @@ onBeforeUnmount(teardownSortables)
                   </button>
                   <span v-else></span>
                   <SystemCategoryIcon :category="s.system_category" size="md" />
-                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate"
-                        @click="s.present && emit('toggle-system-collapsed', s.id)">
-                    {{ usageLabel(s) }}
-                  </span>
+                  <!-- Titre : libellé de la catégorie (Chauffage / Refroidissement…)
+                       + nom du système entre parenthèses, inline-éditable au clic.
+                       Pour les usages BACS standard : « Chauffage (Chaudière gaz
+                       centrale) ». Pour les usages personnalisés (is_bacs=0) :
+                       le custom_label est déjà le label affiché par usageLabel,
+                       on l'expose en édition directement. -->
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate shrink-0"
+                          @click="s.present && emit('toggle-system-collapsed', s.id)">
+                      {{ s.is_bacs ? usageLabel(s) : (s.custom_label || 'Usage personnalisé') }}
+                    </span>
+                    <!-- Input inline pour le nom du système. Visible quand l'auditeur
+                         clique sur la zone (parens). Save sur blur / Enter. Pour BACS
+                         le nom s'affiche entre parenthèses ; pour non-BACS, c'est le
+                         libellé principal qui est édité. -->
+                    <template v-if="editingNameId === s.id">
+                      <span v-if="s.is_bacs" class="text-sm text-gray-500 shrink-0">(</span>
+                      <input :ref="el => setNameInputRef(s.id, el)" type="text"
+                             v-model="editingNameValue"
+                             :placeholder="s.is_bacs ? 'ex : Chaudière gaz centrale' : 'Nom du système'"
+                             @blur="saveSystemName(s)"
+                             @keydown.enter="saveSystemName(s)"
+                             @keydown.escape="cancelEditName"
+                             class="h-7 px-2 text-sm border border-indigo-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 min-w-40" />
+                      <span v-if="s.is_bacs" class="text-sm text-gray-500 shrink-0">)</span>
+                    </template>
+                    <span v-else-if="s.is_bacs && s.custom_label"
+                          @click="startEditName(s)"
+                          class="text-sm text-gray-500 italic truncate cursor-text hover:text-gray-700 hover:bg-gray-50 rounded px-1"
+                          v-tooltip="'Cliquer pour renommer ce système'">
+                      ({{ s.custom_label }})
+                    </span>
+                    <button v-else-if="s.is_bacs" type="button" @click="startEditName(s)"
+                            class="text-[11px] text-gray-400 italic hover:text-indigo-600 hover:bg-indigo-50 rounded px-1.5 py-0.5 transition shrink-0"
+                            v-tooltip="'Donner un nom à ce système (ex: Chaudière gaz centrale)'">
+                      + nom
+                    </button>
+                    <button v-else type="button" @click="startEditName(s)"
+                            class="btn-icon shrink-0"
+                            v-tooltip="'Renommer ce système'">
+                      <PencilSquareIcon class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
                                    @update:model-value="v => setPresence(s, v)" />
                   <div class="flex items-center gap-1 shrink-0 justify-self-end">
@@ -359,11 +469,21 @@ onBeforeUnmount(teardownSortables)
                       v-tooltip="hasNotes(s.notes_html || s.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <!-- Suppression : usages manuels (non BACS) uniquement. -->
-                    <button v-if="s.is_bacs === 0" type="button"
+                    <!-- Raccourci : ajouter un système similaire (même
+                         catégorie + même zone, nom pré-rempli pour aider
+                         l'auditeur à différencier les 2 équipements). -->
+                    <button type="button"
+                            @click="openCreateSystemLike(s, g)"
+                            class="btn-icon"
+                            v-tooltip="'Ajouter un système similaire dans cette zone'">
+                      <DocumentDuplicateIcon class="w-4 h-4" />
+                    </button>
+                    <!-- Suppression : usages manuels (non BACS) toujours,
+                         OU systèmes BACS dupliqués (au moins 1 sibling). -->
+                    <button v-if="canDeleteSystem(s, g)" type="button"
                             @click="removeUsage(s)"
                             class="btn-icon btn-icon-danger"
-                            v-tooltip="'Supprimer cet usage'">
+                            v-tooltip="'Supprimer ce système'">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>
@@ -452,6 +572,7 @@ onBeforeUnmount(teardownSortables)
       v-if="createSystemForZone"
       :zone="createSystemForZone"
       :library-categories="categoryLibrary"
+      :initial="createSystemInitial"
       @close="closeCreateSystem"
       @created="onSystemCreated" />
   </CollapsibleSection>

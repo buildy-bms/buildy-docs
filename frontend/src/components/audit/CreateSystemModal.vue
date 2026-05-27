@@ -15,7 +15,7 @@
  * catégorie dans une même zone. Avant : seuls les usages manuels (catégorie
  * « autre »/personnalisé) étaient possibles, via un workaround `custom:uuid`.
  */
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import { createBacsSystem } from '@/api'
@@ -27,6 +27,9 @@ const props = defineProps({
   zone: { type: Object, required: true }, // { id, name }
   // Catégories de la bibliothèque (clé/label/icon/color) chargées par le parent.
   libraryCategories: { type: Array, default: () => [] },
+  // Pré-remplissage optionnel pour le raccourci « + Système similaire » :
+  // { category: 'heating' | '__custom__' | 'lib:<key>', label: 'Chaudière gaz (2)' }.
+  initial: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'created'])
 const audit = useAuditStore()
@@ -69,6 +72,19 @@ const categoryValue = ref(null)
 const labelValue = ref('')
 const busy = ref(false)
 const labelInput = ref(null)
+
+// Pré-remplissage depuis le raccourci « + Système similaire » : on évite
+// d'écraser la valeur si le composant est ré-utilisé ; le parent contrôle
+// le cycle de vie via v-if sur la modale.
+onMounted(() => {
+  if (props.initial) {
+    if (props.initial.category) categoryValue.value = props.initial.category
+    if (props.initial.label) labelValue.value = props.initial.label
+    // Focus direct sur le nom : la catégorie est déjà choisie, l'auditeur
+    // n'a qu'à confirmer / ajuster le nom suggéré.
+    nextTick(() => labelInput.value?.focus?.())
+  }
+})
 
 // Lorsqu'une catégorie BACS est choisie, on pré-remplit le label avec son nom
 // (« Chauffage », « Refroidissement »…) — l'auditeur peut le préciser
