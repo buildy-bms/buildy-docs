@@ -1289,7 +1289,11 @@ function setupStickyOffsetObserver() {
   if (_stickyOffsetObserver) _stickyOffsetObserver.disconnect()
   let lastH = -1
   const apply = () => {
-    const h = Math.round(el.getBoundingClientRect().height)
+    // Overlap 1px : on positionne les card headers juste UNDER (cachés
+    // derrière) le bord bas du header global pour masquer toute couture
+    // sub-pixel (le bg-white/95 + backdrop-blur du header global laisse
+    // sinon transparaître le contenu défilant dans cette fine bande).
+    const h = Math.round(el.getBoundingClientRect().height) - 1
     if (h !== lastH) {
       lastH = h
       window.document.documentElement.style.setProperty('--audit-sticky-offset', `${h}px`)
