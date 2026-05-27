@@ -25,6 +25,7 @@ const sizeClass = {
   md: 'min-w-0 sm:min-w-[24rem] max-w-[min(92vw,36rem)]',
   lg: 'min-w-0 sm:min-w-[28rem] max-w-[min(92vw,48rem)]',
   xl: 'min-w-0 sm:min-w-[36rem] max-w-[min(92vw,64rem)]',
+  '2xl': 'min-w-0 sm:min-w-[40rem] max-w-[min(92vw,72rem)]',
   // 'full' : pas de cap (en plus du max-w-[92vw] du conteneur de base).
   // La modale s'elargit jusqu'a 92vw pour absorber les tableaux larges.
   full: 'min-w-0 sm:min-w-[36rem]',

@@ -947,7 +947,7 @@
       <span class="thermal-usage">
         {{{categoryIcon category "12"}}}<span class="thermal-usage-label">{{categoryLabel}}</span>
       </span>
-      {{#if label}}<span class="thermal-system-label">{{label}}</span>{{/if}}
+      {{#if displayLabel}}<span class="thermal-system-label">{{displayLabel}}</span>{{/if}}
     </div>
     <div class="thermal-head-meta">
       <span class="thermal-meta-item">
@@ -987,9 +987,45 @@
           <span class="thermal-field-label">Équipement de régulation</span>
           <span class="thermal-field-value">{{#if regulation_device_name}}{{regulation_device_name}}{{else}}<span class="muted">—</span>{{/if}}</span>
         </span>
+        {{!-- Mig 179 : Type de régulation par niveau (saisi sur le device :
+             loi d'eau, vanne 3 voies, thermostat ambiant…). Affiché seulement
+             si renseigné — un système peut avoir un régulateur sans avoir
+             explicité son type. --}}
+        {{#if regulation_type}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Type de régulation</span>
+          <span class="thermal-field-value">{{regulation_type}}</span>
+        </span>
+        {{/if}}
+        {{!-- Mig 179 : identité régulateur (marque + référence) saisie sur
+             le device porteur. Affichée seulement si renseignée. --}}
+        {{#if regulator_brand}}{{#if regulator_model_reference}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Régulateur</span>
+          <span class="thermal-field-value">{{regulator_brand}} · {{regulator_model_reference}}</span>
+        </span>
+        {{else}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Régulateur</span>
+          <span class="thermal-field-value">{{regulator_brand}}</span>
+        </span>
+        {{/if}}{{else}}{{#if regulator_model_reference}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Régulateur</span>
+          <span class="thermal-field-value">{{regulator_model_reference}}</span>
+        </span>
+        {{/if}}{{/if}}
+        {{!-- Mig 181 : Localisation libre par niveau (« chaufferie », « bureau
+             RDC », « gaine VMC »…). --}}
+        {{#if regulator_location}}
+        <span class="thermal-level-field">
+          <span class="thermal-field-label">Localisation</span>
+          <span class="thermal-field-value">{{regulator_location}}</span>
+        </span>
+        {{/if}}
         {{#if ../generatorLabel}}{{#if (eq key "production")}}
         <span class="thermal-level-field">
-          <span class="thermal-field-label">Type production</span>
+          <span class="thermal-field-label">Énergie production</span>
           <span class="thermal-field-value">{{../generatorLabel}}{{#if ../generator_age_years}} · {{../generator_age_years}} ans{{/if}}</span>
         </span>
         {{/if}}{{/if}}

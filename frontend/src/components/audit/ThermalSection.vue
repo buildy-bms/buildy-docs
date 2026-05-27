@@ -1,7 +1,12 @@
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
-import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import {
+  REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
+  derivedGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
+} from '@/lib/audit-options'
+import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
@@ -46,7 +51,8 @@ const LEVEL_NOTES_FIELD = {
 // (ligne principale + ligne détail réordonnées ensemble).
 const props = defineProps({
   thermalFiltered: { type: Array, required: true },
-  regulationOptions: { type: Array, required: true },
+  // Mig 180 : regulationOptions retiré (la granularité est dérivée).
+  regulationOptions: { type: Array, required: false, default: () => [] },
   generatorOptions: { type: Array, required: true },
   generatorDevicesForZoneCategory: { type: Function, required: true },
   step: { type: Object, default: null },
@@ -67,7 +73,7 @@ const { sortKey, sortDir, toggleSort, sortedRows } = useTableSort()
 function sortThermalValue(t, key) {
   if (key === 'zone') return (t.zone_name || '').toLowerCase()
   if (key === 'usage') return (t.category || 'heating')
-  if (key === 'regulation_type') return (t.regulation_type || '').toLowerCase()
+  if (key === 'system') return (t.system_label || '').toLowerCase()
   return ''
 }
 const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortThermalValue))
@@ -80,6 +86,70 @@ async function patchThermal(t, patch) {
   } catch { error('Sauvegarde impossible') }
 }
 
+// ── Pré-remplissage depuis les équipements (R175-6) ──
+// Pour chaque (zone × catégorie), on relit les devices du système et on
+// remplit les champs encore vides (générateur, distribution, émission,
+// régulateur) avec le meilleur candidat. L'auditeur garde la main pour
+// surcharger via le SearchableSelect.
+const REGULATION_CATALOGS = {
+  production:   REGULATION_TYPES_PRODUCTION,
+  distribution: REGULATION_TYPES_DISTRIBUTION,
+  emission:     REGULATION_TYPES_EMISSION,
+}
+const prefillCount = computed(() =>
+  (props.thermalFiltered || [])
+    .map(t => buildPrefillPatch(t, props.generatorDevicesForZoneCategory))
+    .filter(Boolean)
+    .reduce((acc, patch) => acc + Object.keys(patch).length, 0)
+)
+const prefillBusy = ref(false)
+async function prefillAllFromDevices() {
+  if (prefillBusy.value) return
+  prefillBusy.value = true
+  try {
+    for (const t of (props.thermalFiltered || [])) {
+      const patch = buildPrefillPatch(t, props.generatorDevicesForZoneCategory)
+      if (patch) await patchThermal(t, patch)
+    }
+  } finally {
+    prefillBusy.value = false
+  }
+}
+
+// Trouve le device référencé par la ligne thermique pour un niveau donné
+// (production/distribution/emission). Sert à afficher le type de régulation
+// pré-rempli depuis l'équipement, en lecture seule.
+function deviceForLevel(t, level) {
+  const field = LEVEL_DEVICE_FIELD[level]
+  const id = t[field]
+  if (!id) return null
+  const devs = props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  return devs.find(d => d.id === id) || null
+}
+function levelRegulationTypeLabel(t, level) {
+  const d = deviceForLevel(t, level)
+  if (!d) return null
+  const val = d[`regulation_type_${level}`]
+  return regulationTypeLabel(val, level, REGULATION_CATALOGS)
+}
+
+// Granularité R175-6 dérivée du type de régulation d'émission du device
+// émetteur de la ligne. Mig 180 : on ne saisit plus la granularité côté
+// card 06 — elle découle automatiquement de ce qui est renseigné sur
+// l'équipement (modale équipement → section Régulation → type d'émission).
+function systemDisplayName(t) {
+  if (t.system_label && t.system_label.trim()) return t.system_label.trim()
+  const prod = deviceForLevel(t, 'production')
+  if (prod) return prod.name || prod.brand || prod.model_reference || `Équipement #${prod.id}`
+  return defaultLabel(t)
+}
+function granularityForRow(t) {
+  const emitter = deviceForLevel(t, 'emission')
+  const emissionType = emitter?.regulation_type_emission || null
+  const key = derivedGranularity(emissionType)
+  return { key, label: GRANULARITY_LABELS_FR[key], tone: GRANULARITY_TONES[key] }
+}
+
 // ── Ajout / suppression d'entrées de régulation (mig 170) ──
 // Une zone peut porter plusieurs systèmes de chauffage / refroidissement,
 // chacun avec son libellé et son générateur. Les options d'ajout = couples
@@ -88,54 +158,13 @@ function defaultLabel(t) {
   return (t.category || 'heating') === 'cooling' ? 'Refroidissement' : 'Chauffage'
 }
 
-const addOptions = computed(() => {
-  const opts = []
-  const seen = new Set()
-  for (const s of audit.systems) {
-    if (!s.present) continue
-    if (s.system_category !== 'heating' && s.system_category !== 'cooling') continue
-    const key = `${s.zone_id}:${s.system_category}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    opts.push({
-      value: key,
-      label: `${s.zone_name || 'Zone'} — ${s.system_category === 'cooling' ? 'Refroidissement' : 'Chauffage'}`,
-      zone_id: s.zone_id,
-      category: s.system_category,
-    })
-  }
-  return opts.sort((a, b) => a.label.localeCompare(b.label))
-})
-
-const adding = ref(false)
-const addForm = ref({ zoneCategory: null, label: '' })
-const addBusy = ref(false)
-
-function cancelAdd() {
-  adding.value = false
-  addForm.value = { zoneCategory: null, label: '' }
-}
-
-async function addEntry() {
-  const opt = addOptions.value.find(o => o.value === addForm.value.zoneCategory)
-  if (!opt) return error('Choisissez une zone et un usage')
-  addBusy.value = true
-  try {
-    await audit.addThermalEntry({
-      zone_id: opt.zone_id,
-      category: opt.category,
-      label: addForm.value.label.trim() || null,
-    })
-    cancelAdd()
-  } catch (e) {
-    error(e.response?.data?.detail || 'Ajout impossible')
-  } finally {
-    addBusy.value = false
-  }
-}
+// Mig 180 : les lignes sont auto-créées côté backend depuis les systèmes
+// présents (heating/cooling). L'ajout manuel a disparu — on garde
+// uniquement la suppression d'une ligne (équivaut à dire "ce système ne
+// dispose pas de régulation thermique R175-6").
 
 async function removeEntry(t) {
-  if (!confirm(`Supprimer le système de régulation « ${t.label || defaultLabel(t)} » de la zone « ${t.zone_name} » ?`)) return
+  if (!confirm(`Supprimer la ligne régulation thermique pour le système « ${t.system_label || defaultLabel(t)} » de la zone « ${t.zone_name} » ?`)) return
   try {
     await audit.removeThermalEntry(t.id)
   } catch (e) {
@@ -244,6 +273,22 @@ onBeforeUnmount(teardownSortable)
     <!-- Intro pédagogique : qu'est-ce qu'on demande au lecteur de saisir
          et pourquoi. Sans ce contexte, l'auditeur novice se perd entre
          « régulation auto », « type de régulation », « générateur lié »… -->
+    <!-- Pré-remplir depuis les équipements : remplit en un clic les champs
+         Production / Distribution / Émission / Régulateur encore vides à
+         partir des devices du système (rôles + has_regulation). Source de
+         vérité = card 03 « Systèmes ». -->
+    <div v-if="prefillCount > 0" class="mx-3 mt-2 flex items-center justify-between gap-2 p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-lg">
+      <div class="text-xs text-gray-700">
+        <strong class="text-emerald-700">{{ prefillCount }} champ{{ prefillCount > 1 ? 's' : '' }}</strong>
+        peu{{ prefillCount > 1 ? 'vent' : 't' }} être pré-rempli{{ prefillCount > 1 ? 's' : '' }} automatiquement depuis les équipements saisis dans la card « Systèmes ».
+      </div>
+      <button type="button" :disabled="prefillBusy"
+              @click="prefillAllFromDevices"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition whitespace-nowrap shrink-0">
+        <SparklesIcon class="w-4 h-4" />
+        Pré-remplir depuis les équipements
+      </button>
+    </div>
     <div class="mx-3 mt-2 mb-3 p-3 bg-amber-50/50 border border-amber-100 rounded-lg text-xs text-gray-700 leading-relaxed">
       <p class="flex items-start gap-1.5">
         <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
@@ -265,8 +310,7 @@ onBeforeUnmount(teardownSortable)
           <th class="w-8"></th>
           <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
           <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <th>Système</th>
-          <DataTableSortHeader sort-key="regulation_type" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Type de régulation</DataTableSortHeader>
+          <DataTableSortHeader sort-key="system" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Système</DataTableSortHeader>
           <th v-if="anyWoodExempt">Exempté bois</th>
           <th>Production</th>
           <th>Régulation production</th>
@@ -274,6 +318,7 @@ onBeforeUnmount(teardownSortable)
           <th>Régulation distribution</th>
           <th>Émission</th>
           <th>Régulation émission</th>
+          <th>Granularité</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -297,24 +342,14 @@ onBeforeUnmount(teardownSortable)
               {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
             </span>
           </td>
-          <!-- Libellé libre du système régulé (mig 170) -->
-          <td class="align-middle">
-            <input
-              :value="t.label || ''"
-              @blur="e => (e.target.value.trim() || null) !== (t.label || null) && patchThermal(t, { label: e.target.value.trim() || null })"
-              :placeholder="defaultLabel(t)"
-              class="min-w-36 w-full px-2 py-1 text-sm border border-gray-200 rounded-md bg-white" />
-          </td>
-          <td class="align-middle">
-            <div class="min-w-32">
-              <SearchableSelect
-                :model-value="t.regulation_type"
-                @update:modelValue="v => patchThermal(t, { regulation_type: v || null })"
-                :options="(regulationOptions || []).filter(o => o.value)"
-                :invalid="!t.regulation_type"
-                size="sm" placeholder="—"
-                search-placeholder="Filtrer ou ajouter…" />
-            </div>
+          <!-- Mig 180 : Nom du système — lecture seule, vient de
+               bacs_audit_systems.custom_label via le JOIN backend. Si vide,
+               fallback sur le nom de l'équipement de production (plus
+               parlant que « Chauffage » / « Refroidissement »), puis sur
+               le libellé d'usage par défaut.
+               L'édition se fait dans la card 03 « Systèmes ». -->
+          <td class="align-middle text-sm text-gray-800 font-medium whitespace-nowrap">
+            {{ systemDisplayName(t) }}
           </td>
           <td v-if="anyWoodExempt" class="align-middle">
             <!-- Exemption R175-6 II déduite automatiquement de l'énergie de
@@ -337,6 +372,11 @@ onBeforeUnmount(teardownSortable)
                 :invalid="!t.generator_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
+              <div v-if="levelRegulationTypeLabel(t, 'production')"
+                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
+                {{ levelRegulationTypeLabel(t, 'production') }}
+              </div>
             </div>
           </td>
           <!-- Équipement de régulation Production + icône notes Production -->
@@ -369,6 +409,11 @@ onBeforeUnmount(teardownSortable)
                 :invalid="!t.distribution_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
+              <div v-if="levelRegulationTypeLabel(t, 'distribution')"
+                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
+                {{ levelRegulationTypeLabel(t, 'distribution') }}
+              </div>
             </div>
           </td>
           <!-- Équipement de régulation Distribution + icône notes -->
@@ -401,6 +446,11 @@ onBeforeUnmount(teardownSortable)
                 :invalid="!t.emission_device_id"
                 size="sm" placeholder="—"
                 search-placeholder="Rechercher…" />
+              <div v-if="levelRegulationTypeLabel(t, 'emission')"
+                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
+                {{ levelRegulationTypeLabel(t, 'emission') }}
+              </div>
             </div>
           </td>
           <!-- Équipement de régulation Émission + icône notes -->
@@ -422,6 +472,15 @@ onBeforeUnmount(teardownSortable)
                 <PencilSquareIcon class="w-4 h-4" />
               </button>
             </div>
+          </td>
+          <!-- Mig 180 : Granularité R175-6 dérivée du type d'émission du
+               device émetteur de la ligne (modale équipement → section
+               Régulation → type d'émission). Lecture seule. -->
+          <td class="align-middle">
+            <span :class="['inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap', granularityForRow(t).tone]"
+                  v-tooltip="`Granularité dérivée du type d'émission de l'équipement émetteur. Modifier dans la card Systèmes.`">
+              {{ granularityForRow(t).label }}
+            </span>
           </td>
           <!-- Actions de l'entrée de régulation : notes globales + suppression -->
           <td class="align-middle">
@@ -451,45 +510,12 @@ onBeforeUnmount(teardownSortable)
     </table>
     </div>
 
-    <!-- Ajout d'un système de régulation supplémentaire (mig 170) -->
-    <div class="px-3 pb-3 pt-1">
-      <button v-if="!adding && addOptions.length" type="button" @click="adding = true"
-              class="btn-add">
-        <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un système de régulation
-      </button>
-      <div v-else-if="adding" class="border border-indigo-200 bg-indigo-50/40 rounded-lg p-3 space-y-2">
-        <p class="text-xs text-gray-600 leading-relaxed">
-          Une même zone peut être desservie par plusieurs systèmes producteurs distincts
-          (ex. une chaudière gaz et un DRV). Ajoutez ici une entrée de régulation séparée,
-          avec son libellé propre.
-        </p>
-        <div class="flex flex-wrap items-end gap-2">
-          <div class="min-w-56">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Zone &amp; usage</label>
-            <SearchableSelect
-              v-model="addForm.zoneCategory"
-              :options="addOptions"
-              size="sm" placeholder="— Sélectionner —"
-              search-placeholder="Filtrer…" />
-          </div>
-          <div class="flex-1 min-w-48">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Libellé du système</label>
-            <input v-model="addForm.label" type="text"
-                   placeholder="ex : Chaudière gaz + aérothermes, DRV Daikin…"
-                   class="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-md bg-white" />
-          </div>
-          <div class="flex gap-2">
-            <button type="button" @click="cancelAdd"
-                    class="text-xs font-medium text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-100">
-              Annuler
-            </button>
-            <button type="button" @click="addEntry" :disabled="addBusy || !addForm.zoneCategory"
-                    class="text-xs font-medium text-white bg-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap">
-              Ajouter
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Mig 180 : les lignes sont créées automatiquement depuis les
+         systèmes présents (heating/cooling). Pour ajouter une régulation,
+         on ajoute un système dans la card 03. -->
+    <p class="px-3 pb-3 pt-1 text-[11px] text-gray-500 italic">
+      Une ligne par système chauffage / refroidissement présent dans la card « Systèmes ».
+      Pour ajouter une régulation, créer un système dans la card 03.
+    </p>
   </CollapsibleSection>
 </template>

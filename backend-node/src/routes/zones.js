@@ -163,9 +163,16 @@ async function routes(fastify) {
     const id = parseInt(request.params.id, 10);
     const zone = db.zones.getById(id);
     if (!zone || zone.deleted_at) return reply.code(404).send({ detail: 'Zone non trouvee' });
+    // Suffixe numérique incrémenté (cf. lib/duplicate-name.js) au lieu
+    // de « (copie) » systématique : permet la duplication multiple
+    // propre (Bureaux → Bureaux (2) → Bureaux (3)…).
+    const { nextDuplicateName } = require('../lib/duplicate-name');
+    const siblingNames = db.db.prepare(
+      "SELECT name FROM zones WHERE site_id = ? AND deleted_at IS NULL"
+    ).all(zone.site_id).map(r => r.name).filter(Boolean);
     const cloned = db.zones.create({
       siteId: zone.site_id,
-      name: `${zone.name} (copie)`,
+      name: nextDuplicateName(zone.name, siblingNames),
       nature: zone.nature,
       kind: zone.kind,
       position: zone.position + 1,

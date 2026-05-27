@@ -623,16 +623,59 @@ async function routes(fastify) {
 
 
   // ─── Thermal regulation (R175-6) ───────────────────────────────────
+  // Mig 180 : 1 ligne par système (`system_id` obligatoire). On expose le
+  // nom du système (custom_label) et son état (present) via JOIN, afin que
+  // la card 06 affiche directement le libellé saisi côté card 03 sans
+  // double saisie.
+  //
+  // Auto-bootstrap : à chaque GET, on crée une ligne thermal_regulation pour
+  // chaque système heating/cooling présent qui n'en a pas encore. Idempotent
+  // (UNIQUE document_id+system_id côté DB n'est pas strict, on vérifie via
+  // SELECT). Cela évite d'avoir à coupler la création d'un système à un
+  // hook explicite : la card 06 est toujours à jour avec les systèmes.
+  function ensureThermalRowsForSystems(documentId) {
+    const systems = db.db.prepare(`
+      SELECT s.id, s.zone_id, s.system_category
+      FROM bacs_audit_systems s
+      WHERE s.document_id = ?
+        AND s.present = 1
+        AND s.system_category IN ('heating', 'cooling')
+    `).all(documentId);
+    if (!systems.length) return;
+    const existing = new Set(db.db.prepare(
+      'SELECT system_id FROM bacs_audit_thermal_regulation WHERE document_id = ? AND system_id IS NOT NULL'
+    ).all(documentId).map(r => r.system_id));
+    const missing = systems.filter(s => !existing.has(s.id));
+    if (!missing.length) return;
+    const maxPos = db.db.prepare(
+      'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_thermal_regulation WHERE document_id = ?'
+    ).get(documentId).m;
+    const insert = db.db.prepare(`
+      INSERT INTO bacs_audit_thermal_regulation
+        (document_id, zone_id, system_id, category, has_automatic_regulation, position)
+      VALUES (?, ?, ?, ?, 0, ?)
+    `);
+    let pos = maxPos;
+    for (const s of missing) {
+      pos += 10;
+      insert.run(documentId, s.zone_id, s.id, s.system_category, pos);
+    }
+  }
+
   fastify.get('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
     const id = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(id, request, reply)) return;
+    ensureThermalRowsForSystems(id);
     return db.db.prepare(`
-      SELECT t.*, z.name AS zone_name, z.nature AS zone_nature
+      SELECT t.*, z.name AS zone_name, z.nature AS zone_nature,
+             s.custom_label AS system_label, s.present AS system_present
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
-      WHERE t.document_id = ?
+      LEFT JOIN bacs_audit_systems s ON s.id = t.system_id
+      WHERE t.document_id = ? AND t.system_id IS NOT NULL
       ORDER BY t.position, z.position, z.name,
-               CASE t.category WHEN 'heating' THEN 0 ELSE 1 END
+               CASE t.category WHEN 'heating' THEN 0 ELSE 1 END,
+               s.position, s.custom_label
     `).all(id);
   });
 
@@ -642,13 +685,15 @@ async function routes(fastify) {
     if (!row) return reply.code(404).send({ detail: 'Ligne thermal_regulation non trouvee' });
     if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     const schema = z.object({
-      // Migration 170 : libellé libre du système régulé (« Chaudière gaz +
-      // aérothermes », « DRV Daikin »…). NULL = libellé par défaut côté UI
-      // (« Chauffage » / « Refroidissement »).
+      // Mig 180 : `label` archivé (le nom du système vient désormais de
+      // bacs_audit_systems.custom_label, joint via system_id). On accepte
+      // encore en entrée pour compat ascendante mais l'UI n'écrit plus
+      // dessus.
       label: z.string().nullable().optional(),
-      // `has_automatic_regulation` se déduit désormais de regulation_type
-      // (≠ none) et `generator_exempt_wood` de l'énergie de production —
-      // ces colonnes sont dormantes, l'UI ne les saisit plus (Feature J/M).
+      // `regulation_type` (per_room / per_zone / central_only / none) est
+      // dormant depuis mig 180 — la granularité est désormais *dérivée* du
+      // `regulation_type_emission` du device d'émission. Accepté en entrée
+      // pour ne pas casser les clients legacy, mais ignoré côté UI.
       regulation_type: z.enum(REGULATION_TYPES).nullable().optional(),
       // Mig 135 : generator_type (= energy_source du device) et
       // generator_age_years (= age_years du device) ont migré sur le
@@ -700,36 +745,56 @@ async function routes(fastify) {
   });
 
   // POST /bacs-audit/:documentId/thermal-regulation — crée une entrée de
-  // régulation supplémentaire pour une zone × catégorie (mig 170 : une zone
-  // peut être desservie par plusieurs systèmes producteurs distincts).
+  // régulation pour un système thermique donné. Mig 180 : on prend
+  // `system_id` en entrée, zone_id + category sont dérivés depuis
+  // `bacs_audit_systems`. Idempotent : si une ligne existe déjà pour ce
+  // (document_id, system_id), on la renvoie sans en créer une nouvelle.
   fastify.post('/bacs-audit/:documentId/thermal-regulation', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(documentId, request, reply)) return;
     const schema = z.object({
-      zone_id: z.number().int(),
-      category: z.enum(['heating', 'cooling']),
-      label: z.string().nullable().optional(),
+      system_id: z.number().int(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
-    const zone = db.db.prepare('SELECT id FROM zones WHERE id = ?').get(body.zone_id);
-    if (!zone) return reply.code(400).send({ detail: 'Zone introuvable' });
+    const sys = db.db.prepare(
+      'SELECT id, zone_id, system_category FROM bacs_audit_systems WHERE id = ? AND document_id = ?'
+    ).get(body.system_id, documentId);
+    if (!sys) return reply.code(400).send({ detail: 'Système introuvable' });
+    if (!['heating', 'cooling'].includes(sys.system_category)) {
+      return reply.code(400).send({ detail: 'Seuls les systèmes chauffage/refroidissement ont une régulation thermique' });
+    }
+    const existing = db.db.prepare(
+      'SELECT id FROM bacs_audit_thermal_regulation WHERE document_id = ? AND system_id = ?'
+    ).get(documentId, body.system_id);
+    if (existing) {
+      return db.db.prepare(`
+        SELECT t.*, z.name AS zone_name, z.nature AS zone_nature,
+               s.custom_label AS system_label, s.present AS system_present
+        FROM bacs_audit_thermal_regulation t
+        LEFT JOIN zones z ON z.id = t.zone_id
+        LEFT JOIN bacs_audit_systems s ON s.id = t.system_id
+        WHERE t.id = ?
+      `).get(existing.id);
+    }
     const maxPos = db.db.prepare(
       'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_thermal_regulation WHERE document_id = ?'
     ).get(documentId).m;
     const info = db.db.prepare(`
       INSERT INTO bacs_audit_thermal_regulation
-        (document_id, zone_id, category, label, has_automatic_regulation, position)
+        (document_id, zone_id, system_id, category, has_automatic_regulation, position)
       VALUES (?, ?, ?, ?, 0, ?)
-    `).run(documentId, body.zone_id, body.category, body.label?.trim() || null, maxPos + 10);
+    `).run(documentId, sys.zone_id, body.system_id, sys.system_category, maxPos + 10);
     logBacsAudit(request, 'bacs.thermal.create', documentId,
-      { thermalId: info.lastInsertRowid, zone_id: body.zone_id, category: body.category });
+      { thermalId: info.lastInsertRowid, system_id: body.system_id });
     regenerateActionItems(documentId);
     return db.db.prepare(`
-      SELECT t.*, z.name AS zone_name, z.nature AS zone_nature
+      SELECT t.*, z.name AS zone_name, z.nature AS zone_nature,
+             s.custom_label AS system_label, s.present AS system_present
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
+      LEFT JOIN bacs_audit_systems s ON s.id = t.system_id
       WHERE t.id = ?
     `).get(info.lastInsertRowid);
   });
@@ -1193,6 +1258,19 @@ async function routes(fastify) {
       // — c'est l'equipement physique qui a cette caracteristique, pas
       // l'usage en abstrait.
       serves_multiple_buildings: z.boolean().nullable().optional(),
+      // Mig 179 : régulation de l'équipement (refonte modale).
+      has_regulation: z.boolean().nullable().optional(),
+      regulator_brand: z.string().nullable().optional(),
+      regulator_model_reference: z.string().nullable().optional(),
+      regulator_location_zone_id: z.number().int().positive().nullable().optional(),
+      regulation_type_production: z.string().nullable().optional(),
+      regulation_type_distribution: z.string().nullable().optional(),
+      regulation_type_emission: z.string().nullable().optional(),
+      // Mig 181 : localisation libre par niveau de régulation. Acceptée en
+      // texte libre (zone existante choisie dans la liste OU saisie libre).
+      regulator_location_production: z.string().nullable().optional(),
+      regulator_location_distribution: z.string().nullable().optional(),
+      regulator_location_emission: z.string().nullable().optional(),
     });
     const schema = schemaPatch;
     let body;
@@ -1235,9 +1313,14 @@ async function routes(fastify) {
     // une table de jonction, une copie démarre donc non partagée.
     const SKIP_COLS = new Set(['id', 'position', 'document_id', 'created_at', 'updated_at']);
     const copyCols = Object.keys(dev).filter(c => !SKIP_COLS.has(c));
-    const copyValues = copyCols.map(c => (c === 'name'
-      ? (dev.name ? `${dev.name} (copie)` : null)
-      : dev[c]));
+    // Suffixe numérique incrémenté (cf. lib/duplicate-name.js). On regarde
+    // les noms des devices déjà présents dans le MÊME système pour éviter
+    // les collisions à la duplication multiple.
+    const siblingNames = db.db.prepare(
+      'SELECT name FROM bacs_audit_system_devices WHERE system_id = ?'
+    ).all(dev.system_id).map(r => r.name).filter(Boolean);
+    const nextName = require('../lib/duplicate-name').nextDuplicateName(dev.name, siblingNames);
+    const copyValues = copyCols.map(c => (c === 'name' ? nextName : dev[c]));
     const r = db.db.prepare(
       `INSERT INTO bacs_audit_system_devices (position, ${copyCols.join(', ')})
        VALUES (?, ${copyCols.map(() => '?').join(', ')})`

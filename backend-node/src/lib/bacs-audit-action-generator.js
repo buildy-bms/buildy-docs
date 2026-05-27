@@ -492,50 +492,55 @@ function computeTargetActions(documentId) {
     (af?.bacs_generator_works_date && af.bacs_generator_works_date > TRIGGER);
 
   if (r175_6_applicable) {
-    // Lit aussi l'energie du device pointe en generator_device_id pour
-    // l'auto-detection de l'exemption R175-6 II.
+    // Mig 180 : 1 ligne par système. On lit aussi le nom du système
+    // (custom_label) via JOIN sur bacs_audit_systems, et les
+    // regulation_type_* des devices Production / Distribution / Émission
+    // (pour évaluer la conformité « régulation déclarée sur l'équipement »).
     const thermal = db.db.prepare(`
-      SELECT t.*, z.name AS zone_name, d.energy_source AS prod_energy_source
+      SELECT t.*, z.name AS zone_name,
+             s.custom_label AS system_label,
+             dProd.energy_source AS prod_energy_source,
+             dProd.regulation_type_production AS prod_reg_type,
+             dProd.has_regulation AS prod_has_regulation,
+             dDist.regulation_type_distribution AS dist_reg_type,
+             dDist.has_regulation AS dist_has_regulation,
+             dEmit.regulation_type_emission AS emit_reg_type,
+             dEmit.has_regulation AS emit_has_regulation
       FROM bacs_audit_thermal_regulation t
       LEFT JOIN zones z ON z.id = t.zone_id
-      LEFT JOIN bacs_audit_system_devices d ON d.id = t.generator_device_id
+      LEFT JOIN bacs_audit_systems s ON s.id = t.system_id
+      LEFT JOIN bacs_audit_system_devices dProd ON dProd.id = t.generator_device_id
+      LEFT JOIN bacs_audit_system_devices dDist ON dDist.id = t.distribution_device_id
+      LEFT JOIN bacs_audit_system_devices dEmit ON dEmit.id = t.emission_device_id
       WHERE t.document_id = ?
     `).all(documentId);
-    // Plusieurs entrées de régulation peuvent coexister sur une même zone ×
-    // catégorie (mig 170). Une action est générée par entrée non conforme,
-    // chacune gardée distincte par son `source_thermal_id` (clé d'idempotence
-    // unique). Le libellé de l'entrée est ajouté au titre quand la zone porte
-    // plusieurs entrées de la même catégorie, pour éviter des doublons visuels.
-    const thermalCountByZoneCat = {};
     for (const t of thermal) {
-      const k = `${t.zone_id}:${t.category || 'heating'}`;
-      thermalCountByZoneCat[k] = (thermalCountByZoneCat[k] || 0) + 1;
-    }
-    for (const t of thermal) {
-      // Exemption R175-6 II : appareil independant de chauffage au bois.
-      // Auto-detectee si l'energie du device en Production est 'wood'
-      // (l'auditeur n'a pas besoin de cocher manuellement). Le flag
-      // generator_exempt_wood reste un override pour les cas particuliers
-      // (biomasse autre que bois, ou exemption forcee).
-      // L'exemption se déduit uniquement de l'énergie de l'équipement de
-      // production (plus de case à cocher manuelle generator_exempt_wood).
+      // Exemption R175-6 II : appareil indépendant de chauffage au bois.
+      // Auto-détectée via l'énergie du device en Production = 'wood'.
       if (t.prod_energy_source === 'wood') continue;
-      // « Régulation automatique » se déduit de regulation_type (plus de
-      // colonne has_automatic_regulation).
-      const noRegulation = !t.regulation_type || t.regulation_type === 'none';
-      if (noRegulation) {
+      // « Régulation déclarée » : on considère le système régulé si AU MOINS
+      // un de ces signaux est positif sur un device impliqué (production /
+      // distribution / émission) :
+      //  (a) un type de régulation est saisi (regulation_type_X ≠ null)
+      //  (b) le toggle has_regulation = true (mig 179) sur le device
+      //  (c) l'archive legacy regulation_type au niveau thermal_regulation
+      //      ≠ 'none' (compat audits pré-mig 180)
+      // Un toggle Non explicite (has_regulation = false) sur un niveau ne
+      // suffit pas à invalider le système si un autre niveau est régulé.
+      const typeDeclared = !!(t.prod_reg_type || t.dist_reg_type || t.emit_reg_type);
+      const flagSet = t.prod_has_regulation === 1 || t.dist_has_regulation === 1 || t.emit_has_regulation === 1;
+      const legacyTypeOk = t.regulation_type && t.regulation_type !== 'none';
+      if (!typeDeclared && !flagSet && !legacyTypeOk) {
         const cat = t.category || 'heating';
         const defaultLabel = cat === 'cooling' ? 'Refroidissement' : 'Chauffage';
-        const entryLabel = (t.label && t.label.trim()) || defaultLabel;
-        const multiple = (thermalCountByZoneCat[`${t.zone_id}:${cat}`] || 0) > 1;
-        const title = multiple
-          ? `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`
-          : `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} »`;
+        const entryLabel = (t.system_label && t.system_label.trim())
+          || (t.label && t.label.trim())
+          || defaultLabel;
         addTarget({
           source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
           r175_article: 'R175-6',
-          title,
+          title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`,
           description: `L'article R175-6 exige une régulation thermique automatique par pièce ou par zone ${cat === 'cooling' ? 'refroidie' : 'chauffée'}. Le système « ${entryLabel} » n'en dispose pas actuellement.`,
           zone_id: t.zone_id,
         });

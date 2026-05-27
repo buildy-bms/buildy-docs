@@ -523,7 +523,7 @@ async function destroy() {
           </div>
           <div>
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
-              Rôle(s) par défaut <span class="text-gray-400 font-normal">(optionnel)</span>
+              Fonctions intégrées <span class="text-gray-400 font-normal">(optionnel)</span>
             </label>
             <SearchableSelect
               v-model="form.default_device_role"
