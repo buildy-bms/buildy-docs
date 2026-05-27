@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.112",
+      "date": "2026-05-27",
+      "title": "Drop PDF + multi-fichiers sur les lignes d'audit",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Glisser-déposer des PDFs (1 ou N) sur n'importe quelle ligne d'audit",
+          "what": "Les zones de drop des lignes (zones, systèmes, compteurs, équipements, GTB) acceptent désormais les fichiers PDF en plus des photos. Au drop, une modale s'ouvre pour chaque PDF avec deux champs obligatoires : titre du document et catégorie (Plan / Schéma électrique / Schéma synoptique / Analyse fonctionnelle / Fiche technique / Manuel / Rapport d'essais / Autre). Aucune valeur par défaut — la saisie explicite est volontairement imposée pour garantir des noms de documents exploitables. Multi-fichiers OK pour les 2 types (photos comme PDFs).",
+          "where": "Audit BACS, toutes les cards avec drop sur ligne (Zones, Systèmes, Compteurs, GTB, Équipements).",
+          "how": "Glisse un PDF sur une ligne d'audit : la modale « Ajouter un document » s'ouvre, saisis titre + catégorie, valide. Le bouton reste désactivé tant que les deux champs ne sont pas remplis. Glisse 3 PDFs d'un coup → la modale affiche 3 lignes ; le sélecteur en haut « Appliquer la même catégorie à tous » accélère le cas typique. Pour les photos, drop direct comme avant (upload immédiat, pas de modale)."
+        }
+      ]
+    },
+    {
       "version": "0.1.111",
       "date": "2026-05-27",
       "title": "Card 03 — Plusieurs systèmes de même catégorie dans une même zone",

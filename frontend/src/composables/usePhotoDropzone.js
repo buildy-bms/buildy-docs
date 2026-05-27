@@ -2,9 +2,19 @@ import { ref, computed } from 'vue'
 import { uploadSiteDocument } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 
+const IMAGE_MIMES = new Set(['image/jpeg','image/jpg','image/png','image/webp','image/heic','image/heif','image/gif'])
+const PDF_MIMES = new Set(['application/pdf'])
+
 /**
- * Composable : transforme une zone DOM en drop zone pour photos.
- * Retourne {handlers, isDragOver, uploadFiles} a binder via v-on / class.
+ * Composable : drop zone fichiers (photos ET PDFs) sur une ligne d'audit.
+ *
+ * Images → upload immédiat avec category='photo' (workflow rapide pour
+ * les captures terrain).
+ * PDFs → mis en file dans `pendingDocs` ; le composant parent doit afficher
+ * une modale (DocumentUploadModal) qui saisit catégorie + titre obligatoires
+ * par fichier, puis appelle `uploadDocsWithMeta(metaList)` pour uploader.
+ *
+ * Multi-fichiers OK pour les 2 types (toute la liste est traitée d'un coup).
  *
  * @param siteUuidRef ref/computed du site_uuid
  * @param attachToRef ref/computed de { zone_id?, system_id?, meter_id?, device_id?, bms_document_id? }
@@ -14,6 +24,7 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
   const isDragOver = ref(false)
   const dragDepth = ref(0)
   const uploading = ref(false)
+  const pendingDocs = ref([]) // [File, ...] PDFs en attente de saisie meta
   const { success, error: notifyError } = useNotification()
 
   const filterParams = computed(() => {
@@ -27,7 +38,9 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
     return p
   })
 
-  async function uploadFiles(files) {
+  // Upload direct (utilisé pour les images : pas besoin de saisir titre +
+  // catégorie, on déduit). `category` peut être surchargée si besoin.
+  async function uploadFiles(files, { category = 'photo' } = {}) {
     const siteUuid = typeof siteUuidRef === 'function' ? siteUuidRef() : siteUuidRef.value
     if (!siteUuid || !files.length) return
     uploading.value = true
@@ -37,18 +50,50 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
         fd.append('file', f)
         await uploadSiteDocument(siteUuid, fd, {
           title: f.name.replace(/\.[^.]+$/, ''),
-          category: 'photo',
+          category,
           ...filterParams.value,
         })
       }
-      success(files.length > 1 ? `${files.length} photos téléversées` : 'Photo téléversée')
+      const label = category === 'photo' ? 'photo' : 'document'
+      success(files.length > 1 ? `${files.length} ${label}s téléversés` : `${label.charAt(0).toUpperCase() + label.slice(1)} téléversé`)
       window.dispatchEvent(new CustomEvent('site-documents:changed'))
       if (onUploaded) onUploaded()
     } catch (err) {
-      notifyError(err.response?.data?.detail || 'Échec upload photo')
+      notifyError(err.response?.data?.detail || 'Échec upload')
     } finally {
       uploading.value = false
     }
+  }
+
+  // Upload avec metadata par fichier (utilisé après confirmation modale
+  // pour les PDFs : chaque fichier a son titre + sa catégorie propres).
+  async function uploadDocsWithMeta(metaList) {
+    const siteUuid = typeof siteUuidRef === 'function' ? siteUuidRef() : siteUuidRef.value
+    if (!siteUuid || !metaList.length) return
+    uploading.value = true
+    try {
+      for (const m of metaList) {
+        const fd = new FormData()
+        fd.append('file', m.file)
+        await uploadSiteDocument(siteUuid, fd, {
+          title: m.title.trim(),
+          category: m.category,
+          ...filterParams.value,
+        })
+      }
+      success(metaList.length > 1 ? `${metaList.length} documents téléversés` : 'Document téléversé')
+      window.dispatchEvent(new CustomEvent('site-documents:changed'))
+      if (onUploaded) onUploaded()
+    } catch (err) {
+      notifyError(err.response?.data?.detail || 'Échec upload document')
+    } finally {
+      uploading.value = false
+      pendingDocs.value = []
+    }
+  }
+
+  function cancelPendingDocs() {
+    pendingDocs.value = []
   }
 
   function onDragEnter(e) {
@@ -60,27 +105,35 @@ export function usePhotoDropzone(siteUuidRef, attachToRef, onUploaded) {
     dragDepth.value = Math.max(0, dragDepth.value - 1)
     if (dragDepth.value === 0) isDragOver.value = false
   }
-  function onDragOver(e) { /* preventDefault uniquement, fait via @drag*.prevent */ }
+  function onDragOver(_e) { /* preventDefault uniquement, fait via @drag*.prevent */ }
   async function onDrop(e) {
     isDragOver.value = false
     dragDepth.value = 0
-    // Drop interne (drag d'un noeud DOM via SortableJS pour réordonner) :
-    // dataTransfer.files est vide. On return silencieusement, sinon le
-    // reorder déclenche à tort l'erreur "Glisse uniquement des fichiers".
+    // Drop interne (SortableJS reorder) : dataTransfer.files vide → on
+    // return silencieusement sinon on aurait une fausse erreur.
     const allFiles = Array.from(e.dataTransfer?.files || [])
     if (!allFiles.length) return
-    const files = allFiles.filter(f => f.type.startsWith('image/'))
-    if (!files.length) {
-      notifyError('Glisse uniquement des fichiers image')
-      return
+    const images = allFiles.filter(f => f.type.startsWith('image/') || IMAGE_MIMES.has(f.type))
+    const pdfs = allFiles.filter(f => f.type === 'application/pdf' || PDF_MIMES.has(f.type))
+    const unsupported = allFiles.length - images.length - pdfs.length
+    if (unsupported > 0) {
+      notifyError('Seules les images et les PDFs sont acceptés')
     }
-    await uploadFiles(files)
+    if (images.length) await uploadFiles(images, { category: 'photo' })
+    if (pdfs.length) {
+      // Mise en file pour la modale parent. Le parent doit reagir via watch
+      // sur pendingDocs.value.length > 0 et afficher DocumentUploadModal.
+      pendingDocs.value = pdfs
+    }
   }
 
   return {
     isDragOver,
     uploading,
     uploadFiles,
+    pendingDocs,
+    uploadDocsWithMeta,
+    cancelPendingDocs,
     handlers: {
       onDragenter: onDragEnter,
       onDragover: onDragOver,
