@@ -1306,6 +1306,7 @@ async function routes(fastify) {
       serves_multiple_buildings: z.boolean().nullable().optional(),
       // Mig 179 : régulation de l'équipement (refonte modale).
       has_regulation: z.boolean().nullable().optional(),
+      regulation_integrated: z.boolean().nullable().optional(),
       regulator_brand: z.string().nullable().optional(),
       regulator_model_reference: z.string().nullable().optional(),
       regulator_location_zone_id: z.number().int().positive().nullable().optional(),

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 182;
+const TARGET_VERSION = 183;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6959,6 +6959,19 @@ function runMigrations() {
       db.unsafeMode(false);
     }
     db.pragma('user_version = 182');
+  }
+
+  if (current < 183) {
+    // Régulation intégrée vs déportée : si l'équipement dispose d'une
+    // régulation (has_regulation=true, mig 179), elle peut être intégrée à
+    // l'équipement (thermostat embarqué, contrôle natif PAC) ou portée par
+    // un module séparé (régulateur Siemens, GTB, etc.). Ce champ ternaire
+    // pilote l'affichage UI : si intégrée, on ne demande pas marque /
+    // référence / localisation du régulateur (= mêmes infos que
+    // l'équipement principal).
+    db.exec(`ALTER TABLE bacs_audit_system_devices ADD COLUMN regulation_integrated INTEGER DEFAULT NULL;`);
+    log.info('Migration 183 appliquee : bacs_audit_system_devices.regulation_integrated ajouté (ternaire intégrée/déportée)');
+    db.pragma('user_version = 183');
   }
 
   if (current > TARGET_VERSION) {

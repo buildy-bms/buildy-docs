@@ -39,11 +39,11 @@ function pick(v) {
 </script>
 
 <template>
-  <div class="seg-toggle inline-flex rounded-full border border-gray-200 overflow-hidden text-xs"
+  <div class="seg-toggle inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs shrink-0"
        :class="{ 'opacity-50 pointer-events-none': disabled }"
        :title="tooltip">
     <button type="button"
-            class="seg-btn px-3 py-1 font-semibold transition select-none"
+            class="seg-btn h-7 px-3 font-medium transition whitespace-nowrap select-none"
             :class="modelValue === true
               ? (yesDanger ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800')
               : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50'"
@@ -51,7 +51,7 @@ function pick(v) {
       <span class="font-bold">✓</span><span v-if="!compact" class="ml-1">{{ yesLabel }}</span>
     </button>
     <button type="button"
-            class="seg-btn px-3 py-1 font-semibold transition select-none border-l border-gray-200"
+            class="seg-btn h-7 px-3 font-medium transition whitespace-nowrap select-none border-l border-gray-200"
             :class="modelValue === false
               ? 'bg-red-100 text-red-700'
               : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-50'"
@@ -62,6 +62,9 @@ function pick(v) {
 </template>
 
 <style scoped>
-.seg-btn { min-height: 28px; min-width: 36px; }
+/* Aligné sur components/audit/SegmentedToggle.vue (text version) :
+   h-7 (28px), rounded-lg, border-gray-200. Min-width 36px maintenu pour
+   les ✓/✗ qui sont plus étroits. Sur tactile, on garde 44px iOS HIG. */
+.seg-btn { min-width: 36px; }
 @media (pointer: coarse) { .seg-btn { min-height: 44px; min-width: 48px; padding: 0 14px; } }
 </style>
