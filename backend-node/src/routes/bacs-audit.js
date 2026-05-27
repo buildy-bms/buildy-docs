@@ -86,6 +86,10 @@ async function routes(fastify) {
       // non répondu. La PWA et l'UI desktop offrent un toggle 3 états ; ce
       // ternaire doit être préservé bout en bout (cf. plan cohérence audit).
       present: z.boolean().nullable().optional(),
+      // Mig 182 : nom du système (affiché entre parenthèses dans card 03,
+      // utilisé comme libellé dans card 06 et PDF chapitre 5). Édité inline
+      // dans la card 03.
+      custom_label: z.string().nullable().optional(),
       communication: z.enum(COMMUNICATION_VALUES).nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
       notes: z.string().nullable().optional(),
@@ -141,6 +145,10 @@ async function routes(fastify) {
     if ('is_looped' in body) { sets.push('is_looped = ?'); args.push(body.is_looped); }
     if ('negligible_justification' in body) { sets.push('negligible_justification = ?'); args.push(body.negligible_justification); }
     if ('notes_html' in body) { sets.push('notes_html = ?'); args.push(body.notes_html); }
+    if ('custom_label' in body) {
+      const cl = (body.custom_label || '').trim();
+      sets.push('custom_label = ?'); args.push(cl || null);
+    }
     if (sets.length) {
       sets.push('updated_at = CURRENT_TIMESTAMP');
       args.push(id);

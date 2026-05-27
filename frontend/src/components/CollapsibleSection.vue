@@ -59,8 +59,9 @@ onBeforeUnmount(() => {
                     active ? 'border-l-4 border-l-indigo-500 border-y-gray-200 border-r-gray-200 shadow-md ring-1 ring-indigo-100/50'
                            : 'border-gray-200']">
     <header
-      class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50/60 transition select-none"
-      :class="{ 'border-b-0 rounded-lg': !open }"
+      class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50/60 transition select-none lg:sticky z-10 bg-white"
+      style="top: var(--audit-sticky-offset, 0px);"
+      :class="[{ 'border-b-0 rounded-lg': !open }, open ? 'rounded-t-lg' : 'rounded-lg']"
       @click="toggle"
     >
       <slot name="header" :open="open" />

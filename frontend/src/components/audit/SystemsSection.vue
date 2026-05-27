@@ -151,6 +151,49 @@ const settingsSystem = ref(null)
 function openSystemSettings(s) { settingsSystem.value = s }
 function closeSystemSettings() { settingsSystem.value = null }
 
+// ─── Filtre par usage (catégorie BACS) ─────────────────────────────────
+// Pills cliquables en haut de la card 03. Tous activés par défaut →
+// aucun filtre actif. Désélectionner ≥1 catégorie filtre l'affichage.
+// État local Pinia non persisté : redécouvert à chaque ouverture audit.
+const USAGE_FILTER_OPTIONS = [
+  { value: 'heating',                 label: 'Chauffage' },
+  { value: 'cooling',                 label: 'Refroidissement' },
+  { value: 'ventilation',             label: 'Ventilation' },
+  { value: 'dhw',                     label: 'ECS' },
+  { value: 'lighting_indoor',         label: 'Écl. intérieur' },
+  { value: 'lighting_outdoor',        label: 'Écl. extérieur' },
+  { value: 'electricity_production',  label: 'Production PV' },
+]
+const usageFilterOptions = USAGE_FILTER_OPTIONS
+const usageFilter = ref(new Set(USAGE_FILTER_OPTIONS.map(o => o.value)))
+function toggleUsageFilter(v) {
+  const s = new Set(usageFilter.value)
+  if (s.has(v)) {
+    // Empêche de tout désactiver d'un coup — au moins 1 doit rester actif.
+    if (s.size === 1) { resetUsageFilter(); return }
+    s.delete(v)
+  } else {
+    s.add(v)
+  }
+  usageFilter.value = s
+}
+function resetUsageFilter() {
+  usageFilter.value = new Set(USAGE_FILTER_OPTIONS.map(o => o.value))
+}
+
+// Applique le filtre sur systemsByZone : on garde tout système BACS dont
+// la catégorie est dans le set actif, + tous les usages non BACS (toujours
+// visibles — ils n'ont pas de catégorie « standard » à filtrer).
+const filteredSystemsByZone = computed(() => {
+  const active = usageFilter.value
+  return props.systemsByZone
+    .map(g => ({
+      ...g,
+      items: (g.items || []).filter(s => !s.is_bacs || active.has(s.system_category)),
+    }))
+    .filter(g => g.items.length > 0)
+})
+
 // Mig 182 : modale dédiée pour ajouter un système (BACS standard ou usage
 // hors décret). Remplace le picker inline qui ne supportait que les usages
 // non BACS via custom:uuid. Désormais on peut créer N systèmes BACS de
@@ -348,12 +391,34 @@ onBeforeUnmount(teardownSortables)
       <span v-else class="italic">Pas encore de systèmes saisis</span>
     </template>
     <div class="px-3 py-3 bg-gray-50">
+      <!-- Filtres par usage : pills cliquables qui masquent les systèmes
+           dont la system_category n'est pas dans le set actif. État local
+           uniquement (pas persisté), reset à l'ouverture de l'audit.
+           Tous activés par défaut = aucun filtre = tout affiché. -->
+      <div class="flex items-center flex-wrap gap-1.5 mb-3 px-1">
+        <span class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mr-1">Filtrer :</span>
+        <button v-for="cat in usageFilterOptions" :key="cat.value"
+                type="button" @click="toggleUsageFilter(cat.value)"
+                :class="['inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition whitespace-nowrap border',
+                         usageFilter.has(cat.value)
+                           ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                           : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50']">
+          <SystemCategoryIcon :category="cat.value" size="sm" />
+          {{ cat.label }}
+        </button>
+        <button v-if="usageFilter.size < usageFilterOptions.length" type="button"
+                @click="resetUsageFilter"
+                class="ml-2 text-[10px] text-gray-500 hover:text-indigo-600 underline transition">
+          Tout afficher
+        </button>
+      </div>
+
       <!-- Les usages "non concerné" restent toujours visibles (grisés et
            atténués via la classe opacity-60 + bordure dashed sur la card),
            pour permettre à l'auditeur de les remettre actifs facilement
            sans avoir à toggle un flag d'affichage. -->
       <div class="space-y-3">
-        <div v-for="g in systemsByZone" :key="g.zone_id"
+        <div v-for="g in filteredSystemsByZone" :key="g.zone_id"
              class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
           <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">

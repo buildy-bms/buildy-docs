@@ -1250,7 +1250,25 @@ async function deliver() {
 onMounted(() => {
   loadCollapseState()
   refresh()
+  // Met à jour --audit-sticky-offset (CSS var globale) avec la hauteur du
+  // header sticky audit, pour que les card headers internes (sticky aussi)
+  // se calent juste en-dessous au scroll. Compact mode change la hauteur,
+  // d'où ResizeObserver pour rester synchronisé.
+  nextTick(() => {
+    const el = window.document.querySelector('.audit-sticky-header')
+    if (!el) return
+    const apply = () => {
+      const h = Math.round(el.getBoundingClientRect().height)
+      window.document.documentElement.style.setProperty('--audit-sticky-offset', `${h}px`)
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    // Stocke pour cleanup
+    _stickyOffsetObserver = ro
+  })
 })
+let _stickyOffsetObserver = null
 
 import { onBeforeUnmount, nextTick } from 'vue'
 
@@ -1260,11 +1278,46 @@ watch(loading, async (isLoading) => {
   if (!isLoading) {
     await nextTick()
     setupScrollSpy()
+    // Re-bind l'observer de la hauteur du header sticky une fois que le
+    // DOM est monté (sinon querySelector peut renvoyer null au 1er mount).
+    setupStickyOffsetObserver()
   }
 })
+function setupStickyOffsetObserver() {
+  const el = window.document.querySelector('.audit-sticky-header')
+  if (!el) return
+  if (_stickyOffsetObserver) _stickyOffsetObserver.disconnect()
+  let lastH = -1
+  const apply = () => {
+    const h = Math.round(el.getBoundingClientRect().height)
+    if (h !== lastH) {
+      lastH = h
+      window.document.documentElement.style.setProperty('--audit-sticky-offset', `${h}px`)
+    }
+  }
+  apply()
+  _stickyOffsetObserver = new ResizeObserver(apply)
+  _stickyOffsetObserver.observe(el)
+  // Backup : ResizeObserver ne catche pas toujours les transitions CSS
+  // (animations sur padding / max-height qui changent la hauteur sans
+  // déclencher ResizeObserver de manière fiable). Un listener scroll
+  // rAF-throttlé garde la CSS var synchro.
+  if (_stickyOffsetScrollHandler) window.removeEventListener('scroll', _stickyOffsetScrollHandler, { passive: true })
+  let scheduled = false
+  _stickyOffsetScrollHandler = () => {
+    if (scheduled) return
+    scheduled = true
+    requestAnimationFrame(() => { scheduled = false; apply() })
+  }
+  window.addEventListener('scroll', _stickyOffsetScrollHandler, { passive: true })
+}
+let _stickyOffsetScrollHandler = null
 
 onBeforeUnmount(() => {
   if (_spyObserver) { _spyObserver.disconnect(); _spyObserver = null }
+  if (_stickyOffsetObserver) { _stickyOffsetObserver.disconnect(); _stickyOffsetObserver = null }
+  if (_stickyOffsetScrollHandler) { window.removeEventListener('scroll', _stickyOffsetScrollHandler, { passive: true }); _stickyOffsetScrollHandler = null }
+  window.document.documentElement.style.removeProperty('--audit-sticky-offset')
 })
 
 onMounted(() => window.document.addEventListener('mousedown', onDocClickSettings))
