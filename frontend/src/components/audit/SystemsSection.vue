@@ -434,12 +434,12 @@ onBeforeUnmount(teardownSortables)
                     </template>
                     <span v-else-if="s.is_bacs && s.custom_label"
                           @click="startEditName(s)"
-                          class="text-sm text-gray-500 italic truncate cursor-text hover:text-gray-700 hover:bg-gray-50 rounded px-1"
+                          class="text-sm text-gray-600 truncate cursor-text hover:text-gray-900 hover:bg-gray-50 rounded px-1"
                           v-tooltip="'Cliquer pour renommer ce système'">
                       ({{ s.custom_label }})
                     </span>
                     <button v-else-if="s.is_bacs" type="button" @click="startEditName(s)"
-                            class="text-[11px] text-gray-400 italic hover:text-indigo-600 hover:bg-indigo-50 rounded px-1.5 py-0.5 transition shrink-0"
+                            class="text-[11px] text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded px-1.5 py-0.5 transition shrink-0"
                             v-tooltip="'Donner un nom à ce système (ex: Chaudière gaz centrale)'">
                       + nom
                     </button>

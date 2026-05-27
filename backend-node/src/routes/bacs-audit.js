@@ -184,14 +184,39 @@ async function routes(fastify) {
     const category = isBacsStd ? body.system_category : ('custom:' + require('crypto').randomUUID());
     const isBacs = isBacsStd ? 1 : 0;
 
-    const maxPos = db.db.prepare(
-      'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ?'
-    ).get(documentId, body.zone_id).m;
+    // Mig 182 : on groupe les systèmes de même catégorie côte à côte dans
+    // la zone. Si un système BACS de même catégorie existe déjà ou si la
+    // library_category_key matche, on place le nouveau JUSTE APRÈS le
+    // dernier sibling (en décalant les positions suivantes de +10 pour
+    // garder une grille propre). Sinon (premier système de cette
+    // catégorie ou usage custom isolé) : append à la fin de la zone.
+    let newPos;
+    const lastSibling = isBacsStd
+      ? db.db.prepare(
+          'SELECT MAX(position) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND system_category = ?'
+        ).get(documentId, body.zone_id, category)
+      : (body.library_category_key
+          ? db.db.prepare(
+              'SELECT MAX(position) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND library_category_key = ?'
+            ).get(documentId, body.zone_id, body.library_category_key)
+          : null);
+    if (lastSibling && lastSibling.m != null) {
+      // Décale les positions qui viennent après pour faire de la place.
+      db.db.prepare(
+        'UPDATE bacs_audit_systems SET position = position + 10 WHERE document_id = ? AND zone_id = ? AND position > ?'
+      ).run(documentId, body.zone_id, lastSibling.m);
+      newPos = lastSibling.m + 10;
+    } else {
+      const maxPos = db.db.prepare(
+        'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ?'
+      ).get(documentId, body.zone_id).m;
+      newPos = maxPos + 10;
+    }
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_systems
         (document_id, zone_id, system_category, custom_label, is_bacs, present, position, library_category_key)
       VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(documentId, body.zone_id, category, body.label, isBacs, maxPos + 10, body.library_category_key || null);
+    `).run(documentId, body.zone_id, category, body.label, isBacs, newPos, body.library_category_key || null);
     logBacsAudit(request, 'bacs.system.create', documentId, { systemId: r.lastInsertRowid, label: body.label, system_category: category });
     return reply.code(201).send(
       db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(r.lastInsertRowid)
