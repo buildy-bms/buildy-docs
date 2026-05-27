@@ -12,7 +12,17 @@ const props = defineProps({
   options: { type: Array, required: true }, // [{ value, label }]
   disabled: { type: Boolean, default: false },
   placeholder: { type: String, default: '—' },
-  size: { type: String, default: 'sm' }, // 'xs' | 'sm'
+  size: { type: String, default: 'sm' }, // 'xs' | 'sm' | 'md'
+  // Lorsque la question « Communicant ? » est gérée séparément en amont
+  // (cf. DeviceEditModal refondue), on n'a plus besoin de proposer
+  // « Non communicant » dans la liste — la réponse Non au toggle suffit.
+  excludeNonCommunicant: { type: Boolean, default: false },
+})
+
+// Options effectivement présentées : on retire `non_communicant` si demandé.
+const effectiveOptions = computed(() => {
+  if (!props.excludeNonCommunicant) return props.options
+  return props.options.filter(o => o.value !== 'non_communicant')
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -34,11 +44,15 @@ const selected = computed(() => {
 // Filtre les valeurs legacy qui ne sont plus dans les options (ex :
 // 'non_communicant', 'other') : la case « Communicant » porte déjà
 // l'info, on ne veut pas dupliquer côté pilule.
-const validValues = computed(() => new Set(props.options.map(o => o.value)))
+// Filtre les valeurs legacy qui ne sont plus dans les options effectives
+// (ex. 'non_communicant' quand excludeNonCommunicant=true) : la pilule ne doit
+// pas les afficher non plus, sinon on voit fantôme une « Non communicant »
+// alors que la question est portée par un toggle externe.
+const validValues = computed(() => new Set(effectiveOptions.value.map(o => o.value)))
 const selectedLabels = computed(() =>
   selected.value
     .filter(v => validValues.value.has(v))
-    .map(v => props.options.find(o => o.value === v)?.label || v)
+    .map(v => effectiveOptions.value.find(o => o.value === v)?.label || v)
 )
 
 function toggle(value) {
@@ -95,9 +109,17 @@ onBeforeUnmount(() => {
 const buttonCls = computed(() => {
   // Sur mobile (< sm = 640px), force min-h 44px + text-base (anti-zoom Safari)
   // pour respecter les cibles tactiles iOS, peu importe la taille demandée.
-  const sz = props.size === 'xs'
-    ? 'px-3 py-3 sm:px-2 sm:py-1 min-h-11 sm:min-h-0 text-base sm:text-[11px]'
-    : 'px-3 py-3 sm:px-2.5 sm:py-1.5 min-h-11 sm:min-h-0 text-base sm:text-xs'
+  let sz
+  if (props.size === 'xs') {
+    sz = 'px-3 py-3 sm:px-2 sm:py-1 min-h-11 sm:min-h-0 text-base sm:text-[11px]'
+  } else if (props.size === 'md') {
+    // Taille « md » : assez haute pour s'aligner sur un SegmentedToggle
+    // (utilisée dans la modale DeviceEditModal pour la ligne Communicant
+    // + protocoles côte à côte).
+    sz = 'px-3 py-3 sm:px-3 sm:py-2 min-h-11 text-base sm:text-sm'
+  } else {
+    sz = 'px-3 py-3 sm:px-2.5 sm:py-1.5 min-h-11 sm:min-h-0 text-base sm:text-xs'
+  }
   return `w-full inline-flex items-center justify-between gap-1 ${sz} border border-gray-200 rounded-lg bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed`
 })
 </script>
@@ -142,7 +164,7 @@ const buttonCls = computed(() => {
           </button>
         </div>
         <button
-          v-for="o in options"
+          v-for="o in effectiveOptions"
           :key="o.value || 'null'"
           type="button"
           @click="toggle(o.value)"

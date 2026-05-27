@@ -53,10 +53,12 @@ const props = defineProps({
 })
 
 const triggerCls = computed(() => [
-  // min-h-11 (44px) garantit la cible tactile iOS HIG sur mobile pour
-  // toutes les variantes (sm/md). Sur desktop le visuel reste compact
-  // car le contenu ne dépasse pas la hauteur intrinsèque du texte.
-  'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-0',
+  // min-h-11 (44px) garantit la cible tactile iOS HIG sur mobile.
+  // sm:min-h-9 (36px) sur desktop = même hauteur que les <input> avec
+  // `h-9`, pour aligner verticalement avec un input texte voisin dans
+  // les formulaires (incident 2026-05-27 : SearchableSelect rendait à
+  // 27px là où l'input voisin faisait 32-36px → décalage visuel).
+  'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
   props.invalid ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',

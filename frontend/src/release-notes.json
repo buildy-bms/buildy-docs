@@ -2,6 +2,174 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.110",
+      "date": "2026-05-27",
+      "title": "Régulation par niveau : conformité R175-6 + PDF + localisation par niveau intégrés",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Conformité R175-6 : prise en compte du toggle « dispose d'une régulation »",
+          "what": "Le générateur d'actions de mise en conformité considérait jusqu'ici qu'un système était régulé uniquement si un type de régulation était renseigné (loi d'eau, vanne 3 voies, thermostat…). Désormais, il prend aussi en compte le toggle « L'équipement dispose-t-il d'une régulation ? » coché Oui sur n'importe quel device du système (Production / Distribution / Émission). Si Oui sans type, le système est marqué régulé (et l'auditeur peut préciser le type plus tard). L'archive legacy regulation_type reste un fallback pour les audits pré-migration.",
+          "where": "Audit BACS, plan d'action automatique R175-6.",
+          "how": "Coche Oui sur la régulation d'un équipement sans saisir le type → l'action « installer une régulation » disparaît du plan. Décoche → l'action revient."
+        },
+        {
+          "kind": "feat",
+          "title": "Modale équipement : 1 localisation par niveau de régulation, creatable",
+          "what": "Au lieu d'une seule localisation globale du régulateur, chaque niveau (Production / Distribution / Émission) a maintenant son propre champ « Localisation de la régulation de X ». Les zones du site apparaissent en suggestions (zones techniques en tête), et l'auditeur peut aussi saisir une localisation libre (« façade nord », « gaine VMC », « local 03 »…) si elle ne correspond à aucune zone formelle.",
+          "where": "Audit BACS, modale équipement, section Régulation.",
+          "how": "Active la régulation Oui sur un équipement avec les 3 niveaux cochés : 3 lignes Type + Localisation apparaissent. La localisation accepte une zone existante OU n'importe quel texte libre."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF chapitre 5 — Type de régulation + identité régulateur + localisation par niveau",
+          "what": "Pour chaque niveau (Production / Distribution / Émission) dans le chapitre 5 du PDF, les nouvelles infos saisies sur l'équipement apparaissent quand elles existent : Type de régulation (loi d'eau, vanne 3 voies…), Régulateur (marque + référence), Localisation. La synthèse R175-6 (tableau A3) affiche aussi un résumé P/D/É des types par niveau sous la granularité.",
+          "where": "Export PDF audit BACS (chap 5 + tableaux de synthèse).",
+          "how": "Génère un PDF d'un audit dont au moins un équipement a une régulation détaillée (toggle Oui + marque + référence + types par niveau + localisations). Le chapitre 5 affiche les 5 nouveaux champs sous chaque niveau."
+        },
+        {
+          "kind": "fix",
+          "title": "Modale équipement : ne se ferme plus au clic à côté",
+          "what": "La modale d'édition d'un équipement ne se ferme plus quand on clique en dehors (sur le voile sombre). Seuls le bouton ✕, le bouton Fermer du footer, ou la touche Échap ferment la fenêtre. Évite les pertes de saisie accidentelles.",
+          "where": "Audit BACS, modale d'édition d'un équipement.",
+          "how": "Ouvre la modale, saisis quelque chose, clique en dehors : la modale reste ouverte. Appuie sur Échap ou clique Fermer pour vraiment fermer."
+        },
+        {
+          "kind": "fix",
+          "title": "Modale équipement : hauteurs cohérentes inputs ↔ selects + question reformulée",
+          "what": "Les SearchableSelect (Énergie, Type de régulation, Type de calcul de puissance…) avaient une hauteur de 27 px contre 32 px pour les <input>, créant un visible décalage entre fields. Fix appliqué globalement (sm:min-h-9 = 36 px) : tous les fields de toutes les modales du projet ont désormais la même hauteur sur desktop. La question du Suivi énergétique BACS est reformulée en « Le comptage de cet équipement est-il séparable par zone fonctionnelle ? ».",
+          "where": "Toutes les modales mélangeant inputs et SearchableSelect.",
+          "how": "Ouvre n'importe quelle modale avec des dropdowns + inputs côte à côte : alignement parfait sur la même ligne."
+        }
+      ]
+    },
+    {
+      "version": "0.1.109",
+      "date": "2026-05-27",
+      "title": "Card 06 Régulation thermique — 1 ligne par système + renommages + alignement modale",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Card 06 — Régulation thermique : 1 ligne par système (au lieu d'1 ligne par zone × catégorie)",
+          "what": "La card 06 affiche désormais une ligne par système thermique (chauffage / refroidissement) présent dans la card 03, au lieu d'une ligne par couple zone × catégorie. La colonne « Système » affiche le nom du système (custom_label) en lecture seule, avec édition côté card 03. Les lignes sont créées automatiquement à chaque ouverture de la card si un système n'a pas encore son entrée. Migration 180 : fan-out automatique des audits existants (les anciennes lignes par zone-catégorie sont dupliquées en N lignes, une par système matching). Les action items R175-6 auto-générés sont régénérés au prochain calcul.",
+          "where": "Audit BACS, card 06 « Régulation thermique automatique ».",
+          "how": "Sur un audit ayant 2 chaudières en même zone × usage (avant : 1 seule ligne), maintenant 2 lignes distinctes apparaissent."
+        },
+        {
+          "kind": "feat",
+          "title": "Card 06 — Colonne « Type de régulation » supprimée, remplacée par « Granularité » dérivée",
+          "what": "La granularité de régulation R175-6 (Par pièce / Par zone / Centralisée) n'est plus saisie manuellement dans la card 06. Elle est dérivée automatiquement du type de régulation d'émission renseigné sur le device émetteur (modale équipement → section Régulation → Type de régulation d'émission) : thermostat ambiant ou vanne thermostatique → Par pièce, sonde de zone → Par zone, sonde de retour / autre → Centralisée. La pilule couleur indique la granularité résultante avec tooltip « modifier dans la card Systèmes ».",
+          "where": "Audit BACS, card 06, colonne « Granularité ».",
+          "how": "Ouvre un équipement émetteur dans la card 03, déclare son type de régulation d'émission. Reviens sur la card 06 : la pilule Granularité reflète automatiquement la valeur (par pièce / par zone / centralisée)."
+        },
+        {
+          "kind": "feat",
+          "title": "Modale équipement — Identité ↔ Énergie & puissance alignés face-à-face",
+          "what": "Les 2 sections étaient des grilles indépendantes : chaque champ ne s'alignait pas horizontalement avec son équivalent en face. Fusion en un seul grid 4-colonnes (Identité cols 1-2, Énergie cols 3-4) — Nom face à Énergie, Marque/Référence face à Puissance chaud/froid, Quantité/Âge face à Type de calcul, Localisation en pleine ligne en bas.",
+          "where": "Audit BACS, modale d'édition d'un équipement.",
+          "how": "Ouvre n'importe quel équipement : les champs des 2 sections sont sur la même ligne horizontale, plus aucun décalage visuel."
+        },
+        {
+          "kind": "feat",
+          "title": "Renommages — « Niveau(x) de régulation R175-6 » → « Fonctions intégrées »",
+          "what": "Le label change dans la modale d'édition d'un équipement audit ET dans l'éditeur equipment_template de la bibliothèque (Library → Systèmes techniques). Les options de la liste (Production, Distribution, Émission, Régulation) restent inchangées.",
+          "where": "Modale audit BACS d'un équipement + bibliothèque éditeur de système type.",
+          "how": "Ouvre un équipement (audit ou biblio) : le champ multi-select s'appelle désormais « Fonctions intégrées »."
+        },
+        {
+          "kind": "feat",
+          "title": "Renommages — « Type — Production / Distribution / Émission » → labels explicites",
+          "what": "Les 3 selects de la section Régulation s'appellent désormais « Type de régulation de production », « Type de régulation de distribution », « Type de régulation d'émission » — plus juste et moins ambigu.",
+          "where": "Modale équipement audit BACS, section Régulation (visible si toggle Oui).",
+          "how": "Active la régulation Oui sur un équipement avec les 3 niveaux cochés : les 3 selects portent leur label complet."
+        },
+        {
+          "kind": "feat",
+          "title": "Conformité R175-6 + PDF — adaptation aux nouvelles données",
+          "what": "Le calcul de conformité R175-6 lit maintenant les regulation_type_* du device d'émission (et des niveaux Production / Distribution) en plus du legacy regulation_type archivé. Une action « installer régulation thermique » est générée par système non régulé (au lieu d'une par zone-catégorie). PDF chapitre 5 : le nom du système (custom_label) est affiché au lieu du label libre legacy.",
+          "where": "Plan d'action audit BACS + export PDF chapitre 5.",
+          "how": "Régénère le PDF d'un audit après avoir saisi les régulations sur les équipements : le nom des systèmes apparaît correctement, les actions sont une par système non régulé."
+        }
+      ]
+    },
+    {
+      "version": "0.1.108",
+      "date": "2026-05-27",
+      "title": "Équipement : modale refondue, régulation détaillée par niveau, communication clarifiée",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Nouvelle section « Régulation » dans l'édition d'un équipement",
+          "what": "Question Oui/Non « L'équipement dispose-t-il d'une régulation ? ». Si Oui : 3 champs (marque du régulateur, référence, localisation = zone choisie dans la liste avec les zones techniques en tête) et, selon les niveaux cochés sur l'équipement (Production / Distribution / Émission), un type de régulation par niveau (loi d'eau, cascade, vanne 3 voies, thermostat ambiant, vanne thermostatique…). Liste creatable : on peut ajouter sa propre valeur. Le niveau « Régulation » est ajouté automatiquement aux niveaux R175-6 quand on répond Oui (et retiré quand on répond Non).",
+          "where": "Audit BACS, édition d'un équipement (modale détail).",
+          "how": "Ouvre l'édition d'un équipement de chauffage / refroidissement. Sous « Énergie & puissance », la section « Régulation » apparaît. Bascule Oui → les champs se déplient. Coche un niveau (Production / Distribution / Émission) → un select « Type — Niveau » apparaît avec des suggestions, mais tu peux saisir n'importe quelle valeur."
+        },
+        {
+          "kind": "feat",
+          "title": "Communicant Oui/Non + protocoles côte à côte",
+          "what": "La question « L'équipement est-il communicant ? » est isolée à gauche en toggle Oui/Non, avec le sélecteur de protocoles à droite (même hauteur, plus visible). Si on répond Non, les protocoles sont automatiquement vidés et grisés. L'option « Non communicant » a disparu de la liste — le toggle gauche porte cette réponse.",
+          "where": "Audit BACS, édition d'un équipement, section « Communication & conformité R175-3 ».",
+          "how": "Coche Non sur le toggle communicant → le sélecteur de protocoles se grise. Coche Oui → tu peux choisir un ou plusieurs protocoles (Modbus, BACnet, KNX, etc.) sans avoir à choisir « Non communicant »."
+        },
+        {
+          "kind": "feat",
+          "title": "Footer collé en bas avec badge complétude + forçage conditionnel",
+          "what": "Le bas de la modale est désormais collé au viewport (visible même quand on scrolle dans le formulaire). À gauche : badge vert « ✓ Équipement complet » quand tout est OK, ou badge ambré « ⚠ Incomplet — N champs » + case « Forcer la validation » si quelque chose manque. La case de forçage n'apparaît plus quand l'équipement est complet (elle ne sert à rien dans ce cas).",
+          "where": "Audit BACS, édition d'un équipement.",
+          "how": "Scrolle dans la modale : le badge complétude et le bouton Fermer restent visibles en bas. Remplis tout l'équipement → le toggle « Forcer la validation » disparaît, remplacé par un badge vert."
+        },
+        {
+          "kind": "fix",
+          "title": "Toggle « dessert plusieurs bâtiments » remis en forme + espacement compact entre questions",
+          "what": "Les sections Communication R175-3, Suivi énergétique BACS et État de l'équipement passent en layout flex (toggle aligné à droite quelle que soit la largeur du libellé). Le toggle « dessert plusieurs bâtiments » n'apparaît plus décalé selon que l'équipement est partagé (3 boutons) ou non (2 boutons). L'espacement entre questions est resserré (12 px au lieu de 24 px) — la modale tient désormais sur 1 écran sans scroll pour la plupart des équipements.",
+          "where": "Audit BACS, édition d'un équipement.",
+          "how": "Ouvre n'importe quel équipement : tous les Oui/Non sont calés à droite, alignés, avec le même rythme vertical. Édite un équipement partagé entre plusieurs zones : la question « comptage séparable » apparaît sans casser l'alignement du toggle multi-bâtiments."
+        },
+        {
+          "kind": "feat",
+          "title": "Modale d'édition élargie (1152 px max au lieu de 1024 px)",
+          "what": "La modale d'édition d'un équipement a gagné en largeur (taille « 2xl » ajoutée au système de modales). Plus de retours à la ligne sur les sections à deux colonnes.",
+          "where": "Audit BACS, édition d'un équipement.",
+          "how": "Ouvre la modale sur un écran large : Identité et Énergie & puissance tiennent côte à côte sans casser. Sur petit écran ou tablette, le layout passe naturellement en une colonne."
+        },
+        {
+          "kind": "feat",
+          "title": "Card 06 « Régulation thermique » : pré-remplissage depuis les équipements + chip type de régulation",
+          "what": "Un bandeau vert « Pré-remplir depuis les équipements » apparaît en haut de la card 06 quand des champs sont vides et qu'un équipement saisi dans la card 03 peut les remplir. En un clic, Production / Distribution / Émission / Régulateur sont assignés au meilleur candidat (le plus puissant pour Production, le premier rôle correspondant pour les autres). Sous chaque colonne Production / Distribution / Émission, une pilule verte affiche le type de régulation déclaré sur l'équipement (loi d'eau, vanne 3 voies, thermostat ambiant…) avec tooltip « Modifier dans la card Systèmes ». Hors service exclu de la sélection automatique.",
+          "where": "Audit BACS, card 06 Régulation thermique automatique.",
+          "how": "Crée ou édite un audit qui a des équipements de chauffage avec leurs niveaux R175-6 cochés (Production/Distribution/Émission) sur la card 03, ajoute une régulation sur un équipement (toggle Oui + Type — Production = Loi d'eau) puis va sur la card 06 : le bandeau vert propose de pré-remplir, et la pilule « Loi d'eau » s'affiche sous le Production de la zone correspondante."
+        },
+        {
+          "kind": "feat",
+          "title": "Carte des systèmes : colonnes « Qté » et « Niveau(x) » visibles",
+          "what": "La table des équipements (card 03) affiche désormais la quantité (entre Âge et Puissance) et les niveaux R175-6 (entre Énergie et Actions) sans avoir à ouvrir chaque équipement.",
+          "where": "Audit BACS, card 03 Systèmes, table des équipements.",
+          "how": "Ouvre la card systèmes : les colonnes Qté et Niveau(x) sont visibles dans l'en-tête. Les pilules Production / Distribution / Émission / Régulation reprennent le code couleur de la modale."
+        },
+        {
+          "kind": "fix",
+          "title": "Carte de placement : centrage + zoom corrects sur le pin du site",
+          "what": "Dans la modale d'édition d'un site, la carte se centre maintenant sur le pin du site (s'il existe), et zoome plus fort qu'avant pour qu'on voie le bâtiment, pas juste le quartier. Tooltips de la carte refaits en HTML custom (au lieu d'InfoWindow Google) pour rester dans la charte.",
+          "where": "Bouton « Modifier le site » → carte intégrée.",
+          "how": "Édite un site avec une adresse renseignée : la carte ouvre centrée sur le pin du site avec un zoom adapté."
+        },
+        {
+          "kind": "fix",
+          "title": "Tooltips PWA : ne restent plus collées au tap",
+          "what": "Sur tablette / téléphone (pointeur tactile), les tooltips desktop ne s'attachent plus du tout. Elles ne restent donc plus affichées après un tap.",
+          "where": "Toute l'app, sur appareils tactiles.",
+          "how": "Tape sur un bouton avec tooltip dans la PWA : aucune infobulle parasite n'apparaît, comme attendu."
+        },
+        {
+          "kind": "fix",
+          "title": "Duplication d'un système : suffixe « (2) » au lieu de « (copie) »",
+          "what": "Quand on duplique un équipement ou une zone, le nom du nouveau prend un suffixe numérique incrémenté — « Chaudière », « Chaudière (2) », « Chaudière (3) »… au lieu de « Chaudière (copie) ».",
+          "where": "Audit BACS, duplication d'un équipement ou d'une zone.",
+          "how": "Duplique un équipement nommé « Chaudière » 3 fois de suite : tu obtiens (2), (3), (4)."
+        }
+      ]
+    },
+    {
       "version": "0.1.107",
       "date": "2026-05-27",
       "title": "Zones : régimes d'activité 3×8 et 2×8 ajoutés",

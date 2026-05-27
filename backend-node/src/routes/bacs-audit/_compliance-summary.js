@@ -33,7 +33,7 @@ const R175_EXIGENCES = [
   { code: 'R175-5',                axis: 'r175_5',     label: 'Formation de l\'exploitant',
     summary: 'L\'exploitant est formé au paramétrage et au pilotage.' },
   { code: 'R175-6',                axis: 'r175_6',     label: 'Régulation thermique automatique',
-    summary: 'Chaque zone dispose d\'une régulation thermique adaptée.' },
+    summary: 'Chaque système thermique (chauffage / refroidissement) dispose d\'une régulation déclarée.' },
 ];
 
 // Mappe l'article R175 brut d'une action vers l'axe du tableau de bord.

@@ -99,13 +99,19 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ORDER BY z.position NULLS LAST, m.usage
   `).all(documentId);
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+  // Mig 180 : 1 ligne par système. On joint sur bacs_audit_systems pour
+  // récupérer le nom du système (custom_label) directement, et on filtre
+  // les lignes sans system_id (pré-migration / orphelines).
   const thermalRaw = db.db.prepare(`
-    SELECT t.*, z.name AS zone_name FROM bacs_audit_thermal_regulation t
+    SELECT t.*, z.name AS zone_name,
+           s.custom_label AS system_label
+    FROM bacs_audit_thermal_regulation t
     LEFT JOIN zones z ON z.id = t.zone_id
-    WHERE t.document_id = ?
+    LEFT JOIN bacs_audit_systems s ON s.id = t.system_id
+    WHERE t.document_id = ? AND t.system_id IS NOT NULL
     ORDER BY z.position, z.name,
              CASE t.category WHEN 'heating' THEN 0 ELSE 1 END,
-             t.position, t.id
+             s.position, t.position, t.id
   `).all(documentId);
   // On filtre done + declined : ces actions ne doivent pas apparaitre
   // dans le PDF livre aux integrateurs GTB.
@@ -421,26 +427,50 @@ async function buildBacsAuditExportData(af, opts = {}) {
     return d.name || d.brand || d.model_reference || `Équipement #${d.id}`;
   };
 
+  // Mig 180 : 1 ligne par système. La granularité (per_room/per_zone/…)
+  // est désormais dérivée du type de régulation d'émission du device
+  // émetteur (regulation_type_emission). Le nom affichable du système
+  // vient de bacs_audit_systems.custom_label (joint en SQL).
+  const granularityFromEmissionType = emissionType => {
+    if (!emissionType) return 'central_only';
+    if (emissionType === 'thermostat_ambiant' || emissionType === 'vanne_thermostatique') return 'per_room';
+    if (emissionType === 'sonde_zone') return 'per_zone';
+    return 'central_only';
+  };
+
   const thermal = thermalRaw.map(t => {
-    // Mig 135 : generator_type et generator_age_years ont migré sur le
-    // device pointé via generator_device_id. On les remonte ici pour le
-    // PDF / export (labels énergie + âge) en lisant le device source.
     const prodDevice = t.generator_device_id ? devicesById.get(t.generator_device_id) : null;
+    const distDevice = t.distribution_device_id ? devicesById.get(t.distribution_device_id) : null;
+    const emitDevice = t.emission_device_id ? devicesById.get(t.emission_device_id) : null;
     const generatorEnergy = prodDevice?.energy_source || null;
     const generatorAgeYears = prodDevice?.age_years ?? null;
+    // Granularité dérivée de l'émetteur (mig 180), fallback sur l'archive.
+    const derivedKey = granularityFromEmissionType(emitDevice?.regulation_type_emission);
+    const granularityKey = derivedKey;
+    const hasAutoReg = !!(emitDevice?.regulation_type_emission
+      || distDevice?.regulation_type_distribution
+      || prodDevice?.regulation_type_production
+      || (t.regulation_type && t.regulation_type !== 'none'));
     return {
     ...t,
     category: t.category || 'heating',
     categoryLabel: SYSTEM_LABEL[t.category || 'heating'] || (t.category || 'heating'),
-    // Mig 170 : libellé libre du système régulé. NULL → libellé par défaut
-    // (« Chauffage » / « Refroidissement ») pour les audits pré-migration.
-    displayLabel: (t.label && t.label.trim())
+    // Mig 180 : nom affichable = custom_label du système, fallback legacy
+    // sur t.label (mig 170), puis catégorie par défaut.
+    displayLabel: (t.system_label && t.system_label.trim())
+      || (t.label && t.label.trim())
       || SYSTEM_LABEL[t.category || 'heating']
       || (t.category || 'heating'),
-    regulationLabel: t.regulation_type ? (REGULATION_LABEL[t.regulation_type] || t.regulation_type) : '—',
-    // La régulation automatique se déduit du type (≠ none) — la colonne
-    // has_automatic_regulation n'est plus saisie (Feature J).
-    has_automatic_regulation: !!(t.regulation_type && t.regulation_type !== 'none'),
+    // Mig 180 : libellé de granularité dérivée (ex. "Par pièce", "Par zone",
+    // "Centralisée"). On garde regulationLabel pour compat templates PDF.
+    regulationLabel: REGULATION_LABEL[granularityKey] || granularityKey,
+    granularityKey,
+    // Régulation déclarée à au moins un niveau (sur device) OU legacy ok.
+    has_automatic_regulation: hasAutoReg,
+    // Types de régulation par niveau, lisibles dans le PDF chapitre 5.
+    productionRegulationType: prodDevice?.regulation_type_production || null,
+    distributionRegulationType: distDevice?.regulation_type_distribution || null,
+    emissionRegulationType: emitDevice?.regulation_type_emission || null,
     // Exemption R175-6 II déduite de l'énergie de production.
     generator_exempt_wood: generatorEnergy === 'wood',
     // Compat ascendante : `generatorLabel` et `generator_age_years` exposés
@@ -460,6 +490,14 @@ async function buildBacsAuditExportData(af, opts = {}) {
         device_name: deviceNameOrDash(t.generator_device_id),
         regulation_device_name: deviceNameOrDash(t.production_regulation_device_id),
         notes_html: t.production_notes_html || '',
+        // Mig 179/181 : type de régulation + identité régulateur du device
+        // d'émission process (chaudière, PAC…). On lit `regulation_type_production`
+        // et la marque/réf du régulateur portée par ce device.
+        regulation_type: prodDevice?.regulation_type_production || null,
+        has_regulation: prodDevice?.has_regulation === 1 || prodDevice?.has_regulation === true,
+        regulator_brand: prodDevice?.regulator_brand || null,
+        regulator_model_reference: prodDevice?.regulator_model_reference || null,
+        regulator_location: prodDevice?.regulator_location_production || null,
       },
       {
         key: 'distribution',
@@ -467,6 +505,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
         device_name: deviceNameOrDash(t.distribution_device_id),
         regulation_device_name: deviceNameOrDash(t.distribution_regulation_device_id),
         notes_html: t.distribution_notes_html || '',
+        regulation_type: distDevice?.regulation_type_distribution || null,
+        has_regulation: distDevice?.has_regulation === 1 || distDevice?.has_regulation === true,
+        regulator_brand: distDevice?.regulator_brand || null,
+        regulator_model_reference: distDevice?.regulator_model_reference || null,
+        regulator_location: distDevice?.regulator_location_distribution || null,
       },
       {
         key: 'emission',
@@ -474,6 +517,11 @@ async function buildBacsAuditExportData(af, opts = {}) {
         device_name: deviceNameOrDash(t.emission_device_id),
         regulation_device_name: deviceNameOrDash(t.emission_regulation_device_id),
         notes_html: t.emission_notes_html || '',
+        regulation_type: emitDevice?.regulation_type_emission || null,
+        has_regulation: emitDevice?.has_regulation === 1 || emitDevice?.has_regulation === true,
+        regulator_brand: emitDevice?.regulator_brand || null,
+        regulator_model_reference: emitDevice?.regulator_model_reference || null,
+        regulator_location: emitDevice?.regulator_location_emission || null,
       },
     ],
     };

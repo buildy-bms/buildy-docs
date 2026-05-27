@@ -151,9 +151,27 @@ function onLeave() {
   hide()
 }
 
+// Détection mobile / tactile. Sur ces appareils, `mouseenter` est émis
+// au tap mais `mouseleave` jamais déclenché tant qu'on ne tape pas
+// ailleurs — d'où des tooltips qui restent collés. On désactive donc
+// totalement les tooltips dès qu'on détecte un pointeur grossier (tactile)
+// : ils n'ont de toute façon pas de sens sur écrans tactiles (pas de hover).
+const isCoarsePointer = typeof window !== 'undefined'
+  && window.matchMedia
+  && window.matchMedia('(pointer: coarse)').matches
+
+// Auto-hide global au scroll (desktop) : un tooltip ne doit jamais
+// survivre à un scroll de la page (il finirait flottant ailleurs).
+if (typeof window !== 'undefined' && !isCoarsePointer) {
+  window.addEventListener('scroll', () => { if (el) hide() }, { passive: true, capture: true })
+}
+
 export const tooltipDirective = {
   mounted(el, binding) {
     el.__tooltipOpts = getOpts(binding)
+    // En tactile, on n'attache aucun listener — les tooltips restent
+    // muets et ne peuvent jamais se bloquer affichés.
+    if (isCoarsePointer) return
     // Closure : on capture `el` ici plutôt que de lire `e.currentTarget`
     // dans le handler (qui peut être nullé selon le timing du setTimeout).
     const enter = () => {
@@ -206,6 +224,8 @@ export const tooltipDirective = {
 export const truncateTooltipDirective = {
   mounted(el, binding) {
     el.__truncateTooltipPlacement = binding.value?.placement || 'top'
+    // Idem que tooltipDirective : pas de listener en tactile.
+    if (isCoarsePointer) return
     const enter = () => {
       if (!(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) return
       const text = (el.textContent || '').trim()

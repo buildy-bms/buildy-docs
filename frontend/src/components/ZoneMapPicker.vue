@@ -54,6 +54,83 @@ let google = null
 let map = null
 let currentMarker = null
 const contextMarkers = []
+let siteMarker = null
+let tooltipOverlay = null
+let TooltipOverlayClass = null
+
+// Construit la classe `OverlayView` custom (à appeler après loadGoogleMaps).
+// Affiche un div HTML positionné au-dessus du marker, stylé comme les
+// tooltips Buildy (gris foncé, blanc, rounded, font Inter).
+function buildTooltipOverlayClass() {
+  if (TooltipOverlayClass) return
+  TooltipOverlayClass = class extends google.maps.OverlayView {
+    constructor() {
+      super()
+      this.position = null
+      this.text = ''
+      this.div = null
+    }
+    setLabel(position, text) {
+      this.position = position
+      this.text = text
+      if (this.div) {
+        this.div.textContent = text
+        this.draw()
+      }
+    }
+    onAdd() {
+      this.div = document.createElement('div')
+      Object.assign(this.div.style, {
+        position: 'absolute',
+        background: '#1f2937',
+        color: '#fff',
+        padding: '5px 9px',
+        borderRadius: '6px',
+        fontFamily: 'Inter, sans-serif',
+        fontSize: '12px',
+        fontWeight: '500',
+        lineHeight: '1.3',
+        whiteSpace: 'nowrap',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+        pointerEvents: 'none',
+        transform: 'translate(-50%, -100%)',
+        marginTop: '-12px',
+        zIndex: '9999',
+      })
+      this.div.textContent = this.text
+      this.getPanes().floatPane.appendChild(this.div)
+    }
+    draw() {
+      if (!this.div || !this.position) return
+      const projection = this.getProjection()
+      if (!projection) return
+      const pos = projection.fromLatLngToDivPixel(this.position)
+      if (!pos) return
+      this.div.style.left = pos.x + 'px'
+      this.div.style.top = pos.y + 'px'
+    }
+    onRemove() {
+      if (this.div && this.div.parentNode) this.div.parentNode.removeChild(this.div)
+      this.div = null
+    }
+  }
+}
+
+// Hover handler : affiche un OverlayView positionné sur le marker.
+function bindHoverTooltip(marker, label) {
+  if (!label) return
+  marker.addListener('mouseover', () => {
+    if (!tooltipOverlay) {
+      tooltipOverlay = new TooltipOverlayClass()
+      tooltipOverlay.setMap(map)
+    }
+    tooltipOverlay.setLabel(marker.getPosition(), label)
+  })
+  marker.addListener('mouseout', () => {
+    if (tooltipOverlay) tooltipOverlay.setMap(null)
+    tooltipOverlay = null
+  })
+}
 
 const FRANCE = { center: { lat: 46.6, lng: 2.4 }, zoom: 5 }
 
@@ -70,6 +147,13 @@ function pinIcon(color) {
   }
 }
 
+// Nom de la zone en cours d'édition, pour le label de hover sur son pin.
+const currentZoneName = computed(() => {
+  if (props.currentZoneId == null) return props.pointLabel || 'Zone à positionner'
+  const z = (props.zones || []).find(zz => zz.id === props.currentZoneId)
+  return z?.name || props.pointLabel || 'Zone à positionner'
+})
+
 function placeCurrent(lat, lng) {
   if (!currentMarker) {
     currentMarker = new google.maps.Marker({
@@ -83,6 +167,7 @@ function placeCurrent(lat, lng) {
       emit('update:latitude', e.latLng.lat())
       emit('update:longitude', e.latLng.lng())
     })
+    bindHoverTooltip(currentMarker, currentZoneName.value)
   } else {
     currentMarker.setPosition({ lat, lng })
   }
@@ -100,45 +185,108 @@ function renderContextMarkers() {
   for (const z of props.zones || []) {
     if (!z || z.latitude == null || z.longitude == null) continue
     if (props.currentZoneId != null && z.id === props.currentZoneId) continue
-    contextMarkers.push(new google.maps.Marker({
+    const marker = new google.maps.Marker({
       map,
       position: { lat: z.latitude, lng: z.longitude },
       opacity: 0.65,
-      title: z.name || '',
       icon: pinIcon(ZONE_PIN_COLORS[z.kind] || ZONE_PIN_COLORS.functional),
-    }))
+    })
+    bindHoverTooltip(marker, z.name || '')
+    contextMarkers.push(marker)
   }
 }
 
-// Centrage à l'ouverture, par ordre de priorité.
+// Pin du site (centre du bâtiment) — référence visuelle permanente.
+// Couleur indigo distincte des zones.
+function renderSiteMarker() {
+  if (siteMarker) { siteMarker.setMap(null); siteMarker = null }
+  if (props.site?.latitude == null || props.site?.longitude == null) return
+  siteMarker = new google.maps.Marker({
+    map,
+    position: { lat: props.site.latitude, lng: props.site.longitude },
+    zIndex: 500,
+    icon: {
+      ...pinIcon('#4f46e5'),
+      scale: 1.1,
+    },
+  })
+  bindHoverTooltip(siteMarker, props.site.name || 'Site')
+}
+
+// Centrage à l'ouverture. Comportement selon le contexte :
+//
+// - Édition d'un SITE (`kind="site"`) : on centre uniquement sur le pin
+//   du site (props.latitude/longitude) ou sur les coordonnées géocodées
+//   de l'adresse. On n'inclut PAS les zones (elles seraient hors-champ
+//   et forceraient un dézoom inutile pour positionner le site lui-même).
+//
+// - Édition d'une ZONE (kind functional/technical) : fitBounds sur TOUS
+//   les pins disponibles (site + zone courante + autres zones du site)
+//   pour avoir le contexte complet du bâtiment.
+//
+// Zoom plus élevé en mode large (modale dédiée, vue précise des toits)
+// que sur la carte intégrée.
 async function centerMap() {
-  if (props.latitude != null && props.longitude != null) {
-    map.setCenter({ lat: props.latitude, lng: props.longitude })
-    map.setZoom(18)
+  const targetZoom = props.large ? 20 : 18
+  const maxZoom = props.large ? 21 : 19
+
+  // Mode édition site : on centre sur le pin du site (s'il est saisi)
+  // ou on géocode l'adresse. On ignore complètement les zones.
+  if (props.kind === 'site') {
+    if (props.latitude != null && props.longitude != null) {
+      map.setCenter({ lat: props.latitude, lng: props.longitude })
+      map.setZoom(targetZoom)
+      return
+    }
+    if (props.site?.address) {
+      try {
+        const { results } = await new google.maps.Geocoder()
+          .geocode({ address: props.site.address, region: 'FR' })
+        if (results?.[0]) {
+          map.setCenter(results[0].geometry.location)
+          map.setZoom(targetZoom)
+          return
+        }
+      } catch { /* repli */ }
+    }
     return
   }
-  const located = (props.zones || []).filter(z => z.latitude != null && z.longitude != null)
-  if (located.length) {
-    const bounds = new google.maps.LatLngBounds()
-    located.forEach(z => bounds.extend({ lat: z.latitude, lng: z.longitude }))
-    map.fitBounds(bounds, 48)
-    return
-  }
-  if (props.site?.latitude != null && props.site?.longitude != null) {
-    map.setCenter({ lat: props.site.latitude, lng: props.site.longitude })
-    map.setZoom(18)
-    return
-  }
-  if (props.site?.address) {
+
+  // Édition d'une zone : on englobe tous les pins disponibles.
+  // Coordonnées du site (référence stable). Géocoder l'adresse si besoin.
+  let siteLat = props.site?.latitude
+  let siteLng = props.site?.longitude
+  if ((siteLat == null || siteLng == null) && props.site?.address) {
     try {
       const { results } = await new google.maps.Geocoder()
         .geocode({ address: props.site.address, region: 'FR' })
       if (results?.[0]) {
-        map.setCenter(results[0].geometry.location)
-        map.setZoom(18)
-        return
+        siteLat = results[0].geometry.location.lat()
+        siteLng = results[0].geometry.location.lng()
       }
-    } catch { /* repli silencieux sur le centre France */ }
+    } catch { /* repli */ }
+  }
+  const points = []
+  if (siteLat != null && siteLng != null) points.push({ lat: siteLat, lng: siteLng })
+  if (props.latitude != null && props.longitude != null) {
+    points.push({ lat: props.latitude, lng: props.longitude })
+  }
+  for (const z of (props.zones || [])) {
+    if (z.latitude != null && z.longitude != null) {
+      if (props.currentZoneId != null && z.id === props.currentZoneId) continue
+      points.push({ lat: z.latitude, lng: z.longitude })
+    }
+  }
+  if (points.length >= 2) {
+    const bounds = new google.maps.LatLngBounds()
+    points.forEach(p => bounds.extend(p))
+    map.fitBounds(bounds, 96)
+    if (map.getZoom() > maxZoom) map.setZoom(maxZoom)
+    return
+  }
+  if (points.length === 1) {
+    map.setCenter(points[0])
+    map.setZoom(targetZoom)
   }
 }
 
@@ -150,6 +298,7 @@ async function initMap() {
     errorMsg.value = e.message || 'Carte indisponible.'
     return
   }
+  buildTooltipOverlayClass()
   map = new google.maps.Map(mapEl.value, {
     center: FRANCE.center,
     zoom: FRANCE.zoom,
@@ -169,6 +318,7 @@ async function initMap() {
     })
   }
   status.value = 'ready'
+  renderSiteMarker()
   renderContextMarkers()
   if (props.latitude != null && props.longitude != null) {
     placeCurrent(props.latitude, props.longitude)
@@ -194,13 +344,15 @@ watch(() => [props.latitude, props.longitude], ([lat, lng]) => {
   if (pos && Math.abs(pos.lat() - lat) < 1e-7 && Math.abs(pos.lng() - lng) < 1e-7) return
   placeCurrent(lat, lng)
   map.setCenter({ lat, lng })
-  if (map.getZoom() < 16) map.setZoom(18)
+  if (map.getZoom() < 16) map.setZoom(props.large ? 20 : 18)
 })
 
 onMounted(initMap)
 onBeforeUnmount(() => {
   contextMarkers.forEach(m => m.setMap(null))
   if (currentMarker) currentMarker.setMap(null)
+  if (siteMarker) siteMarker.setMap(null)
+  if (tooltipOverlay) tooltipOverlay.setMap(null)
 })
 </script>
 

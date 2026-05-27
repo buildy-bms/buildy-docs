@@ -49,6 +49,62 @@ export const ROLE_OPTIONS = [
   { value: 'autre',        label: 'Autre',        icon: 'fa-circle-question',   color: '#6b7280' },
 ]
 
+// ── Types de régulation par niveau R175-6 ─────────────────────────────
+// Listes de suggestions (creatable côté UI : l'auditeur peut ajouter une
+// valeur libre si la sienne n'est pas listée). Stockées en TEXT libre côté
+// DB (`regulation_type_production / _distribution / _emission`), pas
+// d'enum strict pour rester flexible.
+export const REGULATION_TYPES_PRODUCTION = [
+  { value: 'loi_d_eau',          label: 'Loi d\'eau' },
+  { value: 'pression_constante', label: 'Pression constante' },
+  { value: 'cascade',            label: 'Cascade' },
+  { value: 'modulation',         label: 'Modulation puissance' },
+  { value: 'tout_ou_rien',       label: 'Tout ou rien' },
+  { value: 'autre',              label: 'Autre' },
+]
+export const REGULATION_TYPES_DISTRIBUTION = [
+  { value: 'vanne_3_voies',  label: 'Vanne 3 voies' },
+  { value: 'vanne_2_voies',  label: 'Vanne 2 voies' },
+  { value: 'debit_variable', label: 'Débit variable' },
+  { value: 'equilibrage',    label: 'Équilibrage hydraulique' },
+  { value: 'autre',          label: 'Autre' },
+]
+export const REGULATION_TYPES_EMISSION = [
+  { value: 'thermostat_ambiant',    label: 'Thermostat ambiant' },
+  { value: 'vanne_thermostatique',  label: 'Vanne thermostatique' },
+  { value: 'sonde_zone',            label: 'Sonde de zone' },
+  { value: 'sonde_retour',          label: 'Sonde de retour' },
+  { value: 'autre',                 label: 'Autre' },
+]
+
+// Granularité de la régulation R175-6 (per_room / per_zone / central_only),
+// DÉRIVÉE du type de régulation d'émission du device émetteur :
+//  - thermostat_ambiant       → per_room
+//  - vanne_thermostatique     → per_room
+//  - sonde_zone               → per_zone
+//  - sonde_retour             → central_only
+//  - autre / null             → central_only (signal non précisé)
+// Migration 180 : la valeur saisie historique (per_room/per_zone/central_only/none
+// dans bacs_audit_thermal_regulation.regulation_type) est archivée mais plus
+// remontée — on la recalcule à chaque rendu pour rester cohérent avec la
+// modale équipement.
+export function derivedGranularity(emissionType) {
+  if (!emissionType) return 'central_only'
+  if (emissionType === 'thermostat_ambiant' || emissionType === 'vanne_thermostatique') return 'per_room'
+  if (emissionType === 'sonde_zone') return 'per_zone'
+  return 'central_only'
+}
+export const GRANULARITY_LABELS_FR = {
+  per_room: 'Par pièce',
+  per_zone: 'Par zone',
+  central_only: 'Centralisée',
+}
+export const GRANULARITY_TONES = {
+  per_room: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  per_zone: 'bg-sky-50 text-sky-700 border-sky-200',
+  central_only: 'bg-amber-50 text-amber-700 border-amber-200',
+}
+
 // Le rôle/niveau (Production / Distribution / Émission / Régulation) découle
 // du découpage thermique R175-6 : il n'a de sens que pour les systèmes de
 // chauffage et de climatisation. Pour tous les autres usages (ventilation,
@@ -78,7 +134,10 @@ export function deviceMissingFields(device, systemCategory) {
   try { protocols = JSON.parse(device.communication_protocols || '[]') } catch { protocols = [] }
   const hasProtocol = (Array.isArray(protocols) && protocols.length > 0)
     || (!!device.communication_protocol && device.communication_protocol !== 'non_communicant')
-  if (!hasProtocol) out.push('le(s) protocole(s) de communication')
+  // « Non communicant » est une réponse explicite à la question : si l'auditeur
+  // a coché Non sur le toggle communicant, on n'attend plus de protocole.
+  const explicitNonCommunicant = device.communication_protocol === 'non_communicant'
+  if (!hasProtocol && !explicitNonCommunicant) out.push('le(s) protocole(s) de communication')
   if (isThermalCategory(systemCategory)) {
     const roles = Array.isArray(device.device_role)
       ? device.device_role

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 178;
+const TARGET_VERSION = 181;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6813,6 +6813,112 @@ function runMigrations() {
     }
     log.info('Migration 178 appliquee : zones.occupancy_profile enum étendu (3x8, 2x8)');
     db.pragma('user_version = 178');
+  }
+
+  if (current < 179) {
+    // Refonte modale équipement : colonnes pour la régulation de l'équipement.
+    // - has_regulation : ternaire « L'équipement dispose-t-il d'une régulation ? »
+    // - regulator_brand / regulator_model_reference / regulator_location_zone_id :
+    //   info du régulateur quand l'équipement en a un (intégré ou externe).
+    // - regulation_type_production / _distribution / _emission : type de
+    //   régulation par niveau R175-6 (loi d'eau, vanne 3 voies, thermostat
+    //   ambiant…). Non-enum côté DB pour laisser l'UI ajouter à la volée.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN has_regulation INTEGER DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_brand TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_model_reference TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_location_zone_id INTEGER REFERENCES zones(id) ON DELETE SET NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulation_type_production TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulation_type_distribution TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulation_type_emission TEXT DEFAULT NULL;
+    `);
+    log.info('Migration 179 appliquee : bacs_audit_system_devices.has_regulation + regulator_* + regulation_type_*');
+    db.pragma('user_version = 179');
+  }
+
+  if (current < 180) {
+    // Refonte card 06 : passage de « 1 ligne par (zone × catégorie) » à
+    // « 1 ligne par système ». Fan-out automatique des lignes existantes :
+    // chaque ligne thermique est dupliquée en N lignes, une par
+    // bacs_audit_systems matching (zone_id + system_category + present=1).
+    // La granularité (regulation_type per_room/per_zone/…) est conservée en
+    // colonne archivée — le frontend ne la lit plus mais elle reste
+    // disponible pour rollback. Les action items auto-générés pointant vers
+    // thermal_regulation sont supprimés (ils seront régénérés au prochain
+    // recalcul de conformité).
+    log.info('Migration 180: refonte thermal_regulation — 1 ligne par système');
+    const runMig180 = db.transaction(() => {
+      db.exec(`ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN system_id INTEGER REFERENCES bacs_audit_systems(id) ON DELETE CASCADE;`);
+
+      const droppedActions = db.prepare(
+        `DELETE FROM bacs_audit_action_items WHERE source_thermal_id IS NOT NULL AND auto_generated = 1`
+      ).run();
+      log.info(`  → ${droppedActions.changes} action items thermal auto-générés supprimés (régénération auto au prochain calcul)`);
+
+      const rows = db.prepare(`SELECT * FROM bacs_audit_thermal_regulation`).all();
+      const findSystems = db.prepare(
+        `SELECT id FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND system_category = ? AND present = 1`
+      );
+      const insert = db.prepare(`
+        INSERT INTO bacs_audit_thermal_regulation (
+          document_id, zone_id, category, label, has_automatic_regulation, regulation_type,
+          generator_exempt_wood, generator_device_id, notes, sensor_position, thermostat_type,
+          has_thermostatic_valves, notes_html, position,
+          distribution_device_id, emission_device_id, production_regulation_device_id,
+          distribution_regulation_device_id, emission_regulation_device_id,
+          production_notes_html, distribution_notes_html, emission_notes_html, system_id
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `);
+      let fanCount = 0;
+      for (const row of rows) {
+        const sys = findSystems.all(row.document_id, row.zone_id, row.category);
+        for (const s of sys) {
+          insert.run(
+            row.document_id, row.zone_id, row.category, row.label, row.has_automatic_regulation, row.regulation_type,
+            row.generator_exempt_wood, row.generator_device_id, row.notes, row.sensor_position, row.thermostat_type,
+            row.has_thermostatic_valves, row.notes_html, row.position,
+            row.distribution_device_id, row.emission_device_id, row.production_regulation_device_id,
+            row.distribution_regulation_device_id, row.emission_regulation_device_id,
+            row.production_notes_html, row.distribution_notes_html, row.emission_notes_html, s.id
+          );
+          fanCount++;
+        }
+      }
+
+      const deleted = db.prepare(`DELETE FROM bacs_audit_thermal_regulation WHERE system_id IS NULL`).run();
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_bacs_thermal_system ON bacs_audit_thermal_regulation(system_id);`);
+
+      log.info(`  → ${rows.length} lignes originales → ${fanCount} lignes fan-out (${deleted.changes} originales sans match supprimées)`);
+    });
+    runMig180();
+    log.info('Migration 180 appliquee : bacs_audit_thermal_regulation.system_id ajouté + fan-out par système');
+    db.pragma('user_version = 180');
+  }
+
+  if (current < 181) {
+    // Localisation par niveau de régulation : Production / Distribution /
+    // Émission peuvent chacun avoir son propre emplacement (sonde dans un
+    // local technique, thermostat dans le bureau, vanne dans la VMC…).
+    // Stocké en TEXT libre (pas FK) pour permettre la saisie créative
+    // (« façade nord », « local 03 », « gaine RdC »…) — l'auditeur n'a
+    // pas toujours une zone formelle qui correspond.
+    db.exec(`
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_location_production TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_location_distribution TEXT DEFAULT NULL;
+      ALTER TABLE bacs_audit_system_devices ADD COLUMN regulator_location_emission TEXT DEFAULT NULL;
+    `);
+    // Backfill : si la mig 179 a renseigné regulator_location_zone_id, on
+    // pré-remplit les 3 niveaux avec le nom de la zone (l'auditeur ajustera
+    // si la localisation diffère selon le niveau).
+    const backfill = db.prepare(`
+      UPDATE bacs_audit_system_devices
+      SET regulator_location_production   = COALESCE(regulator_location_production,   (SELECT name FROM zones WHERE id = regulator_location_zone_id)),
+          regulator_location_distribution = COALESCE(regulator_location_distribution, (SELECT name FROM zones WHERE id = regulator_location_zone_id)),
+          regulator_location_emission     = COALESCE(regulator_location_emission,     (SELECT name FROM zones WHERE id = regulator_location_zone_id))
+      WHERE regulator_location_zone_id IS NOT NULL
+    `).run();
+    log.info(`Migration 181 appliquee : regulator_location_{production,distribution,emission} ajoutées (${backfill.changes} rows backfillés depuis regulator_location_zone_id)`);
+    db.pragma('user_version = 181');
   }
 
   if (current > TARGET_VERSION) {

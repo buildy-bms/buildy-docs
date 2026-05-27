@@ -322,10 +322,15 @@
       {{#each thermal}}
         <tr>
           <td class="col-ref">{{ref}}</td>
-          <td class="col-zone">{{zone_name}}{{#if label}}<div class="thermal-row-label">{{label}}</div>{{/if}}</td>
+          <td class="col-zone">{{zone_name}}{{#if displayLabel}}<div class="thermal-row-label">{{displayLabel}}</div>{{/if}}</td>
           <td class="col-usage">{{{categoryIcon category "11"}}}<span class="cat-label">{{categoryLabel}}</span></td>
           <td class="col-bool"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
-          <td class="col-type">{{regulationLabel}}</td>
+          <td class="col-type">
+            {{regulationLabel}}
+            {{#if productionRegulationType}}<div class="thermal-row-label">P : {{productionRegulationType}}</div>{{/if}}
+            {{#if distributionRegulationType}}<div class="thermal-row-label">D : {{distributionRegulationType}}</div>{{/if}}
+            {{#if emissionRegulationType}}<div class="thermal-row-label">É : {{emissionRegulationType}}</div>{{/if}}
+          </td>
           <td class="col-gen">{{generatorLabel}}</td>
           <td class="col-age">{{#if generator_age_years}}{{generator_age_years}} ans{{else}}<span class="muted">—</span>{{/if}}</td>
           <td class="col-bool"><span class="{{#if generator_exempt_wood}}bool-yes{{else}}bool-no{{/if}}">{{#if generator_exempt_wood}}✓{{else}}✗{{/if}}</span></td>

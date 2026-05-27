@@ -52,7 +52,7 @@ const auditStore = useAuditStore()
 const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
-import { ENERGY_OPTIONS, isDeviceComplete } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete } from '@/lib/audit-options'
 
 // Item 3c — les puissances nominales (chaud / froid) n'ont de sens que pour
 // les systèmes qui mettent en jeu une puissance thermique ou aéraulique.
@@ -295,8 +295,10 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="brand" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Marque</DataTableSortHeader>
             <DataTableSortHeader sort-key="model_reference" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Référence</DataTableSortHeader>
             <DataTableSortHeader sort-key="age_years" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Âge</DataTableSortHeader>
+            <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Qté</DataTableSortHeader>
             <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
             <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
+            <th>Niveau(x)</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -339,6 +341,15 @@ async function removeDevice(d) {
                        :class="inputCls" class="text-center placeholder:text-gray-300" />
               </div>
             </td>
+            <!-- Quantité (nombre d'unités identiques de cet équipement) -->
+            <td class="px-2 py-2 align-middle whitespace-nowrap">
+              <div class="w-14 mx-auto">
+                <input type="number" min="1" step="1" :value="d.quantity ?? 1" placeholder="1"
+                       @blur="e => patchDevice(d, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })"
+                       :class="inputCls" class="text-center placeholder:text-gray-300"
+                       v-tooltip="'Nombre d’unités identiques (multiplie la puissance pour le cumul R175-2)'" />
+              </div>
+            </td>
             <!-- Puissance — item 3c : masquée hors usages thermiques. Le
                  détail (frigorifique + type de calcul) est dans la modale. -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
@@ -362,6 +373,22 @@ async function removeDevice(d) {
                   :clearable="false"
                   size="sm"
                   placeholder="Énergie"
+                />
+              </div>
+            </td>
+            <!-- Niveau(x) : Production / Distribution / Régulation / Émission.
+                 Multi-select, applique R175-6 sur chauffage / clim mais reste
+                 informatif pour les autres usages. -->
+            <td class="px-2 py-2 align-middle whitespace-nowrap">
+              <div class="min-w-32">
+                <SearchableSelect
+                  :model-value="Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])"
+                  @update:model-value="v => patchDevice(d, { device_role: Array.isArray(v) ? v : [] })"
+                  :options="ROLE_OPTIONS"
+                  :multiple="true"
+                  :clearable="true"
+                  size="sm"
+                  placeholder="Niveau(x)"
                 />
               </div>
             </td>
