@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 181;
+const TARGET_VERSION = 182;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6919,6 +6919,46 @@ function runMigrations() {
     `).run();
     log.info(`Migration 181 appliquee : regulator_location_{production,distribution,emission} ajoutées (${backfill.changes} rows backfillés depuis regulator_location_zone_id)`);
     db.pragma('user_version = 181');
+  }
+
+  if (current < 182) {
+    // Refonte card 03 « Systèmes » : permettre N systèmes par (zone ×
+    // catégorie). Aujourd'hui UNIQUE(document_id, zone_id, system_category)
+    // limite l'auditeur à 1 « Chauffage » par zone, alors qu'une zone peut
+    // avoir 2 chaudières indépendantes (réversibilité, secours, gaz +
+    // électrique…). Le fan-out card 06 mig 180 supporte déjà N lignes par
+    // (zone × catégorie) → la contrainte est le seul blocage.
+    //
+    // Stratégie sûre (pas de recréation de table, 0 risque sur les FK
+    // entrantes) : on édite la colonne `sql` de sqlite_master via
+    // writable_schema pour retirer juste la ligne UNIQUE(...).
+    db.unsafeMode(true);
+    try {
+      db.pragma('writable_schema = ON');
+      const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'bacs_audit_systems'").get();
+      if (!row || !row.sql) throw new Error('bacs_audit_systems introuvable');
+      if (!/UNIQUE\s*\(\s*document_id\s*,\s*zone_id\s*,\s*system_category\s*\)/i.test(row.sql)) {
+        log.info('Migration 182 : UNIQUE(document_id, zone_id, system_category) déjà absent, skip');
+      } else {
+        const newSql = row.sql
+          .replace(/,\s*UNIQUE\s*\(\s*document_id\s*,\s*zone_id\s*,\s*system_category\s*\)/i, '');
+        db.prepare("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'bacs_audit_systems'").run(newSql);
+        // Retire aussi l'auto-index implicite que SQLite créait pour la
+        // contrainte UNIQUE. Sans ça, il devient orphelin et corrompt le
+        // schéma (« orphan index sqlite_autoindex_bacs_audit_systems_1 »).
+        const orphans = db.prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'bacs_audit_systems' AND name LIKE 'sqlite_autoindex_bacs_audit_systems%'"
+        ).all();
+        for (const o of orphans) {
+          db.prepare("DELETE FROM sqlite_master WHERE type = 'index' AND name = ?").run(o.name);
+        }
+        log.info(`Migration 182 appliquee : UNIQUE(document_id, zone_id, system_category) retiré de bacs_audit_systems (+ ${orphans.length} auto-index orphelin(s) nettoyé(s))`);
+      }
+      db.pragma('writable_schema = OFF');
+    } finally {
+      db.unsafeMode(false);
+    }
+    db.pragma('user_version = 182');
   }
 
   if (current > TARGET_VERSION) {

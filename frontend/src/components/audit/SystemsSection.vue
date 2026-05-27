@@ -7,15 +7,15 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
-import SearchableSelect from '@/components/SearchableSelect.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SystemSettingsModal from '@/components/audit/SystemSettingsModal.vue'
+import CreateSystemModal from '@/components/audit/CreateSystemModal.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { systemUsageLabel } from '@/lib/audit-options'
-import { updateBacsSystem, reorderBacsSystems, createBacsSystem, deleteBacsSystem, listSystemCategories } from '@/api'
+import { updateBacsSystem, reorderBacsSystems, deleteBacsSystem, listSystemCategories } from '@/api'
 
 // Couleur d'accent par categorie de systeme : aligne avec
 // SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
@@ -132,22 +132,17 @@ async function toggleNegligible(s, checked) {
   })
 }
 
-// ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
-// L'auditeur choisit un usage dans la bibliothèque de catégories, ou
-// saisit un nom libre (option "creatable" du SearchableSelect).
+// ─── Ajout d'un système (mig 182) ────────────────────────────────────
+// Bibliothèque de catégories d'usage personnalisées passée à CreateSystemModal
+// pour proposer des catégories « hors décret » (bornes de recharge, etc.) en
+// plus des 7 catégories BACS standard.
 const categoryLibrary = ref([])
 onMounted(async () => {
   try {
     const { data } = await listSystemCategories()
     categoryLibrary.value = data || []
-  } catch { /* silencieux — on retombe sur la saisie libre */ }
+  } catch { /* silencieux — la modale fonctionne aussi sans bibliothèque */ }
 })
-const categoryOptions = computed(() => categoryLibrary.value.map(c => ({
-  value: c.key,
-  label: c.label,
-  icon: c.icon_value,
-  color: c.icon_color,
-})))
 
 // Modale paramètres système (poste négligeable 5 % + surcharge parties).
 // Cf. SystemSettingsModal.vue — les 2 anciens flags sous-station /
@@ -156,33 +151,16 @@ const settingsSystem = ref(null)
 function openSystemSettings(s) { settingsSystem.value = s }
 function closeSystemSettings() { settingsSystem.value = null }
 
-const addingUsageZone = ref(null)   // zone_id en cours de saisie
-const newUsageValue = ref(null)     // key de catégorie OU texte libre
-function startAddUsage(zoneId) {
-  addingUsageZone.value = zoneId
-  newUsageValue.value = null
-}
-function cancelAddUsage() {
-  addingUsageZone.value = null
-  newUsageValue.value = null
-}
-async function confirmAddUsage(zoneId) {
-  const v = (newUsageValue.value || '').toString().trim()
-  if (!v) return
-  // Si la valeur correspond à une catégorie de la bibliothèque, on rattache
-  // l'usage à cette catégorie (filtre la bibliothèque d'équipements) ;
-  // sinon c'est un nom libre.
-  const cat = categoryLibrary.value.find(c => c.key === v)
-  const payload = cat
-    ? { zone_id: zoneId, label: cat.label, library_category_key: cat.key }
-    : { zone_id: zoneId, label: v }
-  try {
-    await createBacsSystem(audit.docId, payload)
-    cancelAddUsage()
-    await audit.refreshAuditCore()
-  } catch (e) {
-    error(e.response?.data?.detail || 'Ajout de l\'usage impossible')
-  }
+// Mig 182 : modale dédiée pour ajouter un système (BACS standard ou usage
+// hors décret). Remplace le picker inline qui ne supportait que les usages
+// non BACS via custom:uuid. Désormais on peut créer N systèmes BACS de
+// même catégorie dans une même zone (ex: 2 chaudières indépendantes).
+const createSystemForZone = ref(null) // { id, name } ou null
+function openCreateSystem(zone) { createSystemForZone.value = zone }
+function closeCreateSystem() { createSystemForZone.value = null }
+async function onSystemCreated() {
+  closeCreateSystem()
+  await audit.refreshAuditCore()
 }
 async function removeUsage(s) {
   const ok = await confirm({
@@ -446,35 +424,14 @@ onBeforeUnmount(teardownSortables)
                   @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
               </div>
             </template>
-            <!-- Ajout manuel d'un usage (hors matrice BACS) — choisir une
-                 catégorie de la bibliothèque ou saisir un nom libre. -->
-            <div v-if="addingUsageZone === g.zone_id"
-                 class="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/40 px-3 py-2.5 space-y-2">
-              <p class="text-[11px] font-medium text-gray-600">
-                Choisir une catégorie de la bibliothèque, ou saisir un nom libre
-              </p>
-              <div class="flex items-center gap-2">
-                <div class="flex-1 min-w-0">
-                  <SearchableSelect
-                    v-model="newUsageValue"
-                    :options="categoryOptions"
-                    :creatable="true"
-                    placeholder="Catégorie ou nom d'usage…"
-                    search-placeholder="Filtrer ou saisir un nom libre…" />
-                </div>
-                <button type="button" @click="confirmAddUsage(g.zone_id)" :disabled="!newUsageValue"
-                        class="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md whitespace-nowrap shrink-0">
-                  Ajouter
-                </button>
-                <button type="button" @click="cancelAddUsage"
-                        class="px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md whitespace-nowrap shrink-0">
-                  Annuler
-                </button>
-              </div>
-            </div>
-            <button v-else type="button" @click="startAddUsage(g.zone_id)"
+            <!-- Mig 182 : ouverture d'une modale pour ajouter un système
+                 (catégorie BACS standard OU usage hors décret). Le bouton
+                 unique remplace l'ancien picker inline (limité aux usages
+                 manuels). On peut désormais créer N systèmes BACS de même
+                 catégorie dans une même zone (ex: 2 chaudières indépendantes). -->
+            <button type="button" @click="openCreateSystem({ id: g.zone_id, name: g.zone_name })"
                     class="btn-add">
-              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un usage
+              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un système
             </button>
           </div>
         </div>
@@ -490,5 +447,12 @@ onBeforeUnmount(teardownSortables)
       :system-weight-pct="systemWeightPct(settingsSystem)"
       @close="closeSystemSettings"
       @patched="refreshAuditData" />
+    <!-- Modale création d'un système (catégorie + nom). Mig 182. -->
+    <CreateSystemModal
+      v-if="createSystemForZone"
+      :zone="createSystemForZone"
+      :library-categories="categoryLibrary"
+      @close="closeCreateSystem"
+      @created="onSystemCreated" />
   </CollapsibleSection>
 </template>

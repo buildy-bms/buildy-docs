@@ -151,18 +151,26 @@ async function routes(fastify) {
     return db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
   });
 
-  // POST /bacs-audit/:documentId/systems — ajout manuel d'un usage non BACS
-  // (system_category libre, is_bacs=0). Permet de saisir des usages hors
-  // decret (bornes de recharge, occultation…) ou des usages dans les zones
-  // techniques. Exclu du scoring R175 (cf. action-generator).
+  // POST /bacs-audit/:documentId/systems — ajout d'un système dans une zone.
+  // Mig 182 : la contrainte UNIQUE(doc, zone, system_category) a été retirée,
+  // donc on peut créer plusieurs « Chauffage » (etc.) dans une même zone.
+  // - Si `system_category` est une catégorie BACS standard (heating, cooling,
+  //   ventilation, dhw, lighting_indoor, lighting_outdoor, electricity_production)
+  //   → is_bacs=1, on conserve le label de référence pour la matrice R175.
+  // - Sinon → `custom:<uuid>` généré, is_bacs=0 (usage hors décret, ex: bornes
+  //   de recharge, occultation, etc.).
+  // `library_category_key` (optionnel) rattache l'usage à une catégorie de la
+  // bibliothèque pour filtrer la liste d'équipements proposés.
   fastify.post('/bacs-audit/:documentId/systems', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);
     if (!assertBacsAuditExists(documentId, request, reply, { requiredRole: 'write' })) return;
+    const BACS_STANDARD_CATEGORIES = ['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'];
     const schema = z.object({
       zone_id: z.number().int().positive(),
-      label: z.string().trim().min(1, 'Nom de l\'usage requis').max(120),
-      // Catégorie de la bibliothèque (optionnel) : rattache l'usage manuel
-      // à une catégorie connue → filtre la bibliothèque d'équipements.
+      label: z.string().trim().min(1, 'Nom du système requis').max(120),
+      // Catégorie BACS standard (heating, cooling…) OU laisser vide pour
+      // un usage non BACS (génère automatiquement `custom:<uuid>`).
+      system_category: z.string().trim().min(1).max(80).nullable().optional(),
       library_category_key: z.string().trim().min(1).max(80).nullable().optional(),
     });
     let body;
@@ -172,31 +180,44 @@ async function routes(fastify) {
     const zone = db.db.prepare('SELECT id FROM zones WHERE id = ?').get(body.zone_id);
     if (!zone) return reply.code(400).send({ detail: 'Zone introuvable.' });
 
+    const isBacsStd = body.system_category && BACS_STANDARD_CATEGORIES.includes(body.system_category);
+    const category = isBacsStd ? body.system_category : ('custom:' + require('crypto').randomUUID());
+    const isBacs = isBacsStd ? 1 : 0;
+
     const maxPos = db.db.prepare(
       'SELECT COALESCE(MAX(position), 0) AS m FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ?'
     ).get(documentId, body.zone_id).m;
-    const category = 'custom:' + require('crypto').randomUUID();
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_systems
         (document_id, zone_id, system_category, custom_label, is_bacs, present, position, library_category_key)
-      VALUES (?, ?, ?, ?, 0, 1, ?, ?)
-    `).run(documentId, body.zone_id, category, body.label, maxPos + 10, body.library_category_key || null);
-    logBacsAudit(request, 'bacs.system.create', documentId, { systemId: r.lastInsertRowid, label: body.label });
+      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(documentId, body.zone_id, category, body.label, isBacs, maxPos + 10, body.library_category_key || null);
+    logBacsAudit(request, 'bacs.system.create', documentId, { systemId: r.lastInsertRowid, label: body.label, system_category: category });
     return reply.code(201).send(
       db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(r.lastInsertRowid)
     );
   });
 
-  // DELETE /bacs-audit/systems/:id — suppression d'un usage MANUEL uniquement.
-  // Les usages BACS de la matrice ne se suppriment pas (toggle not_concerned).
+  // DELETE /bacs-audit/systems/:id — suppression d'un système.
+  // - Usages manuels (is_bacs=0) : toujours supprimables.
+  // - Usages BACS (is_bacs=1) : supprimables seulement si la même (zone ×
+  //   catégorie) en compte au moins un autre (= doublon ajouté manuellement
+  //   via la modale « Ajouter un système », mig 182). On préserve toujours
+  //   le système BACS racine de chaque (zone × catégorie) pour ne pas casser
+  //   la matrice R175 — l'auditeur peut le marquer « Non concerné » à la place.
   fastify.delete('/bacs-audit/systems/:id', async (request, reply) => {
     const id = parseInt(request.params.id, 10);
     const row = db.db.prepare('SELECT * FROM bacs_audit_systems WHERE id = ?').get(id);
-    if (!row) return reply.code(404).send({ detail: 'Usage non trouve' });
+    if (!row) return reply.code(404).send({ detail: 'Système non trouvé' });
     if (row.is_bacs) {
-      return reply.code(400).send({
-        detail: 'Un usage du décret BACS ne se supprime pas — utilisez « Non concerné ».',
-      });
+      const siblings = db.db.prepare(
+        'SELECT COUNT(*) AS n FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND system_category = ? AND id != ?'
+      ).get(row.document_id, row.zone_id, row.system_category, id).n;
+      if (siblings === 0) {
+        return reply.code(400).send({
+          detail: 'Un système BACS de référence ne se supprime pas — utilisez « Non concerné », ou supprimez d\'abord les doublons.',
+        });
+      }
     }
     if (!assertBacsAuditExists(row.document_id, request, reply, { requiredRole: 'write' })) return;
     db.db.prepare('DELETE FROM bacs_audit_systems WHERE id = ?').run(id);
