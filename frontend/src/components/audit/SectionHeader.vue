@@ -33,12 +33,15 @@ function pad(n) { return String(n).padStart(2, '0') }
 </script>
 
 <template>
-  <div class="flex items-center gap-3 flex-1 min-w-0">
+  <!-- Bloc titre à gauche (largeur naturelle, shrink autorisé pour
+       les titres longs). Plus de flex-1 ici : on laisse la place au
+       slot `center` pour un contenu centré (filtres, breadcrumb…). -->
+  <div class="flex items-center gap-3 min-w-0 shrink">
     <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-xs font-medium shrink-0">
       {{ pad(number) }}
     </span>
     <component v-if="icon" :is="icon" :class="['w-5 h-5 shrink-0', iconColor]" />
-    <div class="flex-1 min-w-0">
+    <div class="min-w-0">
       <h2 class="text-base font-medium text-gray-900 leading-tight truncate">{{ title }}</h2>
       <p v-if="subtitle || $slots['subtitle-extra']" class="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
         <span v-if="subtitle" class="truncate">{{ subtitle }}</span>
@@ -46,6 +49,13 @@ function pad(n) { return String(n).padStart(2, '0') }
       </p>
     </div>
   </div>
+  <!-- Slot centré dans le header (filtres, sous-actions). flex-1 +
+       justify-center pour positionner au milieu de la page entre le
+       titre et les actions. -->
+  <div v-if="$slots.center" class="flex-1 flex justify-center min-w-0 px-2">
+    <slot name="center" />
+  </div>
+  <span v-else class="flex-1"></span>
   <div class="flex items-center gap-2 shrink-0">
     <slot name="actions" />
     <StepValidateBadge v-if="step" :step="step"

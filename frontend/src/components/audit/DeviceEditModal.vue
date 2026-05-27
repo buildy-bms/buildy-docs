@@ -42,6 +42,12 @@ const YESNO = [
   { value: true, label: 'Oui', tone: 'green' },
   { value: false, label: 'Non', tone: 'slate' },
 ]
+// Régulation intégrée à l'équipement (true) vs portée par un module
+// déporté (false). Mig 183 — pilote l'affichage des champs régulateur.
+const REGULATION_PLACEMENT_OPTS = [
+  { value: true,  label: 'Intégrée', tone: 'green' },
+  { value: false, label: 'Déportée', tone: 'slate' },
+]
 const METERING_OPTS = [
   { value: 'yes', label: 'Oui', tone: 'green' },
   { value: 'partial', label: 'Partiel', tone: 'amber' },
@@ -87,6 +93,14 @@ const deviceRole = computed(() =>
 const hasProductionRole   = computed(() => deviceRole.value.includes('production'))
 const hasDistributionRole = computed(() => deviceRole.value.includes('distribution'))
 const hasEmissionRole     = computed(() => deviceRole.value.includes('emission'))
+
+// Mig 183 — masquage des détails régulateur quand la régulation est
+// explicitement « Intégrée ». Par défaut (null = pas répondu) ou si
+// « Déportée », on affiche marque/référence/localisations pour que
+// l'auditeur puisse renseigner.
+const showRegulatorDetails = computed(() =>
+  !(props.device.regulation_integrated === 1 || props.device.regulation_integrated === true)
+)
 
 // Options de zones (nom comme value ET label) pour la localisation par
 // niveau de régulation. Mig 181 : on stocke en TEXT libre (creatable
@@ -294,8 +308,29 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           </div>
 
           <div v-if="device.has_regulation === 1 || device.has_regulation === true" class="space-y-3 pt-1">
-            <!-- Régulateur — marque + référence (uniques pour l'équipement). -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
+            <!-- Intégrée à l'équipement ou déportée ? Pilote l'affichage des
+                 champs marque / référence / localisation : si intégrée, ces
+                 infos sont implicitement celles de l'équipement principal et
+                 on évite la double saisie. -->
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-sm flex-1">
+                <div class="font-medium text-gray-800">La régulation est-elle intégrée à l'équipement ou déportée ?</div>
+                <div class="text-xs text-gray-500 mt-0.5">
+                  Intégrée = thermostat embarqué, contrôle natif PAC, électronique sur la chaudière. Déportée = régulateur séparé (Siemens, GTB, sonde déportée…). Si intégrée, marque, référence et localisation sont les mêmes que l'équipement.
+                </div>
+              </div>
+              <SegmentedToggle :model-value="triState(device.regulation_integrated)"
+                               :options="REGULATION_PLACEMENT_OPTS"
+                               @update:model-value="v => patch({ regulation_integrated: v })" />
+            </div>
+
+            <!-- Régulateur — marque + référence. Masqués UNIQUEMENT quand
+                 la régulation est explicitement Intégrée (= toggle = true) :
+                 dans ce cas marque/réf/loc sont implicitement ceux de
+                 l'équipement principal. Par défaut (null) ou Déportée, on
+                 affiche les champs (l'auditeur peut renseigner). -->
+            <div v-if="showRegulatorDetails"
+                 class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Marque du régulateur</label>
                 <input type="text" :value="device.regulator_brand || ''" placeholder="ex : Siemens"
@@ -308,10 +343,10 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
               </div>
             </div>
 
-            <!-- Par niveau présent : Type de régulation + Localisation (créable :
-                 zones existantes en suggestion, mais saisie libre acceptée pour
-                 désigner un local ou une position pas encore tracée). -->
-            <div v-if="hasProductionRole" class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
+            <!-- Par niveau présent : Type de régulation + Localisation (si
+                 régulation déportée). Localisation cachée si intégrée
+                 (l'emplacement est implicitement celui de l'équipement). -->
+            <div v-if="hasProductionRole" :class="['grid gap-x-3 gap-y-3', showRegulatorDetails ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1']">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation de production</label>
                 <SearchableSelect :model-value="device.regulation_type_production"
@@ -319,7 +354,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   :clearable="true" :creatable="true" size="sm" placeholder="Loi d'eau, cascade…"
                                   @update:model-value="v => patch({ regulation_type_production: v || null })" />
               </div>
-              <div>
+              <div v-if="showRegulatorDetails">
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Localisation de la régulation de production</label>
                 <SearchableSelect :model-value="device.regulator_location_production"
                                   :options="zoneOptions"
@@ -328,7 +363,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   @update:model-value="v => patch({ regulator_location_production: v || null })" />
               </div>
             </div>
-            <div v-if="hasDistributionRole" class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
+            <div v-if="hasDistributionRole" :class="['grid gap-x-3 gap-y-3', showRegulatorDetails ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1']">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation de distribution</label>
                 <SearchableSelect :model-value="device.regulation_type_distribution"
@@ -336,7 +371,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   :clearable="true" :creatable="true" size="sm" placeholder="Vanne 3 voies, débit variable…"
                                   @update:model-value="v => patch({ regulation_type_distribution: v || null })" />
               </div>
-              <div>
+              <div v-if="showRegulatorDetails">
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Localisation de la régulation de distribution</label>
                 <SearchableSelect :model-value="device.regulator_location_distribution"
                                   :options="zoneOptions"
@@ -345,7 +380,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   @update:model-value="v => patch({ regulator_location_distribution: v || null })" />
               </div>
             </div>
-            <div v-if="hasEmissionRole" class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
+            <div v-if="hasEmissionRole" :class="['grid gap-x-3 gap-y-3', showRegulatorDetails ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1']">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation d'émission</label>
                 <SearchableSelect :model-value="device.regulation_type_emission"
@@ -353,7 +388,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   :clearable="true" :creatable="true" size="sm" placeholder="Thermostat, vanne thermo…"
                                   @update:model-value="v => patch({ regulation_type_emission: v || null })" />
               </div>
-              <div>
+              <div v-if="showRegulatorDetails">
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Localisation de la régulation d'émission</label>
                 <SearchableSelect :model-value="device.regulator_location_emission"
                                   :options="zoneOptions"

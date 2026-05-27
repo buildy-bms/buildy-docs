@@ -58,22 +58,38 @@ onBeforeUnmount(() => {
            :class="['bg-white border rounded-lg shadow-sm scroll-mt-24 transition-shadow',
                     active ? 'border-l-4 border-l-indigo-500 border-y-gray-200 border-r-gray-200 shadow-md ring-1 ring-indigo-100/50'
                            : 'border-gray-200']">
-    <header
-      class="px-5 py-3 border-b border-gray-200 flex items-center gap-2 cursor-pointer hover:bg-gray-50/60 transition select-none"
-      :class="{ 'border-b-0 rounded-lg': !open }"
-      @click="toggle"
+    <div
+      class="lg:sticky z-10 bg-white"
+      style="top: var(--audit-sticky-offset, 0px);"
+      :class="open ? 'rounded-t-lg' : 'rounded-lg'"
     >
-      <slot name="header" :open="open" />
-      <button
-        type="button"
-        @click.stop="toggle"
-        class="ml-1 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition shrink-0"
-        v-tooltip="open ? 'Replier la section' : 'Déplier la section'"
+      <header
+        class="px-5 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50/60 transition select-none"
+        :class="[
+          { 'border-b border-gray-200': open || !$slots.summary },
+          { 'rounded-t-lg': open },
+          { 'rounded-lg': !open },
+        ]"
+        @click="toggle"
       >
-        <ChevronUpIcon v-if="open" class="w-4 h-4" />
-        <ChevronDownIcon v-else class="w-4 h-4" />
-      </button>
-    </header>
+        <slot name="header" :open="open" />
+        <button
+          type="button"
+          @click.stop="toggle"
+          class="ml-1 p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition shrink-0"
+          v-tooltip="open ? 'Replier la section' : 'Déplier la section'"
+        >
+          <ChevronUpIcon v-if="open" class="w-4 h-4" />
+          <ChevronDownIcon v-else class="w-4 h-4" />
+        </button>
+      </header>
+      <!-- Slot pour une barre supplémentaire qui doit rester sticky avec
+           le header (filtres, sous-actions, breadcrumbs…). Visible
+           uniquement quand la section est dépliée. -->
+      <div v-if="open && $slots.headerExtra" class="px-5 py-2 border-b border-gray-200 bg-white">
+        <slot name="headerExtra" />
+      </div>
+    </div>
     <div v-if="!open && $slots.summary" class="px-5 py-2.5 text-xs text-gray-500 bg-gray-50/60 border-t border-gray-100 rounded-b-lg cursor-pointer" @click="toggle">
       <slot name="summary" />
     </div>

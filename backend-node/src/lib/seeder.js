@@ -757,16 +757,26 @@ function resyncBacsAuditDataForZones(documentId, zones) {
     catch { reqByNature[r.zone_nature] = []; }
   }
 
+  // Mig 182 (2026-05-27) : la contrainte UNIQUE(document_id, zone_id,
+  // system_category) a été retirée pour permettre N systèmes par
+  // catégorie dans une même zone. Côté resync, on ne peut donc plus
+  // s'appuyer sur INSERT OR IGNORE — il faut vérifier explicitement
+  // l'existence pour rester idempotent. Sans ce check, chaque resync
+  // dupliquait l'ensemble du jeu de systèmes (incident 2026-05-27).
+  const systemExists = db.db.prepare(
+    'SELECT 1 FROM bacs_audit_systems WHERE document_id = ? AND zone_id = ? AND system_category = ? LIMIT 1'
+  );
   const insertSystem = db.db.prepare(`
-    INSERT OR IGNORE INTO bacs_audit_systems (document_id, zone_id, system_category, present)
+    INSERT INTO bacs_audit_systems (document_id, zone_id, system_category, present)
     VALUES (?, ?, ?, 0)
   `);
   let systemsCount = 0;
   for (const z of functionalZones) {
     const cats = z.nature ? (reqByNature[z.nature] || []) : [];
     for (const cat of cats) {
-      const r = insertSystem.run(documentId, z.zone_id, cat);
-      if (r.changes) systemsCount++;
+      if (systemExists.get(documentId, z.zone_id, cat)) continue;
+      insertSystem.run(documentId, z.zone_id, cat);
+      systemsCount++;
     }
   }
 

@@ -180,8 +180,8 @@ function onAddInCell({ zone, energy, usage }) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in matrixByEnergy" :key="row.zone.zone_id || '__general'"
-              :class="row.zone.kind === 'general' ? 'bg-gray-50/60' : ''">
+          <tr v-for="(row, idx) in matrixByEnergy" :key="row.zone.zone_id || '__general'"
+              :class="row.zone.kind === 'general' ? 'bg-gray-50/60' : (idx % 2 ? 'bg-gray-50/40' : 'bg-white')">
             <td class="px-3 py-2 align-middle whitespace-nowrap">
               <span class="inline-flex items-center gap-2">
                 <FontAwesomeIcon v-if="row.zone.kind === 'general'"

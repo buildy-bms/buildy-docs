@@ -2,20 +2,20 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import Sortable from 'sortablejs'
-import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, MapPinIcon, ChevronDownIcon, ChevronUpIcon, PencilSquareIcon, Bars3Icon, PlusIcon, TrashIcon, Cog6ToothIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
-import SearchableSelect from '@/components/SearchableSelect.vue'
 import SystemDevicesTable from '@/components/SystemDevicesTable.vue'
 import SystemSettingsModal from '@/components/audit/SystemSettingsModal.vue'
+import CreateSystemModal from '@/components/audit/CreateSystemModal.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import { systemUsageLabel } from '@/lib/audit-options'
-import { updateBacsSystem, reorderBacsSystems, createBacsSystem, deleteBacsSystem, listSystemCategories } from '@/api'
+import { updateBacsSystem, reorderBacsSystems, deleteBacsSystem, listSystemCategories } from '@/api'
 
 // Couleur d'accent par categorie de systeme : aligne avec
 // SystemCategoryIcon, sert de border-l-4 pour mieux distinguer les
@@ -132,22 +132,17 @@ async function toggleNegligible(s, checked) {
   })
 }
 
-// ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
-// L'auditeur choisit un usage dans la bibliothèque de catégories, ou
-// saisit un nom libre (option "creatable" du SearchableSelect).
+// ─── Ajout d'un système (mig 182) ────────────────────────────────────
+// Bibliothèque de catégories d'usage personnalisées passée à CreateSystemModal
+// pour proposer des catégories « hors décret » (bornes de recharge, etc.) en
+// plus des 7 catégories BACS standard.
 const categoryLibrary = ref([])
 onMounted(async () => {
   try {
     const { data } = await listSystemCategories()
     categoryLibrary.value = data || []
-  } catch { /* silencieux — on retombe sur la saisie libre */ }
+  } catch { /* silencieux — la modale fonctionne aussi sans bibliothèque */ }
 })
-const categoryOptions = computed(() => categoryLibrary.value.map(c => ({
-  value: c.key,
-  label: c.label,
-  icon: c.icon_value,
-  color: c.icon_color,
-})))
 
 // Modale paramètres système (poste négligeable 5 % + surcharge parties).
 // Cf. SystemSettingsModal.vue — les 2 anciens flags sous-station /
@@ -156,32 +151,140 @@ const settingsSystem = ref(null)
 function openSystemSettings(s) { settingsSystem.value = s }
 function closeSystemSettings() { settingsSystem.value = null }
 
-const addingUsageZone = ref(null)   // zone_id en cours de saisie
-const newUsageValue = ref(null)     // key de catégorie OU texte libre
-function startAddUsage(zoneId) {
-  addingUsageZone.value = zoneId
-  newUsageValue.value = null
+// ─── Filtre par usage (catégorie BACS) ─────────────────────────────────
+// Sémantique « inclusive » : par défaut le set est VIDE → aucun filtre
+// actif → tout est affiché. Cliquer un pill l'AJOUTE au filtre : la card
+// montre alors uniquement les catégories du filtre (équivalent OR multi-
+// sélection). Re-cliquer un pill actif le retire ; quand le set redevient
+// vide, on retombe sur l'affichage complet par défaut. Plus intuitif
+// qu'une logique « tout-puis-on-désélectionne » (incident 2026-05-27 où
+// l'auditeur cliquait Chauffage pour le filtrer ET cachait Chauffage).
+const USAGE_FILTER_OPTIONS = [
+  { value: 'heating',                 label: 'Chauffage' },
+  { value: 'cooling',                 label: 'Refroidissement' },
+  { value: 'ventilation',             label: 'Ventilation' },
+  { value: 'dhw',                     label: 'ECS' },
+  { value: 'lighting_indoor',         label: 'Écl. intérieur' },
+  { value: 'lighting_outdoor',        label: 'Écl. extérieur' },
+  { value: 'electricity_production',  label: 'Production PV' },
+]
+const usageFilterOptions = USAGE_FILTER_OPTIONS
+const usageFilter = ref(new Set()) // vide par défaut = aucun filtre
+function toggleUsageFilter(v) {
+  // Préserve la position du header dans le viewport (sans ça, le retrait
+  // de rows raccourcit la page et le navigateur clamp le scroll vers le
+  // haut, faisant sauter le sticky).
+  const headerEl = window.document.querySelector('#section-systems header')
+  const beforeTop = headerEl ? headerEl.getBoundingClientRect().top : null
+  const s = new Set(usageFilter.value)
+  if (s.has(v)) s.delete(v); else s.add(v)
+  usageFilter.value = s
+  if (beforeTop != null && headerEl) {
+    nextTick(() => {
+      const afterTop = headerEl.getBoundingClientRect().top
+      const delta = afterTop - beforeTop
+      if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' })
+    })
+  }
 }
-function cancelAddUsage() {
-  addingUsageZone.value = null
-  newUsageValue.value = null
+function resetUsageFilter() {
+  usageFilter.value = new Set()
 }
-async function confirmAddUsage(zoneId) {
-  const v = (newUsageValue.value || '').toString().trim()
-  if (!v) return
-  // Si la valeur correspond à une catégorie de la bibliothèque, on rattache
-  // l'usage à cette catégorie (filtre la bibliothèque d'équipements) ;
-  // sinon c'est un nom libre.
-  const cat = categoryLibrary.value.find(c => c.key === v)
-  const payload = cat
-    ? { zone_id: zoneId, label: cat.label, library_category_key: cat.key }
-    : { zone_id: zoneId, label: v }
+
+// Applique le filtre : si vide → tout affiché ; sinon → on garde tout
+// usage non BACS (toujours visible) + les usages BACS dont la catégorie
+// est dans le filtre.
+const filteredSystemsByZone = computed(() => {
+  const active = usageFilter.value
+  if (!active.size) return props.systemsByZone
+  return props.systemsByZone
+    .map(g => ({
+      ...g,
+      items: (g.items || []).filter(s => !s.is_bacs || active.has(s.system_category)),
+    }))
+    .filter(g => g.items.length > 0)
+})
+
+// Mig 182 : modale dédiée pour ajouter un système (BACS standard ou usage
+// hors décret). Remplace le picker inline qui ne supportait que les usages
+// non BACS via custom:uuid. Désormais on peut créer N systèmes BACS de
+// même catégorie dans une même zone (ex: 2 chaudières indépendantes).
+const createSystemForZone = ref(null) // { id, name } ou null
+const createSystemInitial = ref(null) // { category, label } ou null pour le raccourci « + similaire »
+function openCreateSystem(zone) {
+  createSystemForZone.value = zone
+  createSystemInitial.value = null
+}
+function openCreateSystemLike(s, g) {
+  // Pré-remplit la modale avec la catégorie du système source et un nom
+  // suggéré (le custom_label + suffixe « (2) » si déjà numéroté, sinon le
+  // label de catégorie + « (2) »). L'auditeur peut tout réécrire.
+  const base = (s.custom_label && s.custom_label.trim()) || usageLabel(s) || 'Système'
+  const m = base.match(/^(.*)\((\d+)\)\s*$/)
+  const suggestion = m ? `${m[1].trim()} (${parseInt(m[2], 10) + 1})` : `${base} (2)`
+  // Pour les non-BACS (system_category = 'custom:<uuid>'), on ne peut pas
+  // dupliquer la catégorie telle quelle — fallback sur l'option « Autre
+  // usage » côté modale. Pour les BACS standard, on passe la catégorie.
+  const category = s.is_bacs ? s.system_category : '__custom__'
+  createSystemForZone.value = { id: g.zone_id, name: g.zone_name }
+  createSystemInitial.value = { category, label: suggestion }
+}
+function closeCreateSystem() {
+  createSystemForZone.value = null
+  createSystemInitial.value = null
+}
+async function onSystemCreated() {
+  closeCreateSystem()
+  await audit.refreshAuditCore()
+}
+
+// ─── Renommage inline du custom_label d'un système ────────────────────
+// Le nom apparaît entre parenthèses à côté de la catégorie pour les
+// systèmes BACS standard (« Chauffage (Chaudière gaz centrale) »), ou en
+// libellé principal pour les usages personnalisés. Clic sur la zone →
+// input → blur ou Enter pour saver, Échap pour annuler.
+const editingNameId = ref(null)
+const editingNameValue = ref('')
+const nameInputRefs = new Map()
+function setNameInputRef(id, el) {
+  if (el) nameInputRefs.set(id, el)
+  else nameInputRefs.delete(id)
+}
+function startEditName(s) {
+  editingNameId.value = s.id
+  editingNameValue.value = s.custom_label || ''
+  nextTick(() => nameInputRefs.get(s.id)?.focus?.())
+}
+function cancelEditName() {
+  editingNameId.value = null
+  editingNameValue.value = ''
+}
+// Suppression d'un système autorisée si :
+//  - usage non BACS (is_bacs=0) : toujours
+//  - usage BACS : seulement si au moins un autre système BACS de même
+//    (zone × catégorie) existe (= doublon). On garde toujours 1 racine
+//    pour préserver la matrice R175.
+function canDeleteSystem(s, g) {
+  if (s.is_bacs === 0) return true
+  const siblings = (g.items || []).filter(x =>
+    x.id !== s.id && x.is_bacs === 1 && x.system_category === s.system_category
+  )
+  return siblings.length > 0
+}
+
+async function saveSystemName(s) {
+  // Pas de save si on a déjà reset (blur post-Enter).
+  if (editingNameId.value !== s.id) return
+  const next = editingNameValue.value.trim() || null
+  const current = s.custom_label || null
+  editingNameId.value = null
+  editingNameValue.value = ''
+  if (next === current) return
   try {
-    await createBacsSystem(audit.docId, payload)
-    cancelAddUsage()
+    await updateBacsSystem(s.id, { custom_label: next })
     await audit.refreshAuditCore()
   } catch (e) {
-    error(e.response?.data?.detail || 'Ajout de l\'usage impossible')
+    error(e.response?.data?.detail || 'Renommage impossible')
   }
 }
 async function removeUsage(s) {
@@ -269,6 +372,24 @@ onBeforeUnmount(teardownSortables)
           <R175Tooltip article="R175-1 4°" />
           <R175Tooltip article="R175-3" />
         </template>
+        <!-- Filtres usage centrés dans la rangée du header. Restent
+             visibles dans le sticky au scroll. Couleurs douces : actif
+             = white + bordure + icône colorée, inactif = gray-50
+             grayscale. -->
+        <template #center>
+          <div class="flex items-center flex-wrap gap-1 justify-center" @click.stop>
+            <button v-for="cat in usageFilterOptions" :key="cat.value"
+                    type="button" @click.stop="toggleUsageFilter(cat.value)"
+                    :class="['inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition whitespace-nowrap border',
+                             usageFilter.has(cat.value)
+                               ? 'bg-white text-indigo-700 border-indigo-300 shadow-sm'
+                               : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-white hover:text-gray-600']"
+                    v-tooltip="usageFilter.has(cat.value) ? `Retirer « ${cat.label} » du filtre` : `Filtrer sur « ${cat.label} »`">
+              <SystemCategoryIcon :category="cat.value" size="sm" :class="usageFilter.has(cat.value) ? '' : 'opacity-50 grayscale'" />
+              {{ cat.label }}
+            </button>
+          </div>
+        </template>
         <template #actions>
           <!-- Item 5 — cumul automatique des puissances chaud / froid -->
           <span v-if="powerSummary.power_summary" class="text-xs text-gray-600 whitespace-nowrap flex items-center gap-2">
@@ -304,7 +425,7 @@ onBeforeUnmount(teardownSortables)
            pour permettre à l'auditeur de les remettre actifs facilement
            sans avoir à toggle un flag d'affichage. -->
       <div class="space-y-3">
-        <div v-for="g in systemsByZone" :key="g.zone_id"
+        <div v-for="g in filteredSystemsByZone" :key="g.zone_id"
              class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
           <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
@@ -343,7 +464,7 @@ onBeforeUnmount(teardownSortables)
                      contrôle segmenté présence en auto, puis 1fr pour pousser
                      les actions à droite. -->
                 <div class="px-3 py-2 grid items-center gap-3 bg-white"
-                     :style="'grid-template-columns: 20px 20px 28px 240px auto minmax(0, 1fr);'">
+                     :style="'grid-template-columns: 20px 20px 28px minmax(240px, auto) auto minmax(0, 1fr);'">
                   <button type="button"
                           class="drag-handle p-0.5 -ml-0.5 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
                           v-tooltip="'Glisser pour réordonner'">
@@ -357,10 +478,49 @@ onBeforeUnmount(teardownSortables)
                   </button>
                   <span v-else></span>
                   <SystemCategoryIcon :category="s.system_category" size="md" />
-                  <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate"
-                        @click="s.present && emit('toggle-system-collapsed', s.id)">
-                    {{ usageLabel(s) }}
-                  </span>
+                  <!-- Titre : libellé de la catégorie (Chauffage / Refroidissement…)
+                       + nom du système entre parenthèses, inline-éditable au clic.
+                       Pour les usages BACS standard : « Chauffage (Chaudière gaz
+                       centrale) ». Pour les usages personnalisés (is_bacs=0) :
+                       le custom_label est déjà le label affiché par usageLabel,
+                       on l'expose en édition directement. -->
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="font-medium text-sm text-gray-800 whitespace-nowrap cursor-pointer truncate shrink-0"
+                          @click="s.present && emit('toggle-system-collapsed', s.id)">
+                      {{ s.is_bacs ? usageLabel(s) : (s.custom_label || 'Usage personnalisé') }}
+                    </span>
+                    <!-- Input inline pour le nom du système. Visible quand l'auditeur
+                         clique sur la zone (parens). Save sur blur / Enter. Pour BACS
+                         le nom s'affiche entre parenthèses ; pour non-BACS, c'est le
+                         libellé principal qui est édité. -->
+                    <template v-if="editingNameId === s.id">
+                      <span v-if="s.is_bacs" class="text-sm text-gray-500 shrink-0">(</span>
+                      <input :ref="el => setNameInputRef(s.id, el)" type="text"
+                             v-model="editingNameValue"
+                             :placeholder="s.is_bacs ? 'ex : Chaudière gaz centrale' : 'Nom du système'"
+                             @blur="saveSystemName(s)"
+                             @keydown.enter="saveSystemName(s)"
+                             @keydown.escape="cancelEditName"
+                             class="h-7 px-2 text-sm border border-indigo-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 min-w-40" />
+                      <span v-if="s.is_bacs" class="text-sm text-gray-500 shrink-0">)</span>
+                    </template>
+                    <span v-else-if="s.is_bacs && s.custom_label"
+                          @click="startEditName(s)"
+                          class="text-sm text-gray-600 truncate cursor-text hover:text-gray-900 hover:bg-gray-50 rounded px-1"
+                          v-tooltip="'Cliquer pour renommer ce système'">
+                      ({{ s.custom_label }})
+                    </span>
+                    <button v-else-if="s.is_bacs" type="button" @click="startEditName(s)"
+                            class="text-[11px] text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded px-1.5 py-0.5 transition shrink-0"
+                            v-tooltip="'Donner un nom à ce système (ex: Chaudière gaz centrale)'">
+                      + nom
+                    </button>
+                    <button v-else type="button" @click="startEditName(s)"
+                            class="btn-icon shrink-0"
+                            v-tooltip="'Renommer ce système'">
+                      <PencilSquareIcon class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
                                    @update:model-value="v => setPresence(s, v)" />
                   <div class="flex items-center gap-1 shrink-0 justify-self-end">
@@ -381,11 +541,21 @@ onBeforeUnmount(teardownSortables)
                       v-tooltip="hasNotes(s.notes_html || s.notes) ? 'Modifier les notes' : 'Ajouter une note'">
                       <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <!-- Suppression : usages manuels (non BACS) uniquement. -->
-                    <button v-if="s.is_bacs === 0" type="button"
+                    <!-- Raccourci : ajouter un système similaire (même
+                         catégorie + même zone, nom pré-rempli pour aider
+                         l'auditeur à différencier les 2 équipements). -->
+                    <button type="button"
+                            @click="openCreateSystemLike(s, g)"
+                            class="btn-icon"
+                            v-tooltip="'Ajouter un système similaire dans cette zone'">
+                      <DocumentDuplicateIcon class="w-4 h-4" />
+                    </button>
+                    <!-- Suppression : usages manuels (non BACS) toujours,
+                         OU systèmes BACS dupliqués (au moins 1 sibling). -->
+                    <button v-if="canDeleteSystem(s, g)" type="button"
                             @click="removeUsage(s)"
                             class="btn-icon btn-icon-danger"
-                            v-tooltip="'Supprimer cet usage'">
+                            v-tooltip="'Supprimer ce système'">
                       <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>
@@ -446,35 +616,14 @@ onBeforeUnmount(teardownSortables)
                   @add-device="sys => emit('add-device', { id: sys.id, system_category: sys.system_category, zone_name: g.zone_name, is_bacs: sys.is_bacs, custom_label: sys.custom_label, library_category_key: sys.library_category_key })" />
               </div>
             </template>
-            <!-- Ajout manuel d'un usage (hors matrice BACS) — choisir une
-                 catégorie de la bibliothèque ou saisir un nom libre. -->
-            <div v-if="addingUsageZone === g.zone_id"
-                 class="rounded-lg border border-dashed border-indigo-300 bg-indigo-50/40 px-3 py-2.5 space-y-2">
-              <p class="text-[11px] font-medium text-gray-600">
-                Choisir une catégorie de la bibliothèque, ou saisir un nom libre
-              </p>
-              <div class="flex items-center gap-2">
-                <div class="flex-1 min-w-0">
-                  <SearchableSelect
-                    v-model="newUsageValue"
-                    :options="categoryOptions"
-                    :creatable="true"
-                    placeholder="Catégorie ou nom d'usage…"
-                    search-placeholder="Filtrer ou saisir un nom libre…" />
-                </div>
-                <button type="button" @click="confirmAddUsage(g.zone_id)" :disabled="!newUsageValue"
-                        class="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md whitespace-nowrap shrink-0">
-                  Ajouter
-                </button>
-                <button type="button" @click="cancelAddUsage"
-                        class="px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md whitespace-nowrap shrink-0">
-                  Annuler
-                </button>
-              </div>
-            </div>
-            <button v-else type="button" @click="startAddUsage(g.zone_id)"
+            <!-- Mig 182 : ouverture d'une modale pour ajouter un système
+                 (catégorie BACS standard OU usage hors décret). Le bouton
+                 unique remplace l'ancien picker inline (limité aux usages
+                 manuels). On peut désormais créer N systèmes BACS de même
+                 catégorie dans une même zone (ex: 2 chaudières indépendantes). -->
+            <button type="button" @click="openCreateSystem({ id: g.zone_id, name: g.zone_name })"
                     class="btn-add">
-              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un usage
+              <PlusIcon class="w-4 h-4 shrink-0" /> Ajouter un système
             </button>
           </div>
         </div>
@@ -490,5 +639,13 @@ onBeforeUnmount(teardownSortables)
       :system-weight-pct="systemWeightPct(settingsSystem)"
       @close="closeSystemSettings"
       @patched="refreshAuditData" />
+    <!-- Modale création d'un système (catégorie + nom). Mig 182. -->
+    <CreateSystemModal
+      v-if="createSystemForZone"
+      :zone="createSystemForZone"
+      :library-categories="categoryLibrary"
+      :initial="createSystemInitial"
+      @close="closeCreateSystem"
+      @created="onSystemCreated" />
   </CollapsibleSection>
 </template>

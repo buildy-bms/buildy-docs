@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.111",
+      "date": "2026-05-27",
+      "title": "Card 03 — Plusieurs systèmes de même catégorie dans une même zone",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Card 03 : créer plusieurs systèmes « Chauffage » (ou autre catégorie) dans la même zone",
+          "what": "Jusqu'à maintenant, une zone ne pouvait avoir qu'UN système par catégorie BACS (1 Chauffage, 1 Refroidissement, etc.). Cette limite est levée : on peut désormais créer N systèmes de même catégorie dans la même zone (ex. 2 chaudières indépendantes, une PAC réversible + un chauffage gaz d'appoint…). Chaque système a son propre nom (« Chaudière gaz centrale », « PAC bureaux RDC »…) et est évalué séparément au regard de R175-6. La card 06 Régulation thermique reflète automatiquement chaque système sur sa propre ligne. Migration 182 : retrait de la contrainte UNIQUE(document_id, zone_id, system_category) en mode safe (writable_schema, pas de recréation de table).",
+          "where": "Audit BACS, card 03 « Systèmes techniques par zone » → bouton « + Ajouter un système ».",
+          "how": "Sur une zone qui a déjà un système Chauffage, clique « + Ajouter un système », choisis « Chauffage » dans la modale, saisis un nom (ex. « PAC bureaux » ou « Chaudière gaz d'appoint »), valide. Un 2e système Chauffage apparaît dans la zone. Va sur card 06 : une 2e ligne s'ajoute pour ce nouveau système."
+        },
+        {
+          "kind": "feat",
+          "title": "Modale dédiée pour créer un système",
+          "what": "Le picker inline « Ajouter un usage » qui était limité aux usages hors décret est remplacé par une modale « Ajouter un système » plus claire : choix de la catégorie (7 catégories BACS + catégories de la bibliothèque + option « Autre usage saisie libre ») + nom du système (pré-rempli avec le label de la catégorie pour gagner du temps). Le nom est affiché dans card 06 et le PDF chapitre 5.",
+          "where": "Audit BACS, card 03 → bouton « + Ajouter un système ».",
+          "how": "Clique le bouton, ouvre la modale, observe que le champ Nom se pré-remplit avec « Chauffage » dès qu'on sélectionne la catégorie ; on peut le modifier librement."
+        },
+        {
+          "kind": "feat",
+          "title": "Suppression d'un système BACS dupliqué",
+          "what": "On peut désormais supprimer un système BACS si la zone en compte au moins un autre de la même catégorie (= un doublon ajouté manuellement). Le système BACS « racine » de chaque (zone × catégorie) ne se supprime pas — l'auditeur utilise toujours « Non concerné » dans ce cas, pour préserver la matrice R175.",
+          "where": "Audit BACS, card 03, bouton corbeille rouge sur un système BACS dupliqué.",
+          "how": "Crée un 2e Chauffage dans une zone, observe que la corbeille apparaît. Supprime, ça marche. Sur le système racine, la corbeille ne supprime pas (message explicatif)."
+        }
+      ]
+    },
+    {
       "version": "0.1.110",
       "date": "2026-05-27",
       "title": "Régulation par niveau : conformité R175-6 + PDF + localisation par niveau intégrés",
