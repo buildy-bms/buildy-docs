@@ -202,6 +202,12 @@ function resolveTotalPower(document, auto) {
   return {
     source,
     effectiveKw,
+    // Alias rétro-compat : la card 04 frontend lit `retainedKw`
+    // (= valeur retenue par l'audit pour le cumul R175-2). C'est
+    // sémantiquement `effectiveKw` (manuel si défini en mode manual,
+    // sinon le cumul auto). Sans ce champ, le pill « Retenue X kW »
+    // affichait « Retenue kW » vide (incident audit Communay).
+    retainedKw: effectiveKw,
     autoKw,
     manualKw,
     heatKw: auto.heatKw,
