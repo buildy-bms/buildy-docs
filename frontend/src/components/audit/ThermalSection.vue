@@ -568,11 +568,6 @@ onBeforeUnmount(teardownSortable)
                       :options="GRANULARITY_OPTIONS"
                       :clearable="true" :creatable="true" :auto-width="true"
                       size="sm" placeholder="Granularité…" />
-                    <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
-                          class="text-[9px] text-gray-400 italic shrink-0"
-                          v-tooltip="`Valeur dérivée automatiquement du type d'émission. Choisis une valeur pour la fixer.`">
-                      auto
-                    </span>
                   </template>
                 </ThermalLevelCell>
               </td>
