@@ -89,11 +89,15 @@ function updatePopoverPosition() {
   const el = triggerRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
+  // Popover : aussi large que le trigger AU MINIMUM, mais peut grandir
+  // jusqu'à 480px pour afficher les libellés longs sans troncature
+  // (incident card 06 : « Sous-station de réseau de chaleur urbain » et
+  // « Unité Intérieure (DRV, split, etc.) » étaient illisibles).
   popoverStyle.value = {
     top: `${rect.bottom + 4}px`,
     left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    minWidth: '180px',
+    minWidth: `${Math.max(rect.width, 280)}px`,
+    maxWidth: '480px',
   }
 }
 
@@ -334,8 +338,12 @@ function clear() {
               class="w-4 h-4 shrink-0"
             />
             <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
-            <span class="flex-1 truncate">{{ o.label }}</span>
-            <span v-if="o.hint" class="text-[11px] text-gray-400 truncate">{{ o.hint }}</span>
+            <!-- Label sans truncate : le popover a maxWidth 480px et wrap si
+                 nécessaire. Les libellés longs (« Sous-station de réseau de
+                 chaleur urbain », « Unité Intérieure (DRV, split, etc.) »)
+                 doivent être lisibles intégralement, pas tronqués. -->
+            <span class="flex-1 whitespace-normal wrap-break-word leading-tight">{{ o.label }}</span>
+            <span v-if="o.hint" class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
             <CheckIcon v-if="isSelected(o.value)" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
           <div v-if="!filteredOptions.length && !canCreate" class="px-3 py-3 text-xs text-gray-400 italic text-center">

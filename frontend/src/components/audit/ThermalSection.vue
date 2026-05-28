@@ -271,38 +271,47 @@ const woodExemptCount = computed(() =>
   (props.thermalFiltered || []).filter(t => exemptAutoFromWood(t)).length,
 )
 
-// Drag & drop des lignes thermiques. Sortable sur la <table> avec
-// draggable="tbody" — chaque tbody contient la ligne principale + sa
-// ligne de détail repliable, donc les deux suivent le drag ensemble.
+// Mig 187 — drag & drop des systèmes thermiques. Maintenant 1 Sortable
+// par zone (chaque zone est sa propre sous-card avec sa liste d'articles)
+// pour empêcher de glisser un système hors de sa zone (= contrainte métier
+// implicite : un système Chauffage de Bureaux 1 n'a aucun sens dans Bureaux 2).
 const tableRef = ref(null)
-let sortable = null
+const sortables = []
 function teardownSortable() {
-  if (sortable) { try { sortable.destroy() } catch { /* ignore */ } sortable = null }
+  while (sortables.length) {
+    const s = sortables.pop()
+    try { s.destroy() } catch { /* ignore */ }
+  }
 }
 function setupSortable() {
   teardownSortable()
-  const el = tableRef.value
-  if (!el) return
-  sortable = Sortable.create(el, {
-    draggable: 'tbody.thermal-row',
-    handle: '.drag-handle',
-    animation: 150,
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    onEnd: async (evt) => {
-      if (evt.oldIndex === evt.newIndex) return
-      const ids = Array.from(el.querySelectorAll('tbody.thermal-row'))
-        .map(tb => parseInt(tb.getAttribute('data-id'), 10))
-        .filter(Boolean)
-      try {
-        await reorderBacsThermal(audit.docId, ids)
-        await audit.refreshAuditCore()
-      } catch {
-        error('Réorganisation impossible')
-        await audit.refreshAuditCore()
-      }
-    },
-  })
+  const root = tableRef.value
+  if (!root) return
+  const zones = root.querySelectorAll('.thermal-zone-list')
+  for (const z of zones) {
+    sortables.push(Sortable.create(z, {
+      draggable: '.thermal-row',
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: async (evt) => {
+        if (evt.oldIndex === evt.newIndex) return
+        // Recollecte l'ordre global de toutes les rows (toutes zones
+        // confondues) puisque l'API attend la liste plate.
+        const ids = Array.from(root.querySelectorAll('.thermal-row'))
+          .map(el => parseInt(el.getAttribute('data-id'), 10))
+          .filter(Boolean)
+        try {
+          await reorderBacsThermal(audit.docId, ids)
+          await audit.refreshAuditCore()
+        } catch {
+          error('Réorganisation impossible')
+          await audit.refreshAuditCore()
+        }
+      },
+    }))
+  }
 }
 watch(() => props.thermalFiltered, async () => {
   await nextTick()
@@ -366,147 +375,111 @@ onBeforeUnmount(teardownSortable)
       </p>
     </div>
 
-    <div class="overflow-x-auto">
-    <!-- Mig 187 — Layout regroupé par zone. Un tbody d'en-tête (sticky-like
-         visuel) annonce la zone, puis tous ses systèmes en sous-lignes
-         compactes. Plus de colonnes Zone / Usage / Système redondantes :
-         l'en-tête de zone porte le nom, et la 1ère cellule de chaque ligne
-         combine usage (icône + libellé) + nom du système. -->
-    <table ref="tableRef" class="data-table w-full text-sm">
-      <thead>
-        <tr>
-          <th class="w-8"></th>
-          <th class="min-w-48">Système</th>
-          <th v-if="anyWoodExempt" class="w-24">Exempté bois</th>
-          <!-- Mig 187 — colonnes de niveau larges et homogènes. -->
-          <th class="min-w-64">Production</th>
-          <th class="min-w-64">Distribution</th>
-          <th class="min-w-64">Émission</th>
-          <th class="w-32">Granularité</th>
-          <th class="w-20">Actions</th>
-        </tr>
-      </thead>
-      <template v-for="g in thermalGroups" :key="g.zoneName">
-        <!-- En-tête de zone : barre teintée qui couvre toutes les colonnes,
-             remplace les anciennes cellules Zone répétées sur chaque ligne. -->
-        <tbody class="thermal-zone-header">
-          <tr>
-            <td :colspan="anyWoodExempt ? 8 : 7"
-                class="px-3 py-1.5 bg-gray-50 border-t-2 border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
-              {{ g.zoneName }}
-              <span class="text-gray-400 normal-case font-normal">— {{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
-            </td>
-          </tr>
-        </tbody>
-      <tbody v-for="t in g.rows" :key="t.id"
-             :data-id="t.id"
-             class="thermal-row">
-        <!-- Ligne : Système (usage + nom) + 3 niveaux + Granularité + Actions -->
-        <tr>
-          <td class="align-middle">
-            <button type="button"
-                    class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                    v-tooltip="'Glisser pour réordonner'">
-              <Bars3Icon class="w-4 h-4" />
-            </button>
-          </td>
-          <!-- Système : usage (icône colorée) + nom du système sur 2 lignes
-               compactes. Économise les colonnes Zone/Usage/Système séparées. -->
-          <td class="align-top">
-            <div class="flex items-start gap-1.5">
-              <span class="mt-0.5">
-                <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
+    <!-- Mig 187 (v2) — Layout en SOUS-CARDS par zone : chaque zone est un
+         encart bordé avec son titre, et chaque système est un article avec
+         une ligne d'en-tête identification (Chauffage · Chaudière 1 +
+         granularité + actions) suivie de 3 colonnes empilées
+         Production / Distribution / Émission. Plus de gros tableau ; les
+         dropdowns peuvent enfin afficher les noms d'équipements en entier. -->
+    <div ref="tableRef" class="px-3 pb-3 space-y-4">
+      <section v-for="g in thermalGroups" :key="g.zoneName"
+               class="rounded-xl border border-gray-200 overflow-hidden bg-white">
+        <header class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+          <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
+        </header>
+        <div class="thermal-zone-list divide-y divide-gray-100">
+          <article v-for="t in g.rows" :key="t.id"
+                   :data-id="t.id"
+                   class="thermal-row p-4">
+            <!-- En-tête système : identification (drag + usage + nom) à
+                 gauche, granularité + actions à droite. Une seule ligne,
+                 pas de colonne dédiée au nom : économie de largeur. -->
+            <header class="flex items-center gap-3 mb-3 flex-wrap">
+              <button type="button"
+                      class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
+                      v-tooltip="'Glisser pour réordonner ce système dans la zone'">
+                <Bars3Icon class="w-4 h-4" />
+              </button>
+              <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
+              <span class="text-xs font-semibold uppercase tracking-wider"
+                    :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
+                {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
               </span>
-              <div class="min-w-0">
-                <div class="text-xs font-medium leading-tight"
-                     :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
-                  {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
+              <span class="text-gray-400">·</span>
+              <span class="text-sm font-semibold text-gray-800">{{ systemDisplayName(t) }}</span>
+              <Tooltip v-if="exemptAutoFromWood(t)"
+                       text="Exemption R175-6 II : l'équipement de Production est au bois.">
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
+                  Exempté — bois
+                </span>
+              </Tooltip>
+              <!-- Granularité inline à droite + actions notes/suppression -->
+              <div class="ml-auto flex items-center gap-2 shrink-0">
+                <div class="flex items-center gap-1.5">
+                  <label class="text-[10px] uppercase tracking-wider text-gray-500">Granularité</label>
+                  <div class="min-w-32">
+                    <SearchableSelect
+                      :model-value="granularityForRow(t).key"
+                      @update:modelValue="(v) => patchGranularity(t, v)"
+                      :options="GRANULARITY_OPTIONS"
+                      :clearable="true" :creatable="true" size="sm" placeholder="—" />
+                  </div>
+                  <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
+                        class="text-[9px] text-gray-400 italic"
+                        v-tooltip="`Valeur dérivée automatiquement du type d'émission. Pour la fixer explicitement, choisis une valeur.`">
+                    auto
+                  </span>
                 </div>
-                <div class="text-xs text-gray-800 font-medium leading-tight mt-0.5">
-                  {{ systemDisplayName(t) }}
-                </div>
+                <button type="button"
+                        @click="emit('open-notes', {
+                          title: 'Notes régulation thermique',
+                          contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                          entityType: 'thermal',
+                          entityRef: t,
+                          currentHtml: t.notes_html || t.notes || '',
+                          noteField: 'notes_html',
+                        })"
+                        :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
+                        v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                  <PencilSquareIcon class="w-4 h-4 shrink-0" />
+                </button>
+                <button type="button" @click="removeEntry(t)"
+                        class="btn-icon btn-icon-danger"
+                        v-tooltip="'Supprimer ce système de régulation'">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </div>
+            </header>
+            <!-- Les 3 niveaux R175-6 sur une grille égale. Chaque cellule
+                 peut respirer (min-w-64) sans contraintes de table HTML. -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div v-for="level in LEVELS" :key="level.key" class="space-y-1">
+                <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                  {{ level.label }}
+                </label>
+                <ThermalLevelCell
+                  :thermal="t"
+                  :level="level.key"
+                  :device="deviceForLevel(t, level.key)"
+                  :device-options="deviceOptionsForLevel(t, level.key)"
+                  :regulator-options="deviceOptionsForLevel(t, 'regulation')"
+                  :regulation-type-label="levelRegulationTypeLabel(t, level.key)"
+                  :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
+                  :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
+                  @patch-thermal="(p) => patchThermal(t, p)"
+                  @open-notes="emit('open-notes', {
+                    title: 'Notes ' + level.label + ' — ' + t.zone_name,
+                    contextLabel: t.zone_name + ' · ' + level.label,
+                    entityType: 'thermal', entityRef: t,
+                    currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
+                    noteField: LEVEL_NOTES_FIELD[level.key],
+                  })" />
               </div>
             </div>
-          </td>
-          <td v-if="anyWoodExempt" class="align-middle">
-            <Tooltip v-if="exemptAutoFromWood(t)"
-                     text="Exemption R175-6 II : l'équipement de Production est au bois.">
-              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
-                Exempté — bois
-              </span>
-            </Tooltip>
-            <span v-else class="text-gray-300 text-xs">—</span>
-          </td>
-          <!-- Mig 187 — Layout regroupé : 1 colonne par niveau (Production /
-               Distribution / Émission), chacune contenant équipement principal
-               + chip type de régulation + équipement régulateur séparé SI
-               régulation déportée (`regulation_integrated === 0` sur l'éq.).
-               Sinon « Régulation intégrée » affiché en chip neutre = pas de
-               double saisie. Notes par niveau accessibles via icône. -->
-          <td v-for="level in LEVELS" :key="level.key" class="align-top">
-            <ThermalLevelCell
-              :thermal="t"
-              :level="level.key"
-              :device="deviceForLevel(t, level.key)"
-              :device-options="deviceOptionsForLevel(t, level.key)"
-              :regulator-options="deviceOptionsForLevel(t, 'regulation')"
-              :regulation-type-label="levelRegulationTypeLabel(t, level.key)"
-              :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
-              :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
-              @patch-thermal="(p) => patchThermal(t, p)"
-              @open-notes="emit('open-notes', {
-                title: 'Notes ' + level.label + ' — ' + t.zone_name,
-                contextLabel: t.zone_name + ' · ' + level.label,
-                entityType: 'thermal', entityRef: t,
-                currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
-                noteField: LEVEL_NOTES_FIELD[level.key],
-              })" />
-          </td>
-          <!-- Mig 187 — Granularité R175-6 désormais ÉDITABLE (saisie sur le
-               device émetteur dans la modale équipement). Le SearchableSelect
-               ci-dessous offre les options canoniques + creatable. Vide = on
-               affiche la valeur dérivée du type d'émission. -->
-          <td class="align-middle">
-            <div class="min-w-32">
-              <SearchableSelect
-                :model-value="granularityForRow(t).key"
-                @update:modelValue="(v) => patchGranularity(t, v)"
-                :options="GRANULARITY_OPTIONS"
-                :clearable="true" :creatable="true" size="sm" placeholder="—" />
-              <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
-                    class="mt-1 inline-block text-[9px] text-gray-400 italic"
-                    v-tooltip="`Valeur dérivée automatiquement du type d'émission. Pour la fixer, choisis une valeur dans la liste.`">
-                auto
-              </span>
-            </div>
-          </td>
-          <!-- Actions de l'entrée de régulation : notes globales + suppression -->
-          <td class="align-middle">
-            <div class="inline-flex items-center gap-1">
-              <button type="button"
-                      @click="emit('open-notes', {
-                        title: 'Notes régulation thermique',
-                        contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
-                        entityType: 'thermal',
-                        entityRef: t,
-                        currentHtml: t.notes_html || t.notes || '',
-                        noteField: 'notes_html',
-                      })"
-                      :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
-                      v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-                <PencilSquareIcon class="w-4 h-4 shrink-0" />
-              </button>
-              <button type="button" @click="removeEntry(t)"
-                      class="btn-icon btn-icon-danger"
-                      v-tooltip="'Supprimer ce système de régulation'">
-                <TrashIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-      </template>
-    </table>
+          </article>
+        </div>
+      </section>
     </div>
 
     <!-- Mig 180 : les lignes sont créées automatiquement depuis les

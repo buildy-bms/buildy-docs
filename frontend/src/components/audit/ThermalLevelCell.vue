@@ -74,11 +74,11 @@ function setRegulator(v) {
 </script>
 
 <template>
-  <!-- Mig 187 — cellule par niveau : équipement principal en haut (large pour
-       éviter la troncature des longs noms), métadonnées en pied (chip type +
-       intégrée + bouton notes), et 2e select « Régulateur déporté » UNIQUEMENT
-       si l'auditeur a explicitement coché Déportée. -->
-  <div class="min-w-64 max-w-80 space-y-1">
+  <!-- Mig 187 — cellule par niveau : équipement principal en haut, métadonnées
+       en pied (chip type + intégrée + bouton notes), et 2e select « Régulateur
+       déporté » UNIQUEMENT si l'auditeur a explicitement coché Déportée. Prend
+       100% de sa colonne grid (parent gère la largeur). -->
+  <div class="w-full space-y-1">
     <!-- Équipement principal du niveau. Tooltip = nom complet (compense la
          troncature visuelle du SearchableSelect). -->
     <div v-tooltip="selectedDeviceName">
