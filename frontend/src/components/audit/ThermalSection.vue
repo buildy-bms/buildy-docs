@@ -301,31 +301,32 @@ function setupSortable() {
   teardownSortable()
   const root = tableRef.value
   if (!root) return
-  const zones = root.querySelectorAll('.thermal-zone-list')
-  for (const z of zones) {
-    sortables.push(Sortable.create(z, {
-      draggable: '.thermal-row',
-      handle: '.drag-handle',
-      animation: 150,
-      ghostClass: 'sortable-ghost',
-      chosenClass: 'sortable-chosen',
-      onEnd: async (evt) => {
-        if (evt.oldIndex === evt.newIndex) return
-        // Recollecte l'ordre global de toutes les rows (toutes zones
-        // confondues) puisque l'API attend la liste plate.
-        const ids = Array.from(root.querySelectorAll('.thermal-row'))
-          .map(el => parseInt(el.getAttribute('data-id'), 10))
-          .filter(Boolean)
-        try {
-          await reorderBacsThermal(audit.docId, ids)
-          await audit.refreshAuditCore()
-        } catch {
-          error('Réorganisation impossible')
-          await audit.refreshAuditCore()
-        }
-      },
-    }))
-  }
+  // Mig 187 v8 — 1 seule table dans la card → 1 seul Sortable sur la table
+  // entière, draggable cible les `tbody.thermal-row` (= systèmes). Permet
+  // de réordonner les systèmes y compris cross-zone si l'utilisateur le
+  // souhaite (rare, mais pas bloqué).
+  const table = root.querySelector('table.thermal-card-table')
+  if (!table) return
+  sortables.push(Sortable.create(table, {
+    draggable: 'tbody.thermal-row',
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return
+      const ids = Array.from(table.querySelectorAll('tbody.thermal-row'))
+        .map(el => parseInt(el.getAttribute('data-id'), 10))
+        .filter(Boolean)
+      try {
+        await reorderBacsThermal(audit.docId, ids)
+        await audit.refreshAuditCore()
+      } catch {
+        error('Réorganisation impossible')
+        await audit.refreshAuditCore()
+      }
+    },
+  }))
 }
 watch(() => props.thermalFiltered, async () => {
   await nextTick()
@@ -402,40 +403,59 @@ onBeforeUnmount(teardownSortable)
         {{ allCollapsed ? 'Tout déplier' : 'Tout replier' }}
       </button>
     </div>
-    <div ref="tableRef" class="px-3 pb-3 space-y-4">
-      <section v-for="g in thermalGroups" :key="g.zoneName"
-               class="rounded-xl border border-gray-200 overflow-hidden bg-white">
-        <header @click="toggleZone(g.zoneName)"
-                class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition select-none">
-          <div class="flex items-center gap-2">
-            <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
-            <ChevronDownIcon v-else class="w-4 h-4 text-gray-500" />
-            <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
-          </div>
-          <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
-        </header>
-        <!-- Mig 187 v5 — Vrai <table> par zone pour garantir des colonnes
-             UNIFORMES sur tous les systèmes (browser layout engine équilibre
-             les colonnes par défaut). Granularité dans la cellule ÉMISSION
-             (sémantique R175-6 : la granularité caractérise la régulation
-             d'émission). Chaque système occupe 2 lignes : 1 d'en-tête
-             identification (colspan 3) + 1 avec les 3 cellules niveaux. -->
-        <table v-show="!collapsedZones[g.zoneName]" class="thermal-zone-list w-full">
-          <colgroup>
-            <col class="w-1/3" />
-            <col class="w-1/3" />
-            <col class="w-1/3" />
-          </colgroup>
+    <!-- Mig 187 v8 — UNE SEULE table pour TOUTE la card, pour que les
+         largeurs de colonnes (Production / Distribution / Émission) soient
+         calculées sur le contenu MAXIMUM de toute la card, pas par zone.
+         Sinon chaque zone calculait ses propres largeurs et les colonnes
+         étaient inconsistantes d'une zone à l'autre.
+         Les zones sont matérialisées par des tbody (zone-header cliquable
+         + zone-content masquable en v-show). -->
+    <div ref="tableRef" class="px-3 pb-3">
+      <table class="thermal-card-table border border-gray-200 rounded-xl overflow-hidden">
+        <!-- En-tête de colonnes affiché UNE FOIS en haut de la table : ne
+             se répète plus pour chaque système (gain de bruit visuel). -->
+        <thead class="bg-gray-50">
+          <tr>
+            <th v-for="level in LEVELS" :key="level.key"
+                class="px-4 py-2 text-left text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
+              {{ level.label }}
+              <!-- Mig 187 v5 — Granularité collée à l'Émission (dérive du
+                   type d'émission). -->
+              <span v-if="level.key === 'emission'" class="ml-2 normal-case font-normal text-gray-400">·</span>
+              <span v-if="level.key === 'emission'" class="normal-case font-semibold text-gray-500">Granularité</span>
+            </th>
+          </tr>
+        </thead>
+        <template v-for="g in thermalGroups" :key="g.zoneName">
+          <!-- tbody zone-header — bande grise cliquable pour replier la zone. -->
+          <tbody class="thermal-zone-header">
+            <tr @click="toggleZone(g.zoneName)"
+                class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100 transition select-none">
+              <td colspan="3" class="px-4 py-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
+                    <ChevronDownIcon v-else class="w-4 h-4 text-gray-500" />
+                    <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+                  </div>
+                  <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <!-- tbody par système (regroupe les rows identification + data
+               sous un même drag handle / data-id pour Sortable). -->
           <tbody v-for="t in g.rows" :key="t.id"
+                 v-show="!collapsedZones[g.zoneName]"
                  :data-id="t.id"
-                 class="thermal-row border-t border-gray-100 first:border-t-0">
-            <!-- Ligne 1 — identification du système + actions à droite -->
+                 class="thermal-row border-t border-gray-100">
+            <!-- Ligne 1 — identification (colspan 3) + actions -->
             <tr>
               <td colspan="3" class="px-4 pt-3 pb-1">
                 <div class="flex items-center gap-3 flex-wrap">
                   <button type="button"
                           class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
-                          v-tooltip="'Glisser pour réordonner ce système dans la zone'">
+                          v-tooltip="'Glisser pour réordonner ce système'">
                     <Bars3Icon class="w-4 h-4" />
                   </button>
                   <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
@@ -474,23 +494,8 @@ onBeforeUnmount(teardownSortable)
                 </div>
               </td>
             </tr>
-            <!-- En-têtes de colonnes (Production / Distribution / Émission +
-                 Granularité). Visibles sur chaque système pour clarté. -->
-            <tr>
-              <th v-for="level in LEVELS" :key="level.key"
-                  class="px-4 pt-1 text-left text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
-                {{ level.label }}
-                <!-- Mig 187 v5 — Granularité collée à l'Émission (sémantique :
-                     elle dérive du type d'émission et caractérise la
-                     précision spatiale de la régulation d'émission). -->
-                <span v-if="level.key === 'emission'" class="ml-2 normal-case font-normal text-gray-400">·</span>
-                <span v-if="level.key === 'emission'" class="normal-case font-semibold text-gray-500">Granularité</span>
-              </th>
-            </tr>
-            <!-- Ligne 2 — 3 cellules (Production / Distribution / Émission)
-                 alignées en colonnes uniformes (w-1/3 via colgroup). La
-                 cellule Émission contient en plus le sélecteur Granularité
-                 en dessous. -->
+            <!-- Ligne 2 — 3 cellules niveaux. Largeurs auto par contenu max
+                 sur TOUTE la card (vrai bénéfice du single-table). -->
             <tr>
               <td v-for="level in LEVELS" :key="level.key"
                   class="px-4 pb-3 align-top">
@@ -511,18 +516,15 @@ onBeforeUnmount(teardownSortable)
                     currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
                     noteField: LEVEL_NOTES_FIELD[level.key],
                   })" />
-                <!-- Mig 187 v5 — Granularité dans la cellule Émission, en
-                     dessous du multiselect du device émetteur. Sémantique :
-                     granularité = précision spatiale du pilotage d'émission. -->
+                <!-- Granularité dans la cellule Émission, juste sous le
+                     multiselect du device émetteur. -->
                 <div v-if="level.key === 'emission'" class="mt-2 flex items-center gap-1.5 flex-wrap">
-                  <div class="min-w-32">
-                    <SearchableSelect
-                      :model-value="granularityForRow(t).key"
-                      @update:modelValue="(v) => patchGranularity(t, v)"
-                      :options="GRANULARITY_OPTIONS"
-                      :clearable="true" :creatable="true" :auto-width="true"
-                      size="sm" placeholder="Granularité…" />
-                  </div>
+                  <SearchableSelect
+                    :model-value="granularityForRow(t).key"
+                    @update:modelValue="(v) => patchGranularity(t, v)"
+                    :options="GRANULARITY_OPTIONS"
+                    :clearable="true" :creatable="true" :auto-width="true"
+                    size="sm" placeholder="Granularité…" />
                   <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
                         class="text-[9px] text-gray-400 italic"
                         v-tooltip="`Valeur dérivée automatiquement du type d'émission. Choisis une valeur pour la fixer.`">
@@ -532,8 +534,8 @@ onBeforeUnmount(teardownSortable)
               </td>
             </tr>
           </tbody>
-        </table>
-      </section>
+        </template>
+      </table>
     </div>
 
     <!-- Mig 180 : les lignes sont créées automatiquement depuis les
