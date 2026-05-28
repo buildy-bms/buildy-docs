@@ -270,8 +270,11 @@ table.syn thead th {
   text-align: left;
   padding: 2.5mm 2mm;
   border: none;
-  vertical-align: middle;
-  white-space: nowrap;
+  vertical-align: bottom;
+  /* Headers longs (Interopérable, Référence, Puissance (kW)…) autorisés
+     à wrapper sur 2 lignes pour éviter toute troncature. */
+  white-space: normal;
+  line-height: 1.2;
 }
 table.syn thead th.col-bool { text-align: center; }
 

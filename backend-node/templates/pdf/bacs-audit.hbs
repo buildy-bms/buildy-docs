@@ -203,7 +203,7 @@
               {{#if (eq powerSummary.source "auto")}} · calcul automatique{{else}} · valeur saisie manuellement{{/if}}
             </span>
             {{#if powerSummary.discrepancy}}
-            <span class="power-discrepancy">⚠ Écart de {{powerSummary.discrepancyPct}} % entre la valeur saisie ({{powerSummary.manualKw}} kW) et le cumul calculé ({{powerSummary.autoKw}} kW) — à vérifier.</span>
+            <span class="power-discrepancy">{{{faIcon "triangle-exclamation" "#ea580c" "9"}}} Écart de {{powerSummary.discrepancyPct}} % entre la valeur saisie ({{powerSummary.manualKw}} kW) et le cumul calculé ({{powerSummary.autoKw}} kW) — à vérifier.</span>
             {{/if}}
             {{/if}}
           </span>
@@ -284,7 +284,7 @@
   {{!-- Item 4a — Structure juridique du site (assujettissement) --}}
   {{#if ownershipStructureLabel}}
   <div class="callout callout-info essential-ownership">
-    <span class="callout-icon">⚖️</span>
+    <span class="callout-icon">{{{faIcon "scale-balanced" "#6b7280" "14"}}}</span>
     <div class="callout-body">
       <strong>Structure juridique : {{ownershipStructureLabel}}.</strong>
       L'assujetti au décret BACS est déterminé système par système selon cette structure (cf. chapitre 3).
@@ -296,7 +296,7 @@
   {{!-- Item 12 — Pont avec le décret tertiaire (bâtiment > 1000 m²) --}}
   {{#if tertiaryDecreeApplies}}
   <div class="callout callout-info essential-tertiary">
-    <span class="callout-icon">🔗</span>
+    <span class="callout-icon">{{{faIcon "link" "#6b7280" "14"}}}</span>
     <div class="callout-body">
       <strong>Ce site relève également du décret tertiaire</strong> (surface supérieure à 1 000 m²). Les comptages et le suivi énergétique mis en place dans le cadre du décret BACS peuvent alimenter directement vos déclarations sur la plateforme OPERAT.
     </div>
@@ -605,7 +605,7 @@
 {{#if zonesTechnical.length}}
 <h2 class="subheading">Locaux techniques</h2>
 <div class="callout callout-info">
-  <span class="callout-icon">📌</span>
+  <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
   <div class="callout-body">Les locaux techniques (tableaux électriques, locaux compteurs, locaux techniques) ne sont <strong>pas des zones fonctionnelles au sens du décret BACS</strong>. Ils sont listés ici à titre d'inventaire pour rattacher les compteurs et organes de coupure à un emplacement physique.</div>
 </div>
 <table>
@@ -641,7 +641,7 @@
 {{#if functionalZones.mergedCount}}
 <h2 class="subheading">Regroupement par usage technique</h2>
 <div class="callout callout-info">
-  <span class="callout-icon">📌</span>
+  <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
   <div class="callout-body">Au sens du décret (R175-1 6°), une zone fonctionnelle est une <strong>unité de suivi énergétique</strong>. Lorsqu'un équipement partagé dessert plusieurs zones sans comptage séparable, ces zones sont regroupées en une seule zone fonctionnelle de suivi. Le découpage peut donc différer selon le système technique concerné.</div>
 </div>
 {{#each functionalZones.byCategory}}
@@ -672,7 +672,7 @@
      l'inventaire ci-dessous. --}}
 {{#if zonesOutOfBacsScope.length}}
 <div class="callout callout-info">
-  <span class="callout-icon">📌</span>
+  <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
   <div class="callout-body">
     <strong>Zones hors périmètre R175-2 :</strong> aucun système de
     chauffage, climatisation ou ECS n'est présent dans
@@ -704,7 +704,7 @@
         {{!-- Item 3 — Avertissement légionelles pour les ECS bouclées --}}
         {{#if (and (eq system_category "dhw") (eq is_looped "looped"))}}
         <div class="callout callout-warning system-callout">
-          <span class="callout-icon">⚠️</span>
+          <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
           <div class="callout-body">
             <strong>Eau chaude sanitaire bouclée — arrêt interdit.</strong> Conformément à l'arrêté du 30 novembre 2005, une boucle d'eau chaude sanitaire ne peut pas être arrêtée ni mise en veille (risque de prolifération des légionelles). Le pilotage BACS ne doit pas couper ce poste : il assure la surveillance de la température de bouclage (≥ 50 °C en tout point).
           </div>
@@ -713,7 +713,7 @@
         {{!-- Item 1 — Encart d'exemption pour un poste marqué négligeable (< 5 %) --}}
         {{#if marked_negligible_under_5pct}}
         <div class="callout callout-info system-callout">
-          <span class="callout-icon">ℹ️</span>
+          <span class="callout-icon">{{{faIcon "circle-info" "#6b7280" "14"}}}</span>
           <div class="callout-body">
             <strong>Poste exempté en application de la règle des 5 %</strong> (FAQ ministère, juin 2025). Un poste représentant moins de 5 % de la consommation totale du bâtiment peut être écarté du raccordement et du comptage.{{#if negligible_justification}} {{negligible_justification}}{{/if}}
           </div>
@@ -722,7 +722,7 @@
         {{!-- Item 4d — Assujetti calculé pour ce système --}}
         {{#if liability}}{{#if ../../hasLiabilityData}}
         <div class="system-liability">
-          <span class="system-liability-icon">⚖️</span>
+          <span class="system-liability-icon">{{{faIcon "scale-balanced" "#1b2842" "10"}}}</span>
           <div class="system-liability-body">
             <strong>{{liability.label}}.</strong>
             {{#if liability.explanation}}<span class="muted"> {{liability.explanation}}</span>{{/if}}
@@ -950,11 +950,11 @@
     <thead>
       <tr>
         <th>Zone</th><th>Usage</th><th>Localisation</th>
-        <th class="bool-cell">Req.</th><th class="bool-cell">Prés.</th>
-        <th class="bool-cell">Comm.</th><th>Protocole(s)</th>
+        <th class="bool-cell">Requis</th><th class="bool-cell">Présent</th>
+        <th class="bool-cell">Communicant</th><th>Protocole(s)</th>
         <th class="bool-cell">Câblé</th>
-        <th class="bool-cell">GTB</th>
-        <th class="bool-cell">HS</th>
+        <th class="bool-cell">Intégré GTB</th>
+        <th class="bool-cell">Hors service</th>
       </tr>
     </thead>
     <tbody>
@@ -1034,7 +1034,7 @@
 
 {{#if r175_6_applicable.applies}}
 <div class="callout callout-warn">
-  <span class="callout-icon">⚠️</span>
+  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
   <div class="callout-body"><strong>R175-6 applicable</strong> — {{r175_6_applicable.reason}}.</div>
 </div>
 
@@ -1147,7 +1147,7 @@
 {{/if}}
 {{else}}
 <div class="callout callout-reco">
-  <span class="callout-icon">✅</span>
+  <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
   <div class="callout-body">
     <p><strong>R175-6 — régulation thermique automatique par zone : non applicable à votre bâtiment.</strong></p>
     <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-6 oblige les propriétaires des émetteurs reliés à un générateur de chaleur installé ou remplacé à mettre en place une régulation automatique de la température «&nbsp;par pièce ou par zone chauffée&nbsp;». Cette obligation s'enclenche dans deux cas&nbsp;: (1)&nbsp;dans les bâtiments dont le permis de construire est déposé après le 21&nbsp;juillet&nbsp;2021&nbsp;; (2)&nbsp;dans les autres bâtiments, dès lors que des travaux d'installation ou de remplacement du générateur de chaleur sont engagés après cette date — sauf étude attestant d'un temps de retour sur investissement supérieur à dix&nbsp;ans. Les appareils indépendants de chauffage au bois sont exclus.</p>
@@ -1165,14 +1165,14 @@
 <h1 class="chapter" data-toc-anchor="bms">{{{faIcon "plug" "#1b2842" "16"}}} {{#if isBacs}}6. Solution GTB / GTC (R175-3, R175-4, R175-5){{else}}5. Solution de supervision en place{{/if}}</h1>
 {{#if (eq bms.present 0)}}
 <div class="callout callout-warn">
-  <span class="callout-icon">⚠️</span>
+  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
   <div class="callout-body"><strong>Aucune GTB sur le site.</strong> Le bâtiment ne dispose d'aucun système de gestion technique. L'installation d'une GTB conforme au décret BACS figure dans le plan de mise en conformité (chapitre 7). Les exigences R175-3, R175-4 et R175-5 ne sont donc pas évaluées en détail dans ce chapitre.</div>
 </div>
 {{else}}
 {{#if bms}}
 {{#if bms.out_of_service}}
 <div class="callout callout-warn">
-  <span class="callout-icon">⚠️</span>
+  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
   <div class="callout-body"><strong>GTB Hors-Service.</strong> Les exigences R175-3, R175-4 et R175-5 ne sont pas évaluées car la GTB n'est pas opérationnelle au moment de l'audit.</div>
 </div>
 {{/if}}
@@ -1437,13 +1437,13 @@
         <tr>
           <td>Accès direct du propriétaire à ses données</td>
           <td class="sa-state sa-{{bms.data_owner_access}}">
-            {{#if (eq bms.data_owner_access "yes")}}✓ Oui{{else}}{{#if (eq bms.data_owner_access "no")}}✗ Non{{else}}⚠ Partiel{{/if}}{{/if}}
+            {{#if (eq bms.data_owner_access "yes")}}✓ Oui{{else}}{{#if (eq bms.data_owner_access "no")}}✗ Non{{else}}Partiel{{/if}}{{/if}}
           </td>
         </tr>
         <tr>
           <td>Accès du gestionnaire et des exploitants aux données</td>
           <td class="sa-state sa-{{bms.gestionnaire_exploitant_access}}">
-            {{#if (eq bms.gestionnaire_exploitant_access "yes")}}✓ Oui{{else}}{{#if (eq bms.gestionnaire_exploitant_access "no")}}✗ Non{{else}}⚠ Partiel{{/if}}{{/if}}
+            {{#if (eq bms.gestionnaire_exploitant_access "yes")}}✓ Oui{{else}}{{#if (eq bms.gestionnaire_exploitant_access "no")}}✗ Non{{else}}Partiel{{/if}}{{/if}}
           </td>
         </tr>
         <tr>
@@ -1537,7 +1537,7 @@
     {{/if}}{{/if}}
     {{#if buildySolution}}
     <div class="callout callout-reco" style="margin: 3mm 0 0;">
-      <span class="callout-icon">✅</span>
+      <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
       <div class="callout-body">
         <strong>Solution Buildy déployée.</strong> L'exigence R175-5 est nativement couverte par le support utilisateur intégré (assistance contextuelle, documentation embarquée, support continu). Cf. Annexe B point 8.
       </div>
@@ -1693,7 +1693,7 @@
 <h1 class="chapter" data-toc-anchor="inspections">{{{faIcon "clipboard-check" "#0ea5e9" "16"}}} 7. Inspections périodiques (R175-5-1)</h1>
 
 <div class="callout callout-info">
-  <span class="callout-icon">📋</span>
+  <span class="callout-icon">{{{faIcon "clipboard" "#6b7280" "14"}}}</span>
   <div class="callout-body">
     <p><strong>À quoi sert ce chapitre.</strong> Tracer les inspections périodiques R175-5-1 réalisées sur les systèmes de chauffage et de climatisation et leurs systèmes d'automatisation et de contrôle.</p>
     <p class="explainer-rule"><em>Ce qu'impose le décret.</em> L'article R175-5-1 (issu du décret n°2023-259 du 7 avril 2023) impose une inspection périodique des systèmes de chauffage et de climatisation dont la puissance nominale utile dépasse les seuils fixés au code de l'environnement. Cette inspection est réalisée par un tiers indépendant et donne lieu à un rapport conservé par le propriétaire.</p>
@@ -1702,7 +1702,7 @@
 
 {{#if document.inspection_not_applicable}}
 <div class="callout callout-reco">
-  <span class="callout-icon">✅</span>
+  <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
   <div class="callout-body">
     <p><strong>Inspection R175-5-1 — non applicable à ce site.</strong></p>
     {{#if document.inspection_not_applicable_reason}}
@@ -1779,7 +1779,7 @@
 {{!-- Item 13 — rappel de la base de consommations de référence --}}
 {{#if energyReference}}
 <div class="callout callout-info">
-  <span class="callout-icon">📊</span>
+  <span class="callout-icon">{{{faIcon "chart-line" "#6366f1" "14"}}}</span>
   <div class="callout-body">
     <strong>Base de consommations de référence (année {{energyReference.referenceYear}}) disponible.</strong>
     Cette base de référence, saisie depuis les factures du site, permettra de mesurer les économies réelles après mise en place du BACS et d'objectiver le retour sur investissement des actions ci-dessous.
@@ -1796,7 +1796,7 @@
 {{#if actionItems.blocking.length}}
 <h2>{{#if isBacs}}Actions bloquantes{{else}}Préconisations essentielles{{/if}}</h2>
 <div class="callout callout-warn">
-  <span class="callout-icon">⚠️</span>
+  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
   <div class="callout-body">{{#if isBacs}}Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.{{else}}Préconisations à intégrer en priorité dans le devis Buildy — extension critique de la couverture GTB.{{/if}}</div>
 </div>
 {{#each actionItemsGrouped.blocking}}
@@ -1809,7 +1809,7 @@
         <span class="action-num">{{display_number}}</span>
         <span class="sev sev-blocking">Bloquante</span>
         <span class="muted action-card-article">{{r175_article}}</span>
-        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
         {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
         {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
@@ -1832,7 +1832,7 @@
 {{#if actionItems.major.length}}
 <h2>{{#if isBacs}}Actions majeures{{else}}Préconisations recommandées{{/if}}</h2>
 <div class="callout callout-r175">
-  <span class="callout-icon">📖</span>
+  <span class="callout-icon">{{{faIcon "book-open" "#1b2842" "14"}}}</span>
   <div class="callout-body">{{#if isBacs}}Impact direct sur les exigences fonctionnelles R175-3.{{else}}Améliorations significatives de la couverture GTB recommandées dans le devis.{{/if}}</div>
 </div>
 {{#each actionItemsGrouped.major}}
@@ -1845,7 +1845,7 @@
         <span class="action-num">{{display_number}}</span>
         <span class="sev sev-major">{{#if ../../isBacs}}Majeure{{else}}Recommandée{{/if}}</span>
         {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
         {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
         {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
@@ -1868,7 +1868,7 @@
 {{#if actionItems.minor.length}}
 <h2>{{#if isBacs}}Optimisations{{else}}Optimisations complémentaires{{/if}}</h2>
 <div class="callout callout-info">
-  <span class="callout-icon">📌</span>
+  <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
   <div class="callout-body">{{#if isBacs}}Bonnes pratiques, hors strict décret.{{else}}Bonnes pratiques optionnelles, à proposer en option dans le devis.{{/if}}</div>
 </div>
 {{#each actionItemsGrouped.minor}}
@@ -1881,7 +1881,7 @@
         <span class="action-num">{{display_number}}</span>
         <span class="sev sev-minor">{{#if ../../isBacs}}Mineure{{else}}Optimisation{{/if}}</span>
         {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-        {{#if zone_name}}<span class="action-card-zone">📍 {{zone_name}}</span>{{/if}}
+        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
         {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
         {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
@@ -1904,7 +1904,7 @@
 {{/unless}}
 
 <div class="callout callout-reco" style="margin-top: 8mm;">
-  <span class="callout-icon">✅</span>
+  <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
   <div class="callout-body"><strong>{{#if isBacs}}Pour la mise en conformité{{else}}Pour le devis détaillé{{/if}}</strong>, l'équipe commerciale Buildy se tient à votre disposition pour établir un devis chiffré.</div>
 </div>
 </div>{{!-- /.sections --}}
@@ -1914,7 +1914,7 @@
 <section class="annex">
   <h1>Annexe A — Décret BACS (R175-1 à R175-6)</h1>
   <div class="callout callout-r175">
-    <span class="callout-icon">📖</span>
+    <span class="callout-icon">{{{faIcon "book-open" "#1b2842" "14"}}}</span>
     <div class="callout-body">Texte intégral des articles du décret R175 — Bâtiments tertiaires, automatisation et contrôle. Ce qui suit est la base réglementaire utilisée pour évaluer la conformité au chapitre 7.</div>
   </div>
   {{#each bacsArticles}}
@@ -1932,7 +1932,7 @@
 <section class="annex">
   <h1>Annexe B — Méthodologie et hypothèses retenues par Buildy</h1>
   <div class="callout callout-info">
-    <span class="callout-icon">📌</span>
+    <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
     <div class="callout-body">Cette annexe trace les choix méthodologiques de Buildy. Toute évaluation de conformité du présent rapport repose sur ces hypothèses, librement opposables.</div>
   </div>
 
@@ -2021,7 +2021,7 @@
 <section class="annex">
   <h1>Annexe C — Justification des préconisations</h1>
   <div class="callout callout-info">
-    <span class="callout-icon">📌</span>
+    <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
     <div class="callout-body">Chaque action corrective listée au chapitre 7 a été générée à partir des données saisies pendant l'audit, en référence à un article précis du décret BACS. Cette annexe trace pour chaque item le raisonnement appliqué.</div>
   </div>
   {{#each justifications}}
@@ -2036,7 +2036,7 @@
   {{/each}}
   {{#unless justifications.length}}
   <div class="callout callout-reco">
-    <span class="callout-icon">✅</span>
+    <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>
     <div class="callout-body">Aucune action corrective générée — pas de justification à reporter.</div>
   </div>
   {{/unless}}
@@ -2046,7 +2046,7 @@
 <section class="annex">
   <h1>Annexe D — Mentions légales et disclaimers</h1>
   <div class="callout callout-warn">
-    <span class="callout-icon">⚠️</span>
+    <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
     <div class="callout-body">Lecture obligatoire avant utilisation du présent rapport en support de devis ou de procédure de mise en conformité.</div>
   </div>
   <ol class="disclaimer-list">

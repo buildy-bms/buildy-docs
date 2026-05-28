@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.125",
+      "date": "2026-05-28",
+      "title": "PDF audit BACS : icônes des encarts rendues correctement + libellés de colonnes complets",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Icônes des encarts du PDF rendues correctement (plus de carrés vides)",
+          "what": "Les encarts d'info / alerte / recommandation des PDF audit BACS affichaient leur icône comme un carré vide (□) parce que les polices du PDF (Poppins / Inter) ne contiennent pas les glyphes emoji. Les 22 icônes (✅ ⚠️ ℹ️ 📌 ⚖️ 🔗 📋 📊 📖 📍) sont désormais rendues en SVG FontAwesome inline avec leurs couleurs (vert / orange / gris / navy / indigo) — affichage garanti quelle que soit la police.",
+          "where": "PDF audit BACS — tous les encarts colorés et badges du chapitre 1 (assujettissement, tertiaire), chap 3 (zones hors périmètre, assujetti), chap 5 (R175-6), chap 6 (hiérarchie sources, références), chap 7 (inspections), chap 8 (plan + consommations).",
+          "how": "Exporter le PDF d'un audit (ex. 45) : tous les encarts montrent désormais une icône colorée nette au lieu du carré vide."
+        },
+        {
+          "kind": "fix",
+          "title": "Libellés de colonnes complets dans les tableaux du PDF (plus d'abréviations ambiguës)",
+          "what": "Tableau compteurs (chap 4) : Req. / Prés. / Comm. / GTB / HS deviennent Requis / Présent / Communicant / Intégré GTB / Hors service. Tableaux de synthèse A3 (Rapport) : Réf / Interop. / P (kW) deviennent Référence / Interopérable / Puissance (kW). Les en-têtes wrappent désormais sur 2 lignes max au lieu d'être tronqués.",
+          "where": "PDF audit BACS chap 4 + PDF synthèse A3.",
+          "how": "Exporter le PDF d'un audit avec des compteurs : les colonnes sont nommées en clair, sans ambiguïté."
+        }
+      ]
+    },
+    {
       "version": "0.1.124",
       "date": "2026-05-28",
       "title": "Audit BACS — Zones unifiées, PDF beaucoup plus complet, MCP pédagogique",

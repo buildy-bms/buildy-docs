@@ -3009,6 +3009,11 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-align: left;
+  /* Wrap autorisé sur 2 lignes max — évite la troncature des libellés
+     longs (Communicant, Intégré GTB, Hors service). */
+  white-space: normal;
+  line-height: 1.15;
+  vertical-align: bottom;
 }
 .energy-section-table thead th.bool-cell { text-align: center; }
 /* Cellule protocoles : libellés FR séparés par " / " (BACnet IP / Modbus TCP). */
