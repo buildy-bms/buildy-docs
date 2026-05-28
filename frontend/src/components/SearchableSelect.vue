@@ -278,7 +278,7 @@ function clear() {
       <template v-if="multiple">
         <span v-if="!selectedOptions.length"
               class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
-        <span v-else class="flex-1 flex flex-wrap items-center gap-1">
+        <span v-else class="flex-1 flex flex-nowrap items-center gap-1">
           <span v-for="o in selectedOptions" :key="o.value"
                 class="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"

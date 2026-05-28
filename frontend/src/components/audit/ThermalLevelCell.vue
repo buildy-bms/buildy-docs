@@ -28,11 +28,15 @@ const props = defineProps({
   device: { type: Object, default: null },
   deviceOptions: { type: Array, default: () => [] },
   regulatorOptions: { type: Array, default: () => [] },
-  regulationTypeLabel: { type: String, default: '' },
+  // Mig 187 v10 — Type de régulation : options + handler d'édition.
+  // Avant : affiché en chip vert read-only (« Thermostat avec sonde
+  // déportée »). Maintenant : SearchableSelect éditable qui PATCH le
+  // device. La valeur édite `device.regulation_type_${level}` côté DB.
+  regulationTypeOptions: { type: Array, default: () => [] },
   integrated: { type: Boolean, default: false },
   noteHtml: { type: String, default: '' },
 })
-const emit = defineEmits(['patch-thermal', 'open-notes'])
+const emit = defineEmits(['patch-thermal', 'patch-device', 'open-notes'])
 
 const LEVEL_DEVICE_FIELD = {
   production:   'generator_device_id',
@@ -95,7 +99,16 @@ function setLevelDevices(ids) {
   })
 }
 
-const hasTypeLabel = computed(() => !!(props.regulationTypeLabel && props.regulationTypeLabel.trim()))
+// Mig 187 v10 — type de régulation lu et écrit directement sur le device.
+const regulationTypeField = computed(() => `regulation_type_${props.level}`)
+const regulationTypeValue = computed(() => props.device?.[regulationTypeField.value] || null)
+function setRegulationType(v) {
+  if (!props.device) return
+  emit('patch-device', {
+    deviceId: props.device.id,
+    patch: { [regulationTypeField.value]: v || null },
+  })
+}
 const hasNote = computed(() => {
   if (!props.noteHtml) return false
   return props.noteHtml.replace(/<[^>]*>/g, '').trim().length > 0
@@ -103,12 +116,10 @@ const hasNote = computed(() => {
 </script>
 
 <template>
-  <!-- Mig 187 v3 — ligne unique compacte par niveau :
+  <!-- Mig 187 v9 — ligne unique compacte SANS wrap :
        [Multiselect (device + régulateur déporté)] [chip type] [chip Intégrée] [notes]
-       Largeur du multiselect adaptée au contenu sélectionné (`autoWidth`) :
-       un select vide reste compact, un select avec « Sous-station de réseau
-       de chaleur urbain » s'élargit naturellement pour afficher le nom. -->
-  <div class="flex items-start gap-2 flex-wrap">
+       Tout reste sur 1 seule ligne quoi qu'il arrive. -->
+  <div class="flex items-center gap-2 flex-nowrap">
     <SearchableSelect
       :model-value="selectedDevices"
       :options="allOptions"
@@ -119,25 +130,31 @@ const hasNote = computed(() => {
       placeholder="Ajouter un équipement…"
       search-placeholder="Rechercher…"
       @update:modelValue="setLevelDevices" />
-    <!-- Métadonnées à DROITE du select sur la même ligne (gain vertical
-         massif vs ancien layout empilé) -->
-    <div class="flex items-center gap-1 shrink-0 pt-1 flex-wrap justify-end">
-      <span v-if="hasTypeLabel"
-            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 max-w-45 truncate"
-            v-tooltip="`Type de régulation déclaré sur l'équipement : ${regulationTypeLabel}. Modifier dans la modale équipement.`">
-        {{ regulationTypeLabel }}
-      </span>
-      <span v-if="deviceId && integrated"
-            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200"
-            v-tooltip="`L'équipement embarque sa propre régulation — pas de régulateur séparé à ajouter.`">
-        Intégrée
-      </span>
-      <button v-if="deviceId" type="button"
-              @click="emit('open-notes')"
-              :class="['btn-icon', hasNote && 'is-active']"
-              v-tooltip="hasNote ? 'Note de ce niveau' : 'Ajouter une note pour ce niveau'">
-        <PencilSquareIcon class="w-4 h-4" />
-      </button>
-    </div>
+    <!-- Mig 187 v10 — type de régulation édité par SearchableSelect (vs
+         ancien chip vert read-only). Modifie `device.regulation_type_${level}`
+         directement, sans passer par la modale équipement. -->
+    <SearchableSelect
+      v-if="device"
+      :model-value="regulationTypeValue"
+      :options="regulationTypeOptions"
+      :clearable="true" :creatable="true" :auto-width="true"
+      size="sm" placeholder="Type de régulation…"
+      @update:modelValue="setRegulationType" />
+    <span v-if="deviceId && integrated"
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap shrink-0"
+          v-tooltip="`L'équipement embarque sa propre régulation — pas de régulateur séparé à ajouter.`">
+      Intégrée
+    </span>
+    <button v-if="deviceId" type="button"
+            @click="emit('open-notes')"
+            :class="['btn-icon shrink-0', hasNote && 'is-active']"
+            v-tooltip="hasNote ? 'Note de ce niveau' : 'Ajouter une note pour ce niveau'">
+      <PencilSquareIcon class="w-4 h-4" />
+    </button>
+    <!-- Slot inline pour ajouter du contenu sur la MÊME ligne après les
+         chips/bouton notes. Utilisé pour la granularité dans la cellule
+         Émission (sémantique R175-6 : la granularité est PARTIE de
+         l'émission, pas un champ séparé). -->
+    <slot name="after" />
   </div>
 </template>

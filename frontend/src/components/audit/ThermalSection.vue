@@ -5,7 +5,7 @@ import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon
 import {
   REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
   derivedGranularity, resolveGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
-  GRANULARITY_OPTIONS,
+  GRANULARITY_OPTIONS, regulationTypesForCategory,
 } from '@/lib/audit-options'
 import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -214,6 +214,35 @@ async function patchGranularity(t, value) {
   } catch { error('Sauvegarde granularité impossible') }
 }
 
+// Mig 187 v10 — Options pour le SearchableSelect « type de régulation »
+// affiché dans chaque cellule de niveau. Privilégie la liste du modèle
+// d'équipement du device (si rattaché à un equipment_template), sinon
+// retombe sur les défauts par catégorie d'usage du système.
+function regulationTypeOptionsFor(t, level) {
+  const cat = t.category || 'heating'
+  const device = deviceForLevel(t, level)
+  const tplId = device?.equipment_template_id
+  let override = null
+  if (tplId) {
+    const tpl = (audit.equipmentTemplates || []).find(x => x.id === tplId) || null
+    override = tpl?.[`regulation_${level}_types`] || null
+  }
+  return regulationTypesForCategory(level, cat, override)
+}
+
+// Mig 187 v10 — patch direct sur un device depuis ThermalLevelCell.
+// L'événement contient { deviceId, patch }. Object.assign sync sur la
+// version en mémoire pour réactivité immédiate, puis PATCH HTTP
+// fire-and-forget + refresh action items debouncé.
+async function patchDeviceField({ deviceId, patch }) {
+  const dev = (audit.devices || []).find(d => d.id === deviceId)
+  if (dev) Object.assign(dev, patch)
+  try {
+    await updateBacsDevice(deviceId, patch)
+    audit.scheduleActionItemsRefresh?.()
+  } catch { error('Sauvegarde impossible') }
+}
+
 // Mig 187 — détecte si la régulation est intégrée à l'équipement.
 // Logique « intégrée par défaut » :
 //   - device explicitement marqué Déportée (regulation_integrated === 0/false) → NON intégrée (on affiche le régulateur séparé)
@@ -411,7 +440,17 @@ onBeforeUnmount(teardownSortable)
          Les zones sont matérialisées par des tbody (zone-header cliquable
          + zone-content masquable en v-show). -->
     <div ref="tableRef" class="px-3 pb-3">
-      <table class="thermal-card-table border border-gray-200 rounded-xl overflow-hidden">
+      <table class="thermal-card-table w-full border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Mig 187 v9 — Colgroup pour distribuer la largeur résiduelle :
+             les 2 premières colonnes (Production, Distribution) prennent
+             leur largeur naturelle (contenu max sur toute la card), la
+             colonne Émission absorbe tout le surplus de largeur via
+             `width: 100%`. Plus de gaspillage horizontal à droite. -->
+        <colgroup>
+          <col />
+          <col />
+          <col style="width: 100%" />
+        </colgroup>
         <!-- En-tête de colonnes affiché UNE FOIS en haut de la table : ne
              se répète plus pour chaque système (gain de bruit visuel). -->
         <thead class="bg-gray-50">
@@ -452,7 +491,7 @@ onBeforeUnmount(teardownSortable)
             <!-- Ligne 1 — identification (colspan 3) + actions -->
             <tr>
               <td colspan="3" class="px-4 pt-3 pb-1">
-                <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex items-center gap-3 flex-nowrap">
                   <button type="button"
                           class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
                           v-tooltip="'Glisser pour réordonner ce système'">
@@ -505,32 +544,37 @@ onBeforeUnmount(teardownSortable)
                   :device="deviceForLevel(t, level.key)"
                   :device-options="deviceOptionsForLevel(t, level.key)"
                   :regulator-options="deviceOptionsForLevel(t, 'regulation')"
-                  :regulation-type-label="levelRegulationTypeLabel(t, level.key)"
+                  :regulation-type-options="regulationTypeOptionsFor(t, level.key)"
                   :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
                   :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
                   @patch-thermal="(p) => patchThermal(t, p)"
+                  @patch-device="patchDeviceField"
                   @open-notes="emit('open-notes', {
                     title: 'Notes ' + level.label + ' — ' + t.zone_name,
                     contextLabel: t.zone_name + ' · ' + level.label,
                     entityType: 'thermal', entityRef: t,
                     currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
                     noteField: LEVEL_NOTES_FIELD[level.key],
-                  })" />
-                <!-- Granularité dans la cellule Émission, juste sous le
-                     multiselect du device émetteur. -->
-                <div v-if="level.key === 'emission'" class="mt-2 flex items-center gap-1.5 flex-wrap">
-                  <SearchableSelect
-                    :model-value="granularityForRow(t).key"
-                    @update:modelValue="(v) => patchGranularity(t, v)"
-                    :options="GRANULARITY_OPTIONS"
-                    :clearable="true" :creatable="true" :auto-width="true"
-                    size="sm" placeholder="Granularité…" />
-                  <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
-                        class="text-[9px] text-gray-400 italic"
-                        v-tooltip="`Valeur dérivée automatiquement du type d'émission. Choisis une valeur pour la fixer.`">
-                    auto
-                  </span>
-                </div>
+                  })">
+                  <!-- Mig 187 v10 — Granularité injectée DANS la même ligne
+                       flex que le multiselect du device émetteur (slot after).
+                       Plus de retour à la ligne ni de bloc séparé : la
+                       granularité fait visuellement PARTIE de la colonne
+                       Émission, comme demandé. -->
+                  <template v-if="level.key === 'emission'" #after>
+                    <SearchableSelect
+                      :model-value="granularityForRow(t).key"
+                      @update:modelValue="(v) => patchGranularity(t, v)"
+                      :options="GRANULARITY_OPTIONS"
+                      :clearable="true" :creatable="true" :auto-width="true"
+                      size="sm" placeholder="Granularité…" />
+                    <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
+                          class="text-[9px] text-gray-400 italic shrink-0"
+                          v-tooltip="`Valeur dérivée automatiquement du type d'émission. Choisis une valeur pour la fixer.`">
+                      auto
+                    </span>
+                  </template>
+                </ThermalLevelCell>
               </td>
             </tr>
           </tbody>
