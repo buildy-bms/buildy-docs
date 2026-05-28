@@ -696,6 +696,7 @@
                     <strong>{{name}}</strong>
                     {{#if brand}}<span class="device-card-ref"> · {{brand}}{{#if model_reference}} {{model_reference}}{{/if}}</span>{{/if}}
                     {{#if out_of_service}}<span class="device-card-hs">HS</span>{{/if}}
+                    {{#if is_backup}}<span class="device-card-backup" title="Équipement de secours — puissance exclue du cumul BACS">Secours</span>{{/if}}
                     {{#if shared_zone_count}}
                       <span class="shared-badge" title="Équipement partagé">↔ {{add shared_zone_count 1}} zones</span>
                     {{/if}}

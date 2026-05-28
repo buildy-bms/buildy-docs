@@ -1450,6 +1450,19 @@ h3.fz-heading svg { flex-shrink: 0; }
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
+.device-card-backup {
+  display: inline-block;
+  margin-left: 1.5mm;
+  font-size: 6.5pt;
+  color: #b45309;
+  background: #fef3c7;
+  border: 0.3pt solid #fcd34d;
+  border-radius: 1.5mm;
+  padding: 0.2mm 1.4mm;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
 .device-card-r175 {
   display: flex;
   align-items: center;

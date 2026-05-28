@@ -243,13 +243,32 @@ function usageKpi(s) {
   }
 }
 
+// Priorité de rôle pour le tri par chaîne énergétique
+// (Production → Distribution → Émission → Régulation seule → autre).
+// Aligné sur la card 04 desktop (SystemDevicesTable.rolePriority).
+const ROLE_PRIORITY_MOB = { production: 1, distribution: 2, emission: 3, regulation: 4 }
+function rolePriorityMob(d) {
+  const roles = Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])
+  if (!roles.length) return 5
+  let min = 5
+  for (const r of roles) {
+    const p = ROLE_PRIORITY_MOB[String(r).toLowerCase()]
+    if (p && p < min) min = p
+  }
+  return min
+}
 function devicesOf(systemId) {
   const own = devices.value.filter(d => d.system_id === systemId)
   // Mig 143 : inclut les devices partagés vers cet usage.
   const shared = devices.value.filter(d =>
     d.system_id !== systemId && (d.extra_system_ids || []).includes(systemId),
   )
-  return [...own, ...shared]
+  return [...own, ...shared].sort((a, b) => {
+    const pa = rolePriorityMob(a)
+    const pb = rolePriorityMob(b)
+    if (pa !== pb) return pa - pb
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
+  })
 }
 function isSharedDevice(d, systemId) {
   return d.system_id !== systemId
@@ -925,6 +944,10 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 </p>
                 <p class="text-base font-semibold text-gray-900 truncate leading-tight">
                   {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
+                  <span v-if="d.is_backup === 1 || d.is_backup === true"
+                        class="inline-flex items-center justify-center align-middle ml-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-amber-100 text-amber-700 border border-amber-300">
+                    Secours
+                  </span>
                 </p>
                 <p class="text-sm text-gray-500 truncate mt-0.5">
                   <span v-if="d.brand">{{ d.brand }}</span>

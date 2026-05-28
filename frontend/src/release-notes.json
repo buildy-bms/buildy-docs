@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.123",
+      "date": "2026-05-28",
+      "title": "Card 04 — arborescence + badge Secours propagés au PDF et à la PWA mobile",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "PDF audit BACS — devices triés par chaîne énergétique + pill « Secours »",
+          "what": "Le PDF audit reflète désormais le même ordre que la card 04 desktop : Production → Distribution → Émission → Régulation seule → autre, puis alphabétique. Un pill ambré « Secours » apparaît à côté du nom de l'équipement marqué `is_backup`, en plus du pill rouge « HS » existant pour `out_of_service`.",
+          "where": "Rapport PDF audit BACS → section 4 « Systèmes techniques par zone » → cards équipement de chaque système.",
+          "how": "Exporter le PDF d'un audit avec une chaudière, un circuit et un radiateur dans un système : les 3 cards apparaissent dans l'ordre amont → aval. Un équipement coché « secours » porte un pill ambré « Secours »."
+        },
+        {
+          "kind": "feat",
+          "title": "PWA mobile — devices triés par chaîne énergétique + badge « Secours »",
+          "what": "L'onglet Systèmes en PWA mobile (MobileSystemsTab) affiche désormais les équipements de chaque usage dans l'ordre Production → Distribution → Émission → Régulation → autre. Un badge ambré « Secours » apparaît à côté du nom pour les équipements `is_backup`.",
+          "where": "PWA mobile → audit BACS → onglet Systèmes → ouvrir un usage → liste des équipements.",
+          "how": "Ouvrir un usage chauffage avec chaudière + circuit + radiateur : les 3 lignes apparaissent dans l'ordre amont → aval. Un équipement de secours porte un badge ambré au nom."
+        }
+      ]
+    },
+    {
       "version": "0.1.122",
       "date": "2026-05-28",
       "title": "Card 04 — arborescence Production → Distribution → Émission + badge Secours collé au nom",

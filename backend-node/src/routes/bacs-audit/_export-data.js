@@ -173,6 +173,29 @@ async function buildBacsAuditExportData(af, opts = {}) {
     devicesBySystem.get(d.system_id).push(d);
   }
 
+  // Tri intra-système par chaîne énergétique : Production → Distribution →
+  // Émission → Régulation seule → autre, puis alphabétique. Aligne le PDF
+  // sur la card 04 desktop (cf. SystemDevicesTable.vue rolePriority).
+  const ROLE_PRIORITY_PDF = { production: 1, distribution: 2, emission: 3, regulation: 4 };
+  function rolePriorityPdf(d) {
+    const roles = Array.isArray(d.device_role) ? d.device_role : [];
+    if (!roles.length) return 5;
+    let min = 5;
+    for (const r of roles) {
+      const p = ROLE_PRIORITY_PDF[String(r).toLowerCase()];
+      if (p && p < min) min = p;
+    }
+    return min;
+  }
+  for (const [, devs] of devicesBySystem) {
+    devs.sort((a, b) => {
+      const pa = rolePriorityPdf(a);
+      const pb = rolePriorityPdf(b);
+      if (pa !== pb) return pa - pb;
+      return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
+    });
+  }
+
   // Refactor 2026-05-26 — Dérivation des flags d'assujettissement E/F
   // depuis les devices au lieu d'une saisie système :
   //  · is_district_heating_substation = au moins un device a le modèle
