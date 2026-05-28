@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrashIcon, PlusIcon, PencilSquareIcon, DocumentDuplicateIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
+import { TrashIcon, PlusIcon, PencilSquareIcon, DocumentDuplicateIcon, Cog6ToothIcon, ShieldExclamationIcon } from '@heroicons/vue/24/outline'
 import {
   createBacsDevice, updateBacsDevice, deleteBacsDevice, duplicateBacsDevice,
   listSiteDocuments, uploadSiteDocument, deleteSiteDocument,
@@ -104,9 +104,37 @@ function sortValue(d, key) {
   }
 }
 
-const displayDevices = computed(() =>
-  sortedRows([...props.devices, ...sharedDevices.value], sortValue)
-)
+// Tri hiérarchique par défaut (sortKey nul) : Production → Distribution →
+// Émission → Régulation → autre. Un device multi-rôle est rangé sur son
+// rôle le plus amont (chaîne énergétique). Au sein d'un groupe, ordre
+// alphabétique sur le nom. Permet de visualiser d'un coup d'œil la
+// dépendance amont/aval des équipements d'un même système.
+// L'utilisateur peut surcharger en cliquant un en-tête de colonne.
+const ROLE_PRIORITY = { production: 1, distribution: 2, emission: 3, regulation: 4 }
+function rolePriority(d) {
+  const roles = Array.isArray(d.device_role) ? d.device_role : (d.device_role ? [d.device_role] : [])
+  if (!roles.length) return 5
+  let min = 5
+  for (const r of roles) {
+    const p = ROLE_PRIORITY[String(r).toLowerCase()]
+    if (p && p < min) min = p
+  }
+  return min
+}
+function isBackup(d) {
+  return d.is_backup === 1 || d.is_backup === true
+}
+
+const displayDevices = computed(() => {
+  const merged = [...props.devices, ...sharedDevices.value]
+  if (sortKey.value) return sortedRows(merged, sortValue)
+  return [...merged].sort((a, b) => {
+    const pa = rolePriority(a)
+    const pb = rolePriority(b)
+    if (pa !== pb) return pa - pb
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase())
+  })
+})
 
 // Un device affiché ici mais dont le système primaire est ailleurs =
 // partagé depuis un autre usage.
@@ -278,10 +306,17 @@ async function removeDevice(d) {
                  de fond verte de la ligne et le tooltip du bouton partage).
                  Largeur auto au contenu : pas de min-w. -->
             <td class="px-2 py-2 align-middle">
-              <input type="text" :value="d.name" placeholder="Nommer ce système"
-                     @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                     :class="inputCls"
-                     class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+              <div class="flex items-center gap-1.5">
+                <span v-if="isBackup(d)"
+                      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 shrink-0"
+                      v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
+                  <ShieldExclamationIcon class="w-3.5 h-3.5" />
+                </span>
+                <input type="text" :value="d.name" placeholder="Nommer ce système"
+                       @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
+                       :class="inputCls"
+                       class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+              </div>
             </td>
             <!-- Marque -->
             <td class="px-2 py-2 align-middle">
