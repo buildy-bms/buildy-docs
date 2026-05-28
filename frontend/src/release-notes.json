@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.113",
+      "date": "2026-05-28",
+      "title": "Types de régulation par usage + toggle « communicant » dissocié du protocole",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Suggestions de types de régulation adaptées à chaque usage (chauffage, éclairage, ventilation…)",
+          "what": "Dans la modale d'édition d'un équipement (audit BACS), le champ « Type de régulation de Production / Distribution / Émission » ne propose plus la même liste partout. Chaque usage a maintenant ses propres suggestions : éclairage → détection de présence, présence + luminosité, régulation à lumière constante, horloge, scénarios, manuel ; ventilation → sonde CO₂, humidité, présence, VAV, horloge ; ECS → mitigeur thermostatique, horloge de puisage ; chauffage → thermostat ambiant, thermostat avec sonde déportée, vanne thermostatique, sonde de zone, sonde de retour ; etc. Les listes sont éditables modèle par modèle dans la bibliothèque (Bibliothèque → Systèmes techniques → Éditer un modèle → bloc « Types de régulation suggérés »). Vide = on utilise les défauts de l'usage. Migrations 184 + 186 : 60 modèles existants backfillés avec les bons défauts ; 22 modèles chauffage enrichis avec « Thermostat avec sonde déportée ».",
+          "where": "Audit BACS → modale Modifier un équipement → bloc Régulation. Et Bibliothèque → Systèmes techniques → Éditer un modèle → bloc « Types de régulation suggérés ».",
+          "how": "Ouvre un audit BACS, édite un système d'éclairage : la liste « Type de régulation d'émission » contient maintenant « Détection de présence », « Présence + luminosité », « Régulation à lumière constante »… Édite un système chauffage : on retrouve « Thermostat ambiant », « Thermostat avec sonde déportée », « Vanne thermostatique »… Pour personnaliser un modèle, va dans Bibliothèque → Systèmes techniques, clique « Éditer le modèle » sur (par ex.) « Chaudière », ajoute/retire des lignes dans le bloc « Types de régulation suggérés »."
+        },
+        {
+          "kind": "fix",
+          "title": "Toggle « L'équipement est-il communicant ? » indépendant du protocole",
+          "what": "Avant, impossible de cocher Oui à la question « L'équipement est-il communicant ? » tant qu'on n'avait pas choisi un protocole — le bouton restait visuellement neutre. Désormais l'auditeur répond Oui ou Non d'abord, sa réponse est persistée (nouvelle colonne ternaire `is_communicating`, mig 185, backfill depuis l'existant). Si Oui sans protocole, un label rouge « · obligatoire » apparaît sur le champ Protocoles et l'équipement est marqué incomplet (champ manquant explicite).",
+          "where": "Audit BACS → modale Modifier un équipement → bloc Communication & conformité R175-3.",
+          "how": "Ouvre la modale d'édition d'un équipement. Clique Oui sur « L'équipement est-il communicant ? » : le bouton passe au vert Buildy, le bloc Protocoles s'active et le label affiche « Protocole(s) de communication · obligatoire » en rouge tant que rien n'est sélectionné. La complétude de l'équipement reste rouge tant qu'un protocole n'est pas saisi."
+        }
+      ]
+    },
+    {
       "version": "0.1.112",
       "date": "2026-05-27",
       "title": "Drop PDF + multi-fichiers sur les lignes d'audit",

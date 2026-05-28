@@ -6,6 +6,20 @@ const log = require('./logger').system;
 const ALL_TEMPLATES = require('../seeds/equipment-templates');
 const { buildSnapshot, snapshotAndBump } = require('./template-propagation');
 const { parseRoles, serializeRoles } = require('./device-roles');
+const regulationDefaults = require('./regulation-defaults');
+
+// Mig 184 — résout la liste de régulation à utiliser pour un seed :
+//   1. valeur explicite dans le seed (`tpl.regulation_*_types`)
+//   2. sinon défaut par catégorie (`regulation-defaults.js`)
+//   3. sinon null
+// Renvoie un JSON string ou null (format colonne DB).
+function resolveRegulationList(tpl, level) {
+  const fromSeed = tpl[`regulation_${level}_types`];
+  if (Array.isArray(fromSeed)) return fromSeed.length ? JSON.stringify(fromSeed) : null;
+  const d = regulationDefaults.defaultsForLibraryCategory(tpl.category);
+  const list = d[level];
+  return list && list.length ? JSON.stringify(list) : null;
+}
 // HYPERVEEZ_PAGES n'est plus utilisé (Lot 22 — section 10 supprimée), conservé pour usage futur.
 // eslint-disable-next-line no-unused-vars
 const { PLAN_AF } = require('../seeds/plan-af');
@@ -72,6 +86,10 @@ function seedLibraryOnBoot() {
         // Multi-rôle (mig 117) : serialize en JSON array string. Le seed
         // peut declarer un array (recommandé) ou un scalaire legacy.
         defaultDeviceRole: serializeRoles(parseRoles(tpl.default_device_role)),
+        // Mig 184 — listes de régulation : valeur du seed > défaut de catégorie.
+        regulationProductionTypes:   resolveRegulationList(tpl, 'production'),
+        regulationDistributionTypes: resolveRegulationList(tpl, 'distribution'),
+        regulationEmissionTypes:     resolveRegulationList(tpl, 'emission'),
       });
       for (const p of (tpl.points || [])) {
         db.equipmentTemplatePoints.create(created.id, {
@@ -96,6 +114,21 @@ function seedLibraryOnBoot() {
       if (!existing.default_energy_source && tpl.default_energy_source) updates.defaultEnergySource = tpl.default_energy_source;
       if (!existing.default_device_role && tpl.default_device_role) {
         updates.defaultDeviceRole = serializeRoles(parseRoles(tpl.default_device_role));
+      }
+      // Mig 184 — pré-remplit les listes de régulation si la colonne est NULL
+      // en DB ET qu'on a une valeur (seed ou défaut de catégorie). Respect du
+      // contrat seeder : on n'écrase JAMAIS une liste déjà saisie côté admin.
+      if (!existing.regulation_production_types) {
+        const resolved = resolveRegulationList(tpl, 'production');
+        if (resolved) updates.regulationProductionTypes = resolved;
+      }
+      if (!existing.regulation_distribution_types) {
+        const resolved = resolveRegulationList(tpl, 'distribution');
+        if (resolved) updates.regulationDistributionTypes = resolved;
+      }
+      if (!existing.regulation_emission_types) {
+        const resolved = resolveRegulationList(tpl, 'emission');
+        if (resolved) updates.regulationEmissionTypes = resolved;
       }
       let changed = Object.keys(updates).length > 0;
       if (changed) db.equipmentTemplates.update(existing.id, { ...updates, updatedBy: null });

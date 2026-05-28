@@ -30,7 +30,8 @@ import {
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
 import SearchableSelect from './SearchableSelect.vue'
-import { ENERGY_OPTIONS, ROLE_OPTIONS } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, bacsCategoryForLibraryCategory, regulationDefaultsForCategory } from '@/lib/audit-options'
+import RegulationTypesEditor from './RegulationTypesEditor.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
 import { useSystemCategories } from '@/composables/useSystemCategories'
@@ -94,6 +95,12 @@ const form = ref({
   default_device_role: [],
   // Item 10 — contre-indications de pilotage BACS : array de codes.
   bacs_contraindications: [],
+  // Mig 184 — listes de suggestions de types de régulation par niveau.
+  // Chaque entrée : { value, label }. Array vide = utiliser les défauts par
+  // catégorie d'usage (cf. audit-options.js).
+  regulation_production_types: [],
+  regulation_distribution_types: [],
+  regulation_emission_types: [],
 })
 
 // Item 10 — codes de contre-indications de pilotage par type d'équipement.
@@ -106,6 +113,23 @@ const BACS_CONTRAINDICATION_OPTIONS = [
   { value: 'circulator_degommage', label: 'Circulateur avec dégommage — ne pas couper en été' },
   { value: 'lighting_already_optimized', label: 'Éclairage déjà optimisé — pas de gisement BACS' },
 ]
+
+// Mig 184 — défauts de listes de régulation selon la catégorie BACS dérivée
+// de la catégorie biblio du modèle. Permet à RegulationTypesEditor d'offrir
+// un bouton « Partir des défauts » qui pré-charge des suggestions cohérentes.
+const bacsCategoryForForm = computed(() => bacsCategoryForLibraryCategory(form.value.category))
+const regulationProductionDefaults   = computed(() => regulationDefaultsForCategory('production',   bacsCategoryForForm.value))
+const regulationDistributionDefaults = computed(() => regulationDefaultsForCategory('distribution', bacsCategoryForForm.value))
+const regulationEmissionDefaults     = computed(() => regulationDefaultsForCategory('emission',     bacsCategoryForForm.value))
+// Visibilité des sous-blocs par niveau, alignée sur les rôles cochés (= fonctions
+// intégrées). Si l'admin n'a coché ni production/distribution/émission, on
+// affiche quand même au moins l'émission (cas par défaut le plus courant pour
+// les équipements simples comme un luminaire).
+const hasProductionRole   = computed(() => form.value.default_device_role.includes('production'))
+const hasDistributionRole = computed(() => form.value.default_device_role.includes('distribution'))
+const hasEmissionRole     = computed(() => form.value.default_device_role.includes('emission')
+                                        || (!form.value.default_device_role.includes('production')
+                                         && !form.value.default_device_role.includes('distribution')))
 
 const selectedCategory = computed(() =>
   CATEGORIES.value.find(c => c.value === form.value.category) ||
@@ -253,6 +277,12 @@ watch(() => props.template, (t) => {
       // Item 10 — backend retourne un array de codes (jamais null).
       bacs_contraindications: Array.isArray(t.bacs_contraindications)
         ? t.bacs_contraindications : [],
+      // Mig 184 — listes de régulation : null en DB = pas de surcharge → on
+      // affiche un array vide dans l'UI (l'utilisateur peut « Remettre les
+      // défauts » via le bouton dédié pour les afficher).
+      regulation_production_types:   Array.isArray(t.regulation_production_types)   ? t.regulation_production_types   : [],
+      regulation_distribution_types: Array.isArray(t.regulation_distribution_types) ? t.regulation_distribution_types : [],
+      regulation_emission_types:     Array.isArray(t.regulation_emission_types)     ? t.regulation_emission_types     : [],
     }
   }
 }, { immediate: true })
@@ -334,6 +364,11 @@ async function save({ close = true } = {}) {
       bacs_contraindications: (Array.isArray(form.value.bacs_contraindications) && form.value.bacs_contraindications.length)
         ? form.value.bacs_contraindications
         : null,
+      // Mig 184 — listes de régulation : array vide → null (= retour défaut
+      // de catégorie). Array non-vide → on envoie tel quel.
+      regulation_production_types:   form.value.regulation_production_types.length   ? form.value.regulation_production_types   : null,
+      regulation_distribution_types: form.value.regulation_distribution_types.length ? form.value.regulation_distribution_types : null,
+      regulation_emission_types:     form.value.regulation_emission_types.length     ? form.value.regulation_emission_types     : null,
     }
     let res
     if (isEdit.value) {
@@ -550,6 +585,47 @@ async function destroy() {
               L'audit BACS ne génère pas d'action « arrêt manuel » contraire à ces contraintes.
             </p>
           </div>
+        </div>
+      </fieldset>
+
+      <!-- Mig 184 — Suggestions de types de régulation par niveau.
+           Affichées dans la modale d'édition d'équipement du module audit,
+           selon les fonctions cochées ci-dessus. -->
+      <fieldset class="border border-gray-200 rounded-lg px-3 pt-2 pb-3">
+        <legend class="px-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          Types de régulation suggérés <span class="text-gray-400 normal-case font-normal">(par niveau, audit)</span>
+        </legend>
+        <p class="text-[11px] text-gray-500 leading-snug mb-2">
+          Listes proposées à l'auditeur dans la modale d'édition d'un équipement
+          (champ « Type de régulation de … »). Vide = l'audit utilise les
+          suggestions par défaut de la catégorie d'usage du système.
+        </p>
+        <div class="space-y-3">
+          <div v-if="hasProductionRole">
+            <label class="block text-[11px] font-semibold text-gray-700 mb-1">Production</label>
+            <RegulationTypesEditor
+              v-model="form.regulation_production_types"
+              :default-values="regulationProductionDefaults"
+              level="production" />
+          </div>
+          <div v-if="hasDistributionRole">
+            <label class="block text-[11px] font-semibold text-gray-700 mb-1">Distribution</label>
+            <RegulationTypesEditor
+              v-model="form.regulation_distribution_types"
+              :default-values="regulationDistributionDefaults"
+              level="distribution" />
+          </div>
+          <div v-if="hasEmissionRole">
+            <label class="block text-[11px] font-semibold text-gray-700 mb-1">Émission</label>
+            <RegulationTypesEditor
+              v-model="form.regulation_emission_types"
+              :default-values="regulationEmissionDefaults"
+              level="emission" />
+          </div>
+          <p v-if="!hasProductionRole && !hasDistributionRole && !hasEmissionRole"
+             class="text-[11px] text-gray-400 italic">
+            Coche au moins une fonction intégrée (Production / Distribution / Émission) ci-dessus pour configurer les listes de régulation.
+          </p>
         </div>
       </fieldset>
 

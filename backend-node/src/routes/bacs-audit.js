@@ -1290,6 +1290,10 @@ async function routes(fastify) {
       device_role: deviceRoleSchema,
       communication_protocol: z.enum(DEVICE_COMM).nullable().optional(),
       communication_protocols: z.string().nullable().optional(),
+      // Mig 185 — état ternaire « équipement communicant ? » dissocié du
+      // protocole. L'auditeur répond Oui/Non d'abord ; si Oui, le ou les
+      // protocoles deviennent un champ obligatoire (deviceMissingFields).
+      is_communicating: z.boolean().nullable().optional(),
       wired: z.boolean().nullable().optional(),
       location: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
