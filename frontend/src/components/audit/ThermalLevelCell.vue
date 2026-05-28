@@ -58,11 +58,16 @@ const regulationDeviceId = computed(() => props.thermal[regulationField.value])
 // uniquement via les champs free-text de la modale équipement.
 const selectedDevices = computed(() => {
   const validIds = new Set(props.deviceOptions.map(o => o.value))
+  const seen = new Set()
   const ids = []
-  if (deviceId.value && validIds.has(deviceId.value)) ids.push(deviceId.value)
-  if (!props.integrated && regulationDeviceId.value && validIds.has(regulationDeviceId.value)) {
-    ids.push(regulationDeviceId.value)
+  const push = (id) => {
+    if (id != null && validIds.has(id) && !seen.has(id)) {
+      seen.add(id)
+      ids.push(id)
+    }
   }
+  push(deviceId.value)
+  if (!props.integrated) push(regulationDeviceId.value)
   return ids
 })
 
