@@ -65,6 +65,14 @@ const selectedDevices = computed(() => {
 // Combinaison des options device + régulateurs candidats (mêmes devices de
 // la zone, mais filtrés par rôle régulation). Dédup par id (un device qui
 // porte les 2 rôles ne doit apparaître qu'une fois dans la liste).
+//
+// Mig 187 v19 — les candidats régulateurs ne sont PROPOSÉS dans le dropdown
+// de niveau QUE si le device principal est explicitement marqué « régulation
+// déportée » (`regulation_integrated === false`). Sinon le dropdown est
+// strict au niveau (un radiateur ne doit pas apparaître en Production sous
+// prétexte qu'il porte aussi le rôle `regulation`). Le 2e slot du multi-
+// select (regulator déporté) reste accessible uniquement après que
+// l'auditeur a déclaré la régulation déportée dans la modale équipement.
 const allOptions = computed(() => {
   const seen = new Set()
   const out = []
@@ -73,10 +81,12 @@ const allOptions = computed(() => {
     seen.add(o.value)
     out.push(o)
   }
-  for (const o of props.regulatorOptions) {
-    if (seen.has(o.value)) continue
-    seen.add(o.value)
-    out.push(o)
+  if (isDeported.value) {
+    for (const o of props.regulatorOptions) {
+      if (seen.has(o.value)) continue
+      seen.add(o.value)
+      out.push(o)
+    }
   }
   return out
 })
@@ -111,6 +121,15 @@ function setRegulationType(v) {
 // (`regulator_brand`, `regulator_model_reference`, `regulator_location_X`).
 const isDeported = computed(() =>
   props.device && (props.device.regulation_integrated === 0 || props.device.regulation_integrated === false))
+// Libellé floatlabel "Équipements de <fonction>" (production / distribution /
+// émission). « d'émission » avec apostrophe sur émission.
+const LEVEL_LABEL = {
+  production:   'Équipements de production',
+  distribution: 'Équipements de distribution',
+  emission:     "Équipements d'émission",
+}
+const devicesLabel = computed(() => LEVEL_LABEL[props.level] || 'Équipements')
+
 const deportedTooltip = computed(() => {
   if (!isDeported.value || !props.device) return ''
   const lines = ['Régulation déportée']
@@ -133,7 +152,7 @@ const deportedTooltip = computed(() => {
        colonne flex. -->
   <div class="flex items-end gap-2 flex-nowrap">
     <div class="flex flex-col gap-0.5 shrink-0">
-      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Équipement(s)</span>
+      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">{{ devicesLabel }}</span>
       <SearchableSelect
         :model-value="selectedDevices"
         :options="allOptions"
