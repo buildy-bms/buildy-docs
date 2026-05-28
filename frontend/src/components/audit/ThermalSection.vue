@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, reactive } from 'vue'
 import Sortable from 'sortablejs'
-import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
   REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
-  derivedGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
+  derivedGranularity, resolveGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
+  GRANULARITY_OPTIONS, regulationTypesForCategory,
 } from '@/lib/audit-options'
 import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -13,11 +14,12 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import ThermalLevelCell from '@/components/audit/ThermalLevelCell.vue'
 import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsThermal, reorderBacsThermal } from '@/api'
+import { updateBacsThermal, reorderBacsThermal, updateBacsDevice } from '@/api'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
 
 // Niveaux R175-6 (Production / Distribution / Émission). Chaque niveau
@@ -77,6 +79,41 @@ function sortThermalValue(t, key) {
   return ''
 }
 const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortThermalValue))
+
+// Mig 187 — regroupement par zone pour économiser de la largeur (suppression
+// des colonnes Zone, Usage, Système redondantes sur des audits chargés). On
+// produit une liste de groupes { zoneName, rows } préservant l'ordre stable
+// de sortedThermal. Le DnD reste fonctionnel : chaque tbody.thermal-row a
+// son data-id et Sortable n'a pas besoin de la notion de groupe (le réordo
+// se fait à plat).
+// Mig 187 v3 — état repli/dépli par zone. Map nomZone → boolean (true =
+// replié). Par défaut tout déplié. Toggle individuel via clic header + 2
+// boutons globaux « Tout replier » / « Tout déplier » au-dessus de la liste.
+const collapsedZones = reactive({})
+function toggleZone(name) { collapsedZones[name] = !collapsedZones[name] }
+function collapseAll() {
+  for (const g of thermalGroups.value) collapsedZones[g.zoneName] = true
+}
+function expandAll() {
+  for (const g of thermalGroups.value) collapsedZones[g.zoneName] = false
+}
+const allCollapsed = computed(() => thermalGroups.value.length > 0 &&
+  thermalGroups.value.every(g => collapsedZones[g.zoneName]))
+
+const thermalGroups = computed(() => {
+  const groups = []
+  const byName = new Map()
+  for (const t of sortedThermal.value) {
+    const key = t.zone_name || 'Sans zone'
+    if (!byName.has(key)) {
+      const g = { zoneName: key, rows: [] }
+      byName.set(key, g)
+      groups.push(g)
+    }
+    byName.get(key).rows.push(t)
+  }
+  return groups
+})
 
 async function patchThermal(t, patch) {
   Object.assign(t, patch)
@@ -143,11 +180,80 @@ function systemDisplayName(t) {
   if (prod) return prod.name || prod.brand || prod.model_reference || `Équipement #${prod.id}`
   return defaultLabel(t)
 }
+// Mig 187 — granularité désormais SAISIE explicitement sur le device
+// émetteur (`regulation_granularity`). Fallback sur la dérivée pour les
+// rows historiques sans valeur explicite. Le label/tone n'est connu que
+// pour les 3 valeurs canoniques (per_room / per_zone / central_only) ;
+// pour les valeurs custom créées par l'auditeur, on affiche la valeur
+// telle quelle avec un ton neutre.
 function granularityForRow(t) {
   const emitter = deviceForLevel(t, 'emission')
-  const emissionType = emitter?.regulation_type_emission || null
-  const key = derivedGranularity(emissionType)
-  return { key, label: GRANULARITY_LABELS_FR[key], tone: GRANULARITY_TONES[key] }
+  const key = resolveGranularity(emitter)
+  return {
+    key,
+    label: GRANULARITY_LABELS_FR[key] || key,
+    tone: GRANULARITY_TONES[key] || 'bg-gray-50 text-gray-700 border-gray-200',
+    deviceId: emitter?.id || null,
+    derivedKey: derivedGranularity(emitter?.regulation_type_emission || null),
+  }
+}
+// Patch granularité explicite sur le device émetteur. Si l'utilisateur
+// repasse à la valeur dérivée par défaut, on remet le champ à null pour
+// signaler « pas de surcharge » (l'UI re-tombera sur la dérivée).
+async function patchGranularity(t, value) {
+  const info = granularityForRow(t)
+  if (!info.deviceId) return
+  const next = (value && value !== info.derivedKey) ? value : null
+  try {
+    await updateBacsDevice(info.deviceId, { regulation_granularity: next })
+    // Synchro state local : on cherche le device dans le store et on
+    // l'updaite à la volée (sinon il faudrait refresh complet).
+    const dev = (audit.devices || []).find(d => d.id === info.deviceId)
+    if (dev) dev.regulation_granularity = next
+    await audit.refreshActionItems()
+  } catch { error('Sauvegarde granularité impossible') }
+}
+
+// Mig 187 v10 — Options pour le SearchableSelect « type de régulation »
+// affiché dans chaque cellule de niveau. Privilégie la liste du modèle
+// d'équipement du device (si rattaché à un equipment_template), sinon
+// retombe sur les défauts par catégorie d'usage du système.
+function regulationTypeOptionsFor(t, level) {
+  const cat = t.category || 'heating'
+  const device = deviceForLevel(t, level)
+  const tplId = device?.equipment_template_id
+  let override = null
+  if (tplId) {
+    const tpl = (audit.equipmentTemplates || []).find(x => x.id === tplId) || null
+    override = tpl?.[`regulation_${level}_types`] || null
+  }
+  return regulationTypesForCategory(level, cat, override)
+}
+
+// Mig 187 v10 — patch direct sur un device depuis ThermalLevelCell.
+// L'événement contient { deviceId, patch }. Object.assign sync sur la
+// version en mémoire pour réactivité immédiate, puis PATCH HTTP
+// fire-and-forget + refresh action items debouncé.
+async function patchDeviceField({ deviceId, patch }) {
+  const dev = (audit.devices || []).find(d => d.id === deviceId)
+  if (dev) Object.assign(dev, patch)
+  try {
+    await updateBacsDevice(deviceId, patch)
+    audit.scheduleActionItemsRefresh?.()
+  } catch { error('Sauvegarde impossible') }
+}
+
+// Mig 187 — détecte si la régulation est intégrée à l'équipement.
+// Logique « intégrée par défaut » :
+//   - device explicitement marqué Déportée (regulation_integrated === 0/false) → NON intégrée (on affiche le régulateur séparé)
+//   - tous les autres cas (null = non répondu, true = explicite, device absent…) → on suppose intégrée
+// Ça épargne 90% des cellules « régulateur déporté » qui dupliquaient
+// l'équipement principal quand l'auditeur n'avait pas encore cliqué.
+// L'auditeur peut basculer en Déportée dans la modale équipement pour
+// faire apparaître le second select.
+function regulationIsIntegrated(device) {
+  if (!device) return true
+  return !(device.regulation_integrated === 0 || device.regulation_integrated === false)
 }
 
 // ── Ajout / suppression d'entrées de régulation (mig 170) ──
@@ -208,19 +314,29 @@ const woodExemptCount = computed(() =>
   (props.thermalFiltered || []).filter(t => exemptAutoFromWood(t)).length,
 )
 
-// Drag & drop des lignes thermiques. Sortable sur la <table> avec
-// draggable="tbody" — chaque tbody contient la ligne principale + sa
-// ligne de détail repliable, donc les deux suivent le drag ensemble.
+// Mig 187 — drag & drop des systèmes thermiques. Maintenant 1 Sortable
+// par zone (chaque zone est sa propre sous-card avec sa liste d'articles)
+// pour empêcher de glisser un système hors de sa zone (= contrainte métier
+// implicite : un système Chauffage de Bureaux 1 n'a aucun sens dans Bureaux 2).
 const tableRef = ref(null)
-let sortable = null
+const sortables = []
 function teardownSortable() {
-  if (sortable) { try { sortable.destroy() } catch { /* ignore */ } sortable = null }
+  while (sortables.length) {
+    const s = sortables.pop()
+    try { s.destroy() } catch { /* ignore */ }
+  }
 }
 function setupSortable() {
   teardownSortable()
-  const el = tableRef.value
-  if (!el) return
-  sortable = Sortable.create(el, {
+  const root = tableRef.value
+  if (!root) return
+  // Mig 187 v8 — 1 seule table dans la card → 1 seul Sortable sur la table
+  // entière, draggable cible les `tbody.thermal-row` (= systèmes). Permet
+  // de réordonner les systèmes y compris cross-zone si l'utilisateur le
+  // souhaite (rare, mais pas bloqué).
+  const table = root.querySelector('table.thermal-card-table')
+  if (!table) return
+  sortables.push(Sortable.create(table, {
     draggable: 'tbody.thermal-row',
     handle: '.drag-handle',
     animation: 150,
@@ -228,8 +344,8 @@ function setupSortable() {
     chosenClass: 'sortable-chosen',
     onEnd: async (evt) => {
       if (evt.oldIndex === evt.newIndex) return
-      const ids = Array.from(el.querySelectorAll('tbody.thermal-row'))
-        .map(tb => parseInt(tb.getAttribute('data-id'), 10))
+      const ids = Array.from(table.querySelectorAll('tbody.thermal-row'))
+        .map(el => parseInt(el.getAttribute('data-id'), 10))
         .filter(Boolean)
       try {
         await reorderBacsThermal(audit.docId, ids)
@@ -239,7 +355,7 @@ function setupSortable() {
         await audit.refreshAuditCore()
       }
     },
-  })
+  }))
 }
 watch(() => props.thermalFiltered, async () => {
   await nextTick()
@@ -303,211 +419,162 @@ onBeforeUnmount(teardownSortable)
       </p>
     </div>
 
-    <div class="overflow-x-auto">
-    <table ref="tableRef" class="data-table w-full text-sm">
-      <thead>
-        <tr>
-          <th class="w-8"></th>
-          <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
-          <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <DataTableSortHeader sort-key="system" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Système</DataTableSortHeader>
-          <th v-if="anyWoodExempt">Exempté bois</th>
-          <th>Production</th>
-          <th>Régulation production</th>
-          <th>Distribution</th>
-          <th>Régulation distribution</th>
-          <th>Émission</th>
-          <th>Régulation émission</th>
-          <th>Granularité</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody v-for="t in sortedThermal" :key="t.id"
-             :data-id="t.id"
-             class="thermal-row">
-        <!-- Ligne principale : 12 colonnes alignées + drag handle -->
-        <tr>
-          <td class="align-middle">
-            <button type="button"
-                    class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-                    v-tooltip="'Glisser pour réordonner'">
-              <Bars3Icon class="w-4 h-4" />
-            </button>
-          </td>
-          <td class="text-gray-700 font-medium whitespace-nowrap">{{ t.zone_name }}</td>
-          <td class="whitespace-nowrap">
-            <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
-                  :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
-              <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
-              {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-            </span>
-          </td>
-          <!-- Mig 180 : Nom du système — lecture seule, vient de
-               bacs_audit_systems.custom_label via le JOIN backend. Si vide,
-               fallback sur le nom de l'équipement de production (plus
-               parlant que « Chauffage » / « Refroidissement »), puis sur
-               le libellé d'usage par défaut.
-               L'édition se fait dans la card 03 « Systèmes ». -->
-          <td class="align-middle text-sm text-gray-800 font-medium whitespace-nowrap">
-            {{ systemDisplayName(t) }}
-          </td>
-          <td v-if="anyWoodExempt" class="align-middle">
-            <!-- Exemption R175-6 II déduite automatiquement de l'énergie de
-                 l'équipement de Production (bois). Lecture seule. -->
-            <Tooltip v-if="exemptAutoFromWood(t)"
-                     text="Exemption R175-6 II : l'équipement de Production est au bois.">
-              <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
-                Exempté — bois
-              </span>
-            </Tooltip>
-            <span v-else class="text-gray-300 text-xs">—</span>
-          </td>
-          <!-- Production : équipement (sans type/âge, ils sont sur le device Card 03) -->
-          <td class="align-middle">
-            <div class="min-w-40">
-              <SearchableSelect
-                :model-value="t.generator_device_id"
-                @update:modelValue="v => patchThermal(t, { generator_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'production')"
-                :invalid="!t.generator_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'production')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'production') }}
-              </div>
-            </div>
-          </td>
-          <!-- Équipement de régulation Production + icône notes Production -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.production_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { production_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.production_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Production — ' + t.zone_name, contextLabel: t.zone_name + ' · Production', entityType: 'thermal', entityRef: t, currentHtml: t.production_notes_html || '', noteField: 'production_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.production_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.production_notes_html) ? 'Note production' : 'Ajouter une note production'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Distribution : équipement -->
-          <td class="align-middle">
-            <div class="min-w-40">
-              <SearchableSelect
-                :model-value="t.distribution_device_id"
-                @update:modelValue="v => patchThermal(t, { distribution_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'distribution')"
-                :invalid="!t.distribution_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'distribution')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'distribution') }}
-              </div>
-            </div>
-          </td>
-          <!-- Équipement de régulation Distribution + icône notes -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.distribution_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { distribution_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.distribution_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Distribution — ' + t.zone_name, contextLabel: t.zone_name + ' · Distribution', entityType: 'thermal', entityRef: t, currentHtml: t.distribution_notes_html || '', noteField: 'distribution_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.distribution_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.distribution_notes_html) ? 'Note distribution' : 'Ajouter une note distribution'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Émission : équipement -->
-          <td class="align-middle">
-            <div class="min-w-40">
-              <SearchableSelect
-                :model-value="t.emission_device_id"
-                @update:modelValue="v => patchThermal(t, { emission_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'emission')"
-                :invalid="!t.emission_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'emission')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'emission') }}
-              </div>
-            </div>
-          </td>
-          <!-- Équipement de régulation Émission + icône notes -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.emission_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { emission_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.emission_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Émission — ' + t.zone_name, contextLabel: t.zone_name + ' · Émission', entityType: 'thermal', entityRef: t, currentHtml: t.emission_notes_html || '', noteField: 'emission_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.emission_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.emission_notes_html) ? 'Note émission' : 'Ajouter une note émission'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Mig 180 : Granularité R175-6 dérivée du type d'émission du
-               device émetteur de la ligne (modale équipement → section
-               Régulation → type d'émission). Lecture seule. -->
-          <td class="align-middle">
-            <span :class="['inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap', granularityForRow(t).tone]"
-                  v-tooltip="`Granularité dérivée du type d'émission de l'équipement émetteur. Modifier dans la card Systèmes.`">
-              {{ granularityForRow(t).label }}
-            </span>
-          </td>
-          <!-- Actions de l'entrée de régulation : notes globales + suppression -->
-          <td class="align-middle">
-            <div class="inline-flex items-center gap-1">
-              <button type="button"
-                      @click="emit('open-notes', {
-                        title: 'Notes régulation thermique',
-                        contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
-                        entityType: 'thermal',
-                        entityRef: t,
-                        currentHtml: t.notes_html || t.notes || '',
-                        noteField: 'notes_html',
-                      })"
-                      :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
-                      v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-                <PencilSquareIcon class="w-4 h-4 shrink-0" />
-              </button>
-              <button type="button" @click="removeEntry(t)"
-                      class="btn-icon btn-icon-danger"
-                      v-tooltip="'Supprimer ce système de régulation'">
-                <TrashIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Mig 187 v3 — boutons globaux + sous-cards par zone repliables.
+         L'en-tête de zone est cliquable pour replier/déplier sa liste de
+         systèmes. Plus une ligne globale au-dessus pour tout basculer. -->
+    <div class="px-3 pb-2 flex items-center justify-end">
+      <button v-if="thermalGroups.length"
+              type="button"
+              @click="allCollapsed ? expandAll() : collapseAll()"
+              class="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 px-2 py-1 rounded transition">
+        <ChevronRightIcon v-if="allCollapsed" class="w-3.5 h-3.5" />
+        <ChevronDownIcon v-else class="w-3.5 h-3.5" />
+        {{ allCollapsed ? 'Tout déplier' : 'Tout replier' }}
+      </button>
+    </div>
+    <!-- Mig 187 v8 — UNE SEULE table pour TOUTE la card, pour que les
+         largeurs de colonnes (Production / Distribution / Émission) soient
+         calculées sur le contenu MAXIMUM de toute la card, pas par zone.
+         Sinon chaque zone calculait ses propres largeurs et les colonnes
+         étaient inconsistantes d'une zone à l'autre.
+         Les zones sont matérialisées par des tbody (zone-header cliquable
+         + zone-content masquable en v-show). -->
+    <div ref="tableRef" class="px-3 pb-3">
+      <table class="thermal-card-table w-full border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Mig 187 v16 — 4 colonnes : 3 niveaux + 1 colonne Actions dédiée
+             alignée à droite. Émission absorbe le surplus. -->
+        <colgroup>
+          <col />
+          <col />
+          <col style="width: 100%" />
+          <col />
+        </colgroup>
+        <thead class="bg-gray-50">
+          <tr>
+            <th v-for="level in LEVELS" :key="level.key"
+                class="px-4 py-2 text-left text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
+              {{ level.label }}
+            </th>
+            <th class="px-4 py-2 text-right text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
+              Actions
+            </th>
+          </tr>
+        </thead>
+        <template v-for="g in thermalGroups" :key="g.zoneName">
+          <!-- tbody zone-header — bande grise cliquable pour replier la zone. -->
+          <tbody class="thermal-zone-header">
+            <tr @click="toggleZone(g.zoneName)"
+                class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100 transition select-none">
+              <td colspan="4" class="px-4 py-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
+                    <ChevronDownIcon v-else class="w-4 h-4 text-gray-500" />
+                    <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+                  </div>
+                  <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          <!-- tbody par système (regroupe les rows identification + data
+               sous un même drag handle / data-id pour Sortable). -->
+          <tbody v-for="t in g.rows" :key="t.id"
+                 v-show="!collapsedZones[g.zoneName]"
+                 :data-id="t.id"
+                 class="thermal-row border-t border-gray-100">
+            <!-- Ligne 1 — identification (colspan 4) -->
+            <tr>
+              <td colspan="4" class="px-4 pt-3 pb-1">
+                <div class="flex w-full items-center gap-3 flex-nowrap">
+                  <button type="button"
+                          class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
+                          v-tooltip="'Glisser pour réordonner ce système'">
+                    <Bars3Icon class="w-4 h-4" />
+                  </button>
+                  <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
+                  <span class="text-xs font-semibold uppercase tracking-wider"
+                        :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
+                    {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
+                  </span>
+                  <span class="text-gray-400">·</span>
+                  <span class="text-sm font-semibold text-gray-800">{{ systemDisplayName(t) }}</span>
+                  <Tooltip v-if="exemptAutoFromWood(t)"
+                           text="Exemption R175-6 II : l'équipement de Production est au bois.">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
+                      Exempté — bois
+                    </span>
+                  </Tooltip>
+                </div>
+              </td>
+            </tr>
+            <!-- Ligne 2 — 3 cellules niveaux. Largeurs auto par contenu max
+                 sur TOUTE la card (vrai bénéfice du single-table). -->
+            <tr>
+              <td v-for="level in LEVELS" :key="level.key"
+                  class="px-4 pb-3 align-top">
+                <ThermalLevelCell
+                  :thermal="t"
+                  :level="level.key"
+                  :device="deviceForLevel(t, level.key)"
+                  :device-options="deviceOptionsForLevel(t, level.key)"
+                  :regulator-options="deviceOptionsForLevel(t, 'regulation')"
+                  :regulation-type-options="regulationTypeOptionsFor(t, level.key)"
+                  :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
+                  :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
+                  @patch-thermal="(p) => patchThermal(t, p)"
+                  @patch-device="patchDeviceField"
+                  @open-notes="emit('open-notes', {
+                    title: 'Notes ' + level.label + ' — ' + t.zone_name,
+                    contextLabel: t.zone_name + ' · ' + level.label,
+                    entityType: 'thermal', entityRef: t,
+                    currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
+                    noteField: LEVEL_NOTES_FIELD[level.key],
+                  })">
+                  <!-- Mig 187 v10 — Granularité injectée DANS la même ligne
+                       flex que le multiselect du device émetteur (slot after).
+                       Plus de retour à la ligne ni de bloc séparé : la
+                       granularité fait visuellement PARTIE de la colonne
+                       Émission, comme demandé. -->
+                  <template v-if="level.key === 'emission'" #after>
+                    <div class="flex flex-col gap-0.5 shrink-0">
+                      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Granularité</span>
+                      <SearchableSelect
+                        :model-value="granularityForRow(t).key"
+                        @update:modelValue="(v) => patchGranularity(t, v)"
+                        :options="GRANULARITY_OPTIONS"
+                        :invalid="!deviceForLevel(t, 'emission')?.regulation_granularity"
+                        :clearable="true" :creatable="true" :auto-width="true"
+                        size="sm" placeholder="Granularité…" />
+                    </div>
+                  </template>
+                </ThermalLevelCell>
+              </td>
+              <!-- Mig 187 v16 — Colonne Actions dédiée, alignée à droite. -->
+              <td class="px-4 pb-3 align-bottom text-right whitespace-nowrap">
+                <button type="button"
+                        @click="emit('open-notes', {
+                          title: 'Notes régulation thermique',
+                          contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                          entityType: 'thermal',
+                          entityRef: t,
+                          currentHtml: t.notes_html || t.notes || '',
+                          noteField: 'notes_html',
+                        })"
+                        :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
+                        v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                  <PencilSquareIcon class="w-4 h-4 shrink-0" />
+                </button>
+                <button type="button" @click="removeEntry(t)"
+                        class="btn-icon btn-icon-danger ml-1"
+                        v-tooltip="'Supprimer ce système de régulation'">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </template>
+      </table>
     </div>
 
     <!-- Mig 180 : les lignes sont créées automatiquement depuis les

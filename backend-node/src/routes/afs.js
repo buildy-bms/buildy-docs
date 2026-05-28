@@ -44,6 +44,12 @@ const updateAfSchema = z.object({
   audit_existing_af_status: z.string().nullable().optional(),
   audit_synthesis_html: z.string().nullable().optional(),
   audit_synthesis_generated_at: z.string().nullable().optional(),
+  // Mig 187 — card 08 « Inspection périodique R175-5-1 » : permet à
+  // l'auditeur de cocher « Aucune inspection à déclarer » avec une raison
+  // optionnelle. Quand coché, la card est considérée valide et aucune
+  // action corrective n'est générée (cf. action-generator).
+  inspection_not_applicable: z.boolean().nullable().optional(),
+  inspection_not_applicable_reason: z.string().nullable().optional(),
 });
 
 /**
@@ -411,6 +417,8 @@ async function routes(fastify) {
       'title', 'kind', 'bacs_district_heating_substation_kw', 'bacs_generator_works_date',
       'bacs_roi_study_status', 'bacs_roi_study_html',
       'audit_existing_af_status', 'audit_synthesis_html', 'audit_synthesis_generated_at',
+      // Mig 187 — card 08 inspection R175-5-1.
+      'inspection_not_applicable', 'inspection_not_applicable_reason',
     ];
     for (const k of passthrough) {
       if (k in body) fields[k] = body[k];

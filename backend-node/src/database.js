@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 186;
+const TARGET_VERSION = 187;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7079,6 +7079,35 @@ function runMigrations() {
     db.pragma('user_version = 186');
   }
 
+  if (current < 187) {
+    // 3 ajouts cohérents (regroupés dans une seule migration pour éviter
+    // les pollutions d'historique sur des champs liés) :
+    //
+    // 1. `afs.inspection_not_applicable` (ternaire 0/1, défaut 0) +
+    //    `afs.inspection_not_applicable_reason` (TEXT). Permet à l'auditeur
+    //    de cocher « Aucune inspection à déclarer » sur la card 8 R175-5-1
+    //    quand le site n'y est pas soumis (ex. ERP non concerné) ou n'a pas
+    //    encore été inspecté. Sinon la card bloquait la validation et
+    //    générait une action corrective parasite.
+    //
+    // 2. `bacs_audit_system_devices.regulation_granularity` (TEXT libre,
+    //    creatable) — granularité R175-6 (per_room / per_zone /
+    //    central_only / autre) désormais SAISIE explicitement dans la modale
+    //    équipement (sous Type de régulation d'émission), au lieu d'être
+    //    dérivée du type d'émission via `derivedGranularity()`. La dérivée
+    //    reste utilisée comme valeur initiale en mode auto-prefill.
+    //
+    // 3. `equipment_templates.default_regulation_granularity` (TEXT) —
+    //    granularité par défaut pré-remplie quand on crée un device depuis
+    //    ce modèle. Éditable dans la bibliothèque (EquipmentTemplateEditor).
+    db.exec(`ALTER TABLE afs ADD COLUMN inspection_not_applicable INTEGER DEFAULT 0;`);
+    db.exec(`ALTER TABLE afs ADD COLUMN inspection_not_applicable_reason TEXT;`);
+    db.exec(`ALTER TABLE bacs_audit_system_devices ADD COLUMN regulation_granularity TEXT;`);
+    db.exec(`ALTER TABLE equipment_templates ADD COLUMN default_regulation_granularity TEXT;`);
+    log.info('Migration 187 appliquee : inspection_not_applicable + regulation_granularity (device + template default)');
+    db.pragma('user_version = 187');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7222,21 +7251,22 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, defaultRegulationGranularity, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, bacs_contraindications, regulation_production_types, regulation_distribution_types, regulation_emission_types, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, bacs_contraindications, regulation_production_types, regulation_distribution_types, regulation_emission_types, default_regulation_granularity, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
             descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
             defaultEnergySource || null, defaultDeviceRole || null,
             bacsContraindications || null,
             regulationProductionTypes || null, regulationDistributionTypes || null, regulationEmissionTypes || null,
+            defaultRegulationGranularity || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, updatedBy }) {
+  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, defaultRegulationGranularity, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -7265,6 +7295,9 @@ const equipmentTemplates = {
     const prodRegArg = regulationProductionTypes === '__clear__' ? [] : [regulationProductionTypes ?? null];
     const distRegArg = regulationDistributionTypes === '__clear__' ? [] : [regulationDistributionTypes ?? null];
     const emitRegArg = regulationEmissionTypes === '__clear__' ? [] : [regulationEmissionTypes ?? null];
+    // Mig 187 — granularité par défaut. Sentinel '__clear__' supporté.
+    const granSql = defaultRegulationGranularity === '__clear__' ? 'NULL' : 'COALESCE(?, default_regulation_granularity)';
+    const granArg = defaultRegulationGranularity === '__clear__' ? [] : [defaultRegulationGranularity ?? null];
 
     db.prepare(`
       UPDATE equipment_templates
@@ -7284,11 +7317,12 @@ const equipmentTemplates = {
           regulation_production_types = ${prodRegSql},
           regulation_distribution_types = ${distRegSql},
           regulation_emission_types = ${emitRegSql},
+          default_regulation_granularity = ${granSql},
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, ...contraArg, ...prodRegArg, ...distRegArg, ...emitRegArg, updatedBy || null, id);
+    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, ...contraArg, ...prodRegArg, ...distRegArg, ...emitRegArg, ...granArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {
@@ -8027,6 +8061,8 @@ const afs = {
       'audit_existing_af_status', 'bacs_district_heating_substation_kw',
       'bacs_roi_study_status', 'bacs_roi_study_html',
       'bacs_generator_works_date',
+      // Mig 187 — card 08 inspection R175-5-1.
+      'inspection_not_applicable', 'inspection_not_applicable_reason',
       // Livres blancs (mig 140)
       'parent_af_id', 'wp_layout', 'wp_audience', 'wp_version', 'wp_meta_json',
     ];

@@ -686,8 +686,13 @@ const STEP_DEFINITIONS = [
   { key: 'inspections',
     label: 'Inspections',
     description: 'R175-5-1 : inspection periodique par un tiers (rapport conserve 10 ans).',
-    incomplete: () => ((inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
-      ? [] : ["la date de la dernière inspection périodique R175-5-1 n'est pas renseignée"]) },
+    incomplete: () => {
+      // Mig 187 — case « Aucune inspection à déclarer » bypass la validation.
+      const na = document.value?.inspection_not_applicable
+      if (na === 1 || na === true) return []
+      return (inspections.value.length > 0 && !!inspections.value[0].last_inspection_date)
+        ? [] : ["la date de la dernière inspection périodique R175-5-1 n'est pas renseignée OU coche « Aucune inspection à déclarer » si le site n'y est pas soumis"]
+    } },
   { key: 'docs-checklist',
     label: 'Check-list',
     description: 'Plans, schémas, synoptique GTB, IP, AF GTB, contacts locataires + photos de chaque zone/système/compteur/GTB.',
@@ -1632,7 +1637,8 @@ onBeforeUnmount(() => {
                           :active="activeStepKey === 'inspections'"
                           :step="stepFor('inspections')"
                           @validate-step="validateStep"
-                          @invalidate-step="invalidateStep" />
+                          @invalidate-step="invalidateStep"
+                          @save-doc="saveDocDebounced" />
 
       <!-- 9. Check-list documentaire (mig 100) -->
       <ChecklistSection

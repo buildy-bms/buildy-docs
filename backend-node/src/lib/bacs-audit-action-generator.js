@@ -550,7 +550,12 @@ function computeTargetActions(documentId) {
 
   // R175-5-1 — inspection periodique par tiers (rapport conserve 10 ans).
   // Sans GTB sur site, aucune inspection BACS n'est à programmer.
-  if (!noGtb) {
+  // Mig 187 : si l'auditeur a explicitement coché « Aucune inspection à
+  // déclarer » (ex. ERP non concerné, site non encore inspecté), on saute
+  // également la génération de l'action corrective.
+  const inspectionNa = db.db.prepare('SELECT inspection_not_applicable FROM afs WHERE id = ?').get(documentId);
+  const inspectionMarkedNa = inspectionNa && (inspectionNa.inspection_not_applicable === 1 || inspectionNa.inspection_not_applicable === true);
+  if (!noGtb && !inspectionMarkedNa) {
    const inspections = db.db.prepare(
     'SELECT * FROM bacs_audit_inspections WHERE document_id = ? ORDER BY COALESCE(last_inspection_date, \'1970\') DESC'
    ).all(documentId);

@@ -59,6 +59,10 @@ const createTemplateSchema = z.object({
   regulation_production_types:   regulationTypeSchema,
   regulation_distribution_types: regulationTypeSchema,
   regulation_emission_types:     regulationTypeSchema,
+  // Mig 187 — granularité par défaut R175-6 (per_room / per_zone /
+  // central_only / autre, ou TEXT libre). Pré-remplit la modale équipement
+  // à la création d'un device depuis ce modèle.
+  default_regulation_granularity: z.string().nullable().optional(),
 });
 
 // Le slug reste editable (Lot AF QoL) ; verification d'unicite + check
@@ -219,6 +223,8 @@ async function routes(fastify) {
       regulationProductionTypes:   serializeRegulationList(body.regulation_production_types,   body.category, 'production'),
       regulationDistributionTypes: serializeRegulationList(body.regulation_distribution_types, body.category, 'distribution'),
       regulationEmissionTypes:     serializeRegulationList(body.regulation_emission_types,     body.category, 'emission'),
+      // Mig 187 — granularité par défaut R175-6.
+      defaultRegulationGranularity: body.default_regulation_granularity || null,
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -279,6 +285,12 @@ async function routes(fastify) {
     const regulationProductionTypes   = adaptRegulation('regulation_production_types');
     const regulationDistributionTypes = adaptRegulation('regulation_distribution_types');
     const regulationEmissionTypes     = adaptRegulation('regulation_emission_types');
+    // Mig 187 — granularité par défaut. null explicite → '__clear__' (unset).
+    let defaultRegulationGranularity = undefined;
+    if ('default_regulation_granularity' in body) {
+      const v = body.default_regulation_granularity;
+      defaultRegulationGranularity = (v && v.trim()) ? v.trim() : '__clear__';
+    }
     // Update + tombstone de l'ancien slug en transaction. Le tombstone
     // empeche le seeder de recreer un row a partir du fichier seed
     // (seeds/equipment-templates/<oldSlug>.js) au prochain boot, ce qui
@@ -302,6 +314,7 @@ async function routes(fastify) {
         regulationProductionTypes,
         regulationDistributionTypes,
         regulationEmissionTypes,
+        defaultRegulationGranularity,
         updatedBy: userId,
       });
       if (nextSlug) {

@@ -16,7 +16,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import {
   ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS,
-  regulationTypesForCategory,
+  regulationTypesForCategory, GRANULARITY_OPTIONS,
   isThermalCategory, isDeviceComplete, deviceMissingFields,
 } from '@/lib/audit-options'
 
@@ -361,10 +361,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             </div>
 
             <!-- Régulateur — marque + référence. Masqués UNIQUEMENT quand
-                 la régulation est explicitement Intégrée (= toggle = true) :
-                 dans ce cas marque/réf/loc sont implicitement ceux de
-                 l'équipement principal. Par défaut (null) ou Déportée, on
-                 affiche les champs (l'auditeur peut renseigner). -->
+                 la régulation est explicitement Intégrée. -->
             <div v-if="showRegulatorDetails"
                  class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
               <div>
@@ -381,7 +378,10 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
 
             <!-- Par niveau présent : Type de régulation + Localisation (si
                  régulation déportée). Localisation cachée si intégrée
-                 (l'emplacement est implicitement celui de l'équipement). -->
+                 (l'emplacement est implicitement celui de l'équipement).
+                 Mig 187 v12 — type de régulation visible dès qu'on a
+                 répondu Oui à has_regulation, indépendamment du choix
+                 Intégrée / Déportée. -->
             <div v-if="hasProductionRole" :class="['grid gap-x-3 gap-y-3', showRegulatorDetails ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1']">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation de production</label>
@@ -416,7 +416,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   @update:model-value="v => patch({ regulator_location_distribution: v || null })" />
               </div>
             </div>
-            <div v-if="hasEmissionRole" :class="['grid gap-x-3 gap-y-3', showRegulatorDetails ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1']">
+            <div v-if="hasEmissionRole" class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3">
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation d'émission</label>
                 <SearchableSelect :model-value="device.regulation_type_emission"
@@ -424,7 +424,18 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   :clearable="true" :creatable="true" size="sm" placeholder="Thermostat, présence, lumière constante…"
                                   @update:model-value="v => patch({ regulation_type_emission: v || null })" />
               </div>
-              <div v-if="showRegulatorDetails">
+              <div>
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+                  Granularité R175-6
+                  <span class="text-gray-400 font-normal">— précision spatiale</span>
+                </label>
+                <SearchableSelect :model-value="device.regulation_granularity"
+                                  :options="GRANULARITY_OPTIONS"
+                                  :clearable="true" :creatable="true" size="sm"
+                                  placeholder="Par pièce / Par zone / Centralisée…"
+                                  @update:model-value="v => patch({ regulation_granularity: v || null })" />
+              </div>
+              <div v-if="showRegulatorDetails" class="sm:col-span-2">
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Localisation de la régulation d'émission</label>
                 <SearchableSelect :model-value="device.regulator_location_emission"
                                   :options="zoneOptions"

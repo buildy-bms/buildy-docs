@@ -50,6 +50,17 @@ const props = defineProps({
   multiple: { type: Boolean, default: false },
   // Si true : habillage rouge pâle pour signaler une info manquante.
   invalid: { type: Boolean, default: false },
+  // Si true : largeur du trigger s'adapte au contenu sélectionné (min-w-fit)
+  // au lieu d'occuper 100% du parent. Utilisé dans la card 06 pour que la
+  // largeur des listes reflète la richesse du nom de l'équipement choisi.
+  autoWidth: { type: Boolean, default: false },
+  // Mig 187 v13 — Mode multi : nombre max de chips à afficher avant de
+  // tronquer en « + N équipements ». 0 = pas de troncature (défaut). Utilisé
+  // dans la card 06 (`chipLimit: 1`) pour garder une ligne compacte même
+  // quand un device principal + un régulateur déporté sont sélectionnés.
+  chipLimit: { type: Number, default: 0 },
+  chipLabel: { type: String, default: 'élément' },
+  chipLabelPlural: { type: String, default: 'éléments' },
 })
 
 const triggerCls = computed(() => [
@@ -58,7 +69,9 @@ const triggerCls = computed(() => [
   // `h-9`, pour aligner verticalement avec un input texte voisin dans
   // les formulaires (incident 2026-05-27 : SearchableSelect rendait à
   // 27px là où l'input voisin faisait 32-36px → décalage visuel).
-  'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
+  props.autoWidth
+    ? 'inline-flex max-w-full items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9'
+    : 'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
   props.invalid ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',
@@ -89,11 +102,15 @@ function updatePopoverPosition() {
   const el = triggerRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
+  // Popover : aussi large que le trigger AU MINIMUM, mais peut grandir
+  // jusqu'à 480px pour afficher les libellés longs sans troncature
+  // (incident card 06 : « Sous-station de réseau de chaleur urbain » et
+  // « Unité Intérieure (DRV, split, etc.) » étaient illisibles).
   popoverStyle.value = {
     top: `${rect.bottom + 4}px`,
     left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    minWidth: '180px',
+    minWidth: `${Math.max(rect.width, 280)}px`,
+    maxWidth: '480px',
   }
 }
 
@@ -118,6 +135,19 @@ const selectedOptions = computed(() => {
     const opt = props.options.find(o => o.value === v)
     return opt || { value: v, label: String(v) }
   })
+})
+// Mig 187 v13 — Découpe selectedOptions en chips visibles + compteur de
+// chips cachées. Activé via `chipLimit > 0` (sinon tout affiché).
+const visibleChips = computed(() => {
+  if (!props.chipLimit || selectedOptions.value.length <= props.chipLimit) {
+    return selectedOptions.value
+  }
+  return selectedOptions.value.slice(0, props.chipLimit)
+})
+const hiddenChipsCount = computed(() => Math.max(0, selectedOptions.value.length - visibleChips.value.length))
+const hiddenChipsLabels = computed(() => {
+  if (!hiddenChipsCount.value) return ''
+  return selectedOptions.value.slice(visibleChips.value.length).map(o => o.label).join(', ')
 })
 // En mode creatable, une valeur courante non listée doit quand même
 // s'afficher dans le trigger (sinon elle paraît "perdue").
@@ -268,8 +298,12 @@ function clear() {
       <template v-if="multiple">
         <span v-if="!selectedOptions.length"
               class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
-        <span v-else class="flex-1 flex flex-wrap items-center gap-1">
-          <span v-for="o in selectedOptions" :key="o.value"
+        <span v-else class="flex-1 flex flex-nowrap items-center gap-1">
+          <!-- Mig 187 v13 — Si `chipLimit > 0` et que la sélection dépasse,
+               on affiche les N premières chips suivies d'un badge compact
+               « + M équipements » au lieu de toutes les chips wrap qui
+               cassaient la ligne (multiselect 1ʳᵉ ligne dans card 06). -->
+          <span v-for="o in visibleChips" :key="o.value"
                 class="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
@@ -280,6 +314,11 @@ function clear() {
                     v-tooltip="'Retirer'">
               <XMarkIcon class="w-2.5 h-2.5" />
             </button>
+          </span>
+          <span v-if="hiddenChipsCount > 0"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[11px] whitespace-nowrap shrink-0"
+                v-tooltip="hiddenChipsLabels">
+            + {{ hiddenChipsCount }}
           </span>
         </span>
       </template>
@@ -334,8 +373,12 @@ function clear() {
               class="w-4 h-4 shrink-0"
             />
             <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
-            <span class="flex-1 truncate">{{ o.label }}</span>
-            <span v-if="o.hint" class="text-[11px] text-gray-400 truncate">{{ o.hint }}</span>
+            <!-- Label sans truncate : le popover a maxWidth 480px et wrap si
+                 nécessaire. Les libellés longs (« Sous-station de réseau de
+                 chaleur urbain », « Unité Intérieure (DRV, split, etc.) »)
+                 doivent être lisibles intégralement, pas tronqués. -->
+            <span class="flex-1 whitespace-normal wrap-break-word leading-tight">{{ o.label }}</span>
+            <span v-if="o.hint" class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
             <CheckIcon v-if="isSelected(o.value)" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
           <div v-if="!filteredOptions.length && !canCreate" class="px-3 py-3 text-xs text-gray-400 italic text-center">

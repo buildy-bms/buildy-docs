@@ -292,9 +292,29 @@ export const useAuditStore = defineStore('audit', {
       await this.refreshActionItems()
     },
 
-    async saveBms() {
-      await updateBacsBms(this.docId, this.bms)
-      await this.refreshActionItems()
+    // Fire-and-forget : on déclenche le PATCH GTB sans attendre la réponse
+    // serveur. L'état local (`this.bms`) a déjà été muté en synchrone côté
+    // composant (via Object.assign / affectation directe sur le state Pinia),
+    // donc l'UI a déjà réagi. Le refresh du plan d'action + cumul puissance
+    // est debouncé 800 ms via `scheduleActionItemsRefresh` pour ne déclencher
+    // qu'un seul recalcul après une rafale de clics — cf. memoire
+    // `feedback_audit_perf_no_blocking_patch`. Avant ce fix, chaque toggle
+    // GTB enchainait await PATCH + await refreshActionItems (2 GET + Vue
+    // re-render lourd), figeant l'UI plusieurs centaines de ms.
+    saveBms() {
+      const p = updateBacsBms(this.docId, this.bms)
+      p.then(() => this.scheduleActionItemsRefresh()).catch(() => {})
+      return p
+    },
+
+    // Debounce centralisé du refresh action items + power summary. Utilisé
+    // par les patch* GTB / device / meter pour mutualiser une seule rafale
+    // de refresh quand l'auditeur enchaîne 10-20 toggles.
+    scheduleActionItemsRefresh() {
+      if (this._actionItemsRefreshTimer) clearTimeout(this._actionItemsRefreshTimer);
+      this._actionItemsRefreshTimer = setTimeout(() => {
+        this.refreshActionItems().catch(() => {})
+      }, 800)
     },
 
     /**

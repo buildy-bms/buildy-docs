@@ -1232,6 +1232,13 @@ async function routes(fastify) {
       if (!prefRoles.length) prefRoles = parseRoles(tpl.default_device_role);
     }
     const prefRole = serializeRoles(prefRoles);
+    // Mig 187 — granularité R175-6 pré-remplie depuis le template
+    // (`default_regulation_granularity`) à la création du device.
+    let prefGranularity = null;
+    if (body.equipment_template_id) {
+      const tpl2 = db.equipmentTemplates.getById(body.equipment_template_id);
+      prefGranularity = tpl2?.default_regulation_granularity || null;
+    }
 
     // Position : derniere + 10
     const maxPos = db.db.prepare('SELECT COALESCE(MAX(position), 0) AS p FROM bacs_audit_system_devices WHERE system_id = ?').get(sysId).p;
@@ -1239,8 +1246,9 @@ async function routes(fastify) {
       INSERT INTO bacs_audit_system_devices
         (system_id, position, name, brand, model_reference, power_kw, energy_source,
          device_role, communication_protocol, communication_protocols, location, notes, equipment_template_id,
+         regulation_granularity,
          wired, meets_r175_3_p4, meets_r175_3_p4_autonomous, is_backup, out_of_service)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL)
     `).run(
       sysId, maxPos + 10,
       prefName, body.brand || null, body.model_reference || null, body.power_kw ?? null,
@@ -1249,6 +1257,7 @@ async function routes(fastify) {
       body.communication_protocols || null,
       body.location || null, body.notes || null,
       body.equipment_template_id || null,
+      prefGranularity,
     );
     logBacsAudit(request, 'bacs.device.create', sys.document_id, { systemId: sysId, deviceId: r.lastInsertRowid, fromTemplate: body.equipment_template_id || null });
     // Si le device a une energy_source, on resync les compteurs (compteur général gaz/fuel/thermique selon)
@@ -1325,6 +1334,10 @@ async function routes(fastify) {
       regulation_type_production: z.string().nullable().optional(),
       regulation_type_distribution: z.string().nullable().optional(),
       regulation_type_emission: z.string().nullable().optional(),
+      // Mig 187 : granularité R175-6 saisie explicitement (au lieu d'être
+      // dérivée du type d'émission). TEXT libre (per_room / per_zone /
+      // central_only / autre / valeur custom).
+      regulation_granularity: z.string().nullable().optional(),
       // Mig 181 : localisation libre par niveau de régulation. Acceptée en
       // texte libre (zone existante choisie dans la liste OU saisie libre).
       regulator_location_production: z.string().nullable().optional(),
