@@ -57,6 +57,13 @@ const hasNote = computed(() => {
   if (!props.noteHtml) return false
   return props.noteHtml.replace(/<[^>]*>/g, '').trim().length > 0
 })
+// Tooltip = nom complet de l'équipement sélectionné. Compense la troncature
+// visuelle du SearchableSelect quand le label dépasse la largeur dispo.
+const selectedDeviceName = computed(() => {
+  const opt = props.deviceOptions.find(o => o.value === deviceId.value)
+  if (!opt) return ''
+  return opt.hint ? `${opt.label} — ${opt.hint}` : opt.label
+})
 
 function setDevice(v) {
   emit('patch-thermal', { [deviceField.value]: v != null ? parseInt(v, 10) : null })
@@ -67,30 +74,38 @@ function setRegulator(v) {
 </script>
 
 <template>
-  <div class="min-w-44 space-y-1.5">
-    <!-- Équipement principal du niveau -->
-    <SearchableSelect
-      :model-value="deviceId"
-      :options="deviceOptions"
-      :invalid="!deviceId"
-      size="sm" placeholder="—" search-placeholder="Rechercher…"
-      @update:modelValue="setDevice" />
+  <!-- Mig 187 — cellule par niveau : équipement principal en haut (large pour
+       éviter la troncature des longs noms), métadonnées en pied (chip type +
+       intégrée + bouton notes), et 2e select « Régulateur déporté » UNIQUEMENT
+       si l'auditeur a explicitement coché Déportée. -->
+  <div class="min-w-64 max-w-80 space-y-1">
+    <!-- Équipement principal du niveau. Tooltip = nom complet (compense la
+         troncature visuelle du SearchableSelect). -->
+    <div v-tooltip="selectedDeviceName">
+      <SearchableSelect
+        :model-value="deviceId"
+        :options="deviceOptions"
+        :invalid="!deviceId"
+        size="sm" placeholder="—" search-placeholder="Rechercher un équipement…"
+        @update:modelValue="setDevice" />
+    </div>
 
-    <!-- Bandeau bas : chip type de régulation + indicateur intégrée / select
-         régulateur déporté + bouton notes. Compact, sur une ligne quand
-         possible, wrap sinon. -->
-    <div class="flex items-center gap-1 flex-wrap">
+    <!-- Bandeau bas COMPACT : visible uniquement si on a quelque chose à
+         dire (type de régulation déclaré, statut intégrée explicite, ou
+         note existante). Plus de chips parasites sur une cellule vide. -->
+    <div v-if="hasTypeLabel || (integrated && deviceId) || hasNote || deviceId"
+         class="flex items-center gap-1 flex-wrap min-h-[20px]">
       <span v-if="hasTypeLabel"
-            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-            v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
+            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 max-w-full truncate"
+            v-tooltip="`Type de régulation déclaré sur l'équipement : ${regulationTypeLabel}. Modifier dans la modale équipement.`">
         {{ regulationTypeLabel }}
       </span>
-      <span v-if="integrated && deviceId"
+      <span v-if="deviceId && integrated && !showSeparateRegulator"
             class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200"
             v-tooltip="`L'équipement embarque sa propre régulation — pas de régulateur séparé à saisir.`">
-        Régulation intégrée
+        Intégrée
       </span>
-      <button type="button"
+      <button v-if="deviceId" type="button"
               @click="emit('open-notes')"
               :class="['btn-icon ml-auto', hasNote && 'is-active']"
               v-tooltip="hasNote ? 'Note de ce niveau' : 'Ajouter une note pour ce niveau'">
@@ -98,11 +113,11 @@ function setRegulator(v) {
       </button>
     </div>
 
-    <!-- Régulateur séparé : visible UNIQUEMENT si la régulation n'est pas
-         déclarée comme intégrée à l'équipement. Évite le doublon « Chaudière /
-         Chaudière » qui parasitait l'ancien layout. -->
-    <div v-if="showSeparateRegulator && deviceId" class="mt-1">
-      <label class="block text-[9px] uppercase tracking-wider text-gray-400 mb-0.5">Régulateur déporté</label>
+    <!-- Régulateur séparé : visible UNIQUEMENT si la régulation a été cochée
+         Déportée dans la modale équipement. Sinon le device pilote sa propre
+         régulation et on ne demande pas de second équipement. -->
+    <div v-if="showSeparateRegulator && deviceId" class="pt-1 border-t border-gray-100">
+      <div class="text-[9px] uppercase tracking-wider text-gray-400 mb-0.5">Régulateur déporté</div>
       <SearchableSelect
         :model-value="regulationDeviceId"
         :options="regulatorOptions"

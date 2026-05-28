@@ -80,6 +80,27 @@ function sortThermalValue(t, key) {
 }
 const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortThermalValue))
 
+// Mig 187 — regroupement par zone pour économiser de la largeur (suppression
+// des colonnes Zone, Usage, Système redondantes sur des audits chargés). On
+// produit une liste de groupes { zoneName, rows } préservant l'ordre stable
+// de sortedThermal. Le DnD reste fonctionnel : chaque tbody.thermal-row a
+// son data-id et Sortable n'a pas besoin de la notion de groupe (le réordo
+// se fait à plat).
+const thermalGroups = computed(() => {
+  const groups = []
+  const byName = new Map()
+  for (const t of sortedThermal.value) {
+    const key = t.zone_name || 'Sans zone'
+    if (!byName.has(key)) {
+      const g = { zoneName: key, rows: [] }
+      byName.set(key, g)
+      groups.push(g)
+    }
+    byName.get(key).rows.push(t)
+  }
+  return groups
+})
+
 async function patchThermal(t, patch) {
   Object.assign(t, patch)
   try {
@@ -346,25 +367,41 @@ onBeforeUnmount(teardownSortable)
     </div>
 
     <div class="overflow-x-auto">
+    <!-- Mig 187 — Layout regroupé par zone. Un tbody d'en-tête (sticky-like
+         visuel) annonce la zone, puis tous ses systèmes en sous-lignes
+         compactes. Plus de colonnes Zone / Usage / Système redondantes :
+         l'en-tête de zone porte le nom, et la 1ère cellule de chaque ligne
+         combine usage (icône + libellé) + nom du système. -->
     <table ref="tableRef" class="data-table w-full text-sm">
       <thead>
         <tr>
           <th class="w-8"></th>
-          <DataTableSortHeader sort-key="zone" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Zone</DataTableSortHeader>
-          <DataTableSortHeader sort-key="usage" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Usage</DataTableSortHeader>
-          <DataTableSortHeader sort-key="system" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Système</DataTableSortHeader>
-          <th v-if="anyWoodExempt">Exempté bois</th>
-          <th>Production</th>
-          <th>Distribution</th>
-          <th>Émission</th>
-          <th>Granularité</th>
-          <th>Actions</th>
+          <th class="min-w-48">Système</th>
+          <th v-if="anyWoodExempt" class="w-24">Exempté bois</th>
+          <!-- Mig 187 — colonnes de niveau larges et homogènes. -->
+          <th class="min-w-64">Production</th>
+          <th class="min-w-64">Distribution</th>
+          <th class="min-w-64">Émission</th>
+          <th class="w-32">Granularité</th>
+          <th class="w-20">Actions</th>
         </tr>
       </thead>
-      <tbody v-for="t in sortedThermal" :key="t.id"
+      <template v-for="g in thermalGroups" :key="g.zoneName">
+        <!-- En-tête de zone : barre teintée qui couvre toutes les colonnes,
+             remplace les anciennes cellules Zone répétées sur chaque ligne. -->
+        <tbody class="thermal-zone-header">
+          <tr>
+            <td :colspan="anyWoodExempt ? 8 : 7"
+                class="px-3 py-1.5 bg-gray-50 border-t-2 border-gray-200 text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              {{ g.zoneName }}
+              <span class="text-gray-400 normal-case font-normal">— {{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
+            </td>
+          </tr>
+        </tbody>
+      <tbody v-for="t in g.rows" :key="t.id"
              :data-id="t.id"
              class="thermal-row">
-        <!-- Ligne principale : 12 colonnes alignées + drag handle -->
+        <!-- Ligne : Système (usage + nom) + 3 niveaux + Granularité + Actions -->
         <tr>
           <td class="align-middle">
             <button type="button"
@@ -373,26 +410,25 @@ onBeforeUnmount(teardownSortable)
               <Bars3Icon class="w-4 h-4" />
             </button>
           </td>
-          <td class="text-gray-700 font-medium whitespace-nowrap">{{ t.zone_name }}</td>
-          <td class="whitespace-nowrap">
-            <span class="inline-flex items-center gap-1.5 justify-center text-xs font-medium"
-                  :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
-              <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
-              {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
-            </span>
-          </td>
-          <!-- Mig 180 : Nom du système — lecture seule, vient de
-               bacs_audit_systems.custom_label via le JOIN backend. Si vide,
-               fallback sur le nom de l'équipement de production (plus
-               parlant que « Chauffage » / « Refroidissement »), puis sur
-               le libellé d'usage par défaut.
-               L'édition se fait dans la card 03 « Systèmes ». -->
-          <td class="align-middle text-sm text-gray-800 font-medium whitespace-nowrap">
-            {{ systemDisplayName(t) }}
+          <!-- Système : usage (icône colorée) + nom du système sur 2 lignes
+               compactes. Économise les colonnes Zone/Usage/Système séparées. -->
+          <td class="align-top">
+            <div class="flex items-start gap-1.5">
+              <span class="mt-0.5">
+                <SystemCategoryIcon :category="t.category || 'heating'" size="sm" />
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-medium leading-tight"
+                     :class="(t.category || 'heating') === 'heating' ? 'text-red-600' : 'text-cyan-600'">
+                  {{ (t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement' }}
+                </div>
+                <div class="text-xs text-gray-800 font-medium leading-tight mt-0.5">
+                  {{ systemDisplayName(t) }}
+                </div>
+              </div>
+            </div>
           </td>
           <td v-if="anyWoodExempt" class="align-middle">
-            <!-- Exemption R175-6 II déduite automatiquement de l'énergie de
-                 l'équipement de Production (bois). Lecture seule. -->
             <Tooltip v-if="exemptAutoFromWood(t)"
                      text="Exemption R175-6 II : l'équipement de Production est au bois.">
               <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap cursor-help">
@@ -469,6 +505,7 @@ onBeforeUnmount(teardownSortable)
           </td>
         </tr>
       </tbody>
+      </template>
     </table>
     </div>
 
