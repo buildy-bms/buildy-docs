@@ -18,6 +18,10 @@ const EditSiteModal = defineAsyncComponent(() => import('./EditSiteModal.vue'))
 const props = defineProps({
   latitude: { type: Number, default: null },
   longitude: { type: Number, default: null },
+  // Niveau de zoom satellite (persisté par l'auditeur). Si non fourni, on
+  // tombe sur un défaut adapté (17 quand un point est placé, France
+  // entière sinon).
+  zoom: { type: Number, default: null },
   kind: { type: String, default: 'functional' },
   // Toutes les zones du site (pour le contexte). La zone courante est
   // exclue via currentZoneId.
@@ -35,7 +39,7 @@ const props = defineProps({
   // true : carte en lecture seule (aucun placement de pin, pas d'aide).
   readonly: { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:latitude', 'update:longitude'])
+const emit = defineEmits(['update:latitude', 'update:longitude', 'update:zoom'])
 
 const mapEl = ref(null)
 const status = ref('loading') // 'loading' | 'ready' | 'error'
@@ -227,7 +231,12 @@ function renderSiteMarker() {
 // Zoom plus élevé en mode large (modale dédiée, vue précise des toits)
 // que sur la carte intégrée.
 async function centerMap() {
-  const targetZoom = props.large ? 20 : 18
+  // Niveau persisté > défaut large > défaut compact. Préserve le zoom
+  // sauvegardé par l'auditeur (mig 188) — sinon un re-rendu remettrait
+  // la valeur par défaut à chaque réouverture de la modale.
+  const targetZoom = Number.isFinite(props.zoom)
+    ? props.zoom
+    : (props.large ? 20 : 17)
   const maxZoom = props.large ? 21 : 19
 
   // Mode édition site : on centre sur le pin du site (s'il est saisi)
@@ -307,6 +316,14 @@ async function initMap() {
     streetViewControl: false,
     mapTypeControl: true,
     fullscreenControl: true,
+    // Contrôles +/- de zoom explicitement activés — sans ça Google peut
+    // les masquer sur certains rendus (devices à pointeur fin), or
+    // l'auditeur en a besoin pour ajuster finement le cadrage avant
+    // d'enregistrer la position du site (cf. mig 188 — zoom persisté).
+    zoomControl: true,
+    zoomControlOptions: {
+      position: google.maps.ControlPosition.RIGHT_BOTTOM,
+    },
   })
   if (!props.readonly) {
     map.addListener('click', (e) => {
@@ -315,6 +332,15 @@ async function initMap() {
       placeCurrent(lat, lng)
       emit('update:latitude', lat)
       emit('update:longitude', lng)
+    })
+    // Persiste le niveau de zoom dès que l'utilisateur termine un
+    // ajustement (mig 188). Évite d'émettre à chaque tick intermédiaire
+    // grâce à `zoom_changed` (Google déclenche un seul event par changement
+    // stabilisé). Le PDF utilisera cette valeur pour cadrer la vue
+    // satellite du chap 1.
+    map.addListener('zoom_changed', () => {
+      const z = map.getZoom()
+      if (Number.isFinite(z)) emit('update:zoom', z)
     })
   }
   status.value = 'ready'

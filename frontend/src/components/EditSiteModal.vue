@@ -29,6 +29,7 @@ const form = ref({
   notes: props.site.notes || '',
   latitude: props.site.latitude ?? null,
   longitude: props.site.longitude ?? null,
+  map_zoom: props.site.map_zoom ?? null,
 })
 const submitting = ref(false)
 const canSubmit = computed(() => !!form.value.name.trim() && !submitting.value)
@@ -70,6 +71,7 @@ async function submit() {
       notes: form.value.notes.trim() || null,
       latitude: form.value.latitude,
       longitude: form.value.longitude,
+      map_zoom: form.value.map_zoom,
     })
     // Garde le store de l'audit synchronisé (source de vérité de l'adresse).
     if (audit.site && (audit.site.site_uuid === uuid || audit.site.uuid === uuid)) {
@@ -118,6 +120,7 @@ async function submit() {
         <ZoneMapPicker
           v-model:latitude="form.latitude"
           v-model:longitude="form.longitude"
+          v-model:zoom="form.map_zoom"
           kind="site"
           point-label="le site"
           :zones="audit.zones || []"

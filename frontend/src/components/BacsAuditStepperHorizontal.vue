@@ -67,7 +67,7 @@ function connectorClass(s) {
           type="button"
           @click="$emit('step-click', s.key)"
           class="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-gray-50 active:bg-gray-100 transition"
-          v-tooltip="s.description"
+          v-tooltip="{ text: s.description, placement: 'bottom' }"
         >
           <span
             :class="['relative shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-semibold transition shadow-sm',

@@ -6,6 +6,8 @@ import { MapPinIcon, PencilSquareIcon, PlusIcon, TrashIcon, DocumentDuplicateIco
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import ZoneMapPicker from '@/components/ZoneMapPicker.vue'
+import ZonesOverviewMap from '@/components/audit/ZonesOverviewMap.vue'
+import { buildZoneLegendMap } from '@/lib/zone-map-legend'
 import ZoneFunctionalHelpModal from '@/components/audit/ZoneFunctionalHelpModal.vue'
 import ZonePartiesModal from '@/components/audit/ZonePartiesModal.vue'
 import R175Tooltip from '@/components/R175Tooltip.vue'
@@ -32,6 +34,13 @@ const props = defineProps({
   step: { type: Object, default: null },
   active: { type: Boolean, default: false },
   kind: { type: String, default: 'functional' }, // 'functional' | 'technical'
+  // Mode unifié : une seule card affichant les zones fonctionnelles ET
+  // techniques dans le même tableau, avec la colonne « Type » qui permet
+  // de basculer chaque ligne d'un kind à l'autre. Préserve la colonne
+  // « Régime d'activité » qui reste éditable mais vide pour les techniques.
+  // Le `kind` prop est ignoré quand `unified=true`. Le PDF garde un rendu
+  // séparé fonctionnelles / techniques.
+  unified: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'open-notes', 'validate-step', 'invalidate-step', 'add-zone',
@@ -40,33 +49,53 @@ const emit = defineEmits([
 const audit = useAuditStore()
 const { document, zones, site, siteParties } = storeToRefs(audit)
 
-const isTechnical = computed(() => props.kind === 'technical')
+// `isTechnical` reste basé sur le `kind` prop, mais est forcé à `false`
+// en mode unifié — les conditions UI qui s'en servent (couleur d'icône,
+// boutons, colonne « Régime d'activité ») retrouvent ainsi automatiquement
+// le rendu enrichi de la section fonctionnelle.
+const isTechnical = computed(() => !props.unified && props.kind === 'technical')
 
 // Modale d'aide pédagogique « Comprendre la zone fonctionnelle » (item 7a).
 const showHelp = ref(false)
 
-// Présentation propre à chaque type de card.
-const KIND_UI = computed(() => isTechnical.value
-  ? {
-      number: '3',
-      title: 'Zones techniques',
-      subtitleBacs: 'Hors décret BACS — local technique, TGBT, local compteurs…',
-      subtitleSite: 'Locaux techniques du site',
-      storageKey: 'technical-zones',
-      sectionId: 'section-technical-zones',
-    }
-  : {
+// Présentation propre à chaque mode (unifié / fonctionnel / technique).
+const KIND_UI = computed(() => {
+  if (props.unified) {
+    return {
       number: '2',
-      title: 'Zones fonctionnelles',
-      subtitleBacs: 'R175-1 6° — usages homogènes',
-      subtitleSite: 'Découpage du site',
+      title: 'Zones',
+      subtitleBacs: 'R175-1 6° (zones fonctionnelles) + locaux techniques',
+      subtitleSite: 'Découpage du site (fonctionnel + technique)',
       storageKey: 'zones',
       sectionId: 'section-zones',
-    })
+    }
+  }
+  return isTechnical.value
+    ? {
+        number: '3',
+        title: 'Zones techniques',
+        subtitleBacs: 'Hors décret BACS — local technique, TGBT, local compteurs…',
+        subtitleSite: 'Locaux techniques du site',
+        storageKey: 'technical-zones',
+        sectionId: 'section-technical-zones',
+      }
+    : {
+        number: '2',
+        title: 'Zones fonctionnelles',
+        subtitleBacs: 'R175-1 6° — usages homogènes',
+        subtitleSite: 'Découpage du site',
+        storageKey: 'zones',
+        sectionId: 'section-zones',
+      }
+})
 
-// Zones de ce type uniquement (les zones sans `kind` sont fonctionnelles).
-const kindZones = computed(() =>
-  zones.value.filter(z => (z.kind || 'functional') === props.kind))
+// Zones affichées dans cette section :
+//   - mode unifié : toutes les zones du site (la colonne « Type » de chaque
+//     ligne permet de basculer un kind à l'autre)
+//   - mode classique : zones du `kind` courant uniquement.
+const kindZones = computed(() => props.unified
+  ? zones.value
+  : zones.value.filter(z => (z.kind || 'functional') === props.kind))
 
 // Bascule une zone d'une card à l'autre (functional <-> technical).
 async function patchZoneKind(z, kind) {
@@ -159,6 +188,13 @@ function sortZoneValue(z, key) {
   return ''
 }
 const sortedZones = computed(() => sortedRows(kindZones.value, sortZoneValue))
+// Légende de la map satellite (initiale + couleur par zone) propagée dans
+// les DEUX tableaux (fonctionnel + technique) pour cohérence visuelle avec
+// ZonesOverviewMap. Construite sur la liste COMPLÈTE des zones du site
+// (toutes catégories confondues) — la map affiche tous les pins
+// géolocalisés et chaque tableau marque ses lignes avec l'initiale + la
+// couleur correspondante. Stable même si l'utilisateur trie le tableau.
+const legendByZone = computed(() => buildZoneLegendMap(zones.value))
 
 // Drag & drop des zones (desktop uniquement). Sortable sur le <tbody>,
 // la ligne « + Ajouter une zone » est filtrée. L'API persiste via
@@ -238,6 +274,14 @@ onBeforeUnmount(teardownZonesSortable)
       Locaux hors périmètre du décret BACS. Inventoriés ici, ils ne génèrent
       pas de systèmes ni de compteurs dans les cards suivantes.
     </p>
+    <!-- Vue satellite pleine largeur — rendue une seule fois (dans la
+         section fonctionnelle, qui est ouverte par défaut), elle affiche
+         TOUTES les zones du site (fonctionnelles + techniques) pour donner
+         une vision d'ensemble. La table de la section technique en
+         dessous garde ses pastilles cohérentes via `legendByZone` partagé. -->
+    <div v-if="!isTechnical" class="mb-3">
+      <ZonesOverviewMap :zones="zones" />
+    </div>
     <!-- Desktop : data-table aligné (>=768px) -->
     <div class="hidden md:block overflow-x-auto">
       <table class="data-table w-full text-sm">
@@ -268,9 +312,20 @@ onBeforeUnmount(teardownZonesSortable)
               </button>
             </td>
             <td>
-              <input type="text" :value="z.name"
-                     @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
-                     class="w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
+              <div class="flex items-center gap-2">
+                <!-- Pastille initiale + couleur, identique à la légende de la
+                     map satellite (ZonesOverviewMap). Présente uniquement
+                     pour les zones géolocalisées (les autres n'apparaissent
+                     pas sur la map). -->
+                <span v-if="legendByZone.get(z.zone_id)"
+                      class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold text-white shadow shrink-0"
+                      :style="{ background: legendByZone.get(z.zone_id).color }">
+                  {{ legendByZone.get(z.zone_id).initial }}
+                </span>
+                <input type="text" :value="z.name"
+                       @blur="e => e.target.value !== z.name && patchZone(z, { name: e.target.value })"
+                       class="w-full text-sm px-2 py-1 border border-gray-200 rounded-md hover:border-gray-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition bg-white font-semibold text-gray-900" />
+              </div>
             </td>
             <td class="min-w-44">
               <SearchableSelect
@@ -311,6 +366,21 @@ onBeforeUnmount(teardownZonesSortable)
             </td>
             <td class="whitespace-nowrap">
               <div class="inline-flex items-center gap-1">
+                <!-- Parties prenantes + Position en TÊTE de la colonne actions :
+                     ce sont les saisies métier les plus structurantes — l'auditeur
+                     y revient régulièrement. Code couleur indigo (`is-active`)
+                     dès qu'au moins une partie est rattachée ou que le pin est posé. -->
+                <button @click="openPartiesModal(z)"
+                        :class="['btn-icon', zoneHasParties(z) && 'is-success']"
+                        v-tooltip="zoneHasParties(z) ? 'Parties prenantes (renseignées)' : 'Parties prenantes de la zone'"
+                        aria-label="Parties prenantes de la zone">
+                  <UserGroupIcon class="w-4 h-4" />
+                </button>
+                <button @click="openZoneMap(z)"
+                        :class="['btn-icon', z.latitude != null && 'is-success']"
+                        v-tooltip="z.latitude != null ? 'Position sur la carte (renseignée)' : 'Positionner sur la carte'">
+                  <MapPinIcon class="w-4 h-4" />
+                </button>
                 <button
                   type="button"
                   @click="emit('open-notes', { title: 'Notes - ' + z.name, contextLabel: 'Zone : ' + z.name, entityType: 'zone', entityRef: z, currentHtml: z.notes_html || z.notes || '' })"
@@ -328,17 +398,6 @@ onBeforeUnmount(teardownZonesSortable)
                   :site-uuid="document.site_uuid"
                   :attach-to="{ zone_id: z.zone_id }"
                   :label="z.name" />
-                <button @click="openPartiesModal(z)"
-                        :class="['btn-icon', zoneHasParties(z) && 'is-active']"
-                        v-tooltip="'Parties prenantes de la zone'"
-                        aria-label="Parties prenantes de la zone">
-                  <UserGroupIcon class="w-4 h-4" />
-                </button>
-                <button @click="openZoneMap(z)"
-                        :class="['btn-icon', z.latitude != null && 'is-active']"
-                        v-tooltip="z.latitude != null ? 'Position sur la carte' : 'Positionner sur la carte'">
-                  <MapPinIcon class="w-4 h-4" />
-                </button>
                 <button @click="dupZone(z)" class="btn-icon" v-tooltip="'Dupliquer'">
                   <DocumentDuplicateIcon class="w-4 h-4" />
                 </button>

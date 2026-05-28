@@ -67,16 +67,32 @@ async function resolveSiteCenter({ site, zones }, key) {
 /**
  * @returns {Promise<string|null>} data URL PNG, ou null si indisponible.
  */
-async function buildSiteStaticMap({ site, zones }) {
+async function buildSiteStaticMap({ site, zones, zoom }) {
   const key = (config.googleMapsApiKey || '').trim();
   if (!key) return null;
 
   const center = await resolveSiteCenter({ site, zones }, key);
   if (!center) return null;
 
+  // Zoom : priorité (1) valeur explicite passée par l'appelant,
+  // (2) `site.map_zoom` saisi par l'auditeur, (3) défaut 17 (un cran plus
+  // large que l'ancien 18 — un bâtiment industriel complet rentre dans le
+  // cadre, l'ancien 18 ne montrait qu'une partie).
+  //
+  // ⚠ `Number(null)` vaut `0` (et `Number.isFinite(0) === true`) — il faut
+  // tester `!= null` AVANT de coercer, sinon un site legacy sans map_zoom
+  // renseigné produit zoom=0 et Google renvoie une vue monde tilée.
+  const explicitZoom = (zoom != null && Number.isFinite(Number(zoom))) ? Number(zoom) : null;
+  const persistedZoom = (site?.map_zoom != null && Number.isFinite(Number(site.map_zoom)))
+    ? Number(site.map_zoom)
+    : null;
+  const effectiveZoom = explicitZoom ?? persistedZoom ?? 17;
+
+  // Format large (640x400 × scale=2 = 1280x800) pour rester nette en pleine
+  // largeur A4 (~180mm).
   const params = [
-    'size=640x360', 'scale=2', 'maptype=hybrid', 'language=fr',
-    `center=${center.lat},${center.lng}`, 'zoom=18',
+    'size=640x400', 'scale=2', 'maptype=hybrid', 'language=fr',
+    `center=${center.lat},${center.lng}`, `zoom=${effectiveZoom}`,
     'markers=' + encodeURIComponent(`color:0x0d9488|size:mid|${center.lat},${center.lng}`),
     `key=${encodeURIComponent(key)}`,
   ];
@@ -100,4 +116,82 @@ async function buildSiteStaticMap({ site, zones }) {
   }
 }
 
-module.exports = { buildSiteStaticMap };
+/**
+ * Vue satellite avec marqueurs étiquetés (1 par zone). Le cadrage est
+ * laissé à Google Maps via le paramètre `visible` (auto-fit sur les
+ * points listés) — pas besoin de calculer un bbox côté Node.
+ *
+ * Labels : initiale de la zone (limitation Google Static Maps — 1 char
+ * alphanumérique). La légende détaillée nom-par-nom est rendue à part
+ * dans le template PDF, sous l'image.
+ *
+ * @returns {Promise<{ url: string, legend: Array<{ initial: string, name: string, color: string }> } | null>}
+ */
+async function buildZonesStaticMap({ site, zones }) {
+  const key = (config.googleMapsApiKey || '').trim();
+  if (!key) return null;
+
+  const located = (zones || []).filter(z => z.latitude != null && z.longitude != null);
+  if (!located.length) return null;
+
+  // Couleurs accessibles distinctes pour les pins (cycle si > 10 zones).
+  // Choix sobre, contraste suffisant sur vue satellite hybrid.
+  const PALETTE = [
+    '0x1d4ed8', '0xb91c1c', '0x16a34a', '0xd97706', '0x7c3aed',
+    '0x0ea5e9', '0xdb2777', '0x059669', '0xea580c', '0x6366f1',
+  ];
+
+  // Étiquetage SÉQUENTIEL — A, B, C, D… (lettres seules sur 1-26 zones,
+  // chiffres au-delà). Évite le bug « B, C, 3, 4 » obtenu quand on
+  // utilisait l'initiale du nom (3 zones « Cellules N » donnaient toutes
+  // C, donc collisions et bascule chiffre).
+  const legend = [];
+  const markerParams = [];
+
+  function labelFor(idx) {
+    return idx < 26 ? String.fromCharCode(65 + idx) : String(idx - 25);
+  }
+
+  located.forEach((z, idx) => {
+    const label = labelFor(idx);
+    const color = PALETTE[idx % PALETTE.length];
+    legend.push({ initial: label, name: z.name || `Zone ${idx + 1}`, color: `#${color.slice(2)}` });
+    markerParams.push(
+      'markers=' + encodeURIComponent(`color:${color}|label:${label}|size:mid|${z.latitude},${z.longitude}`)
+    );
+  });
+
+  // visible= force l'auto-fit sur tous les points listés (pas besoin de
+  // center/zoom explicites — Google calcule le cadrage).
+  const visibles = located.map(z => `${z.latitude},${z.longitude}`).join('|');
+
+  const params = [
+    'size=640x400', 'scale=2', 'maptype=hybrid', 'language=fr',
+    `visible=${encodeURIComponent(visibles)}`,
+    ...markerParams,
+    `key=${encodeURIComponent(key)}`,
+  ];
+
+  const url = `https://maps.googleapis.com/maps/api/staticmap?${params.join('&')}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Referer: REFERER },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      log.warn(`Vue satellite zones indisponible (HTTP ${res.status})`);
+      return null;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    const mime = res.headers.get('content-type') || 'image/png';
+    return {
+      dataUrl: `data:${mime};base64,${buf.toString('base64')}`,
+      legend,
+    };
+  } catch (e) {
+    log.warn(`Vue satellite zones : ${e.message}`);
+    return null;
+  }
+}
+
+module.exports = { buildSiteStaticMap, buildZonesStaticMap };
