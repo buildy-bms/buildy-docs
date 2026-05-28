@@ -25,18 +25,21 @@ const ROLE_PILL = {
   regulation:   { label: 'Régulation',   icon: 'sliders',          color: '#a855f7' },
   autre:        { label: 'Autre',        icon: 'circle-question',  color: '#6b7280' },
 };
-Handlebars.registerHelper('rolePill', (role) => {
+Handlebars.registerHelper('rolePill', (role, variant) => {
   const cfg = ROLE_PILL[String(role || '').toLowerCase()];
   if (!cfg) return '';
+  const isSm = typeof variant === 'string' && variant === 'sm';
+  const iconSize = isSm ? '7' : '9';
+  const cls = isSm ? 'role-pill role-pill-sm' : 'role-pill';
   const def = lookupFaIcon(cfg.icon);
   let iconSvg = '';
   if (def) {
     const [w, h, , , path] = def.icon;
     const d = Array.isArray(path) ? path[path.length - 1] : path;
-    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="9" height="9" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:0.8mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
+    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${iconSize}" height="${iconSize}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:0.6mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
   }
   return new Handlebars.SafeString(
-    `<span class="role-pill" style="background:${cfg.color}1a;color:${cfg.color};border:0.3pt solid ${cfg.color}66">${iconSvg}${cfg.label}</span>`
+    `<span class="${cls}" style="background:${cfg.color}1a;color:${cfg.color};border:0.3pt solid ${cfg.color}66">${iconSvg}${cfg.label}</span>`
   );
 });
 
@@ -133,28 +136,55 @@ const METER_USAGE_PILL = {
   lighting: { icon: 'lightbulb',    label: 'Éclairage',     bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
   other:    { icon: 'circle-notch', label: 'Général',       bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
 };
-function renderMeterPill(cfg, size = '11') {
+function renderMeterPill(cfg, opts = {}) {
   if (!cfg) return '';
+  // Variantes de taille : 'md' (défaut, cards / encarts) | 'sm' (tableaux
+  // denses : action-group-table, énergie-section, plan de comptage…).
+  const variant = opts.variant === 'sm' ? 'sm' : 'md';
+  const iconSize = variant === 'sm' ? '8' : '11';
+  const cls = variant === 'sm' ? 'm-pill m-pill-sm' : 'm-pill';
   const def = lookupFaIcon(cfg.icon);
   let svgHtml = '';
   if (def) {
     const [w, h, , , p] = def.icon;
     const d = Array.isArray(p) ? p[p.length - 1] : p;
-    svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" style="vertical-align:-1px;flex-shrink:0;margin-right:1.2mm"><path fill="${cfg.fg}" d="${d}"/></svg>`;
+    const margin = variant === 'sm' ? '0.8mm' : '1.2mm';
+    svgHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${iconSize}" height="${iconSize}" style="vertical-align:-1px;flex-shrink:0;margin-right:${margin}"><path fill="${cfg.fg}" d="${d}"/></svg>`;
   }
   return new Handlebars.SafeString(
-    `<span class="m-pill" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${svgHtml}${cfg.label}</span>`
+    `<span class="${cls}" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${svgHtml}${cfg.label}</span>`
   );
 }
-// {{{meterTypePill type}}} -> pastille type compteur (élec, gaz, eau, etc.)
-Handlebars.registerHelper('meterTypePill', (type) => {
+// {{{meterTypePill type}}}    -> pastille md (défaut)
+// {{{meterTypePill type "sm"}}} -> pastille sm pour tableaux denses
+Handlebars.registerHelper('meterTypePill', (type, variant) => {
   const cfg = METER_TYPE_PILL[type] || METER_TYPE_PILL.other;
-  return renderMeterPill(cfg);
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
 });
-// {{{meterUsagePill usage}}} -> pastille usage compteur (chauffage, ECS, PV...)
-Handlebars.registerHelper('meterUsagePill', (usage) => {
+Handlebars.registerHelper('meterUsagePill', (usage, variant) => {
   const cfg = METER_USAGE_PILL[usage] || METER_USAGE_PILL.other;
-  return renderMeterPill(cfg);
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+});
+
+// Pill « catégorie système » pour les équipements (heating / cooling /
+// ventilation / dhw / lighting_indoor / lighting_outdoor / electricity_production).
+// Distinct de meterUsagePill (qui couvre les compteurs avec un set un peu
+// différent — pas de ventilation, pas de PV par exemple). Aligné sur les
+// couleurs system_category de l'UI (cf. frontend/lib/audit-options).
+const SYSTEM_CATEGORY_PILL = {
+  heating:                { icon: 'fire',        label: 'Chauffage',          bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+  cooling:                { icon: 'snowflake',   label: 'Refroidissement',    bg: '#ecfeff', fg: '#155e75', border: '#a5f3fc' },
+  ventilation:            { icon: 'fan',         label: 'Ventilation',        bg: '#eff6ff', fg: '#1d4ed8', border: '#bfdbfe' },
+  dhw:                    { icon: 'faucet',      label: 'ECS',                bg: '#f0f9ff', fg: '#0369a1', border: '#bae6fd' },
+  lighting_indoor:        { icon: 'lightbulb',   label: 'Éclairage intérieur',bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
+  lighting_outdoor:       { icon: 'lightbulb',   label: 'Éclairage extérieur',bg: '#fefce8', fg: '#a16207', border: '#fde047' },
+  lighting:               { icon: 'lightbulb',   label: 'Éclairage',          bg: '#fffbeb', fg: '#b45309', border: '#fde68a' },
+  electricity_production: { icon: 'solar-panel', label: 'Production PV',      bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  other:                  { icon: 'circle-notch',label: 'Autre',              bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
+};
+Handlebars.registerHelper('systemCategoryPill', (cat, variant) => {
+  const cfg = SYSTEM_CATEGORY_PILL[cat] || SYSTEM_CATEGORY_PILL.other;
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
 });
 Handlebars.registerHelper('or', function(...args) {
   // Handlebars passe l'options en dernier argument, on l'exclut
@@ -587,7 +617,7 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     if (needPostProcess) {
       await postProcessPdf(outputPath, {
         maskFirstPage: needMask ? { margin: pdfOptions.margin, color: '#1b2842' } : null,
-        maskLastPage: needMaskLast ? { margin: pdfOptions.margin, color: '#1b2842' } : null,
+        maskLastPage: needMaskLast ? { margin: pdfOptions.margin, color: '#1b2842', accentTop: { heightMm: 4, hex: '#00cd92' } } : null,
         watermark,
         formFields: addFormFields ? extractedFields : null,
         pageFormat,
@@ -623,16 +653,26 @@ async function postProcessPdf(pdfPath, { maskFirstPage, maskLastPage, watermark,
   const pages = doc.getPages();
 
   // Masque les bandes header/footer d'une page avec un rectangle plein.
-  const maskHeaderFooter = (page, { margin, color }) => {
+  // accentTop: { heightMm, hex } facultatif — bandeau couleur dessine APRES
+  // le masque navy, au tout haut de la page. Utilise pour la bande verte
+  // Buildy de la page de cloture (sinon le masque navy l'efface).
+  const maskHeaderFooter = (page, { margin, color, accentTop }) => {
     const { width, height } = page.getSize();
     const topPt = margin.top ? mmToPt(margin.top) : 0;
     const botPt = margin.bottom ? mmToPt(margin.bottom) : 0;
-    const r = parseInt(color.slice(1, 3), 16) / 255;
-    const g = parseInt(color.slice(3, 5), 16) / 255;
-    const b = parseInt(color.slice(5, 7), 16) / 255;
-    const fill = rgb(r, g, b);
+    const hexToRgb = (hex) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      return rgb(r, g, b);
+    };
+    const fill = hexToRgb(color);
     if (topPt > 0) page.drawRectangle({ x: 0, y: height - topPt, width, height: topPt, color: fill });
     if (botPt > 0) page.drawRectangle({ x: 0, y: 0, width, height: botPt, color: fill });
+    if (accentTop && accentTop.heightMm > 0) {
+      const accentH = mmToPt(accentTop.heightMm);
+      page.drawRectangle({ x: 0, y: height - accentH, width, height: accentH, color: hexToRgb(accentTop.hex) });
+    }
   };
 
   // 1. Masque header/footer page 1

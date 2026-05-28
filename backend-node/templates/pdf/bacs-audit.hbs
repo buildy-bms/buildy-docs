@@ -10,7 +10,7 @@
 {{!-- ═══════════ Page de garde — affirmation, verdict en accroche ═══════════ --}}
 <section class="cover">
   <header class="cover-top">
-    <img class="cover-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <img class="cover-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
     <span class="cover-eyebrow">{{#if isBacs}}Audit de conformité BACS · Décret R175{{else}}Audit GTB · Préparation devis Buildy{{/if}}</span>
   </header>
 
@@ -258,28 +258,6 @@
       </div>
     </div>
   </div>
-
-  {{#if compliance.headlineActions.length}}
-  <div class="essential-headlines">
-    <h3 class="essential-block-title">{{#if isBacs}}Actions phares à engager en priorité{{else}}Préconisations phares pour le devis{{/if}}</h3>
-    <ol class="headlines-list">
-      {{#each compliance.headlineActions}}
-      <li class="headline">
-        <span class="headline-num">{{display_number}}</span>
-        <div class="headline-body">
-          <div class="headline-title">{{title}}</div>
-          <div class="headline-meta">
-            <span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}{{#if ../isBacs}}Bloquante{{else}}Essentielle{{/if}}{{else}}{{#if (eq severity "major")}}{{#if ../isBacs}}Majeure{{else}}Recommandée{{/if}}{{else}}{{#if ../isBacs}}Mineure{{else}}Optimisation{{/if}}{{/if}}{{/if}}</span>
-            {{#if r175_article}}<span class="r175-tag">{{r175_article}}</span>{{/if}}
-            {{#if zone_name}}<span class="zone-tag">{{zone_name}}</span>{{/if}}
-          </div>
-        </div>
-      </li>
-      {{/each}}
-    </ol>
-    <p class="essential-footnote">Détail complet {{#if isBacs}}du plan de mise en conformité{{else}}des préconisations Buildy{{/if}} au chapitre 7.</p>
-  </div>
-  {{/if}}
 
   {{!-- Item 4a — Structure juridique du site (assujettissement) --}}
   {{#if ownershipStructureLabel}}
@@ -791,7 +769,7 @@
                   <div class="device-attr">
                     <span class="device-attr-label">Nature</span>
                     <span class="device-attr-value device-attr-roles">
-                      {{#if device_role.length}}{{#each device_role}}{{{rolePill this}}}{{/each}}{{else}}<span class="bool-na">—</span>{{/if}}
+                      {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}}{{/each}}{{else}}<span class="bool-na">—</span>{{/if}}
                     </span>
                   </div>
                   <div class="device-attr">
@@ -969,7 +947,7 @@
         {{#each items}}
           <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}">
             <td>{{zoneLabel}}</td>
-            <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage}}}{{/if}}</td>
+            <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
             <td class="bool-cell"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
             <td class="bool-cell"><span class="{{#if present_actual}}bool-yes{{else}}bool-no{{/if}}">{{#if present_actual}}✓{{else}}✗{{/if}}</span></td>
@@ -1008,8 +986,8 @@
 {{#each metersWithDetails}}
   <div class="detail-card">
     <div class="detail-card-head">
-      {{{meterTypePill meter_type}}}
-      {{{meterUsagePill usage}}}
+      {{{meterTypePill meter_type "sm"}}}
+      {{{meterUsagePill usage "sm"}}}
       <span class="detail-card-title">{{zoneLabel}}</span>
     </div>
     <div class="detail-card-body">
@@ -1571,16 +1549,33 @@
       <span class="bms-section-title">Intégrés à la GTB</span>
       <span class="bms-section-count">{{bmsManagedDevices.length}}</span>
     </div>
-    <div class="bms-list">
-      {{#each bmsManagedDevices}}
-        <div class="bms-row">
-          <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
-          <span class="bms-row-name">{{name}}</span>
-          <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
-          {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
-        </div>
-      {{/each}}
-    </div>
+    {{#each bmsManagedDevicesByZone}}
+      <table class="bms-devices-table">
+        <thead>
+          <tr>
+            <th colspan="5" class="bms-devices-zone">{{zone_name}}</th>
+          </tr>
+          <tr>
+            <th class="bms-col-name">Équipement</th>
+            <th class="bms-col-usage">Usage</th>
+            <th class="bms-col-roles">Fonctions</th>
+            <th class="bms-col-loc">Localisation</th>
+            <th class="bms-col-pwr">Puissance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each devices}}
+          <tr>
+            <td class="bms-col-name"><strong>{{name}}</strong>{{#if brand}}<br><span class="muted">{{brand}}{{#if model_reference}} · {{model_reference}}{{/if}}</span>{{/if}}</td>
+            <td class="bms-col-usage">{{{systemCategoryPill system_category "sm"}}}</td>
+            <td class="bms-col-roles">{{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="bms-col-loc">{{#if location}}{{location}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="bms-col-pwr">{{#if power_kw}}{{power_kw}} kW{{else}}<span class="bool-na">—</span>{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{/each}}
     {{/if}}
     {{#if bmsUnmanagedDevices.length}}
     <div class="bms-section-head bms-section-head-gap">
@@ -1588,16 +1583,33 @@
       <span class="bms-section-title">À intégrer (hors GTB)</span>
       <span class="bms-section-count bms-section-count-gap">{{bmsUnmanagedDevices.length}}</span>
     </div>
-    <div class="bms-list">
-      {{#each bmsUnmanagedDevices}}
-        <div class="bms-row bms-row-gap">
-          <span class="bms-row-icon">{{{categoryIcon system_category "14"}}}</span>
-          <span class="bms-row-name">{{name}}</span>
-          <span class="bms-row-meta">{{categoryLabel}} · {{zone_name}}{{#if brand}} · {{brand}}{{/if}}</span>
-          {{#if power_kw}}<span class="bms-row-pwr">{{power_kw}} kW</span>{{/if}}
-        </div>
-      {{/each}}
-    </div>
+    {{#each bmsUnmanagedDevicesByZone}}
+      <table class="bms-devices-table bms-devices-table-gap">
+        <thead>
+          <tr>
+            <th colspan="5" class="bms-devices-zone">{{zone_name}}</th>
+          </tr>
+          <tr>
+            <th class="bms-col-name">Équipement</th>
+            <th class="bms-col-usage">Usage</th>
+            <th class="bms-col-roles">Fonctions</th>
+            <th class="bms-col-loc">Localisation</th>
+            <th class="bms-col-pwr">Puissance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each devices}}
+          <tr>
+            <td class="bms-col-name"><strong>{{name}}</strong>{{#if brand}}<br><span class="muted">{{brand}}{{#if model_reference}} · {{model_reference}}{{/if}}</span>{{/if}}</td>
+            <td class="bms-col-usage">{{{systemCategoryPill system_category "sm"}}}</td>
+            <td class="bms-col-roles">{{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="bms-col-loc">{{#if location}}{{location}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
+            <td class="bms-col-pwr">{{#if power_kw}}{{power_kw}} kW{{else}}<span class="bool-na">—</span>{{/if}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    {{/each}}
     {{/if}}
     {{#if bmsTopicNotes.equipements}}
     <div class="panel-inline-note" style="margin: 3mm 4mm 0;">
@@ -1630,7 +1642,7 @@
     <div class="bms-list">
       {{#each bmsManagedMeters}}
         <div class="bms-row">
-          <span class="bms-row-pills">{{{meterTypePill meter_type}}}{{{meterUsagePill usage}}}</span>
+          <span class="bms-row-pills">{{{meterTypePill meter_type "sm"}}}{{{meterUsagePill usage "sm"}}}</span>
           <span class="bms-row-meta">{{zoneLabel}}</span>
         </div>
       {{/each}}
@@ -1645,7 +1657,7 @@
     <div class="bms-list">
       {{#each bmsUnmanagedMeters}}
         <div class="bms-row bms-row-gap">
-          <span class="bms-row-pills">{{{meterTypePill meter_type}}}{{{meterUsagePill usage}}}</span>
+          <span class="bms-row-pills">{{{meterTypePill meter_type "sm"}}}{{{meterUsagePill usage "sm"}}}</span>
           <span class="bms-row-meta">{{zoneLabel}}</span>
         </div>
       {{/each}}
@@ -1811,8 +1823,8 @@
         <span class="muted action-card-article">{{r175_article}}</span>
         {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
+        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
+        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
         {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
       </div>
       <div class="action-card-title"><strong>{{title}}</strong></div>
@@ -1847,8 +1859,8 @@
         {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
         {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
+        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
+        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
         {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
       </div>
       <div class="action-card-title"><strong>{{title}}</strong></div>
@@ -1883,8 +1895,8 @@
         {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
         {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
         {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type}}}{{/if}}
+        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
+        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
         {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
       </div>
       <div class="action-card-title"><strong>{{title}}</strong></div>
@@ -2060,7 +2072,7 @@
 {{!-- ═══════════ Page de clôture plein-bord — accompagnement Buildy ═══════════ --}}
 <section class="closing">
   <header class="closing-top">
-    <img class="closing-logo" src="{{logoDataUrl}}" alt="Buildy" />
+    <img class="closing-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
     <span class="closing-eyebrow">{{#if isBacs}}Mise en conformité · Décret R175{{else}}Extension de votre GTB{{/if}}</span>
   </header>
 
@@ -2078,6 +2090,10 @@
     </ul>
   </main>
 
+  <div class="closing-cta-button-wrap">
+    <span class="closing-cta-button">{{#if isBacs}}Demandez votre devis de mise en conformité BACS{{else}}Demandez votre devis d'extension GTB{{/if}}</span>
+  </div>
+
   <div class="closing-cta">
     <span class="closing-cta-label">Pour échanger sur la suite</span>
     <div class="closing-cta-rows">
@@ -2085,7 +2101,6 @@
       <span class="closing-cta-row"><span class="closing-cta-key">Téléphone</span> 04 28 39 03 34</span>
       <span class="closing-cta-row"><span class="closing-cta-key">Site</span> www.buildy.fr</span>
     </div>
-    <span class="closing-cta-demo">Demandez une démonstration de la solution Buildy.</span>
   </div>
 </section>
 

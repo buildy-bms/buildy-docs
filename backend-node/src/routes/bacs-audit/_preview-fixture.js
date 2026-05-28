@@ -1082,6 +1082,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
     exportDate,
     version: 'bacs-vAPERCU',
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
     // Charts générés via chartjs-node-canvas (Vague 4 item 17) :
     // donut sévérité + bar usage power. Permet à la preview HTML/PDF
     // d'être visuellement fidèle au PDF prod (sinon cases blanches).
