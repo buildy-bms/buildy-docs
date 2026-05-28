@@ -107,37 +107,42 @@ function setRegulationType(v) {
 </script>
 
 <template>
-  <!-- Mig 187 v13 — ligne unique compacte SANS wrap :
-       [Multiselect (device + régulateur déporté)] [● bleu si intégrée] [Liste type régul] [notes]
-       Chip « Intégrée » supprimée, remplacée par une PETITE ICÔNE bleue
-       en préfixe du select type de régulation. Multiselect device tronqué
-       à 1 chip + « + N équipements » via chipLimit. -->
-  <div class="flex items-center gap-2 flex-nowrap">
-    <SearchableSelect
-      :model-value="selectedDevices"
-      :options="allOptions"
-      :multiple="true"
-      :invalid="!deviceId"
-      :auto-width="true"
-      :chip-limit="1"
-      chip-label="équipement"
-      chip-label-plural="équipements"
-      size="sm"
-      placeholder="Ajouter un équipement…"
-      search-placeholder="Rechercher…"
-      @update:modelValue="setLevelDevices" />
-    <!-- Type de régulation — icône bleue préfixe si la régulation est
-         intégrée à l'équipement (info compacte, plus de chip Intégrée). -->
-    <div v-if="device" class="flex items-center gap-1 shrink-0">
-      <span v-if="integrated"
-            class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
-            v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+  <!-- Mig 187 v16 — ligne unique compacte avec mini-floatlabels au-dessus
+       de chaque liste déroulante (lecture rapide du rôle de chaque champ
+       sans ambiguïté). Chaque "groupe" (label + select) reste sur sa
+       colonne flex. -->
+  <div class="flex items-end gap-2 flex-nowrap">
+    <div class="flex flex-col gap-0.5 shrink-0">
+      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Équipement(s)</span>
       <SearchableSelect
-        :model-value="regulationTypeValue"
-        :options="regulationTypeOptions"
-        :clearable="true" :creatable="true" :auto-width="true"
-        size="sm" placeholder="Type de régulation…"
-        @update:modelValue="setRegulationType" />
+        :model-value="selectedDevices"
+        :options="allOptions"
+        :multiple="true"
+        :invalid="!deviceId"
+        :auto-width="true"
+        :chip-limit="1"
+        chip-label="équipement"
+        chip-label-plural="équipements"
+        size="sm"
+        placeholder="Ajouter un équipement…"
+        search-placeholder="Rechercher…"
+        @update:modelValue="setLevelDevices" />
+    </div>
+    <!-- Type de régulation — icône bleue préfixe si la régulation est
+         intégrée à l'équipement. -->
+    <div v-if="device" class="flex flex-col gap-0.5 shrink-0">
+      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Type de régulation</span>
+      <div class="flex items-center gap-1">
+        <span v-if="integrated"
+              class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
+              v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+        <SearchableSelect
+          :model-value="regulationTypeValue"
+          :options="regulationTypeOptions"
+          :clearable="true" :creatable="true" :auto-width="true"
+          size="sm" placeholder="Type de régulation…"
+          @update:modelValue="setRegulationType" />
+      </div>
     </div>
     <slot name="after" />
   </div>

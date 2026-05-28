@@ -441,27 +441,22 @@ onBeforeUnmount(teardownSortable)
          + zone-content masquable en v-show). -->
     <div ref="tableRef" class="px-3 pb-3">
       <table class="thermal-card-table w-full border border-gray-200 rounded-xl overflow-hidden">
-        <!-- Mig 187 v9 — Colgroup pour distribuer la largeur résiduelle :
-             les 2 premières colonnes (Production, Distribution) prennent
-             leur largeur naturelle (contenu max sur toute la card), la
-             colonne Émission absorbe tout le surplus de largeur via
-             `width: 100%`. Plus de gaspillage horizontal à droite. -->
+        <!-- Mig 187 v16 — 4 colonnes : 3 niveaux + 1 colonne Actions dédiée
+             alignée à droite. Émission absorbe le surplus. -->
         <colgroup>
           <col />
           <col />
           <col style="width: 100%" />
+          <col />
         </colgroup>
-        <!-- En-tête de colonnes affiché UNE FOIS en haut de la table : ne
-             se répète plus pour chaque système (gain de bruit visuel). -->
         <thead class="bg-gray-50">
           <tr>
             <th v-for="level in LEVELS" :key="level.key"
                 class="px-4 py-2 text-left text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
               {{ level.label }}
-              <!-- Mig 187 v5 — Granularité collée à l'Émission (dérive du
-                   type d'émission). -->
-              <span v-if="level.key === 'emission'" class="ml-2 normal-case font-normal text-gray-400">·</span>
-              <span v-if="level.key === 'emission'" class="normal-case font-semibold text-gray-500">Granularité</span>
+            </th>
+            <th class="px-4 py-2 text-right text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-b border-gray-200">
+              Actions
             </th>
           </tr>
         </thead>
@@ -470,7 +465,7 @@ onBeforeUnmount(teardownSortable)
           <tbody class="thermal-zone-header">
             <tr @click="toggleZone(g.zoneName)"
                 class="bg-gray-50 border-t border-gray-200 cursor-pointer hover:bg-gray-100 transition select-none">
-              <td colspan="3" class="px-4 py-2">
+              <td colspan="4" class="px-4 py-2">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
@@ -488,9 +483,9 @@ onBeforeUnmount(teardownSortable)
                  v-show="!collapsedZones[g.zoneName]"
                  :data-id="t.id"
                  class="thermal-row border-t border-gray-100">
-            <!-- Ligne 1 — identification (colspan 3) + actions -->
+            <!-- Ligne 1 — identification (colspan 4) -->
             <tr>
-              <td colspan="3" class="px-4 pt-3 pb-1">
+              <td colspan="4" class="px-4 pt-3 pb-1">
                 <div class="flex w-full items-center gap-3 flex-nowrap">
                   <button type="button"
                           class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
@@ -542,34 +537,38 @@ onBeforeUnmount(teardownSortable)
                        granularité fait visuellement PARTIE de la colonne
                        Émission, comme demandé. -->
                   <template v-if="level.key === 'emission'" #after>
-                    <SearchableSelect
-                      :model-value="granularityForRow(t).key"
-                      @update:modelValue="(v) => patchGranularity(t, v)"
-                      :options="GRANULARITY_OPTIONS"
-                      :clearable="true" :creatable="true" :auto-width="true"
-                      size="sm" placeholder="Granularité…" />
-                    <!-- Actions globales du système (notes + suppression),
-                         alignées dans la même ligne que les dropdowns. -->
-                    <button type="button"
-                            @click="emit('open-notes', {
-                              title: 'Notes régulation thermique',
-                              contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
-                              entityType: 'thermal',
-                              entityRef: t,
-                              currentHtml: t.notes_html || t.notes || '',
-                              noteField: 'notes_html',
-                            })"
-                            :class="['btn-icon shrink-0', hasNotes(t.notes_html || t.notes) && 'is-active']"
-                            v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-                      <PencilSquareIcon class="w-4 h-4 shrink-0" />
-                    </button>
-                    <button type="button" @click="removeEntry(t)"
-                            class="btn-icon btn-icon-danger shrink-0"
-                            v-tooltip="'Supprimer ce système de régulation'">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
+                    <div class="flex flex-col gap-0.5 shrink-0">
+                      <span class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Granularité</span>
+                      <SearchableSelect
+                        :model-value="granularityForRow(t).key"
+                        @update:modelValue="(v) => patchGranularity(t, v)"
+                        :options="GRANULARITY_OPTIONS"
+                        :clearable="true" :creatable="true" :auto-width="true"
+                        size="sm" placeholder="Granularité…" />
+                    </div>
                   </template>
                 </ThermalLevelCell>
+              </td>
+              <!-- Mig 187 v16 — Colonne Actions dédiée, alignée à droite. -->
+              <td class="px-4 pb-3 align-bottom text-right whitespace-nowrap">
+                <button type="button"
+                        @click="emit('open-notes', {
+                          title: 'Notes régulation thermique',
+                          contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                          entityType: 'thermal',
+                          entityRef: t,
+                          currentHtml: t.notes_html || t.notes || '',
+                          noteField: 'notes_html',
+                        })"
+                        :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
+                        v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                  <PencilSquareIcon class="w-4 h-4 shrink-0" />
+                </button>
+                <button type="button" @click="removeEntry(t)"
+                        class="btn-icon btn-icon-danger ml-1"
+                        v-tooltip="'Supprimer ce système de régulation'">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
               </td>
             </tr>
           </tbody>
