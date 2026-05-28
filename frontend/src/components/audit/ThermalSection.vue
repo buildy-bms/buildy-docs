@@ -510,26 +510,6 @@ onBeforeUnmount(teardownSortable)
                       Exempté — bois
                     </span>
                   </Tooltip>
-                  <div class="ml-auto flex items-center gap-1 shrink-0">
-                    <button type="button"
-                            @click="emit('open-notes', {
-                              title: 'Notes régulation thermique',
-                              contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
-                              entityType: 'thermal',
-                              entityRef: t,
-                              currentHtml: t.notes_html || t.notes || '',
-                              noteField: 'notes_html',
-                            })"
-                            :class="['btn-icon', hasNotes(t.notes_html || t.notes) && 'is-active']"
-                            v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
-                      <PencilSquareIcon class="w-4 h-4 shrink-0" />
-                    </button>
-                    <button type="button" @click="removeEntry(t)"
-                            class="btn-icon btn-icon-danger"
-                            v-tooltip="'Supprimer ce système de régulation'">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
               </td>
             </tr>
@@ -568,6 +548,26 @@ onBeforeUnmount(teardownSortable)
                       :options="GRANULARITY_OPTIONS"
                       :clearable="true" :creatable="true" :auto-width="true"
                       size="sm" placeholder="Granularité…" />
+                    <!-- Actions globales du système (notes + suppression),
+                         alignées dans la même ligne que les dropdowns. -->
+                    <button type="button"
+                            @click="emit('open-notes', {
+                              title: 'Notes régulation thermique',
+                              contextLabel: t.zone_name + ' — ' + ((t.category || 'heating') === 'heating' ? 'Chauffage' : 'Refroidissement'),
+                              entityType: 'thermal',
+                              entityRef: t,
+                              currentHtml: t.notes_html || t.notes || '',
+                              noteField: 'notes_html',
+                            })"
+                            :class="['btn-icon shrink-0', hasNotes(t.notes_html || t.notes) && 'is-active']"
+                            v-tooltip="hasNotes(t.notes_html || t.notes) ? 'Modifier les notes globales' : 'Ajouter une note globale'">
+                      <PencilSquareIcon class="w-4 h-4 shrink-0" />
+                    </button>
+                    <button type="button" @click="removeEntry(t)"
+                            class="btn-icon btn-icon-danger shrink-0"
+                            v-tooltip="'Supprimer ce système de régulation'">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
                   </template>
                 </ThermalLevelCell>
               </td>
