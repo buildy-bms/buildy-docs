@@ -49,30 +49,33 @@ const regulationField = computed(() => LEVEL_REGULATION_FIELD[props.level])
 const deviceId = computed(() => props.thermal[deviceField.value])
 const regulationDeviceId = computed(() => props.thermal[regulationField.value])
 
-// Modèle multi : tableau [device, régulateur déporté] limité à 2 entrées.
-// Le régulateur n'est sémantiquement pertinent que si la régulation est
-// déclarée Déportée (regulation_integrated=false). Si Intégrée par défaut,
-// on ne POUSSE PAS le régulateur dans le multi (l'éq. principal pilote sa
-// propre régulation). L'auditeur peut le faire apparaître en passant en
-// Déportée dans la modale équipement.
+// Mig 187 v20 — selectedDevices ne contient que des ids présents dans le
+// dropdown strict du niveau. Les anciennes FK régulateur (pointant
+// éventuellement vers un device d'un autre niveau, ex. aérotherme stocké
+// dans `production_regulation_device_id`) ne sont plus affichées comme
+// chips orphelins (id brut sans label) — elles restent en DB mais ne
+// polluent plus l'UI. Le régulateur déporté est désormais documenté
+// uniquement via les champs free-text de la modale équipement.
 const selectedDevices = computed(() => {
+  const validIds = new Set(props.deviceOptions.map(o => o.value))
   const ids = []
-  if (deviceId.value) ids.push(deviceId.value)
-  if (!props.integrated && regulationDeviceId.value) ids.push(regulationDeviceId.value)
+  if (deviceId.value && validIds.has(deviceId.value)) ids.push(deviceId.value)
+  if (!props.integrated && regulationDeviceId.value && validIds.has(regulationDeviceId.value)) {
+    ids.push(regulationDeviceId.value)
+  }
   return ids
 })
 
-// Combinaison des options device + régulateurs candidats (mêmes devices de
-// la zone, mais filtrés par rôle régulation). Dédup par id (un device qui
-// porte les 2 rôles ne doit apparaître qu'une fois dans la liste).
-//
-// Mig 187 v19 — les candidats régulateurs ne sont PROPOSÉS dans le dropdown
-// de niveau QUE si le device principal est explicitement marqué « régulation
-// déportée » (`regulation_integrated === false`). Sinon le dropdown est
-// strict au niveau (un radiateur ne doit pas apparaître en Production sous
-// prétexte qu'il porte aussi le rôle `regulation`). Le 2e slot du multi-
-// select (regulator déporté) reste accessible uniquement après que
-// l'auditeur a déclaré la régulation déportée dans la modale équipement.
+// Mig 187 v20 — dropdown STRICT au niveau (Production / Distribution /
+// Émission). On ne fusionne plus les candidats régulateurs : dans la
+// pratique, l'auditeur tagge ses émetteurs / distributeurs / générateurs
+// comme « regulation » aussi (régulation intégrée), ce qui les rendait
+// candidats à être proposés comme régulateur déporté d'autres niveaux et
+// polluait le dropdown (un radiateur proposé en Production, un circuit
+// d'eau chaude proposé en Émission). Le régulateur déporté est désormais
+// décrit via les champs free-text `regulator_brand` / `regulator_model_reference`
+// / `regulator_location_<level>` saisis dans la modale équipement (visibles
+// dans le tooltip de la pastille violette).
 const allOptions = computed(() => {
   const seen = new Set()
   const out = []
@@ -81,27 +84,27 @@ const allOptions = computed(() => {
     seen.add(o.value)
     out.push(o)
   }
-  if (isDeported.value) {
-    for (const o of props.regulatorOptions) {
-      if (seen.has(o.value)) continue
-      seen.add(o.value)
-      out.push(o)
-    }
-  }
   return out
 })
 
 function setLevelDevices(ids) {
   const arr = Array.isArray(ids) ? ids : []
   // On garde les 2 derniers ids sélectionnés (FIFO) si l'utilisateur en
-  // pousse plus que 2 — le 1er reste l'équipement principal, le 2e devient
-  // le régulateur déporté. Pas de 3e column dans la DB.
+  // pousse plus que 2.
   const limited = arr.length > 2 ? arr.slice(-2) : arr
   const [d, r] = limited
-  emit('patch-thermal', {
+  const patch = {
     [deviceField.value]: d != null ? parseInt(d, 10) : null,
-    [regulationField.value]: r != null ? parseInt(r, 10) : null,
-  })
+  }
+  // Mig 187 v20 — n'écrase regulationField QUE si l'utilisateur a
+  // explicitement sélectionné un 2e item. En single-pick, on préserve la
+  // FK régulateur historique en DB (les anciennes données ne sont plus
+  // affichées par selectedDevices si elles pointent vers un device d'un
+  // autre niveau, mais on évite d'écraser silencieusement).
+  if (arr.length >= 2) {
+    patch[regulationField.value] = r != null ? parseInt(r, 10) : null
+  }
+  emit('patch-thermal', patch)
 }
 
 // Mig 187 v10 — type de régulation lu et écrit directement sur le device.

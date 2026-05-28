@@ -2,16 +2,16 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.115",
+      "version": "0.1.116",
       "date": "2026-05-28",
       "title": "Card 06 — listes Production / Distribution / Émission strictement filtrées par rôle",
       "highlights": [
         {
           "kind": "fix",
           "title": "Les listes déroulantes par niveau ne montrent plus que les équipements du bon rôle",
-          "what": "Sur l'audit BACS card 06 « Régulation thermique automatique », chaque cellule Production / Distribution / Émission propose désormais STRICTEMENT les équipements dont le rôle (`device_role`) correspond au niveau. Un aérotherme (rôle `emission`) n'apparaît plus dans la liste Production d'une chaudière, un circuit eau chaude (rôle `distribution`) n'apparaît plus en Émission, etc. Les candidats régulateurs (rôle `regulation`) ne sont fusionnés dans le dropdown que si le device principal est marqué « régulation déportée » (modale équipement → question « La régulation est-elle intégrée ou déportée ? » = Déportée).",
+          "what": "Sur l'audit BACS card 06 « Régulation thermique automatique », chaque cellule Production / Distribution / Émission propose désormais STRICTEMENT les équipements dont le rôle (`device_role`) correspond au niveau. Un aérotherme (rôle `emission`) n'apparaît plus dans la liste Production, un circuit eau chaude (rôle `distribution`) n'apparaît plus en Émission, etc. Le régulateur déporté n'est plus pické via cette multi-sélection (qui polluait le dropdown avec tout device taggé aussi `regulation`) : il se documente via les champs free-text `regulator_brand` / `regulator_model_reference` / `regulator_location_<niveau>` saisis dans la modale équipement (visibles dans le tooltip de la pastille violette).",
           "where": "Audit BACS → card 06 « Régulation thermique automatique » → dropdowns Production / Distribution / Émission de chaque ligne.",
-          "how": "Sur l'audit 45 (ou tout audit avec des aérothermes), ouvrir la liste Production d'une ligne chauffage : seules les chaudières / cumulus / DRV / pompes à chaleur (rôle `production`) sont proposées. Idem Distribution = uniquement CTA, circuit eau chaude, boucle ECS… Idem Émission = uniquement radiateurs, aérothermes, ventilo-convecteurs… Pour faire apparaître un régulateur déporté dans le dropdown, ouvrir la modale d'édition de l'équipement et passer la régulation à Déportée."
+          "how": "Sur l'audit 45 (ou tout audit avec des aérothermes), ouvrir la liste Production d'une ligne chauffage : seules les chaudières / cumulus / DRV / pompes à chaleur (rôle `production`) sont proposées. Idem Distribution = uniquement CTA, circuit eau chaude, boucle ECS… Idem Émission = uniquement radiateurs, aérothermes, ventilo-convecteurs…"
         },
         {
           "kind": "fix",
