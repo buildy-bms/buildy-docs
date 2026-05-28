@@ -104,6 +104,26 @@ function setRegulationType(v) {
     patch: { [regulationTypeField.value]: v || null },
   })
 }
+
+// Mig 187 v18 — pastilles intégrée (bleue) / déportée (#7033d9). Au survol
+// de la pastille déportée, on affiche les infos du régulateur (marque,
+// référence, localisation) sourcées depuis le device émetteur lui-même
+// (`regulator_brand`, `regulator_model_reference`, `regulator_location_X`).
+const isDeported = computed(() =>
+  props.device && (props.device.regulation_integrated === 0 || props.device.regulation_integrated === false))
+const deportedTooltip = computed(() => {
+  if (!isDeported.value || !props.device) return ''
+  const lines = ['Régulation déportée']
+  const brand = props.device.regulator_brand
+  const ref = props.device.regulator_model_reference
+  const loc = props.device[`regulator_location_${props.level}`]
+  if (brand) lines.push(`• Marque : ${brand}`)
+  if (ref)   lines.push(`• Référence : ${ref}`)
+  if (loc)   lines.push(`• Localisation : ${loc}`)
+  if (lines.length === 1) lines.push('Détails non renseignés — à compléter dans la modale équipement.')
+  // Le tooltip directive transforme '\n' → <br> (cf. tooltip-directive.js).
+  return lines.join('\n')
+})
 </script>
 
 <template>
@@ -136,6 +156,10 @@ function setRegulationType(v) {
         <span v-if="integrated"
               class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
               v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+        <span v-else-if="isDeported"
+              class="inline-block w-2 h-2 rounded-full shrink-0"
+              :style="{ background: '#7033d9' }"
+              v-tooltip="deportedTooltip"></span>
         <SearchableSelect
           :model-value="regulationTypeValue"
           :options="regulationTypeOptions"
