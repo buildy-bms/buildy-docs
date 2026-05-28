@@ -19,7 +19,6 @@
  * découpée en sous-cards par zone.
  */
 import { computed } from 'vue'
-import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 
 const props = defineProps({
@@ -29,14 +28,10 @@ const props = defineProps({
   deviceOptions: { type: Array, default: () => [] },
   regulatorOptions: { type: Array, default: () => [] },
   // Mig 187 v10 — Type de régulation : options + handler d'édition.
-  // Avant : affiché en chip vert read-only (« Thermostat avec sonde
-  // déportée »). Maintenant : SearchableSelect éditable qui PATCH le
-  // device. La valeur édite `device.regulation_type_${level}` côté DB.
   regulationTypeOptions: { type: Array, default: () => [] },
   integrated: { type: Boolean, default: false },
-  noteHtml: { type: String, default: '' },
 })
-const emit = defineEmits(['patch-thermal', 'patch-device', 'open-notes'])
+const emit = defineEmits(['patch-thermal', 'patch-device'])
 
 const LEVEL_DEVICE_FIELD = {
   production:   'generator_device_id',
@@ -109,10 +104,6 @@ function setRegulationType(v) {
     patch: { [regulationTypeField.value]: v || null },
   })
 }
-const hasNote = computed(() => {
-  if (!props.noteHtml) return false
-  return props.noteHtml.replace(/<[^>]*>/g, '').trim().length > 0
-})
 </script>
 
 <template>
@@ -148,12 +139,6 @@ const hasNote = computed(() => {
         size="sm" placeholder="Type de régulation…"
         @update:modelValue="setRegulationType" />
     </div>
-    <button v-if="deviceId" type="button"
-            @click="emit('open-notes')"
-            :class="['btn-icon shrink-0', hasNote && 'is-active']"
-            v-tooltip="hasNote ? 'Note de ce niveau' : 'Ajouter une note pour ce niveau'">
-      <PencilSquareIcon class="w-4 h-4" />
-    </button>
     <slot name="after" />
   </div>
 </template>

@@ -491,7 +491,7 @@ onBeforeUnmount(teardownSortable)
             <!-- Ligne 1 — identification (colspan 3) + actions -->
             <tr>
               <td colspan="3" class="px-4 pt-3 pb-1">
-                <div class="flex items-center gap-3 flex-nowrap">
+                <div class="flex w-full items-center gap-3 flex-nowrap">
                   <button type="button"
                           class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing shrink-0"
                           v-tooltip="'Glisser pour réordonner ce système'">
