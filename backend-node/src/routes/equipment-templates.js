@@ -6,6 +6,7 @@ const log = require('../lib/logger').system;
 const { slugify } = require('../lib/slug');
 const { snapshotAndBump } = require('../lib/template-propagation');
 const { parseRoles, serializeRoles } = require('../lib/device-roles');
+const regulationDefaults = require('../lib/regulation-defaults');
 
 // Énergies = enum fermé (aligné sur bacs_audit_system_devices.energy_source).
 // Niveau (default_device_role) = TEXT libre + multi-select (mig 117).
@@ -29,6 +30,16 @@ const BACS_CONTRAINDICATION_CODES = [
   'lighting_already_optimized',
 ];
 
+// Mig 184 — suggestions de types de régulation par niveau, portées par le
+// modèle d'équipement. Chaque entrée = { value, label }. Le `value` est un
+// snake_case_id (clé stable), le `label` est en français pour l'affichage.
+// Stockées en TEXT JSON. Array vide ou null = pas de suggestion personnalisée
+// → la modale audit retombe sur les défauts par catégorie.
+const regulationTypeSchema = z.array(z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+})).nullable().optional();
+
 const createTemplateSchema = z.object({
   slug: z.string().optional(),
   name: z.string().min(1),
@@ -44,6 +55,10 @@ const createTemplateSchema = z.object({
   default_device_role: deviceRoleSchema,
   // Item 10 — array de codes de contre-indications BACS (ou null).
   bacs_contraindications: z.array(z.enum(BACS_CONTRAINDICATION_CODES)).nullable().optional(),
+  // Mig 184 — suggestions de types de régulation par niveau.
+  regulation_production_types:   regulationTypeSchema,
+  regulation_distribution_types: regulationTypeSchema,
+  regulation_emission_types:     regulationTypeSchema,
 });
 
 // Le slug reste editable (Lot AF QoL) ; verification d'unicite + check
@@ -67,6 +82,27 @@ const pointSchema = z.object({
 // propre bacs_articles depuis le Lot 35 — il l'herite de sa categorie.
 // Parse aussi default_device_role en array (mig 117 multi-niveau) pour
 // que le frontend recoive toujours un array, jamais un JSON string.
+// Mig 184 — sérialise une liste de régulation pour insertion. À la création,
+// si l'admin ne fournit pas explicitement la liste, on pré-remplit avec les
+// défauts par catégorie (regulation-defaults.js) pour que les nouveaux modèles
+// soient pré-câblés. À l'update, ce helper n'est pas utilisé : sentinel
+// '__clear__' / valeur explicite.
+function serializeRegulationList(provided, libraryCategory, level) {
+  if (Array.isArray(provided)) return provided.length ? JSON.stringify(provided) : null;
+  // Pas fourni : fallback par défaut de catégorie.
+  const d = regulationDefaults.defaultsForLibraryCategory(libraryCategory);
+  const list = d[level];
+  return list && list.length ? JSON.stringify(list) : null;
+}
+
+function parseJsonArray(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
 function inheritBacsFromCategory(template, categoriesByKey) {
   const cat = template.category ? categoriesByKey.get(template.category) : null;
   // Item 10 — bacs_contraindications stocké en JSON array string → array.
@@ -77,12 +113,18 @@ function inheritBacsFromCategory(template, categoriesByKey) {
       if (Array.isArray(parsed)) contraindications = parsed;
     } catch { /* valeur corrompue → tableau vide */ }
   }
+  // Mig 184 — listes de régulation : JSON → array. Le fallback par défaut est
+  // calculé côté `routes/audit-options` (frontend), pas ici : on renvoie tel
+  // quel (null = "pas de surcharge" → l'UI applique le défaut de catégorie).
   return {
     ...template,
     bacs_articles: cat?.bacs || null,
     bacs_inherited_from: cat ? { key: cat.key, label: cat.label } : null,
     default_device_role: parseRoles(template.default_device_role),
     bacs_contraindications: contraindications,
+    regulation_production_types:   parseJsonArray(template.regulation_production_types),
+    regulation_distribution_types: parseJsonArray(template.regulation_distribution_types),
+    regulation_emission_types:     parseJsonArray(template.regulation_emission_types),
   };
 }
 
@@ -171,6 +213,12 @@ async function routes(fastify) {
       // Item 10 — contre-indications BACS : array → JSON array string.
       bacsContraindications: Array.isArray(body.bacs_contraindications)
         ? JSON.stringify(body.bacs_contraindications) : null,
+      // Mig 184 — listes de régulation : array → JSON. Si non fourni, on
+      // pré-remplit avec les défauts par catégorie pour qu'un nouveau modèle
+      // ait directement les bonnes suggestions sans saisie admin.
+      regulationProductionTypes:   serializeRegulationList(body.regulation_production_types,   body.category, 'production'),
+      regulationDistributionTypes: serializeRegulationList(body.regulation_distribution_types, body.category, 'distribution'),
+      regulationEmissionTypes:     serializeRegulationList(body.regulation_emission_types,     body.category, 'emission'),
       createdBy: userId,
     });
     db.auditLog.add({ templateId: tpl.id, userId, action: 'template.create', payload: { slug } });
@@ -221,6 +269,16 @@ async function routes(fastify) {
       const codes = Array.isArray(body.bacs_contraindications) ? body.bacs_contraindications : [];
       bacsContraindications = codes.length ? JSON.stringify(codes) : '__clear__';
     }
+    // Mig 184 — listes de régulation : array vide ou null → '__clear__' (retour
+    // au défaut par catégorie). Array non-vide → JSON sérialisé.
+    function adaptRegulation(field) {
+      if (!(field in body)) return undefined;
+      const arr = Array.isArray(body[field]) ? body[field] : [];
+      return arr.length ? JSON.stringify(arr) : '__clear__';
+    }
+    const regulationProductionTypes   = adaptRegulation('regulation_production_types');
+    const regulationDistributionTypes = adaptRegulation('regulation_distribution_types');
+    const regulationEmissionTypes     = adaptRegulation('regulation_emission_types');
     // Update + tombstone de l'ancien slug en transaction. Le tombstone
     // empeche le seeder de recreer un row a partir du fichier seed
     // (seeds/equipment-templates/<oldSlug>.js) au prochain boot, ce qui
@@ -241,6 +299,9 @@ async function routes(fastify) {
         defaultEnergySource,
         defaultDeviceRole,
         bacsContraindications,
+        regulationProductionTypes,
+        regulationDistributionTypes,
+        regulationEmissionTypes,
         updatedBy: userId,
       });
       if (nextSlug) {

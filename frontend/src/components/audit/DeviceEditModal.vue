@@ -6,17 +6,17 @@
  * répondu), placés juste après la question. Un bandeau de complétude
  * indique si l'équipement est « validé » (= complètement renseigné).
  */
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
-import { updateBacsDevice } from '@/api'
+import { updateBacsDevice, getEquipmentTemplate } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import {
   ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS,
-  REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
+  regulationTypesForCategory,
   isThermalCategory, isDeviceComplete, deviceMissingFields,
 } from '@/lib/audit-options'
 
@@ -94,6 +94,23 @@ const hasProductionRole   = computed(() => deviceRole.value.includes('production
 const hasDistributionRole = computed(() => deviceRole.value.includes('distribution'))
 const hasEmissionRole     = computed(() => deviceRole.value.includes('emission'))
 
+// Mig 184 — listes de suggestions de types de régulation. Priorité :
+//   1. surcharge du modèle d'équipement (equipment_templates.regulation_*_types)
+//   2. défauts par catégorie d'usage du système
+//   3. fallback minimal { autre }
+// Le template est fetché à l'ouverture de la modale via getEquipmentTemplate
+// (1 seul appel — pas de cache audit car la modale est éphémère).
+const template = ref(null)
+watch(() => props.device.equipment_template_id, async (id) => {
+  if (!id) { template.value = null; return }
+  try { const { data } = await getEquipmentTemplate(id); template.value = data } catch { template.value = null }
+}, { immediate: true })
+
+const cat = computed(() => props.system?.system_category || null)
+const regulationProductionOptions   = computed(() => regulationTypesForCategory('production',   cat.value, template.value?.regulation_production_types))
+const regulationDistributionOptions = computed(() => regulationTypesForCategory('distribution', cat.value, template.value?.regulation_distribution_types))
+const regulationEmissionOptions     = computed(() => regulationTypesForCategory('emission',     cat.value, template.value?.regulation_emission_types))
+
 // Mig 183 — masquage des détails régulateur quand la régulation est
 // explicitement « Intégrée ». Par défaut (null = pas répondu) ou si
 // « Déportée », on affiche marque/référence/localisations pour que
@@ -118,20 +135,36 @@ const zoneOptions = computed(() => {
     .map(z => ({ value: z.name, label: z.name }))
 })
 
-// Question dérivée : « L'équipement est-il communicant ? ». Tri-état dérivé
-// de communication_protocols (JSON array → true si non vide, sinon null tant
-// que rien n'a été coché). On stocke la réponse explicite Non dans une colonne
-// front-only éphémère via un patch direct du protocole à null + flag local
-// indirect : si l'utilisateur clique Non, on garde communication_protocols=null
-// et on enregistre l'intention dans `communication_protocol` (legacy) à
-// 'non_communicant' pour persister la réponse Non.
-const isCommunicating = computed(() => {
+// Question « L'équipement est-il communicant ? » — désormais portée par la
+// colonne dédiée `is_communicating` (mig 185), ternaire (null/false/true).
+// Avant la mig 185, l'état était dérivé de la présence d'un protocole, ce
+// qui empêchait l'auditeur de répondre Oui tant qu'aucun protocole n'avait
+// été sélectionné (UX bloquante). Désormais : Oui/Non d'abord, puis si Oui
+// la sélection du ou des protocoles devient un champ obligatoire (signalé
+// par deviceMissingFields).
+//
+// Fallback de lecture pour les rows antérieures à la mig 185 (transitoire) :
+// si `is_communicating` est null mais qu'on a un protocole, on l'interprète
+// comme Oui ; si `non_communicant` est posé, comme Non.
+const hasAnyProtocol = computed(() => {
   const raw = props.device.communication_protocols
   if (raw) {
     try {
       const arr = JSON.parse(raw)
-      // Filtre la valeur legacy 'non_communicant' qui pouvait être stockée dans
-      // l'array : elle exprime « Non communicant », pas un protocole.
+      const real = Array.isArray(arr) ? arr.filter(v => v && v !== 'non_communicant') : []
+      if (real.length) return true
+    } catch { /* ignore */ }
+  }
+  return !!(props.device.communication_protocol && props.device.communication_protocol !== 'non_communicant')
+})
+const isCommunicating = computed(() => {
+  if (props.device.is_communicating === 1 || props.device.is_communicating === true)  return true
+  if (props.device.is_communicating === 0 || props.device.is_communicating === false) return false
+  // Fallback legacy.
+  const raw = props.device.communication_protocols
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw)
       const real = Array.isArray(arr) ? arr.filter(v => v && v !== 'non_communicant') : []
       if (real.length) return true
       if (Array.isArray(arr) && arr.includes('non_communicant')) return false
@@ -143,16 +176,19 @@ const isCommunicating = computed(() => {
 })
 function setCommunicating(v) {
   if (v === true) {
-    // Oui → on laisse l'utilisateur cocher des protocoles ; on efface le
-    // marqueur legacy « non_communicant ».
+    // Oui → on persiste l'état, on efface le marqueur legacy « non_communicant »
+    // s'il était posé. Les protocoles ne sont PAS pré-sélectionnés — l'auditeur
+    // doit en choisir un (signalé en champ manquant).
+    const p = { is_communicating: true }
     if (props.device.communication_protocol === 'non_communicant') {
-      patch({ communication_protocol: null })
+      p.communication_protocol = null
     }
+    patch(p)
   } else if (v === false) {
-    // Non → on vide tous les protocoles et on marque non_communicant.
-    patch({ communication_protocols: null, communication_protocol: 'non_communicant' })
+    // Non → on vide tous les protocoles + marque legacy + état persistant.
+    patch({ is_communicating: false, communication_protocols: null, communication_protocol: 'non_communicant' })
   } else {
-    patch({ communication_protocols: null, communication_protocol: null })
+    patch({ is_communicating: null, communication_protocols: null, communication_protocol: null })
   }
 }
 
@@ -350,7 +386,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation de production</label>
                 <SearchableSelect :model-value="device.regulation_type_production"
-                                  :options="REGULATION_TYPES_PRODUCTION"
+                                  :options="regulationProductionOptions"
                                   :clearable="true" :creatable="true" size="sm" placeholder="Loi d'eau, cascade…"
                                   @update:model-value="v => patch({ regulation_type_production: v || null })" />
               </div>
@@ -367,7 +403,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation de distribution</label>
                 <SearchableSelect :model-value="device.regulation_type_distribution"
-                                  :options="REGULATION_TYPES_DISTRIBUTION"
+                                  :options="regulationDistributionOptions"
                                   :clearable="true" :creatable="true" size="sm" placeholder="Vanne 3 voies, débit variable…"
                                   @update:model-value="v => patch({ regulation_type_distribution: v || null })" />
               </div>
@@ -384,8 +420,8 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
               <div>
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de régulation d'émission</label>
                 <SearchableSelect :model-value="device.regulation_type_emission"
-                                  :options="REGULATION_TYPES_EMISSION"
-                                  :clearable="true" :creatable="true" size="sm" placeholder="Thermostat, vanne thermo…"
+                                  :options="regulationEmissionOptions"
+                                  :clearable="true" :creatable="true" size="sm" placeholder="Thermostat, présence, lumière constante…"
                                   @update:model-value="v => patch({ regulation_type_emission: v || null })" />
               </div>
               <div v-if="showRegulatorDetails">
@@ -414,18 +450,22 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
               </div>
             </div>
             <div class="sm:col-span-8 flex flex-col"
-                 :class="{ 'opacity-50 pointer-events-none': isCommunicating === false }">
-              <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Protocole(s) de communication</label>
+                 :class="{ 'opacity-50 pointer-events-none': isCommunicating !== true }">
+              <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+                Protocole(s) de communication
+                <span v-if="isCommunicating === true && !hasAnyProtocol" class="text-rose-600 font-semibold">·  obligatoire</span>
+              </label>
               <ProtocolMultiPicker
                 :model-value="device.communication_protocols || (device.communication_protocol && device.communication_protocol !== 'non_communicant' ? JSON.stringify([device.communication_protocol]) : null)"
-                :options="COMM_OPTIONS" placeholder="Aucun protocole" size="md"
+                :options="COMM_OPTIONS" placeholder="Sélectionner un ou plusieurs protocoles…" size="md"
                 :exclude-non-communicant="true"
                 @update:modelValue="v => patch({ communication_protocols: v, communication_protocol: v ? null : device.communication_protocol })" />
             </div>
           </div>
           <p class="text-xs text-gray-500 leading-snug mt-1">
-            Langages par lesquels l'équipement échange avec la supervision. Un équipement qui ne
-            communique avec aucun protocole ne peut être ni piloté ni suivi à distance.
+            Réponds d'abord <strong>Oui</strong> ou <strong>Non</strong> à la question. Si Oui,
+            sélectionne au moins un protocole : un équipement qui ne communique avec aucun protocole
+            ne peut être ni piloté ni suivi à distance.
           </p>
         </div>
         <div class="border-t border-gray-100 px-3 py-3 space-y-3">

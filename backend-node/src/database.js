@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 183;
+const TARGET_VERSION = 186;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -6974,6 +6974,111 @@ function runMigrations() {
     db.pragma('user_version = 183');
   }
 
+  if (current < 184) {
+    // Listes de suggestions de types de régulation par niveau, portées par le
+    // modèle d'équipement. Avant la mig 184, les listes étaient codées en dur
+    // dans `frontend/src/lib/audit-options.js` (REGULATION_TYPES_*), uniformes
+    // pour tous les usages — ce qui collait mal pour l'éclairage (détection
+    // présence, lumière constante…), la ventilation (sonde CO2, VAV…), etc.
+    //
+    // Désormais chaque equipment_template porte ses propres listes (TEXT JSON
+    // d'array d'objets `{ value, label }`). La modale d'édition d'équipement
+    // (DeviceEditModal.vue) lit ces listes via `equipment_template_id` du
+    // device, avec fallback sur les défauts par catégorie (lib/audit-options.js
+    // côté front, `_regulation-defaults.js` côté back).
+    db.exec(`ALTER TABLE equipment_templates ADD COLUMN regulation_production_types TEXT;`);
+    db.exec(`ALTER TABLE equipment_templates ADD COLUMN regulation_distribution_types TEXT;`);
+    db.exec(`ALTER TABLE equipment_templates ADD COLUMN regulation_emission_types TEXT;`);
+
+    // Backfill : pré-remplit chaque template existant avec les listes par
+    // défaut de sa catégorie BACS (mapping `system_categories_db.key` → BACS
+    // category via `LIBRARY_CATS_FOR_BACS_CATEGORY` inversé). Les éditions
+    // manuelles restent prioritaires (le seeder est idempotent, mais ici on
+    // écrit dans des colonnes NULL pour les rows existantes).
+    const DEFAULTS = require('./lib/regulation-defaults');
+    const tpls = db.prepare('SELECT id, category FROM equipment_templates').all();
+    const upd = db.prepare(`
+      UPDATE equipment_templates
+         SET regulation_production_types   = ?,
+             regulation_distribution_types = ?,
+             regulation_emission_types     = ?
+       WHERE id = ?
+    `);
+    for (const t of tpls) {
+      const d = DEFAULTS.defaultsForLibraryCategory(t.category);
+      upd.run(
+        d.production   ? JSON.stringify(d.production)   : null,
+        d.distribution ? JSON.stringify(d.distribution) : null,
+        d.emission     ? JSON.stringify(d.emission)     : null,
+        t.id,
+      );
+    }
+    log.info(`Migration 184 appliquee : equipment_templates.regulation_*_types ajoutés (3 listes JSON) + backfill ${tpls.length} templates`);
+    db.pragma('user_version = 184');
+  }
+
+  if (current < 185) {
+    // `is_communicating` ternaire (null/false/true) sur les devices. Avant
+    // cette mig, l'état « communicant » était dérivé de la présence d'un
+    // protocole : on ne pouvait pas répondre Oui tant qu'aucun protocole
+    // n'était sélectionné (UX bloquante). Désormais l'auditeur répond d'abord
+    // Oui / Non, puis si Oui, le ou les protocoles deviennent obligatoires.
+    // Backfill : true si le device a déjà un protocole ; false s'il est
+    // marqué `non_communicant` ; null sinon.
+    db.exec(`ALTER TABLE bacs_audit_system_devices ADD COLUMN is_communicating INTEGER DEFAULT NULL;`);
+    db.exec(`
+      UPDATE bacs_audit_system_devices
+      SET is_communicating = CASE
+        WHEN communication_protocol = 'non_communicant' THEN 0
+        WHEN communication_protocols IS NOT NULL
+             AND communication_protocols != ''
+             AND communication_protocols != '[]'
+             AND communication_protocols != '["non_communicant"]'
+        THEN 1
+        WHEN communication_protocol IS NOT NULL
+             AND communication_protocol != ''
+        THEN 1
+        ELSE NULL
+      END;
+    `);
+    log.info('Migration 185 appliquee : bacs_audit_system_devices.is_communicating ajouté (ternaire, backfill depuis les protocoles existants)');
+    db.pragma('user_version = 185');
+  }
+
+  if (current < 186) {
+    // Ajout idempotent du type d'émission « Thermostat avec sonde déportée »
+    // aux modèles d'équipement de la catégorie chauffage déjà backfillés par
+    // la mig 184. Touche uniquement les rows qui :
+    //   - ont une liste d'émission non vide (= un backfill ou une saisie admin)
+    //   - n'incluent pas déjà la nouvelle valeur (`thermostat_sonde_deportee`)
+    // Les modèles avec liste personnalisée qui ont volontairement retiré le
+    // thermostat ambiant ne sont PAS « corrigés » (respect du choix admin :
+    // on n'ajoute que là où la liste de défaut est encore reconnaissable —
+    // critère = présence de `thermostat_ambiant`).
+    const heatingTpls = db.prepare(`
+      SELECT id, regulation_emission_types
+      FROM equipment_templates
+      WHERE category IN ('chauffage', 'thermique_mixte')
+        AND regulation_emission_types IS NOT NULL
+    `).all();
+    let bumped = 0;
+    const upd = db.prepare('UPDATE equipment_templates SET regulation_emission_types = ? WHERE id = ?');
+    for (const t of heatingTpls) {
+      let list;
+      try { list = JSON.parse(t.regulation_emission_types); } catch { continue; }
+      if (!Array.isArray(list)) continue;
+      const hasThermostatAmbiant = list.some(e => e?.value === 'thermostat_ambiant');
+      const hasSondeDeportee     = list.some(e => e?.value === 'thermostat_sonde_deportee');
+      if (!hasThermostatAmbiant || hasSondeDeportee) continue;
+      const idx = list.findIndex(e => e?.value === 'thermostat_ambiant');
+      list.splice(idx + 1, 0, { value: 'thermostat_sonde_deportee', label: 'Thermostat avec sonde déportée' });
+      upd.run(JSON.stringify(list), t.id);
+      bumped++;
+    }
+    log.info(`Migration 186 appliquee : ajout « Thermostat avec sonde déportée » à ${bumped} modèles chauffage (idempotent)`);
+    db.pragma('user_version = 186');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -7117,20 +7222,21 @@ const equipmentTemplates = {
   getBySlug(slug) {
     return db.prepare('SELECT * FROM equipment_templates WHERE slug = ?').get(slug);
   },
-  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, createdBy }) {
+  create({ slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, createdBy }) {
     const result = db.prepare(`
       INSERT INTO equipment_templates
-        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, bacs_contraindications, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (slug, name, category, bacs_articles, bacs_justification, description_html, icon_kind, icon_value, icon_color, preferred_protocols, default_energy_source, default_device_role, bacs_contraindications, regulation_production_types, regulation_distribution_types, regulation_emission_types, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(slug, name, category || null, bacsArticles || null, bacsJustification || null,
             descriptionHtml || null,
             iconKind || null, iconValue || null, iconColor || null, preferredProtocols || null,
             defaultEnergySource || null, defaultDeviceRole || null,
             bacsContraindications || null,
+            regulationProductionTypes || null, regulationDistributionTypes || null, regulationEmissionTypes || null,
             createdBy || null, createdBy || null);
     return this.getById(result.lastInsertRowid);
   },
-  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, updatedBy }) {
+  update(id, { slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, defaultEnergySource, defaultDeviceRole, bacsContraindications, regulationProductionTypes, regulationDistributionTypes, regulationEmissionTypes, updatedBy }) {
     // Auto-clear de la validation si description_html change effectivement
     // (mig 89). Le contenu repasse en brouillon — l'utilisateur devra re-valider.
     let clearValidation = false;
@@ -7151,6 +7257,14 @@ const equipmentTemplates = {
     // sérialisé '[]' côté route → ici on accepte aussi le sentinel).
     const contraSql = bacsContraindications === '__clear__' ? 'NULL' : 'COALESCE(?, bacs_contraindications)';
     const contraArg = bacsContraindications === '__clear__' ? [] : [bacsContraindications ?? null];
+    // Listes de régulation (mig 184) : sentinel '__clear__' = unset (NULL =
+    // utiliser les défauts par catégorie). Absent (undefined) = inchangé.
+    const prodRegSql = regulationProductionTypes === '__clear__' ? 'NULL' : 'COALESCE(?, regulation_production_types)';
+    const distRegSql = regulationDistributionTypes === '__clear__' ? 'NULL' : 'COALESCE(?, regulation_distribution_types)';
+    const emitRegSql = regulationEmissionTypes === '__clear__' ? 'NULL' : 'COALESCE(?, regulation_emission_types)';
+    const prodRegArg = regulationProductionTypes === '__clear__' ? [] : [regulationProductionTypes ?? null];
+    const distRegArg = regulationDistributionTypes === '__clear__' ? [] : [regulationDistributionTypes ?? null];
+    const emitRegArg = regulationEmissionTypes === '__clear__' ? [] : [regulationEmissionTypes ?? null];
 
     db.prepare(`
       UPDATE equipment_templates
@@ -7167,11 +7281,14 @@ const equipmentTemplates = {
           default_energy_source = ${energySql},
           default_device_role = ${roleSql},
           bacs_contraindications = ${contraSql},
+          regulation_production_types = ${prodRegSql},
+          regulation_distribution_types = ${distRegSql},
+          regulation_emission_types = ${emitRegSql},
           updated_by = ?,
           updated_at = CURRENT_TIMESTAMP
           ${clearValidation ? ', content_validated_at = NULL, content_validated_by = NULL' : ''}
       WHERE id = ?
-    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, ...contraArg, updatedBy || null, id);
+    `).run(slug, name, category, bacsArticles, bacsJustification, descriptionHtml, iconKind, iconValue, iconColor, preferredProtocols, ...energyArg, ...roleArg, ...contraArg, ...prodRegArg, ...distRegArg, ...emitRegArg, updatedBy || null, id);
     return this.getById(id);
   },
   delete(id) {

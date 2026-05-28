@@ -49,33 +49,200 @@ export const ROLE_OPTIONS = [
   { value: 'autre',        label: 'Autre',        icon: 'fa-circle-question',   color: '#6b7280' },
 ]
 
-// ── Types de régulation par niveau R175-6 ─────────────────────────────
-// Listes de suggestions (creatable côté UI : l'auditeur peut ajouter une
-// valeur libre si la sienne n'est pas listée). Stockées en TEXT libre côté
-// DB (`regulation_type_production / _distribution / _emission`), pas
-// d'enum strict pour rester flexible.
-export const REGULATION_TYPES_PRODUCTION = [
-  { value: 'loi_d_eau',          label: 'Loi d\'eau' },
-  { value: 'pression_constante', label: 'Pression constante' },
-  { value: 'cascade',            label: 'Cascade' },
-  { value: 'modulation',         label: 'Modulation puissance' },
-  { value: 'tout_ou_rien',       label: 'Tout ou rien' },
-  { value: 'autre',              label: 'Autre' },
-]
-export const REGULATION_TYPES_DISTRIBUTION = [
-  { value: 'vanne_3_voies',  label: 'Vanne 3 voies' },
-  { value: 'vanne_2_voies',  label: 'Vanne 2 voies' },
-  { value: 'debit_variable', label: 'Débit variable' },
-  { value: 'equilibrage',    label: 'Équilibrage hydraulique' },
-  { value: 'autre',          label: 'Autre' },
-]
-export const REGULATION_TYPES_EMISSION = [
-  { value: 'thermostat_ambiant',    label: 'Thermostat ambiant' },
-  { value: 'vanne_thermostatique',  label: 'Vanne thermostatique' },
-  { value: 'sonde_zone',            label: 'Sonde de zone' },
-  { value: 'sonde_retour',          label: 'Sonde de retour' },
-  { value: 'autre',                 label: 'Autre' },
-]
+// ── Types de régulation par niveau (mig 184) ──────────────────────────
+// Listes de suggestions par CATÉGORIE D'USAGE (heating / cooling /
+// ventilation / dhw / lighting_indoor / lighting_outdoor / electricity_production).
+// Creatables côté UI : l'auditeur peut ajouter une valeur libre si la sienne
+// n'est pas listée. Stockées en TEXT libre côté DB
+// (`regulation_type_production / _distribution / _emission`).
+//
+// Les listes EFFECTIVES affichées dans la modale d'édition d'équipement
+// viennent en priorité du modèle d'équipement (`equipment_templates.
+// regulation_*_types`, éditable dans la bibliothèque). Les défauts ci-dessous
+// sont le filet de secours quand le device n'est pas rattaché à un modèle
+// (équipement saisi à la main) ou que le modèle n'a pas de liste.
+const REGULATION_DEFAULTS_BY_CATEGORY = {
+  heating: {
+    production: [
+      { value: 'loi_d_eau',          label: "Loi d'eau" },
+      { value: 'pression_constante', label: 'Pression constante' },
+      { value: 'cascade',            label: 'Cascade' },
+      { value: 'modulation',         label: 'Modulation de puissance' },
+      { value: 'tout_ou_rien',       label: 'Tout ou rien' },
+    ],
+    distribution: [
+      { value: 'vanne_3_voies',  label: 'Vanne 3 voies' },
+      { value: 'vanne_2_voies',  label: 'Vanne 2 voies' },
+      { value: 'debit_variable', label: 'Débit variable' },
+      { value: 'equilibrage',    label: 'Équilibrage hydraulique' },
+    ],
+    emission: [
+      { value: 'thermostat_ambiant',         label: 'Thermostat ambiant' },
+      { value: 'thermostat_sonde_deportee',  label: 'Thermostat avec sonde déportée' },
+      { value: 'vanne_thermostatique',       label: 'Vanne thermostatique' },
+      { value: 'sonde_zone',                 label: 'Sonde de zone' },
+      { value: 'sonde_retour',               label: 'Sonde de retour' },
+    ],
+  },
+  cooling: {
+    production: [
+      { value: 'loi_d_eau',          label: "Loi d'eau froid" },
+      { value: 'pression_constante', label: 'Pression constante' },
+      { value: 'cascade',            label: 'Cascade groupes froid' },
+      { value: 'modulation',         label: 'Modulation de puissance' },
+      { value: 'tout_ou_rien',       label: 'Tout ou rien' },
+      { value: 'free_cooling',       label: 'Free-cooling' },
+    ],
+    distribution: [
+      { value: 'vanne_3_voies',  label: 'Vanne 3 voies' },
+      { value: 'vanne_2_voies',  label: 'Vanne 2 voies' },
+      { value: 'debit_variable', label: 'Débit variable' },
+    ],
+    emission: [
+      { value: 'thermostat_ambiant', label: 'Thermostat ambiant' },
+      { value: 'sonde_zone',         label: 'Sonde de zone' },
+      { value: 'sonde_retour',       label: 'Sonde de retour' },
+    ],
+  },
+  ventilation: {
+    production: [
+      { value: 'debit_constant',  label: 'Débit constant (CAV)' },
+      { value: 'debit_variable',  label: 'Débit variable (VAV)' },
+      { value: 'tout_ou_rien',    label: 'Tout ou rien' },
+      { value: 'modulation_freq', label: 'Variation de fréquence' },
+    ],
+    distribution: [
+      { value: 'registre_motorise', label: 'Registre motorisé' },
+      { value: 'caisson_vav',       label: 'Caisson VAV' },
+      { value: 'pressostat',        label: 'Pressostat' },
+    ],
+    emission: [
+      { value: 'sonde_co2',      label: 'Sonde CO₂' },
+      { value: 'sonde_humidite', label: 'Sonde humidité' },
+      { value: 'sonde_presence', label: 'Détection de présence' },
+      { value: 'horloge',        label: 'Horloge / programmation' },
+      { value: 'debit_constant', label: 'Débit constant' },
+    ],
+  },
+  dhw: {
+    production: [
+      { value: 'thermostat_ballon', label: 'Thermostat ballon' },
+      { value: 'sonde_ballon',      label: 'Sonde ballon' },
+      { value: 'modulation',        label: 'Modulation de puissance' },
+      { value: 'cascade',           label: 'Cascade' },
+    ],
+    distribution: [
+      { value: 'bouclage_regule',  label: 'Bouclage régulé' },
+      { value: 'horloge_bouclage', label: 'Horloge sur bouclage' },
+      { value: 'sonde_retour',     label: 'Sonde de retour bouclage' },
+    ],
+    emission: [
+      { value: 'mitigeur_thermostatique', label: 'Mitigeur thermostatique' },
+      { value: 'horloge_puisage',         label: 'Horloge de puisage' },
+    ],
+  },
+  lighting_indoor: {
+    production: [
+      { value: 'controleur_dali', label: 'Contrôleur DALI' },
+      { value: 'controleur_knx',  label: 'Contrôleur KNX' },
+      { value: 'controleur_dmx',  label: 'Contrôleur DMX' },
+    ],
+    distribution: [
+      { value: 'gradateur',     label: 'Gradateur de circuit' },
+      { value: 'relais_pilote', label: 'Relais piloté' },
+      { value: 'bus_dali',      label: 'Bus DALI' },
+    ],
+    emission: [
+      { value: 'detection_presence',  label: 'Détection de présence' },
+      { value: 'presence_luminosite', label: 'Présence + luminosité' },
+      { value: 'lumiere_constante',   label: 'Régulation à lumière constante' },
+      { value: 'horloge',             label: 'Horloge / programmation' },
+      { value: 'scenario',            label: 'Scénarios' },
+      { value: 'manuel',              label: 'Commande manuelle' },
+    ],
+  },
+  lighting_outdoor: {
+    production: [
+      { value: 'controleur_dali', label: 'Contrôleur DALI' },
+      { value: 'controleur_knx',  label: 'Contrôleur KNX' },
+    ],
+    distribution: [
+      { value: 'gradateur',     label: 'Gradateur' },
+      { value: 'relais_pilote', label: 'Relais piloté' },
+    ],
+    emission: [
+      { value: 'crepusculaire',        label: 'Cellule crépusculaire' },
+      { value: 'horloge_astronomique', label: 'Horloge astronomique' },
+      { value: 'horloge',              label: 'Horloge / programmation' },
+      { value: 'detection_presence',   label: 'Détection de présence' },
+      { value: 'abaissement_nuit',     label: 'Abaissement de nuit' },
+      { value: 'manuel',               label: 'Commande manuelle' },
+    ],
+  },
+  electricity_production: {
+    production: [
+      { value: 'mppt',                label: 'MPPT (suivi de puissance)' },
+      { value: 'onduleur_centralise', label: 'Onduleur centralisé' },
+      { value: 'micro_onduleur',      label: 'Micro-onduleur' },
+      { value: 'autoconsommation',    label: 'Régulation autoconsommation' },
+    ],
+    distribution: [
+      { value: 'limiteur_injection', label: "Limiteur d'injection" },
+      { value: 'deconnexion_reseau', label: 'Découplage réseau' },
+    ],
+    emission: [],
+  },
+}
+
+// Mig 184 — équivalent FE de `regulation-defaults.js::LIBRARY_TO_BACS`.
+// Mapping catégorie bibliothèque FR → catégorie BACS audit EN. Permet à
+// l'éditeur de modèle (EquipmentTemplateEditor) de calculer les défauts à
+// afficher pour la catégorie du modèle en cours d'édition.
+export const LIBRARY_CATEGORY_TO_BACS = {
+  chauffage:       'heating',
+  climatisation:   'cooling',
+  thermique_mixte: 'heating',
+  ventilation:     'ventilation',
+  ecs:             'dhw',
+  pv:              'electricity_production',
+  electricite:     'electricity_production',
+  eclairage_int:   'lighting_indoor',
+  eclairage_ext:   'lighting_outdoor',
+  eclairage:       'lighting_indoor',
+}
+
+export function bacsCategoryForLibraryCategory(libraryCategory) {
+  return LIBRARY_CATEGORY_TO_BACS[libraryCategory] || null
+}
+
+// Renvoie uniquement les défauts (sans entrée 'autre'), pour pré-remplir
+// l'éditeur de listes du modèle. Pour l'audit, utilise plutôt
+// `regulationTypesForCategory` qui ajoute 'autre' à la fin.
+export function regulationDefaultsForCategory(level, systemCategory) {
+  const cat = REGULATION_DEFAULTS_BY_CATEGORY[systemCategory]
+  return (cat?.[level] || []).map(o => ({ ...o }))
+}
+
+/**
+ * Renvoie la liste de suggestions pour un niveau (production / distribution /
+ * emission) et une catégorie d'usage donnés. Priorité :
+ *   1. surcharge fournie (typiquement `equipment_template.regulation_*_types`)
+ *   2. défaut de catégorie ci-dessus
+ *   3. liste minimale `[{ value: 'autre', label: 'Autre' }]`
+ */
+export function regulationTypesForCategory(level, systemCategory, override = null) {
+  if (Array.isArray(override) && override.length) return [...override, { value: 'autre', label: 'Autre' }]
+  const cat = REGULATION_DEFAULTS_BY_CATEGORY[systemCategory]
+  const list = cat?.[level]
+  if (list && list.length) return [...list, { value: 'autre', label: 'Autre' }]
+  return [{ value: 'autre', label: 'Autre' }]
+}
+
+// Compat : conservent l'API legacy pour les composants qui n'ont pas encore
+// été migrés (et pour les tests). Mappent sur le chauffage (cas historique).
+export const REGULATION_TYPES_PRODUCTION   = regulationTypesForCategory('production',   'heating')
+export const REGULATION_TYPES_DISTRIBUTION = regulationTypesForCategory('distribution', 'heating')
+export const REGULATION_TYPES_EMISSION     = regulationTypesForCategory('emission',     'heating')
 
 // Granularité de la régulation R175-6 (per_room / per_zone / central_only),
 // DÉRIVÉE du type de régulation d'émission du device émetteur :
@@ -134,10 +301,19 @@ export function deviceMissingFields(device, systemCategory) {
   try { protocols = JSON.parse(device.communication_protocols || '[]') } catch { protocols = [] }
   const hasProtocol = (Array.isArray(protocols) && protocols.length > 0)
     || (!!device.communication_protocol && device.communication_protocol !== 'non_communicant')
-  // « Non communicant » est une réponse explicite à la question : si l'auditeur
-  // a coché Non sur le toggle communicant, on n'attend plus de protocole.
-  const explicitNonCommunicant = device.communication_protocol === 'non_communicant'
-  if (!hasProtocol && !explicitNonCommunicant) out.push('le(s) protocole(s) de communication')
+  // Mig 185 — `is_communicating` ternaire pilote la complétude :
+  //   null   → on attend une réponse Oui/Non
+  //   false  → ok, pas de protocole attendu
+  //   true   → un protocole devient obligatoire
+  // Fallback legacy : `non_communicant` posé sur l'ancienne colonne enum.
+  const commAnswered = (device.is_communicating === true || device.is_communicating === 1)
+                    || (device.is_communicating === false || device.is_communicating === 0)
+                    || device.communication_protocol === 'non_communicant'
+                    || hasProtocol
+  if (!commAnswered) out.push("la communication de l'équipement (oui/non)")
+  const isCommunicatingYes = (device.is_communicating === true || device.is_communicating === 1)
+                          || (hasProtocol && device.communication_protocol !== 'non_communicant')
+  if (isCommunicatingYes && !hasProtocol) out.push('le(s) protocole(s) de communication')
   if (isThermalCategory(systemCategory)) {
     const roles = Array.isArray(device.device_role)
       ? device.device_role
