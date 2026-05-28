@@ -543,6 +543,7 @@ onBeforeUnmount(teardownSortable)
                         :model-value="granularityForRow(t).key"
                         @update:modelValue="(v) => patchGranularity(t, v)"
                         :options="GRANULARITY_OPTIONS"
+                        :invalid="!deviceForLevel(t, 'emission')?.regulation_granularity"
                         :clearable="true" :creatable="true" :auto-width="true"
                         size="sm" placeholder="Granularité…" />
                     </div>

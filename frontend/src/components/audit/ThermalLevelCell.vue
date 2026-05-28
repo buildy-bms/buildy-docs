@@ -139,6 +139,7 @@ function setRegulationType(v) {
         <SearchableSelect
           :model-value="regulationTypeValue"
           :options="regulationTypeOptions"
+          :invalid="!regulationTypeValue"
           :clearable="true" :creatable="true" :auto-width="true"
           size="sm" placeholder="Type de régulation…"
           @update:modelValue="setRegulationType" />
