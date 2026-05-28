@@ -54,6 +54,13 @@ const props = defineProps({
   // au lieu d'occuper 100% du parent. Utilisé dans la card 06 pour que la
   // largeur des listes reflète la richesse du nom de l'équipement choisi.
   autoWidth: { type: Boolean, default: false },
+  // Mig 187 v13 — Mode multi : nombre max de chips à afficher avant de
+  // tronquer en « + N équipements ». 0 = pas de troncature (défaut). Utilisé
+  // dans la card 06 (`chipLimit: 1`) pour garder une ligne compacte même
+  // quand un device principal + un régulateur déporté sont sélectionnés.
+  chipLimit: { type: Number, default: 0 },
+  chipLabel: { type: String, default: 'élément' },
+  chipLabelPlural: { type: String, default: 'éléments' },
 })
 
 const triggerCls = computed(() => [
@@ -128,6 +135,19 @@ const selectedOptions = computed(() => {
     const opt = props.options.find(o => o.value === v)
     return opt || { value: v, label: String(v) }
   })
+})
+// Mig 187 v13 — Découpe selectedOptions en chips visibles + compteur de
+// chips cachées. Activé via `chipLimit > 0` (sinon tout affiché).
+const visibleChips = computed(() => {
+  if (!props.chipLimit || selectedOptions.value.length <= props.chipLimit) {
+    return selectedOptions.value
+  }
+  return selectedOptions.value.slice(0, props.chipLimit)
+})
+const hiddenChipsCount = computed(() => Math.max(0, selectedOptions.value.length - visibleChips.value.length))
+const hiddenChipsLabels = computed(() => {
+  if (!hiddenChipsCount.value) return ''
+  return selectedOptions.value.slice(visibleChips.value.length).map(o => o.label).join(', ')
 })
 // En mode creatable, une valeur courante non listée doit quand même
 // s'afficher dans le trigger (sinon elle paraît "perdue").
@@ -279,7 +299,11 @@ function clear() {
         <span v-if="!selectedOptions.length"
               class="flex-1 text-left truncate text-gray-400 italic">{{ placeholder }}</span>
         <span v-else class="flex-1 flex flex-nowrap items-center gap-1">
-          <span v-for="o in selectedOptions" :key="o.value"
+          <!-- Mig 187 v13 — Si `chipLimit > 0` et que la sélection dépasse,
+               on affiche les N premières chips suivies d'un badge compact
+               « + M équipements » au lieu de toutes les chips wrap qui
+               cassaient la ligne (multiselect 1ʳᵉ ligne dans card 06). -->
+          <span v-for="o in visibleChips" :key="o.value"
                 class="inline-flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px]">
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
@@ -290,6 +314,11 @@ function clear() {
                     v-tooltip="'Retirer'">
               <XMarkIcon class="w-2.5 h-2.5" />
             </button>
+          </span>
+          <span v-if="hiddenChipsCount > 0"
+                class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[11px] whitespace-nowrap shrink-0"
+                v-tooltip="hiddenChipsLabels">
+            + {{ hiddenChipsCount }}
           </span>
         </span>
       </template>

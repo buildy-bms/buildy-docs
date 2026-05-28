@@ -116,9 +116,11 @@ const hasNote = computed(() => {
 </script>
 
 <template>
-  <!-- Mig 187 v9 — ligne unique compacte SANS wrap :
-       [Multiselect (device + régulateur déporté)] [chip type] [chip Intégrée] [notes]
-       Tout reste sur 1 seule ligne quoi qu'il arrive. -->
+  <!-- Mig 187 v13 — ligne unique compacte SANS wrap :
+       [Multiselect (device + régulateur déporté)] [● bleu si intégrée] [Liste type régul] [notes]
+       Chip « Intégrée » supprimée, remplacée par une PETITE ICÔNE bleue
+       en préfixe du select type de régulation. Multiselect device tronqué
+       à 1 chip + « + N équipements » via chipLimit. -->
   <div class="flex items-center gap-2 flex-nowrap">
     <SearchableSelect
       :model-value="selectedDevices"
@@ -126,35 +128,32 @@ const hasNote = computed(() => {
       :multiple="true"
       :invalid="!deviceId"
       :auto-width="true"
+      :chip-limit="1"
+      chip-label="équipement"
+      chip-label-plural="équipements"
       size="sm"
       placeholder="Ajouter un équipement…"
       search-placeholder="Rechercher…"
       @update:modelValue="setLevelDevices" />
-    <!-- Mig 187 v10 — type de régulation édité par SearchableSelect (vs
-         ancien chip vert read-only). Modifie `device.regulation_type_${level}`
-         directement, sans passer par la modale équipement. -->
-    <SearchableSelect
-      v-if="device"
-      :model-value="regulationTypeValue"
-      :options="regulationTypeOptions"
-      :clearable="true" :creatable="true" :auto-width="true"
-      size="sm" placeholder="Type de régulation…"
-      @update:modelValue="setRegulationType" />
-    <span v-if="deviceId && integrated"
-          class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap shrink-0"
-          v-tooltip="`L'équipement embarque sa propre régulation — pas de régulateur séparé à ajouter.`">
-      Intégrée
-    </span>
+    <!-- Type de régulation — icône bleue préfixe si la régulation est
+         intégrée à l'équipement (info compacte, plus de chip Intégrée). -->
+    <div v-if="device" class="flex items-center gap-1 shrink-0">
+      <span v-if="integrated"
+            class="inline-block w-2 h-2 rounded-full bg-sky-500 shrink-0"
+            v-tooltip="`L'équipement embarque sa propre régulation (intégrée).`"></span>
+      <SearchableSelect
+        :model-value="regulationTypeValue"
+        :options="regulationTypeOptions"
+        :clearable="true" :creatable="true" :auto-width="true"
+        size="sm" placeholder="Type de régulation…"
+        @update:modelValue="setRegulationType" />
+    </div>
     <button v-if="deviceId" type="button"
             @click="emit('open-notes')"
             :class="['btn-icon shrink-0', hasNote && 'is-active']"
             v-tooltip="hasNote ? 'Note de ce niveau' : 'Ajouter une note pour ce niveau'">
       <PencilSquareIcon class="w-4 h-4" />
     </button>
-    <!-- Slot inline pour ajouter du contenu sur la MÊME ligne après les
-         chips/bouton notes. Utilisé pour la granularité dans la cellule
-         Émission (sémantique R175-6 : la granularité est PARTIE de
-         l'émission, pas un champ séparé). -->
     <slot name="after" />
   </div>
 </template>
