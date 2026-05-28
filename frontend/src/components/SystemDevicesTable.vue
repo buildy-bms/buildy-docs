@@ -138,11 +138,12 @@ const minRolePriorityInSystem = computed(() => {
   }
   return min
 })
-// Indentation arborescente cellule « Nom » : 12px par cran relatif à l'amont
-// présent dans le système (Production → Distribution → Émission).
+// Indentation arborescente cellule « Nom » : 8px par cran relatif à l'amont
+// présent dans le système (Production → Distribution → Émission). Reste
+// discret pour ne pas grignoter de la largeur sur les noms longs.
 function nameIndent(d) {
   const rel = rolePriority(d) - minRolePriorityInSystem.value
-  return Math.max(0, rel) * 12
+  return Math.max(0, rel) * 8
 }
 // Connecteur « └─ » uniquement si un rôle plus amont existe dans le système.
 function showConnector(d) {
@@ -352,7 +353,7 @@ async function removeDevice(d) {
                 <input type="text" :value="d.name" placeholder="Nommer ce système"
                        @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
                        :class="inputCls"
-                       class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+                       class="font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic name-input" />
                 <!-- Badge Secours collé au champ Nom (sibling, pas absolute) :
                      suit la fin de l'input, ne s'aligne pas au bord droit
                      de la cellule. -->
@@ -518,5 +519,13 @@ async function removeDevice(d) {
    trop génériques. */
 .data-table tbody td > div.flex {
   justify-content: center;
+}
+/* Champ Nom — auto-grow au contenu (field-sizing, Chrome 123+ / Safari 18+).
+   Pas de troncature sur les noms longs (« Centrale de traitement d'air ») ;
+   reste >= 10rem pour les noms courts et le placeholder. */
+.name-input {
+  field-sizing: content;
+  min-width: 10rem;
+  max-width: 100%;
 }
 </style>

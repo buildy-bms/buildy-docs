@@ -2,14 +2,14 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.121",
+      "version": "0.1.122",
       "date": "2026-05-28",
       "title": "Card 04 — arborescence Production → Distribution → Émission + badge Secours collé au nom",
       "highlights": [
         {
           "kind": "feat",
           "title": "Indentation relative + connecteur « └─ » uniquement quand un amont existe",
-          "what": "Dans chaque système, les équipements sont triés par défaut Production → Distribution → Émission → Régulation seule, puis alphabétique. L'indentation (12px par cran) est calculée RELATIVEMENT au rôle le plus amont présent dans le système : un système éclairage qui n'a que des émetteurs n'est plus indenté dans le vide. Le connecteur « └─ » coloré (indigo Distribution, rose Émission, violet Régulation) n'apparaît que s'il y a un amont auquel se rattacher. Cliquer un en-tête de colonne surcharge le tri.",
+          "what": "Dans chaque système, les équipements sont triés par défaut Production → Distribution → Émission → Régulation seule, puis alphabétique. L'indentation (8px par cran) est calculée RELATIVEMENT au rôle le plus amont présent dans le système : un système éclairage qui n'a que des émetteurs n'est plus indenté dans le vide. Le connecteur « └─ » coloré (indigo Distribution, rose Émission, violet Régulation) n'apparaît que s'il y a un amont auquel se rattacher. Le champ Nom auto-grow au contenu (CSS `field-sizing: content`) : plus de troncature sur les noms longs comme « Centrale de traitement d'air (CTA) ». Cliquer un en-tête de colonne surcharge le tri.",
           "where": "Audit BACS card 04 « Systèmes techniques par zone » → sous-table des équipements de chaque système.",
           "how": "Sur un système avec chaudière + circuit + radiateur : la chaudière reste collée à gauche, le circuit apparaît indenté de 12px avec un └─ indigo, le radiateur indenté de 24px avec un └─ rose. Sur un système éclairage seul : pas d'indent, pas de └─."
         },
