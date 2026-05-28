@@ -632,16 +632,10 @@ const STEP_DEFINITIONS = [
       return r
     } },
   { key: 'zones',
-    label: 'Zones fonctionnelles',
-    description: 'Au moins une zone fonctionnelle saisie.',
+    label: 'Zones',
+    description: 'Au moins une zone fonctionnelle saisie. Les locaux techniques (hors décret BACS) sont inventoriés dans la même carte mais ne sont pas exigés pour la validation.',
     incomplete: () => (zones.value.some(z => (z.kind || 'functional') !== 'technical')
       ? [] : ["aucune zone fonctionnelle n'a été saisie"]) },
-  { key: 'technical-zones',
-    label: 'Zones techniques',
-    description: 'Inventaire des locaux techniques hors decret BACS (optionnel).',
-    descriptionSite: 'Inventaire des locaux techniques du site (optionnel).',
-    // Étape optionnelle : jamais bloquante pour la complétion de l'audit.
-    incomplete: () => [] },
   { key: 'systems',
     label: 'Systèmes',
     description: 'Chaque équipement des systèmes présents doit être complètement renseigné.',
@@ -828,7 +822,6 @@ async function invalidateStep(stepKey) {
 const STEP_TO_SECTION_ID = {
   identification: 'section-identification',
   zones: 'section-zones',
-  'technical-zones': 'section-technical-zones',
   systems: 'section-systems',
   meters: 'section-meters',
   thermal: 'section-thermal',
@@ -1544,24 +1537,15 @@ onBeforeUnmount(() => {
         @open-notes="openNotesModal"
       />
 
-      <!-- 2. Zones fonctionnelles (R175-1 6°) -->
+      <!-- 2. Zones (R175-1 6° + locaux techniques) — section unifiée :
+           map satellite + un seul tableau avec colonne « Type » qui permet
+           de basculer chaque ligne entre fonctionnelle et technique.
+           Le PDF garde un rendu séparé (zonesFunctional / zonesTechnical). -->
       <ZonesSection
-        kind="functional"
+        unified
         :active="activeStepKey === 'zones'"
         :zone-natures="ZONE_NATURES"
         :step="stepFor('zones')"
-        @open-notes="openNotesModal"
-        @validate-step="validateStep"
-        @invalidate-step="invalidateStep"
-        @add-zone="onAddZoneRequest"
-      />
-
-      <!-- 3. Zones techniques (hors décret BACS) -->
-      <ZonesSection
-        kind="technical"
-        :active="activeStepKey === 'technical-zones'"
-        :zone-natures="ZONE_NATURES"
-        :step="stepFor('technical-zones')"
         @open-notes="openNotesModal"
         @validate-step="validateStep"
         @invalidate-step="invalidateStep"

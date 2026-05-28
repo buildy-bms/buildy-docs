@@ -38,8 +38,8 @@
           <td class="agt-num"><span class="agt-bacs-num">{{display_number}}</span></td>
           {{#each ../columns}}
             {{#if (eq this "zone")}}<td>{{../zone_name}}</td>{{/if}}
-            {{#if (eq this "usage")}}<td>{{../meter_usage_label}}</td>{{/if}}
-            {{#if (eq this "meter_type")}}<td>{{../meter_type_label}}</td>{{/if}}
+            {{#if (eq this "usage")}}<td>{{#if ../meter_usage}}{{{meterUsagePill ../meter_usage}}}{{else}}{{../meter_usage_label}}{{/if}}</td>{{/if}}
+            {{#if (eq this "meter_type")}}<td>{{#if ../meter_type}}{{{meterTypePill ../meter_type}}}{{else}}{{../meter_type_label}}{{/if}}</td>{{/if}}
             {{#if (eq this "system")}}<td>{{../system_label}}</td>{{/if}}
             {{#if (eq this "device")}}<td><strong>{{../device_name}}</strong>{{#if ../device_brand}} <span class="muted">· {{../device_brand}}</span>{{/if}}</td>{{/if}}
           {{/each}}

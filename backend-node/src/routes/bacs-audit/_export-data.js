@@ -12,7 +12,8 @@ const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const { parseRoles } = require('../../lib/device-roles');
 const { isTrue, isFalse } = require('./_ternary');
 const { buildMeterCoverage } = require('./_meter-coverage');
-const { buildSiteStaticMap } = require('../../lib/static-map');
+const { buildSiteStaticMap, buildZonesStaticMap } = require('../../lib/static-map');
+const { regulationTypeLabel } = require('../../lib/regulation-defaults');
 const bacsArticlesData = require('../../seeds/bacs-articles');
 // Fallback statique si la table pdf_boilerplate est vide (cas pre-migration 65).
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
@@ -99,6 +100,48 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ORDER BY z.position NULLS LAST, m.usage
   `).all(documentId);
   const bms = db.db.prepare('SELECT * FROM bacs_audit_bms WHERE document_id = ?').get(documentId) || null;
+  // Composants matériels de la GTB (serveurs, contrôleurs, passerelles…) saisis
+  // par l'auditeur. Affichés dans le chapitre GTB du PDF si présents.
+  const bmsComponents = db.db.prepare(`
+    SELECT id, position, component_type, brand, model, location, ip_address,
+           protocols, firmware_version, notes, notes_html
+    FROM bacs_audit_bms_components WHERE document_id = ?
+    ORDER BY position, id
+  `).all(documentId);
+  // Décodage des protocoles JSON array → libellés FR.
+  for (const c of bmsComponents) {
+    let list = [];
+    if (c.protocols) {
+      try {
+        const arr = JSON.parse(c.protocols);
+        if (Array.isArray(arr)) list = arr.map(p => COMM_LABEL[p] || p).filter(Boolean);
+      } catch { /* legacy */ }
+    }
+    c.protocolsLabel = list.join(' / ');
+  }
+  // Inspections R175-5-1 — saisies par l'auditeur, jusqu'ici jamais
+  // rendues dans le PDF. Lecture conjointe du flag « non applicable »
+  // saisi sur le document (mig 187) : permet de distinguer 3 cas dans le
+  // PDF — (1) inspection saisie, (2) non applicable + justification,
+  // (3) chapitre non rendu si rien n'est renseigné.
+  const inspections = db.db.prepare(`
+    SELECT last_inspection_date, last_inspection_inspector, last_inspection_report_filename,
+           last_inspection_anomalies_html, last_inspection_recommendations_html,
+           next_inspection_due_date, retained_until_date, notes
+    FROM bacs_audit_inspections WHERE document_id = ? LIMIT 1
+  `).get(documentId) || null;
+  // Décodage des protocoles fournis (JSON array TEXT) → libellés FR pour le PDF.
+  if (bms && bms.provided_protocols) {
+    try {
+      const arr = JSON.parse(bms.provided_protocols);
+      if (Array.isArray(arr)) {
+        bms.providedProtocolsLabels = arr.map(p => COMM_LABEL[p] || p).filter(Boolean);
+      }
+    } catch { /* legacy non-JSON ou null */ }
+  }
+  if (!bms?.providedProtocolsLabels) {
+    if (bms) bms.providedProtocolsLabels = [];
+  }
   // Mig 180 : 1 ligne par système. On joint sur bacs_audit_systems pour
   // récupérer le nom du système (custom_label) directement, et on filtre
   // les lignes sans system_id (pré-migration / orphelines).
@@ -121,11 +164,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     WHERE a.document_id = ? AND a.status NOT IN ('done', 'declined')
     ORDER BY a.position, a.id
   `).all(documentId);
+  // Labels FR pour l'effort estimé saisi par l'auditeur sur chaque action.
+  const EFFORT_LABEL = { low: 'Faible', medium: 'Moyen', high: 'Élevé' };
+  for (const a of actionItemsRaw) {
+    a.effortLabel = a.estimated_effort ? (EFFORT_LABEL[a.estimated_effort] || a.estimated_effort) : null;
+  }
 
   // Notes par sujet de la carte GTB (mig 108 + 109).
   // Map { topic_key -> note_html } pour lookup direct dans le template
   // PDF sous chaque sous-section du chapitre 6 GTB.
   const bmsTopicNotes = db.bacsAuditGtbObservations.notesByTopic(documentId);
+  const bmsTopicOpportunities = db.bacsAuditGtbObservations.opportunitiesByTopic(documentId);
 
   // Charge tous les devices du document (joints au systeme parent +
   // au modèle bibliothèque pour récupérer le slug — nécessaire au calcul
@@ -341,14 +390,32 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // l'énergie du site, pas un usage particulier) — on remplace par '—'
   // côté PDF/affichage. Le champ `location_zone_name` (mig 176) vient
   // du JOIN dans la route GET /bacs-audit/:id/meters.
-  const enrichedMeters = meters.map(m => ({
-    ...m,
-    typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
-    usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
-    zoneLabel: m.zone_name || 'Compteur général',
-    locationLabel: m.location_zone_name || null,
-    isGeneral: !m.zone_id,
-  }));
+  const enrichedMeters = meters.map(m => {
+    // Décodage des protocoles communiquant (JSON array TEXT) → libellés FR.
+    let protocolsList = [];
+    if (m.communication_protocols) {
+      try {
+        const arr = JSON.parse(m.communication_protocols);
+        if (Array.isArray(arr)) {
+          protocolsList = arr.map(p => COMM_LABEL[p] || p).filter(Boolean);
+        }
+      } catch { /* legacy */ }
+    }
+    // Fallback sur communication_protocol simple si pas d'array.
+    if (!protocolsList.length && m.communication_protocol) {
+      protocolsList = [COMM_LABEL[m.communication_protocol] || m.communication_protocol];
+    }
+    return {
+      ...m,
+      typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
+      usageLabel: m.zone_id ? (METER_USAGE_LABEL[m.usage] || m.usage) : '—',
+      zoneLabel: m.zone_name || 'Compteur général',
+      locationLabel: m.location_zone_name || null,
+      isGeneral: !m.zone_id,
+      protocolsList,
+      protocolsLabel: protocolsList.join(' / '),
+    };
+  });
   // Liste affichée dans le PDF chapitre 4 : on retire les compteurs ni
   // requis, ni présents, ni HS — ces lignes n'ont aucune valeur
   // informative pour l'intégrateur et bruitent le tableau. Les autres
@@ -480,7 +547,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     const generatorAgeYears = prodDevice?.age_years ?? null;
     // Granularité dérivée de l'émetteur (mig 180), fallback sur l'archive.
     const derivedKey = granularityFromEmissionType(emitDevice?.regulation_type_emission);
-    const granularityKey = derivedKey;
+    // Mig 187 : saisie explicite du champ regulation_granularity sur le device
+    // émetteur prioritaire sur la dérivation depuis le type d'émission.
+    const granularityKey = emitDevice?.regulation_granularity || derivedKey;
     const hasAutoReg = !!(emitDevice?.regulation_type_emission
       || distDevice?.regulation_type_distribution
       || prodDevice?.regulation_type_production
@@ -502,9 +571,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // Régulation déclarée à au moins un niveau (sur device) OU legacy ok.
     has_automatic_regulation: hasAutoReg,
     // Types de régulation par niveau, lisibles dans le PDF chapitre 5.
-    productionRegulationType: prodDevice?.regulation_type_production || null,
-    distributionRegulationType: distDevice?.regulation_type_distribution || null,
-    emissionRegulationType: emitDevice?.regulation_type_emission || null,
+    productionRegulationType: regulationTypeLabel(prodDevice?.regulation_type_production),
+    distributionRegulationType: regulationTypeLabel(distDevice?.regulation_type_distribution),
+    emissionRegulationType: regulationTypeLabel(emitDevice?.regulation_type_emission),
     // Exemption R175-6 II déduite de l'énergie de production.
     generator_exempt_wood: generatorEnergy === 'wood',
     // Compat ascendante : `generatorLabel` et `generator_age_years` exposés
@@ -527,7 +596,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
         // Mig 179/181 : type de régulation + identité régulateur du device
         // d'émission process (chaudière, PAC…). On lit `regulation_type_production`
         // et la marque/réf du régulateur portée par ce device.
-        regulation_type: prodDevice?.regulation_type_production || null,
+        regulation_type: regulationTypeLabel(prodDevice?.regulation_type_production),
         has_regulation: prodDevice?.has_regulation === 1 || prodDevice?.has_regulation === true,
         regulator_brand: prodDevice?.regulator_brand || null,
         regulator_model_reference: prodDevice?.regulator_model_reference || null,
@@ -539,7 +608,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
         device_name: deviceNameOrDash(t.distribution_device_id),
         regulation_device_name: deviceNameOrDash(t.distribution_regulation_device_id),
         notes_html: t.distribution_notes_html || '',
-        regulation_type: distDevice?.regulation_type_distribution || null,
+        regulation_type: regulationTypeLabel(distDevice?.regulation_type_distribution),
         has_regulation: distDevice?.has_regulation === 1 || distDevice?.has_regulation === true,
         regulator_brand: distDevice?.regulator_brand || null,
         regulator_model_reference: distDevice?.regulator_model_reference || null,
@@ -551,7 +620,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
         device_name: deviceNameOrDash(t.emission_device_id),
         regulation_device_name: deviceNameOrDash(t.emission_regulation_device_id),
         notes_html: t.emission_notes_html || '',
-        regulation_type: emitDevice?.regulation_type_emission || null,
+        regulation_type: regulationTypeLabel(emitDevice?.regulation_type_emission),
         has_regulation: emitDevice?.has_regulation === 1 || emitDevice?.has_regulation === true,
         regulator_brand: emitDevice?.regulator_brand || null,
         regulator_model_reference: emitDevice?.regulator_model_reference || null,
@@ -562,14 +631,36 @@ async function buildBacsAuditExportData(af, opts = {}) {
   });
 
   // Plan de mise en conformite groupe par severite
+  // metersById construit ici (avant l'usage dans la map ci-dessous) ; la
+  // construction d'origine plus bas est conservée mais redondante côté
+  // sémantique — laissée pour ne pas casser d'autres call sites.
+  const _metersByIdEarly = new Map(meters.map(m => [m.id, m]));
   const numberedItems = [
     ...actionItemsRaw.filter(a => a.severity === 'blocking'),
     ...actionItemsRaw.filter(a => a.severity === 'major'),
     ...actionItemsRaw.filter(a => a.severity === 'minor'),
-  ].map((a, idx) => ({
-    ...a,
-    display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
-  }));
+  ].map((a, idx) => {
+    // Enrichit avec usage/type de compteur + énergie (depuis source_meter_id)
+    // ou usage système (depuis source_device_id) pour les pills colorées
+    // du PDF chap 7. Sans ça, les actions s'affichent en texte brut alors
+    // qu'on saurait coder le contexte visuellement.
+    let meterUsage = null, meterType = null, deviceSystemCategory = null;
+    if (a.source_meter_id) {
+      const m = _metersByIdEarly.get(a.source_meter_id);
+      if (m) { meterUsage = m.usage || null; meterType = m.meter_type || null; }
+    }
+    if (a.source_device_id) {
+      const d = devicesById.get(a.source_device_id);
+      if (d) deviceSystemCategory = d.system_category || null;
+    }
+    return {
+      ...a,
+      display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
+      meter_usage: meterUsage,
+      meter_type: meterType,
+      device_system_category: deviceSystemCategory,
+    };
+  });
   const actionItems = { blocking: [], major: [], minor: [] };
   for (const a of numberedItems) actionItems[a.severity]?.push(a);
   const actionStats = {
@@ -627,7 +718,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
       display_number: item.display_number,
       zone_name: item.zone_name || '—',
       r175_article: item.r175_article,
+      meter_type: null,
       meter_type_label: '',
+      meter_usage: null,
       meter_usage_label: '',
       device_name: '',
       device_brand: '',
@@ -636,7 +729,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (item.source_meter_id) {
       const m = metersById.get(item.source_meter_id);
       if (m) {
+        out.meter_type = m.meter_type || null;
         out.meter_type_label = METER_TYPE_LABEL[m.meter_type] || m.meter_type || '—';
+        out.meter_usage = m.usage || null;
         out.meter_usage_label = METER_USAGE_LABEL[m.usage] || m.usage || '—';
         if (!item.zone_name && !m.zone_id) out.zone_name = 'Général bâtiment';
       }
@@ -738,11 +833,25 @@ async function buildBacsAuditExportData(af, opts = {}) {
   const R175_6_TRIGGER = '2021-07-21';
   const pcAfter = af.bacs_building_permit_date && af.bacs_building_permit_date > R175_6_TRIGGER;
   const worksAfter = af.bacs_generator_works_date && af.bacs_generator_works_date > R175_6_TRIGGER;
+  // Formatage français des dates pour l'encart didactique du PDF
+  // (« 15 mars 2018 » plutôt que « 2018-03-15 »).
+  function frDate(isoDate) {
+    if (!isoDate) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
+    if (!m) return null;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  }
   const r175_6_applicable = pcAfter || worksAfter
-    ? { applies: true, reason: pcAfter && worksAfter
+    ? { applies: true,
+        reason: pcAfter && worksAfter
           ? 'permis de construire postérieur au 21/07/2021 et travaux générateur récents'
-          : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021') }
-    : { applies: false, reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)' };
+          : (pcAfter ? 'permis de construire postérieur au 21/07/2021' : 'travaux d\'installation/remplacement de générateur postérieurs au 21/07/2021'),
+        permitDateFr: frDate(af.bacs_building_permit_date),
+        worksDateFr: frDate(af.bacs_generator_works_date) }
+    : { applies: false,
+        reason: 'aucun déclencheur (permis de construire et travaux générateur antérieurs ou égaux au 21/07/2021)',
+        permitDateFr: frDate(af.bacs_building_permit_date),
+        worksDateFr: frDate(af.bacs_generator_works_date) };
 
   // Detail du calcul auto chauffage + clim — initial sans contributions.
   // Les contributions effectives (heat_contrib / cool_contrib / inScope)
@@ -921,6 +1030,22 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // URL. Best-effort : null si la clé/API est indisponible → PDF sans vue.
   // `zones` sert de repli de centrage quand le site n'a pas de coordonnées.
   const siteMapDataUrl = await buildSiteStaticMap({ site, zones });
+  // Vue satellite annotée pour le chapitre 2 « Zones fonctionnelles ».
+  // Apparaît uniquement si au moins une zone a des coordonnées GPS.
+  const zonesMap = await buildZonesStaticMap({ site, zones: zonesFunctional });
+  // Propage l'initiale + couleur de pin depuis la légende sur chaque zone
+  // fonctionnelle (lookup par nom). Permet d'afficher la pastille dans le
+  // tableau d'inventaire du chap 2 — cohérent avec la légende sous la map.
+  if (zonesMap?.legend?.length) {
+    const byName = new Map(zonesMap.legend.map(l => [l.name, l]));
+    for (const z of zonesFunctional) {
+      const hit = byName.get(z.name);
+      if (hit) {
+        z.mapInitial = hit.initial;
+        z.mapColor = hit.color;
+      }
+    }
+  }
 
   // Surface du site pour le pont avec le decret tertiaire (item 12).
   // Source : sites.surface_m2 si renseignee, sinon cumul des surfaces des
@@ -953,6 +1078,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     isSiteAudit: !isBacs,
     site,
     siteMapDataUrl,
+    zonesMap,
     siteSurfaceM2,
     // Pont decret tertiaire (item 12) : true si batiment tertiaire > 1000 m2.
     tertiaryDecreeApplies,
@@ -984,6 +1110,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     metersWithDetails,
     thermal,
     bms,
+    bmsComponents,
+    inspections,
     bmsManagedDevices,
     bmsUnmanagedDevices,
     bmsManagedMeters,
@@ -999,6 +1127,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     actionItemsGrouped,
     actionStats,
     bmsTopicNotes,
+    bmsTopicOpportunities,
     // actionItemsRaw expose en realite les items NUMEROTES (BACS-XXX) pour
     // que les tableaux de synthese puissent les afficher en forme finale.
     // Si on a besoin des bruts sans numerotation, ils sont reconstitubles

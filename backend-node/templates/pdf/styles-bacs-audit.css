@@ -858,7 +858,21 @@ table .total-row td {
 }
 .kv-row:last-child { border-bottom: none; }
 .kv-row:nth-child(odd) { background: #fafbfc; }
-.kv-label { flex: 1; color: #1f2937; }
+.kv-label { color: #1f2937; }
+/* Pédagogie : sous chaque label R175-3, une courte explication en clair
+   sourcée mot à mot sur le décret. Aide le lecteur non spécialiste à
+   comprendre l'exigence sans aller chercher l'annexe. */
+.kv-label-block { flex: 1; display: flex; flex-direction: column; gap: 0.8mm; }
+.kv-label-block .kv-label { font-weight: 600; }
+.kv-explainer {
+  font-size: 7.4pt;
+  line-height: 1.4;
+  color: #6b7280;
+}
+.kv-explainer em { font-style: italic; font-weight: 500; }
+/* Tant que le label reste un span direct (rows non encore enrichies),
+   il garde son flex:1 historique. */
+.kv-row > .kv-label { flex: 1; }
 .kv-value {
   display: inline-flex;
   align-items: center;
@@ -873,6 +887,67 @@ table .total-row td {
 .kv-no  { background: #fee2e2; color: #991b1b; }
 .kv-na  { background: #e5e7eb; color: #6b7280; }
 .kv-ico { font-weight: 700; font-size: 9pt; line-height: 1; }
+/* Sous-détails saisis par l'auditeur (format, fréquence, périodicité,
+   formateur…) qui complètent une réponse Oui/Non. Affichés en bloc compact
+   sous la liste kv, indentés visuellement par un filet bleu. */
+.bms-sub-detail {
+  margin: 1.5mm 3mm 0;
+  padding: 1.5mm 2mm;
+  background: #f0f9ff;
+  border-left: 1.5pt solid #0ea5e9;
+  border-radius: 0 1mm 1mm 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 4mm;
+  align-items: baseline;
+  font-size: 7.6pt;
+  color: #075985;
+}
+.bms-sub-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 6.6pt;
+  color: #0369a1;
+}
+.bms-sub-item { line-height: 1.4; }
+.bms-sub-item strong { font-weight: 600; }
+.bms-sub-item.rich-notes { width: 100%; }
+/* Table des composants matériels GTB (serveurs, contrôleurs, passerelles…). */
+.bms-components-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7.5pt;
+}
+.bms-components-table th,
+.bms-components-table td {
+  padding: 1.2mm 2mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+  text-align: left;
+}
+.bms-components-table thead th {
+  background: #fafafa;
+  font-size: 6.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bms-components-table code {
+  font-family: 'Inter', 'Manrope', monospace;
+  font-size: 7pt;
+  color: #4338ca;
+  background: #eef2ff;
+  padding: 0.3mm 1.2mm;
+  border-radius: 1mm;
+}
+.bms-component-notes-row td {
+  background: #fafafa;
+  font-size: 7pt;
+  color: #4b5563;
+  font-style: italic;
+  padding: 1mm 2mm;
+}
 
 /* ── Liste compacte type "table sans bordures" ─────────────────────
    Remplace les <ul><li> à puces noires des listes d'équipements ou
@@ -922,6 +997,25 @@ table .total-row td {
 .callout-body strong { font-weight: 600; }
 .callout-body p { margin: 0 0 1.5mm; font-size: 8.2pt; }
 .callout-body p:last-child { margin-bottom: 0; }
+/* Pédagogie : 3 paragraphes successifs dans un callout (« Ce qu'impose le
+   décret », « Ce que nous avons vérifié », « Point de vigilance ») —
+   permettent au lecteur non spécialiste de comprendre d'où sort le verdict
+   sans lire l'annexe du décret. Pas d'icônes en plus du symbole déjà
+   présent en début de callout : on garde la sobriété typographique. */
+.callout-body .explainer-rule,
+.callout-body .explainer-check,
+.callout-body .explainer-watch {
+  font-size: 7.8pt;
+  line-height: 1.45;
+  color: inherit;
+}
+.callout-body .explainer-rule em,
+.callout-body .explainer-check em,
+.callout-body .explainer-watch em {
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 .callout-info {
   background: #f3f4f6;
   border-left: 2pt solid #6b7280;
@@ -1463,6 +1557,59 @@ h3.fz-heading svg { flex-shrink: 0; }
   letter-spacing: 0.04em;
   vertical-align: middle;
 }
+.device-card-forced {
+  display: inline-block;
+  margin-left: 1.5mm;
+  font-size: 6.5pt;
+  color: #92400e;
+  background: #fef3c7;
+  border: 0.3pt solid #f59e0b;
+  border-radius: 1.5mm;
+  padding: 0.2mm 1.4mm;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.device-card-bms-hs {
+  display: inline-block;
+  margin-left: 1.5mm;
+  font-size: 6.5pt;
+  color: #4338ca;
+  background: #e0e7ff;
+  border: 0.3pt solid #a5b4fc;
+  border-radius: 1.5mm;
+  padding: 0.2mm 1.4mm;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+/* Bloc régulateur déporté : ligne compacte sous les attributs de la card
+   équipement, visible uniquement si la régulation est marquée déportée. */
+.device-card-regulator {
+  margin: 1.5mm 0 0;
+  padding: 1.5mm 2mm;
+  background: #faf5ff;
+  border-left: 1.5pt solid #7c3aed;
+  border-radius: 0 1mm 1mm 0;
+  font-size: 7.6pt;
+  color: #4c1d95;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 3mm;
+  align-items: baseline;
+}
+.device-card-regulator-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 6.6pt;
+  color: #7c3aed;
+}
+.device-card-regulator-item em {
+  font-style: italic;
+  color: #6d28d9;
+  font-weight: 500;
+}
 .device-card-r175 {
   display: flex;
   align-items: center;
@@ -1898,6 +2045,123 @@ table.action-group-table td.agt-num {
   line-height: 1.5;
 }
 .panel-inline-note strong { color: #1b2842; font-weight: 600; }
+/* Variante « Opportunités d'amélioration » : ton vert pour distinguer
+   visuellement des notes factuelles (gris). Saisi séparément côté UI dans
+   bacs_audit_gtb_observations.opportunity_html — jusqu'ici perdu en PDF. */
+.panel-inline-note.panel-opportunity {
+  background: #ecfdf5;
+  border-left-color: #00cd92;
+}
+.panel-inline-note.panel-opportunity strong { color: #065f46; }
+/* Card opportunité dans le bloc « Identité GTB » (info-cards) : même
+   ton vert, sobre. */
+.info-card.bms-opportunity-card {
+  background: #ecfdf5;
+  border-left: 1.5pt solid #00cd92;
+}
+.info-card.bms-opportunity-card .info-card-label { color: #065f46; }
+/* Pill « Effort estimé » sur les action items du plan de mise en conformité.
+   Saisi par l'auditeur (Faible / Moyen / Élevé) — jusqu'ici perdu en PDF. */
+.action-card-effort {
+  display: inline-block;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.4mm 1.6mm;
+  border-radius: 1.5mm;
+  margin-left: 1.5mm;
+  vertical-align: middle;
+}
+.action-card-effort-low    { background: #ecfdf5; color: #065f46; border: 0.3pt solid #6ee7b7; }
+.action-card-effort-medium { background: #fef3c7; color: #92400e; border: 0.3pt solid #fcd34d; }
+.action-card-effort-high   { background: #fee2e2; color: #991b1b; border: 0.3pt solid #fca5a5; }
+/* Vues satellite (chap 1 + chap 2) : pleine largeur de la zone de contenu
+   (A4 : 180mm utiles). Image autonome contenue dans son cadre, sans
+   surdéborder. La légende des pins de zone est rendue sous l'image en
+   pastilles. */
+.map-figure {
+  margin: 3mm 0 5mm;
+}
+.map-figure-full {
+  display: block;
+  text-align: center;
+}
+.map-figure-full img {
+  display: block;
+  width: 100%;
+  max-width: 180mm;
+  margin: 0 auto;
+  border: 0.3pt solid #e2e8f0;
+  border-radius: 1.5mm;
+}
+.map-figure-caption {
+  margin: 1.5mm 0 0;
+  font-size: 7pt;
+  color: #6b7280;
+  font-style: italic;
+  text-align: center;
+}
+.map-legend {
+  margin: 2mm auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 3mm;
+  justify-content: center;
+  max-width: 180mm;
+  font-size: 7.5pt;
+  color: #1f2937;
+}
+.map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2mm;
+}
+.map-legend-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5mm;
+  height: 4.5mm;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: 0 0.3pt 1pt rgba(0,0,0,0.25);
+}
+.map-legend-name { font-weight: 500; }
+/* Pin inline dans le tableau d'inventaire (chap 2) — même look que la
+   légende sous la map mais en plus petit, devant le nom de zone. */
+.zone-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.map-legend-pin-inline {
+  width: 3.8mm;
+  height: 3.8mm;
+  font-size: 6.4pt;
+}
+/* Pills colorées « rôle » dans les cards équipement (Production / Distribution
+   / Émission / Régulation / Autre). Reproduit le visuel desktop (card 04). */
+.device-attr-roles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1mm 1.2mm;
+  align-items: center;
+}
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5mm;
+  padding: 0.4mm 1.4mm;
+  border-radius: 4mm;
+  font-size: 6.8pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
 
 /* ── Chapitre 3 — zone heading + carte par catégorie de système ───
    Chaque catégorie présente est une vraie card autonome :
@@ -1959,6 +2223,30 @@ h2.zone-heading {
   font-size: 7.5pt;
   color: #6b7280;
   font-weight: 500;
+}
+/* Pills caractérisant le système : multi-bâtiments, sous-station RDU,
+   géré par GTB, ECS bouclée. Sobre, sans concurrencer le titre. */
+.system-card-flag {
+  display: inline-block;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.5mm 1.8mm;
+  border-radius: 1.5mm;
+  background: #fef3c7;
+  color: #92400e;
+  border: 0.3pt solid #fcd34d;
+  vertical-align: middle;
+}
+.system-card-flag-bms {
+  background: #e0e7ff;
+  color: #4338ca;
+  border-color: #a5b4fc;
+}
+.system-card-flag-muted {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
 }
 .system-card-body { padding: 2.5mm 3.5mm; }
 .system-card-body table { margin: 0; }
@@ -2723,6 +3011,27 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   text-align: left;
 }
 .energy-section-table thead th.bool-cell { text-align: center; }
+/* Cellule protocoles : libellés FR séparés par " / " (BACnet IP / Modbus TCP). */
+.meter-protocols-cell {
+  font-size: 7pt;
+  white-space: nowrap;
+}
+/* Ligne « recommandation auditeur » sous le compteur — visible si saisie. */
+.meter-row-recommendation td {
+  background: #fffbeb;
+  border-bottom: 0.3pt solid #fde68a;
+  color: #92400e;
+  font-size: 7pt;
+  padding: 1mm 2mm;
+}
+.meter-recommendation-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 6.5pt;
+  margin-right: 1.5mm;
+  color: #b45309;
+}
 .energy-subheader td {
   background: #f3f4f6;
   font-size: 7pt;

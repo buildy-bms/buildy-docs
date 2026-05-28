@@ -194,9 +194,33 @@ function defaultsForLibraryCategory(libraryCategory) {
   };
 }
 
+// Index plat { value: label } construit à partir de tous les enums BACS
+// pour résoudre rapidement un type de régulation persisté côté device.
+// Plusieurs catégories partagent le même `value` (loi_d_eau,
+// vanne_3_voies…) — on garde le PREMIER label rencontré, suffisant pour
+// le PDF (le contexte chaud/froid se lit déjà sur la catégorie système).
+const REGULATION_TYPE_LABEL = {};
+for (const cat of Object.values(BACS)) {
+  for (const levelOpts of Object.values(cat)) {
+    for (const opt of (levelOpts || [])) {
+      if (!(opt.value in REGULATION_TYPE_LABEL)) {
+        REGULATION_TYPE_LABEL[opt.value] = opt.label;
+      }
+    }
+  }
+}
+// Valeurs creatable saisies en clair par l'auditeur — on les retourne
+// telles quelles.
+function regulationTypeLabel(raw) {
+  if (!raw) return null;
+  return REGULATION_TYPE_LABEL[raw] || raw;
+}
+
 module.exports = {
   BACS,
   LIBRARY_TO_BACS,
   defaultsForBacsCategory,
   defaultsForLibraryCategory,
+  REGULATION_TYPE_LABEL,
+  regulationTypeLabel,
 };

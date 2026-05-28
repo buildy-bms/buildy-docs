@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 187;
+const TARGET_VERSION = 188;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7108,6 +7108,17 @@ function runMigrations() {
     db.pragma('user_version = 187');
   }
 
+  if (current < 188) {
+    // Persiste le niveau de zoom satellite du site, saisi par l'auditeur
+    // au moment où il place le pin dans EditSiteModal. Reproduit dans le
+    // PDF audit (chap 1) — l'ancien défaut hardcodé à 18 cadrait trop
+    // serré pour les grands sites logistiques.
+    try { db.exec('ALTER TABLE sites ADD COLUMN map_zoom INTEGER'); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    log.info('Migration 188 appliquee : sites.map_zoom (zoom satellite persistant)');
+    db.pragma('user_version = 188');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -9034,7 +9045,8 @@ const sites = {
     // — donnee propre a Buildy Docs, jamais poussee vers Fleet Manager.
     const allowed = ['name', 'customer_name', 'address', 'notes', 'latitude', 'longitude',
                      'synced_at', 'deleted_at',
-                     'ownership_structure', 'ownership_notes'];
+                     'ownership_structure', 'ownership_notes',
+                     'map_zoom'];
     const sets = [], params = [];
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
@@ -10255,6 +10267,20 @@ const bacsAuditGtbObservations = {
     const map = {};
     for (const r of rows) {
       if (r.observation_html?.replace(/<[^>]*>/g, '').trim()) map[r.topic_key] = r.observation_html;
+    }
+    return map;
+  },
+  // Opportunités d'amélioration saisies par l'auditeur sur chaque sous-section
+  // GTB. Distinctes des observations factuelles (notesByTopic). Surfacées dans
+  // le PDF audit pour matérialiser les pistes d'optimisation identifiées sur
+  // site avant le plan d'action.
+  opportunitiesByTopic(documentId) {
+    const rows = db.prepare(
+      'SELECT topic_key, opportunity_html FROM bacs_audit_gtb_observations WHERE document_id = ?'
+    ).all(documentId);
+    const map = {};
+    for (const r of rows) {
+      if (r.opportunity_html?.replace(/<[^>]*>/g, '').trim()) map[r.topic_key] = r.opportunity_html;
     }
     return map;
   },

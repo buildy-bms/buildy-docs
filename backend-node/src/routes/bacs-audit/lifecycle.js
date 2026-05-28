@@ -85,7 +85,12 @@ async function routes(fastify) {
   // STEP_DEFINITIONS (frontend BacsAuditDetailView.vue) et sur les clés
   // gérées par lib/bacs-audit-step-completion.js. Sinon validate-step
   // rejette l'étape en 400 (z.enum).
-  const AUDIT_STEPS = ['identification','zones','technical-zones','systems','meters','thermal','bms','inspections','docs-checklist','documents','credentials','review','synthesis'];
+  // `technical-zones` retiré : les zones techniques sont désormais
+  // inventoriées dans la même section que les fonctionnelles (frontend
+  // unifié) — la validation passe donc par la step 'zones' unique. La
+  // clé est gardée tolérée côté completion (renvoie `true`) pour ne pas
+  // casser un audit qui aurait stocké un état legacy.
+  const AUDIT_STEPS = ['identification','zones','systems','meters','thermal','bms','inspections','docs-checklist','documents','credentials','review','synthesis'];
 
   fastify.post('/bacs-audit/:documentId/validate-step', async (request, reply) => {
     const documentId = parseInt(request.params.documentId, 10);

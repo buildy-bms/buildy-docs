@@ -13,6 +13,32 @@ Handlebars.registerHelper('eq', (a, b) => a === b);
 Handlebars.registerHelper('minus', (a, b) => Number(a) - Number(b));
 Handlebars.registerHelper('add', (a, b) => Number(a) + Number(b));
 Handlebars.registerHelper('and', function(...args) { args.pop(); return args.every(Boolean); });
+Handlebars.registerHelper('join', (arr, sep) => Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : '');
+
+// Pill colorée représentant un rôle de niveau de la chaîne énergétique
+// (production / distribution / émission / régulation / autre). Aligne le
+// PDF sur le composant ROLE_OPTIONS du frontend (lib/audit-options.js).
+const ROLE_PILL = {
+  production:   { label: 'Production',   icon: 'industry',         color: '#dc2626' },
+  distribution: { label: 'Distribution', icon: 'route',            color: '#0ea5e9' },
+  emission:     { label: 'Émission',     icon: 'fan',              color: '#3b82f6' },
+  regulation:   { label: 'Régulation',   icon: 'sliders',          color: '#a855f7' },
+  autre:        { label: 'Autre',        icon: 'circle-question',  color: '#6b7280' },
+};
+Handlebars.registerHelper('rolePill', (role) => {
+  const cfg = ROLE_PILL[String(role || '').toLowerCase()];
+  if (!cfg) return '';
+  const def = lookupFaIcon(cfg.icon);
+  let iconSvg = '';
+  if (def) {
+    const [w, h, , , path] = def.icon;
+    const d = Array.isArray(path) ? path[path.length - 1] : path;
+    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="9" height="9" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:0.8mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
+  }
+  return new Handlebars.SafeString(
+    `<span class="role-pill" style="background:${cfg.color}1a;color:${cfg.color};border:0.3pt solid ${cfg.color}66">${iconSvg}${cfg.label}</span>`
+  );
+});
 
 // FontAwesome icons inline en SVG, parametrables (couleur + taille).
 // Utilisation : {{{faIcon "building" "#4f46e5" "16"}}}

@@ -50,6 +50,9 @@ const updateSiteSchema = z.object({
   notes: z.string().nullable().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
+  // Niveau de zoom satellite persisté par l'auditeur depuis le picker
+  // (mig 188). Sert ensuite à cadrer la vue satellite du chap 1 du PDF.
+  map_zoom: z.number().int().min(1).max(21).nullable().optional(),
   // Item 4a — structure juridique. PAS synchronisé avec Fleet Manager
   // (cf. lib/sites-sync.js serializeSite qui n'expose pas ces champs).
   ownership_structure: z.enum(OWNERSHIP_STRUCTURES).nullable().optional(),
@@ -231,6 +234,8 @@ async function routes(fastify) {
       // Item 4a — colonnes locales Buildy Docs, non poussées vers FM.
       ownership_structure: body.ownership_structure,
       ownership_notes: body.ownership_notes,
+      // Mig 188 — zoom satellite persisté (utilisé pour cadrer la vue du PDF).
+      map_zoom: body.map_zoom,
       updatedBy: userId,
     });
     db.auditLog.add({ userId, action: 'site.update', payload: { site_uuid: site.site_uuid, fields: Object.keys(body) } });

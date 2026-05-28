@@ -2,6 +2,110 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.124",
+      "date": "2026-05-28",
+      "title": "Audit BACS — Zones unifiées, PDF beaucoup plus complet, MCP pédagogique",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Section Zones unifiée (fonctionnelles + techniques) avec vue satellite pleine largeur",
+          "what": "Les anciennes cards 02 « Zones fonctionnelles » et 03 « Zones techniques » fusionnent en une seule card « Zones ». Un toggle Type sur chaque ligne permet de basculer fonctionnelle ↔ technique. Au-dessus du tableau, une vue satellite Google Maps interactive montre TOUTES les zones géolocalisées du site avec des pins étiquetés A, B, C, D… (couleurs cohérentes avec le PDF). Une pastille colorée à gauche de chaque nom de zone dans le tableau reprend la même initiale + couleur. Le stepper passe de 13 à 12 étapes (l'étape Zones techniques disparaît, la step Zones gère les deux).",
+          "where": "Audit BACS → étape 2 Zones.",
+          "how": "Ouvrir un audit avec des zones géolocalisées : la map s'affiche en intro avec les pins A, B, C, D… La ligne de chaque zone dans le tableau porte la même pastille."
+        },
+        {
+          "kind": "feat",
+          "title": "Persistance du zoom satellite saisi par l'auditeur (sites.map_zoom — mig 188)",
+          "what": "Quand l'auditeur place le pin du site dans la modale d'édition, son niveau de zoom Google Maps est désormais sauvegardé (nouvelle colonne `sites.map_zoom` — mig 188). Le PDF audit utilise ce niveau de zoom pour cadrer la vue satellite du chapitre 1 — fini la vue monde tilée qui apparaissait sur les bâtiments industriels.",
+          "where": "Modale d'édition du site → carte → ajuster le zoom + Enregistrer.",
+          "how": "Éditer un site, zoomer/dézoomer sur la map, enregistrer. Exporter le PDF : la vue satellite du chap 1 reprend exactement le cadrage choisi."
+        },
+        {
+          "kind": "feat",
+          "title": "Card 04 « Systèmes » — Équipements triés par chaîne énergétique avec connecteurs arborescents",
+          "what": "Dans chaque système, les équipements sont triés Production → Distribution → Émission → Régulation seule puis alphabétique. L'indentation 8 px par cran calculée RELATIVEMENT au rôle le plus amont du système, avec un connecteur └─ coloré devant le nom (indigo Distribution, rose Émission, violet Régulation). Pas d'indent ni de └─ pour un système qui n'a que des émetteurs (cas éclairage). Champ Nom auto-grow au contenu : plus de troncature sur les noms longs. Badge orange « Secours » collé au champ Nom pour les équipements `is_backup` (cas typique cascade n+1).",
+          "where": "Audit BACS card 04 → sous-table des équipements de chaque système.",
+          "how": "Système avec chaudière + circuit + radiateur : la chaudière (production) reste à gauche, le circuit (distribution) apparaît indenté avec un └─ indigo, le radiateur (émission) encore plus indenté avec un └─ rose."
+        },
+        {
+          "kind": "fix",
+          "title": "Card 06 — Listes Production/Distribution/Émission strictement filtrées par rôle",
+          "what": "Dans la régulation thermique automatique, chaque dropdown ne propose désormais que les équipements du bon rôle (production / distribution / émission). Un aérotherme (rôle émission) n'apparaît plus dans la liste Production, un circuit eau chaude (distribution) n'apparaît plus en Émission. Le régulateur déporté n'est plus pické via cette multi-sélection (qui polluait avec tous les devices taggés `regulation`) : il se documente via les champs free-text `regulator_brand` / `regulator_model_reference` / `regulator_location_<niveau>` dans la modale équipement.",
+          "where": "Audit BACS card 06 → dropdowns Production / Distribution / Émission.",
+          "how": "Sur n'importe quel audit, la liste Production d'une ligne chauffage ne propose que des chaudières / DRV / PAC / cumulus."
+        },
+        {
+          "kind": "feat",
+          "title": "Card 06 — Types de régulation lisibles (Loi d'eau, Vanne 3 voies…) au lieu des slugs",
+          "what": "Les types de régulation par niveau s'affichent désormais avec leurs libellés FR (« Loi d'eau », « Vanne 3 voies », « Thermostat ambiant »…) au lieu des valeurs techniques (loi_d_eau, vanne_3_voies). Le type saisi par l'auditeur dans la modale équipement est appliqué partout — card 06, modale, PDF.",
+          "where": "Audit BACS card 06 + PDF chapitre 5.",
+          "how": "Sur un audit avec types saisis, les chips du dropdown et le PDF affichent les libellés humains."
+        },
+        {
+          "kind": "ux",
+          "title": "Aide « Équipement de secours » beaucoup plus concrète (cascade n+1, seuils BACS)",
+          "what": "Desktop + mobile : la description sous la question « Est-ce un équipement de secours ? » explique le cas typique (2ᵉ chaudière en cascade qui démarre quelques heures par an), précise les seuils R175-2 (70 / 290 kW) et ajoute le garde-fou « si elle tourne en permanence en complément, laisser sur Non ».",
+          "where": "Modale équipement → bloc « État de l'équipement »."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — surfaçage massif de champs jusque-là perdus (~70 champs)",
+          "what": "Le PDF intègre désormais tout ce qui est saisi côté équipements, compteurs, GTB, systèmes : Âge, Filaire / Sans-fil, Mesurage séparable + note, Régulation intégrée / déportée + Régulateur (marque + référence + localisation par niveau), pill Communicant (R175-3 §3 device), pills Validation forcée + Intégration GTB HS sur les cards device. Pour les compteurs : colonne Protocoles + colonne GTB + ligne « Recommandation » sous le compteur. Pour les systèmes : pills Multi-bâtiments, Sous-station RDU, Géré par GTB, Bouclée / Sans boucle. Pour la GTB : Protocoles de mise à dispo, sous-blocs Format archivage + Rétention 5 ans vérifiée (P1), Règles d'anomalie (P2), Fréquence + Format de mise à dispo, Périodicité + Responsable maintenance, Formateur + Sujets formation. Nouveau bloc « Composants matériels de la GTB » (serveurs, contrôleurs, passerelles avec marque, référence, IP, protocoles, firmware).",
+          "where": "PDF audit BACS — chap 3 / 4 / 5 / 6.",
+          "how": "Exporter le PDF d'un audit avec ces champs saisis : ils apparaissent là où ils sont attendus visuellement."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Nouveau chapitre 7 « Inspections périodiques R175-5-1 »",
+          "what": "Le PDF intègre un chapitre dédié quand l'auditeur a saisi des informations d'inspection (date, inspecteur, rapport, anomalies, recommandations, prochaine échéance) OU coché « non applicable » avec motif. Bandeau didactique expliquant le cadre R175-5-1 (décret 2023-259 du 7 avril 2023). Le chapitre Plan de mise en conformité décale en 8 automatiquement (sinon reste 7).",
+          "where": "PDF audit BACS — nouveau chapitre 7 (visible si données inspection saisies).",
+          "how": "Sur un audit avec ces champs renseignés, exporter le PDF : le chapitre apparaît avec date, organisme tiers, rapport, anomalies, recommandations, prochaine date."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Opportunités d'amélioration GTB rendues partout (7 topics)",
+          "what": "Le champ `opportunity_html` saisi par l'auditeur sur chaque sous-section GTB (analyse fonctionnelle, usages, R175-3 capacités, R175-3 mise à dispo, R175-4, R175-5, équipements, compteurs) n'était JAMAIS dans le PDF — il l'est désormais, en bloc vert sous le bloc Notes correspondant. La fonction `db.bacsAuditGtbObservations.opportunitiesByTopic()` complète l'existante `notesByTopic()`.",
+          "where": "PDF audit BACS — chapitre 6 GTB, sous chaque card."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Plan d'action enrichi (effort estimé, pills colorées usage/type)",
+          "what": "Chaque action porte un pill « Effort » coloré (vert Faible / orange Moyen / rouge Élevé) selon l'effort estimé par l'auditeur. Les colonnes Usage et Type des cards groupées utilisent les pills colorées des compteurs (au lieu de texte brut). Le header des cards d'action individuelles affiche aussi l'icône catégorie système + pill usage + pill type.",
+          "where": "PDF audit BACS — chapitre 7/8 Plan de mise en conformité."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Maps satellite refondues (site + zones) en pleine largeur",
+          "what": "La vue satellite du chap 1 cadre maintenant correctement le bâtiment (correction d'un bug `Number(null) === 0` qui mettait zoom=0). Nouveau bloc satellite au chap 2 « Zones fonctionnelles » : pins étiquetés A, B, C, D… avec couleurs accessibles, cadrage auto (`visible=` de Google Static Maps), légende sous l'image et pastille colorée à gauche de chaque ligne du tableau d'inventaire. Les 2 maps passent en pleine largeur 180 mm.",
+          "where": "PDF audit BACS — chap 1 + chap 2."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Pills colorées Production/Distribution/Émission/Régulation",
+          "what": "Dans la card équipement du chap 3, la cellule « Nature » utilise désormais des pills colorées avec icônes (Production rouge industry, Distribution cyan route, Émission bleu fan, Régulation violet sliders) au lieu de texte « Production / Régulation ». Aligné sur la palette ROLE_OPTIONS du frontend.",
+          "where": "PDF audit BACS — chap 3 cards équipement."
+        },
+        {
+          "kind": "feat",
+          "title": "PDF audit — Encarts didactiques R175 (Ce qu'impose le décret)",
+          "what": "Chapitre 6 GTB : chaque label R175-3 §1 / §2 / Mise à disposition / R175-4 / R175-5 porte un mini-paragraphe explicatif sourcé mot à mot sur le décret. Chapitre 5 Régulation thermique : quand R175-6 est non applicable, l'encart explique ce qu'impose le décret, ce qui a été vérifié sur ce bâtiment (dates PC + travaux générateurs en français) et un point de vigilance pour les futurs travaux.",
+          "where": "PDF audit BACS — chap 5 + chap 6."
+        },
+        {
+          "kind": "fix",
+          "title": "Tooltips du stepper qui chevauchent les boutons topbar",
+          "what": "Les tooltips des étapes du stepper apparaissent désormais EN DESSOUS du stepper (placement bottom) au lieu d'au-dessus. Plus de chevauchement avec les boutons Aperçu / Rapport / Synthèse / Livrer / Plus du topbar quand l'utilisateur navigue vers eux.",
+          "where": "Audit BACS — header sticky avec le stepper."
+        },
+        {
+          "kind": "ux",
+          "title": "Boutons « Parties prenantes » et « Position sur la carte » en tête des actions Zones + colorés en vert quand renseignés",
+          "what": "Dans le tableau Zones, les deux boutons les plus structurants (UserGroup → Parties prenantes, MapPin → Position GPS) passent en première position de la colonne Actions et adoptent la couleur verte (`is-success` emerald) dès qu'au moins une partie est rattachée ou que le pin est posé — comme le bouton Photos.",
+          "where": "Audit BACS étape 2 Zones — colonne Actions."
+        }
+      ]
+    },
+    {
       "version": "0.1.123",
       "date": "2026-05-28",
       "title": "Card 04 — arborescence + badge Secours propagés au PDF et à la PWA mobile",
