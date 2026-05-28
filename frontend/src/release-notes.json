@@ -2,23 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.120",
+      "version": "0.1.121",
       "date": "2026-05-28",
-      "title": "Card 04 — arborescence Production → Distribution → Émission + badge « Secours » dans le champ Nom",
+      "title": "Card 04 — arborescence Production → Distribution → Émission + badge Secours collé au nom",
       "highlights": [
         {
           "kind": "feat",
-          "title": "Indentation et connecteur « └─ » pour visualiser la chaîne énergétique",
-          "what": "Dans chaque système, les équipements sont triés par défaut Production → Distribution → Émission → Régulation seule, puis alphabétique. Les niveaux aval sont visuellement indentés (Distribution +20px, Émission +40px, Régulation +30px) avec un connecteur arborescent « └─ » coloré devant leur nom (indigo Distribution, rose Émission, violet Régulation). Permet de lire la dépendance amont/aval d'un coup d'œil, comme un arbre de fichiers. Cliquer un en-tête de colonne surcharge le tri.",
+          "title": "Indentation relative + connecteur « └─ » uniquement quand un amont existe",
+          "what": "Dans chaque système, les équipements sont triés par défaut Production → Distribution → Émission → Régulation seule, puis alphabétique. L'indentation (12px par cran) est calculée RELATIVEMENT au rôle le plus amont présent dans le système : un système éclairage qui n'a que des émetteurs n'est plus indenté dans le vide. Le connecteur « └─ » coloré (indigo Distribution, rose Émission, violet Régulation) n'apparaît que s'il y a un amont auquel se rattacher. Cliquer un en-tête de colonne surcharge le tri.",
           "where": "Audit BACS card 04 « Systèmes techniques par zone » → sous-table des équipements de chaque système.",
-          "how": "Sur un système avec chaudière + circuit eau chaude + radiateur : la chaudière (production) reste collée à gauche, le circuit (distribution) apparaît indenté avec un └─ indigo, le radiateur (émission) encore plus indenté avec un └─ rose."
+          "how": "Sur un système avec chaudière + circuit + radiateur : la chaudière reste collée à gauche, le circuit apparaît indenté de 12px avec un └─ indigo, le radiateur indenté de 24px avec un └─ rose. Sur un système éclairage seul : pas d'indent, pas de └─."
         },
         {
           "kind": "feat",
-          "title": "Badge « Secours » intégré dans le champ Nom (à droite)",
-          "what": "Les équipements marqués `is_backup` portent désormais un badge orange (icône bouclier) à l'intérieur du champ Nom, sur la droite (au lieu de l'extérieur à gauche). Tooltip au survol rappelant que leur puissance est exclue du cumul retenu pour l'assujettissement BACS.",
-          "where": "Card 04 → colonne « Nom » → coin droit du champ texte.",
-          "how": "Sur un équipement coché « Est-ce un équipement de secours ? » = Oui dans la modale, un cercle orange avec une icône bouclier apparaît à droite à l'intérieur du champ Nom."
+          "title": "Badge « Secours » collé au champ Nom (sibling, plus à l'intérieur)",
+          "what": "Le badge orange (icône bouclier) est désormais un élément SIBLING placé juste après le champ Nom, plus une superposition absolute à droite à l'intérieur du champ. Visuellement collé au nom, ne se balade plus au bord droit de la cellule. Tooltip au survol rappelant l'exclusion du cumul BACS.",
+          "where": "Card 04 → colonne « Nom » → juste à droite du champ texte.",
+          "how": "Sur un équipement coché « Est-ce un équipement de secours ? » = Oui dans la modale, un petit cercle orange apparaît tout de suite après le champ Nom."
         }
       ]
     },

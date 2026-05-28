@@ -124,16 +124,29 @@ function rolePriority(d) {
 function isBackup(d) {
   return d.is_backup === 1 || d.is_backup === true
 }
-// Indentation arborescente cellule « Nom » : visualise la chaîne énergétique
-// Production → Distribution → Émission (régulation seule au milieu).
-function nameIndent(d) {
-  switch (rolePriority(d)) {
-    case 1: return 0    // Production : amont, pas d'indent
-    case 2: return 20   // Distribution : 1 cran
-    case 3: return 40   // Émission : 2 crans
-    case 4: return 30   // Régulation seule : entre distribution et émission
-    default: return 0   // Autre / non typé : aligné à gauche
+// Priorité de rôle minimale présente dans les devices du système courant.
+// Sert à calculer l'indentation RELATIVE : si le système n'a que des émetteurs
+// (cas typique éclairage), on ne les indente pas dans le vide — pas de
+// production/distribution en amont à laquelle se rattacher.
+const minRolePriorityInSystem = computed(() => {
+  const merged = [...props.devices, ...sharedDevices.value]
+  if (!merged.length) return 1
+  let min = 5
+  for (const d of merged) {
+    const p = rolePriority(d)
+    if (p < min) min = p
   }
+  return min
+})
+// Indentation arborescente cellule « Nom » : 12px par cran relatif à l'amont
+// présent dans le système (Production → Distribution → Émission).
+function nameIndent(d) {
+  const rel = rolePriority(d) - minRolePriorityInSystem.value
+  return Math.max(0, rel) * 12
+}
+// Connecteur « └─ » uniquement si un rôle plus amont existe dans le système.
+function showConnector(d) {
+  return rolePriority(d) > minRolePriorityInSystem.value && rolePriority(d) <= 4
 }
 // Couleur du connecteur « └─ » : code visuel par rôle pour repérer le niveau
 // sans avoir à lire la colonne Niveau(x).
@@ -327,26 +340,27 @@ async function removeDevice(d) {
                  de fond verte de la ligne et le tooltip du bouton partage).
                  Largeur auto au contenu : pas de min-w. -->
             <td class="px-2 py-2 align-middle">
-              <div class="flex items-center gap-1" :style="{ paddingLeft: nameIndent(d) + 'px' }">
-                <!-- Connecteur arborescent « └─ » avant le nom pour
-                     les niveaux aval (distribution / émission / régul.) :
-                     l'œil suit la chaîne énergétique amont → aval. -->
-                <span v-if="rolePriority(d) >= 2 && rolePriority(d) <= 4"
+              <div class="flex items-center gap-1.5" :style="{ paddingLeft: nameIndent(d) + 'px' }">
+                <!-- Connecteur arborescent « └─ » avant le nom uniquement si
+                     un rôle plus amont existe dans le système. Évite le └─
+                     orphelin sur un système éclairage qui n'a que des
+                     émetteurs. -->
+                <span v-if="showConnector(d)"
                       class="select-none text-base leading-none shrink-0"
                       :class="connectorColorClass(d)"
                       aria-hidden="true">└─</span>
-                <div class="relative min-w-40 flex-1">
-                  <input type="text" :value="d.name" placeholder="Nommer ce système"
-                         @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                         :class="inputCls"
-                         class="w-full font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic"
-                         :style="isBackup(d) ? { paddingRight: '28px' } : null" />
-                  <span v-if="isBackup(d)"
-                        class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300"
-                        v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
-                    <ShieldExclamationIcon class="w-3.5 h-3.5" />
-                  </span>
-                </div>
+                <input type="text" :value="d.name" placeholder="Nommer ce système"
+                       @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
+                       :class="inputCls"
+                       class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+                <!-- Badge Secours collé au champ Nom (sibling, pas absolute) :
+                     suit la fin de l'input, ne s'aligne pas au bord droit
+                     de la cellule. -->
+                <span v-if="isBackup(d)"
+                      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 shrink-0"
+                      v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
+                  <ShieldExclamationIcon class="w-3.5 h-3.5" />
+                </span>
               </div>
             </td>
             <!-- Marque -->
