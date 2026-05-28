@@ -477,10 +477,13 @@ onBeforeUnmount(teardownSortable)
                 </button>
               </div>
             </header>
-            <!-- Les 3 niveaux R175-6 sur une grille égale. Chaque cellule
-                 peut respirer (min-w-64) sans contraintes de table HTML. -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div v-for="level in LEVELS" :key="level.key" class="space-y-1">
+            <!-- Mig 187 v4 — Les 3 niveaux R175-6 en FLEX WRAP : chaque niveau
+                 prend la largeur de son contenu. « Chaudière 1 » seul reste
+                 compact, « Sous-station de réseau de chaleur urbain » +
+                 régulateur s'élargit naturellement. Les niveaux flow sur
+                 une ligne et wrap si le viewport est trop étroit. -->
+            <div class="flex flex-wrap gap-x-8 gap-y-3">
+              <div v-for="level in LEVELS" :key="level.key" class="space-y-1 min-w-0">
                 <label class="block text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
                   {{ level.label }}
                 </label>
