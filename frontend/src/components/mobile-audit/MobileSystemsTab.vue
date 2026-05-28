@@ -1181,7 +1181,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           />
           <MobileYesNo
             label="Est-ce un équipement de secours ?"
-            description="Non utilisé en fonctionnement normal — exclu du cumul de puissance BACS."
+            description="Relève qui ne tourne qu'en cas de panne, pointe extrême ou maintenance (typique : 2ᵉ chaudière en cascade quelques heures par an). Puissance exclue du cumul BACS (seuils 70 / 290 kW). Si elle tourne en permanence en complément, laisser sur Non."
             :model-value="deviceForm.is_backup"
             @update:model-value="v => deviceForm.is_backup = v"
           />

@@ -557,7 +557,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="flex items-center justify-between gap-3">
             <div class="text-sm flex-1">
               <div class="font-medium text-gray-800">Est-ce un équipement de secours ?</div>
-              <div class="text-xs text-gray-500 mt-0.5">Équipement de secours, non utilisé en fonctionnement normal — sa puissance n'entre pas dans le calcul d'assujettissement au décret.</div>
+              <div class="text-xs text-gray-500 mt-0.5">Équipement de relève qui ne tourne qu'en cas de panne, pointe extrême ou maintenance — typiquement une 2<sup>e</sup> chaudière en cascade qui ne démarre que quelques heures par an. Sa puissance est <strong>exclue du cumul</strong> retenu pour l'assujettissement BACS (seuils 70 puis 290 kW). Si elle fonctionne en permanence en complément, la laisser sur Non.</div>
             </div>
             <SegmentedToggle :model-value="triState(device.is_backup)" :options="YESNO"
                              @update:model-value="v => patch({ is_backup: v })" />

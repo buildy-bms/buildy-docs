@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.118",
+      "date": "2026-05-28",
+      "title": "Card 04 — explication « équipement de secours » détaillée (cascade n+1, seuils BACS)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Texte d'aide « Est-ce un équipement de secours ? » plus concret",
+          "what": "L'aide sous la question explique maintenant le cas typique (2ᵉ chaudière en cascade qui ne démarre que quelques heures par an), précise que la puissance est exclue du cumul retenu pour l'assujettissement BACS (seuils 70 puis 290 kW), et ajoute un garde-fou : si la 2ᵉ chaudière tourne en permanence en complément, laisser sur Non.",
+          "where": "Audit BACS card 04 → ouvrir un équipement → bloc « État de l'équipement » → question « Est-ce un équipement de secours ? ». Idem en PWA mobile dans la fiche équipement.",
+          "how": "Sur un audit avec 2 chaudières en cascade dont la 2ᵉ est rarement utilisée, ouvrir sa fiche : le texte d'aide explique désormais quand cocher Oui (relève / secours) vs Non (cascade permanente), et l'impact sur le calcul de puissance retenue."
+        }
+      ]
+    },
+    {
       "version": "0.1.117",
       "date": "2026-05-28",
       "title": "Card 06 — listes Production / Distribution / Émission strictement filtrées par rôle",
