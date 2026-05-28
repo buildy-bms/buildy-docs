@@ -4,7 +4,8 @@ import Sortable from 'sortablejs'
 import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import {
   REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
-  derivedGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
+  derivedGranularity, resolveGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
+  GRANULARITY_OPTIONS,
 } from '@/lib/audit-options'
 import { buildPrefillPatch, regulationTypeLabel } from '@/lib/thermal-prefill'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -13,11 +14,12 @@ import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Tooltip from '@/components/Tooltip.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
+import ThermalLevelCell from '@/components/audit/ThermalLevelCell.vue'
 import DataTableSortHeader from '@/components/DataTableSortHeader.vue'
 import { useTableSort } from '@/composables/useTableSort'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
-import { updateBacsThermal, reorderBacsThermal } from '@/api'
+import { updateBacsThermal, reorderBacsThermal, updateBacsDevice } from '@/api'
 import { filterAndSortByRole } from '@/composables/useDeviceRoleFilter'
 
 // Niveaux R175-6 (Production / Distribution / Émission). Chaque niveau
@@ -143,11 +145,51 @@ function systemDisplayName(t) {
   if (prod) return prod.name || prod.brand || prod.model_reference || `Équipement #${prod.id}`
   return defaultLabel(t)
 }
+// Mig 187 — granularité désormais SAISIE explicitement sur le device
+// émetteur (`regulation_granularity`). Fallback sur la dérivée pour les
+// rows historiques sans valeur explicite. Le label/tone n'est connu que
+// pour les 3 valeurs canoniques (per_room / per_zone / central_only) ;
+// pour les valeurs custom créées par l'auditeur, on affiche la valeur
+// telle quelle avec un ton neutre.
 function granularityForRow(t) {
   const emitter = deviceForLevel(t, 'emission')
-  const emissionType = emitter?.regulation_type_emission || null
-  const key = derivedGranularity(emissionType)
-  return { key, label: GRANULARITY_LABELS_FR[key], tone: GRANULARITY_TONES[key] }
+  const key = resolveGranularity(emitter)
+  return {
+    key,
+    label: GRANULARITY_LABELS_FR[key] || key,
+    tone: GRANULARITY_TONES[key] || 'bg-gray-50 text-gray-700 border-gray-200',
+    deviceId: emitter?.id || null,
+    derivedKey: derivedGranularity(emitter?.regulation_type_emission || null),
+  }
+}
+// Patch granularité explicite sur le device émetteur. Si l'utilisateur
+// repasse à la valeur dérivée par défaut, on remet le champ à null pour
+// signaler « pas de surcharge » (l'UI re-tombera sur la dérivée).
+async function patchGranularity(t, value) {
+  const info = granularityForRow(t)
+  if (!info.deviceId) return
+  const next = (value && value !== info.derivedKey) ? value : null
+  try {
+    await updateBacsDevice(info.deviceId, { regulation_granularity: next })
+    // Synchro state local : on cherche le device dans le store et on
+    // l'updaite à la volée (sinon il faudrait refresh complet).
+    const dev = (audit.devices || []).find(d => d.id === info.deviceId)
+    if (dev) dev.regulation_granularity = next
+    await audit.refreshActionItems()
+  } catch { error('Sauvegarde granularité impossible') }
+}
+
+// Mig 187 — détecte si la régulation est intégrée à l'équipement.
+// Logique « intégrée par défaut » :
+//   - device explicitement marqué Déportée (regulation_integrated === 0/false) → NON intégrée (on affiche le régulateur séparé)
+//   - tous les autres cas (null = non répondu, true = explicite, device absent…) → on suppose intégrée
+// Ça épargne 90% des cellules « régulateur déporté » qui dupliquaient
+// l'équipement principal quand l'auditeur n'avait pas encore cliqué.
+// L'auditeur peut basculer en Déportée dans la modale équipement pour
+// faire apparaître le second select.
+function regulationIsIntegrated(device) {
+  if (!device) return true
+  return !(device.regulation_integrated === 0 || device.regulation_integrated === false)
 }
 
 // ── Ajout / suppression d'entrées de régulation (mig 170) ──
@@ -313,11 +355,8 @@ onBeforeUnmount(teardownSortable)
           <DataTableSortHeader sort-key="system" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Système</DataTableSortHeader>
           <th v-if="anyWoodExempt">Exempté bois</th>
           <th>Production</th>
-          <th>Régulation production</th>
           <th>Distribution</th>
-          <th>Régulation distribution</th>
           <th>Émission</th>
-          <th>Régulation émission</th>
           <th>Granularité</th>
           <th>Actions</th>
         </tr>
@@ -362,125 +401,48 @@ onBeforeUnmount(teardownSortable)
             </Tooltip>
             <span v-else class="text-gray-300 text-xs">—</span>
           </td>
-          <!-- Production : équipement (sans type/âge, ils sont sur le device Card 03) -->
+          <!-- Mig 187 — Layout regroupé : 1 colonne par niveau (Production /
+               Distribution / Émission), chacune contenant équipement principal
+               + chip type de régulation + équipement régulateur séparé SI
+               régulation déportée (`regulation_integrated === 0` sur l'éq.).
+               Sinon « Régulation intégrée » affiché en chip neutre = pas de
+               double saisie. Notes par niveau accessibles via icône. -->
+          <td v-for="level in LEVELS" :key="level.key" class="align-top">
+            <ThermalLevelCell
+              :thermal="t"
+              :level="level.key"
+              :device="deviceForLevel(t, level.key)"
+              :device-options="deviceOptionsForLevel(t, level.key)"
+              :regulator-options="deviceOptionsForLevel(t, 'regulation')"
+              :regulation-type-label="levelRegulationTypeLabel(t, level.key)"
+              :integrated="regulationIsIntegrated(deviceForLevel(t, level.key))"
+              :note-html="t[LEVEL_NOTES_FIELD[level.key]] || ''"
+              @patch-thermal="(p) => patchThermal(t, p)"
+              @open-notes="emit('open-notes', {
+                title: 'Notes ' + level.label + ' — ' + t.zone_name,
+                contextLabel: t.zone_name + ' · ' + level.label,
+                entityType: 'thermal', entityRef: t,
+                currentHtml: t[LEVEL_NOTES_FIELD[level.key]] || '',
+                noteField: LEVEL_NOTES_FIELD[level.key],
+              })" />
+          </td>
+          <!-- Mig 187 — Granularité R175-6 désormais ÉDITABLE (saisie sur le
+               device émetteur dans la modale équipement). Le SearchableSelect
+               ci-dessous offre les options canoniques + creatable. Vide = on
+               affiche la valeur dérivée du type d'émission. -->
           <td class="align-middle">
-            <div class="min-w-40">
+            <div class="min-w-32">
               <SearchableSelect
-                :model-value="t.generator_device_id"
-                @update:modelValue="v => patchThermal(t, { generator_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'production')"
-                :invalid="!t.generator_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'production')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'production') }}
-              </div>
+                :model-value="granularityForRow(t).key"
+                @update:modelValue="(v) => patchGranularity(t, v)"
+                :options="GRANULARITY_OPTIONS"
+                :clearable="true" :creatable="true" size="sm" placeholder="—" />
+              <span v-if="granularityForRow(t).deviceId && !deviceForLevel(t, 'emission')?.regulation_granularity"
+                    class="mt-1 inline-block text-[9px] text-gray-400 italic"
+                    v-tooltip="`Valeur dérivée automatiquement du type d'émission. Pour la fixer, choisis une valeur dans la liste.`">
+                auto
+              </span>
             </div>
-          </td>
-          <!-- Équipement de régulation Production + icône notes Production -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.production_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { production_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.production_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Production — ' + t.zone_name, contextLabel: t.zone_name + ' · Production', entityType: 'thermal', entityRef: t, currentHtml: t.production_notes_html || '', noteField: 'production_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.production_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.production_notes_html) ? 'Note production' : 'Ajouter une note production'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Distribution : équipement -->
-          <td class="align-middle">
-            <div class="min-w-40">
-              <SearchableSelect
-                :model-value="t.distribution_device_id"
-                @update:modelValue="v => patchThermal(t, { distribution_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'distribution')"
-                :invalid="!t.distribution_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'distribution')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'distribution') }}
-              </div>
-            </div>
-          </td>
-          <!-- Équipement de régulation Distribution + icône notes -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.distribution_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { distribution_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.distribution_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Distribution — ' + t.zone_name, contextLabel: t.zone_name + ' · Distribution', entityType: 'thermal', entityRef: t, currentHtml: t.distribution_notes_html || '', noteField: 'distribution_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.distribution_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.distribution_notes_html) ? 'Note distribution' : 'Ajouter une note distribution'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Émission : équipement -->
-          <td class="align-middle">
-            <div class="min-w-40">
-              <SearchableSelect
-                :model-value="t.emission_device_id"
-                @update:modelValue="v => patchThermal(t, { emission_device_id: v != null ? parseInt(v, 10) : null })"
-                :options="deviceOptionsForLevel(t, 'emission')"
-                :invalid="!t.emission_device_id"
-                size="sm" placeholder="—"
-                search-placeholder="Rechercher…" />
-              <div v-if="levelRegulationTypeLabel(t, 'emission')"
-                   class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-                   v-tooltip="`Type de régulation déclaré sur l'équipement. Modifier dans la card Systèmes.`">
-                {{ levelRegulationTypeLabel(t, 'emission') }}
-              </div>
-            </div>
-          </td>
-          <!-- Équipement de régulation Émission + icône notes -->
-          <td class="align-middle">
-            <div class="flex items-center gap-1 min-w-40">
-              <div class="flex-1 min-w-0">
-                <SearchableSelect
-                  :model-value="t.emission_regulation_device_id"
-                  @update:modelValue="v => patchThermal(t, { emission_regulation_device_id: v != null ? parseInt(v, 10) : null })"
-                  :options="deviceOptionsForLevel(t, 'regulation')"
-                  :invalid="!t.emission_regulation_device_id"
-                  size="sm" placeholder="—"
-                  search-placeholder="Sonde, thermo…" />
-              </div>
-              <button type="button"
-                      @click="emit('open-notes', { title: 'Notes Émission — ' + t.zone_name, contextLabel: t.zone_name + ' · Émission', entityType: 'thermal', entityRef: t, currentHtml: t.emission_notes_html || '', noteField: 'emission_notes_html' })"
-                      :class="['btn-icon', hasNotes(t.emission_notes_html) && 'is-active']"
-                      v-tooltip="hasNotes(t.emission_notes_html) ? 'Note émission' : 'Ajouter une note émission'">
-                <PencilSquareIcon class="w-4 h-4" />
-              </button>
-            </div>
-          </td>
-          <!-- Mig 180 : Granularité R175-6 dérivée du type d'émission du
-               device émetteur de la ligne (modale équipement → section
-               Régulation → type d'émission). Lecture seule. -->
-          <td class="align-middle">
-            <span :class="['inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap', granularityForRow(t).tone]"
-                  v-tooltip="`Granularité dérivée du type d'émission de l'équipement émetteur. Modifier dans la card Systèmes.`">
-              {{ granularityForRow(t).label }}
-            </span>
           </td>
           <!-- Actions de l'entrée de régulation : notes globales + suppression -->
           <td class="align-middle">

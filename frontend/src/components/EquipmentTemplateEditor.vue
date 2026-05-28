@@ -30,7 +30,7 @@ import {
 } from '@/api'
 import ContentValidationDot from './ContentValidationDot.vue'
 import SearchableSelect from './SearchableSelect.vue'
-import { ENERGY_OPTIONS, ROLE_OPTIONS, bacsCategoryForLibraryCategory, regulationDefaultsForCategory } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, GRANULARITY_OPTIONS, bacsCategoryForLibraryCategory, regulationDefaultsForCategory } from '@/lib/audit-options'
 import RegulationTypesEditor from './RegulationTypesEditor.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import { useNotification } from '@/composables/useNotification'
@@ -101,6 +101,9 @@ const form = ref({
   regulation_production_types: [],
   regulation_distribution_types: [],
   regulation_emission_types: [],
+  // Mig 187 — granularité R175-6 par défaut (pré-remplie sur le device à
+  // la création).
+  default_regulation_granularity: null,
 })
 
 // Item 10 — codes de contre-indications de pilotage par type d'équipement.
@@ -283,6 +286,7 @@ watch(() => props.template, (t) => {
       regulation_production_types:   Array.isArray(t.regulation_production_types)   ? t.regulation_production_types   : [],
       regulation_distribution_types: Array.isArray(t.regulation_distribution_types) ? t.regulation_distribution_types : [],
       regulation_emission_types:     Array.isArray(t.regulation_emission_types)     ? t.regulation_emission_types     : [],
+      default_regulation_granularity: t.default_regulation_granularity || null,
     }
   }
 }, { immediate: true })
@@ -369,6 +373,7 @@ async function save({ close = true } = {}) {
       regulation_production_types:   form.value.regulation_production_types.length   ? form.value.regulation_production_types   : null,
       regulation_distribution_types: form.value.regulation_distribution_types.length ? form.value.regulation_distribution_types : null,
       regulation_emission_types:     form.value.regulation_emission_types.length     ? form.value.regulation_emission_types     : null,
+      default_regulation_granularity: form.value.default_regulation_granularity || null,
     }
     let res
     if (isEdit.value) {
@@ -621,6 +626,20 @@ async function destroy() {
               v-model="form.regulation_emission_types"
               :default-values="regulationEmissionDefaults"
               level="emission" />
+            <!-- Mig 187 — granularité par défaut R175-6, pré-remplie sur les
+                 devices créés depuis ce modèle. -->
+            <div class="mt-3">
+              <label class="block text-[11px] font-medium text-gray-600 mb-1">
+                Granularité par défaut R175-6 <span class="text-gray-400 font-normal">(optionnel)</span>
+              </label>
+              <SearchableSelect v-model="form.default_regulation_granularity"
+                                :options="GRANULARITY_OPTIONS"
+                                :clearable="true" :creatable="true" size="sm"
+                                placeholder="Par pièce / Par zone / Centralisée…" />
+              <p class="text-[10px] text-gray-400 mt-0.5 leading-snug">
+                Pré-remplit le champ « Granularité » de la modale équipement à la création d'un device depuis ce modèle. Reste éditable au cas par cas.
+              </p>
+            </div>
           </div>
           <p v-if="!hasProductionRole && !hasDistributionRole && !hasEmissionRole"
              class="text-[11px] text-gray-400 italic">

@@ -16,7 +16,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import {
   ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS,
-  regulationTypesForCategory,
+  regulationTypesForCategory, GRANULARITY_OPTIONS,
   isThermalCategory, isDeviceComplete, deviceMissingFields,
 } from '@/lib/audit-options'
 
@@ -431,6 +431,24 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                                   :clearable="true" :creatable="true" size="sm"
                                   placeholder="Bureau, salle de réunion…"
                                   @update:model-value="v => patch({ regulator_location_emission: v || null })" />
+              </div>
+              <!-- Mig 187 — Granularité R175-6 saisie explicitement (per_room /
+                   per_zone / central_only). Pré-remplie depuis le modèle
+                   d'équipement (`default_regulation_granularity`) à la
+                   création du device. -->
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+                  Granularité de la régulation R175-6
+                  <span class="text-gray-400 font-normal">— précision spatiale du pilotage</span>
+                </label>
+                <SearchableSelect :model-value="device.regulation_granularity"
+                                  :options="GRANULARITY_OPTIONS"
+                                  :clearable="true" :creatable="true" size="sm"
+                                  placeholder="Par pièce / Par zone / Centralisée…"
+                                  @update:model-value="v => patch({ regulation_granularity: v || null })" />
+                <p class="text-[10px] text-gray-400 mt-0.5 leading-snug">
+                  <strong>Par pièce</strong> = thermostat ou vanne dans chaque pièce. <strong>Par zone</strong> = sonde de zone qui pilote plusieurs pièces. <strong>Centralisée</strong> = un seul réglage pour tout le bâtiment / tout le système.
+                </p>
               </div>
             </div>
           </div>

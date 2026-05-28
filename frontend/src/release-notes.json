@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.114",
+      "date": "2026-05-28",
+      "title": "Card 06 plus lisible · card 08 débloquable · granularité R175-6 saisie · perf GTB",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Card 06 « Régulation thermique » : layout regroupé par niveau",
+          "what": "Le tableau passe de 11 colonnes à 8 (Zone · Usage · Système · Production · Distribution · Émission · Granularité · Actions). Chaque cellule de niveau contient l'équipement principal + le chip type de régulation, et n'affiche un second select « Régulateur déporté » QUE si l'auditeur a explicitement déclaré la régulation comme déportée dans la modale équipement. Par défaut, on suppose intégrée → fini les doublons « Chaudière / Chaudière ». Composant dédié `ThermalLevelCell.vue`.",
+          "where": "Audit BACS → card 06 « Régulation thermique automatique ».",
+          "how": "Ouvre l'audit BACS, va sur la card 06. Si un équipement a sa régulation intégrée (cas usuel), tu vois un chip bleu « Régulation intégrée » au lieu d'un second select dupliqué. Pour faire apparaître le régulateur déporté, ouvre la modale d'édition de l'équipement (card 03) et coche « Déportée » sur la question « La régulation est-elle intégrée à l'équipement ou déportée ? »."
+        },
+        {
+          "kind": "feat",
+          "title": "Granularité R175-6 (Par pièce / Par zone / Centralisée) saisie explicitement",
+          "what": "Nouvelle colonne `bacs_audit_system_devices.regulation_granularity` (TEXT, creatable) — mig 187. La granularité n'est plus uniquement dérivée du type d'émission : elle est demandée dans la modale d'édition d'équipement (sous Type de régulation d'émission) ET pré-remplie depuis le modèle d'équipement (`default_regulation_granularity` sur `equipment_templates`, éditable dans l'éditeur de modèle). La card 06 expose un SearchableSelect creatable sur cette colonne (la valeur dérivée reste affichée avec un badge « auto » si rien n'est saisi).",
+          "where": "Audit BACS → modale Modifier un équipement → bloc Régulation, sous Type de régulation d'émission. Bibliothèque → Systèmes techniques → Éditer un modèle → bloc Types de régulation suggérés → Granularité par défaut.",
+          "how": "Ouvre la modale d'un équipement d'émission, choisis sa granularité (Par pièce / Par zone / Centralisée). Reviens sur card 06 : la valeur apparaît directement. Si tu choisis la valeur dérivée par défaut, le champ se remet à null pour signaler « pas de surcharge »."
+        },
+        {
+          "kind": "feat",
+          "title": "Card 08 « Inspection périodique » : toggle « Aucune inspection à déclarer »",
+          "what": "Nouveau toggle Oui/Non en tête de la card 08 + champ texte raison optionnel. Quand coché, la card est considérée validée même sans inspection saisie, et aucune action corrective R175-5-1 n'est générée. Utile pour les sites non soumis (ex. ERP hors champ) ou qui n'ont pas encore été inspectés pour des raisons légitimes. Persisté sur le document (mig 187 : colonnes `inspection_not_applicable` + `inspection_not_applicable_reason`).",
+          "where": "Audit BACS → card 08 « Inspection périodique par un tiers ».",
+          "how": "Sur un audit avec GTB présente, ouvre la card 08. Le bloc gris en tête propose « Aucune inspection à déclarer ? ». Coche Oui et saisis (optionnellement) la raison. La card peut maintenant être validée."
+        },
+        {
+          "kind": "perf",
+          "title": "Toggles GTB plus réactifs — `saveBms` fire-and-forget",
+          "what": "Avant : chaque clic sur un toggle GTB (présent, usages traités, …) enchaînait `await PATCH` + `await refreshActionItems()` dans le store, soit ~300-1000ms de freeze UI selon la taille de l'audit. Maintenant : PATCH fire-and-forget + refresh debouncé 800ms via `scheduleActionItemsRefresh`. Les clics multiples consécutifs ne se sérialisent plus.",
+          "where": "Audit BACS → card 07 « Solution GTB » → tous les toggles Oui/Non et boutons usages traités.",
+          "how": "Sur un audit chargé, clique 3-4 toggles GTB d'affilée. Avant : chaque clic devait attendre le précédent. Maintenant : tous les clics réagissent indépendamment, et le plan d'action ne se recalcule qu'une seule fois 800 ms après la dernière action."
+        }
+      ]
+    },
+    {
       "version": "0.1.113",
       "date": "2026-05-28",
       "title": "Types de régulation par usage + toggle « communicant » dissocié du protocole",

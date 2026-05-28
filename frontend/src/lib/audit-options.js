@@ -257,10 +257,29 @@ export const REGULATION_TYPES_EMISSION     = regulationTypesForCategory('emissio
 // modale équipement.
 export function derivedGranularity(emissionType) {
   if (!emissionType) return 'central_only'
-  if (emissionType === 'thermostat_ambiant' || emissionType === 'vanne_thermostatique') return 'per_room'
+  if (emissionType === 'thermostat_ambiant' || emissionType === 'thermostat_sonde_deportee' || emissionType === 'vanne_thermostatique') return 'per_room'
   if (emissionType === 'sonde_zone') return 'per_zone'
   return 'central_only'
 }
+
+// Mig 187 — granularité désormais SAISIE explicitement par l'auditeur dans
+// la modale équipement (champ `regulation_granularity` sur le device). Si
+// vide, on retombe sur `derivedGranularity()` pour compat ascendante.
+// `resolveGranularity` est l'unique source de vérité côté UI : tout
+// affichage de granularité (card 06, badges, etc.) doit passer par elle.
+export function resolveGranularity(device) {
+  if (device?.regulation_granularity) return device.regulation_granularity
+  return derivedGranularity(device?.regulation_type_emission || null)
+}
+
+// Options pour le SearchableSelect (creatable). L'auditeur peut saisir une
+// valeur libre si la sienne n'est pas listée — stockée en TEXT côté DB.
+export const GRANULARITY_OPTIONS = [
+  { value: 'per_room',     label: 'Par pièce' },
+  { value: 'per_zone',     label: 'Par zone' },
+  { value: 'central_only', label: 'Centralisée' },
+]
+
 export const GRANULARITY_LABELS_FR = {
   per_room: 'Par pièce',
   per_zone: 'Par zone',
