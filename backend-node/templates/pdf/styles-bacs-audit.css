@@ -86,12 +86,12 @@ h1, h2, h3, h4, h5 {
   print-color-adjust: exact;
   position: relative;
 }
-/* Discrète accroche visuelle : 1 trait vert Buildy verticale à gauche */
+/* Bandeau supérieur full-width vert Buildy : signature visuelle franche. */
 .cover::before {
   content: '';
   position: absolute;
-  left: 0; top: 28mm; bottom: 28mm;
-  width: 2.5mm;
+  top: 0; left: 0; right: 0;
+  height: 4mm;
   background: var(--buildy-green);
 }
 
@@ -102,7 +102,6 @@ h1, h2, h3, h4, h5 {
 }
 .cover-logo {
   width: 42mm;
-  filter: brightness(0) invert(1);
 }
 .cover-eyebrow {
   font-family: 'Inter', sans-serif;
@@ -630,9 +629,9 @@ h1, h2, h3, h4, h5 {
 }
 .r175-row {
   display: grid;
-  grid-template-columns: 24mm 1fr 38mm 18mm;
+  grid-template-columns: 24mm minmax(0, 1fr) 38mm 18mm;
   align-items: center;
-  gap: 4mm;
+  gap: 7mm;
   padding: 3mm 4mm;
   background: white;
   border: 0.4pt solid var(--neutral-200);
@@ -673,14 +672,15 @@ h1, h2, h3, h4, h5 {
 .r175-row-verdict {
   display: inline-flex;
   align-items: center;
-  gap: 1.5mm;
-  padding: 1.2mm 2.5mm;
+  gap: 1.8mm;
+  padding: 1.4mm 4mm;
   border-radius: 2mm;
   font-family: 'Poppins', sans-serif;
   font-size: 8pt;
   font-weight: 600;
   white-space: nowrap;
   justify-content: center;
+  justify-self: center;
 }
 .r175-row-verdict-icon {
   font-weight: 700;
@@ -715,7 +715,7 @@ h1.chapter {
   font-weight: 700;
   color: #1b2842;
   margin: 0 0 5mm 0;
-  padding: 0 0 1.5mm 0;
+  padding: 0.5mm 0 0.5mm 3.5mm;
   page-break-before: always;
   letter-spacing: -0.01em;
   position: relative;
@@ -723,16 +723,17 @@ h1.chapter {
   align-items: baseline;
   gap: 2.5mm;
 }
-/* Trait court vert Buildy en dessous, plus elegant qu'une ligne pleine. */
-h1.chapter::after {
+/* Indicateur de section : fine barre verticale verte Buildy à gauche,
+   alignée sur la hauteur du titre. Plus lisible et plus pro qu'un stub. */
+h1.chapter::before {
   content: '';
   position: absolute;
   left: 0;
-  bottom: 0;
-  width: 14mm;
-  height: 1mm;
+  top: 0.5mm;
+  bottom: 0.5mm;
+  width: 1.2mm;
   background: #00cd92;
-  border-radius: 2.5mm;
+  border-radius: 0.6mm;
 }
 h2 {
   font-family: 'Poppins', sans-serif;
@@ -891,11 +892,11 @@ table .total-row td {
    formateur…) qui complètent une réponse Oui/Non. Affichés en bloc compact
    sous la liste kv, indentés visuellement par un filet bleu. */
 .bms-sub-detail {
-  margin: 1.5mm 3mm 0;
-  padding: 1.5mm 2mm;
+  margin: 2.5mm -4mm -3mm;
+  padding: 2.5mm 4mm;
   background: #f0f9ff;
-  border-left: 1.5pt solid #0ea5e9;
-  border-radius: 0 1mm 1mm 0;
+  border-top: 0.4pt solid #bae6fd;
+  border-radius: 0 0 2mm 2mm;
   display: flex;
   flex-wrap: wrap;
   gap: 1mm 4mm;
@@ -1084,6 +1085,94 @@ table .total-row td {
   white-space: nowrap;
   line-height: 1.2;
 }
+/* Variante compacte pour tableaux denses (plan d'action, plan de comptage,
+   énergie-section…) — taille de pill harmonisée avec le corps de table. */
+.m-pill-sm {
+  padding: 0.4mm 1.4mm;
+  font-size: 6.5pt;
+  line-height: 1.15;
+}
+.role-pill-sm {
+  padding: 0.3mm 1.2mm;
+  font-size: 6.4pt;
+  line-height: 1.15;
+  border-radius: 3mm;
+}
+
+/* Table équipements groupés par zone (chap 6 GTB — « Intégrés / À intégrer »).
+   Remplace l'ancienne liste plate `.bms-row` qui mélangeait nom, catégorie,
+   zone et marque sur une seule ligne difficile à parcourir. */
+.bms-devices-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7.5pt;
+  margin: 0 4mm 3mm;
+}
+.bms-devices-table thead th {
+  background: #fafbfc;
+  font-size: 6.5pt;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1.2mm 2mm;
+  text-align: left;
+  vertical-align: bottom;
+  border-bottom: 0.3pt solid #e5e7eb;
+}
+.bms-devices-table th.bms-devices-zone {
+  background: #eef2f7;
+  color: #1b2842;
+  font-size: 7.5pt;
+  letter-spacing: 0.03em;
+  border-bottom: none;
+  padding: 1.8mm 2mm 1mm;
+}
+.bms-devices-table tbody td {
+  padding: 1.2mm 2mm;
+  border-bottom: 0.3pt solid #f3f4f6;
+  vertical-align: middle;
+  font-size: 7.5pt;
+}
+.bms-devices-table tbody td.bms-col-name strong { color: #1b2842; font-weight: 600; }
+.bms-devices-table tbody td .muted { color: #6b7280; font-size: 6.5pt; }
+.bms-devices-table tbody tr:last-child td { border-bottom: none; }
+.bms-devices-table tbody tr:nth-child(odd) td { background: #fafbfc; }
+.bms-col-pwr { text-align: right; white-space: nowrap; font-weight: 600; color: #1b2842; }
+.bms-col-roles { white-space: nowrap; }
+.bms-col-usage, .bms-col-loc { white-space: nowrap; }
+/* Variante « à intégrer » : tonalité ambrée pour signaler le gap. */
+.bms-devices-table-gap thead th.bms-devices-zone { background: #fff7ed; color: #9a3412; }
+
+/* ─── Centrage harmonisé des tableaux ─────────────────────────────────
+   Demande Kévin : pour les colonnes « secondaires » (état, badge, pill,
+   valeur courte), centrer en-tête et cellules ; conserver le texte
+   gauche pour la 1ʳᵉ colonne (Nom / Zone / Référence) qui sert d'ancre
+   visuelle au lecteur.
+   Règle : toute colonne autre que la première dans une table dense
+   d'audit est centrée par défaut sauf si elle a `text-align:left` ou si
+   sa classe le force (ex. action-card-desc, bms-col-name…). */
+.bms-devices-table thead th:not(.bms-devices-zone):not(.bms-col-name),
+.bms-devices-table tbody td:not(.bms-col-name) { text-align: center; }
+.bms-devices-table thead th.bms-col-pwr,
+.bms-devices-table tbody td.bms-col-pwr { text-align: right; }
+
+.energy-section-table thead th:not(:first-child),
+.energy-section-table tbody td:not(:first-child):not(:nth-child(2)):not(:nth-child(3)) { text-align: center; }
+/* Colonne Protocole(s) reste à gauche (texte multi-mots). */
+.energy-section-table thead th.meter-protocols-cell,
+.energy-section-table tbody td.meter-protocols-cell { text-align: left; }
+
+.bms-components-table thead th:not(:first-child),
+.bms-components-table tbody td:not(:first-child) { text-align: center; }
+.bms-components-table tbody td:nth-child(2) { text-align: left; }
+
+table.action-group-table thead th:not(:first-child):not(.agt-num),
+table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: center; }
+
+/* Tables de synthèse A3 (bacs-audit-tables.hbs) : idem, sauf nom et notes. */
+table.syn thead th:not(:first-child):not(.col-name):not(.col-notes),
+table.syn tbody td:not(:first-child):not(.col-name):not(.col-notes) { text-align: center; }
 /* Variantes anciennes conservees pour le decret (Annexe A et autres
    endroits eventuels qui utilisent encore .usage-tag/s). */
 .usage-tags { display: flex; flex-wrap: wrap; gap: 1.5mm; margin: 1.5mm 0 4mm; }
@@ -2705,12 +2794,12 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-/* Trait vert Buildy vertical à gauche, comme la cover */
+/* Bandeau supérieur full-width vert Buildy : miroir de la cover. */
 .closing::before {
   content: '';
   position: absolute;
-  left: 0; top: 28mm; bottom: 28mm;
-  width: 2.5mm;
+  top: 0; left: 0; right: 0;
+  height: 4mm;
   background: var(--buildy-green);
 }
 .closing-top {
@@ -2720,7 +2809,6 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 }
 .closing-logo {
   width: 38mm;
-  filter: brightness(0) invert(1);
 }
 .closing-eyebrow {
   font-family: 'Inter', sans-serif;
@@ -2818,6 +2906,26 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   border-top: 0.4pt solid rgba(255, 255, 255, 0.14);
   font-size: 9pt;
   color: rgba(255, 255, 255, 0.78);
+}
+
+/* Bouton CTA principal vert centre : invitation a demander le devis. */
+.closing-cta-button-wrap {
+  margin-top: 12mm;
+  display: flex;
+  justify-content: center;
+}
+.closing-cta-button {
+  display: inline-block;
+  padding: 5mm 14mm;
+  background: var(--buildy-green);
+  color: var(--buildy-navy);
+  font-family: 'Poppins', sans-serif;
+  font-size: 12pt;
+  font-weight: 700;
+  border-radius: 3mm;
+  letter-spacing: -0.005em;
+  text-align: center;
+  box-shadow: 0 2pt 6pt rgba(0, 205, 146, 0.25);
 }
 
 /* ─── Plan de comptage — matrice de couverture (ch.4) ──────────────── */

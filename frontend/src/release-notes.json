@@ -2,6 +2,69 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.126",
+      "date": "2026-05-29",
+      "title": "PDF audit BACS : page de garde plus distinctive, pills aérées, CTA devis sur la 4e de couverture",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Page de garde et 4e de couverture : logo Buildy en couleur + bandeau vert haut",
+          "what": "Le logo Buildy passe en version blanche officielle (couleurs préservées : vert/blanc, plus de filtre brightness/invert). Le filet vert latéral est remplacé par un bandeau vert 4mm sur toute la largeur du haut de page, plus affirmé. Symétrique sur la cover et la 4e de couverture.",
+          "where": "PDF audit BACS — page 1 (page de garde) et dernière page.",
+          "how": "Exporter un PDF audit : la cover et la 4e de couverture ont un bandeau vert en haut. Le logo Buildy s'affiche en blanc avec son accent vert."
+        },
+        {
+          "kind": "feat",
+          "title": "Bouton CTA « Demandez votre devis » centré sur la 4e de couverture",
+          "what": "Un gros bouton vert centré « Demandez votre devis de mise en conformité BACS » (variante GTB classique pour les audits hors décret) est ajouté au-dessus du bloc de contacts « Pour échanger sur la suite ». Le texte « Demandez une démonstration » est retiré (redondant).",
+          "where": "PDF audit BACS — dernière page (page de clôture).",
+          "how": "Exporter un PDF audit : le bouton vert centré est visible juste avant les coordonnées de contact."
+        },
+        {
+          "kind": "feat",
+          "title": "Indicateur vertical de section sur les titres de chapitre (au lieu d'un stub horizontal)",
+          "what": "Le tiret vert sous chaque H1 chapitre est remplacé par une fine barre verticale verte à gauche du titre (sur toute la hauteur du H1). Plus lisible, plus professionnel.",
+          "where": "PDF audit BACS — tous les titres de chapitre numérotés (1. Identification du site, 2. Zones, 3. Systèmes…).",
+          "how": "Exporter le PDF : chaque opener de chapitre porte sa barre verticale verte à gauche."
+        },
+        {
+          "kind": "fix",
+          "title": "Pills harmonisées dans tout le PDF (taille sm cohérente, plus de débordement)",
+          "what": "Les pills d'usage compteur, type compteur, rôle équipement et catégorie système étaient incohérentes en taille selon le chapitre (parfois énormes dans le plan d'action, parfois normales ailleurs). Toutes les pills hors tables principales basculent en variante sm (6.5pt, padding réduit) : proportions harmonieuses, plus de tableaux qui débordent à droite.",
+          "where": "PDF audit BACS — device-cards systèmes (chap 3), cards compteur (chap 4), tables BMS (chap 6), cards action plan (chap 7), table action groupée.",
+          "how": "Comparer un PDF avant/après : les pills sont à la même taille du début à la fin."
+        },
+        {
+          "kind": "feat",
+          "title": "Tables PDF : équipements GTB regroupés par zone + colonnes centrées",
+          "what": "Le chapitre 6 « Solution GTB » présente désormais les équipements intégrés / à intégrer dans un vrai tableau structuré (colonnes Équipement / Usage / Fonctions / Localisation / Puissance) regroupé par zone, au lieu de l'ancienne liste inline. Les en-têtes et cellules secondaires des tableaux sont centrées pour une lecture plus pro (1re colonne nom reste à gauche).",
+          "where": "PDF audit BACS — chap 6 + chap 4 compteurs + chap 7 plan d'action + synthèse A3.",
+          "how": "Exporter le PDF d'un audit avec des équipements intégrés à la GTB : tableau par zone, lecture verticale claire."
+        },
+        {
+          "kind": "fix",
+          "title": "Pill verdict R175 mieux aérée + plus de collision avec le texte de gauche",
+          "what": "Sur le tableau de bord « Conformité par exigence du décret R175 » (page 5), la pill verdict (Statut / Non conforme / Partiellement conforme / À qualifier…) avait son texte qui touchait les bords + le texte de la colonne précédente venait toucher la pill. Padding intérieur augmenté + écart entre colonnes du grid augmenté à 7mm.",
+          "where": "PDF audit BACS — page 5 « Conformité par exigence du décret R175 ».",
+          "how": "Exporter le PDF : chaque pill verdict a de l'air à gauche / droite et ne colle plus au descriptif."
+        },
+        {
+          "kind": "fix",
+          "title": "Bloc « Modalités de maintenance » désormais en bandeau full-width de la card R175-4",
+          "what": "Le bloc bleu pâle qui détaille la périodicité et le responsable de maintenance (chap 6, card R175-4) avait des marges latérales qui le laissaient flotter au milieu de la card. Il est désormais ancré en bandeau bas plein-largeur de la card R175-4, avec coins arrondis raccord.",
+          "where": "PDF audit BACS — chap 6, card « R175-4 Vérifications périodiques ».",
+          "how": "Auditer un site avec des consignes écrites de maintenance + une périodicité saisie : le bloc remplit la largeur de la card."
+        },
+        {
+          "kind": "fix",
+          "title": "Section « Actions phares à engager en priorité » retirée du PDF",
+          "what": "La section « Actions phares à engager en priorité » de la note de synthèse faisait doublon avec le chap 7 « Plan de mise en conformité » qui contient déjà la liste complète priorisée. Elle est supprimée du PDF.",
+          "where": "PDF audit BACS — note de synthèse (chap 0).",
+          "how": "Exporter un PDF : la section a disparu de la note de synthèse, le plan d'action chap 7 reste la source unique."
+        }
+      ]
+    },
+    {
       "version": "0.1.125",
       "date": "2026-05-28",
       "title": "PDF audit BACS : icônes des encarts rendues correctement + libellés de colonnes complets",

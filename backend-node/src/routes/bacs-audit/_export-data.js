@@ -486,6 +486,20 @@ async function buildBacsAuditExportData(af, opts = {}) {
     ...d,
     categoryLabel: SYSTEM_LABEL[d.system_category] || d.system_category,
   }));
+  // Vue regroupée par zone pour le tableau « Équipements intégrés à la GTB »
+  // du PDF chapitre 6. Évite les lignes plates « Nom · Usage · Zone · Marque »
+  // qui sont peu lisibles et redondent la zone à chaque ligne.
+  function groupDevicesByZone(list) {
+    const map = new Map();
+    for (const d of list) {
+      const z = d.zone_name || 'Hors zone';
+      if (!map.has(z)) map.set(z, { zone_name: z, devices: [] });
+      map.get(z).devices.push(d);
+    }
+    return [...map.values()].sort((a, b) => a.zone_name.localeCompare(b.zone_name, 'fr'));
+  }
+  const bmsManagedDevicesByZone = groupDevicesByZone(bmsManagedDevices);
+  const bmsUnmanagedDevicesByZone = groupDevicesByZone(bmsUnmanagedDevices);
   const bmsManagedMeters = enrichedMeters.filter(m => m.managed_by_bms);
   const bmsUnmanagedMeters = enrichedMeters.filter(m => !m.managed_by_bms && m.present_actual && !m.out_of_service);
 
@@ -1113,7 +1127,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bmsComponents,
     inspections,
     bmsManagedDevices,
+    bmsManagedDevicesByZone,
     bmsUnmanagedDevices,
+    bmsUnmanagedDevicesByZone,
     bmsManagedMeters,
     bmsUnmanagedMeters,
     metersByZone,
@@ -1151,6 +1167,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
     exportDate,
     version,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
     // Charts (lot B2)
     sevDonutDataUrl,
     barUsagePowerDataUrl,
