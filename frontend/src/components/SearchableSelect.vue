@@ -50,6 +50,10 @@ const props = defineProps({
   multiple: { type: Boolean, default: false },
   // Si true : habillage rouge pâle pour signaler une info manquante.
   invalid: { type: Boolean, default: false },
+  // Si true : largeur du trigger s'adapte au contenu sélectionné (min-w-fit)
+  // au lieu d'occuper 100% du parent. Utilisé dans la card 06 pour que la
+  // largeur des listes reflète la richesse du nom de l'équipement choisi.
+  autoWidth: { type: Boolean, default: false },
 })
 
 const triggerCls = computed(() => [
@@ -58,7 +62,9 @@ const triggerCls = computed(() => [
   // `h-9`, pour aligner verticalement avec un input texte voisin dans
   // les formulaires (incident 2026-05-27 : SearchableSelect rendait à
   // 27px là où l'input voisin faisait 32-36px → décalage visuel).
-  'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
+  props.autoWidth
+    ? 'inline-flex max-w-full items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9'
+    : 'w-full flex items-center gap-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition min-h-11 sm:min-h-9',
   props.invalid ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200',
   props.size === 'sm' ? 'px-2 py-1' : 'px-3 py-2 rounded-lg',
   props.disabled ? 'opacity-50 cursor-not-allowed' : '',

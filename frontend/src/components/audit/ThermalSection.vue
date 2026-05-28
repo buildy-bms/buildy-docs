@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, reactive } from 'vue'
 import Sortable from 'sortablejs'
-import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import { FireIcon, PencilSquareIcon, InformationCircleIcon, Bars3Icon, TrashIcon, SparklesIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 import {
   REGULATION_TYPES_PRODUCTION, REGULATION_TYPES_DISTRIBUTION, REGULATION_TYPES_EMISSION,
   derivedGranularity, resolveGranularity, GRANULARITY_LABELS_FR, GRANULARITY_TONES,
@@ -86,6 +86,20 @@ const sortedThermal = computed(() => sortedRows(props.thermalFiltered, sortTherm
 // de sortedThermal. Le DnD reste fonctionnel : chaque tbody.thermal-row a
 // son data-id et Sortable n'a pas besoin de la notion de groupe (le réordo
 // se fait à plat).
+// Mig 187 v3 — état repli/dépli par zone. Map nomZone → boolean (true =
+// replié). Par défaut tout déplié. Toggle individuel via clic header + 2
+// boutons globaux « Tout replier » / « Tout déplier » au-dessus de la liste.
+const collapsedZones = reactive({})
+function toggleZone(name) { collapsedZones[name] = !collapsedZones[name] }
+function collapseAll() {
+  for (const g of thermalGroups.value) collapsedZones[g.zoneName] = true
+}
+function expandAll() {
+  for (const g of thermalGroups.value) collapsedZones[g.zoneName] = false
+}
+const allCollapsed = computed(() => thermalGroups.value.length > 0 &&
+  thermalGroups.value.every(g => collapsedZones[g.zoneName]))
+
 const thermalGroups = computed(() => {
   const groups = []
   const byName = new Map()
@@ -375,20 +389,32 @@ onBeforeUnmount(teardownSortable)
       </p>
     </div>
 
-    <!-- Mig 187 (v2) — Layout en SOUS-CARDS par zone : chaque zone est un
-         encart bordé avec son titre, et chaque système est un article avec
-         une ligne d'en-tête identification (Chauffage · Chaudière 1 +
-         granularité + actions) suivie de 3 colonnes empilées
-         Production / Distribution / Émission. Plus de gros tableau ; les
-         dropdowns peuvent enfin afficher les noms d'équipements en entier. -->
+    <!-- Mig 187 v3 — boutons globaux + sous-cards par zone repliables.
+         L'en-tête de zone est cliquable pour replier/déplier sa liste de
+         systèmes. Plus une ligne globale au-dessus pour tout basculer. -->
+    <div class="px-3 pb-2 flex items-center justify-end">
+      <button v-if="thermalGroups.length"
+              type="button"
+              @click="allCollapsed ? expandAll() : collapseAll()"
+              class="inline-flex items-center gap-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 px-2 py-1 rounded transition">
+        <ChevronRightIcon v-if="allCollapsed" class="w-3.5 h-3.5" />
+        <ChevronDownIcon v-else class="w-3.5 h-3.5" />
+        {{ allCollapsed ? 'Tout déplier' : 'Tout replier' }}
+      </button>
+    </div>
     <div ref="tableRef" class="px-3 pb-3 space-y-4">
       <section v-for="g in thermalGroups" :key="g.zoneName"
                class="rounded-xl border border-gray-200 overflow-hidden bg-white">
-        <header class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+        <header @click="toggleZone(g.zoneName)"
+                class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition select-none">
+          <div class="flex items-center gap-2">
+            <ChevronRightIcon v-if="collapsedZones[g.zoneName]" class="w-4 h-4 text-gray-500" />
+            <ChevronDownIcon v-else class="w-4 h-4 text-gray-500" />
+            <h3 class="text-sm font-semibold text-gray-800">{{ g.zoneName }}</h3>
+          </div>
           <span class="text-[11px] text-gray-500">{{ g.rows.length }} système{{ g.rows.length > 1 ? 's' : '' }}</span>
         </header>
-        <div class="thermal-zone-list divide-y divide-gray-100">
+        <div v-show="!collapsedZones[g.zoneName]" class="thermal-zone-list divide-y divide-gray-100">
           <article v-for="t in g.rows" :key="t.id"
                    :data-id="t.id"
                    class="thermal-row p-4">
