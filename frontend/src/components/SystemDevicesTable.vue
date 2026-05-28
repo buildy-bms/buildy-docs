@@ -124,6 +124,27 @@ function rolePriority(d) {
 function isBackup(d) {
   return d.is_backup === 1 || d.is_backup === true
 }
+// Indentation arborescente cellule « Nom » : visualise la chaîne énergétique
+// Production → Distribution → Émission (régulation seule au milieu).
+function nameIndent(d) {
+  switch (rolePriority(d)) {
+    case 1: return 0    // Production : amont, pas d'indent
+    case 2: return 20   // Distribution : 1 cran
+    case 3: return 40   // Émission : 2 crans
+    case 4: return 30   // Régulation seule : entre distribution et émission
+    default: return 0   // Autre / non typé : aligné à gauche
+  }
+}
+// Couleur du connecteur « └─ » : code visuel par rôle pour repérer le niveau
+// sans avoir à lire la colonne Niveau(x).
+function connectorColorClass(d) {
+  switch (rolePriority(d)) {
+    case 2: return 'text-indigo-400'  // Distribution
+    case 3: return 'text-rose-400'    // Émission
+    case 4: return 'text-violet-400'  // Régulation seule
+    default: return 'text-gray-300'
+  }
+}
 
 const displayDevices = computed(() => {
   const merged = [...props.devices, ...sharedDevices.value]
@@ -306,16 +327,26 @@ async function removeDevice(d) {
                  de fond verte de la ligne et le tooltip du bouton partage).
                  Largeur auto au contenu : pas de min-w. -->
             <td class="px-2 py-2 align-middle">
-              <div class="flex items-center gap-1.5">
-                <span v-if="isBackup(d)"
-                      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 shrink-0"
-                      v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
-                  <ShieldExclamationIcon class="w-3.5 h-3.5" />
-                </span>
-                <input type="text" :value="d.name" placeholder="Nommer ce système"
-                       @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
-                       :class="inputCls"
-                       class="min-w-40 font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic" />
+              <div class="flex items-center gap-1" :style="{ paddingLeft: nameIndent(d) + 'px' }">
+                <!-- Connecteur arborescent « └─ » avant le nom pour
+                     les niveaux aval (distribution / émission / régul.) :
+                     l'œil suit la chaîne énergétique amont → aval. -->
+                <span v-if="rolePriority(d) >= 2 && rolePriority(d) <= 4"
+                      class="select-none text-base leading-none shrink-0"
+                      :class="connectorColorClass(d)"
+                      aria-hidden="true">└─</span>
+                <div class="relative min-w-40 flex-1">
+                  <input type="text" :value="d.name" placeholder="Nommer ce système"
+                         @blur="e => e.target.value !== (d.name || '') && patchDevice(d, { name: e.target.value || null })"
+                         :class="inputCls"
+                         class="w-full font-semibold text-gray-900 placeholder:font-normal placeholder:text-gray-300 placeholder:italic"
+                         :style="isBackup(d) ? { paddingRight: '28px' } : null" />
+                  <span v-if="isBackup(d)"
+                        class="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 border border-amber-300"
+                        v-tooltip="'Équipement de secours — puissance exclue du cumul BACS'">
+                    <ShieldExclamationIcon class="w-3.5 h-3.5" />
+                  </span>
+                </div>
               </div>
             </td>
             <!-- Marque -->

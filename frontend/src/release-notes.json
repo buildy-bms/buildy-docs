@@ -2,23 +2,23 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
-      "version": "0.1.119",
+      "version": "0.1.120",
       "date": "2026-05-28",
-      "title": "Card 04 — équipements ordonnés par chaîne énergétique + badge « Secours »",
+      "title": "Card 04 — arborescence Production → Distribution → Émission + badge « Secours » dans le champ Nom",
       "highlights": [
         {
           "kind": "feat",
-          "title": "Tri par défaut : Production → Distribution → Émission → Régulation",
-          "what": "Dans chaque système de la card 04, les équipements sont désormais affichés par défaut dans l'ordre de la chaîne énergétique (production → distribution → émission → régulation seule → autre). Un équipement multi-rôle (ex. chaudière taggée production+régulation) est rangé sur son rôle le plus amont. Au sein d'un groupe, ordre alphabétique sur le nom. Cliquer un en-tête de colonne (Nom / Marque / Puissance / …) surcharge ce tri.",
+          "title": "Indentation et connecteur « └─ » pour visualiser la chaîne énergétique",
+          "what": "Dans chaque système, les équipements sont triés par défaut Production → Distribution → Émission → Régulation seule, puis alphabétique. Les niveaux aval sont visuellement indentés (Distribution +20px, Émission +40px, Régulation +30px) avec un connecteur arborescent « └─ » coloré devant leur nom (indigo Distribution, rose Émission, violet Régulation). Permet de lire la dépendance amont/aval d'un coup d'œil, comme un arbre de fichiers. Cliquer un en-tête de colonne surcharge le tri.",
           "where": "Audit BACS card 04 « Systèmes techniques par zone » → sous-table des équipements de chaque système.",
-          "how": "Ouvrir un audit avec chaudière + circuit eau chaude + radiateur dans un même système : la chaudière (production) apparaît en haut, le circuit (distribution) au milieu, le radiateur (émission) en bas — la dépendance amont/aval se lit en un coup d'œil."
+          "how": "Sur un système avec chaudière + circuit eau chaude + radiateur : la chaudière (production) reste collée à gauche, le circuit (distribution) apparaît indenté avec un └─ indigo, le radiateur (émission) encore plus indenté avec un └─ rose."
         },
         {
           "kind": "feat",
-          "title": "Badge « Secours » à côté du nom",
-          "what": "Les équipements marqués `is_backup` portent un badge orange (icône bouclier) à gauche de leur nom, avec un tooltip rappelant que leur puissance est exclue du cumul retenu pour l'assujettissement BACS. Permet de repérer instantanément la 2ᵉ chaudière de cascade qui ne tourne qu'en relève.",
-          "where": "Card 04 → première colonne « Nom ».",
-          "how": "Sur un équipement coché « Est-ce un équipement de secours ? » = Oui, un cercle orange avec une icône bouclier apparaît à gauche du nom."
+          "title": "Badge « Secours » intégré dans le champ Nom (à droite)",
+          "what": "Les équipements marqués `is_backup` portent désormais un badge orange (icône bouclier) à l'intérieur du champ Nom, sur la droite (au lieu de l'extérieur à gauche). Tooltip au survol rappelant que leur puissance est exclue du cumul retenu pour l'assujettissement BACS.",
+          "where": "Card 04 → colonne « Nom » → coin droit du champ texte.",
+          "how": "Sur un équipement coché « Est-ce un équipement de secours ? » = Oui dans la modale, un cercle orange avec une icône bouclier apparaît à droite à l'intérieur du champ Nom."
         }
       ]
     },
