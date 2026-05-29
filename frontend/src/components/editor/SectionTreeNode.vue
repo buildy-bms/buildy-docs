@@ -26,8 +26,20 @@ const props = defineProps({
   kindIcon: { type: Object, required: true },
   isEmpty: { type: Function, required: true },
   search: { type: String, default: '' },
+  selectionMode: { type: Boolean, default: false },
+  selectedIds: { type: Set, default: () => new Set() },
 })
-const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits(['select', 'toggle', 'add-child', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library', 'toggle-select'])
+
+const isChecked = computed(() => props.selectedIds.has(props.node.id))
+
+function onRowClick() {
+  if (props.selectionMode) {
+    emit('toggle-select', props.node)
+    return
+  }
+  emit('select', props.node.id)
+}
 
 // Niveau de contrat de l'AF injecte par AfDetailView (mig 92). Sert a
 // calculer la disponibilite de chaque feature au niveau choisi par le MOA.
@@ -232,18 +244,40 @@ const titleHtml = computed(() => {
       :style="indentStyle"
       :class="[
         'group w-full text-left flex items-center gap-1.5 h-6 pr-2 rounded-md transition-colors leading-tight',
-        isSelected ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-gray-100 text-gray-700',
+        selectionMode && isChecked ? 'bg-red-50 ring-1 ring-red-200' : (isSelected ? 'bg-indigo-50 text-indigo-900' : 'hover:bg-gray-100 text-gray-700'),
         dragOver ? 'ring-2 ring-emerald-400 bg-emerald-50' : '',
         excluded && !optedOut ? 'opacity-50' : '',
       ]"
-      @click="emit('select', node.id)"
+      @click="onRowClick"
       @dragover="onDragOver"
       @dragleave="onDragLeave"
       @drop="onDrop"
     >
-      <!-- Drag handle : visible au hover, declenche le drag SortableJS. -->
-      <span class="section-drag-handle shrink-0 opacity-0 group-hover:opacity-100 cursor-grab text-gray-400 hover:text-gray-700 -ml-0.5"
-            @click.stop @mousedown.stop>
+      <!-- Checkbox de sélection multiple (uniquement en mode sélection). -->
+      <span
+        v-if="selectionMode"
+        @click.stop="emit('toggle-select', node)"
+        class="shrink-0 inline-flex items-center justify-center w-5 h-5 -ml-0.5 rounded cursor-pointer"
+      >
+        <span
+          :class="[
+            'inline-flex items-center justify-center w-4 h-4 rounded border transition-colors',
+            isChecked ? 'bg-red-600 border-red-600' : 'bg-white border-gray-300 hover:border-red-400',
+          ]"
+        >
+          <svg v-if="isChecked" class="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42L8.5 12.08l6.79-6.79a1 1 0 011.42 0z" clip-rule="evenodd" />
+          </svg>
+        </span>
+      </span>
+      <!-- Drag handle : visible au hover, declenche le drag SortableJS.
+           Masque en mode sélection pour eviter les ambiguites. -->
+      <span
+        v-if="!selectionMode"
+        class="section-drag-handle shrink-0 opacity-0 group-hover:opacity-100 cursor-grab text-gray-400 hover:text-gray-700 -ml-0.5"
+        @click.stop
+        @mousedown.stop
+      >
         <Bars3Icon class="w-3 h-3" />
       </span>
       <!-- Slot statut "verifie" : toujours rendu (place fixe la plus a gauche)
@@ -316,7 +350,7 @@ const titleHtml = computed(() => {
            hidden plutot qu'opacity-0 pour ne pas voler de largeur au titre.
            Tooltips via <Tooltip> (instantanes, fond sombre) pour remplacer les
            native title= qui ont un delai de ~500ms et un style basique. -->
-      <span class="hidden group-hover:flex items-center gap-0.5 shrink-0">
+      <span v-if="!selectionMode" class="hidden group-hover:flex items-center gap-0.5 shrink-0">
         <Tooltip
           v-if="canDemand"
           :text="demanded ? 'Annuler la validation MOA' : 'Marquer comme fonction exigée par la MOA (à inclure dans l\'avenant contractuel)'"
@@ -475,6 +509,8 @@ const titleHtml = computed(() => {
         :kind-icon="kindIcon"
         :is-empty="isEmpty"
         :search="search"
+        :selection-mode="selectionMode"
+        :selected-ids="selectedIds"
         @select="emit('select', $event)"
         @toggle="emit('toggle', $event)"
         @add-child="emit('add-child', $event)"
@@ -490,6 +526,7 @@ const titleHtml = computed(() => {
         @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"
+        @toggle-select="emit('toggle-select', $event)"
       />
     </div>
   </div>
