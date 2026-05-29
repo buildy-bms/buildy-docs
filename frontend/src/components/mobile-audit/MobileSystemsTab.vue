@@ -6,7 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
-import { updateBacsSystem, shareBacsDevice, moveBacsDevice, createBacsDevice, updateBacsDevice, deleteBacsDevice, createBacsSystem, deleteBacsSystem, listSystemCategories } from '@/api'
+import { updateBacsSystem, shareBacsDevice, moveBacsDevice, createBacsDevice, updateBacsDevice, deleteBacsDevice, createBacsSystem, deleteBacsSystem, listSystemCategories, getEquipmentTemplate } from '@/api'
 import MobileField from './MobileField.vue'
 import MobileSheet from './MobileSheet.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
@@ -15,11 +15,9 @@ import MobileLibraryPicker from './MobileLibraryPicker.vue'
 import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
-import SearchableSelect from '@/components/SearchableSelect.vue'
-import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
 import MobileYesNo from './MobileYesNo.vue'
-import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete } from '@/lib/audit-options'
+import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete, regulationTypesForCategory, GRANULARITY_OPTIONS } from '@/lib/audit-options'
 
 // Item 8 — type de calcul de puissance par équipement. Vide = automatique.
 const POWER_CALC_OPTIONS = [
@@ -133,8 +131,8 @@ const SYSTEM_NEGATIVE_LABEL = {
   electricity_production: 'Pas de production photovoltaïque',
 }
 // Options décorées (icônes + couleurs) depuis lib/audit-options pour un
-// rendu visuel cohérent dans le MobileSelectSheet (énergie) et le
-// SearchableSelect (niveaux multi-select).
+// rendu visuel cohérent dans les MobileSelectSheet (énergie mono,
+// niveaux multi).
 const ENERGY_OPTIONS = ENERGY_OPTIONS_DECORATED
 const ROLE_OPTIONS = ROLE_OPTIONS_DECORATED
 
@@ -430,10 +428,20 @@ function openCreateDevice(system) {
     name: '', brand: '', model_reference: '', power_kw: null,
     // Item 8 — puissance frigorifique + type de calcul + secours.
     power_kw_cooling: null, power_calculation_type: null, is_backup: null,
+    // Identification — quantité + âge (parité desktop DeviceEditModal).
+    quantity: 1, age_years: null,
     // Multi-rôle (mig 117) : array.
     energy_source: null, device_role: [], location: '',
-    // Communication : protocoles multi (string JSON) + câblé.
-    communication_protocols: null, wired: null,
+    // Communication : protocoles multi (string JSON) + câblé + ternaire
+    // `is_communicating` (mig 185).
+    is_communicating: null, communication_protocols: null, wired: null,
+    // Régulation (mig 183 + 184 + 187) : ternaire + sous-champs par niveau.
+    has_regulation: null, regulation_integrated: null,
+    regulator_brand: null, regulator_model_reference: null,
+    regulation_type_production: null, regulator_location_production: null,
+    regulation_type_distribution: null, regulator_location_distribution: null,
+    regulation_type_emission: null, regulation_granularity: null,
+    regulator_location_emission: null,
     // État R175-3 4° + Hors service. null = non répondu (cf. mig 172).
     meets_r175_3_p4: null, meets_r175_3_p4_autonomous: null, out_of_service: null,
     // Item 7c — séparabilité du comptage (équipement partagé).
@@ -473,13 +481,29 @@ async function saveDevice() {
       energy_source: deviceForm.value.energy_source,
       device_role: Array.isArray(deviceForm.value.device_role) ? deviceForm.value.device_role : [],
       location: deviceForm.value.location?.trim() || null,
+      // Identification — quantité + âge (parité desktop).
+      quantity: deviceForm.value.quantity === '' || deviceForm.value.quantity == null ? 1 : Math.max(1, parseInt(deviceForm.value.quantity, 10) || 1),
+      age_years: deviceForm.value.age_years === '' || deviceForm.value.age_years == null ? null : Math.max(0, parseInt(deviceForm.value.age_years, 10) || 0),
       // Communication (regroupe Protocoles + Câblé pour cohérence desktop).
+      is_communicating: triBool(deviceForm.value.is_communicating),
       communication_protocols: deviceForm.value.communication_protocols ?? null,
       // Le legacy `communication_protocol` (single) est nullé : la source
       // de vérité côté écriture est désormais `communication_protocols`
       // (cohérent avec patchDevice de SystemDevicesTable).
       communication_protocol: null,
       wired: triBool(deviceForm.value.wired),
+      // Régulation — mêmes champs que DeviceEditModal desktop.
+      has_regulation: triBool(deviceForm.value.has_regulation),
+      regulation_integrated: triBool(deviceForm.value.regulation_integrated),
+      regulator_brand: deviceForm.value.regulator_brand?.trim() || null,
+      regulator_model_reference: deviceForm.value.regulator_model_reference?.trim() || null,
+      regulation_type_production: deviceForm.value.regulation_type_production || null,
+      regulator_location_production: deviceForm.value.regulator_location_production || null,
+      regulation_type_distribution: deviceForm.value.regulation_type_distribution || null,
+      regulator_location_distribution: deviceForm.value.regulator_location_distribution || null,
+      regulation_type_emission: deviceForm.value.regulation_type_emission || null,
+      regulation_granularity: deviceForm.value.regulation_granularity || null,
+      regulator_location_emission: deviceForm.value.regulator_location_emission || null,
       // État R175-3 4° + Hors service. null = non répondu.
       meets_r175_3_p4: triBool(deviceForm.value.meets_r175_3_p4),
       meets_r175_3_p4_autonomous: triBool(deviceForm.value.meets_r175_3_p4_autonomous),
@@ -547,6 +571,109 @@ const deviceComplete = computed(() =>
     ? isDeviceComplete(deviceForm.value, editingDevice.value.system?.system_category)
     : false)
 const deviceForced = computed(() => !!deviceForm.value?.validation_forced)
+
+// ── Niveaux (device_role) — pilote l'affichage des champs régulation ─
+const deviceRole = computed(() =>
+  Array.isArray(deviceForm.value.device_role)
+    ? deviceForm.value.device_role
+    : (deviceForm.value.device_role ? [deviceForm.value.device_role] : []))
+const hasProductionRole   = computed(() => deviceRole.value.includes('production'))
+const hasDistributionRole = computed(() => deviceRole.value.includes('distribution'))
+const hasEmissionRole     = computed(() => deviceRole.value.includes('emission'))
+
+// ── Régulation : template d'équipement (mig 184 — surcharges types). ──
+const deviceTemplate = ref(null)
+watch(() => deviceForm.value.equipment_template_id, async (id) => {
+  if (!id) { deviceTemplate.value = null; return }
+  try { const { data } = await getEquipmentTemplate(id); deviceTemplate.value = data }
+  catch { deviceTemplate.value = null }
+}, { immediate: true })
+const deviceCategoryForRegulation = computed(() => editingDevice.value?.system?.system_category || null)
+const regulationProductionOptions = computed(() =>
+  regulationTypesForCategory('production',   deviceCategoryForRegulation.value, deviceTemplate.value?.regulation_production_types))
+const regulationDistributionOptions = computed(() =>
+  regulationTypesForCategory('distribution', deviceCategoryForRegulation.value, deviceTemplate.value?.regulation_distribution_types))
+const regulationEmissionOptions = computed(() =>
+  regulationTypesForCategory('emission',     deviceCategoryForRegulation.value, deviceTemplate.value?.regulation_emission_types))
+// Détails régulateur cachés UNIQUEMENT si régulation explicitement « Intégrée ».
+const showRegulatorDetails = computed(() =>
+  !(deviceForm.value.regulation_integrated === 1 || deviceForm.value.regulation_integrated === true))
+// Toggle has_regulation : ajoute/retire automatiquement 'regulation' dans device_role.
+function setHasRegulation(v) {
+  const roles = new Set(deviceRole.value)
+  deviceForm.value.has_regulation = v
+  if (v === true) {
+    roles.add('regulation')
+    deviceForm.value.device_role = [...roles]
+  } else if (v === false) {
+    roles.delete('regulation')
+    deviceForm.value.device_role = [...roles]
+    deviceForm.value.regulator_brand = null
+    deviceForm.value.regulator_model_reference = null
+    deviceForm.value.regulation_integrated = null
+    deviceForm.value.regulation_type_production = null
+    deviceForm.value.regulator_location_production = null
+    deviceForm.value.regulation_type_distribution = null
+    deviceForm.value.regulator_location_distribution = null
+    deviceForm.value.regulation_type_emission = null
+    deviceForm.value.regulation_granularity = null
+    deviceForm.value.regulator_location_emission = null
+  }
+}
+// ── Toggle is_communicating : Oui → garde protocoles ; Non → efface. ──
+function setIsCommunicating(v) {
+  deviceForm.value.is_communicating = v
+  if (v === false) {
+    deviceForm.value.communication_protocols = null
+  }
+}
+// ── Protocoles : MobileSelectSheet multi prend un Array, la DB stocke
+//    un JSON.stringify. On wrappe avec parse/stringify, et on filtre les
+//    options « non_communicant » / « absent » qui sont portées par le
+//    toggle is_communicating ci-dessus (parité desktop).
+const protocolOptionsPwa = computed(() =>
+  COMM_OPTIONS.filter(o => o.value !== 'non_communicant' && o.value !== 'absent')
+)
+const protocolsArray = computed(() => {
+  const raw = deviceForm.value.communication_protocols
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return raw ? [raw] : []
+  }
+})
+function updateProtocols(arr) {
+  if (!Array.isArray(arr) || !arr.length) {
+    deviceForm.value.communication_protocols = null
+  } else {
+    deviceForm.value.communication_protocols = JSON.stringify(arr)
+  }
+}
+// Options de zones (label + value identiques, creatable côté UI).
+const zoneOptionsForReg = computed(() => {
+  const all = audit.zones || []
+  const isTech = z => /techn|local.*technique|lt/i.test(`${z.kind || ''} ${z.name || ''}`)
+  const tech = all.filter(isTech)
+  const rest = all.filter(z => !isTech(z))
+  return [...tech, ...rest].filter(z => z.name).map(z => ({ value: z.name, label: z.name }))
+})
+// Granularité R175-6 — import shared.
+
+// Titre du sheet d'édition équipement : nom de l'équipement courant
+// (ou marque+ref, ou label de l'usage en fallback). Permet à l'auditeur
+// de toujours savoir ce qu'il édite dans le header sticky.
+const deviceSheetTitle = computed(() => {
+  if (!editingDevice.value) return ''
+  if (editingDevice.value.mode === 'create') return 'Nouvel équipement'
+  const d = deviceForm.value || editingDevice.value.device || {}
+  const parts = []
+  if (d.name) parts.push(d.name)
+  else if (d.brand || d.model_reference) parts.push([d.brand, d.model_reference].filter(Boolean).join(' '))
+  if (parts.length) return parts.join(' ')
+  return editingDevice.value.system ? usageLabel(editingDevice.value.system) : 'Équipement'
+})
 
 // ── Puissance conditionnelle (chaud / froid selon l'usage desservi) ─
 const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
@@ -999,10 +1126,11 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
       </div>
     </MobileSheet>
 
-    <!-- Sheet édition device -->
+    <!-- Sheet édition device : titre = nom de l'équipement courant
+         (ou « Nouvel équipement » en création). -->
     <MobileSheet
       :open="!!editingDevice"
-      :title="editingDevice?.mode === 'create' ? 'Nouvel équipement' : 'Équipement'"
+      :title="deviceSheetTitle"
       :saving="savingDevice"
       @close="closeDevice"
       @save="saveDevice"
@@ -1029,7 +1157,13 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           </span>
         </div>
 
+        <!-- Le toggle disparait quand l'equipement est complet (plus
+             besoin de forcer). Aligne sur le pattern desktop : si l'auditeur
+             a deja force et complete ensuite, le toggle masque a vraisement
+             plus de raison d'etre. Pour defaire un forcage actif sur un
+             equipement encore incomplet, on garde le toggle visible. -->
         <MobileYesNo
+          v-if="!deviceComplete"
           label="Forcer la validation de cet équipement ?"
           description="À activer si certaines informations resteront définitivement inconnues. L'équipement sera considéré validé même incomplet."
           :model-value="deviceForm.validation_forced"
@@ -1089,6 +1223,34 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           </MobileField>
         </div>
 
+        <!-- Identification — Quantité + Âge (parité desktop). -->
+        <div class="grid grid-cols-2 gap-3">
+          <MobileField label="Quantité">
+            <input
+              v-model.number="deviceForm.quantity"
+              type="number"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              min="1"
+              step="1"
+              placeholder="1"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+            />
+          </MobileField>
+          <MobileField label="Âge (années)">
+            <input
+              v-model.number="deviceForm.age_years"
+              type="number"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              min="0"
+              step="1"
+              placeholder="—"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+            />
+          </MobileField>
+        </div>
+
         <!-- Puissance conditionnelle : chaud / froid selon l'usage desservi.
              Les deux champs uniquement pour un équipement réversible
              (chauffage ET refroidissement). -->
@@ -1140,12 +1302,12 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
         </MobileField>
 
         <MobileField label="Niveau(x)">
-          <SearchableSelect
-            v-model="deviceForm.device_role"
+          <MobileSelectSheet
+            :model-value="Array.isArray(deviceForm.device_role) ? deviceForm.device_role : (deviceForm.device_role ? [deviceForm.device_role] : [])"
+            @update:model-value="v => deviceForm.device_role = v"
             :options="ROLE_OPTIONS"
             :multiple="true"
-            :clearable="true"
-            :creatable="true"
+            title="Niveaux"
             placeholder="Sélectionner un ou plusieurs niveaux"
           />
         </MobileField>
@@ -1160,17 +1322,97 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           />
         </MobileField>
 
-        <!-- Communication : Protocoles d'abord puis Câblé (regroupement
-             cohérent avec la sous-section desktop). -->
-        <div class="space-y-2">
-          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Communication</p>
-          <MobileField label="Protocole(s)">
-            <ProtocolMultiPicker
-              :model-value="deviceForm.communication_protocols ?? null"
-              :options="COMM_OPTIONS"
-              size="sm"
-              placeholder="Aucun protocole"
-              @update:modelValue="v => deviceForm.communication_protocols = v"
+        <!-- Régulation (parité desktop) : Oui/Non, intégrée/déportée,
+             marque/référence régulateur, types et localisations par niveau
+             (production / distribution / émission), granularité R175-6. -->
+        <div class="space-y-3 pt-2">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Régulation</p>
+          <MobileYesNo
+            label="L'équipement dispose-t-il d'une régulation ?"
+            description="Régulation intégrée (thermostat embarqué) ou externe (régulateur séparé). Si Oui, le niveau « Régulation » est ajouté automatiquement."
+            :model-value="deviceForm.has_regulation"
+            @update:model-value="setHasRegulation"
+          />
+          <template v-if="!!deviceForm.has_regulation">
+            <MobileYesNo
+              label="La régulation est-elle intégrée ou déportée ?"
+              description="Intégrée = thermostat embarqué, contrôle natif PAC. Déportée = régulateur séparé (Siemens, GTB, sonde déportée…). Si intégrée, marque/référence sont celles de l'équipement."
+              :yes-label="'Intégrée'" :no-label="'Déportée'"
+              :model-value="deviceForm.regulation_integrated"
+              @update:model-value="v => deviceForm.regulation_integrated = v"
+            />
+            <div v-if="showRegulatorDetails" class="grid grid-cols-2 gap-3">
+              <MobileField label="Marque du régulateur">
+                <input v-model="deviceForm.regulator_brand" type="text" placeholder="ex : Siemens"
+                       class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+              </MobileField>
+              <MobileField label="Référence">
+                <input v-model="deviceForm.regulator_model_reference" type="text" placeholder="ex : RVS43.143"
+                       class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+              </MobileField>
+            </div>
+            <template v-if="hasProductionRole">
+              <MobileField label="Type de régulation de production">
+                <MobileSelectSheet v-model="deviceForm.regulation_type_production"
+                  :options="regulationProductionOptions" :creatable="true"
+                  title="Type de régulation production" placeholder="Loi d'eau, cascade…" />
+              </MobileField>
+              <MobileField v-if="showRegulatorDetails" label="Localisation de la régulation de production">
+                <MobileSelectSheet v-model="deviceForm.regulator_location_production"
+                  :options="zoneOptionsForReg" :creatable="true"
+                  title="Localisation" placeholder="Chaufferie, local technique…" />
+              </MobileField>
+            </template>
+            <template v-if="hasDistributionRole">
+              <MobileField label="Type de régulation de distribution">
+                <MobileSelectSheet v-model="deviceForm.regulation_type_distribution"
+                  :options="regulationDistributionOptions" :creatable="true"
+                  title="Type de régulation distribution" placeholder="Vanne 3 voies, débit variable…" />
+              </MobileField>
+              <MobileField v-if="showRegulatorDetails" label="Localisation de la régulation de distribution">
+                <MobileSelectSheet v-model="deviceForm.regulator_location_distribution"
+                  :options="zoneOptionsForReg" :creatable="true"
+                  title="Localisation" placeholder="Gaine technique, sous-sol…" />
+              </MobileField>
+            </template>
+            <template v-if="hasEmissionRole">
+              <MobileField label="Type de régulation d'émission">
+                <MobileSelectSheet v-model="deviceForm.regulation_type_emission"
+                  :options="regulationEmissionOptions" :creatable="true"
+                  title="Type de régulation émission" placeholder="Thermostat, présence…" />
+              </MobileField>
+              <MobileField label="Granularité R175-6">
+                <MobileSelectSheet v-model="deviceForm.regulation_granularity"
+                  :options="GRANULARITY_OPTIONS" :creatable="true"
+                  title="Granularité R175-6" placeholder="Par pièce / Par zone / Centralisée…" />
+              </MobileField>
+              <MobileField v-if="showRegulatorDetails" label="Localisation de la régulation d'émission">
+                <MobileSelectSheet v-model="deviceForm.regulator_location_emission"
+                  :options="zoneOptionsForReg" :creatable="true"
+                  title="Localisation" placeholder="Bureau, salle de réunion…" />
+              </MobileField>
+            </template>
+          </template>
+        </div>
+
+        <!-- Communication : ternaire is_communicating, puis Protocoles
+             (masqués si is_communicating !== true), puis liaison câblée. -->
+        <div class="space-y-2 pt-2">
+          <p class="text-xs font-medium text-gray-600 uppercase tracking-wider">Communication &amp; conformité R175-3</p>
+          <MobileYesNo
+            label="L'équipement est-il communicant ?"
+            description="Réponds Oui ou Non. Si Oui, sélectionne au moins un protocole."
+            :model-value="deviceForm.is_communicating"
+            @update:model-value="setIsCommunicating"
+          />
+          <MobileField v-if="!!deviceForm.is_communicating" label="Protocole(s)">
+            <MobileSelectSheet
+              :model-value="protocolsArray"
+              :options="protocolOptionsPwa"
+              :multiple="true"
+              title="Protocoles de communication"
+              placeholder="Sélectionner un ou plusieurs protocoles"
+              @update:model-value="updateProtocols"
             />
           </MobileField>
           <MobileYesNo
@@ -1196,17 +1438,18 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             :model-value="deviceForm.meets_r175_3_p4_autonomous"
             @update:model-value="v => deviceForm.meets_r175_3_p4_autonomous = v"
           />
-          <MobileYesNo
-            label="L'équipement est-il hors service ?"
-            description="Équipement hors d'usage — ignoré dans le plan de mise en conformité."
-            :model-value="deviceForm.out_of_service"
-            @update:model-value="v => deviceForm.out_of_service = v"
-          />
+          <!-- Ordre desktop : is_backup AVANT out_of_service. -->
           <MobileYesNo
             label="Est-ce un équipement de secours ?"
             description="Relève qui ne tourne qu'en cas de panne, pointe extrême ou maintenance (typique : 2ᵉ chaudière en cascade quelques heures par an). Puissance exclue du cumul BACS (seuils 70 / 290 kW). Si elle tourne en permanence en complément, laisser sur Non."
             :model-value="deviceForm.is_backup"
             @update:model-value="v => deviceForm.is_backup = v"
+          />
+          <MobileYesNo
+            label="L'équipement est-il hors service ?"
+            description="Équipement hors d'usage — ignoré dans le plan de mise en conformité."
+            :model-value="deviceForm.out_of_service"
+            @update:model-value="v => deviceForm.out_of_service = v"
           />
           <!-- Mig 175 — multi-bâtiments déplacé du système vers le device.
                Chaudière commune, GPC, sous-station… qui dessert plusieurs

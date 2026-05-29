@@ -31,6 +31,7 @@ const { buildMeterCoverage } = require('./_meter-coverage');
 const bacsAuditMethodologyStatic = require('../../lib/bacs-audit-methodology');
 const bacsAuditDisclaimersStatic = require('../../lib/bacs-audit-disclaimers');
 const { isTrue, isFalse } = require('./_ternary');
+const { sortActions, groupByCard, cardOfAction } = require('./_action-cards');
 const {
   SYSTEM_LABEL, SYSTEM_NEGATIVE_LABEL, COMM_LABEL, ENERGY_LABEL, ROLE_LABEL,
   METER_TYPE_LABEL, METER_USAGE_LABEL, REGULATION_LABEL, GENERATOR_LABEL,
@@ -841,13 +842,13 @@ async function buildFixturePreviewData({ user = null } = {}) {
     ...a,
     zone_name: a.zone_id ? ZONES_RAW.find(z => z.zone_id === a.zone_id)?.name : null,
   })).filter(a => a.status !== 'done' && a.status !== 'declined');
-  const numberedItems = [
-    ...actionItemsRaw.filter(a => a.severity === 'blocking'),
-    ...actionItemsRaw.filter(a => a.severity === 'major'),
-    ...actionItemsRaw.filter(a => a.severity === 'minor'),
-  ].map((a, idx) => ({
+  // Tri theme -> severite -> r175, puis renumerotation BACS-NNN.
+  // Cf. _action-cards.js (refonte plan d'action 2026-05-29 v2 — par carte).
+  const numberedItems = sortActions(actionItemsRaw).map((a, idx) => ({
     ...a,
     display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
+    card_key:        cardOfAction(a).card,
+    card_subsection: cardOfAction(a).subsection,
   }));
   const actionItems = { blocking: [], major: [], minor: [] };
   for (const a of numberedItems) actionItems[a.severity]?.push(a);
@@ -856,6 +857,18 @@ async function buildFixturePreviewData({ user = null } = {}) {
     major: actionItems.major.length,
     minor: actionItems.minor.length,
   };
+  const actionItemsByCard = groupByCard(numberedItems).map(card => {
+    const hasSub = (card.subsections || []).length > 0;
+    const flat = (items) => items.map(it => ({ kind: 'single', item: it }));
+    const subsections = hasSub
+      ? card.subsections.map(sub => ({ ...sub, grouped: flat(sub.items) }))
+      : [{
+          key: card.key, label: card.label,
+          count: card.count, blocking: card.blocking, major: card.major, minor: card.minor,
+          items: card.items, grouped: flat(card.items),
+        }];
+    return { ...card, grouped: flat(card.items), subsections };
+  });
 
   // Justifications (Annexe C). Cf. _export-data.js : derive le label
   // depuis la FK non-NULL (apres mig 125).
@@ -1057,6 +1070,7 @@ async function buildFixturePreviewData({ user = null } = {}) {
     recapStats,
     buildySolution,
     actionItems,
+    actionItemsByCard,
     actionStats,
     actionItemsRaw: numberedItems,
     // Mig 109 : notes par sujet de la carte GTB (notesByTopic = map

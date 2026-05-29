@@ -112,7 +112,7 @@
 {{/if}}
 
 {{!-- ═══════════ Mini-tableau zones fonctionnelles ═══════════ --}}
-{{#if zones.length}}
+{{#if zonesFunctional.length}}
 <section class="table-section">
   <header class="section-head">
     <span class="section-eyebrow">Référence</span>
@@ -130,7 +130,7 @@
       </tr>
     </thead>
     <tbody>
-      {{#each zones}}
+      {{#each zonesFunctional}}
         <tr>
           <td class="col-ref">{{ref}}</td>
           <td class="col-name"><strong>{{name}}</strong></td>
@@ -143,12 +143,43 @@
     </tbody>
   </table>
 
+  {{#if zonesTechnical.length}}
+  <header class="section-head" style="margin-top:6mm">
+    <h2 class="section-title">Zones techniques</h2>
+    <p class="section-intro">Locaux abritant les équipements techniques (chaufferies, locaux GTC, locaux onduleurs PV…). Hors champ R175-1 6° mais conservés pour situer les équipements.</p>
+  </header>
+  <table class="syn syn-zones">
+    <thead>
+      <tr>
+        <th class="col-ref">Référence</th>
+        <th class="col-name">Nom</th>
+        <th class="col-nature">Nature</th>
+        <th class="col-nature">Régime d'activité</th>
+        <th class="col-surface">Surface (m²)</th>
+        <th class="col-notes">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each zonesTechnical}}
+        <tr>
+          <td class="col-ref">{{ref}}</td>
+          <td class="col-name"><strong>{{name}}</strong></td>
+          <td class="col-nature">{{natureLabel}}</td>
+          <td class="col-nature">{{#if occupancyLabel}}{{occupancyLabel}}{{else}}<span class="muted">—</span>{{/if}}</td>
+          <td class="col-surface">{{surface_m2}}</td>
+          <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+
   {{!-- Item 7d/7e — zones fonctionnelles de suivi --}}
   {{#if functionalZones.mergedCount}}
   <table class="syn syn-zones" style="margin-top:4mm">
     <thead>
       <tr>
-        <th class="col-nature">Système technique</th>
+        <th class="col-nature">Usage</th>
         <th class="col-name">Zone fonctionnelle de suivi</th>
         <th class="col-notes">Justification du regroupement</th>
       </tr>
@@ -268,8 +299,8 @@
         {{#each items}}
           <tr class="{{#if out_of_service}}row-hs{{else}}{{#unless present_actual}}row-missing{{/unless}}{{/if}}">
             <td class="col-ref">{{ref}}</td>
-            <td class="col-type">{{{meterTypePill meter_type}}}</td>
-            <td class="col-usage">{{{meterUsagePill usage}}}</td>
+            <td class="col-type">{{{meterTypePill meter_type "sm"}}}</td>
+            <td class="col-usage">{{{meterUsagePill usage "sm"}}}</td>
             <td class="col-bool"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
             <td class="col-bool">
               {{#if present_actual}}
@@ -368,21 +399,29 @@
       </tr>
     </thead>
     <tbody>
-      {{#each actionItemsRaw}}
-        <tr class="action-row action-row-{{severity}}">
-          <td class="col-ref">{{display_number}}</td>
-          <td class="col-sev"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span></td>
-          <td class="col-r175">{{r175_article}}</td>
-          <td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-title">{{title}}</td>
-          <td class="col-source">
-            {{#if source_table}}
-              {{#if (eq source_table "bacs_audit_system_devices")}}E-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_meters")}}M-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_thermal_regulation")}}T-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_bms")}}GTB{{else}}<span class="muted">—</span>{{/if}}{{/if}}{{/if}}{{/if}}
-            {{else}}
-              <span class="muted">—</span>
-            {{/if}}
-          </td>
-        </tr>
+      {{#each actionItemsByCard}}
+        <tr class="theme-row"><th colspan="6">{{label}} <span class="theme-row-meta">({{count}} action{{#unless (eq count 1)}}s{{/unless}})</span></th></tr>
+        {{#each subsections}}
+          {{#if (gt ../subsections.length 1)}}
+            <tr class="theme-sub-row"><th colspan="6">{{label}} <span class="theme-row-meta">· {{count}}</span></th></tr>
+          {{/if}}
+          {{#each items}}
+            <tr class="action-row action-row-{{severity}}">
+              <td class="col-ref">{{display_number}}</td>
+              <td class="col-sev"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span></td>
+              <td class="col-r175">{{r175_article}}</td>
+              <td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>
+              <td class="col-title">{{title}}</td>
+              <td class="col-source">
+                {{#if source_table}}
+                  {{#if (eq source_table "bacs_audit_system_devices")}}E-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_meters")}}M-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_thermal_regulation")}}T-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_bms")}}GTB{{else}}<span class="muted">—</span>{{/if}}{{/if}}{{/if}}{{/if}}
+                {{else}}
+                  <span class="muted">—</span>
+                {{/if}}
+              </td>
+            </tr>
+          {{/each}}
+        {{/each}}
       {{/each}}
     </tbody>
   </table>

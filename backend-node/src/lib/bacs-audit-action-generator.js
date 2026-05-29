@@ -253,13 +253,16 @@ function computeTargetActions(documentId) {
         p && p !== 'non_communicant' && p !== 'absent');
 
       if (!hasValidProtocol) {
-        // Cas 2 : non communicant — remplacement preconise.
+        // Cas 2 : non communicant — deux options a chiffrer pour eviter
+        // de prescrire systematiquement le remplacement (retour Kevin
+        // 2026-05-29 : en pratique l'ajout d'un module/passerelle est
+        // souvent moins couteux et c'est ce que l'integrateur retient).
         addTarget({
           source_device_id: d.id, source_subtype: 'r175_3_p3_replace',
           category: 'communication_upgrade', severity: 'major',
           r175_article: 'R175-3 §3',
-          title: `Prévoir le remplacement de « ${devName} » par un équipement communicant`,
-          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne dispose d'aucun protocole de communication et ne peut pas être raccordé au BACS en l'état. Conformément au guide PROFEEL (section 3.1.2), lorsqu'un équipement de régulation existant ne permet pas une communication avec un BACS, son remplacement est à envisager. À planifier lors du prochain remplacement ou renouvellement de l'équipement.`,
+          title: `Rendre « ${devName} » communicant`,
+          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne dispose d'aucun protocole de communication et ne peut pas être raccordé au BACS en l'état. Deux options à chiffrer par l'intégrateur : (1) ajouter un module de communication (passerelle ou convertisseur BACnet/Modbus/KNX/MQTT) — souvent l'option la moins coûteuse, à privilégier sur les équipements récents en bon état ; (2) remplacer l'équipement par un modèle communicant — à planifier lors du prochain renouvellement (recommandation guide PROFEEL §3.1.2). L'intégrateur tranche selon l'âge de l'équipement, la disponibilité d'un module fabricant et le coût comparé.`,
           zone_id: s.zone_id, equipment_id: null,
         });
       } else if (!d.wired && !d.managed_by_bms) {
@@ -383,8 +386,8 @@ function computeTargetActions(documentId) {
       source_bms_document_id: documentId, source_subtype: 'no_gtb',
       category: 'bms_upgrade', severity: 'blocking',
       r175_article: 'R175-3',
-      title: 'Installer une GTB conforme au décret BACS',
-      description: 'Aucune GTB n\'est présente sur le site. Le décret BACS impose un système d\'automatisation et de contrôle du bâtiment (GTB) assurant le suivi, la détection des dérives et le pilotage des systèmes techniques.',
+      title: 'Mettre en place une GTB conforme au décret BACS',
+      description: 'Aucune GTB n\'est déclarée sur le site. Le décret BACS impose un système d\'automatisation et de contrôle du bâtiment assurant le suivi des consommations, la détection des dérives et le pilotage des systèmes techniques. Deux pistes à instruire avec l\'intégrateur : (1) étendre une supervision ou un automate existants s\'ils peuvent porter les fonctions R175-3 ; (2) déployer une solution GTB neuve si rien d\'exploitable n\'est en place. L\'arbitrage dépend de l\'architecture déjà câblée sur site.',
     });
   }
   if (!noGtb && bms && !bms.out_of_service) {
@@ -540,8 +543,8 @@ function computeTargetActions(documentId) {
           source_thermal_id: t.id,
           category: 'thermal_regulation', severity: 'major',
           r175_article: 'R175-6',
-          title: `Installer une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`,
-          description: `L'article R175-6 exige une régulation thermique automatique par pièce ou par zone ${cat === 'cooling' ? 'refroidie' : 'chauffée'}. Le système « ${entryLabel} » n'en dispose pas actuellement.`,
+          title: `Mettre en place une régulation thermique automatique en zone « ${t.zone_name || '?'} » — ${entryLabel}`,
+          description: `L'article R175-6 exige une régulation thermique automatique par pièce ou par zone ${cat === 'cooling' ? 'refroidie' : 'chauffée'}. Le système « ${entryLabel} » n'en dispose pas actuellement. Selon l'existant, l'intégrateur arbitre entre : mise à niveau d'un thermostat déjà câblé, ajout d'un module de pilotage piloté par la GTB, ou pose d'une régulation neuve.`,
           zone_id: t.zone_id,
         });
       }

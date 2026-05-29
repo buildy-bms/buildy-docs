@@ -23,6 +23,10 @@ const props = defineProps({
   // métier où l'absence de réponse a une sémantique propre (différente de Non).
   allowPartial: { type: Boolean, default: false },
   partialLabel: { type: String, default: 'Partiel' },
+  // Permet de personnaliser les libellés des 2 boutons (par ex. « Intégrée »
+  // / « Déportée » pour la régulation, plutôt que « Oui » / « Non »).
+  yesLabel: { type: String, default: 'Oui' },
+  noLabel: { type: String, default: 'Non' },
 })
 defineEmits(['update:modelValue'])
 
@@ -43,7 +47,7 @@ const state = computed(() => (props.modelValue == null ? null : !!props.modelVal
                  state === true
                    ? 'bg-[#00cd92] text-white border-[#00cd92]'
                    : 'bg-white text-gray-600 border-gray-200']"
-      >Oui</button>
+      >{{ yesLabel }}</button>
       <button
         v-if="allowPartial"
         type="button"
@@ -60,7 +64,7 @@ const state = computed(() => (props.modelValue == null ? null : !!props.modelVal
                  state === false
                    ? 'bg-slate-600 text-white border-slate-600'
                    : 'bg-white text-gray-600 border-gray-200']"
-      >Non</button>
+      >{{ noLabel }}</button>
     </div>
   </div>
 </template>

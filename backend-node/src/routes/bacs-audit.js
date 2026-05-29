@@ -884,9 +884,33 @@ async function routes(fastify) {
     if (category) { sql += ' AND a.category = ?'; args.push(category); }
     if (status) { sql += ' AND a.status = ?'; args.push(status); }
     if (zone_id) { sql += ' AND a.zone_id = ?'; args.push(parseInt(zone_id, 10)); }
-    // Tri : severity (blocking > major > minor) puis position
-    sql += ` ORDER BY CASE a.severity WHEN 'blocking' THEN 0 WHEN 'major' THEN 1 ELSE 2 END, a.position, a.id`;
-    return db.db.prepare(sql).all(...args);
+    const rows = db.db.prepare(sql).all(...args);
+    // Tri canonique par carte de l'audit (Identification → Systèmes →
+    // Compteurs → GTB → Régulation → Inspections → Divers) puis sous-section
+    // GTB puis severite puis article puis id. Le backend calcule aussi
+    // `display_number` (BACS-001..NNN) pour que UI desktop, PWA mobile, PDF
+    // et MCP partagent EXACTEMENT la meme numerotation — pas de recalcul
+    // local cote consommateur.
+    //
+    // Numerotation : seuls les items VISIBLES (status != done/declined)
+    // recoivent un numero, identique au filtre du PDF (cf. _export-data.js
+    // ligne ~165 — WHERE status NOT IN ('done','declined')). Les items
+    // resolus / ecartes restent dans la reponse pour les vues "Toutes" /
+    // "Faites" cote PWA, mais sans numero (display_number=null).
+    const { sortActions, cardOfAction } = require('./bacs-audit/_action-cards');
+    const sorted = sortActions(rows);
+    let nbr = 0;
+    return sorted.map(r => {
+      const c = cardOfAction(r);
+      const visible = r.status !== 'done' && r.status !== 'declined';
+      if (visible) nbr++;
+      return {
+        ...r,
+        display_number: visible ? 'BACS-' + String(nbr).padStart(3, '0') : null,
+        card_key: c.card,
+        card_subsection: c.subsection,
+      };
+    });
   });
 
   fastify.post('/bacs-audit/:documentId/action-items', async (request, reply) => {
@@ -900,17 +924,30 @@ async function routes(fastify) {
       description: z.string().nullable().optional(),
       zone_id: z.number().int().nullable().optional(),
       equipment_id: z.number().int().nullable().optional(),
+      // Refonte plan par cartes (mig 189) : permet de creer un item
+      // manuel directement dans une carte specifique au lieu de le
+      // ranger dans Divers et de le deplacer apres.
+      assigned_card: z.string().nullable().optional(),
+      assigned_subsection: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    // Validation de l'enum cartes (silent drop si valeur inconnue).
+    const { CARDS } = require('./bacs-audit/_action-cards');
+    const cardKeys = new Set(CARDS.map(c => c.key));
+    const subKeys = new Set(CARDS.flatMap(c => (c.subsections || []).map(s => s.key)));
+    if (body.assigned_card && !cardKeys.has(body.assigned_card)) body.assigned_card = null;
+    if (body.assigned_subsection && !subKeys.has(body.assigned_subsection)) body.assigned_subsection = null;
     const r = db.db.prepare(`
       INSERT INTO bacs_audit_action_items
-        (document_id, category, severity, r175_article, title, description, zone_id, equipment_id, auto_generated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        (document_id, category, severity, r175_article, title, description, zone_id, equipment_id,
+         assigned_card, assigned_subsection, auto_generated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
     `).run(documentId, body.category, body.severity, body.r175_article || null,
-      body.title, body.description || null, body.zone_id || null, body.equipment_id || null);
+      body.title, body.description || null, body.zone_id || null, body.equipment_id || null,
+      body.assigned_card || null, body.assigned_subsection || null);
     logBacsAudit(request, 'bacs.action_item.create', documentId, { itemId: r.lastInsertRowid, severity: body.severity, title: body.title });
     return reply.code(201).send(db.db.prepare('SELECT * FROM bacs_audit_action_items WHERE id = ?').get(r.lastInsertRowid));
   });
@@ -929,12 +966,19 @@ async function routes(fastify) {
       status: z.enum(['open','quoted','in_progress','done','declined']).optional(),
       position: z.number().int().optional(),
       alternative_solutions_html: z.string().nullable().optional(),
+      // Refonte plan par cartes (mig 189) : l'auditeur peut reaffecter
+      // un item MANUEL a une carte specifique (default 'misc'). Les
+      // items auto-generes ignorent ces champs (filtre `allowed`).
+      assigned_card: z.string().nullable().optional(),
+      assigned_subsection: z.string().nullable().optional(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
-    // Pour items auto-generes, on n'autorise QUE l'edit des champs commerciaux
+    // Pour items auto-generes, on n'autorise QUE l'edit des champs commerciaux.
+    // L'affectation a une carte est derivee runtime (helper _action-cards.js),
+    // donc assigned_card/subsection n'est PAS modifiable sur les autos.
     if (row.auto_generated) {
       const allowed = ['estimated_effort', 'status', 'position', 'alternative_solutions_html'];
       for (const k of Object.keys(body)) {
@@ -942,6 +986,15 @@ async function routes(fastify) {
           delete body[k]; // ignore silently les champs metier
         }
       }
+    } else {
+      // Items manuels : valider assigned_card / assigned_subsection contre
+      // l'enum du helper. Toute valeur inconnue est ignoree silencieusement
+      // (l'helper retombera sur 'misc' au rendu).
+      const { CARDS } = require('./bacs-audit/_action-cards');
+      const cardKeys = new Set(CARDS.map(c => c.key));
+      const subKeys = new Set(CARDS.flatMap(c => (c.subsections || []).map(s => s.key)));
+      if (body.assigned_card != null && !cardKeys.has(body.assigned_card)) delete body.assigned_card;
+      if (body.assigned_subsection != null && !subKeys.has(body.assigned_subsection)) delete body.assigned_subsection;
     }
     const sets = Object.keys(body).map(k => `${k} = ?`);
     if (sets.length) {

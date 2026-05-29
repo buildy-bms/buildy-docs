@@ -21,7 +21,8 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { resolveFaIconName } from '@/lib/equipment-icons'
 
 const props = defineProps({
-  modelValue: { type: [String, Number, null], default: null },
+  // Mono : String|Number|null. Multi : Array<String|Number>.
+  modelValue: { type: [String, Number, Array, null], default: null },
   options: {
     type: Array,
     required: true,
@@ -33,6 +34,10 @@ const props = defineProps({
   customPlaceholder: { type: String, default: 'Saisir une valeur…' },
   searchable: { type: Boolean, default: null }, // null = auto (≥8 options)
   disabled: { type: Boolean, default: false },
+  // Mode multi-select : tap toggle l'option sans fermer le sheet ; on
+  // ferme via le bouton « Valider » du footer. modelValue devient un
+  // tableau de values (compatible API `SearchableSelect :multiple`).
+  multiple: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -62,18 +67,35 @@ const filtered = computed(() => {
   return props.options.filter(o => normalize(o.label).includes(q) || normalize(o.hint).includes(q))
 })
 
-// L'option canonique correspondant à la valeur courante (si présente).
+// L'option canonique correspondant à la valeur courante (mono only).
 const matchedOption = computed(() =>
   props.options.find(o => String(o.value) === String(props.modelValue)) || null,
+)
+// Multi : set des valeurs sélectionnées pour lookup en O(1).
+const selectedSet = computed(() => {
+  if (!props.multiple) return new Set()
+  const arr = Array.isArray(props.modelValue) ? props.modelValue : []
+  return new Set(arr.map(String))
+})
+function isSelected(opt) {
+  if (props.multiple) return selectedSet.value.has(String(opt.value))
+  return String(opt.value) === String(props.modelValue)
+}
+// Options sélectionnées, dans l'ordre des options pour stabilité du
+// rendu des pilules dans le trigger.
+const selectedOptions = computed(() =>
+  props.multiple ? props.options.filter(o => selectedSet.value.has(String(o.value))) : []
 )
 // Valeur libre (creatable) : la valeur n'est pas dans les options canoniques.
 const isCustomValue = computed(() => {
   if (!props.creatable) return false
+  if (props.multiple) return false
   const v = props.modelValue
   if (v == null || v === '') return false
   return !matchedOption.value
 })
-// Libellé affiché dans le trigger.
+// Libellé affiché dans le trigger (mono uniquement, multi gère les
+// pilules directement dans le template).
 const triggerLabel = computed(() => {
   if (matchedOption.value) return matchedOption.value.label
   if (isCustomValue.value) return String(props.modelValue)
@@ -116,11 +138,20 @@ function closeSheet() {
 }
 
 function pick(opt) {
+  if (props.multiple) {
+    // Toggle sans fermer le sheet.
+    const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
+    const idx = current.findIndex(v => String(v) === String(opt.value))
+    if (idx >= 0) current.splice(idx, 1)
+    else current.push(opt.value)
+    emit('update:modelValue', current)
+    return
+  }
   emit('update:modelValue', opt.value)
   closeSheet()
 }
 function clear() {
-  emit('update:modelValue', null)
+  emit('update:modelValue', props.multiple ? [] : null)
 }
 function startCustom() {
   customMode.value = true
@@ -161,23 +192,38 @@ watch(() => props.modelValue, (v) => {
         disabled ? 'border-gray-200 opacity-50 cursor-not-allowed' : 'border-gray-200 active:bg-gray-50',
       ]"
     >
-      <!-- Icône de l'option sélectionnée -->
-      <FontAwesomeIcon
-        v-if="matchedOption?.icon"
-        :icon="['fas', faName(matchedOption.icon)]"
-        :style="{ color: matchedOption.color || '#6b7280' }"
-        class="w-4 h-4 shrink-0"
-      />
-      <!-- Pilule de l'option sélectionnée -->
-      <span
-        v-else-if="matchedOption?.pill"
-        :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0', pillClass(matchedOption.pillTone)]"
-      >{{ matchedOption.pill }}</span>
+      <!-- Multi-select : pilules des options sélectionnées, à plat -->
+      <template v-if="multiple">
+        <span v-if="!selectedOptions.length"
+              class="flex-1 text-left text-gray-500 italic truncate">{{ placeholder }}</span>
+        <span v-else class="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
+          <span
+            v-for="o in selectedOptions" :key="o.value"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+          >
+            <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]" :style="{ color: o.color || '#6366f1' }" class="w-3 h-3" />
+            {{ o.label }}
+          </span>
+        </span>
+      </template>
+      <!-- Mono-select : icône + libellé classique -->
+      <template v-else>
+        <FontAwesomeIcon
+          v-if="matchedOption?.icon"
+          :icon="['fas', faName(matchedOption.icon)]"
+          :style="{ color: matchedOption.color || '#6b7280' }"
+          class="w-4 h-4 shrink-0"
+        />
+        <span
+          v-else-if="matchedOption?.pill"
+          :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0', pillClass(matchedOption.pillTone)]"
+        >{{ matchedOption.pill }}</span>
 
-      <span
-        class="flex-1 text-left truncate"
-        :class="triggerLabel ? 'text-gray-900' : 'text-gray-500 italic'"
-      >{{ triggerLabel || placeholder }}</span>
+        <span
+          class="flex-1 text-left truncate"
+          :class="triggerLabel ? 'text-gray-900' : 'text-gray-500 italic'"
+        >{{ triggerLabel || placeholder }}</span>
+      </template>
 
       <FontAwesomeIcon :icon="['fas', 'chevron-down']" class="w-4 h-4 text-gray-500 shrink-0" />
     </button>
@@ -211,8 +257,16 @@ watch(() => props.modelValue, (v) => {
               <FontAwesomeIcon :icon="['fas', 'xmark']" class="w-6 h-6" />
             </button>
             <h3 class="flex-1 min-w-0 text-center text-base font-medium text-gray-900 truncate">{{ title }}</h3>
+            <!-- Multi : bouton « OK » pour confirmer la sélection courante.
+                 Mono : bouton « Effacer » si une valeur est posée. -->
             <button
-              v-if="modelValue != null && modelValue !== '' && !customMode"
+              v-if="multiple"
+              type="button"
+              @click="closeSheet"
+              class="tap-target inline-flex items-center justify-center px-2 text-sm font-medium text-indigo-600 -mr-1"
+            >OK</button>
+            <button
+              v-else-if="modelValue != null && modelValue !== '' && !customMode"
               type="button"
               @click="clear"
               class="tap-target inline-flex items-center justify-center px-2 text-sm font-medium text-gray-500 -mr-1"
@@ -270,7 +324,7 @@ watch(() => props.modelValue, (v) => {
                 @click="pick(o)"
                 :class="[
                   'w-full min-h-12 px-3 py-3 flex items-center gap-3 text-left rounded-lg transition',
-                  String(o.value) === String(modelValue) ? 'bg-indigo-50' : 'active:bg-gray-100',
+                  isSelected(o) ? 'bg-indigo-50' : 'active:bg-gray-100',
                 ]"
               >
                 <FontAwesomeIcon
@@ -286,12 +340,12 @@ watch(() => props.modelValue, (v) => {
                 <span v-else class="w-5 shrink-0"></span>
 
                 <span class="flex-1 min-w-0">
-                  <span :class="['block text-base truncate', String(o.value) === String(modelValue) ? 'text-indigo-700 font-medium' : 'text-gray-900']">{{ o.label }}</span>
+                  <span :class="['block text-base truncate', isSelected(o) ? 'text-indigo-700 font-medium' : 'text-gray-900']">{{ o.label }}</span>
                   <span v-if="o.hint" class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
                 </span>
 
                 <FontAwesomeIcon
-                  v-if="String(o.value) === String(modelValue)"
+                  v-if="isSelected(o)"
                   :icon="['fas', 'check']"
                   class="w-5 h-5 text-indigo-600 shrink-0"
                 />

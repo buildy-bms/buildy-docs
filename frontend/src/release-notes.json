@@ -2,6 +2,97 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.127",
+      "date": "2026-05-29",
+      "title": "Plan d'action regroupé par carte du stepper, refonte PWA édition équipement et navigation drill-down",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Plan d'action regroupé par carte de l'audit (avec sous-sections GTB)",
+          "what": "Les actions du plan suivent désormais l'ordre des cartes du stepper (Identification → Systèmes → Compteurs → GTB → Régulation → Inspections → Divers). La carte GTB est sous-divisée en 4 sous-sections : Capacités GTB, Intégration équipements, Intégration compteurs, Maintenance & formation. La numérotation BACS-NNN est centralisée côté backend, partagée 1:1 entre PDF, PWA, app web et MCP.",
+          "where": "App web : carte « Plan de mise en conformité » du détail audit. PDF audit chap 7 et synthèse Tableau 4. MCP : `audit_get_summary.action_items_by_card`.",
+          "how": "Ouvrir un audit BACS, la carte Plan affiche les bandeaux émeraude (cartes) et ardoise (sous-sections GTB). Citer BACS-007 dans un échange : même numéro PDF / web / PWA / MCP."
+        },
+        {
+          "kind": "feat",
+          "title": "Plan d'action PWA en drill-down 3 niveaux (cartes → sous-sections → items)",
+          "what": "Sur PWA, l'onglet Plan passe en navigation drill-down (même pattern que MobileSystemsTab) : tap sur une carte → liste des sous-sections (pour GTB) ou des items, breadcrumb sticky en haut avec bouton retour. Plus de liste plate qui noyait la lecture.",
+          "where": "PWA : onglet « Plan » du détail audit.",
+          "how": "Ouvrir le tab Plan : 7 cartes cliquables avec leurs stats. Tap « GTB » → 4 sous-sections. Tap « Capacités GTB » → la liste des items. Bouton retour en haut."
+        },
+        {
+          "kind": "feat",
+          "title": "Item manuel : champ « Carte de l'audit » à la création et à l'édition",
+          "what": "Un sélecteur permet de ranger une préconisation manuelle dans la carte de son choix (par défaut « Divers »). Disponible dans le formulaire de création (route Plan plein écran) et dans la card desktop / le sheet PWA d'édition.",
+          "where": "App web : modale « Ajouter une action manuelle » + sélecteur à droite de chaque item manuel. PWA : sheet d'édition item.",
+          "how": "Créer un item manuel → choisir une carte. Sur un item existant, changer la carte → il bouge instantanément vers la bonne section du plan."
+        },
+        {
+          "kind": "feat",
+          "title": "Alignement complet PWA ↔ desktop pour l'édition d'équipement",
+          "what": "Les questions, l'ordre et les conditionnels du sheet PWA d'édition d'équipement matchent maintenant la modale desktop : Quantité, Âge, toggle « L'équipement dispose-t-il d'une régulation ? » + 11 champs régulation (intégrée/déportée, marque/référence, types et localisations par niveau, granularité R175-6), toggle « L'équipement est-il communicant ? ». La section « Partage entre usages » (déplacement + multi-présence) est ajoutée au desktop pour cohérence avec la PWA.",
+          "where": "PWA : sheet équipement (onglet Systèmes). Desktop : modale `DeviceEditModal`.",
+          "how": "Saisir une chaudière sur PWA, ouvrir le même équipement en desktop : mêmes champs, mêmes blocs conditionnels."
+        },
+        {
+          "kind": "ux",
+          "title": "Header sticky PWA : nom de l'entité éditée",
+          "what": "Les sheets d'édition affichent maintenant le nom de l'entité courante : BACS-007 + titre pour une action du plan, nom de l'équipement, « Zone · usage » pour un compteur, nom de la zone.",
+          "where": "PWA : tous les sheets d'édition (équipement, compteur, action plan, zone).",
+          "how": "Ouvrir n'importe quel sheet d'édition : le titre du header sticky reflète l'entité éditée."
+        },
+        {
+          "kind": "ux",
+          "title": "Parties prenantes héritées du site (cochées et verrouillées)",
+          "what": "Quand on édite une zone ou un système, les parties prenantes du site apparaissent automatiquement cochées avec mention « hérité du site » / « hérité de la zone » (case grisée, non décochable). Pour retirer une partie, on remonte au niveau du site. L'auditeur n'a plus l'impression qu'il faut tout ressaisir.",
+          "where": "App web et PWA : édition zone + édition système.",
+          "how": "Créer 2 parties prenantes sur le site → ouvrir l'édition d'une zone : elles sont déjà cochées (badge vert) et verrouillées."
+        },
+        {
+          "kind": "ux",
+          "title": "« Forcer la validation » masqué quand l'équipement est complet",
+          "what": "Sur PWA et desktop, le toggle « Forcer la validation » disparaît dès que l'équipement n'a plus de champ manquant. Reste visible si l'équipement est forcé alors qu'il est encore incomplet, pour permettre de défaire le forçage.",
+          "where": "Édition équipement web et PWA.",
+          "how": "Compléter tous les champs d'un équipement → le toggle disparaît."
+        },
+        {
+          "kind": "ux",
+          "title": "Sélecteurs PWA : tous en bottom sheet custom (régression corrigée)",
+          "what": "Les sélecteurs du sheet d'édition action (Effort estimé, Carte) et le sélecteur de protocoles d'équipement utilisaient encore le picker iOS roue / un popover desktop. Ils basculent en `MobileSelectSheet` (bottom sheet plein écran custom) avec icônes, couleurs et recherche, comme tous les autres sélecteurs PWA. Le composant supporte désormais le multi-select (Niveau(x), Protocoles).",
+          "where": "PWA : sheet édition action plan, sheet équipement (Niveau(x), Protocoles).",
+          "how": "Tap sur un sélecteur PWA → bottom sheet plein écran. Plus de picker iOS natif."
+        },
+        {
+          "kind": "fix",
+          "title": "Reformulation des actions auto-générées (module add-on vs remplacement)",
+          "what": "Les actions « Prévoir le remplacement par un équipement communicant » / « Installer une GTB » / « Installer une régulation thermique » sont reformulées pour proposer les options moins coûteuses (module add-on, étendre l'existant, mise à niveau du thermostat) au lieu de prescrire systématiquement le remplacement.",
+          "where": "Plan d'action — descriptions des actions auto-générées concernant les équipements non-communicants, l'absence de GTB et l'absence de régulation thermique.",
+          "how": "Régénérer le plan d'un audit incomplet : les textes des actions citées proposent plusieurs pistes."
+        },
+        {
+          "kind": "fix",
+          "title": "Header sticky audit qui ne saute plus au moindre scroll",
+          "what": "Le bandeau sticky (breadcrumb + stepper) alternait entre mode plein et compact à chaque micro-mouvement du trackpad. Bascule simplifiée en hystérésis basée sur la position absolue (compact > 200 px, plein < 60 px) et transition CSS limitée au padding.",
+          "where": "App web : détail audit BACS, bandeau sticky en haut.",
+          "how": "Scroller doucement vers le bas / haut : le bandeau reste stable, plus de yo-yo."
+        },
+        {
+          "kind": "fix",
+          "title": "PWA : sous-bloc régulation et protocoles affichés sur entité déjà configurée",
+          "what": "Les `v-if` testaient `=== true` strict ; or la DB SQLite stocke `0/1`. Un équipement déjà configuré avec Régulation = Oui en desktop n'affichait pas le sous-bloc en PWA tant qu'on ne re-cliquait pas sur Oui. Corrigé par cast booléen tolérant (`!!`).",
+          "where": "PWA : sheet équipement, sous-blocs régulation et protocoles de communication.",
+          "how": "Ouvrir un équipement existant qui a déjà Régulation = Oui : le sous-bloc apparaît immédiatement, avec ses champs."
+        },
+        {
+          "kind": "fix",
+          "title": "Clonage d'AF : zones fonctionnelles et liens M2M correctement reportés",
+          "what": "Le clonage d'une AF embarque maintenant les zones fonctionnelles attachées et reporte les associations instance ↔ zone et instance ↔ catégorie après la création des nouvelles instances. Le périmètre fonctionnel du modèle source est préservé.",
+          "where": "Backend route `POST /api/afs/:id/clone`.",
+          "how": "Cloner une AF avec des zones et des équipements liés à plusieurs catégories : tout est reporté dans la copie."
+        }
+      ]
+    },
+    {
       "version": "0.1.126",
       "date": "2026-05-29",
       "title": "PDF audit BACS : page de garde plus distinctive, pills aérées, CTA devis sur la 4e de couverture",

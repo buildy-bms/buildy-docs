@@ -11,13 +11,14 @@ import BaseModal from '@/components/BaseModal.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/audit/SegmentedToggle.vue'
-import { updateBacsDevice, getEquipmentTemplate } from '@/api'
+import { updateBacsDevice, getEquipmentTemplate, moveBacsDevice, shareBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useAuditStore } from '@/stores/audit'
 import {
   ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS,
   regulationTypesForCategory, GRANULARITY_OPTIONS,
   isThermalCategory, isDeviceComplete, deviceMissingFields,
+  systemUsageLabel,
 } from '@/lib/audit-options'
 
 const props = defineProps({
@@ -233,6 +234,50 @@ function patchInput(field, value) {
 const missing = computed(() => deviceMissingFields(props.device, props.system?.system_category))
 const forced = computed(() => !!props.device.validation_forced)
 const complete = computed(() => isDeviceComplete(props.device, props.system?.system_category))
+
+// ── Partage / déplacement entre usages (parité PWA mig 143) ──────────
+// Aligne le desktop sur la PWA : permet à l'auditeur de déplacer un
+// équipement vers un autre usage et de le marquer comme partagé entre
+// plusieurs usages (chaudière qui sert à la fois chauffage + ECS, etc.)
+function usageLabel(s) { return systemUsageLabel(s) }
+const savingShare = ref(false)
+const moveSystemOptions = computed(() => (audit.systems || []).map(s => ({
+  value: s.id,
+  label: `${s.zone_name || 'Zone'} — ${usageLabel(s)}`,
+})))
+function shareCandidateSystems() {
+  return (audit.systems || []).filter(s => s.id !== props.device.system_id)
+}
+async function moveDeviceToSystem(systemId) {
+  if (savingShare.value || systemId === props.device.system_id) return
+  savingShare.value = true
+  try {
+    const { data } = await moveBacsDevice(props.device.id, systemId)
+    Object.assign(props.device, data)
+    await audit.refreshAuditCore()
+    emit('changed')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Déplacement impossible')
+  } finally {
+    savingShare.value = false
+  }
+}
+async function toggleShareDeviceSystem(systemId, checked) {
+  if (savingShare.value) return
+  savingShare.value = true
+  const next = new Set(props.device.extra_system_ids || [])
+  if (checked) next.add(systemId); else next.delete(systemId)
+  try {
+    const { data } = await shareBacsDevice(props.device.id, [...next])
+    Object.assign(props.device, data)
+    await audit.refreshAuditCore()
+    emit('changed')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Partage impossible')
+  } finally {
+    savingShare.value = false
+  }
+}
 
 const inputCls = 'h-9 px-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition'
 const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-700 uppercase tracking-wider'
@@ -573,22 +618,72 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
         </div>
       </section>
 
+      <!-- Partage / déplacement entre usages (parité PWA mig 143).
+           Permet de déplacer un équipement vers un autre usage du site
+           et de marquer une multi-présence (chaudière qui sert à la fois
+           chauffage et ECS, etc.). -->
+      <section v-if="device.id" class="space-y-3 pt-4 mt-2 border-t border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-800">Partage entre usages</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Usage principal</label>
+            <SearchableSelect
+              :model-value="device.system_id"
+              :options="moveSystemOptions"
+              placeholder="— Usage —"
+              :disabled="savingShare"
+              @update:model-value="moveDeviceToSystem"
+            />
+            <p class="text-[11px] text-gray-500 mt-1">Déplace l'équipement vers un autre usage existant du site.</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Aussi présent dans</label>
+            <div class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 max-h-44 overflow-y-auto">
+              <label
+                v-for="sys in shareCandidateSystems()"
+                :key="sys.id"
+                class="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  :checked="(device.extra_system_ids || []).includes(sys.id)"
+                  :disabled="savingShare"
+                  @change="e => toggleShareDeviceSystem(sys.id, e.target.checked)"
+                  class="w-4 h-4 rounded border-gray-300 shrink-0"
+                />
+                <span class="text-sm text-gray-700 truncate">{{ sys.zone_name }} — {{ usageLabel(sys) }}</span>
+              </label>
+              <p v-if="!shareCandidateSystems().length" class="px-3 py-3 text-xs text-gray-500 italic text-center">
+                Aucun autre usage disponible.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
 
     <template #footer>
       <div class="flex items-center justify-between gap-3 flex-wrap w-full">
         <div class="flex items-center gap-3 flex-wrap">
-          <span v-if="complete && !forced"
+          <!-- Indicateur de complétude :
+               · complet + non forcé → badge vert (rien d'autre)
+               · forcé + incomplet → badge "Validation forcée" + toggle pour défaire
+               · non forcé + incomplet → badge "Incomplet" + toggle pour forcer
+               · complet + forcé → badge vert (le forçage n'a plus lieu d'être,
+                 on retire le toggle silencieusement) -->
+          <span v-if="complete"
                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium">
             ✓ Équipement complet
           </span>
-          <span v-else-if="forced"
-                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium"
-                :title="missing.length ? `Champs non renseignés : ${missing.join(', ')}` : ''">
-            ⚠ Validation forcée
-          </span>
           <template v-else>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium"
+            <span v-if="forced"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium"
+                  :title="missing.length ? `Champs non renseignés : ${missing.join(', ')}` : ''">
+              ⚠ Validation forcée
+            </span>
+            <span v-else
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium"
                   :title="`À renseigner : ${missing.join(', ')}`">
               ⚠ Incomplet
               <span class="text-amber-700/80 font-normal">— {{ missing.length }} champ{{ missing.length > 1 ? 's' : '' }}</span>

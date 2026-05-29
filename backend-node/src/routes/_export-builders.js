@@ -454,10 +454,13 @@ async function buildAfExportData(af, opts = {}) {
     if (contractTargetSlug === 'P') return s.tpl_avail_p;
     return null;
   }
+  // Exception : si demanded_by_moa=1, la MOA exige la fonctionnalite
+  // *incluse* (pas en option) → elle doit forcer le level-up, donc on la
+  // garde dans le calcul meme si elle est en paid_option au niveau cible.
   const sectionsForLevelCalc = allSections.filter(s =>
     !s.opted_out_by_moa
     && !s.optin_paid_option
-    && _availAtContractTarget(s) !== 'paid_option'
+    && (s.demanded_by_moa === 1 || _availAtContractTarget(s) !== 'paid_option')
   );
   const serviceLevel = resolveAfLevel(sectionsForLevelCalc);
   // Compteur d'options payantes a la carte (mig 92) pour affichage cover :
@@ -739,7 +742,16 @@ function buildContractualSummaryForAf(af) {
     if (availAtTarget === 'included') {
       coveredFeatures.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
     } else if (availAtTarget === 'paid_option') {
-      requiredOptions.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+      // Une fonctionnalite demanded_by_moa en paid_option au niveau cible
+      // doit forcer le level-up (au lieu de finir en option payante de
+      // l'avenant). Coherent avec le filtre sectionsForLevelCalc qui la
+      // garde maintenant dans le calcul du niveau requis.
+      if (isDemanded) {
+        unavailableFeatures.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+        upgradeNeeded = true;
+      } else {
+        requiredOptions.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
+      }
     } else {
       unavailableFeatures.push({ title: tpl.title, demanded: isDemanded, optin: isOptin });
       // Seules les sections demanded (= socle exige) imposent un upgrade.
