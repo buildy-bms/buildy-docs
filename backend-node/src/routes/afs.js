@@ -751,7 +751,18 @@ async function routes(fastify) {
             hyperveezPageSlug: child.hyperveez_page_slug,
             includedInExport: child.included_in_export,
             genericNote: child.generic_note,
+            systemCategoryKey: child.system_category_key,
           });
+          // Restaure le lien biblio (section_template_id + version) sur la
+          // section clonee. Sans ca, le bandeau « X nouveaux dans la biblio »
+          // s'affiche immediatement sur la nouvelle AF et « Tout appliquer »
+          // cree des doublons (cf. plan dans-les-af-de-quirky-planet.md).
+          if (child.section_template_id != null) {
+            db.sections.update(newSec.id, {
+              sectionTemplateId: child.section_template_id,
+              sectionTemplateVersion: child.section_template_version,
+            });
+          }
           idMap.set(child.id, newSec.id);
           cloneTree(child.id, newSec.id);
         }

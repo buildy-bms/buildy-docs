@@ -249,6 +249,132 @@ async function handleDeleteSection(node) {
   }
 }
 
+// ─── Mode sélection multiple + suppression batch ───────────────────────────
+// Active depuis le bouton « Sélection multiple » au-dessus de l'arbre. Permet
+// de cocher N sections (parent + enfants OK), puis « Supprimer » lance une
+// modale qui liste les racines + le total cascadé. Cas d'usage principal :
+// nettoyer les doublons crees par « Tout appliquer » sur une AF clonee avant
+// le fix backend (cf. plan dans-les-af-de-quirky-planet.md).
+const selectionMode = ref(false)
+const selectedIds = ref(new Set())
+
+function enterSelectionMode() {
+  selectionMode.value = true
+  selectedIds.value = new Set()
+}
+function exitSelectionMode() {
+  selectionMode.value = false
+  selectedIds.value = new Set()
+}
+function toggleSelectSection(node) {
+  const next = new Set(selectedIds.value)
+  if (next.has(node.id)) next.delete(node.id)
+  else next.add(node.id)
+  selectedIds.value = next
+}
+function selectAllSections() {
+  selectedIds.value = new Set(sections.value.map(s => s.id))
+}
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+function invertSelection() {
+  const cur = selectedIds.value
+  selectedIds.value = new Set(sections.value.filter(s => !cur.has(s.id)).map(s => s.id))
+}
+
+// Racines de la sélection : on ne supprime que les sections dont AUCUN ancetre
+// n'est selectionne (les enfants sont cascades par SQLite ON DELETE CASCADE).
+// Sans ce calcul, supprimer un parent + son enfant ferait DELETE deja cascade,
+// renvoyant un 404 sur le second appel et faussant les compteurs.
+function selectionRoots() {
+  const set = selectedIds.value
+  const byId = new Map(sections.value.map(s => [s.id, s]))
+  return Array.from(set).filter(id => {
+    let cur = byId.get(id)
+    while (cur?.parent_id != null) {
+      if (set.has(cur.parent_id)) return false
+      cur = byId.get(cur.parent_id)
+    }
+    return true
+  }).map(id => byId.get(id)).filter(Boolean)
+}
+
+// Compte tous les descendants d'un set de racines (pour annoncer le total cascade).
+function countDescendants(rootIds) {
+  const roots = new Set(rootIds)
+  const total = new Set(rootIds)
+  // BFS sur parent_id
+  const byParent = new Map()
+  for (const s of sections.value) {
+    const k = s.parent_id || 'root'
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(s)
+  }
+  const queue = [...roots]
+  while (queue.length) {
+    const id = queue.shift()
+    for (const child of (byParent.get(id) || [])) {
+      if (!total.has(child.id)) {
+        total.add(child.id)
+        queue.push(child.id)
+      }
+    }
+  }
+  return total.size
+}
+
+async function handleBatchDelete() {
+  const roots = selectionRoots()
+  if (!roots.length) return
+  const totalCascaded = countDescendants(roots.map(r => r.id))
+  const titlesPreview = roots.slice(0, 10).map(r => `• ${r.title}`).join('\n')
+  const moreLine = roots.length > 10 ? `\n… et ${roots.length - 10} autres` : ''
+  const cascadeLine = totalCascaded > roots.length
+    ? `\n\nCela supprimera aussi tous leurs enfants, soit ${totalCascaded} section(s) au total (overrides, instances et captures inclus).`
+    : ''
+  const ok = await confirm({
+    title: `Supprimer ${roots.length} section${roots.length > 1 ? 's' : ''} ?`,
+    message: titlesPreview + moreLine + cascadeLine,
+    confirmLabel: `Supprimer ${roots.length} section${roots.length > 1 ? 's' : ''}`,
+    danger: true,
+  })
+  if (!ok) return
+
+  // Si la section selectionnee actuelle est dans la cascade, on la deselectionne
+  // avant le DELETE pour eviter un editeur en etat zombie. removeSection() ne le
+  // fait que pour la racine, pas pour les descendants cascades.
+  const rootIds = roots.map(r => r.id)
+  if (selectedId.value && (rootIds.includes(selectedId.value) || isAncestorIn(selectedId.value, rootIds))) {
+    afStore.selectedId = null
+    afStore.selectedSection = null
+  }
+
+  const results = await Promise.allSettled(
+    roots.map(r => afStore.removeSection(r.id))
+  )
+  const ok_count = results.filter(r => r.status === 'fulfilled').length
+  const fail_count = results.length - ok_count
+  if (fail_count === 0) {
+    notifySuccess(`${ok_count} section${ok_count > 1 ? 's supprimées' : ' supprimée'}`)
+  } else if (ok_count === 0) {
+    notifyError(`Échec de la suppression de ${fail_count} section(s)`)
+  } else {
+    notifyError(`${ok_count} supprimée(s), ${fail_count} en échec`)
+  }
+  exitSelectionMode()
+}
+
+function isAncestorIn(targetId, rootIds) {
+  const set = new Set(rootIds)
+  let cur = sections.value.find(s => s.id === targetId)
+  while (cur?.parent_id != null) {
+    if (set.has(cur.parent_id)) return true
+    cur = sections.value.find(s => s.id === cur.parent_id)
+  }
+  return false
+}
+
 async function handleAttachmentDrop({ attachmentId, sectionId }) {
   // Pas de move si on drop sur la section actuelle (deja la, no-op).
   if (selectedSection.value?.id === sectionId) return
@@ -588,6 +714,8 @@ watch(() => route.params.id, async (newId, oldId) => {
               :sections="sections"
               :selected-id="selectedId"
               :af-id="af?.id"
+              :selection-mode="selectionMode"
+              :selected-ids="selectedIds"
               @select="selectSection"
               @add-root="openAddSection(null)"
               @add-child="openAddSection"
@@ -603,6 +731,13 @@ watch(() => route.params.id, async (newId, oldId) => {
               @reorder-children="handleReorderChildren"
               @attachment-drop="handleAttachmentDrop"
               @promote-to-library="handlePromoteToLibrary"
+              @toggle-select="toggleSelectSection"
+              @select-all="selectAllSections"
+              @clear-selection="clearSelection"
+              @invert-selection="invertSelection"
+              @batch-delete="handleBatchDelete"
+              @exit-selection-mode="exitSelectionMode"
+              @enter-selection-mode="enterSelectionMode"
             />
           </div>
         </div>

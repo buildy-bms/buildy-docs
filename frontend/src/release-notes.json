@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.128",
+      "date": "2026-05-29",
+      "title": "Clone d'AF sans doublons biblio + suppression multiple de sections",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de doublons après clone d'une AF",
+          "what": "Le clone d'une AF préserve désormais le lien vers la bibliothèque pour chaque section (template, version, catégorie). Conséquence : à l'ouverture de la nouvelle AF, le bandeau « X nouveaux dans la biblio » n'apparaît plus à tort et « Tout appliquer » ne crée plus de sections en double.",
+          "where": "App web : action « Dupliquer » d'une AF depuis la liste des AFs.",
+          "how": "Cloner une AF, ouvrir le clone : aucun bandeau « éléments à revoir / nouveaux dans la biblio ». Comparer le plan source et le plan cloné — mêmes sections, pas de doublon."
+        },
+        {
+          "kind": "feat",
+          "title": "Sélection multiple de sections + suppression en lot",
+          "what": "Bouton « Sélection multiple » au-dessus de l'arbre des sections. Une fois activé, chaque ligne devient cochable. Une barre rouge en haut affiche le compteur, les actions Tout sélectionner / Inverser / Vider, et le bouton « Supprimer ». La modale de confirmation liste les titres des sections sélectionnées + le nombre total cascadé (enfants, captures, instances). Pratique pour nettoyer les doublons créés sur les AFs déjà clonées avant le fix.",
+          "where": "App web : détail d'une AF, en-tête de l'arbre à gauche (« Sélection multiple »).",
+          "how": "Ouvrir une AF, cliquer « Sélection multiple », cocher plusieurs sections (ou un parent + des enfants), cliquer « Supprimer ». La modale liste les sections + le total ; confirmer supprime tout en une opération."
+        }
+      ]
+    },
+    {
       "version": "0.1.127",
       "date": "2026-05-29",
       "title": "Plan d'action regroupé par carte du stepper, refonte PWA édition équipement et navigation drill-down",

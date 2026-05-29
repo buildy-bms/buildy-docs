@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   RectangleStackIcon, GlobeAltIcon, ChartBarSquareIcon, DocumentTextIcon,
   MagnifyingGlassIcon, PlusIcon, XMarkIcon, CheckCircleIcon,
+  TrashIcon, CheckIcon, Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import SectionTreeNode from './SectionTreeNode.vue'
 import Tooltip from '@/components/Tooltip.vue'
@@ -12,8 +13,16 @@ const props = defineProps({
   sections: { type: Array, required: true }, // liste plate (parent_id pour hierarchie)
   selectedId: { type: Number, default: null },
   afId: { type: Number, default: null }, // sert de clé de persistance du collapse state
+  selectionMode: { type: Boolean, default: false },
+  selectedIds: { type: Set, default: () => new Set() },
 })
-const emit = defineEmits(['select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out', 'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down', 'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library'])
+const emit = defineEmits([
+  'select', 'add-child', 'add-root', 'delete', 'toggle-include', 'toggle-opt-out',
+  'toggle-demanded', 'toggle-optin-paid-option', 'move-up', 'move-down',
+  'indent', 'outdent', 'reorder-children', 'attachment-drop', 'promote-to-library',
+  'toggle-select', 'select-all', 'clear-selection', 'invert-selection',
+  'batch-delete', 'exit-selection-mode', 'enter-selection-mode',
+])
 
 // Recherche live (Lot 16.1)
 const search = ref('')
@@ -248,12 +257,81 @@ onBeforeUnmount(teardownRootSortable)
           <CheckCircleIcon class="w-4 h-4" />
         </button>
       </Tooltip>
+      <Tooltip
+        v-if="!selectionMode"
+        text="Sélection multiple — cocher des sections pour les supprimer en lot"
+        placement="bottom"
+      >
+        <button
+          type="button"
+          @click="emit('enter-selection-mode')"
+          class="shrink-0 p-1.5 rounded text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+        >
+          <Squares2X2Icon class="w-4 h-4 shrink-0" />
+        </button>
+      </Tooltip>
       <Tooltip text="Ajouter une section racine" placement="bottom">
         <button
           @click="emit('add-root')"
           class="shrink-0 p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
         >
           <PlusIcon class="w-4 h-4" />
+        </button>
+      </Tooltip>
+    </div>
+
+    <!-- Toolbar mode sélection multiple -->
+    <div
+      v-if="selectionMode"
+      class="px-2 py-2 sticky top-11 z-20 bg-red-50 border-b border-red-200 -mx-2 mb-2 flex items-center gap-2"
+    >
+      <span class="text-[12px] font-medium text-red-700 whitespace-nowrap">
+        {{ selectedIds.size }} sélectionnée{{ selectedIds.size > 1 ? 's' : '' }}
+      </span>
+      <Tooltip text="Tout sélectionner" placement="bottom">
+        <button
+          type="button"
+          @click="emit('select-all')"
+          class="shrink-0 p-1.5 rounded text-gray-600 hover:bg-white hover:text-gray-900"
+        >
+          <CheckIcon class="w-4 h-4 shrink-0" />
+        </button>
+      </Tooltip>
+      <Tooltip text="Inverser la sélection" placement="bottom">
+        <button
+          type="button"
+          @click="emit('invert-selection')"
+          class="shrink-0 px-2 py-1 text-[11px] font-medium rounded text-gray-700 hover:bg-white whitespace-nowrap"
+        >
+          Inverser
+        </button>
+      </Tooltip>
+      <Tooltip text="Vider la sélection" placement="bottom">
+        <button
+          type="button"
+          @click="emit('clear-selection')"
+          class="shrink-0 px-2 py-1 text-[11px] font-medium rounded text-gray-700 hover:bg-white whitespace-nowrap"
+        >
+          Vider
+        </button>
+      </Tooltip>
+      <div class="flex-1" />
+      <button
+        type="button"
+        :disabled="selectedIds.size === 0"
+        @click="emit('batch-delete')"
+        class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed whitespace-nowrap"
+      >
+        <TrashIcon class="w-3.5 h-3.5 shrink-0" />
+        Supprimer
+      </button>
+      <Tooltip text="Quitter le mode sélection" placement="bottom">
+        <button
+          type="button"
+          @click="emit('exit-selection-mode')"
+          class="shrink-0 p-1.5 rounded text-gray-500 hover:bg-white hover:text-gray-800"
+        >
+          <XMarkIcon class="w-4 h-4 shrink-0" />
         </button>
       </Tooltip>
     </div>
@@ -276,6 +354,8 @@ onBeforeUnmount(teardownRootSortable)
         :kind-icon="KIND_ICON"
         :is-empty="isEmpty"
         :search="search"
+        :selection-mode="selectionMode"
+        :selected-ids="selectedIds"
         @select="emit('select', $event)"
         @toggle="toggle"
         @add-child="emit('add-child', $event)"
@@ -291,6 +371,7 @@ onBeforeUnmount(teardownRootSortable)
         @reorder-children="emit('reorder-children', $event)"
         @attachment-drop="emit('attachment-drop', $event)"
         @promote-to-library="emit('promote-to-library', $event)"
+        @toggle-select="emit('toggle-select', $event)"
       />
     </div>
   </div>
