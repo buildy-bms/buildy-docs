@@ -13,6 +13,9 @@ import {
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import BaseModal from '@/components/BaseModal.vue'
+import { CARD_FLAT_OPTIONS } from '@/lib/action-cards'
+
+const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
 const route = useRoute()
 const router = useRouter()
@@ -133,14 +136,24 @@ function downloadCsv() {
 
 // Ajout manuel
 const showAdd = ref(false)
-const newItem = ref({ category: 'other', severity: 'major', r175_article: '', title: '', description: '' })
+const newItem = ref({ category: 'other', severity: 'major', r175_article: '', title: '', description: '', assigned_card_value: '' })
 async function submitNew() {
   if (!newItem.value.title.trim()) return
   try {
-    await createBacsActionItem(docId, newItem.value)
+    // Decoupe la valeur du selecteur de carte ("bms/bms_devices") en
+    // {assigned_card, assigned_subsection} attendus par le backend.
+    const { assigned_card_value, ...rest } = newItem.value
+    let assigned_card = null
+    let assigned_subsection = null
+    if (assigned_card_value) {
+      const [c, s] = assigned_card_value.split('/')
+      assigned_card = c
+      assigned_subsection = s || null
+    }
+    await createBacsActionItem(docId, { ...rest, assigned_card, assigned_subsection })
     success('Action ajoutée')
     showAdd.value = false
-    newItem.value = { category: 'other', severity: 'major', r175_article: '', title: '', description: '' }
+    newItem.value = { category: 'other', severity: 'major', r175_article: '', title: '', description: '', assigned_card_value: '' }
     await refresh()
   } catch (e) {
     error(e.response?.data?.detail || 'Création impossible')
@@ -353,6 +366,15 @@ onMounted(refresh)
               <option v-for="c in CATEGORY_OPTS" :key="c.value" :value="c.value">{{ c.label }}</option>
             </select>
           </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Carte de l'audit</label>
+          <select v-model="newItem.assigned_card_value"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+            <option value="">Divers (par défaut)</option>
+            <option v-for="opt in CARD_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <p class="text-[11px] text-gray-500 mt-1">Choisis la carte dans laquelle cette préconisation doit apparaître. Tu pourras la déplacer plus tard.</p>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Article R175 (optionnel)</label>

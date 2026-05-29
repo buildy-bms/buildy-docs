@@ -353,12 +353,6 @@ const itemsBySeverity = computed(() => {
   return out
 })
 
-// Numero affiche par action du plan : "BACS-001" -> facilite la
-// reference dans les devis des integrateurs GTB.
-function actionNumber(idx) {
-  return 'BACS-' + String(idx + 1).padStart(3, '0')
-}
-
 // Computed v-model pour les 2 checkboxes conditionnelles : evite les
 // problemes de reactivite avec :checked + @change.
 // Filtre les actions resolues automatiquement (status='done') ou
@@ -1333,17 +1327,19 @@ onBeforeUnmount(() => window.document.removeEventListener('mousedown', onDocClic
 //     qu'on est sous les 50 px
 // Le scroll handler est throttle par requestAnimationFrame pour éviter
 // d'overcaler le DOM à chaque pixel.
+// Hysteresis basee uniquement sur la position de scroll (pas la
+// direction). Compact a partir de 200 px, plein retrouve quand on
+// remonte sous 60 px. Entre 60 et 200, on garde l'etat courant.
+// Anciennement base sur delta ±8 px : un micro-mouvement de trackpad
+// suffisait a basculer le mode → header qui saute en boucle pendant
+// que la transition CSS s'animait. La direction n'apporte rien ici.
 const isScrolledDown = ref(false)
-let lastScrollY = 0
 let scrollRaf = 0
 function processScroll() {
   scrollRaf = 0
   const y = window.scrollY
-  const delta = y - lastScrollY
-  lastScrollY = y
-  if (y < 50) { isScrolledDown.value = false; return }
-  if (delta < -8) { isScrolledDown.value = false; return }      // remontée nette
-  if (delta > 0 && y > 120) { isScrolledDown.value = true; return } // descente nette
+  if (y > 200 && !isScrolledDown.value) isScrolledDown.value = true
+  else if (y < 60 && isScrolledDown.value) isScrolledDown.value = false
 }
 function onScrollY() {
   if (scrollRaf) return
@@ -1351,7 +1347,6 @@ function onScrollY() {
 }
 onMounted(() => {
   window.addEventListener('scroll', onScrollY, { passive: true })
-  lastScrollY = window.scrollY
   processScroll()
 })
 onBeforeUnmount(() => {
@@ -1364,7 +1359,7 @@ onBeforeUnmount(() => {
   <div class="w-full mx-auto px-3 pb-12" :style="isNarrow ? { paddingBottom: 'calc(56px + env(safe-area-inset-bottom) + 1rem)' } : null">
     <!-- Bloc sticky desktop : breadcrumb + titre + actions + stepper.
          Reste visible en haut tout au long du scroll de l'audit. -->
-    <div :class="['audit-sticky-header lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:border-b lg:border-gray-100 lg:mb-6 lg:transition-all',
+    <div :class="['audit-sticky-header lg:sticky lg:top-0 lg:z-30 lg:bg-white/95 lg:backdrop-blur lg:-mx-3 lg:px-3 lg:border-b lg:border-gray-100 lg:mb-6 lg:transition-[padding] lg:duration-150',
                   isScrolledDown ? 'lg:pt-1.5 lg:pb-2 audit-topbar-compact' : 'lg:pt-3 lg:pb-3']">
     <!-- Header compact (1 ligne sur desktop, breadcrumbs + titre + actions) -->
     <div class="flex items-center justify-between gap-4 mb-3 flex-wrap">

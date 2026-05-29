@@ -11,6 +11,7 @@ const { loadAssetDataUrl } = require('../../lib/pdf');
 const { optimizeFileToDataUrl } = require('../../lib/image-optimizer');
 const { parseRoles } = require('../../lib/device-roles');
 const { isTrue, isFalse } = require('./_ternary');
+const { sortActions, groupByCard, cardOfAction } = require('./_action-cards');
 const { buildMeterCoverage } = require('./_meter-coverage');
 const { buildSiteStaticMap, buildZonesStaticMap } = require('../../lib/static-map');
 const { regulationTypeLabel } = require('../../lib/regulation-defaults');
@@ -649,11 +650,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // construction d'origine plus bas est conservée mais redondante côté
   // sémantique — laissée pour ne pas casser d'autres call sites.
   const _metersByIdEarly = new Map(meters.map(m => [m.id, m]));
-  const numberedItems = [
-    ...actionItemsRaw.filter(a => a.severity === 'blocking'),
-    ...actionItemsRaw.filter(a => a.severity === 'major'),
-    ...actionItemsRaw.filter(a => a.severity === 'minor'),
-  ].map((a, idx) => {
+  // Tri par theme (A->H) puis severite (blocking->minor) puis r175 puis id.
+  // Cf. lib/routes/bacs-audit/_action-cards.js. La renumerotation suit ce
+  // tri : BACS-001 = premiere action du theme A en severite la plus haute.
+  const numberedItems = sortActions(actionItemsRaw).map((a, idx) => {
     // Enrichit avec usage/type de compteur + énergie (depuis source_meter_id)
     // ou usage système (depuis source_device_id) pour les pills colorées
     // du PDF chap 7. Sans ça, les actions s'affichent en texte brut alors
@@ -670,6 +670,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     return {
       ...a,
       display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
+      card_key:         cardOfAction(a).card,
+      card_subsection:  cardOfAction(a).subsection,
       meter_usage: meterUsage,
       meter_type: meterType,
       device_system_category: deviceSystemCategory,
@@ -777,6 +779,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     for (const [key, list] of buckets) {
       if (list.length >= 3) {
         const cfg = GROUP_LABELS[key];
+        // Severite = celle du 1er item du bucket (homogene pour un meme
+        // source_subtype). Permet au partial _action-group.hbs de styler
+        // la card sans recevoir le param explicitement.
+        const sev = list[0].severity;
         result.push({
           kind: 'group',
           key,
@@ -784,6 +790,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
           columns: cfg.columns,
           count: list.length,
           r175_article: list[0].r175_article,
+          severity: sev,
+          severity_label: sev === 'blocking' ? 'Bloquantes' : sev === 'major' ? 'Majeures' : 'Optimisations',
+          severity_class: 'sev-' + sev,
           first_number: list[0].display_number,
           last_number: list[list.length - 1].display_number,
           items: list.map(enrichItemForGroup),
@@ -799,6 +808,30 @@ async function buildBacsAuditExportData(af, opts = {}) {
     major: buildGroupedPlan(actionItems.major),
     minor: buildGroupedPlan(actionItems.minor),
   };
+
+  // ── Regroupement par CARTE de l'audit (refonte 2026-05-29 v2) ──
+  // Le plan suit les cartes du stepper (Identification → Systèmes →
+  // Compteurs → GTB → Régulation → Inspections → Divers) ; la carte GTB
+  // contient des sous-sections (Capacités / Intégration équipements /
+  // Intégration compteurs / Maintenance & formation). Voir _action-cards.js.
+  // Chaque carte/sous-section embarque sa propre version condensee
+  // (>=3 items du meme source_subtype regroupes en « X compteurs à poser »
+  // au lieu de N lignes a plat).
+  // Normalisation : chaque carte expose TOUJOURS un tableau `subsections`
+  // non vide (singleton pour les cartes sans sous-division), pour que le
+  // template PDF puisse iterer uniformement. Le sous-titre n'est rendu que
+  // si subsections.length > 1.
+  const actionItemsByCard = groupByCard(numberedItems).map(card => {
+    const hasSub = (card.subsections || []).length > 0;
+    const subsections = hasSub
+      ? card.subsections.map(sub => ({ ...sub, grouped: buildGroupedPlan(sub.items) }))
+      : [{
+          key: card.key, label: card.label,
+          count: card.count, blocking: card.blocking, major: card.major, minor: card.minor,
+          items: card.items, grouped: buildGroupedPlan(card.items),
+        }];
+    return { ...card, grouped: buildGroupedPlan(card.items), subsections };
+  });
 
   // Justifications (Annexe C). La source est derivee de la FK non-NULL
   // (mig 125) pour rester lisible dans le PDF.
@@ -1141,6 +1174,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
     // Plan d'action groupé par subtype pour le PDF (ch.7) — réduit le
     // nombre de cartes en condensant les actions répétitives.
     actionItemsGrouped,
+    // Plan d'action regroupe par carte de l'audit (alignement stepper).
+    // Refonte 2026-05-29 v2 : remplacement du tri par theme R175.
+    // Cf. _action-cards.js. La carte 'bms' contient des sous-sections.
+    actionItemsByCard,
     actionStats,
     bmsTopicNotes,
     bmsTopicOpportunities,

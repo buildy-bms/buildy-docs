@@ -39,6 +39,18 @@ async function load() {
   try {
     const { data } = await getZoneParties(props.zoneId)
     selectedIds.value = (data || []).map(l => l.party_id)
+    // Auto-seed : les parties du site sont héritées par toutes les zones
+    // (accord Kevin 2026-05-29 — pas de surcharge locale). Si la zone
+    // n'a encore aucune partie en DB, on persiste l'héritage complet
+    // pour rester cohérent avec ce que les PDF / agrégations attendent.
+    const siteIds = (props.siteParties || []).map(p => p.id)
+    const missing = siteIds.filter(id => !selectedIds.value.includes(id))
+    if (missing.length) {
+      const merged = [...selectedIds.value, ...missing]
+      await setZoneParties(props.zoneId, merged)
+      selectedIds.value = merged
+      await audit.refreshSiteParties()
+    }
   } catch {
     error('Chargement des parties de la zone impossible')
   } finally {
@@ -48,26 +60,13 @@ async function load() {
 
 onMounted(load)
 watch(() => props.zoneId, load)
-
-async function persist() {
-  try {
-    await setZoneParties(props.zoneId, selectedIds.value)
-    // Propage le changement aux pilules « Zones affectées » de chaque
-    // partie (carte Structure juridique) via le store partagé.
-    await audit.refreshSiteParties()
-  } catch {
-    error('Sauvegarde des parties de la zone impossible')
-  }
-}
-
-function toggle(partyId, checked) {
-  if (checked) {
-    if (!selectedIds.value.includes(partyId)) selectedIds.value.push(partyId)
-  } else {
-    selectedIds.value = selectedIds.value.filter(id => id !== partyId)
-  }
-  persist()
-}
+// Si l'auditeur ajoute une nouvelle partie au site pendant qu'il édite
+// la zone, on la propage immédiatement (héritage automatique).
+watch(() => props.siteParties.map(p => p.id).join(','), async (newKey, oldKey) => {
+  if (newKey === oldKey) return
+  if (!props.zoneId || loading.value) return
+  await load()
+})
 </script>
 
 <template>
@@ -79,16 +78,17 @@ function toggle(partyId, checked) {
       Aucune partie prenante — à définir dans l'identification du site.
     </p>
 
-    <!-- Multi-select des parties du site -->
+    <!-- Toutes les parties du site sont héritées (cochées + verrouillées).
+         Pour retirer une partie d'une zone, on la retire au niveau du site
+         dans la carte Identification — pas de surcharge locale. -->
     <ul v-else class="space-y-1">
       <li v-for="p in siteParties" :key="p.id">
-        <label class="inline-flex items-center gap-2 cursor-pointer min-h-11 sm:min-h-0">
+        <div class="inline-flex items-center gap-2 min-h-11 sm:min-h-0 opacity-90">
           <input
             type="checkbox"
-            :checked="selectedIds.includes(p.id)"
-            :disabled="loading"
-            @change="e => toggle(p.id, e.target.checked)"
-            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30"
+            checked
+            disabled
+            class="rounded border-gray-300 text-emerald-600 cursor-not-allowed"
           />
           <FontAwesomeIcon
             :icon="['fas', resolveFaIconName(partyKind(p.kind)?.icon)]"
@@ -97,8 +97,12 @@ function toggle(partyId, checked) {
           />
           <span class="text-sm text-gray-700">{{ p.name }}</span>
           <span class="text-[11px] text-gray-400">({{ partyKindLabel(p.kind) }})</span>
-        </label>
+          <span class="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">hérité du site</span>
+        </div>
       </li>
     </ul>
+    <p v-if="siteParties.length" class="text-[11px] text-gray-400 italic mt-2">
+      Pour retirer une partie, ouvrez la carte « Identification » du site.
+    </p>
   </div>
 </template>

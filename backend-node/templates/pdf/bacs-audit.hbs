@@ -1800,120 +1800,64 @@
 {{/if}}
 
 {{!--
-  Plan d'action — refonte v2.x : les actions répétitives (≥3 du même
-  source_subtype) sont condensées en cartes groupées avec tableau interne.
-  Les actions isolées conservent l'affichage carte classique.
-  Le helper `actionItemsGrouped` est construit côté _export-data.js.
+  Plan d'action — refonte 2026-05-29 : les actions sont regroupees par
+  theme metier (8 cards max), dans l'ordre de lecture du decret. Chaque
+  card embarque ses items deja numerotes (BACS-NNN renumerote selon le
+  nouveau tri theme → severite → r175). Les actions repetitives (≥3 du
+  meme source_subtype) restent condensees en sous-cartes groupees.
+  Helper : `actionItemsByCard` cote _export-data.js (mig 189 refonte
+  plan par cartes du stepper, accord Kevin 2026-05-29).
 --}}
-{{#if actionItems.blocking.length}}
-<h2>{{#if isBacs}}Actions bloquantes{{else}}Préconisations essentielles{{/if}}</h2>
-<div class="callout callout-warn">
-  <span class="callout-icon">{{{faIcon "triangle-exclamation" "#ea580c" "14"}}}</span>
-  <div class="callout-body">{{#if isBacs}}Sans ces actions, le site ne peut pas être considéré comme conforme au décret BACS.{{else}}Préconisations à intégrer en priorité dans le devis Buildy — extension critique de la couverture GTB.{{/if}}</div>
-</div>
-{{#each actionItemsGrouped.blocking}}
-  {{#if (eq kind "group")}}
-    {{> _action-group sev="blocking" sevLabel="Bloquantes" sevClass="sev-blocking"}}
-  {{else}}
-    {{#with item}}
-    <div class="action-card">
-      <div class="action-card-head">
-        <span class="action-num">{{display_number}}</span>
-        <span class="sev sev-blocking">Bloquante</span>
-        <span class="muted action-card-article">{{r175_article}}</span>
-        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
-        {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
-        {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
-      </div>
-      <div class="action-card-title"><strong>{{title}}</strong></div>
-      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-      {{#if alternative_solutions_html}}
-        <div class="alt-solutions">
-          <p class="alt-solutions-label">Préconisations Buildy :</p>
-          {{{alternative_solutions_html}}}
+{{#if actionItemsByCard.length}}
+{{#each actionItemsByCard}}
+<section class="theme-section">
+  <header class="theme-head">
+    <h2 class="theme-title">{{label}}</h2>
+    <span class="theme-meta">
+      {{count}} action{{#unless (eq count 1)}}s{{/unless}}
+      {{#if blocking}} · <span class="sev-dot sev-dot-blocking"></span>{{blocking}} bloquante{{#unless (eq blocking 1)}}s{{/unless}}{{/if}}
+      {{#if major}} · <span class="sev-dot sev-dot-major"></span>{{major}} majeure{{#unless (eq major 1)}}s{{/unless}}{{/if}}
+      {{#if minor}} · <span class="sev-dot sev-dot-minor"></span>{{minor}} mineure{{#unless (eq minor 1)}}s{{/unless}}{{/if}}
+    </span>
+  </header>
+  {{#each subsections}}
+    {{#if (gt ../subsections.length 1)}}
+      <h3 class="theme-sub-title">{{label}} <span class="theme-sub-meta">· {{count}}</span></h3>
+    {{/if}}
+    {{#each grouped}}
+      {{#if (eq kind "group")}}
+        {{> _action-group sev=severity sevLabel=severity_label sevClass=severity_class}}
+      {{else}}
+        {{#with item}}
+        <div class="action-card{{#if (eq severity "minor")}} action-card-minor{{/if}}">
+          <div class="action-card-head">
+            <span class="action-num">{{display_number}}</span>
+            <span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}{{#if ../../../../isBacs}}Bloquante{{else}}Essentielle{{/if}}{{else}}{{#if (eq severity "major")}}{{#if ../../../../isBacs}}Majeure{{else}}Recommandée{{/if}}{{else}}{{#if ../../../../isBacs}}Mineure{{else}}Optimisation{{/if}}{{/if}}{{/if}}</span>
+            {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
+            {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
+            {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
+            {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
+            {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
+            {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
+          </div>
+          <div class="action-card-title"><strong>{{title}}</strong></div>
+          {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+          {{#if alternative_solutions_html}}
+            <div class="alt-solutions">
+              <p class="alt-solutions-label">Préconisations Buildy :</p>
+              {{{alternative_solutions_html}}}
+            </div>
+          {{/if}}
         </div>
+        {{/with}}
       {{/if}}
-    </div>
-    {{/with}}
-  {{/if}}
+    {{/each}}
+  {{/each}}
+</section>
 {{/each}}
-{{/if}}
-
-{{#if actionItems.major.length}}
-<h2>{{#if isBacs}}Actions majeures{{else}}Préconisations recommandées{{/if}}</h2>
-<div class="callout callout-r175">
-  <span class="callout-icon">{{{faIcon "book-open" "#1b2842" "14"}}}</span>
-  <div class="callout-body">{{#if isBacs}}Impact direct sur les exigences fonctionnelles R175-3.{{else}}Améliorations significatives de la couverture GTB recommandées dans le devis.{{/if}}</div>
-</div>
-{{#each actionItemsGrouped.major}}
-  {{#if (eq kind "group")}}
-    {{> _action-group sev="major" sevLabel="Majeures" sevClass="sev-major"}}
-  {{else}}
-    {{#with item}}
-    <div class="action-card">
-      <div class="action-card-head">
-        <span class="action-num">{{display_number}}</span>
-        <span class="sev sev-major">{{#if ../../isBacs}}Majeure{{else}}Recommandée{{/if}}</span>
-        {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
-        {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
-        {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
-      </div>
-      <div class="action-card-title"><strong>{{title}}</strong></div>
-      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-      {{#if alternative_solutions_html}}
-        <div class="alt-solutions">
-          <p class="alt-solutions-label">Préconisations Buildy :</p>
-          {{{alternative_solutions_html}}}
-        </div>
-      {{/if}}
-    </div>
-    {{/with}}
-  {{/if}}
-{{/each}}
-{{/if}}
-
-{{#if actionItems.minor.length}}
-<h2>{{#if isBacs}}Optimisations{{else}}Optimisations complémentaires{{/if}}</h2>
-<div class="callout callout-info">
-  <span class="callout-icon">{{{faIcon "thumbtack" "#6b7280" "14"}}}</span>
-  <div class="callout-body">{{#if isBacs}}Bonnes pratiques, hors strict décret.{{else}}Bonnes pratiques optionnelles, à proposer en option dans le devis.{{/if}}</div>
-</div>
-{{#each actionItemsGrouped.minor}}
-  {{#if (eq kind "group")}}
-    {{> _action-group sev="minor" sevLabel="Optimisations" sevClass="sev-minor"}}
-  {{else}}
-    {{#with item}}
-    <div class="action-card action-card-minor">
-      <div class="action-card-head">
-        <span class="action-num">{{display_number}}</span>
-        <span class="sev sev-minor">{{#if ../../isBacs}}Mineure{{else}}Optimisation{{/if}}</span>
-        {{#if r175_article}}<span class="muted action-card-article">{{r175_article}}</span>{{/if}}
-        {{#if zone_name}}<span class="action-card-zone">{{{faIcon "location-dot" "#6b7280" "10"}}} {{zone_name}}</span>{{/if}}
-        {{#if device_system_category}}{{{categoryIcon device_system_category "11"}}}{{/if}}
-        {{#if meter_usage}}{{{meterUsagePill meter_usage "sm"}}}{{/if}}
-        {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
-        {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
-      </div>
-      <div class="action-card-title"><strong>{{title}}</strong></div>
-      {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
-    </div>
-    {{/with}}
-  {{/if}}
-{{/each}}
-{{/if}}
-
-{{#unless actionItems.blocking.length}}
-{{#unless actionItems.major.length}}
-{{#unless actionItems.minor.length}}
+{{else}}
 <p>{{#if isBacs}}Aucune action corrective à ce stade.{{else}}Aucune préconisation à ce stade — la GTB couvre l'intégralité du périmètre.{{/if}}</p>
-{{/unless}}
-{{/unless}}
-{{/unless}}
+{{/if}}
 
 <div class="callout callout-reco" style="margin-top: 8mm;">
   <span class="callout-icon">{{{faIcon "circle-check" "#00cd92" "14"}}}</span>

@@ -1,11 +1,14 @@
 <script setup>
 import { computed } from 'vue'
-import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon, MapPinIcon, EyeSlashIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon, EyeSlashIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Button from '@/components/Button.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
+
+const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
 // Section "Plan de mise en conformité" (R175 — actions correctives auto
 // + manuelles + annotations commerciales). Affiche les items visibles
@@ -47,26 +50,29 @@ const emit = defineEmits([
   'patch-item', 'open-alternatives',
 ])
 
-// Numero affiche par action : "BACS-001" pour faciliter la reference
-// dans les devis des integrateurs GTB.
-function actionNumber(idx) {
-  return 'BACS-' + String(idx + 1).padStart(3, '0')
+// La numerotation BACS-001..NNN est calculee cote backend (route GET
+// /action-items) pour que UI desktop, PWA mobile, PDF audit et MCP
+// affichent EXACTEMENT le meme numero pour la meme action. On lit donc
+// directement `it.display_number`.
+const groupedCards = computed(() => groupByCard(props.visibleActionItems))
+
+function manualAssignedValue(it) {
+  const c = cardOfAction(it)
+  if (!c.card || c.card === 'misc') return ''
+  if (c.subsection) return `${c.card}/${c.subsection}`
+  return c.card
 }
 
-// Actions regroupées par zone fonctionnelle (lisibilité). Les actions
-// sans zone (GTB, inspections) vont dans un groupe « Site / Général ».
-// L'index global est conservé pour la numérotation BACS-XXX.
-const groupedItems = computed(() => {
-  const groups = new Map()
-  props.visibleActionItems.forEach((it, idx) => {
-    const key = it.zone_name || '__general__'
-    if (!groups.has(key)) {
-      groups.set(key, { key, zone_name: it.zone_name || null, items: [] })
-    }
-    groups.get(key).items.push({ it, idx })
-  })
-  return [...groups.values()]
-})
+function reassignManual(it, value) {
+  let assigned_card = null
+  let assigned_subsection = null
+  if (value) {
+    const [card, sub] = value.split('/')
+    assigned_card = card
+    assigned_subsection = sub || null
+  }
+  emit('patch-item', { item: it, patch: { assigned_card, assigned_subsection } })
+}
 
 function hasNotes(html) {
   if (!html) return false
@@ -114,30 +120,53 @@ function hasNotes(html) {
       </span>
       <span v-else class="italic text-emerald-700">✓ Aucune action corrective</span>
     </template>
-    <div class="px-5 py-4 space-y-3">
+    <div class="px-5 py-4 space-y-5">
       <div v-if="!visibleActionItems.length" class="py-10 text-center">
         <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
         <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
         <p class="text-xs text-gray-500">Saisis les systèmes et la GTB ci-dessus pour générer le plan.</p>
       </div>
-      <!-- Actions regroupées par zone fonctionnelle -->
-      <div v-for="grp in groupedItems" :key="grp.key" class="space-y-2">
-        <div class="flex items-center gap-1.5 pt-1">
-          <MapPinIcon class="w-4 h-4 text-indigo-500 shrink-0" />
-          <h3 class="text-sm font-semibold text-gray-700">{{ grp.zone_name || 'Site / Général' }}</h3>
-          <span class="text-[11px] text-gray-400">· {{ grp.items.length }} action{{ grp.items.length > 1 ? 's' : '' }}</span>
-        </div>
-        <div
-          v-for="{ it, idx } in grp.items"
-          :key="it.id"
-          :class="['border rounded-lg overflow-hidden transition bg-white',
-            it.status === 'declined' ? 'opacity-50' : '',
-            it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200')]">
+      <!-- Actions regroupees par CARTE de l'audit (stepper). Carte GTB
+           sous-divisee en sous-sections (Capacites, Integration
+           equipements, Integration compteurs, Maintenance & formation). -->
+      <section v-for="(card, ci) in groupedCards" :key="card.key" class="space-y-3">
+        <!-- Bandeau de carte : full-width, fond emeraude prononce, numero
+             d'ordre dans la pastille pour rythmer le scroll. -->
+        <header class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-emerald-50 border-l-4 border-emerald-500">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold shrink-0">{{ ci + 1 }}</span>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-base font-semibold text-emerald-900 leading-tight">{{ card.label }}</h3>
+            <p class="text-xs text-emerald-700/80 mt-0.5">
+              {{ card.count }} action{{ card.count > 1 ? 's' : '' }}<template v-if="card.blocking"> · <span class="text-red-700 font-semibold">{{ card.blocking }} bloquante{{ card.blocking > 1 ? 's' : '' }}</span></template><template v-if="card.major"> · <span class="text-orange-700">{{ card.major }} majeure{{ card.major > 1 ? 's' : '' }}</span></template><template v-if="card.minor"> · <span class="text-amber-700">{{ card.minor }} mineure{{ card.minor > 1 ? 's' : '' }}</span></template>
+            </p>
+          </div>
+        </header>
+        <template v-for="(sub, si) in (card.subsections || [{ key: card.key, items: card.items }])" :key="card.key + '-' + sub.key">
+          <!-- Sous-titre uniquement si la carte a plusieurs sous-sections
+               (cas GTB) — bandeau ardoise indente, design parallele au
+               bandeau de carte avec une pastille a/b/c/d pour le rythme. -->
+          <div v-if="card.subsections && card.subsections.length > 1"
+               class="flex items-center gap-2.5 ml-4 mt-3 px-3 py-2 rounded-md bg-slate-100 border-l-[3px] border-slate-400">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-500 text-white text-[10px] font-bold shrink-0">{{ String.fromCharCode(97 + si) }}</span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-slate-800 leading-tight">{{ sub.label }}</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                {{ sub.count }} action{{ sub.count > 1 ? 's' : '' }}<template v-if="sub.blocking"> · <span class="text-red-700 font-semibold">{{ sub.blocking }} bloquante{{ sub.blocking > 1 ? 's' : '' }}</span></template><template v-if="sub.major"> · <span class="text-orange-700">{{ sub.major }} majeure{{ sub.major > 1 ? 's' : '' }}</span></template><template v-if="sub.minor"> · <span class="text-amber-700">{{ sub.minor }} mineure{{ sub.minor > 1 ? 's' : '' }}</span></template>
+              </p>
+            </div>
+          </div>
+          <div
+            v-for="it in sub.items"
+            :key="it.id"
+            :class="['border rounded-lg overflow-hidden transition bg-white',
+              card.subsections && card.subsections.length > 1 ? 'ml-4' : '',
+              it.status === 'declined' ? 'opacity-50' : '',
+              it.severity === 'blocking' ? 'border-red-200' : (it.severity === 'major' ? 'border-orange-200' : 'border-amber-200')]">
         <!-- Ligne unique condensée : tags + titre/description + actions -->
         <div class="px-3 py-2 flex items-start gap-2.5">
           <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
             <span class="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap">
-              {{ actionNumber(idx) }}
+              {{ it.display_number || '—' }}
             </span>
             <span :class="['pill', severityLabels[it.severity].cls]">
               {{ severityLabels[it.severity].label }}
@@ -147,9 +176,22 @@ function hasNotes(html) {
           <div class="flex-1 min-w-0">
             <div class="text-sm text-gray-800 font-medium leading-snug">{{ it.title }}</div>
             <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 leading-snug">{{ it.description }}</div>
+            <div v-if="it.zone_name" class="text-[10px] text-gray-400 mt-0.5">📍 {{ it.zone_name }}</div>
           </div>
           <!-- Actions compactes à droite -->
           <div class="flex items-center gap-1 shrink-0">
+            <!-- Selecteur de carte sur les items MANUELS uniquement
+                 (les autos sont rattaches automatiquement par helper). -->
+            <select
+              v-if="!it.auto_generated"
+              :value="manualAssignedValue(it)"
+              @change="e => reassignManual(it, e.target.value)"
+              class="text-[11px] rounded border border-gray-200 bg-white px-1.5 py-1 text-gray-600 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              title="Affecter cette préconisation à une carte de l'audit"
+            >
+              <option value="">Divers</option>
+              <option v-for="opt in CARD_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
             <button
               type="button"
               @click="emit('open-alternatives', it)"
@@ -182,7 +224,8 @@ function hasNotes(html) {
           <SafeHtml class="prose prose-sm max-w-none text-violet-900" :html="it.alternative_solutions_html" />
         </div>
         </div>
-      </div>
+        </template>
+      </section>
     </div>
   </CollapsibleSection>
 </template>

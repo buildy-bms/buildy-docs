@@ -1,15 +1,18 @@
 <script setup>
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
-import { computed, ref } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { regenerateBacsActionItems, updateBacsActionItem } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
-import MobileNativeSelect from './MobileNativeSelect.vue'
+import MobileSelectSheet from './MobileSelectSheet.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
+
+const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
 const audit = useAuditStore()
 const { actionItems, document } = storeToRefs(audit)
@@ -51,6 +54,34 @@ const itemsBySeverity = computed(() => ({
   minor: filteredItems.value.filter(i => i.severity === 'minor'),
 }))
 
+// Regroupement par CARTE de l'audit (alignement stepper, identique au
+// desktop et au PDF). La carte GTB embarque ses sous-sections. La
+// numerotation BACS-NNN vient directement du backend (champ
+// `display_number`) — pas de recalcul local.
+const groupedCards = computed(() => groupByCard(filteredItems.value))
+
+function manualAssignedValue(it) {
+  const c = cardOfAction(it)
+  if (!c.card || c.card === 'misc') return ''
+  if (c.subsection) return `${c.card}/${c.subsection}`
+  return c.card
+}
+async function reassignManual(it, value) {
+  let assigned_card = null
+  let assigned_subsection = null
+  if (value) {
+    const [card, sub] = value.split('/')
+    assigned_card = card
+    assigned_subsection = sub || null
+  }
+  try {
+    await updateBacsActionItem(it.id, { assigned_card, assigned_subsection })
+    await audit.refreshActionItems()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Réaffectation impossible')
+  }
+}
+
 const regenerating = ref(false)
 async function regenerate() {
   regenerating.value = true
@@ -69,6 +100,65 @@ async function regenerate() {
 const editing = ref(null)            // l'item en cours d'édition
 const draft = ref({})
 const saving = ref(false)
+
+// Titre du sheet d'édition : numéro BACS-NNN + titre court de l'action,
+// au lieu du libellé générique « BACS · Mineure » qui ne renseignait
+// pas sur le contenu.
+const actionSheetTitle = computed(() => {
+  if (!editing.value) return ''
+  const num = editing.value.display_number || 'BACS'
+  const title = editing.value.title || SEVERITY_LABEL[editing.value.severity]?.label || ''
+  return title ? `${num} — ${title}` : num
+})
+
+// ── Navigation drill-down 3 niveaux (parité avec MobileSystemsTab) ─────
+// Niveau 1 (cards)        : liste des cartes du stepper
+// Niveau 2 (subsections) : sous-sections (uniquement carte GTB)
+// Niveau 3 (items)        : liste des items BACS-NNN
+// Le sticky header retour remonte d'un niveau ; scroll reset à chaque
+// changement de niveau (cf. nextTick + window.scrollTo).
+const selectedCardKey = ref(null)
+const selectedSubKey = ref(null)
+const currentCard = computed(() =>
+  selectedCardKey.value ? groupedCards.value.find(c => c.key === selectedCardKey.value) : null)
+const currentSub = computed(() => {
+  if (!currentCard.value || !selectedSubKey.value) return null
+  return (currentCard.value.subsections || []).find(s => s.key === selectedSubKey.value) || null
+})
+// Liste des items à afficher au niveau le plus bas.
+const currentItems = computed(() => {
+  if (currentSub.value) return currentSub.value.items
+  if (currentCard.value && (!currentCard.value.subsections || currentCard.value.subsections.length <= 1)) {
+    return currentCard.value.items
+  }
+  return []
+})
+const drillView = computed(() => {
+  if (!currentCard.value) return 'cards'
+  if (currentCard.value.subsections && currentCard.value.subsections.length > 1 && !currentSub.value) return 'subsections'
+  return 'items'
+})
+function enterCard(card) {
+  selectedCardKey.value = card.key
+  selectedSubKey.value = null
+  // Si la carte n'a pas de sous-sections (autres que la fictive), on
+  // saute directement au niveau items.
+  if (!card.subsections || card.subsections.length <= 1) {
+    selectedSubKey.value = null
+  }
+  scrollTop()
+}
+function enterSub(sub) {
+  selectedSubKey.value = sub.key
+  scrollTop()
+}
+function backOne() {
+  if (selectedSubKey.value) { selectedSubKey.value = null; scrollTop(); return }
+  if (selectedCardKey.value) { selectedCardKey.value = null; scrollTop(); return }
+}
+function scrollTop() {
+  nextTick(() => window.scrollTo({ top: 0, behavior: 'auto' }))
+}
 
 function openEdit(item) {
   editing.value = item
@@ -108,8 +198,29 @@ async function saveEdit() {
 
 <template>
   <div class="p-3 pb-24 space-y-3">
-    <!-- Filtre -->
-    <div class="flex gap-1.5">
+    <!-- Breadcrumb sticky : niveau courant + bouton retour.
+         Niveau 1 → pas de breadcrumb.
+         Niveau 2/3 → bouton ← + label de la carte (+ sous-section). -->
+    <div v-if="currentCard"
+         class="sticky top-0 z-10 -mx-3 px-3 py-2 bg-white/95 backdrop-blur border-b border-gray-100 flex items-center gap-2">
+      <button type="button" @click="backOne"
+              class="tap-target inline-flex items-center gap-1 text-sm font-medium text-indigo-600 -ml-1.5 pl-1.5">
+        <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-3.5 h-3.5" />
+        Retour
+      </button>
+      <div class="flex-1 min-w-0 text-xs text-gray-500 truncate">
+        Plan d'action
+        <span class="text-gray-400"> › </span>
+        <strong class="text-gray-700">{{ currentCard.label }}</strong>
+        <template v-if="currentSub">
+          <span class="text-gray-400"> › </span>
+          <strong class="text-gray-700">{{ currentSub.label }}</strong>
+        </template>
+      </div>
+    </div>
+
+    <!-- Filtre (niveau 1 uniquement) -->
+    <div v-if="drillView === 'cards'" class="flex gap-1.5">
       <button
         v-for="opt in [{v:'open',l:'À traiter'}, {v:'done',l:'Faites'}, {v:'all',l:'Toutes'}]"
         :key="opt.v"
@@ -122,8 +233,8 @@ async function saveEdit() {
       </button>
     </div>
 
-    <!-- 3 stats severities -->
-    <div class="grid grid-cols-3 gap-2">
+    <!-- 3 stats severities (niveau 1 uniquement) -->
+    <div v-if="drillView === 'cards'" class="grid grid-cols-3 gap-2">
       <div v-for="sev in ['blocking', 'major', 'minor']" :key="sev"
            :class="['rounded-xl border p-3 text-center', SEVERITY_LABEL[sev].cls]">
         <p class="text-2xl font-medium leading-none">{{ itemsBySeverity[sev].length }}</p>
@@ -131,8 +242,9 @@ async function saveEdit() {
       </div>
     </div>
 
-    <!-- Bouton régénérer -->
+    <!-- Bouton régénérer (niveau 1 uniquement) -->
     <button
+      v-if="drillView === 'cards'"
       @click="regenerate"
       :disabled="regenerating"
       class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl active:bg-gray-50"
@@ -141,11 +253,52 @@ async function saveEdit() {
       {{ regenerating ? 'Régénération…' : 'Régénérer le plan' }}
     </button>
 
-    <!-- Liste actions -->
-    <div v-if="filteredItems.length" class="space-y-2">
+    <!-- NIVEAU 1 — Liste des cartes du stepper, chacune tactile. -->
+    <div v-if="drillView === 'cards' && filteredItems.length" class="space-y-2">
       <button
-        v-for="(it, idx) in filteredItems"
-        :key="it.id"
+        v-for="card in groupedCards" :key="card.key"
+        type="button"
+        @click="enterCard(card)"
+        class="w-full text-left bg-white rounded-2xl border-2 border-emerald-200 p-4 active:bg-emerald-50/40 transition flex items-center gap-3"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-base font-semibold text-emerald-900 leading-tight">{{ card.label }}</p>
+          <p class="text-xs text-emerald-700/80 mt-0.5">
+            {{ card.count }} action{{ card.count > 1 ? 's' : '' }}
+            <template v-if="card.blocking"> · <span class="text-red-700 font-semibold">{{ card.blocking }} bloquante{{ card.blocking > 1 ? 's' : '' }}</span></template>
+            <template v-if="card.major"> · <span class="text-orange-700">{{ card.major }} majeure{{ card.major > 1 ? 's' : '' }}</span></template>
+            <template v-if="card.minor"> · <span class="text-amber-700">{{ card.minor }} mineure{{ card.minor > 1 ? 's' : '' }}</span></template>
+          </p>
+        </div>
+        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-4 h-4 text-emerald-500 shrink-0" />
+      </button>
+    </div>
+
+    <!-- NIVEAU 2 — Sous-sections GTB. -->
+    <div v-else-if="drillView === 'subsections'" class="space-y-2">
+      <button
+        v-for="sub in (currentCard.subsections || [])" :key="sub.key"
+        type="button"
+        @click="enterSub(sub)"
+        class="w-full text-left bg-white rounded-2xl border-2 border-slate-200 p-4 active:bg-slate-50 transition flex items-center gap-3"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-base font-semibold text-slate-800 leading-tight">{{ sub.label }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">
+            {{ sub.count }} action{{ sub.count > 1 ? 's' : '' }}
+            <template v-if="sub.blocking"> · <span class="text-red-700 font-semibold">{{ sub.blocking }} bloquante{{ sub.blocking > 1 ? 's' : '' }}</span></template>
+            <template v-if="sub.major"> · <span class="text-orange-700">{{ sub.major }} majeure{{ sub.major > 1 ? 's' : '' }}</span></template>
+            <template v-if="sub.minor"> · <span class="text-amber-700">{{ sub.minor }} mineure{{ sub.minor > 1 ? 's' : '' }}</span></template>
+          </p>
+        </div>
+        <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-4 h-4 text-slate-500 shrink-0" />
+      </button>
+    </div>
+
+    <!-- NIVEAU 3 — Liste des items BACS-NNN. -->
+    <div v-else-if="drillView === 'items'" class="space-y-2">
+      <button
+        v-for="it in currentItems" :key="it.id"
         type="button"
         @click="openEdit(it)"
         :class="['w-full text-left bg-white rounded-2xl border-2 p-4 active:bg-gray-50 transition',
@@ -154,7 +307,7 @@ async function saveEdit() {
       >
         <div class="flex items-start gap-2 mb-2 flex-wrap">
           <span class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap">
-            BACS-{{ String(idx + 1).padStart(3, '0') }}
+            {{ it.display_number || '—' }}
           </span>
           <span :class="['inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full', SEVERITY_LABEL[it.severity].cls]">
             {{ SEVERITY_LABEL[it.severity].label }}
@@ -168,6 +321,10 @@ async function saveEdit() {
         <p v-if="it.description" class="text-xs text-gray-600 mt-1.5 leading-relaxed">{{ it.description }}</p>
         <p v-if="it.zone_name" class="text-xs text-gray-500 mt-2">📍 {{ it.zone_name }}</p>
       </button>
+      <div v-if="!currentItems.length" class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
+        <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-10 h-10 text-emerald-500 mx-auto" />
+        <p class="text-sm font-medium text-emerald-700 mt-3">Aucune action ici.</p>
+      </div>
     </div>
     <div v-else class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
       <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-12 h-12 text-emerald-500 mx-auto" />
@@ -177,10 +334,11 @@ async function saveEdit() {
       <p v-if="filter === 'open'" class="text-xs text-gray-500 mt-1">Tu peux passer à la livraison</p>
     </div>
 
-    <!-- Sheet d'édition d'un item -->
+    <!-- Sheet d'édition d'un item — titre = BACS-NNN + titre court de
+         l'action pour que l'auditeur sache ce qu'il édite. -->
     <MobileSheet
       :open="!!editing"
-      :title="editing ? `BACS · ${SEVERITY_LABEL[editing.severity]?.label || ''}` : ''"
+      :title="actionSheetTitle"
       :saving="saving"
       save-label="Enregistrer"
       @close="closeEdit"
@@ -224,11 +382,25 @@ async function saveEdit() {
 
         <!-- Effort estimé -->
         <MobileField label="Effort estimé" hint="Pour le devis commercial. Peut être laissé vide.">
-          <MobileNativeSelect
+          <MobileSelectSheet
             :model-value="draft.estimated_effort"
             @update:modelValue="v => draft.estimated_effort = v || null"
             :options="EFFORT_OPTIONS"
+            title="Effort estimé"
             placeholder="— À évaluer —"
+          />
+        </MobileField>
+
+        <!-- Carte de l'audit (items MANUELS uniquement) -->
+        <MobileField v-if="editing && !editing.auto_generated"
+                     label="Carte de l'audit"
+                     hint="Range cette préconisation dans une carte du stepper. Par défaut elle vit dans « Divers ».">
+          <MobileSelectSheet
+            :model-value="manualAssignedValue(editing) || ''"
+            @update:modelValue="v => reassignManual(editing, v || '')"
+            :options="[{ value: '', label: 'Divers' }, ...CARD_OPTIONS]"
+            title="Carte de l'audit"
+            placeholder="— Divers —"
           />
         </MobileField>
 

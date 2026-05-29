@@ -1170,9 +1170,8 @@ table .total-row td {
 table.action-group-table thead th:not(:first-child):not(.agt-num),
 table.action-group-table tbody td:not(:first-child):not(.agt-num) { text-align: center; }
 
-/* Tables de synthèse A3 (bacs-audit-tables.hbs) : idem, sauf nom et notes. */
-table.syn thead th:not(:first-child):not(.col-name):not(.col-notes),
-table.syn tbody td:not(:first-child):not(.col-name):not(.col-notes) { text-align: center; }
+/* (Les tables de synthese A3 vivent dans styles-bacs-audit-tables.css —
+   regles de centrage et pills .m-pill-sm definies la-bas.) */
 /* Variantes anciennes conservees pour le decret (Annexe A et autres
    endroits eventuels qui utilisent encore .usage-tag/s). */
 .usage-tags { display: flex; flex-wrap: wrap; gap: 1.5mm; margin: 1.5mm 0 4mm; }
@@ -1809,6 +1808,90 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
    Cible : tailles compactes mais aérées. Refonte v2.x : ajout du
    variant `.action-card-grouped` qui condense N actions répétitives
    (même source_subtype, ≥3) en 1 carte + tableau interne. */
+
+/* ─── Card thematique du plan d'action (refonte 2026-05-29) ─────────
+   Chaque theme metier (A=Assujettissement, B=Comptage…) est rendu en
+   bloc visuel propre, avec son code, son libelle et un meta-compteur
+   par severite. Les actions du theme suivent en dessous. */
+.theme-section {
+  margin: 0 0 6mm;
+  padding: 0;
+  page-break-inside: auto;
+}
+.theme-section + .theme-section { margin-top: 9mm; }
+.theme-head {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin: 0 0 4mm;
+  padding: 3mm 4mm;
+  background: #ecfdf5;            /* emerald-50, plus saillant que slate */
+  border-left: 4pt solid var(--buildy-green);
+  border-radius: 0 2mm 2mm 0;
+  page-break-after: avoid;
+}
+.theme-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13pt;                /* +2pt — la carte est le repere visuel principal */
+  font-weight: 700;
+  color: #064e3b;                 /* emerald-900 */
+  margin: 0;
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+.theme-meta {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 500;
+  color: #047857;                 /* emerald-700 */
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+  white-space: nowrap;
+}
+.theme-meta .sev-dot {
+  width: 2mm;
+  height: 2mm;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.4mm;
+}
+.theme-meta .sev-dot-blocking { background: var(--sev-blocking); }
+.theme-meta .sev-dot-major    { background: var(--sev-major); }
+.theme-meta .sev-dot-minor    { background: var(--sev-minor); }
+
+/* Sous-section (uniquement carte GTB) : Capacites / Integration
+   equipements / Integration compteurs / Maintenance & formation. Niveau
+   hierarchique distinct du bandeau de carte (vert) : bandeau ardoise
+   indente, pour donner au lecteur la sensation visuelle « carte > sous-
+   carte > items ». */
+.theme-sub-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10pt;
+  font-weight: 600;
+  color: #334155;                  /* slate-700 */
+  margin: 4mm 0 2.5mm 4mm;
+  padding: 1.6mm 3mm;
+  background: #f1f5f9;             /* slate-100 */
+  border-left: 3pt solid #94a3b8;  /* slate-400 */
+  border-radius: 0 1.5mm 1.5mm 0;
+  page-break-after: avoid;
+}
+.theme-sub-title:first-of-type { margin-top: 0; }
+.theme-sub-meta {
+  font-family: 'Inter', sans-serif;
+  font-size: 8pt;
+  font-weight: 500;
+  color: #64748b;                  /* slate-500 */
+  margin-left: 1mm;
+}
+/* Indenter les action-card sous une sous-section, alignees avec le
+   bandeau gris. */
+.theme-sub-title + .action-card,
+.theme-sub-title ~ .action-card {
+  margin-left: 4mm;
+}
+
 .action-card {
   page-break-inside: avoid;
   margin: 0 0 3mm;

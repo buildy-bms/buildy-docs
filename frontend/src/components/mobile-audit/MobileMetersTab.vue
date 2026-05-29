@@ -249,6 +249,16 @@ function openEdit(m) {
 }
 function close() { editing.value = null }
 
+// Titre dynamique du sheet d'édition : zone + usage du compteur courant.
+const meterSheetTitle = computed(() => {
+  if (!editing.value) return ''
+  if (editing.value.mode === 'create') return 'Nouveau compteur'
+  const m = editing.value.meter || editForm.value || {}
+  const zone = m.zone_name || 'Général'
+  const usage = usageLabel(m.usage)
+  return `${zone} · ${usage}`
+})
+
 // Ouverture directe depuis l'onglet Docs (KPIs couverture photo).
 watch(() => audit.pendingFocus, (focus) => {
   if (!focus || focus.kind !== 'meters' || focus.id == null) return
@@ -589,7 +599,7 @@ function toggleProtocol(p) {
 
     <MobileSheet
       :open="!!editing"
-      :title="editing?.mode === 'create' ? 'Nouveau compteur' : 'Compteur'"
+      :title="meterSheetTitle"
       :saving="saving"
       @close="close"
       @save="save"

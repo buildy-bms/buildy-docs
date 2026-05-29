@@ -758,22 +758,92 @@ async function routes(fastify) {
       }
       cloneTree(null, null);
 
-      // Clone overrides + instances par section (attachments NON clonees : on
-      // veut une AF vierge cote captures pour le nouveau projet)
+      // Clone overrides + instances + zones fonctionnelles par section
+      // (attachments NON clonees : on veut une AF vierge cote captures pour
+      // le nouveau projet). Les M2M instance<->zone et instance<->category
+      // sont reportes apres la creation des nouvelles instances et zones.
       const cloneOverrides = db.db.prepare(`
         INSERT INTO section_point_overrides
           (section_id, action, base_point_id, position, label, data_type, direction, unit, is_optional, created_by)
         SELECT ?, action, base_point_id, position, label, data_type, direction, unit, is_optional, ?
         FROM section_point_overrides WHERE section_id = ?
       `);
-      const cloneInstances = db.db.prepare(`
-        INSERT INTO equipment_instances (section_id, position, reference, location, qty, notes)
-        SELECT ?, position, reference, location, qty, notes
+      const listInstances = db.db.prepare(`
+        SELECT id, position, reference, location, qty, notes
         FROM equipment_instances WHERE section_id = ?
       `);
+      const insertInstance = db.db.prepare(`
+        INSERT INTO equipment_instances (section_id, position, reference, location, qty, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const listZones = db.db.prepare(`
+        SELECT id, position, name, surface_m2, occupation_type,
+               occupation_max_personnes, horaires, qai_contraintes, notes
+        FROM af_zones WHERE section_id = ?
+      `);
+      const insertZone = db.db.prepare(`
+        INSERT INTO af_zones
+          (section_id, position, name, surface_m2, occupation_type,
+           occupation_max_personnes, horaires, qai_contraintes, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const instanceIdMap = new Map();
+      const zoneIdMap = new Map();
       for (const [oldId, newId] of idMap) {
         cloneOverrides.run(newId, userId || null, oldId);
-        cloneInstances.run(newId, oldId);
+        for (const inst of listInstances.all(oldId)) {
+          const res = insertInstance.run(newId, inst.position, inst.reference, inst.location, inst.qty, inst.notes);
+          instanceIdMap.set(inst.id, Number(res.lastInsertRowid));
+        }
+        for (const z of listZones.all(oldId)) {
+          const res = insertZone.run(
+            newId, z.position, z.name, z.surface_m2, z.occupation_type,
+            z.occupation_max_personnes, z.horaires, z.qai_contraintes, z.notes,
+          );
+          zoneIdMap.set(z.id, Number(res.lastInsertRowid));
+        }
+      }
+
+      // M2M instance <-> zones fonctionnelles (Lot 32). Indispensable pour
+      // que les equipements affectes a une zone restent rattaches dans le
+      // clone — sans ce report, l'AF clonee perdait toutes les affectations.
+      if (instanceIdMap.size && zoneIdMap.size) {
+        const sourceLinks = db.db.prepare(`
+          SELECT eiz.instance_id, eiz.zone_id
+          FROM equipment_instance_zones eiz
+          JOIN equipment_instances ei ON ei.id = eiz.instance_id
+          JOIN sections s ON s.id = ei.section_id
+          WHERE s.af_id = ?
+        `).all(source.id);
+        const insertLink = db.db.prepare(`
+          INSERT OR IGNORE INTO equipment_instance_zones (instance_id, zone_id) VALUES (?, ?)
+        `);
+        for (const link of sourceLinks) {
+          const newInstanceId = instanceIdMap.get(link.instance_id);
+          const newZoneId = zoneIdMap.get(link.zone_id);
+          if (newInstanceId && newZoneId) insertLink.run(newInstanceId, newZoneId);
+        }
+      }
+
+      // M2M instance <-> categories d'usage par instance (Lot 32, mig 23).
+      // Ex : une CTA marquee chauffage+ventilation doit conserver ses tags
+      // dans le clone, sinon les filtres BACS / calculs de niveau perdent
+      // l'info de categorie.
+      if (instanceIdMap.size) {
+        const sourceCats = db.db.prepare(`
+          SELECT eic.instance_id, eic.category_key
+          FROM equipment_instance_categories eic
+          JOIN equipment_instances ei ON ei.id = eic.instance_id
+          JOIN sections s ON s.id = ei.section_id
+          WHERE s.af_id = ?
+        `).all(source.id);
+        const insertCat = db.db.prepare(`
+          INSERT OR IGNORE INTO equipment_instance_categories (instance_id, category_key) VALUES (?, ?)
+        `);
+        for (const c of sourceCats) {
+          const newInstanceId = instanceIdMap.get(c.instance_id);
+          if (newInstanceId) insertCat.run(newInstanceId, c.category_key);
+        }
       }
 
       return newAf;
@@ -805,6 +875,9 @@ async function routes(fastify) {
     // n'impose PAS d'upgrade : c'est une option payante qu'on ajoute en sus.
     // On l'exclut du calcul "niveau requis" pour eviter un faux shortfall.
     // Idem pour les sections deja optin_paid_option=1 (acceptees en option).
+    // Exception : si demanded_by_moa=1, la MOA exige la fonctionnalite
+    // *incluse* (pas en option) → elle doit forcer le level-up. C'est tout
+    // l'interet de marquer une section comme exigee plutot que comme option.
     const targetSlug = (af.service_level || '').toUpperCase();
     function availableAsPaidOptionAtTarget(s) {
       if (!targetSlug) return false;
@@ -818,7 +891,7 @@ async function routes(fastify) {
       !s.opted_out_by_moa &&
       !excluded.has(s.id) &&
       !s.optin_paid_option &&            // deja prise en option payante
-      !availableAsPaidOptionAtTarget(s)  // activable en option au niveau choisi
+      (s.demanded_by_moa === 1 || !availableAsPaidOptionAtTarget(s))
     );
 
     const { resolveAfLevel } = require('../lib/service-level-resolver');

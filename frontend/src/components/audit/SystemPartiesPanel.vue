@@ -44,6 +44,27 @@ async function loadAll() {
     ])
     systemLinks.value = sysp.data || []
     liability.value = liab.data.by_system?.[props.system.id] || null
+    // Auto-seed : héritage transitif (site → zone → système). Si une
+    // partie du site n'est pas encore liée à ce système, on la lie
+    // automatiquement (accord Kevin 2026-05-29 — pas de surcharge
+    // locale, le toggle est verrouillé côté UI). `responsible_for_works`
+    // reste à false par défaut (saisie locale via le toggle dédié).
+    const siteIds = (parties.value || []).map(p => p.id)
+    const linkedIds = new Set(systemLinks.value.map(l => l.party_id))
+    const missing = siteIds.filter(id => !linkedIds.has(id))
+    if (missing.length) {
+      const merged = [
+        ...systemLinks.value,
+        ...missing.map(id => ({ party_id: id, responsible_for_works: 0 })),
+      ]
+      await setSystemParties(props.system.id, merged.map(l => ({
+        party_id: l.party_id,
+        responsible_for_works: !!l.responsible_for_works,
+      })))
+      systemLinks.value = merged
+      const liab2 = await getBacsLiability(document.value.id)
+      liability.value = liab2.data.by_system?.[props.system.id] || null
+    }
   } catch {
     error('Chargement des parties prenantes impossible')
   } finally {
@@ -53,6 +74,11 @@ async function loadAll() {
 
 onMounted(loadAll)
 watch(() => props.system.id, loadAll)
+// Si une partie est ajoutée au site, la propager immédiatement ici.
+watch(() => (parties.value || []).map(p => p.id).join(','), async (newKey, oldKey) => {
+  if (newKey === oldKey || loading.value) return
+  await loadAll()
+})
 
 function linkFor(partyId) {
   return systemLinks.value.find(l => l.party_id === partyId) || null
@@ -73,15 +99,6 @@ async function persistLinks() {
   }
 }
 
-function toggleParty(partyId, checked) {
-  if (checked) {
-    if (!linkFor(partyId)) systemLinks.value.push({ party_id: partyId, responsible_for_works: 0 })
-  } else {
-    systemLinks.value = systemLinks.value.filter(l => l.party_id !== partyId)
-  }
-  persistLinks()
-}
-
 function toggleWorks(partyId, checked) {
   const link = linkFor(partyId)
   if (link) { link.responsible_for_works = checked ? 1 : 0; persistLinks() }
@@ -100,22 +117,24 @@ function toggleWorks(partyId, checked) {
       </div>
     </div>
 
-    <!-- Multi-select parties + travaux preneurs -->
+    <!-- Toutes les parties du site sont héritées par le système (cochées
+         + verrouillées). Seule la sub-saisie « travaux preneurs » reste
+         éditable car elle est spécifique à ce système. -->
     <div v-if="parties.length">
       <span class="text-xs font-medium text-gray-600">Parties rattachées à ce système</span>
       <p class="text-[11px] text-gray-400 mb-1">
-        Par défaut, le système hérite des parties de sa zone. Cochez ici pour surcharger.
+        Héritage automatique depuis le site (via la zone). Pour retirer une partie, ouvrez la carte « Identification » du site.
       </p>
       <ul class="space-y-1">
         <li v-for="p in parties" :key="p.id"
             class="flex items-center gap-2 flex-wrap text-xs">
-          <label class="inline-flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" :checked="!!linkFor(p.id)"
-                   @change="e => toggleParty(p.id, e.target.checked)"
-                   class="rounded border-gray-300" />
+          <div class="inline-flex items-center gap-1.5 opacity-90">
+            <input type="checkbox" checked disabled
+                   class="rounded border-gray-300 text-emerald-600 cursor-not-allowed" />
             <span class="text-gray-700">{{ p.name }}</span>
             <span class="text-[10px] text-gray-400">({{ partyKindLabel(p.kind) }})</span>
-          </label>
+            <span class="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-medium">hérité de la zone</span>
+          </div>
           <label v-if="linkFor(p.id) && p.kind === 'tenant'"
                  class="inline-flex items-center gap-1 cursor-pointer text-[11px] text-amber-700">
             <input type="checkbox" :checked="!!linkFor(p.id)?.responsible_for_works"

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 188;
+const TARGET_VERSION = 189;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7117,6 +7117,26 @@ function runMigrations() {
     catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
     log.info('Migration 188 appliquee : sites.map_zoom (zoom satellite persistant)');
     db.pragma('user_version = 188');
+  }
+
+  if (current < 189) {
+    // Refonte du plan d'action : regroupement par CARTE de l'audit (cf
+    // _action-cards.js, accord Kevin 2026-05-29). Les items auto-generes
+    // ont leur carte derivee runtime depuis source_*_id ; les items
+    // MANUELS (auto_generated=0) recoivent un champ `assigned_card`
+    // editable depuis l'UI pour que l'auditeur puisse les ranger dans la
+    // bonne carte. Default 'misc' (carte Divers, catch-all).
+    // Pas de CHECK constraint : la liste des cartes peut bouger ; le
+    // helper backend tolere une valeur inconnue (retombe sur 'misc').
+    try { db.exec('ALTER TABLE bacs_audit_action_items ADD COLUMN assigned_card TEXT'); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    // Pour la sous-section GTB (capacites / equipements / compteurs /
+    // maintenance), idem : optionnel, seulement utile quand l'auditeur
+    // reaffecte un manuel a une sous-section precise.
+    try { db.exec('ALTER TABLE bacs_audit_action_items ADD COLUMN assigned_subsection TEXT'); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    log.info('Migration 189 appliquee : assigned_card / assigned_subsection sur action_items');
+    db.pragma('user_version = 189');
   }
 
   if (current > TARGET_VERSION) {

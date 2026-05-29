@@ -29,6 +29,34 @@ function minRequiredFromValue(value) {
 }
 
 /**
+ * Fallback : derive un service_level format 'E/S/P' depuis les champs
+ * tpl_avail_e/s/p du nouveau schema (Lot 32).
+ *
+ * Le champ section_templates.service_level est calcule au seed via
+ * formatServiceLevel(features[]) qui depend de la matrice legacy
+ * SERVICE_LEVELS. Tout section_template dont la feature key n'est pas
+ * presente dans SERVICE_LEVELS recoit service_level=NULL et devient
+ * invisible au resolveur, alors meme que ses avail_e/s/p indiquent
+ * clairement son niveau d'inclusion minimum (ex : maintenance_software).
+ *
+ * Regle : niveau minimum = premier niveau (E < S < P) ou avail === 'included'.
+ *  - avail_e='included' → 'E/S/P'
+ *  - avail_e='paid_option', avail_s='included' → 'S/P'
+ *  - avail_s='paid_option', avail_p='included' → 'P'
+ *  - tout en paid_option ou null → null (option pure, n'impose pas de niveau)
+ */
+function deriveLevelFromAvail(sec) {
+  if (!sec) return null;
+  const e = sec.tpl_avail_e;
+  const s = sec.tpl_avail_s;
+  const p = sec.tpl_avail_p;
+  if (e === 'included') return 'E/S/P';
+  if (s === 'included') return 'S/P';
+  if (p === 'included') return 'P';
+  return null;
+}
+
+/**
  * Calcule le niveau global requis (E, S, P) depuis une liste de sections
  * incluses. Renvoie aussi le label complet et la liste des sections qui ont
  * pousse le niveau (utile pour l'encart "Niveau requis : Premium — justifie par...").
@@ -39,7 +67,10 @@ function resolveAfLevel(includedSections) {
   const justifications = [];
 
   for (const sec of includedSections) {
-    const required = minRequiredFromValue(sec.service_level);
+    // Fallback sur tpl_avail_e/s/p quand sec.service_level est NULL — cas des
+    // section_templates dont la feature key n'est pas dans la matrice
+    // SERVICE_LEVELS legacy (ex : maintenance_software).
+    const required = minRequiredFromValue(sec.service_level || deriveLevelFromAvail(sec));
     if (required == null) continue;
     const r = RANK[required];
     if (r > maxRank) {
@@ -101,4 +132,4 @@ function formatLevelFull(value) {
   return labels.slice(0, -1).join(', ') + ' et ' + labels.slice(-1);
 }
 
-module.exports = { resolveAfLevel, formatLevelFull, LABELS, RANK };
+module.exports = { resolveAfLevel, formatLevelFull, deriveLevelFromAvail, LABELS, RANK };
