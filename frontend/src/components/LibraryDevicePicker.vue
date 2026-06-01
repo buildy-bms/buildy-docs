@@ -21,6 +21,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { CheckIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import BaseModal from './BaseModal.vue'
 import EquipmentIcon from './EquipmentIcon.vue'
+import RolePills from './audit/RolePills.vue'
+import EnergyPill from './audit/EnergyPill.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import { listEquipmentTemplates, createBacsDevice } from '@/api'
 import { useNotification } from '@/composables/useNotification'
@@ -256,11 +258,9 @@ async function pickTemplate(t) {
             />
             <div class="min-w-0 flex-1">
               <div class="font-medium text-base text-gray-900 leading-snug">{{ t.name }}</div>
-              <div class="text-xs text-gray-500 mt-0.5">
-                <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
-                <span v-if="t.default_energy_source && hasRole(t.default_device_role)"> · </span>
-                <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
-                <span v-if="!t.default_energy_source && !hasRole(t.default_device_role)" class="text-gray-300">—</span>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                <EnergyPill :value="t.default_energy_source" size="xs" />
+                <RolePills :roles="t.default_device_role" size="xs" />
               </div>
             </div>
           </div>
@@ -288,7 +288,7 @@ async function pickTemplate(t) {
             <tr>
               <th class="px-3 py-2 text-left font-medium">Modèle</th>
               <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Énergie</th>
-              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Niveau</th>
+              <th class="px-3 py-2 text-left font-medium whitespace-nowrap">Fonction(s)</th>
               <th class="px-3 py-2 text-right font-medium whitespace-nowrap">Action</th>
             </tr>
           </thead>
@@ -305,13 +305,11 @@ async function pickTemplate(t) {
                   </div>
                 </div>
               </td>
-              <td class="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                <span v-if="t.default_energy_source">{{ energyLabel(t.default_energy_source) }}</span>
-                <span v-else class="text-gray-300">—</span>
+              <td class="px-3 py-2.5 whitespace-nowrap">
+                <EnergyPill :value="t.default_energy_source" size="xs" />
               </td>
-              <td class="px-3 py-2.5 text-gray-600 whitespace-nowrap">
-                <span v-if="hasRole(t.default_device_role)">{{ roleLabel(t.default_device_role) }}</span>
-                <span v-else class="text-gray-300">—</span>
+              <td class="px-3 py-2.5 whitespace-nowrap">
+                <RolePills :roles="t.default_device_role" size="xs" />
               </td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap">
                 <button

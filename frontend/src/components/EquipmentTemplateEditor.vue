@@ -563,12 +563,12 @@ async function destroy() {
           </div>
           <div>
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
-              Fonctions intégrées <span class="text-gray-400 font-normal">(optionnel)</span>
+              Fonction(s) <span class="text-gray-400 font-normal">(optionnel)</span>
             </label>
             <SearchableSelect
               v-model="form.default_device_role"
               :options="ROLE_OPTIONS"
-              placeholder="Sélectionne un ou plusieurs rôles…"
+              placeholder="Sélectionne une ou plusieurs fonctions…"
               :multiple="true"
               :clearable="true"
               :creatable="true"

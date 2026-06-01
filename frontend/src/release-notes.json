@@ -2,6 +2,76 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.136",
+      "date": "2026-06-01",
+      "title": "Bibliothèque — 9 modèles supplémentaires alignés sur la doctrine énergie + cohérence visuelle « Fonction(s) »",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Pompe à chaleur — énergie « electrique » au lieu de « heat_pump »",
+          "what": "`heat_pump` n'est pas une énergie, c'est une technologie de générateur. La PAC consomme bien de l'électricité pour son compresseur. Aligne sur le chauffe-eau thermodynamique, le split, l'unité extérieure DRV — qui sont tous déjà à `electric` depuis 0.1.135.",
+          "where": "Bibliothèque → catégorie Chauffage → Pompe à chaleur.",
+          "how": "Ouvrir le modèle Pompe à chaleur : énergie par défaut = Électrique. Cumul R175-2 inchangé sur les audits prod (la PAC contribue toujours au cumul électrique)."
+        },
+        {
+          "kind": "fix",
+          "title": "Ventilation — CTA, VMC simple flux, VMC double flux, ventilation générique → ajout du rôle Production",
+          "what": "Le moteur ventilateur crée le débit d'air, c'est de la « production » de mouvement d'air au sens de la doctrine. Cohérent avec extracteur autonome déjà arbitré dans 0.1.135. Une CTA porte désormais Production + Distribution + Émission + Régulation.",
+          "where": "Bibliothèque → catégorie Ventilation.",
+          "how": "Ouvrir une CTA ou une VMC dans la biblio : la liste Fonction(s) inclut Production. Énergie primaire reste visible et obligatoire."
+        },
+        {
+          "kind": "fix",
+          "title": "Destratificateur → rôle Production + Émission",
+          "what": "Le destratificateur a un ventilateur qui crée le brassage d'air. Aligné sur extracteur autonome.",
+          "where": "Bibliothèque → catégorie Chauffage → Destratificateur.",
+          "how": "Ouvrir le modèle Destratificateur : Fonction(s) = Production, Émission. Énergie = Électrique."
+        },
+        {
+          "kind": "fix",
+          "title": "Prises de courant pilotées → rôle Distribution, plus d'énergie",
+          "what": "Une prise ne consomme pas d'énergie — elle distribue l'élec au consommateur branché derrière (qui n'est pas l'objet de l'audit). Comme un circuit eau chaude qui distribue sans consommer.",
+          "where": "Bibliothèque → catégorie Prises → Prises de courant pilotées.",
+          "how": "Ouvrir le modèle : Fonction(s) = Distribution. Champ Énergie masqué."
+        },
+        {
+          "kind": "fix",
+          "title": "BSO motorisé → rôle Régulation, plus d'énergie",
+          "what": "La conso élec marginale du moteur BSO n'est pas une énergie primaire au sens R175. La coercion backend l'aurait nullifiée à chaque édition de toute façon. On aligne la biblio pour éviter l'écart visuel.",
+          "where": "Bibliothèque → catégorie Occultation → BSO motorisé.",
+          "how": "Ouvrir le modèle : Fonction(s) = Régulation seule. Champ Énergie masqué."
+        },
+        {
+          "kind": "fix",
+          "title": "ASI / Onduleur de secours → rôle Production",
+          "what": "Une ASI est une source d'énergie de secours pour le bâtiment quand le réseau coupe — c'est de la production électrique au sens R175. Aligne sur Batterie stationnaire (déjà en Production / electric).",
+          "where": "Bibliothèque → catégorie Autres → Onduleur / ASI.",
+          "how": "Ouvrir le modèle : Fonction(s) = Production. Énergie = Électrique."
+        },
+        {
+          "kind": "feat",
+          "title": "Pilules colorées par fonction, partout",
+          "what": "Création d'un composant unique « RolePills » qui rend une pilule colorée avec icône pour chaque fonction (rouge Production, bleu Distribution, bleu clair Émission, violet Régulation). Utilisé dans la biblio (table + cartes + picker d'équipement). L'affichage est désormais cohérent entre l'audit et la biblio.",
+          "where": "Bibliothèque (table desktop, cartes, picker d'équipement dans un audit).",
+          "how": "Ouvrir Bibliothèque → Équipements : la colonne Fonction(s) affiche une pilule par fonction avec son icône colorée. Ajouter un équipement biblio depuis un audit : même rendu dans le picker."
+        },
+        {
+          "kind": "feat",
+          "title": "Bandeaux catégories bibliothèque plus visibles",
+          "what": "Les groupes par catégorie dans la liste des modèles étaient discrets (gris pâle). Ils portent désormais la couleur de la catégorie (héritée de `system_categories_db`) avec son icône, un compteur de modèles, et une bordure colorée. La hiérarchie visuelle est immédiatement lisible.",
+          "where": "Bibliothèque → Équipements (mode table + mode grille de cartes).",
+          "how": "Ouvrir la biblio : chaque catégorie (Chauffage, Refroidissement, Ventilation, ECS, etc.) a son bandeau coloré avec icône."
+        },
+        {
+          "kind": "feat",
+          "title": "Vocabulaire unifié — « Fonction(s) » partout",
+          "what": "Renommage cohérent : les anciens libellés « Rôle », « Rôles », « Niveau(x) », « Fonctions intégrées » deviennent tous « Fonction(s) ». Plus de confusion entre la fonction métier (production/distribution/émission/régulation) et un éventuel « niveau ».",
+          "where": "Modale d'édition d'équipement, modale d'ajout, table des équipements, sheet mobile, biblio, éditeur de modèle biblio.",
+          "how": "Toutes les apparitions de ces mots dans l'UI sont alignées sur « Fonction(s) »."
+        }
+      ]
+    },
+    {
       "version": "0.1.135",
       "date": "2026-06-01",
       "title": "Audit BACS — doctrine énergie primaire = production seule (correction de fond sur émetteurs et bibliothèque)",

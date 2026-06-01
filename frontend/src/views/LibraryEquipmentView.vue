@@ -16,6 +16,9 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { faCamera } from '@fortawesome/pro-solid-svg-icons'
 library.add(faCamera)
 import EquipmentIcon from '@/components/EquipmentIcon.vue'
+import RolePills from '@/components/audit/RolePills.vue'
+import EnergyPill from '@/components/audit/EnergyPill.vue'
+import { resolveFaIconName } from '@/lib/equipment-icons'
 import ProtocolPills from '@/components/ProtocolPills.vue'
 import BacsContextBox from '@/components/BacsContextBox.vue'
 import EquipmentTemplateEditor from '@/components/EquipmentTemplateEditor.vue'
@@ -51,7 +54,7 @@ const { error: notifyError, success: notifySuccess } = useNotification()
 // (table `system_categories_db`). Source de vérité pour les libellés des
 // catégories. Déclaré en tête du setup car référencé par les computed plus
 // bas (groupedForTable, watch sur celui-ci, etc.) — sinon TDZ au setup.
-const { categories: dbCategories, labelOf: categoryLabel } = useSystemCategories()
+const { categories: dbCategories, labelOf: categoryLabel, iconOf: categoryIcon } = useSystemCategories()
 
 const router = useRouter()
 const route = useRoute()
@@ -381,9 +384,11 @@ function setTbodyRef(cat, el) {
 }
 
 // Groupage pour le mode canonique : groupes ordonnés selon l'ordre serveur
-// (templates est déjà retourné ORDER BY system_categories_db.position,
-// equipment_templates.position, name). Filtres recherche / validation
-// continuent de s'appliquer en amont via filteredSorted.
+// (categories suivent system_categories_db.position), MAIS au sein de chaque
+// catégorie on trie par nom alphabétique par défaut (cf. juin 2026, Kévin —
+// l'ordre canonique des items dans une catégorie est rarement intuitif sur
+// une biblio dense). Le drag-drop fonctionne toujours mais les changements
+// de position seront masqués tant qu'on est en tri alphabétique.
 const groupedForTable = computed(() => {
   if (!canDrag.value) return []
   const groups = []
@@ -391,11 +396,22 @@ const groupedForTable = computed(() => {
   for (const t of filteredSorted.value) {
     const cat = t.category || 'autres'
     if (!seen.has(cat)) {
-      const grp = { cat, label: categoryLabel(cat), items: [] }
+      const ic = categoryIcon(cat)
+      const grp = {
+        cat,
+        label: categoryLabel(cat),
+        icon: ic?.name || 'fa-cube',
+        color: ic?.color || '#6b7280',
+        items: [],
+      }
       seen.set(cat, grp)
       groups.push(grp)
     }
     seen.get(cat).items.push(t)
+  }
+  // Tri alphabétique par défaut au sein de chaque groupe (Kévin, juin 2026).
+  for (const g of groups) {
+    g.items.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr', { sensitivity: 'base' }))
   }
   return groups
 })
@@ -626,18 +642,17 @@ onMounted(async () => {
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap">Slug</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_energy_source')">
                 Énergie {{ sortBy === 'default_energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_device_role')">
-                Rôle {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+                Fonction(s) {{ sortBy === 'default_device_role' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('points_count')">
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')">
-                AFs {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+                Documents {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap">Protocoles exigés</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
@@ -653,12 +668,22 @@ onMounted(async () => {
           <template v-if="canDrag">
             <template v-for="grp in groupedForTable" :key="`grp-${grp.cat}`">
               <tbody>
-                <tr class="border-t border-gray-100 bg-gray-50/40">
-                  <td class="px-3 py-1.5"></td>
-                  <td class="px-4 py-1.5"></td>
-                  <td class="px-4 py-1.5 font-semibold text-gray-700 text-[11px] uppercase tracking-wider whitespace-nowrap" colspan="10">
-                    {{ grp.label }}
-                    <span class="text-gray-400 normal-case font-normal ml-2">· {{ grp.items.length }}</span>
+                <tr class="border-t-2"
+                    :style="{ borderTopColor: grp.color, backgroundColor: grp.color + '14' }">
+                  <td class="px-3 py-2.5" colspan="2"></td>
+                  <td class="px-4 py-2.5 whitespace-nowrap" colspan="9">
+                    <span class="inline-flex items-center gap-2 font-bold text-sm tracking-wide"
+                          :style="{ color: grp.color }">
+                      <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg"
+                            :style="{ backgroundColor: grp.color + '22' }">
+                        <FontAwesomeIcon :icon="['fas', resolveFaIconName(grp.icon)]" class="w-3.5 h-3.5" :style="{ color: grp.color }" />
+                      </span>
+                      <span class="uppercase">{{ grp.label }}</span>
+                      <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium normal-case bg-white/70 border"
+                            :style="{ color: grp.color, borderColor: grp.color + '55' }">
+                        {{ grp.items.length }} modèle{{ grp.items.length > 1 ? 's' : '' }}
+                      </span>
+                    </span>
                   </td>
                 </tr>
               </tbody>
@@ -696,14 +721,11 @@ onMounted(async () => {
                       <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
                     </button>
                   </td>
-                  <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
-                    <span v-if="t.default_energy_source" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">{{ energyLabel(t.default_energy_source) }}</span>
-                    <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                    <EnergyPill :value="t.default_energy_source" size="xs" />
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
-                    <span v-if="hasRole(t.default_device_role)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
-                    <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                    <RolePills :roles="t.default_device_role" size="xs" />
                   </td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
@@ -776,8 +798,7 @@ onMounted(async () => {
                 <span v-else class="text-[11px] text-gray-300 italic">—</span>
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
-                <span v-if="hasRole(t.default_device_role)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">{{ roleLabel(t.default_device_role) }}</span>
-                <span v-else class="text-[11px] text-gray-300 italic">—</span>
+                <RolePills :roles="t.default_device_role" size="xs" />
               </td>
               <td class="px-4 py-2 text-center whitespace-nowrap">
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-medium tabular-nums">{{ t.points_count }}</span>
@@ -811,7 +832,7 @@ onMounted(async () => {
               </td>
             </tr>
             <tr v-if="!filteredSorted.length">
-              <td colspan="12" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
             </tr>
@@ -833,8 +854,19 @@ onMounted(async () => {
       </div>
 
       <div v-else v-for="(items, cat) in grouped" :key="cat" class="mb-8">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-          {{ categoryLabel(cat) }} <span class="text-gray-400">· {{ items.length }}</span>
+        <h3 class="flex items-center gap-2 text-sm font-bold uppercase tracking-wide mb-3 pb-2 border-b-2"
+            :style="{ color: categoryIcon(cat)?.color || '#6b7280', borderBottomColor: (categoryIcon(cat)?.color || '#6b7280') + '55' }">
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg"
+                :style="{ backgroundColor: (categoryIcon(cat)?.color || '#6b7280') + '22' }">
+            <FontAwesomeIcon :icon="['fas', resolveFaIconName(categoryIcon(cat)?.name || 'fa-cube')]"
+                             class="w-3.5 h-3.5"
+                             :style="{ color: categoryIcon(cat)?.color || '#6b7280' }" />
+          </span>
+          {{ categoryLabel(cat) }}
+          <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium normal-case bg-white border"
+                :style="{ color: categoryIcon(cat)?.color || '#6b7280', borderColor: (categoryIcon(cat)?.color || '#6b7280') + '55' }">
+            {{ items.length }} modèle{{ items.length > 1 ? 's' : '' }}
+          </span>
         </h3>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button v-for="t in items" :key="t.id" @click="openTemplate(t)"
