@@ -312,25 +312,19 @@ function computeTargetActions(documentId) {
       // Structure description : sections "Titre\nContenu" separees par
       // \n\n. ActionDescription.vue / stripActionTags() rendent les titres
       // en sous-titres distinctifs.
-      const deviceTags = relevantActive.map(d => `{{device:${d.id}}}`).join(' · ');
-      const eqLabel = relevantActive.length > 1
-        ? `Équipements actifs concernés (${relevantActive.length})`
-        : `Équipement actif concerné`;
+      // Pas de bloc « Equipement actif concerne » : la card systeme dans
+      // l'audit liste deja les equipements en detail, le repeter ici dans
+      // chaque action est redondant.
       addTarget({
         source_system_id: s.id, source_subtype: 'system_not_interoperable',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §3',
-        title: `Raccorder {{system:${s.id}}} ({{zone:${s.zone_id || 0}}}) au BACS`,
+        title: `Raccorder {{system:${s.id}}} au BACS`,
         description: [
           // Décret en tête — seule source opposable.
           `Décret R175-3 §3\n« [Les systèmes d'automatisation et de contrôle des bâtiments] sont interopérables avec les différents systèmes techniques du bâtiment. »`,
-          // Constat (sans la liste d'équipements pour aérer)
           `Constat\nAucune voie d'interface n'existe aujourd'hui entre {{system:${s.id}}} et le BACS.`,
-          // Liste équipements en section dédiée (avec saut de ligne avant)
-          `${eqLabel}\n${deviceTags}`,
-          // Strict minimum
           `Strict minimum pour la conformité\nÉtablir UNE voie d'interface entre {{system:${s.id}}} et le BACS. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle protocolaire (BACnet / Modbus / KNX / M-Bus / MQTT) sur le composant qui porte la régulation centrale.`,
-          // Note R175-6
           `Note R175-6\nLes émetteurs (radiateurs, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) restent conformes sans motorisation. L'action ne porte pas sur eux.`,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
@@ -352,7 +346,7 @@ function computeTargetActions(documentId) {
         source_system_id: s.id, source_subtype: 'system_no_manual_stop',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §4',
-        title: `Permettre l'arrêt manuel sur place de {{system:${s.id}}} ({{zone:${s.zone_id || 0}}})`,
+        title: `Permettre l'arrêt manuel sur place de {{system:${s.id}}}`,
         description: [
           `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
           `Constat\nAucun équipement actif de {{system:${s.id}}} ne permet aujourd'hui un arrêt manuel directement sur place.`,
@@ -366,7 +360,7 @@ function computeTargetActions(documentId) {
         source_system_id: s.id, source_subtype: 'system_not_autonomous',
         category: 'bms_upgrade', severity: 'major',
         r175_article: 'R175-3 §4',
-        title: `Garantir le redémarrage autonome de {{system:${s.id}}} ({{zone:${s.zone_id || 0}}})`,
+        title: `Garantir le redémarrage autonome de {{system:${s.id}}}`,
         description: [
           `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent […] la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
           `Constat\nAucun équipement actif de {{system:${s.id}}} n'est aujourd'hui déclaré capable de reprendre seul après une coupure de courant ou un redémarrage de la GTB.`,

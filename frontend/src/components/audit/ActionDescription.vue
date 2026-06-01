@@ -139,7 +139,7 @@ function renderPill(token) {
       class: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border hover:opacity-90 transition align-baseline',
       style: { color: tone.color, borderColor: tone.color + '66', backgroundColor: tone.color + '1A' },
       onClick: (e) => { e.stopPropagation(); gotoSystem(token.id) },
-    }, [faIcon(tone.icon, tone.color), h('span', meta.label), meta.zoneName ? h('span', { class: 'opacity-60' }, ` · ${meta.zoneName}`) : null])
+    }, [faIcon(tone.icon, tone.color), h('span', meta.label), meta.zoneName ? h('span', ` · ${meta.zoneName}`) : null])
   }
   if (token.type === 'device') {
     const label = deviceLabel(token.id)

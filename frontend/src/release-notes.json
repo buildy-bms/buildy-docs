@@ -4,14 +4,35 @@
     {
       "version": "0.1.132",
       "date": "2026-05-29",
-      "title": "Plan d'action : retrait de la pilule zone redondante en bas de chaque action",
+      "title": "Plan d'action : élagage visuel des actions (zone + équipement + lisibilité)",
       "highlights": [
         {
           "kind": "fix",
           "title": "Plus de doublon « 📍 zone » en bas des actions du plan",
-          "what": "Chaque action affichait la zone à 3 endroits : pilule dans le titre, pilule dans la description, et ligne grise « 📍 Cellules 1 » en bas. La 3e ligne est retirée — les pilules cliquables du titre / de la description suffisent et restent la voie pour scroller vers la card concernée.",
+          "what": "Chaque action affichait la zone à 3 endroits : pilule dans le titre, pilule dans la description, et ligne grise « 📍 Cellules 1 » en bas. La 3e ligne est retirée — les pilules cliquables du titre et de la description suffisent et restent la voie pour scroller vers la card concernée.",
           "where": "Card « Plan de mise en conformité » (web + PWA).",
           "how": "Ouvrir le plan d'action : chaque action n'affiche plus la zone qu'une fois (via la pilule cliquable)."
+        },
+        {
+          "kind": "fix",
+          "title": "Retrait de « (zone) » dans le titre des actions R175-3 §3 / §4",
+          "what": "Les titres « Raccorder {système} ({zone}) au BACS », « Permettre l'arrêt manuel sur place de {système} ({zone}) » et « Garantir le redémarrage autonome de {système} ({zone}) » deviennent « Raccorder {système} au BACS », etc. La zone est déjà visible dans la pilule système (« Éclairage intérieur · Cellules 1 »).",
+          "where": "Titres des actions du plan + PDF Rapport chap 7.",
+          "how": "Régénérer le plan d'action : les titres sont plus courts, la zone reste lisible via la pilule système."
+        },
+        {
+          "kind": "fix",
+          "title": "Nom de zone dans la pilule système : maintenant bien lisible",
+          "what": "La zone (« · Cellules 1 ») dans la pilule système était rendue à 60 % d'opacité et apparaissait pâle, surtout sur les pilules ambre / cyan. Elle hérite désormais du même poids et de la même saturation que le nom du système, comme dans la pilule équipement.",
+          "where": "Pilules système dans le plan d'action (web + PWA + PDF).",
+          "how": "Ouvrir le plan : la zone dans « 💡 Éclairage intérieur · Cellules 1 » doit être lisible et au même niveau de contraste que le nom du système."
+        },
+        {
+          "kind": "fix",
+          "title": "Retrait du bloc « Équipement actif concerné » dans les actions",
+          "what": "Le bloc qui listait les équipements actifs avec des pilules grises sous le constat de l'action faisait doublon avec la card Système de l'audit (qui détaille déjà tous les équipements). Retiré.",
+          "where": "Description de l'action R175-3 §3 « Raccorder … au BACS ».",
+          "how": "Ouvrir une action de raccordement : la description enchaîne Décret → Constat → Strict minimum → Note R175-6 sans le bloc équipements répétitif."
         }
       ]
     },

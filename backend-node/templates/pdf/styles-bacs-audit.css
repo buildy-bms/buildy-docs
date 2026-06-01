@@ -1977,7 +1977,8 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
 .tag-pill svg { vertical-align: -0.5px; }
 .tag-pill-zone   { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
 .tag-pill-device { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
-.tag-pill-meta { opacity: 0.65; font-weight: 500; }
+/* Volontairement vide : la zone hérite du font-weight 500 de .tag-pill,
+   au même poids que le nom du système, comme la pilule équipement. */
 
 /* Variant groupé : N actions répétitives condensées en 1 carte + tableau. */
 .action-card-grouped {
