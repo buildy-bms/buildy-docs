@@ -82,7 +82,7 @@ const ARTICLE_SUMMARIES = {
   },
   'R175-3 1°': {
     title: 'R175-3 1° — Suivi continu et conservation',
-    body: `La consommation énergétique des systèmes techniques doit être suivie en continu, à pas horaire, et les données conservées à l'échelle mensuelle pendant 5 ans minimum. Un compteur de chaque énergie (gaz, électricité, fioul, réseau de chaleur…) est requis au niveau du bâtiment, et un sous-comptage par zone fonctionnelle pour les usages chauffage / refroidissement / ECS / éclairage.`,
+    body: `La consommation énergétique des systèmes techniques doit être suivie en continu, à pas horaire, et les données conservées à l'échelle mensuelle pendant 5 ans minimum.<br/><br/><em>Interprétation Buildy :</em> pour respecter le suivi par zone fonctionnelle, on attend un compteur de chaque énergie (gaz, électricité, fioul, réseau de chaleur…) au niveau du bâtiment, et un sous-comptage par zone fonctionnelle pour les usages chauffage / refroidissement / ECS / éclairage.`,
   },
   'R175-3 3°': {
     title: 'R175-3 3° — Interopérabilité',
@@ -90,7 +90,7 @@ const ARTICLE_SUMMARIES = {
   },
   'R175-3 4°': {
     title: 'R175-3 4° — Arrêt manuel et gestion autonome',
-    body: `Chaque équipement doit pouvoir être <strong>arrêté manuellement</strong> par l'utilisateur, et la GTB doit ensuite <strong>reprendre la main de manière autonome</strong> sans intervention humaine. Buildy évalue ces 2 critères individuellement par équipement.`,
+    body: `Le décret demande que la GTB <strong>permette un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques</strong>. La GTB doit pouvoir être stoppée manuellement, puis reprendre la main sans intervention humaine.<br/><br/><em>Lecture Buildy :</em> ces 2 critères sont évalués au niveau de chaque équipement (lecture plus stricte que le décret, qui parle « d'un ou plusieurs systèmes techniques »).`,
   },
   'R175-4': {
     title: 'R175-4 — Vérifications périodiques',
@@ -98,7 +98,7 @@ const ARTICLE_SUMMARIES = {
   },
   'R175-5': {
     title: 'R175-5 — Formation de l\'exploitant',
-    body: `L'exploitant du BACS doit être formé à son paramétrage. Buildy demande la preuve documentée de cette formation.<br/><br/><strong>Particularité Buildy :</strong> lorsque la solution déployée est Buildy, cette exigence est <strong>nativement couverte</strong> par le support utilisateur intégré (assistance contextuelle, documentation embarquée, support continu).`,
+    body: `Le propriétaire du BACS veille à ce que son exploitant soit formé à son fonctionnement, notamment à son paramétrage. Le décret n'impose pas de modalité spécifique de formation, mais la formation doit être effective. Buildy demande la preuve documentée (date, intervenant, contenu).`,
   },
   'R175-6': {
     title: 'R175-6 — Régulation thermique automatique',

@@ -20,7 +20,7 @@ const {
   assertBacsAuditExists, logBacsAudit,
 } = require('./bacs-audit/_shared');
 const { sanitizeBodyHtmlFields } = require('../lib/html-sanitize');
-const { parseRoles, serializeRoles } = require('../lib/device-roles');
+const { parseRoles, serializeRoles, rolesAllowEnergySource } = require('../lib/device-roles');
 
 // Mapping d'un row device vers l'API : parse `device_role` en array (mig 117).
 function mapDevice(d) {
@@ -48,6 +48,21 @@ async function routes(fastify) {
       WHERE s.document_id = ?
       ORDER BY z.position, z.name, s.position, s.system_category
     `).all(id);
+  });
+
+  // GET /bacs-audit/:documentId/compliance — verdict R175 source unique.
+  // Renvoie la synthese de conformite (verdict global + tableau de bord
+  // R175 par axe + actions phares) telle qu'elle apparait dans le PDF.
+  // Frontend / MCP / UI futurs : consommer cette route plutot que de
+  // recalculer la regle « blocking>0 = NC » localement (cf. revue de
+  // coherence partie B chantier 6 — source unique de verite).
+  fastify.get('/bacs-audit/:documentId/compliance', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, request, reply);
+    if (!af) return;
+    const { buildBacsAuditExportData } = require('./bacs-audit/_export-data');
+    const data = await buildBacsAuditExportData(af, { user: request.authUser });
+    return data.compliance;
   });
 
   // GET /bacs-audit/:documentId/full — instantane complet d'un audit en un
@@ -790,6 +805,14 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+    // Cohérence transversale : empêcher l'assignation d'un équipement
+    // d'une autre zone ou d'une autre catégorie d'usage que la régulation,
+    // et empêcher qu'un équipement « régulation intégrée » soit aussi
+    // désigné comme régulateur déporté. Cf. lib/audit-coherence-checks.js
+    // et le rapport de revue (partie B chantier 2).
+    const { validateThermalDeviceCoherence } = require('../lib/audit-coherence-checks');
+    const coherenceErr = validateThermalDeviceCoherence(body, row);
+    if (coherenceErr) return reply.code(400).send({ detail: coherenceErr });
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       const val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;
@@ -1291,6 +1314,12 @@ async function routes(fastify) {
       if (!prefEnergy) prefEnergy = tpl.default_energy_source || null;
       if (!prefRoles.length) prefRoles = parseRoles(tpl.default_device_role);
     }
+    // Coercion doctrine `energy_source` (mig 194) : l'énergie primaire
+    // n'a de sens que pour un équipement de production. Si le rôle ne
+    // contient pas production, on null-ify silencieusement — l'UI cache
+    // le champ donc l'utilisateur ne le voit pas, mais on protège les
+    // appels MCP / API directs.
+    if (!rolesAllowEnergySource(prefRoles)) prefEnergy = null;
     const prefRole = serializeRoles(prefRoles);
     // Mig 187 — granularité R175-6 pré-remplie depuis le template
     // (`default_regulation_granularity`) à la création du device.
@@ -1409,6 +1438,29 @@ async function routes(fastify) {
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
     sanitizeBodyHtmlFields(body);
+
+    // Coercion doctrine `energy_source` (mig 194). On calcule le rôle
+    // effectif après patch (body si fourni, sinon valeur actuelle DB) ;
+    // si le rôle effectif ne contient pas production, on force
+    // energy_source à null. Cela protège contre :
+    //   1. les appels MCP qui posent une énergie sur un radiateur
+    //   2. le changement de rôle (production → émission) qui laisserait
+    //      une énergie orpheline.
+    const effectiveRoles = ('device_role' in body)
+      ? parseRoles(body.device_role)
+      : parseRoles(dev.device_role);
+    if (!rolesAllowEnergySource(effectiveRoles)) {
+      // Si le rôle effectif n'autorise pas l'énergie : force null. On
+      // l'écrit explicitement seulement si le body essaie de poser une
+      // valeur, OU si la DB actuelle a une valeur (cleanup défensif sur
+      // changement de rôle).
+      if ('energy_source' in body && body.energy_source != null) {
+        body.energy_source = null;
+      } else if ('device_role' in body && dev.energy_source != null && !('energy_source' in body)) {
+        body.energy_source = null;
+      }
+    }
+
     const sets = [], args = [];
     for (const [k, v] of Object.entries(body)) {
       let val = (typeof v === 'boolean') ? (v ? 1 : 0) : v;

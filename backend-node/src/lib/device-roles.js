@@ -34,4 +34,17 @@ function serializeRoles(arr) {
   return JSON.stringify(cleaned);
 }
 
-module.exports = { parseRoles, serializeRoles };
+/**
+ * `energy_source` = énergie primaire CONSOMMÉE par le device. Cela n'a de
+ * sens que pour un équipement de production (chaudière qui brûle du gaz,
+ * PAC qui consomme de l'électricité, capteurs PV qui captent le soleil…).
+ * Un radiateur à eau chaude, un ventilo-convecteur ou une unité intérieure
+ * DRV ne consomment pas d'énergie primaire — ils reçoivent un fluide d'un
+ * autre équipement. Pour eux, energy_source DOIT être null.
+ */
+function rolesAllowEnergySource(roles) {
+  const parsed = parseRoles(roles);
+  return parsed.some(r => /production|generator/i.test(r));
+}
+
+module.exports = { parseRoles, serializeRoles, rolesAllowEnergySource };

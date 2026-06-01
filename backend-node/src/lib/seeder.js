@@ -955,13 +955,47 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
 
   // Recupere tous les devices avec leur zone parent. is_bacs = 1 : les
   // usages manuels hors decret ne generent PAS de compteur reglementaire.
+  // device_role est ajoute pour pouvoir filtrer les devices non producteurs
+  // sur les usages thermiques (cf. plus bas).
   const devices = db.db.prepare(`
-    SELECT d.id, d.energy_source, s.zone_id, s.system_category, z.name AS zone_name
+    SELECT d.id, d.energy_source, d.device_role, s.zone_id, s.system_category, z.name AS zone_name
     FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     LEFT JOIN zones z ON z.id = s.zone_id
     WHERE s.document_id = ? AND s.is_bacs = 1 AND d.energy_source IS NOT NULL
   `).all(documentId);
+
+  // Pour les usages thermiques (chauffage / refroidissement / ECS), seul
+  // l'equipement de PRODUCTION (chaudiere, PAC, sous-station…) consomme
+  // l'energie primaire. Les emetteurs (radiateurs, ventilo-convecteurs) et
+  // la distribution sont passifs — la chaleur leur arrive par le circuit
+  // de production. Compter l'energy_source d'un radiateur cree un compteur
+  // doublon faux. Pour les autres usages (eclairage, ventilation, PV),
+  // tous les devices sont actifs : pas de filtre.
+  const REQUIRES_PRODUCTION_ROLE = new Set(['heating', 'cooling', 'dhw']);
+  function rolesOf(d) {
+    const raw = d.device_role;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        if (typeof parsed === 'string' && parsed) return [parsed];
+      } catch { /* not JSON */ }
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  }
+  function isMeterEligible(d) {
+    if (!REQUIRES_PRODUCTION_ROLE.has(d.system_category)) return true;
+    const roles = rolesOf(d);
+    // Tolerance : si l'auditeur n'a pas qualifie le role, on garde le
+    // device (pas de regression sur les saisies historiques). Si un role
+    // est present, il doit inclure 'production' ou 'generator'.
+    if (!roles.length) return true;
+    return roles.some(r => /production|generator/i.test(r));
+  }
 
   // Ensemble canonique des compteurs reellement requis. Sert ensuite a
   // remettre `required=0` sur les compteurs devenus orphelins (energie
@@ -970,9 +1004,12 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   const keyZonal = (zoneId, usage, type) => `z${zoneId}:${usage}:${type}`;
   const keyGeneral = (usage, type) => `g:${usage}:${type}`;
 
+  // Devices retenus pour generer des compteurs (cf. isMeterEligible).
+  const eligibleDevices = devices.filter(isMeterEligible);
+
   // 1. Compteurs zonaux : 1 par (zone, meter_type, usage) selon les devices
   const zonalSeen = new Set();
-  for (const d of devices) {
+  for (const d of eligibleDevices) {
     const meterType = ENERGY_TO_METER_TYPE[d.energy_source];
     if (!meterType || !d.zone_id) continue;
     // L'usage est porte par la categorie du systeme parent du device
@@ -992,7 +1029,7 @@ function resyncBacsAuditMetersForZones(documentId, zones) {
   }
 
   // 2. Compteurs generaux du batiment : 1 par energie primaire
-  const generalEnergies = new Set(devices.map(d => d.energy_source));
+  const generalEnergies = new Set(eligibleDevices.map(d => d.energy_source));
   // Compteur general electrique : si AU MOINS 1 device electrique/PAC/solar
   // (ou si AU MOINS 1 device tout court pour respecter la regle "compteur
   // general electrique toujours obligatoire des qu'il y a un audit serieux")

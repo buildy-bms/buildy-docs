@@ -9,10 +9,23 @@
 // d'un compteur (= scroll/highlight de la section détaillée plus bas)
 // par clic. Les cellules vides exposent un mini « + » au survol pour
 // ajouter un compteur avec zone et énergie pré-remplies.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 import '@/lib/equipment-icons'
 import { METER_TYPES, getMeterUsageMeta } from '@/lib/meter-options'
+import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
+
+// État pliable/dépliable de la sous-card, persisté en localStorage.
+const STORAGE_KEY = 'bacs-collapse:meters-matrix'
+const expanded = ref((() => {
+  const v = localStorage.getItem(STORAGE_KEY)
+  return v === null ? true : v === '1'
+})())
+function toggleExpanded() {
+  expanded.value = !expanded.value
+  localStorage.setItem(STORAGE_KEY, expanded.value ? '1' : '0')
+}
 
 const props = defineProps({
   meters: { type: Array, required: true },
@@ -20,14 +33,8 @@ const props = defineProps({
   systems: { type: Array, default: () => [] },
 })
 
-// Mapping usage compteur → system_category(s) du système bacs correspondant.
-const METER_USAGE_TO_SYSTEM_CATS = {
-  heating: ['heating'],
-  cooling: ['cooling'],
-  dhw: ['dhw'],
-  pv: ['electricity_production'],
-  lighting: ['lighting_indoor', 'lighting_outdoor'],
-}
+// Mapping usage compteur → catégorie(s) de système. Source unique dans
+// `lib/audit-options.js`.
 function systemNameForMeter(m) {
   if (!m || m.zone_id == null) return null
   const cats = METER_USAGE_TO_SYSTEM_CATS[m.usage] || []
@@ -169,16 +176,25 @@ function onAddInCell({ zone, energy, usage }) {
 </script>
 
 <template>
+  <!-- Sous-card pliable « Plan de comptage » : la matrice est lourde
+       verticalement quand l'audit a 10+ zones, on permet à l'auditeur de
+       la replier pendant qu'il travaille les détails par énergie en
+       dessous. Etat persisté en localStorage (clé bacs-collapse:meters-matrix). -->
   <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-    <!-- Header de la matrice -->
-    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+    <!-- Header cliquable -->
+    <button type="button"
+            class="w-full px-4 py-3 border-b border-gray-200 flex items-center gap-2 text-left hover:bg-gray-50/60 transition"
+            :class="!expanded && 'border-b-0'"
+            @click="toggleExpanded">
       <FontAwesomeIcon :icon="['fas', 'gauge']" class="w-4 h-4 text-emerald-600 shrink-0" />
       <h3 class="text-sm font-semibold text-gray-800">Plan de comptage</h3>
       <span class="text-xs text-gray-500">— vue d'ensemble de la couverture</span>
-    </div>
+      <ChevronUpIcon v-if="expanded" class="w-4 h-4 text-gray-400 ml-auto shrink-0" />
+      <ChevronDownIcon v-else class="w-4 h-4 text-gray-400 ml-auto shrink-0" />
+    </button>
 
     <!-- Lignes = zones, colonnes = énergies (lecture physique du site) -->
-    <div class="overflow-x-auto">
+    <div v-show="expanded" class="overflow-x-auto">
       <table class="meter-matrix w-full text-sm">
         <thead>
           <tr>
@@ -247,8 +263,8 @@ function onAddInCell({ zone, energy, usage }) {
       </table>
     </div>
 
-    <!-- Légende compacte -->
-    <div class="px-4 py-2 border-t border-gray-100 bg-gray-50/40 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+    <!-- Légende compacte (cachée quand la sous-card est repliée) -->
+    <div v-show="expanded" class="px-4 py-2 border-t border-gray-100 bg-gray-50/40 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
       <span class="inline-flex items-center gap-1.5">
         <span class="relative inline-block w-3 h-3 rounded bg-gray-200">
           <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white"></span>

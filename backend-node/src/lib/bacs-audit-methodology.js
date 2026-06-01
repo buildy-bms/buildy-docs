@@ -47,7 +47,7 @@ module.exports = [
   },
   {
     title: 'Formation de l\'exploitant (R175-5)',
-    body: `Buildy demande au propriétaire ou à son représentant si l'exploitant a reçu une formation au paramétrage du BACS. Lorsque la solution BACS déployée est Buildy, cette exigence est nativement couverte par le support utilisateur intégré dans l'application (assistance contextuelle, documentation embarquée, support continu). Ce mode de formation continue répond à l'esprit du R175-5, qui n'impose pas de modalité spécifique. La preuve documentaire est consignée pour les solutions tierces.`,
+    body: `Buildy demande au propriétaire ou à son représentant si l'exploitant a reçu une formation au paramétrage du BACS, et consigne la preuve documentaire (date, intervenant, contenu). L'article R175-5 n'impose pas de modalité spécifique de formation, mais le décret rend le propriétaire responsable de son effectivité, quelle que soit la solution déployée.`,
   },
   {
     title: 'Date butoir applicable',

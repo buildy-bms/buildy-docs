@@ -129,8 +129,9 @@ function statusFor(ins) {
         </p>
         <p class="text-sm text-amber-900 leading-relaxed">
           Trace ici les inspections officielles réalisées par un tiers (organisme indépendant).
-          Inspection tous les <strong>5 ans</strong>, rapport conservé <strong>10 ans</strong>.
-          L'audit Buildy est interne et ne se substitue pas à cette obligation.
+          Rapport conservé <strong>10 ans</strong> (R175-5-1). Le décret n'impose pas de
+          périodicité explicite ; Buildy propose <strong>+5 ans</strong> par défaut — à ajuster
+          selon votre planning. L'audit Buildy est interne et ne se substitue pas à cette obligation.
         </p>
       </div>
 

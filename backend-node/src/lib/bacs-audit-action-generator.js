@@ -324,8 +324,8 @@ function computeTargetActions(documentId) {
           // Décret en tête — seule source opposable.
           `Décret R175-3 §3\n« [Les systèmes d'automatisation et de contrôle des bâtiments] sont interopérables avec les différents systèmes techniques du bâtiment. »`,
           `Constat\nAucune voie d'interface n'existe aujourd'hui entre {{system:${s.id}}} et le BACS.`,
-          `Strict minimum pour la conformité\nÉtablir UNE voie d'interface entre {{system:${s.id}}} et le BACS. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle protocolaire (BACnet / Modbus / KNX / M-Bus / MQTT) sur le composant qui porte la régulation centrale.`,
-          `Note R175-6\nLes émetteurs (radiateurs, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) restent conformes sans motorisation. L'action ne porte pas sur eux.`,
+          `Recommandation Buildy pour la conformité\nÉtablir UNE voie d'interface entre {{system:${s.id}}} et le BACS. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle protocolaire (BACnet / Modbus / KNX / M-Bus / MQTT) sur le composant qui porte la régulation centrale.`,
+          `Lecture Buildy du décret\nLes émetteurs passifs sans interface technique (radiateurs simples, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) ne sont pas concernés par l'exigence d'interopérabilité R175-3 §3. L'action ne porte pas sur eux.`,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
@@ -350,7 +350,7 @@ function computeTargetActions(documentId) {
         description: [
           `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
           `Constat\nAucun équipement actif de {{system:${s.id}}} ne permet aujourd'hui un arrêt manuel directement sur place.`,
-          `Strict minimum pour la conformité\nIdentifier (ou installer si absent) un interrupteur d'arrêt accessible sur la régulation centrale ou un équipement actif du système. Le décret n'exige pas d'équipement de pilotage complexe.`,
+          `Recommandation Buildy pour la conformité\nIdentifier (ou installer si absent) un interrupteur d'arrêt accessible sur la régulation centrale ou un équipement actif du système. Le décret n'exige pas d'équipement de pilotage complexe.`,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });
@@ -364,7 +364,7 @@ function computeTargetActions(documentId) {
         description: [
           `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent […] la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
           `Constat\nAucun équipement actif de {{system:${s.id}}} n'est aujourd'hui déclaré capable de reprendre seul après une coupure de courant ou un redémarrage de la GTB.`,
-          `Strict minimum pour la conformité\nConfigurer la régulation centrale pour qu'elle redémarre automatiquement en mémorisant son dernier état de fonctionnement. Sur la plupart des régulateurs récents, c'est un simple paramètre d'usine à activer (aucune dépense matérielle).`,
+          `Recommandation Buildy pour la conformité\nConfigurer la régulation centrale pour qu'elle redémarre automatiquement en mémorisant son dernier état de fonctionnement. Sur la plupart des régulateurs récents, c'est un simple paramètre d'usine à activer (aucune dépense matérielle).`,
         ].join('\n\n'),
         zone_id: s.zone_id, equipment_id: s.equipment_id,
       });

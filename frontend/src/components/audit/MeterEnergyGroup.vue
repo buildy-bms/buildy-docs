@@ -20,6 +20,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import { meterUsageLabel, METER_USAGES, getMeterUsageMeta } from '@/lib/meter-options'
+import { METER_USAGE_TO_SYSTEM_CATS } from '@/lib/audit-options'
 
 const props = defineProps({
   energy: { type: Object, required: true }, // { value, label, icon, color }
@@ -32,15 +33,8 @@ const props = defineProps({
   highlightId: { type: Number, default: null }, // surligne temporairement une ligne
 })
 
-// Mapping usage compteur → system_category(s) du système bacs correspondant.
-// Lighting peut matcher indoor ou outdoor — on accepte les 2.
-const METER_USAGE_TO_SYSTEM_CATS = {
-  heating: ['heating'],
-  cooling: ['cooling'],
-  dhw: ['dhw'],
-  pv: ['electricity_production'],
-  lighting: ['lighting_indoor', 'lighting_outdoor'],
-}
+// Mapping usage compteur → catégorie(s) de système. Source unique dans
+// `lib/audit-options.js` pour éviter la divergence entre composants.
 
 // Pour un compteur donné, retourne le custom_label du système BACS
 // matchant (zone × usage) si défini, sinon null. Utilisé pour afficher

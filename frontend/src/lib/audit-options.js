@@ -9,26 +9,60 @@
  * en option afficherait le placeholder comme item sélectionnable.
  */
 
+// Énergie PRIMAIRE consommée par un équipement de production. Cette liste
+// n'est proposée à l'auditeur que si le rôle inclut « Production »
+// (cf. doctrine mig 194 — un radiateur à eau chaude reçoit un fluide d'un
+// autre équipement, il n'a pas d'énergie primaire).
 export const ENERGY_OPTIONS = [
-  { value: 'gas',              label: 'Gaz',                icon: 'fa-fire-flame-curved', color: '#f97316' },
-  { value: 'electric',         label: 'Électrique',         icon: 'fa-bolt',              color: '#eab308' },
-  { value: 'district_heating', label: 'Calories / Frigories', icon: 'fa-temperature-snow', color: '#dc2626' },
-  { value: 'wood',             label: 'Bois',               icon: 'fa-tree',              color: '#65a30d' },
-  { value: 'biomass',          label: 'Biomasse',           icon: 'fa-leaf',              color: '#16a34a' },
-  { value: 'fuel_oil',         label: 'Fioul',              icon: 'fa-droplet',           color: '#92400e' },
-  { value: 'solar',            label: 'Solaire',            icon: 'fa-solar-panel',       color: '#facc15' },
-  { value: 'autre',            label: 'Autre',              icon: 'fa-circle-question',   color: '#6b7280' },
+  { value: 'gas',              label: 'Gaz',                          icon: 'fa-fire-flame-curved', color: '#f97316' },
+  { value: 'electric',         label: 'Électrique',                   icon: 'fa-bolt',              color: '#eab308' },
+  { value: 'district_heating', label: 'Réseau de chaleur / froid urbain', icon: 'fa-temperature-snow', color: '#dc2626' },
+  { value: 'wood',             label: 'Bois',                         icon: 'fa-tree',              color: '#65a30d' },
+  { value: 'biomass',          label: 'Biomasse',                     icon: 'fa-leaf',              color: '#16a34a' },
+  { value: 'fuel_oil',         label: 'Fioul',                        icon: 'fa-droplet',           color: '#92400e' },
+  { value: 'solar',            label: 'Solaire',                      icon: 'fa-solar-panel',       color: '#facc15' },
+  { value: 'autre',            label: 'Autre',                        icon: 'fa-circle-question',   color: '#6b7280' },
 ]
+
+// Doctrine — `energy_source` n'a de sens que pour un équipement qui CONSOMME
+// une énergie primaire sur place : chaudière qui brûle du gaz, PAC qui
+// consomme de l'élec, panneau PV qui capte le soleil, échangeur sous-station
+// branché sur le RC. Un radiateur à eau chaude ou un ventilo-convecteur
+// reçoit un fluide d'un autre équipement → pas d'énergie primaire.
+export function deviceRoleAllowsEnergySource(deviceRole) {
+  if (!deviceRole) return false
+  const arr = Array.isArray(deviceRole) ? deviceRole : [deviceRole]
+  return arr.some(r => typeof r === 'string' && /production|generator/i.test(r))
+}
 
 // Libellés FR des catégories d'usage BACS (system_category). Pour un usage
 // manuel non BACS (is_bacs=0), le libellé affiché est `custom_label`.
+// Mapping de l'usage d'un compteur vers la (ou les) catégorie(s) de
+// système qu'il mesure. Utilisé pour relier un compteur au système
+// matchant zone × catégorie (matrice de couverture, détection de
+// compteurs orphelins, etc.). Source unique partagée par tous les
+// composants frontend ET dupliquée côté backend dans
+// `backend-node/src/routes/bacs-audit/_shared.js` (test d'égalité au
+// démarrage si besoin).
+export const METER_USAGE_TO_SYSTEM_CATS = {
+  heating: ['heating'],
+  cooling: ['cooling'],
+  dhw: ['dhw'],
+  pv: ['electricity_production'],
+  lighting: ['lighting_indoor', 'lighting_outdoor'],
+}
+
+// Le décret R175-1 §4 parle d'« éclairage intégré » sans distinguer
+// intérieur/extérieur. Buildy garde la distinction pour pouvoir
+// inventorier l'éclairage extérieur, mais l'auditeur doit savoir qu'il
+// se situe hors périmètre strict du décret.
 export const SYSTEM_CATEGORY_LABELS = {
   heating: 'Chauffage',
   cooling: 'Refroidissement',
   ventilation: 'Ventilation',
   dhw: 'Eau chaude sanitaire',
   lighting_indoor: 'Éclairage intérieur',
-  lighting_outdoor: 'Éclairage extérieur',
+  lighting_outdoor: 'Éclairage extérieur (hors R175 strict)',
   electricity_production: 'Production photovoltaïque',
 }
 
@@ -274,22 +308,32 @@ export function resolveGranularity(device) {
 
 // Options pour le SearchableSelect (creatable). L'auditeur peut saisir une
 // valeur libre si la sienne n'est pas listée — stockée en TEXT côté DB.
+// R175-6 n'accepte que « par pièce » ou « par zone » — la régulation
+// centralisée (1 sonde retour pour tout le bâtiment) ne satisfait pas le
+// décret. On garde l'option dans le sélecteur pour permettre la saisie
+// de l'état réel terrain, mais le libellé porte un avertissement clair
+// et `GRANULARITY_R175_COMPLIANT` permet aux calculs de conformité de
+// distinguer les valeurs conformes.
 export const GRANULARITY_OPTIONS = [
   { value: 'per_room',     label: 'Par pièce' },
   { value: 'per_zone',     label: 'Par zone' },
-  { value: 'central_only', label: 'Centralisée' },
+  { value: 'central_only', label: 'Centralisée — ⚠ ne satisfait pas R175-6' },
 ]
 
 export const GRANULARITY_LABELS_FR = {
   per_room: 'Par pièce',
   per_zone: 'Par zone',
-  central_only: 'Centralisée',
+  central_only: 'Centralisée (⚠ non conforme R175-6)',
 }
 export const GRANULARITY_TONES = {
   per_room: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   per_zone: 'bg-sky-50 text-sky-700 border-sky-200',
-  central_only: 'bg-amber-50 text-amber-700 border-amber-200',
+  central_only: 'bg-red-50 text-red-700 border-red-200',
 }
+// Marque les granularités qui satisfont R175-6 (par pièce / par zone).
+// La régulation centralisée n'y figure PAS — c'est la seule différence
+// avec l'enum GRANULARITY_OPTIONS.
+export const GRANULARITY_R175_COMPLIANT = new Set(['per_room', 'per_zone'])
 
 // Le rôle/niveau (Production / Distribution / Émission / Régulation) découle
 // du découpage thermique R175-6 : il n'a de sens que pour les systèmes de
@@ -315,7 +359,13 @@ export function deviceMissingFields(device, systemCategory) {
     || (device.brand || '').trim()
     || (device.model_reference || '').trim())
   if (!hasIdentity) out.push('un nom, une marque ou une référence')
-  if (!device.energy_source) out.push("l'énergie")
+  // Doctrine mig 194 — l'énergie primaire n'est exigée que sur les
+  // équipements de production. Un émetteur passif (radiateur, ventilo-
+  // convecteur, unité intérieure DRV…) n'a pas d'énergie propre, c'est
+  // l'équipement de production amont qui la porte.
+  if (deviceRoleAllowsEnergySource(device.device_role) && !device.energy_source) {
+    out.push("l'énergie")
+  }
   let protocols = []
   try { protocols = JSON.parse(device.communication_protocols || '[]') } catch { protocols = [] }
   const hasProtocol = (Array.isArray(protocols) && protocols.length > 0)

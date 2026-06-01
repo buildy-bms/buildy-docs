@@ -492,14 +492,27 @@ const bmsSteps = computed(() => {
   ]
 })
 
-// Devices disponibles comme générateurs pour une (zone, catégorie).
-// On filtre sur la category — un device de chauffage n'a aucun sens
-// comme générateur de la régulation clim et inversement.
-// Inclut aussi les devices partagés depuis un autre usage via
+// Devices disponibles pour une régulation thermique. On filtre sur le
+// `system_id` exact (FK mig 188) plutôt que sur (zone × catégorie) :
+// dans la même zone × catégorie, plusieurs systèmes peuvent coexister
+// (ex. « Multisplits » et « Radiateurs » sur la zone Bureaux 1) et le
+// dropdown ne doit proposer QUE les équipements du système concerné.
+// Inclut aussi les devices partagés explicitement vers ce système via
 // bacs_audit_device_shared_systems (mig 143).
-function generatorDevicesForZoneCategory(zoneId, category) {
+// Fallback (zoneId, category) gardé pour les appelants qui ne passent
+// pas encore le system_id — comportement historique.
+function generatorDevicesForZoneCategory(zoneIdOrSystemId, categoryOrNull) {
+  // Nouveau call : generatorDevicesForSystem(systemId)
+  if (categoryOrNull == null) {
+    const systemId = zoneIdOrSystemId
+    return devices.value.filter(d =>
+      d.system_id === systemId ||
+      (Array.isArray(d.extra_system_ids) && d.extra_system_ids.includes(systemId))
+    )
+  }
+  // Appel historique (zoneId, category) — strict legacy
   const sysIds = new Set(systems.value
-    .filter(s => s.zone_id === zoneId && s.present && s.system_category === category)
+    .filter(s => s.zone_id === zoneIdOrSystemId && s.present && s.system_category === categoryOrNull)
     .map(s => s.id))
   return devices.value.filter(d =>
     sysIds.has(d.system_id) ||
@@ -662,8 +675,25 @@ const STEP_DEFINITIONS = [
   { key: 'thermal',
     label: 'Régulation',
     description: 'R175-6 renseignee pour chaque zone chauffee/climatisee.',
-    incomplete: () => (thermal.value.length > 0
-      ? [] : ["aucune régulation thermique R175-6 n'a été saisie"]) },
+    incomplete: () => {
+      if (thermal.value.length === 0) {
+        return ["aucune régulation thermique R175-6 n'a été saisie"]
+      }
+      // Chaque ligne doit avoir au moins un équipement d'émission saisi
+      // OU être déclarée exemptée (bois). Sinon le PDF générera des
+      // actions « Régulation manquante » que l'auditeur ne s'attend pas
+      // à voir, alors qu'il a validé l'étape.
+      const incomplete = thermal.value.filter(t =>
+        !t.emission_device_id && !t.generator_exempt_wood
+      )
+      if (incomplete.length === 0) return []
+      const labels = incomplete.map(t => {
+        const cat = t.category === 'cooling' ? 'refroidissement' : 'chauffage'
+        return `${t.zone_name || 'zone'} (${cat})`
+      })
+      const head = `${incomplete.length} régulation${incomplete.length > 1 ? 's' : ''} sans équipement d'émission saisi`
+      return [`${head} : ${labels.join(', ')}`]
+    } },
   // GTB : complète si « Pas de GTB » répondu, ou GTB présente + solution saisie.
   { key: 'bms',
     label: 'GTB',
