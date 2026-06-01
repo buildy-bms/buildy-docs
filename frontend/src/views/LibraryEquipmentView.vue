@@ -384,9 +384,11 @@ function setTbodyRef(cat, el) {
 }
 
 // Groupage pour le mode canonique : groupes ordonnés selon l'ordre serveur
-// (templates est déjà retourné ORDER BY system_categories_db.position,
-// equipment_templates.position, name). Filtres recherche / validation
-// continuent de s'appliquer en amont via filteredSorted.
+// (categories suivent system_categories_db.position), MAIS au sein de chaque
+// catégorie on trie par nom alphabétique par défaut (cf. juin 2026, Kévin —
+// l'ordre canonique des items dans une catégorie est rarement intuitif sur
+// une biblio dense). Le drag-drop fonctionne toujours mais les changements
+// de position seront masqués tant qu'on est en tri alphabétique.
 const groupedForTable = computed(() => {
   if (!canDrag.value) return []
   const groups = []
@@ -406,6 +408,10 @@ const groupedForTable = computed(() => {
       groups.push(grp)
     }
     seen.get(cat).items.push(t)
+  }
+  // Tri alphabétique par défaut au sein de chaque groupe (Kévin, juin 2026).
+  for (const g of groups) {
+    g.items.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr', { sensitivity: 'base' }))
   }
   return groups
 })
@@ -646,7 +652,7 @@ onMounted(async () => {
                 Points {{ sortBy === 'points_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('sections_using_count')">
-                AFs {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
+                Documents {{ sortBy === 'sections_using_count' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap">Protocoles exigés</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('current_version')">
