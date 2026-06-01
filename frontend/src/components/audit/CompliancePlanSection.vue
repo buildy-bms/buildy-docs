@@ -195,7 +195,9 @@ function hasNotes(html) {
             <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 leading-snug">
               <ActionDescription :text="it.description" />
             </div>
-            <div v-if="it.zone_name" class="text-[10px] text-gray-400 mt-0.5">📍 {{ it.zone_name }}</div>
+            <!-- Pas de pill « 📍 zone » ici : la zone apparaît déjà dans le
+                 titre et la description via les pilules cliquables
+                 {{zone:N}} rendues par ActionDescription. -->
           </div>
           <!-- Actions compactes à droite -->
           <div class="flex items-center gap-1 shrink-0">
