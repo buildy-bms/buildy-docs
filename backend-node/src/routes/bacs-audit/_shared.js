@@ -95,10 +95,24 @@ function logBacsAudit(request, action, afId, payload = {}) {
   } catch { /* fail-soft : pas de log = pas de bloquage */ }
 }
 
+// Mapping de l'usage d'un compteur vers la (ou les) catégorie(s) de
+// système qu'il mesure. DOIT rester identique à
+// `frontend/src/lib/audit-options.js` METER_USAGE_TO_SYSTEM_CATS (source
+// unique côté frontend). Toute désynchronisation = compteur orphelin
+// silencieux entre l'UI et le calcul de couverture côté serveur (PDF).
+const METER_USAGE_TO_SYSTEM_CATS = {
+  heating: ['heating'],
+  cooling: ['cooling'],
+  dhw: ['dhw'],
+  pv: ['electricity_production'],
+  lighting: ['lighting_indoor', 'lighting_outdoor'],
+};
+
 module.exports = {
   SYSTEM_CATEGORIES, COMMUNICATION_VALUES, DEVICE_COMM,
   METER_USAGES, METER_TYPES, RECOMMENDATIONS,
   REGULATION_TYPES, GENERATOR_TYPES, ENERGY_SOURCES,
+  METER_USAGE_TO_SYSTEM_CATS,
   assertBacsAuditExists,
   logBacsAudit,
 };

@@ -8,7 +8,7 @@ module.exports = {
   bacs_justification: '<p>L\'article R175-1 inclut <strong>l\'éclairage intégré</strong> dans la définition des systèmes techniques de bâtiment (§4). À ce titre, l\'éclairage intérieur fait partie du périmètre du décret BACS lorsque le bâtiment dépasse les seuils d\'application.</p><p>Le décret impose que l\'éclairage soit <strong>interopérable</strong> avec les autres systèmes techniques (présence, occultation, climatisation), qu\'il puisse être <strong>arrêté manuellement</strong> et qu\'il soit <strong>géré de manière autonome</strong> (scénarios horaires, gradation, détection de présence).</p><p>L\'intégration de l\'éclairage intérieur dans la solution Buildy permet de superviser les niveaux et les états par zone, et de transmettre les commandes d\'allumage et de gradation.</p>',
   preferred_protocols: 'KNX/IP,DALI,Modbus TCP',
   default_energy_source: 'electric',
-  default_device_role: ['emission'],
+  default_device_role: ['production', 'emission'],
   icon_kind: 'fa',
   icon_value: 'fa-lightbulb',
   icon_color: '#facc15',

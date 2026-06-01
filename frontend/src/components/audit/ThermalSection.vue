@@ -160,7 +160,9 @@ function deviceForLevel(t, level) {
   const field = LEVEL_DEVICE_FIELD[level]
   const id = t[field]
   if (!id) return null
-  const devs = props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  const devs = t.system_id
+    ? (props.generatorDevicesForZoneCategory(t.system_id) || [])
+    : (props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
   return devs.find(d => d.id === id) || null
 }
 function levelRegulationTypeLabel(t, level) {
@@ -283,7 +285,12 @@ async function removeEntry(t) {
 // Mode tolérant : équipements pertinents en tête, équipements sans rôle
 // en bas, équipements avec rôle incompatible masqués.
 function deviceOptionsForLevel(t, level) {
-  const devices = props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  // Filtre sur le system_id exact (mig 188) : on ne propose que les
+  // équipements du système courant + ses équipements partagés. Fallback
+  // (zone × catégorie) si le system_id manque (rétro-compat).
+  const devices = t.system_id
+    ? (props.generatorDevicesForZoneCategory(t.system_id) || [])
+    : (props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
   return filterAndSortByRole(devices, level).map(d => ({
     value: d.id,
     label: d.name || d.brand || d.model_reference || `Équipement #${d.id}`,
@@ -297,7 +304,9 @@ function deviceOptionsForLevel(t, level) {
 // dérivé du système — pas besoin de cocher manuellement.
 function exemptAutoFromWood(t) {
   if (!t.generator_device_id) return false
-  const devices = props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  const devices = t.system_id
+    ? (props.generatorDevicesForZoneCategory(t.system_id) || [])
+    : (props.generatorDevicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
   const d = devices.find(dd => dd.id === t.generator_device_id)
   return d?.energy_source === 'wood'
 }
@@ -409,12 +418,16 @@ onBeforeUnmount(teardownSortable)
       <p class="flex items-start gap-1.5">
         <InformationCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
         <span>
-          <strong>R175-6</strong> impose qu'à compter du <strong>1ᵉʳ janvier 2027</strong>, chaque émetteur de chauffage et
-          de refroidissement soit équipé d'une <strong>régulation thermique automatique en fonction de la température
-          intérieure</strong> de la zone qu'il dessert. Pour chaque couple <em>(zone × usage chaud/froid)</em>, on déroule
-          <strong>trois sous-lignes</strong> — Production, Distribution, Émission — qui précisent l'équipement concerné, son
-          équipement de régulation (sonde, thermostat, GTB) et des notes spécifiques. La liste des équipements proposés
-          est filtrée selon le rôle requis. Les <strong>appareils indépendants de chauffage au bois</strong> sont exemptés (R175-6 II).
+          <strong>R175-6</strong> impose une <strong>régulation thermique automatique par pièce ou par zone</strong>
+          pour chaque émetteur de chauffage et de refroidissement. Déclencheur : permis de construire après le
+          21 juillet 2021 OU travaux d'installation/remplacement du générateur de chaleur. Les <strong>appareils
+          indépendants de chauffage au bois</strong> sont exemptés (R175-6 II).
+          <br/><br/>
+          <em>Structure d'analyse Buildy basée sur la norme NF EN ISO 52120-1 (non opposable) :</em> pour chaque couple
+          <em>(zone × usage chaud/froid)</em>, on déroule <strong>trois sous-lignes</strong> — Production, Distribution,
+          Émission — qui précisent l'équipement concerné, son équipement de régulation (sonde, thermostat, GTB)
+          et des notes spécifiques. Le décret R175-6 ne détaille pas cette structure ; elle facilite l'analyse mais
+          ne conditionne pas la conformité.
         </span>
       </p>
     </div>

@@ -17,7 +17,7 @@ import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import SystemPartiesPanel from '@/components/audit/SystemPartiesPanel.vue'
 import MobileYesNo from './MobileYesNo.vue'
-import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete, regulationTypesForCategory, GRANULARITY_OPTIONS } from '@/lib/audit-options'
+import { COMM_OPTIONS, ENERGY_OPTIONS as ENERGY_OPTIONS_DECORATED, ROLE_OPTIONS as ROLE_OPTIONS_DECORATED, systemUsageLabel, deviceMissingFields, isDeviceComplete, regulationTypesForCategory, GRANULARITY_OPTIONS, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
 
 // Item 8 — type de calcul de puissance par équipement. Vide = automatique.
 const POWER_CALC_OPTIONS = [
@@ -1353,25 +1353,36 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           </MobileField>
         </template>
 
-        <MobileField label="Énergie">
-          <MobileSelectSheet
-            v-model="deviceForm.energy_source"
-            :options="ENERGY_OPTIONS"
-            title="Choisir une énergie"
-            placeholder="— Sélectionner —"
-          />
-        </MobileField>
-
-        <MobileField label="Niveau(x)">
+        <!-- Rôle(s) d'abord : l'énergie n'apparaît qu'ensuite, et SEULEMENT
+             si le rôle inclut Production (doctrine mig 194). Pour un
+             radiateur à eau chaude ou un ventilo-convecteur, pas d'énergie
+             primaire — elle est portée par l'équipement amont. -->
+        <MobileField label="Rôle(s) de l'équipement">
           <MobileSelectSheet
             :model-value="Array.isArray(deviceForm.device_role) ? deviceForm.device_role : (deviceForm.device_role ? [deviceForm.device_role] : [])"
             @update:model-value="v => deviceForm.device_role = v"
             :options="ROLE_OPTIONS"
             :multiple="true"
-            title="Niveaux"
-            placeholder="Sélectionner un ou plusieurs niveaux"
+            title="Rôles"
+            placeholder="Production / Distribution / Émission / Régulation"
+          />
+          <p class="text-xs text-gray-500 mt-1.5 leading-snug">
+            <strong>Production</strong> = transforme une énergie primaire (gaz, élec, soleil) en chaleur, froid ou lumière. <strong>Émission seule</strong> = reçoit un fluide d'un autre équipement (radiateur à eau, ventilo-convecteur…).
+          </p>
+        </MobileField>
+
+        <MobileField v-if="deviceRoleAllowsEnergySource(deviceForm.device_role)"
+                     label="Énergie primaire consommée">
+          <MobileSelectSheet
+            v-model="deviceForm.energy_source"
+            :options="ENERGY_OPTIONS"
+            title="Énergie primaire"
+            placeholder="— Sélectionner —"
           />
         </MobileField>
+        <div v-else class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 leading-snug">
+          Pas d'énergie primaire à renseigner — cet équipement ne consomme pas d'énergie directement. Ajoute le rôle <strong>Production</strong> ci-dessus pour saisir une énergie.
+        </div>
 
         <MobileField label="Localisation">
           <input

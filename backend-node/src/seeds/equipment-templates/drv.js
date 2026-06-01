@@ -7,7 +7,7 @@ module.exports = {
   bacs_articles: 'R175-1 §1, §2',
   bacs_justification: '<p>L\'article R175-1 définit un <strong>système de climatisation</strong> comme la combinaison des composantes nécessaires pour assurer un traitement de l\'air intérieur permettant le contrôle ou l\'abaissement de la température. Un système DRV/VRV/VRF entre dans cette définition, et combine également la fonction de chauffage (§1) sur une même boucle frigorifique réversible.</p><p>Le décret impose <strong>l\'interopérabilité</strong> avec les autres systèmes techniques, la <strong>capacité d\'arrêt manuel</strong> et la <strong>gestion autonome</strong> via le système BACS (suivi, alarmes, programmation, pilotage à distance).</p><p>L\'intégration du DRV dans la solution Buildy permet de superviser chaque unité intérieure (mode, consigne, état, alarmes) et de transmettre les commandes correspondantes.</p>',
   preferred_protocols: 'BACnet/IP,Modbus TCP',
-  default_energy_source: 'heat_pump',
+  default_energy_source: 'electric',
   default_device_role: ['production'],
   icon_kind: 'fa',
   icon_value: 'fa-snowflake',

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 193;
+const TARGET_VERSION = 194;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7289,6 +7289,114 @@ function runMigrations() {
     }
     log.info('Migration 193 appliquee : bacs_audit_thermal_regulation.{production,distribution,emission}_extra_device_ids');
     db.pragma('user_version = 193');
+  }
+
+  if (current < 194) {
+    // Migration 194 — Doctrine `energy_source` = énergie primaire consommée
+    // par un équipement de PRODUCTION uniquement.
+    //
+    // Avant : la biblio et la saisie attribuaient `energy_source` (souvent
+    // `district_heating`) à des émetteurs ou distributeurs passifs
+    // (radiateur, ventilo-convecteur, plancher chauffant à eau, cassette
+    // plafonnière, unité intérieure DRV…) qui en réalité ne consomment pas
+    // d'énergie primaire — ils reçoivent un fluide d'un autre équipement.
+    //
+    // Conséquence concrète : des compteurs thermiques étaient générés
+    // automatiquement à tort (cf. cas Communay mai 2026, audit 43).
+    //
+    // Cette migration nullify `energy_source` sur les rows
+    // `bacs_audit_system_devices` dont le rôle n'inclut pas `production`
+    // (ni `generator`, alias historique). Idempotente.
+    const rows = db.prepare(`
+      SELECT id, device_role FROM bacs_audit_system_devices
+      WHERE energy_source IS NOT NULL
+    `).all();
+    let cleaned = 0;
+    for (const r of rows) {
+      const raw = r.device_role;
+      let roles = [];
+      if (raw) {
+        const s = String(raw).trim();
+        if (s.startsWith('[')) {
+          try { const p = JSON.parse(s); if (Array.isArray(p)) roles = p; } catch { /* legacy */ }
+        } else { roles = [s]; }
+      }
+      const isProducer = roles.some(x => typeof x === 'string' && /production|generator/i.test(x));
+      if (!isProducer) {
+        db.prepare(`UPDATE bacs_audit_system_devices SET energy_source = NULL WHERE id = ?`).run(r.id);
+        cleaned++;
+      }
+    }
+    log.info(`Migration 194 appliquee : energy_source nullify sur ${cleaned} device(s) non-producteur(s) (doctrine énergie primaire = production uniquement)`);
+
+    // Patch des modèles de bibliothèque pour aligner avec la même doctrine.
+    // Liste exhaustive validée avec Kévin (cf. session mai 2026). Pour
+    // chaque modèle : nouveau rôle JSON + nouvelle energy_source (ou NULL).
+    // Le seeder reste idempotent ; ce patch direct écrase les `default_*`
+    // pour les ramener à la doctrine, sans toucher au reste.
+    const LIB_PATCHES = [
+      // ── Émetteurs passifs : pas d'énergie primaire, rôle émission seul.
+      { slug: 'radiateur',                role: ['emission'],                 energy: null },
+      { slug: 'radiateur-eau-chaude',     role: ['emission'],                 energy: null },
+      { slug: 'plancher-chauffant-eau',   role: ['distribution','emission'],  energy: null },
+      { slug: 'ventilo-convecteur',       role: ['emission','regulation'],    energy: null },
+      { slug: 'ui-drv',                   role: ['emission'],                 energy: null },
+      { slug: 'cassette-plafonniere',     role: ['emission'],                 energy: null },
+      { slug: 'destratificateur',         role: ['emission'],                 energy: 'electric' }, // un destrato consomme bien de l'élec primaire pour son moteur
+      // ── Aérotherme gaz = production+émission intégrées (combustion sur place).
+      { slug: 'aerotherme',               role: ['production','emission'],    energy: 'gas' },
+      // ── Régulation / pilotage : rôle regulation, pas d'énergie primaire.
+      { slug: 'regulateur-chaufferie',    role: ['regulation'],               energy: null },
+      { slug: 'thermostat',               role: ['regulation'],               energy: null },
+      { slug: 'detecteur-presence',       role: ['regulation'],               energy: null },
+      { slug: 'detecteur-luminosite',     role: ['regulation'],               energy: null },
+      // ── ECS : bouclage = distribution, pas d'énergie primaire (la pompe
+      // consomme un peu d'élec, c'est marginal et hors périmètre ECS R175).
+      { slug: 'boucle-ecs',               role: ['distribution'],             energy: null },
+      // ── Éclairage : la lampe transforme l'élec en lumière (= production)
+      // ET la restitue (= émission), comme un convecteur élec.
+      { slug: 'eclairage-interieur',      role: ['production','emission'],    energy: 'electric' },
+      { slug: 'eclairage-exterieur',      role: ['production','emission'],    energy: 'electric' },
+      // ── Extracteur d'air autonome : le ventilateur crée le débit (production)
+      // ET souffle dans le local (émission), comme un convecteur élec.
+      { slug: 'extracteur-air',           role: ['production','emission'],    energy: 'electric' },
+      // ── PAC : on retire `regulation` du rôle par défaut. La régulation
+      // intégrée est capturée par regulation_integrated=1 sur l'instance.
+      { slug: 'pompe-a-chaleur',          role: ['production'],               energy: 'heat_pump' },
+      // ── Split/Multi-split : production+emission, électricité (la techno
+      // PAC consomme bien de l'élec primaire).
+      { slug: 'split-mono-multi',         role: ['production','emission'],    energy: 'electric' },
+      // ── Unité Extérieure DRV : production, élec (idem).
+      { slug: 'ue-drv',                   role: ['production'],               energy: 'electric' },
+      // ── Chauffe-eau thermodynamique : production, élec (la PAC ECS
+      // consomme de l'élec primaire — `heat_pump` n'est pas une énergie,
+      // c'est une techno de générateur).
+      { slug: 'chauffe-eau-thermodynamique', role: ['production'],            energy: 'electric' },
+      // ── Compteurs : doctrine = pas d'energy_source sur un compteur
+      // (la nature du fluide vit sur bacs_audit_meters.meter_type).
+      { slug: 'compteur-electrique',      role: ['autre'],                    energy: null },
+      { slug: 'compteur-gaz',             role: ['autre'],                    energy: null },
+      { slug: 'compteur-fioul',           role: ['autre'],                    energy: null },
+      { slug: 'compteur-eau',             role: ['autre'],                    energy: null },
+      { slug: 'compteur-calories',        role: ['autre'],                    energy: null },
+      { slug: 'sous-compteur-electrique', role: ['autre'],                    energy: null },
+      // ── BSO motorisé : régulation, électrique (le moteur consomme de
+      // l'élec — Kévin a tranché pour rester cohérent avec la réalité
+      // même si c'est marginal).
+      { slug: 'bso',                      role: ['regulation'],               energy: 'electric' },
+    ];
+    const stmt = db.prepare(`
+      UPDATE equipment_templates
+      SET default_device_role = ?, default_energy_source = ?
+      WHERE slug = ?
+    `);
+    let libCleaned = 0;
+    for (const p of LIB_PATCHES) {
+      const r = stmt.run(JSON.stringify(p.role), p.energy, p.slug);
+      if (r.changes > 0) libCleaned++;
+    }
+    log.info(`Migration 194 appliquee : ${libCleaned} modele(s) bibliotheque patche(s) (defaults role/energy)`);
+    db.pragma('user_version = 194');
   }
 
   if (current > TARGET_VERSION) {

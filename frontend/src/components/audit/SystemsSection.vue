@@ -100,6 +100,24 @@ function systemPowerKw(s) {
   const devs = props.devicesBySystem[s.id] || []
   return devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0)
 }
+
+// Un système coché « présent » doit avoir au moins un équipement saisi
+// (primaire OU partagé depuis un autre système via extra_system_ids,
+// cf. mig 143). Sinon l'audit n'est pas exploitable (PDF, plan d'action,
+// calcul de puissance R175-2). Signalé visuellement par un badge ambré
+// dans le header de la card.
+function isSystemPresentWithoutDevices(s) {
+  if (!s.present) return false
+  const primaries = props.devicesBySystem[s.id] || []
+  if (primaries.length > 0) return false
+  // Devices partagés depuis un autre système (le système courant est
+  // listé dans `device.extra_system_ids`). On regarde le store global.
+  const all = audit.devices || []
+  const shared = all.some(d =>
+    d.system_id !== s.id && (d.extra_system_ids || []).includes(s.id)
+  )
+  return !shared
+}
 function sitePowerKw() {
   let total = 0
   for (const g of props.systemsByZone) {
@@ -531,6 +549,15 @@ onBeforeUnmount(teardownSortables)
                             v-tooltip="'Renommer ce système'">
                       <PencilSquareIcon class="w-3.5 h-3.5" />
                     </button>
+                    <!-- Badge : système coché présent mais sans équipement saisi.
+                         Pas bloquant, juste signaler à l'auditeur. Le détail
+                         (« ajoute une chaudière… ») apparaît aussi en encart
+                         dans le contenu déplié. -->
+                    <span v-if="isSystemPresentWithoutDevices(s)"
+                          class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded-full shrink-0 whitespace-nowrap"
+                          v-tooltip="'Aucun équipement saisi. Ajoute au moins une chaudière, une unité DRV, etc.'">
+                      ⚠ Aucun équipement
+                    </span>
                   </div>
                   <SegmentedToggle :model-value="presenceValue(s)" :options="PRESENCE_OPTIONS"
                                    @update:model-value="v => setPresence(s, v)" />

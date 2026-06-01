@@ -4,7 +4,7 @@ import BaseModal from './BaseModal.vue'
 import SearchableSelect from './SearchableSelect.vue'
 import ProtocolMultiPicker from './ProtocolMultiPicker.vue'
 import { createBacsDevice } from '@/api'
-import { isThermalCategory } from '@/lib/audit-options'
+import { isThermalCategory, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps({
@@ -52,9 +52,13 @@ function protocolCount() {
 }
 
 const hasIdentity = () => !!(form.value.name?.trim() || form.value.brand?.trim() || form.value.model_reference?.trim())
+// Doctrine mig 194 — l'énergie primaire n'est exigée que si le rôle inclut
+// Production. Pour un radiateur à eau chaude (émission seule), c'est
+// l'équipement amont qui porte l'énergie, pas celui-ci.
+const energyRequired = computed(() => deviceRoleAllowsEnergySource(form.value.device_role))
 const canSubmit = () =>
   hasIdentity() &&
-  !!form.value.energy_source &&
+  (!energyRequired.value || !!form.value.energy_source) &&
   (!roleApplies.value || (Array.isArray(form.value.device_role) && form.value.device_role.length > 0)) &&
   protocolCount() > 0
 
@@ -62,8 +66,8 @@ const canSubmit = () =>
 const missingFields = () => {
   const out = []
   if (!hasIdentity()) out.push('un nom, une marque ou une référence')
-  if (!form.value.energy_source) out.push('l\'énergie')
-  if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le niveau')
+  if (energyRequired.value && !form.value.energy_source) out.push('l\'énergie primaire')
+  if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le rôle')
   if (protocolCount() === 0) out.push('le(s) protocole(s)')
   return out
 }
@@ -130,8 +134,22 @@ async function submit(keepContext = false) {
           <input v-model="form.model_reference" type="text" placeholder="ex : Varmax 70, VRV-IV 75…"
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Énergie <span class="text-red-500">*</span></label>
+        <div v-if="roleApplies" :class="{ 'sm:col-span-2': true }">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Rôle(s) de l'équipement <span class="text-red-500">*</span></label>
+          <SearchableSelect
+            v-model="form.device_role"
+            :options="roleOptions"
+            :multiple="true"
+            :clearable="true"
+            :creatable="true"
+            placeholder="Production / Distribution / Émission / Régulation"
+          />
+          <p class="text-xs text-gray-500 mt-1 leading-snug">
+            <strong>Production</strong> = transforme une énergie primaire (gaz, élec, soleil) en chaleur, froid ou lumière sur place. <strong>Émission seule</strong> = reçoit un fluide d'un autre équipement (radiateur à eau, ventilo-convecteur…).
+          </p>
+        </div>
+        <div v-if="energyRequired">
+          <label class="block text-xs font-medium text-gray-700 mb-1">Énergie primaire <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.energy_source"
             :options="energyOptions"
@@ -143,17 +161,6 @@ async function submit(keepContext = false) {
           <input v-model.number="form.power_kw" type="number" inputmode="decimal" pattern="[0-9.,]*" min="0" step="0.1"
                  placeholder="—"
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
-        </div>
-        <div v-if="roleApplies">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Niveau(x) <span class="text-red-500">*</span></label>
-          <SearchableSelect
-            v-model="form.device_role"
-            :options="roleOptions"
-            :multiple="true"
-            :clearable="true"
-            :creatable="true"
-            placeholder="Sélectionner un ou plusieurs niveaux"
-          />
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-700 mb-1">Protocole(s) de communication <span class="text-red-500">*</span></label>

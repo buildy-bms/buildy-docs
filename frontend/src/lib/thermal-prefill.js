@@ -51,7 +51,11 @@ export function bestDeviceForLevel(devices, level) {
  * les devices candidats (ou null).
  */
 export function deriveLevelsForThermalRow(t, devicesForZoneCategory) {
-  const devs = devicesForZoneCategory(t.zone_id, t.category || 'heating') || []
+  // Filtre sur le system_id exact si disponible (mig 188), sinon
+  // fallback historique (zone × catégorie).
+  const devs = t.system_id
+    ? (devicesForZoneCategory(t.system_id) || [])
+    : (devicesForZoneCategory(t.zone_id, t.category || 'heating') || [])
   return {
     production:   bestDeviceForLevel(devs, 'production'),
     distribution: bestDeviceForLevel(devs, 'distribution'),

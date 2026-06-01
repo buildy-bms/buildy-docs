@@ -2,6 +2,55 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.135",
+      "date": "2026-06-01",
+      "title": "Audit BACS — doctrine énergie primaire = production seule (correction de fond sur émetteurs et bibliothèque)",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "L'énergie primaire ne s'attribue plus qu'aux équipements de production",
+          "what": "Un radiateur à eau chaude, un ventilo-convecteur, une unité intérieure DRV ou une cassette plafonnière ne consomment pas d'énergie primaire — ils reçoivent un fluide d'un autre équipement. Désormais l'audit reflète cette réalité : le champ « Énergie primaire » n'apparaît dans la modale d'équipement que si le rôle inclut Production. Pour les autres équipements (émission, distribution, régulation seule), un encart explique pourquoi le champ est masqué et invite à ajouter le rôle Production si l'équipement transforme réellement une énergie primaire (cas d'un convecteur électrique, par exemple).",
+          "where": "Card 3 « Systèmes » → bouton Modifier d'un équipement → section « Rôle de l'équipement ». Même comportement côté mobile (Saisie d'un équipement) et sur la modale « Ajouter un équipement ».",
+          "how": "Ouvrir un radiateur à eau chaude existant : le champ Énergie a disparu, remplacé par un encart explicatif. Ouvrir une chaudière : le champ Énergie est visible et obligatoire. Changer le rôle d'un radiateur de Émission vers Production+Émission : le champ Énergie réapparaît."
+        },
+        {
+          "kind": "fix",
+          "title": "Plus de compteurs thermiques fantômes générés automatiquement",
+          "what": "Avant, un radiateur marqué (par défaut biblio) avec énergie « Réseau de chaleur urbain » poussait l'audit à proposer un compteur thermique requis sur la zone, alors que ce radiateur n'était pas du tout sur un réseau de chaleur. Vu sur Communay (4 compteurs thermiques fantômes). La doctrine énergie primaire = production seule supprime ce comportement.",
+          "where": "Card 4 « Compteurs et mesurage » : la liste des compteurs requis colle désormais à la réalité du site (chaudière gaz → compteur gaz, PAC → compteur électrique, etc.).",
+          "how": "Sur Communay : aucun compteur thermique n'apparaît plus en requis (avant : 4 fantômes). Sur un site avec sous-station RC réelle : le compteur thermique reste requis car la sous-station, elle, a bien `Production / Réseau de chaleur urbain`."
+        },
+        {
+          "kind": "fix",
+          "title": "Bibliothèque d'équipements alignée sur la doctrine",
+          "what": "27 modèles de la bibliothèque réécrits : radiateur, radiateur à eau chaude, plancher chauffant à eau, ventilo-convecteur, cassette plafonnière, unité intérieure DRV → plus d'énergie par défaut. Aérotherme gaz → désormais Production + Émission (combustion sur place). Luminaire intérieur / extérieur et extracteur d'air autonome → Production + Émission (transforment l'élec en lumière / débit d'air). Compteurs → plus d'énergie (la nature du fluide vit dans la table compteurs). Thermostat / régulateur / détecteur de présence → plus d'énergie (juste régulation).",
+          "where": "Biblio (sidebar → Bibliothèque → Équipements). Toute saisie nouvelle d'équipement depuis la biblio héritera de ces défauts cohérents.",
+          "how": "Ouvrir un radiateur dans la biblio : Énergie est vide, Rôle = Émission seul. Glisser un radiateur de la biblio dans un audit : créé sans énergie, l'auditeur ne perd plus de temps à se demander si c'est `district_heating` ou autre."
+        },
+        {
+          "kind": "fix",
+          "title": "Label clarifié — « Réseau de chaleur / froid urbain »",
+          "what": "L'option `district_heating` s'appelait « Calories / Frigories » dans le sélecteur d'énergie, ce qui était ambigu (un radiateur n'a pas d'énergie « calories » au sens propre — il reçoit l'eau d'un générateur). Renommé en « Réseau de chaleur / froid urbain », à utiliser uniquement sur une sous-station effectivement raccordée à un RC urbain.",
+          "where": "Sélecteur d'énergie de la modale équipement et de la création d'équipement.",
+          "how": "Ouvrir une sous-station RC : l'énergie affiche « Réseau de chaleur / froid urbain » (plus « Calories / Frigories »)."
+        },
+        {
+          "kind": "fix",
+          "title": "Cohérence rôle ↔ énergie protégée à chaque écriture",
+          "what": "Si un appel API (MCP Claude Desktop ou intégration tiers) tente de poser une énergie primaire sur un équipement non-producteur, l'énergie est silencieusement remise à null côté serveur. De même, si l'auditeur change le rôle d'un équipement de Production vers Émission seul, l'énergie est automatiquement nettoyée. Aucune désync silencieuse n'est plus possible.",
+          "where": "Toutes les routes de création / modification d'équipement (PATCH /bacs-audit/devices/:id, POST /bacs-audit/systems/:id/devices).",
+          "how": "Test API : POST `{ device_role: ['emission'], energy_source: 'gas' }` → en DB l'énergie sera null. Idem si on modifie un équipement existant pour retirer le rôle Production."
+        },
+        {
+          "kind": "feat",
+          "title": "Aide pédagogique sur les rôles dans la modale équipement",
+          "what": "Un encart bleu détaille les 4 rôles (Production, Distribution, Émission, Régulation) avec un exemple contextualisé selon la catégorie d'usage du système. Ex. pour un système chauffage : « Une chaudière gaz → Production. Un radiateur à eau chaude → Émission seul. Un convecteur électrique → Production + Émission. »",
+          "where": "Modale d'édition d'équipement → section « Rôle de l'équipement », sous le sélecteur.",
+          "how": "Ouvrir n'importe quel équipement : un encart bleu d'aide apparaît, l'exemple change selon que le système est chauffage / refroidissement / ECS / ventilation / éclairage / PV."
+        }
+      ]
+    },
+    {
       "version": "0.1.134",
       "date": "2026-05-29",
       "title": "Audit BACS — drag-drop photos restauré, multi-équipements régulation, numérotation cards alignée",

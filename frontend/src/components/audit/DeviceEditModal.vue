@@ -18,7 +18,7 @@ import {
   ENERGY_OPTIONS, ROLE_OPTIONS, COMM_OPTIONS,
   regulationTypesForCategory, GRANULARITY_OPTIONS,
   isThermalCategory, isDeviceComplete, deviceMissingFields,
-  systemUsageLabel,
+  systemUsageLabel, deviceRoleAllowsEnergySource,
 } from '@/lib/audit-options'
 
 const props = defineProps({
@@ -94,6 +94,24 @@ const deviceRole = computed(() =>
 const hasProductionRole   = computed(() => deviceRole.value.includes('production'))
 const hasDistributionRole = computed(() => deviceRole.value.includes('distribution'))
 const hasEmissionRole     = computed(() => deviceRole.value.includes('emission'))
+
+// Doctrine mig 194 — l'énergie primaire ne se renseigne que pour un
+// équipement de production. Pour un radiateur ou un ventilo-convecteur
+// (rôle émission seul), pas d'énergie : la chaleur vient d'ailleurs.
+const showEnergyField = computed(() => deviceRoleAllowsEnergySource(deviceRole.value))
+
+// Aide pédagogique sur le rôle : un exemple court par catégorie d'usage
+// pour ancrer la doctrine production/distribution/émission/régulation.
+const roleHelpExample = computed(() => {
+  const c = props.system?.system_category
+  if (c === 'heating') return 'Ex. : une chaudière gaz → Production. Un radiateur à eau chaude → Émission seul. Un convecteur électrique → Production + Émission.'
+  if (c === 'cooling') return 'Ex. : un groupe froid → Production. Un ventilo-convecteur → Émission. Un DRV → unité extérieure Production, unité intérieure Émission.'
+  if (c === 'dhw')     return 'Ex. : un ballon ECS électrique → Production. Le bouclage avec circulateur → Distribution seul (pas d\'énergie primaire).'
+  if (c === 'ventilation') return 'Ex. : une CTA double flux → Distribution + Émission + Régulation. Un simple extracteur → Production + Émission.'
+  if (c === 'lighting_indoor' || c === 'lighting_outdoor') return 'Ex. : un luminaire LED → Production + Émission (la lampe transforme l\'élec en lumière). Un détecteur de présence → Régulation seul.'
+  if (c === 'electricity_production') return 'Ex. : panneaux PV + onduleur → Production solaire. Batterie → Production (stockage différé).'
+  return 'Production = transforme une énergie primaire (gaz, élec, soleil) en chaleur/froid/lumière. Émission seule = reçoit un fluide d\'un autre équipement.'
+})
 
 // Mig 184 — listes de suggestions de types de régulation. Priorité :
 //   1. surcharge du modèle d'équipement (equipment_templates.regulation_*_types)
@@ -363,13 +381,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             <input type="text" :value="device.model_reference || ''" placeholder="Varmax 70"
                    @blur="e => patchInput('model_reference', e.target.value)" :class="inputCls" class="w-full" />
           </div>
-          <div>
-            <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Énergie</label>
-            <SearchableSelect :model-value="device.energy_source" :options="ENERGY_OPTIONS"
-                              :clearable="false" size="sm" placeholder="Énergie"
-                              @update:model-value="v => patch({ energy_source: v || null })" />
-          </div>
-          <div>
+          <div class="sm:col-span-2">
             <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Localisation</label>
             <input type="text" :value="device.location || ''" placeholder="ex : Local technique sous-sol"
                    @blur="e => patchInput('location', e.target.value)" :class="inputCls" class="w-full" />
@@ -409,16 +421,48 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
         </div>
       </section>
 
-      <!-- Fonctions intégrées — pleine largeur pour ne pas casser l'alignement
-           horizontal des sections Identité / Énergie au-dessus (les pilules
-           multi-select sont de hauteur variable). -->
+      <!-- Rôle de l'équipement & énergie primaire — section clé pour la
+           cohérence métier. L'énergie n'apparaît QUE si le rôle contient
+           Production (doctrine mig 194 : un radiateur à eau chaude n'a pas
+           d'énergie primaire propre, c'est l'équipement amont qui la porte). -->
       <section class="rounded-xl border border-gray-200 overflow-hidden">
-        <h4 :class="headCls">Fonctions intégrées</h4>
-        <div class="p-3">
+        <h4 :class="headCls">Rôle de l'équipement</h4>
+        <div class="p-3 space-y-3">
           <SearchableSelect :model-value="deviceRole" :options="ROLE_OPTIONS"
                             :multiple="true" :clearable="true" :creatable="true" size="sm"
                             placeholder="Production / Distribution / Émission / Régulation…"
                             @update:model-value="v => patch({ device_role: Array.isArray(v) ? v : [] })" />
+          <!-- Aide pédagogique : cartes synthétiques des 4 fonctions, exemple
+               contextualisé selon la catégorie d'usage. -->
+          <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-900 space-y-2">
+            <div class="font-semibold flex items-center gap-1.5">
+              <span class="text-base">💡</span>
+              <span>Comment choisir le(s) rôle(s) ?</span>
+            </div>
+            <ul class="space-y-1 pl-1">
+              <li><strong class="text-rose-700">Production</strong> — l'équipement transforme une énergie primaire (gaz, élec, soleil, bois…) en chaleur, froid ou lumière sur place. <em>Une énergie primaire devra être renseignée.</em></li>
+              <li><strong class="text-sky-700">Distribution</strong> — l'équipement transporte un fluide (eau chaude, eau glacée, air, élec) du producteur vers l'émetteur. Ex. : circuit eau chaude, gaines de soufflage, bouclage ECS.</li>
+              <li><strong class="text-blue-700">Émission</strong> — l'équipement restitue l'énergie dans le local. Ex. : radiateur, ventilo-convecteur, bouches d'air, luminaire.</li>
+              <li><strong class="text-purple-700">Régulation</strong> — l'équipement pilote (thermostat, détecteur, sonde, régulateur de chaufferie).</li>
+            </ul>
+            <div class="pt-1 border-t border-blue-200/60 text-blue-800/90 italic">{{ roleHelpExample }}</div>
+          </div>
+          <!-- Énergie primaire — visible UNIQUEMENT si le rôle inclut Production.
+               Pour un émetteur ou distributeur passif (radiateur à eau, FCU,
+               unité intérieure DRV), l'énergie est portée par l'équipement
+               amont qui produit la chaleur/le froid, pas par celui-ci. -->
+          <div v-if="showEnergyField" class="pt-1">
+            <label class="block text-[11px] font-medium text-gray-600 mb-1">
+              Énergie primaire consommée
+              <span class="text-gray-400 font-normal">— ce que l'équipement transforme en chaleur / froid / lumière / élec</span>
+            </label>
+            <SearchableSelect :model-value="device.energy_source" :options="ENERGY_OPTIONS"
+                              :clearable="true" size="sm" placeholder="Sélectionne l'énergie primaire…"
+                              @update:model-value="v => patch({ energy_source: v || null })" />
+          </div>
+          <div v-else class="pt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+            <strong class="text-gray-700">Pas d'énergie primaire à renseigner</strong> — cet équipement ne consomme pas d'énergie primaire (gaz, élec…). Il reçoit son fluide ou son alimentation d'un autre équipement marqué <em>Production</em>. Si tu veux saisir une énergie, ajoute le rôle <strong>Production</strong> ci-dessus.
+          </div>
         </div>
       </section>
 
