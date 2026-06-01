@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.131",
+      "date": "2026-05-29",
+      "title": "Fix : réponse au toggle Inspection plantait en 500",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Toggle « Y a-t-il une inspection à tracer ? » ne plante plus en 500",
+          "what": "Répondre Oui ou Non au toggle d'inspection envoyait un booléen à better-sqlite3 qui ne sait pas binder true/false directement → erreur 500. Corrigé : la couche DB coerce désormais les booléens en 0/1 avant le bind. Le bug touchait aussi tous les champs ternaires des audits passant par db.afs.update — protégé pour de futurs champs similaires.",
+          "where": "Bloc en haut de la card Inspection R175-5-1 (web + PWA).",
+          "how": "Ouvrir la card Inspection, cliquer Oui ou Non sur la question — la réponse doit être enregistrée sans erreur 500 dans la console réseau."
+        }
+      ]
+    },
+    {
       "version": "0.1.130",
       "date": "2026-05-29",
       "title": "Inspection R175-5-1 : card compacte + dates pré-calculées + dépôt du rapport PDF",
