@@ -2,26 +2,23 @@
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import '@/lib/equipment-icons'
 /**
- * Sous-page mobile pour les inspections périodiques R175-5-1 (rapport
- * conservé 10 ans). Vague 3 item 11 de l'audit BACS.
+ * Sous-page mobile pour les inspections périodiques R175-5-1.
  *
- * Réplique fonctionnel de InspectionsSection desktop, optimisée tactile :
- * - MobileSheet plein écran (slide-up).
- * - Inputs date / texte 16px anti-zoom iOS, padding généreux.
- * - Auto-save 500 ms (Object.assign optimistic + PATCH debounce).
- * - Tags d'alerte « ⚠ Échéance dépassée » sur les inspections passées.
- *
- * Ouverte depuis MobileBmsTab (l'inspection est aussi liée à la GTB
- * réglementaire). Pas dans la bottom nav pour ne pas surcharger
- * (déjà 7 onglets).
+ * Refonte compacte alignée sur InspectionsSection desktop :
+ * - Liste accordéon (1 ligne par inspection, détails repliables).
+ * - Auto-pré-calc des échéances (5 ans / 10 ans) à la saisie de la date.
+ * - Boutons rapides « Aujourd'hui », « +5 ans », « +10 ans ».
+ * - Pill statut (à jour / < 6 mois / dépassée) sur la ligne d'accroche.
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuditStore } from '@/stores/audit'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
+import { addYearsIso, todayIso as todayIsoLocal } from '@/lib/date-helpers'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
+import InspectionReportDrop from '@/components/audit/InspectionReportDrop.vue'
 
 defineProps({
   open: { type: Boolean, default: false },
@@ -33,24 +30,56 @@ const { inspections, todayIso } = storeToRefs(audit)
 const { error } = useNotification()
 const { confirm } = useConfirm()
 
+const openIds = ref(new Set())
+watch(inspections, (list) => {
+  if (list?.length === 1) openIds.value.add(list[0].id)
+}, { immediate: true })
+function isOpen(id) { return openIds.value.has(id) }
+function toggleOpen(id) {
+  const s = new Set(openIds.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  openIds.value = s
+}
+
 const adding = ref(false)
 async function addInspection() {
   if (adding.value) return
   adding.value = true
-  try { await audit.addInspection() }
+  try {
+    await audit.addInspection()
+    const last = inspections.value[0]
+    if (last) openIds.value.add(last.id)
+  }
   catch (e) { error(e.response?.data?.detail || 'Création de l\'inspection impossible') }
   finally { adding.value = false }
 }
 
-// Auto-save 500 ms par champ (optimistic)
 const timers = new Map()
 function patchDebounced(ins, patch) {
+  // Pré-calc R175-5-1 : si on saisit la date d'inspection, pré-remplir
+  // les échéances vides (5 ans suivante, 10 ans conservation).
+  if (Object.prototype.hasOwnProperty.call(patch, 'last_inspection_date') && patch.last_inspection_date) {
+    if (!ins.next_inspection_due_date) {
+      patch.next_inspection_due_date = addYearsIso(patch.last_inspection_date, 5)
+    }
+    if (!ins.retained_until_date) {
+      patch.retained_until_date = addYearsIso(patch.last_inspection_date, 10)
+    }
+  }
   Object.assign(ins, patch)
   clearTimeout(timers.get(ins.id))
   timers.set(ins.id, setTimeout(async () => {
     try { await audit.patchInspection(ins, patch) }
     catch (e) { error(e.response?.data?.detail || 'Sauvegarde inspection impossible') }
   }, 500))
+}
+
+function setToday(ins) {
+  patchDebounced(ins, { last_inspection_date: todayIsoLocal() })
+}
+function setPlusYears(ins, field, years) {
+  const base = ins.last_inspection_date || todayIsoLocal()
+  patchDebounced(ins, { [field]: addYearsIso(base, years) })
 }
 
 async function removeInspection(ins) {
@@ -63,6 +92,25 @@ async function removeInspection(ins) {
   if (!ok) return
   try { await audit.removeInspection(ins.id) }
   catch (e) { error(e.response?.data?.detail || 'Suppression impossible') }
+}
+
+function fmtDate(iso) {
+  if (!iso) return null
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+function statusFor(ins) {
+  if (!ins.next_inspection_due_date) return null
+  if (ins.next_inspection_due_date < todayIso.value) {
+    return { tone: 'red', label: 'Dépassée' }
+  }
+  const inSixMonths = new Date()
+  inSixMonths.setMonth(inSixMonths.getMonth() + 6)
+  const sixIso = inSixMonths.toISOString().slice(0, 10)
+  if (ins.next_inspection_due_date < sixIso) {
+    return { tone: 'amber', label: '< 6 mois' }
+  }
+  return { tone: 'emerald', label: 'À jour' }
 }
 </script>
 
@@ -81,108 +129,148 @@ async function removeInspection(ins) {
         </p>
         <p class="text-sm text-amber-900 leading-relaxed">
           Trace ici les inspections officielles réalisées par un tiers (organisme indépendant).
-          Le rapport doit être conservé <strong>10 ans</strong>. L'audit Buildy est interne et
-          ne se substitue pas à cette obligation.
+          Inspection tous les <strong>5 ans</strong>, rapport conservé <strong>10 ans</strong>.
+          L'audit Buildy est interne et ne se substitue pas à cette obligation.
         </p>
       </div>
 
-      <!-- Liste des inspections -->
-      <div v-if="inspections.length" class="space-y-3">
+      <!-- Liste compacte -->
+      <div v-if="inspections.length" class="space-y-2">
         <div
           v-for="ins in inspections"
           :key="ins.id"
-          class="bg-white rounded-2xl border border-gray-200 p-4 space-y-3"
+          class="bg-white rounded-2xl border border-gray-200 overflow-hidden"
         >
-          <div class="flex items-center gap-2 justify-between">
-            <span class="inline-flex items-center gap-1 text-xs text-gray-500">
-              <FontAwesomeIcon :icon="['fas', 'clock']" class="w-3.5 h-3.5" />
-              Inspection #{{ ins.id }}
-            </span>
-            <span
-              v-if="ins.next_inspection_due_date && ins.next_inspection_due_date < todayIso"
-              class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 border border-red-200"
-            >
-              ⚠ Échéance dépassée
-            </span>
-          </div>
-
-          <MobileField label="Date de l'inspection">
-            <input
-              :value="ins.last_inspection_date || ''"
-              type="date"
-              @input="e => patchDebounced(ins, { last_inspection_date: e.target.value || null })"
-              class="pwa-input w-full"
-            />
-          </MobileField>
-
-          <MobileField label="Tiers inspecteur (nom / société)">
-            <input
-              :value="ins.last_inspection_inspector || ''"
-              type="text"
-              autocapitalize="words"
-              placeholder="ex : APAVE, SOCOTEC, Bureau Veritas…"
-              @input="e => patchDebounced(ins, { last_inspection_inspector: e.target.value || null })"
-              class="pwa-input w-full"
-            />
-          </MobileField>
-
-          <div class="grid grid-cols-2 gap-3">
-            <MobileField label="Prochaine échéance">
-              <input
-                :value="ins.next_inspection_due_date || ''"
-                type="date"
-                @input="e => patchDebounced(ins, { next_inspection_due_date: e.target.value || null })"
-                class="pwa-input w-full"
-              />
-            </MobileField>
-            <MobileField label="Conserver jusqu'au">
-              <input
-                :value="ins.retained_until_date || ''"
-                type="date"
-                @input="e => patchDebounced(ins, { retained_until_date: e.target.value || null })"
-                class="pwa-input w-full"
-              />
-            </MobileField>
-          </div>
-
-          <MobileField label="Anomalies identifiées">
-            <textarea
-              :value="ins.last_inspection_anomalies_html || ''"
-              rows="3"
-              placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
-              @input="e => patchDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
-              class="pwa-input w-full resize-y"
-            ></textarea>
-          </MobileField>
-
-          <MobileField label="Recommandations à reprendre">
-            <textarea
-              :value="ins.last_inspection_recommendations_html || ''"
-              rows="3"
-              placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
-              @input="e => patchDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
-              class="pwa-input w-full resize-y"
-            ></textarea>
-          </MobileField>
-
-          <MobileField label="Notes libres">
-            <input
-              :value="ins.notes || ''"
-              type="text"
-              placeholder="ex : N° de rapport, contact référent…"
-              @input="e => patchDebounced(ins, { notes: e.target.value || null })"
-              class="pwa-input w-full"
-            />
-          </MobileField>
-
           <button
             type="button"
-            @click="removeInspection(ins)"
-            class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium text-red-700 bg-red-50 active:bg-red-100 rounded-xl"
+            @click="toggleOpen(ins.id)"
+            class="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50 transition"
           >
-            <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4 shrink-0" />
-            Supprimer cette inspection
+            <FontAwesomeIcon :icon="['fas', 'clock']" class="w-4 h-4 text-amber-600 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-900 truncate">
+                {{ fmtDate(ins.last_inspection_date) || 'Date à renseigner' }}
+              </div>
+              <div class="text-xs text-gray-500 truncate">
+                {{ ins.last_inspection_inspector || '—' }}
+                <span v-if="ins.next_inspection_due_date" class="ml-1">
+                  · → {{ fmtDate(ins.next_inspection_due_date) }}
+                </span>
+              </div>
+            </div>
+            <span v-if="statusFor(ins)"
+                  :class="[
+                    'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0',
+                    statusFor(ins).tone === 'red' && 'bg-red-50 text-red-700 border-red-200',
+                    statusFor(ins).tone === 'amber' && 'bg-amber-50 text-amber-700 border-amber-200',
+                    statusFor(ins).tone === 'emerald' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  ]">
+              {{ statusFor(ins).label }}
+            </span>
+            <FontAwesomeIcon :icon="['fas', 'chevron-down']"
+                             class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform"
+                             :class="isOpen(ins.id) && 'rotate-180'" />
           </button>
+
+          <div v-if="isOpen(ins.id)" class="border-t border-gray-200 px-4 py-4 space-y-3 bg-gray-50/30">
+            <MobileField label="Date de l'inspection">
+              <div class="flex items-center gap-2">
+                <input
+                  :value="ins.last_inspection_date || ''"
+                  type="date"
+                  @input="e => patchDebounced(ins, { last_inspection_date: e.target.value || null })"
+                  class="pwa-input flex-1"
+                />
+                <button type="button" @click="setToday(ins)"
+                        class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
+                  Aujourd'hui
+                </button>
+              </div>
+            </MobileField>
+
+            <MobileField label="Tiers inspecteur (nom / société)">
+              <input
+                :value="ins.last_inspection_inspector || ''"
+                type="text"
+                autocapitalize="words"
+                placeholder="APAVE, SOCOTEC, Bureau Veritas…"
+                @input="e => patchDebounced(ins, { last_inspection_inspector: e.target.value || null })"
+                class="pwa-input w-full"
+              />
+            </MobileField>
+
+            <MobileField label="Prochaine échéance">
+              <div class="flex items-center gap-2">
+                <input
+                  :value="ins.next_inspection_due_date || ''"
+                  type="date"
+                  @input="e => patchDebounced(ins, { next_inspection_due_date: e.target.value || null })"
+                  class="pwa-input flex-1"
+                />
+                <button type="button" @click="setPlusYears(ins, 'next_inspection_due_date', 5)"
+                        class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
+                  +5 ans
+                </button>
+              </div>
+            </MobileField>
+
+            <MobileField label="Conserver jusqu'au">
+              <div class="flex items-center gap-2">
+                <input
+                  :value="ins.retained_until_date || ''"
+                  type="date"
+                  @input="e => patchDebounced(ins, { retained_until_date: e.target.value || null })"
+                  class="pwa-input flex-1"
+                />
+                <button type="button" @click="setPlusYears(ins, 'retained_until_date', 10)"
+                        class="px-3 min-h-12 text-xs font-medium text-indigo-700 bg-indigo-50 active:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0">
+                  +10 ans
+                </button>
+              </div>
+            </MobileField>
+
+            <MobileField label="Anomalies identifiées">
+              <textarea
+                :value="ins.last_inspection_anomalies_html || ''"
+                rows="3"
+                placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
+                @input="e => patchDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
+                class="pwa-input w-full resize-y"
+              ></textarea>
+            </MobileField>
+
+            <MobileField label="Recommandations à reprendre">
+              <textarea
+                :value="ins.last_inspection_recommendations_html || ''"
+                rows="3"
+                placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
+                @input="e => patchDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
+                class="pwa-input w-full resize-y"
+              ></textarea>
+            </MobileField>
+
+            <!-- Rapport PDF (disponible dès qu'une date d'inspection est saisie) -->
+            <InspectionReportDrop v-if="ins.last_inspection_date" :inspection-id="ins.id" />
+
+            <MobileField label="Notes libres">
+              <input
+                :value="ins.notes || ''"
+                type="text"
+                placeholder="ex : N° de rapport, contact référent…"
+                @input="e => patchDebounced(ins, { notes: e.target.value || null })"
+                class="pwa-input w-full"
+              />
+            </MobileField>
+
+            <button
+              type="button"
+              @click="removeInspection(ins)"
+              class="w-full inline-flex items-center justify-center gap-1.5 min-h-12 px-3 text-sm font-medium text-red-700 bg-red-50 active:bg-red-100 rounded-xl"
+            >
+              <FontAwesomeIcon :icon="['fas', 'trash']" class="w-4 h-4 shrink-0" />
+              Supprimer cette inspection
+            </button>
+          </div>
         </div>
       </div>
       <div v-else class="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center">

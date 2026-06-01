@@ -2,6 +2,48 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.130",
+      "date": "2026-05-29",
+      "title": "Inspection R175-5-1 : card compacte + dates pré-calculées + dépôt du rapport PDF",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Card Inspection R175-5-1 repensée : compacte et plus rapide à remplir",
+          "what": "Chaque inspection est maintenant une ligne d'accroche cliquable (date + inspecteur + pill statut « À jour / < 6 mois / Dépassée »). Les détails (anomalies, recommandations, notes) ne s'affichent qu'au clic. Si une seule inspection est tracée, elle est ouverte automatiquement.",
+          "where": "App web : card « Inspection périodique par un tiers » du détail audit. PWA : sheet « Inspections R175-5-1 » accessible depuis le tab GTB.",
+          "how": "Ouvrir un audit BACS, dérouler la card Inspection. La nouvelle entrée d'inspection occupe ~44 px au lieu de ~350 px avant. Cliquer dessus pour déplier."
+        },
+        {
+          "kind": "feat",
+          "title": "Échéances pré-calculées automatiquement",
+          "what": "Dès que tu renseignes la date de l'inspection, la prochaine échéance est pré-remplie à +5 ans et la date de conservation à +10 ans (sauf si tu les as déjà saisies manuellement). Boutons rapides « Aujourd'hui », « +5 ans », « +10 ans » à côté de chaque champ pour ajuster d'un clic.",
+          "where": "Card / sheet Inspection (web + PWA).",
+          "how": "Saisir la date d'une nouvelle inspection : les 2 dates suivantes se remplissent toutes seules. Cliquer « +5 ans » pour décaler la prochaine échéance."
+        },
+        {
+          "kind": "feat",
+          "title": "Question reformulée : plus de double négation pénible",
+          "what": "Le toggle « Aucune inspection à déclarer ? » devient « Y a-t-il une inspection officielle à tracer pour ce site ? ». Oui = à tracer (état par défaut, action corrective générée si rien tracé), Non = rien à tracer (bypass + raison optionnelle). Plus de référence au statut réglementaire dans la question — l'auditeur n'a pas à savoir si R175-5-1 s'applique.",
+          "where": "Bloc en haut de la card Inspection.",
+          "how": "Ouvrir la card Inspection : la question est formulée positivement, Oui = il faut tracer."
+        },
+        {
+          "kind": "feat",
+          "title": "Dépôt direct du rapport PDF d'inspection",
+          "what": "Une zone de drop apparaît dans les détails d'une inspection dès qu'elle a une date. Glisse le PDF du rapport officiel (ou clique pour parcourir) — il est rattaché à l'inspection, listé avec lien de téléchargement direct, suppression possible. Formats acceptés : PDF, JPG, PNG, WebP, 25 Mo max.",
+          "where": "Détails d'une inspection (web + PWA), section « Rapport d'inspection (PDF) » sous les champs d'identification.",
+          "how": "Saisir une date d'inspection → la zone de drop apparaît. Glisser un PDF dessus → upload immédiat, le fichier apparaît dans la liste avec un lien cliquable."
+        },
+        {
+          "kind": "fix",
+          "title": "Pilules cliquables zones / équipements : le scroll fonctionne enfin",
+          "what": "Régression de 0.1.129 : les attributs `data-zone-id` / `data-device-id` ne s'attachaient pas au DOM (fragment Vue 2 roots), donc cliquer sur une pilule zone / équipement dans une action du plan ne déclenchait pas le scroll. Corrigé : le scroll vers la card concernée fonctionne maintenant.",
+          "where": "Card « Plan de mise en conformité » : pilules indigo / slate dans les actions.",
+          "how": "Cliquer sur une pilule « Bureaux » ou « Chaudière X » dans une action — la page scrolle vers la zone ou l'équipement correspondant."
+        }
+      ]
+    },
+    {
       "version": "0.1.129",
       "date": "2026-05-29",
       "title": "Plan d'action recentré sur les systèmes + pilules cliquables + PWA hauteurs uniformes",

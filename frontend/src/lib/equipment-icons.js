@@ -51,6 +51,8 @@ import {
   // Base de consommations de référence (item 13)
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
   faClone,
+  // Drop-zone rapport d'inspection (InspectionReportDrop)
+  faCloudArrowUp,
 } from '@fortawesome/pro-solid-svg-icons'
 
 const ICONS = [
@@ -81,6 +83,7 @@ const ICONS = [
   faHeat, faBox, faSnowBlowing, faAirConditioner, faTemperatureLow,
   faChartColumn, faTableCells, faFilePdf, faPaperclip, faSpinner, faFileArrowDown,
   faClone,
+  faCloudArrowUp,
 ]
 
 library.add(...ICONS)

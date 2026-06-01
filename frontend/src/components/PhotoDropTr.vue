@@ -6,10 +6,17 @@
  * Accepte images ET PDFs : images upload direct, PDFs ouvrent la modale
  * DocumentUploadModal (titre + categorie obligatoires) — la modale est
  * Teleport-ee dans le body pour ne pas violer la structure <tr>.
+ *
+ * inheritAttrs: false + v-bind="$attrs" sur le <tr> : le composant a 2
+ * roots (tr + Teleport) donc Vue ne sait pas où attacher automatiquement
+ * les data-* (data-zone-id, data-device-id, etc. utilisés pour le scroll
+ * depuis les pilules d'actions). On les binde explicitement sur le tr.
  */
 import { computed } from 'vue'
 import { usePhotoDropzone } from '@/composables/usePhotoDropzone'
 import DocumentUploadModal from './DocumentUploadModal.vue'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps({
   siteUuid: { type: String, required: true },
@@ -34,6 +41,7 @@ const {
 
 <template>
   <tr
+    v-bind="$attrs"
     :class="[rowClass, isDragOver ? 'bg-indigo-50 outline outline-2 outline-indigo-400' : '']"
     v-on="enabled ? {
       dragenter: e => { e.preventDefault(); e.stopPropagation(); handlers.onDragenter(e) },
