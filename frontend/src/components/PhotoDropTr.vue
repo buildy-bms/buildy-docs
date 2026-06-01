@@ -44,10 +44,10 @@ const {
     v-bind="$attrs"
     :class="[rowClass, isDragOver ? 'bg-indigo-50 outline outline-2 outline-indigo-400' : '']"
     v-on="enabled ? {
-      dragenter: e => { e.preventDefault(); e.stopPropagation(); handlers.onDragenter(e) },
-      dragover:  e => { e.preventDefault(); e.stopPropagation(); handlers.onDragover(e) },
-      dragleave: e => { e.preventDefault(); e.stopPropagation(); handlers.onDragleave(e) },
-      drop:      e => { e.preventDefault(); e.stopPropagation(); handlers.onDrop(e) },
+      dragenter: e => { if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault(); e.stopPropagation(); handlers.onDragenter(e) },
+      dragover:  e => { if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault(); e.stopPropagation(); handlers.onDragover(e) },
+      dragleave: e => { if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault(); e.stopPropagation(); handlers.onDragleave(e) },
+      drop:      e => { if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault(); e.stopPropagation(); handlers.onDrop(e) },
     } : {}"
   >
     <slot />

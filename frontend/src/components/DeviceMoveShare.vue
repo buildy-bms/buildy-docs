@@ -55,7 +55,16 @@ const shareZones = computed(() =>
     .filter(g => g.items.length)
 )
 
-function labelOf(s) { return systemUsageLabel(s) }
+// Affiche le nom personnalisé du système en plus de l'usage quand il
+// existe : « Chauffage — chaudière principale ». Pour les usages BACS
+// standards sans nom personnalisé, on retombe sur l'usage seul.
+function labelOf(s) {
+  const usage = systemUsageLabel(s)
+  if (s?.is_bacs && s?.custom_label && s.custom_label.trim() && s.custom_label.trim() !== usage) {
+    return `${usage} — ${s.custom_label.trim()}`
+  }
+  return usage
+}
 
 async function onMove(targetId) {
   if (saving.value || !targetId || targetId === props.device.system_id) return

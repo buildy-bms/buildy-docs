@@ -619,7 +619,11 @@ const STEP_DEFINITIONS = [
     description: 'Site et applicabilite R175-2 renseignes.',
     incomplete: () => {
       const r = []
-      if (!site.value) r.push("le site n'est pas rattaché")
+      // Site rattaché = document.site_id non-null en DB. Le hydrate
+      // `site.value` du store peut être null transitoirement (chargement
+      // lent, getSite() qui échoue silencieusement) sans pour autant que
+      // le rattachement soit absent.
+      if (!document.value?.site_id) r.push("le site n'est pas rattaché")
       if (!document.value?.bacs_applicability_status) {
         r.push("l'applicabilité R175-2 n'est pas déterminée (puissance chauffage + climatisation et date de permis à renseigner)")
       }

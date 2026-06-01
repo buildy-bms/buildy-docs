@@ -31,15 +31,15 @@ const OWNERSHIP_STRUCTURES = [
 //   - le CHECK constraint de la migration 161 (database.js)
 //   - PARTY_KIND_LABEL dans lib/bacs-liability.js (libellés FR)
 //   - PARTY_KINDS dans frontend/src/lib/audit-options.js
-const PARTY_KINDS = ['owner_occupant', 'co_owner', 'tenant', 'syndicate', 'network_operator'];
+const PARTY_KINDS = ['owner_occupant', 'owner_lessor', 'co_owner', 'tenant', 'syndicate', 'network_operator'];
 
 // Partie prenante par défaut proposée selon la structure juridique du site
 // (item 4b — « au minimum 1 partie par défaut »).
 const DEFAULT_PARTY_BY_STRUCTURE = {
   single_owner_occupant: { name: 'Propriétaire occupant', kind: 'owner_occupant' },
   condominium: { name: 'Syndicat de copropriété', kind: 'syndicate' },
-  owner_with_tenants: { name: 'Propriétaire bailleur', kind: 'owner_occupant' },
-  multiple_independent_tenants: { name: 'Propriétaire bailleur', kind: 'owner_occupant' },
+  owner_with_tenants: { name: 'Propriétaire bailleur', kind: 'owner_lessor' },
+  multiple_independent_tenants: { name: 'Propriétaire bailleur', kind: 'owner_lessor' },
   mixed: { name: 'Propriétaire', kind: 'owner_occupant' },
 };
 

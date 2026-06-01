@@ -39,7 +39,7 @@
  */
 
 // Genres de parties considérés comme « propriétaire » du bâtiment.
-const OWNER_KINDS = new Set(['owner_occupant', 'co_owner']);
+const OWNER_KINDS = new Set(['owner_occupant', 'owner_lessor', 'co_owner']);
 
 /**
  * Calcule la/les partie(s) assujettie(s) pour chaque système d'un audit.
@@ -226,6 +226,7 @@ const OWNERSHIP_STRUCTURE_LABEL = {
 // Libellés FR des genres de partie prenante (item 4b).
 const PARTY_KIND_LABEL = {
   owner_occupant: 'Propriétaire occupant',
+  owner_lessor: 'Propriétaire bailleur',
   co_owner: 'Copropriétaire',
   tenant: 'Preneur à bail',
   syndicate: 'Syndicat de copropriété',
