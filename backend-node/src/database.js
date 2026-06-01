@@ -8203,7 +8203,13 @@ const afs = {
     for (const [k, v] of Object.entries(fields)) {
       if (v === undefined) continue;
       const col = k.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
-      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(v); }
+      if (allowed.includes(col)) {
+        sets.push(`${col} = ?`);
+        // better-sqlite3 refuse les booleans JS — on les coerce en 0/1.
+        // Concerne `inspection_not_applicable` (INTEGER 0/1) et tout
+        // futur champ ternaire passe par cette update().
+        params.push(typeof v === 'boolean' ? (v ? 1 : 0) : v);
+      }
     }
     if (fields.updatedBy != null) { sets.push('updated_by = ?'); params.push(fields.updatedBy); }
     if (!sets.length) return this.getById(id);
