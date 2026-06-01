@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.132",
+      "date": "2026-05-29",
+      "title": "Plan d'action : retrait de la pilule zone redondante en bas de chaque action",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de doublon « 📍 zone » en bas des actions du plan",
+          "what": "Chaque action affichait la zone à 3 endroits : pilule dans le titre, pilule dans la description, et ligne grise « 📍 Cellules 1 » en bas. La 3e ligne est retirée — les pilules cliquables du titre / de la description suffisent et restent la voie pour scroller vers la card concernée.",
+          "where": "Card « Plan de mise en conformité » (web + PWA).",
+          "how": "Ouvrir le plan d'action : chaque action n'affiche plus la zone qu'une fois (via la pilule cliquable)."
+        }
+      ]
+    },
+    {
       "version": "0.1.131",
       "date": "2026-05-29",
       "title": "Fix : réponse au toggle Inspection plantait en 500",

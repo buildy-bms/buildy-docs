@@ -334,7 +334,8 @@ async function saveEdit() {
         <p v-if="it.description" class="text-xs text-gray-600 mt-1.5 leading-relaxed">
           <ActionDescription :text="it.description" />
         </p>
-        <p v-if="it.zone_name" class="text-xs text-gray-500 mt-2">📍 {{ it.zone_name }}</p>
+        <!-- Pas de pill « 📍 zone » ici : la zone apparaît déjà dans le
+             titre et la description via les pilules {{zone:N}}. -->
       </button>
       <div v-if="!currentItems.length" class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
         <FontAwesomeIcon :icon="['fas', 'circle-check']" class="w-10 h-10 text-emerald-500 mx-auto" />
@@ -370,7 +371,7 @@ async function saveEdit() {
           </p>
           <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span v-if="editing.r175_article" class="font-mono">{{ editing.r175_article }}</span>
-            <span v-if="editing.zone_name">📍 {{ editing.zone_name }}</span>
+            <!-- Zone affichée via pilule {{zone:N}} dans le titre/description. -->
             <span v-if="editing.auto_generated" class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">
               Auto-générée
             </span>
