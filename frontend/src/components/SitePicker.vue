@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { MagnifyingGlassIcon, BuildingOffice2Icon, MapPinIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { listSites } from '@/api'
 
@@ -22,6 +22,31 @@ const loading = ref(false)
 const open = ref(false)
 const query = ref('')
 const inputRef = ref(null)
+const anchorRef = ref(null)
+const dropdownStyle = ref({})
+
+function updateDropdownPosition() {
+  if (!anchorRef.value) return
+  const r = anchorRef.value.getBoundingClientRect()
+  dropdownStyle.value = {
+    position: 'fixed',
+    top: `${r.bottom + 4}px`,
+    left: `${r.left}px`,
+    width: `${r.width}px`,
+  }
+}
+function onScrollOrResize() {
+  if (open.value) updateDropdownPosition()
+}
+onMounted(() => {
+  window.addEventListener('scroll', onScrollOrResize, true)
+  window.addEventListener('resize', onScrollOrResize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScrollOrResize, true)
+  window.removeEventListener('resize', onScrollOrResize)
+})
+watch(open, (v) => { if (v) nextTick(updateDropdownPosition) })
 
 const selected = computed(() => sites.value.find(s => s.site_id === props.modelValue) || null)
 
@@ -93,7 +118,7 @@ onMounted(loadSites)
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative" ref="anchorRef">
     <!-- Site selectionne -->
     <div
       v-if="selected && !open"
@@ -138,37 +163,41 @@ onMounted(loadSites)
       />
     </div>
 
-    <!-- Dropdown de suggestions : ouvert dès que open=true (le clic sur le
-         site sélectionné force open=true via openForChange, ce qui permet
-         de remplacer le site sans avoir à le clear d'abord). -->
-    <div
-      v-if="open"
-      class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"
-    >
-      <div v-if="loading" class="px-3 py-2 text-xs text-gray-400">Chargement…</div>
-      <div v-else-if="!matches.length" class="px-3 py-3 text-xs text-gray-500 text-center">
-        Aucun site ne correspond.
-        <span class="text-gray-400 block mt-1">Crée-le d'abord depuis « Mes Sites ».</span>
-      </div>
-      <button
-        v-for="s in matches"
-        :key="s.site_uuid"
-        type="button"
-        @mousedown.prevent="pick(s)"
-        class="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-b-0 transition"
+    <!-- Dropdown de suggestions teleporté au body : sinon clippé par
+         `overflow-hidden` du BaseModal quand le picker est dans une modale
+         (cf. EditAuditMetadataModal). z-[120] passe au-dessus du backdrop
+         BaseModal (z-110). -->
+    <Teleport to="body">
+      <div
+        v-if="open"
+        :style="dropdownStyle"
+        class="z-120 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"
       >
-        <div class="flex items-start gap-2">
-          <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-gray-800 wrap-break-word">{{ s.name }}</div>
-            <div class="text-[11px] text-gray-500 wrap-break-word">
-              <span v-if="s.customer_name">{{ s.customer_name }}</span>
-              <span v-if="s.customer_name && s.address"> — </span>
-              <span v-if="s.address">{{ s.address }}</span>
+        <div v-if="loading" class="px-3 py-2 text-xs text-gray-400">Chargement…</div>
+        <div v-else-if="!matches.length" class="px-3 py-3 text-xs text-gray-500 text-center">
+          Aucun site ne correspond.
+          <span class="text-gray-400 block mt-1">Crée-le d'abord depuis « Mes Sites ».</span>
+        </div>
+        <button
+          v-for="s in matches"
+          :key="s.site_uuid"
+          type="button"
+          @mousedown.prevent="pick(s)"
+          class="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-b-0 transition"
+        >
+          <div class="flex items-start gap-2">
+            <BuildingOffice2Icon class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-800 wrap-break-word">{{ s.name }}</div>
+              <div class="text-[11px] text-gray-500 wrap-break-word">
+                <span v-if="s.customer_name">{{ s.customer_name }}</span>
+                <span v-if="s.customer_name && s.address"> — </span>
+                <span v-if="s.address">{{ s.address }}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </button>
-    </div>
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>

@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 191;
+const TARGET_VERSION = 192;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7239,6 +7239,32 @@ function runMigrations() {
              ON site_documents(bacs_audit_inspection_id)`);
     log.info('Migration 191 appliquee : site_documents.bacs_audit_inspection_id');
     db.pragma('user_version = 191');
+  }
+
+  if (current < 192) {
+    // Migration 192 — Ajout de la valeur 'owner_lessor' au CHECK constraint
+    // de site_parties.kind. Permet de distinguer le propriétaire bailleur
+    // (loue à des preneurs) du propriétaire occupant. Le label FR est
+    // « Propriétaire bailleur ». Pattern PRAGMA writable_schema +
+    // unsafeMode pour modifier le CHECK sans recréer la table (cf. memory
+    // feedback_sqlite_check_constraint_safe_migration).
+    const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='site_parties'`).get();
+    if (row?.sql && !/owner_lessor/.test(row.sql)) {
+      const newSql = row.sql.replace(
+        /CHECK\s*\(\s*kind\s+IN\s*\([^\)]+\)\s*\)/i,
+        `CHECK (kind IN ('owner_occupant','owner_lessor','co_owner','tenant','syndicate','network_operator'))`,
+      );
+      db.unsafeMode(true);
+      try {
+        db.pragma('writable_schema = 1');
+        db.prepare(`UPDATE sqlite_master SET sql = ? WHERE type='table' AND name='site_parties'`).run(newSql);
+        db.pragma('writable_schema = 0');
+      } finally {
+        db.unsafeMode(false);
+      }
+    }
+    log.info('Migration 192 appliquee : site_parties.kind accepte owner_lessor');
+    db.pragma('user_version = 192');
   }
 
   if (current > TARGET_VERSION) {

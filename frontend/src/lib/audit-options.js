@@ -429,6 +429,7 @@ export const OWNERSHIP_STRUCTURES = [
 // backend lib/bacs-liability.js + CHECK migration 161.
 export const PARTY_KINDS = [
   { value: 'owner_occupant',   label: 'Propriétaire occupant',     icon: 'fa-user-tie',      color: '#1e40af' },
+  { value: 'owner_lessor',     label: 'Propriétaire bailleur',     icon: 'fa-handshake',     color: '#0d9488' },
   { value: 'co_owner',         label: 'Copropriétaire',            icon: 'fa-user-group',    color: '#7c3aed' },
   { value: 'tenant',           label: 'Preneur à bail',            icon: 'fa-key',           color: '#0891b2' },
   { value: 'syndicate',        label: 'Syndicat de copropriété',   icon: 'fa-building-user', color: '#a855f7' },

@@ -2,6 +2,55 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.133",
+      "date": "2026-05-29",
+      "title": "Audit BACS — paquet de fixes UI (parties prenantes, site picker, drag-drop, move équipement)",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Nouvelle valeur « Propriétaire bailleur » dans la liste des parties prenantes",
+          "what": "Ajout de la valeur `owner_lessor` (label « Propriétaire bailleur », icône poignée de main) dans le sélecteur de type de partie prenante. Les structures juridiques `owner_with_tenants` et `multiple_independent_tenants` proposent désormais ce type par défaut au lieu de `owner_occupant`. Couvre le décret au même titre que le propriétaire occupant et le copropriétaire (OWNER_KINDS).",
+          "where": "Card Identification du site (web + PWA) → Parties prenantes → Type. Migration 192 ajoute la valeur au CHECK constraint.",
+          "how": "Ouvrir un audit, ajouter une partie prenante : « Propriétaire bailleur » apparaît dans la liste."
+        },
+        {
+          "kind": "fix",
+          "title": "Sélecteur de site dans la modale paramètres n'est plus tronqué",
+          "what": "Le dropdown du SitePicker était clippé par l'`overflow-hidden` du BaseModal. Il est maintenant teleporté au body avec une position fixed calculée par rapport à l'ancre — il échappe au clipping et reste positionné correctement même au scroll/resize.",
+          "where": "Audit BACS → bouton « Modifier les paramètres » → champ Site rattaché.",
+          "how": "Ouvrir la modale paramètres, cliquer dans le sélecteur de site : la liste s'affiche en entier, déborde correctement de la modale."
+        },
+        {
+          "kind": "fix",
+          "title": "Validation d'étape : plus de faux positif « Le site n'est pas rattaché »",
+          "what": "Le check du step Identification regardait `site.value` (hydraté depuis getSite via site_uuid). Si l'hydratation tardait ou échouait silencieusement, le toast disait « pas rattaché » alors qu'un site_id était bien présent en DB. Check basé désormais sur `document.site_id`.",
+          "where": "Audit BACS → bouton « Valider » sur l'étape Identification.",
+          "how": "Valider un audit dont l'identification est complète : plus d'erreur « site pas rattaché » si le site est bien lié."
+        },
+        {
+          "kind": "fix",
+          "title": "Parties prenantes par zone : édition redevenue libre",
+          "what": "Les checkboxes des parties prenantes par zone étaient verrouillées (« hérité du site, modifier au niveau du site »). Elles sont à nouveau interactives : au premier affichage la zone hérite des parties du site, puis l'auditeur peut décocher au cas par cas (ex. un preneur qui ne loue qu'une zone). Les changements sont persistés à chaque clic.",
+          "where": "Card 02 « Zones » → ligne dépliée d'une zone → bloc Parties prenantes.",
+          "how": "Ouvrir une zone, décocher une partie prenante : la sélection est sauvegardée. Re-cocher : pareil. Plus de message « hérité du site, verrouillé »."
+        },
+        {
+          "kind": "fix",
+          "title": "Liste « Déplacer un équipement » : affiche le nom du système",
+          "what": "Quand un système a un nom personnalisé (custom_label), il est désormais affiché en plus de l'usage : « Chauffage — chaudière principale » au lieu de juste « Chauffage ». Permet de distinguer plusieurs systèmes de même usage. Pas de régression pour les usages standards sans nom personnalisé.",
+          "where": "Card 03 « Systèmes » → menu d'un équipement → « Déplacer vers ».",
+          "how": "Ouvrir le menu d'un équipement, choisir Déplacer : la liste affiche le nom du système + l'usage quand un nom personnalisé existe."
+        },
+        {
+          "kind": "fix",
+          "title": "Glisser-déposer des zones réparé",
+          "what": "Réordonner les zones par drag-drop ne fonctionnait plus depuis la 0.1.129 : les handlers `dragover` / `drop` de PhotoDropTr (pour le dépôt de photos/PDFs) faisaient `stopPropagation()` sur tous les drags, y compris ceux de SortableJS. PhotoDropTr ne capte désormais que les drags de fichiers (`dataTransfer.types.includes('Files')`), laissant Sortable gérer les drags internes. Répare aussi d'autres tables réordonnables qui utilisent ce pattern.",
+          "where": "Card 02 « Zones » → poignée de drag à gauche de chaque ligne.",
+          "how": "Drag une zone par sa poignée : elle se déplace, l'ordre est persisté en DB."
+        }
+      ]
+    },
+    {
       "version": "0.1.132",
       "date": "2026-05-29",
       "title": "Plan d'action : élagage visuel des actions (zone + équipement + lisibilité)",
