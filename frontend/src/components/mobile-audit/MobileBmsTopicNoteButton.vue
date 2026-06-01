@@ -65,12 +65,12 @@ async function save() {
   <button
     type="button"
     @click.stop="openSheet"
-    :class="['inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap',
+    :class="['pwa-button border whitespace-nowrap',
       hasNote
         ? 'border-indigo-300 text-indigo-700 bg-indigo-50'
         : 'border-gray-300 text-gray-600 bg-white']"
   >
-    <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-3.5 h-3.5" />
+    <FontAwesomeIcon :icon="['fas', 'pen-to-square']" class="w-5 h-5" />
     {{ hasNote ? 'Note' : '+ Note' }}
   </button>
 
@@ -85,7 +85,7 @@ async function save() {
         v-model="localText"
         rows="8"
         placeholder="Ce que tu observes…"
-        class="w-full text-sm rounded-lg border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+        class="pwa-input resize-y"
       ></textarea>
     </div>
   </MobileSheet>

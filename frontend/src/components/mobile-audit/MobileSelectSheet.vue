@@ -38,6 +38,10 @@ const props = defineProps({
   // ferme via le bouton « Valider » du footer. modelValue devient un
   // tableau de values (compatible API `SearchableSelect :multiple`).
   multiple: { type: Boolean, default: false },
+  // Grouper visuellement les options par le champ `hint` (chaque option
+  // d'un meme hint apparait sous un sous-titre commun). Le hint disparait
+  // alors de la ligne d'option (deja porte par le sous-titre).
+  groupByHint: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -97,7 +101,8 @@ const isCustomValue = computed(() => {
 // Libellé affiché dans le trigger (mono uniquement, multi gère les
 // pilules directement dans le template).
 const triggerLabel = computed(() => {
-  if (matchedOption.value) return matchedOption.value.label
+  // `chipLabel` = libellé complet (« Zone · Usage »). Fallback `label`.
+  if (matchedOption.value) return matchedOption.value.chipLabel || matchedOption.value.label
   if (isCustomValue.value) return String(props.modelValue)
   return null
 })
@@ -181,16 +186,12 @@ watch(() => props.modelValue, (v) => {
 
 <template>
   <div>
-    <!-- Trigger plein-largeur, 44pt min, style cohérent inputs Buildy -->
+    <!-- Trigger : gabarit PWA standard (48px, text-base, border, rounded-xl). -->
     <button
       type="button"
       @click="openSheet"
       :disabled="disabled"
-      :class="[
-        'w-full min-h-11 px-4 py-2.5 flex items-center gap-2 bg-white border rounded-lg text-base transition',
-        'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500',
-        disabled ? 'border-gray-200 opacity-50 cursor-not-allowed' : 'border-gray-200 active:bg-gray-50',
-      ]"
+      :class="['pwa-select-trigger', disabled ? 'opacity-50 cursor-not-allowed' : 'active:bg-gray-50']"
     >
       <!-- Multi-select : pilules des options sélectionnées, à plat -->
       <template v-if="multiple">
@@ -202,7 +203,9 @@ watch(() => props.modelValue, (v) => {
             class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
           >
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]" :style="{ color: o.color || '#6366f1' }" class="w-3 h-3" />
-            {{ o.label }}
+            <!-- `chipLabel` = libellé complet (ex « Zone · Usage »). Fallback
+                 sur `label` si non fourni par l'option. -->
+            {{ o.chipLabel || o.label }}
           </span>
         </span>
       </template>
@@ -276,26 +279,26 @@ watch(() => props.modelValue, (v) => {
 
           <!-- Mode "Saisir une valeur libre" -->
           <div v-if="customMode" class="px-4 py-4">
-            <label class="block text-xs font-medium uppercase tracking-wider text-gray-500 mb-2">Saisir une valeur</label>
+            <label class="pwa-label mb-2">Saisir une valeur</label>
             <input
               ref="customInput"
               v-model="customDraft"
               type="text"
               :placeholder="customPlaceholder"
-              class="w-full min-h-11 px-4 py-2.5 text-base bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+              class="pwa-input border-amber-300 focus:ring-amber-500/30 focus:border-amber-500"
               @keydown.enter.prevent="commitCustom"
             />
             <div class="mt-3 flex gap-2">
               <button
                 type="button"
                 @click="customMode = false"
-                class="flex-1 min-h-11 px-4 py-2.5 text-base font-medium text-gray-700 bg-gray-100 rounded-lg active:bg-gray-200"
+                class="pwa-button pwa-button--neutral flex-1"
               >Annuler</button>
               <button
                 type="button"
                 @click="commitCustom"
                 :disabled="!customDraft.trim()"
-                class="flex-1 min-h-11 px-4 py-2.5 text-base font-medium text-white bg-indigo-600 rounded-lg active:bg-indigo-700 disabled:opacity-40"
+                class="pwa-button pwa-button--primary flex-1 disabled:opacity-40"
               >Utiliser</button>
             </div>
           </div>
@@ -304,26 +307,34 @@ watch(() => props.modelValue, (v) => {
           <template v-else>
             <div v-if="showSearch" class="shrink-0 px-3 pt-3">
               <div class="relative">
-                <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                <FontAwesomeIcon :icon="['fas', 'magnifying-glass']" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10" />
                 <input
                   ref="searchInput"
                   v-model="search"
                   type="search"
                   inputmode="search"
                   placeholder="Rechercher…"
-                  class="w-full min-h-11 pl-10 pr-3 py-2.5 text-base bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                  class="pwa-input pl-10 pr-3 bg-gray-50"
                 />
               </div>
             </div>
 
             <div class="flex-1 overflow-y-auto overscroll-contain px-1 py-2">
+              <template v-for="(o, oi) in filtered" :key="o.value ?? '__null'">
+                <!-- Sous-titre de groupe (groupByHint) : insere quand la
+                     valeur du hint change. Bandeau saillant pour bien
+                     scander les groupes (gabarit aligne sur les cartes
+                     du plan d'action, slate clair). -->
+                <div v-if="groupByHint && o.hint && (oi === 0 || filtered[oi - 1].hint !== o.hint)"
+                     :class="['mx-1 mb-1 px-3 py-2 rounded-lg bg-slate-100 border-l-[3px] border-slate-400 text-sm font-semibold text-slate-800',
+                              oi === 0 ? 'mt-0' : 'mt-3']">
+                  {{ o.hint }}
+                </div>
               <button
-                v-for="o in filtered"
-                :key="o.value ?? '__null'"
                 type="button"
                 @click="pick(o)"
                 :class="[
-                  'w-full min-h-12 px-3 py-3 flex items-center gap-3 text-left rounded-lg transition',
+                  'pwa-list-item border-transparent',
                   isSelected(o) ? 'bg-indigo-50' : 'active:bg-gray-100',
                 ]"
               >
@@ -341,7 +352,9 @@ watch(() => props.modelValue, (v) => {
 
                 <span class="flex-1 min-w-0">
                   <span :class="['block text-base truncate', isSelected(o) ? 'text-indigo-700 font-medium' : 'text-gray-900']">{{ o.label }}</span>
-                  <span v-if="o.hint" class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
+                  <!-- En mode groupByHint, le hint est porté par le
+                       sous-titre ; on évite de le doubler ici. -->
+                  <span v-if="o.hint && !groupByHint" class="block text-sm text-gray-500 truncate">{{ o.hint }}</span>
                 </span>
 
                 <FontAwesomeIcon
@@ -350,6 +363,7 @@ watch(() => props.modelValue, (v) => {
                   class="w-5 h-5 text-indigo-600 shrink-0"
                 />
               </button>
+              </template>
 
               <div v-if="!filtered.length" class="px-4 py-6 text-center text-sm text-gray-500 italic">
                 Aucun résultat
@@ -359,7 +373,7 @@ watch(() => props.modelValue, (v) => {
                 v-if="creatable"
                 type="button"
                 @click="startCustom"
-                class="w-full min-h-12 mt-1 px-3 py-3 flex items-center gap-3 text-left rounded-lg text-amber-700 border border-dashed border-amber-300 bg-amber-50/40 active:bg-amber-50"
+                class="pwa-list-item mt-1 text-amber-700 border-dashed border-amber-300 bg-amber-50/40 active:bg-amber-50"
               >
                 <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
                 <span class="flex-1 text-base">Saisir une autre valeur…</span>

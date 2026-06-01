@@ -358,11 +358,72 @@ function shareCandidateSystems() {
   if (!dev) return []
   return (systems.value || []).filter(s => s.id !== dev.system_id)
 }
+// Mapping icônes/couleurs par catégorie d'usage (aligné SystemCategoryIcon).
+const SYSTEM_CATEGORY_DECOR = {
+  heating:                { icon: 'fa-fire',        color: '#dc2626' },
+  cooling:                { icon: 'fa-snowflake',   color: '#0891b2' },
+  ventilation:            { icon: 'fa-fan',         color: '#64748b' },
+  dhw:                    { icon: 'fa-faucet',      color: '#0284c7' },
+  lighting_indoor:        { icon: 'fa-lightbulb',   color: '#f59e0b' },
+  lighting_outdoor:       { icon: 'fa-tower-cell',  color: '#f59e0b' },
+  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a' },
+}
 // Options « usage principal » pour le MobileSelectSheet de déplacement.
-const moveSystemOptions = computed(() => (systems.value || []).map(s => ({
-  value: s.id,
-  label: `${s.zone_name || 'Zone'} — ${usageLabel(s)}`,
-})))
+// Triées par zone puis usage, décorées avec icône/couleur de catégorie.
+function decorateSystemOption(s) {
+  const decor = SYSTEM_CATEGORY_DECOR[s.system_category] || { icon: 'fa-cube', color: '#6b7280' }
+  const usage = usageLabel(s)
+  const zone = s.zone_name || 'Zone non précisée'
+  return {
+    value: s.id,
+    label: usage,                            // libellé court (popover groupé : la zone est déjà en sous-titre)
+    chipLabel: `${zone} · ${usage}`,         // libellé complet pour le trigger / la pilule sélectionnée
+    hint: zone,
+    icon: decor.icon,
+    color: decor.color,
+    _zone: zone,
+    _zoneOrder: (s.zone_position ?? 999),
+  }
+}
+function sortByZoneThenUsage(a, b) {
+  if (a._zoneOrder !== b._zoneOrder) return a._zoneOrder - b._zoneOrder
+  if (a._zone !== b._zone) return a._zone.localeCompare(b._zone, 'fr')
+  return a.label.localeCompare(b.label, 'fr')
+}
+const moveSystemOptions = computed(() =>
+  (systems.value || []).map(decorateSystemOption).sort(sortByZoneThenUsage))
+// Options « Aussi présent dans » : même décor + tri, mais on exclut le
+// système primaire courant.
+const shareSystemOptions = computed(() => {
+  const dev = editingDevice.value?.device
+  if (!dev) return []
+  return (systems.value || [])
+    .filter(s => s.id !== dev.system_id)
+    .map(decorateSystemOption)
+    .sort(sortByZoneThenUsage)
+})
+// Liste des ids actuellement partagés (pour binding multi-select).
+const extraSystemIds = computed(() =>
+  Array.isArray(editingDevice.value?.device?.extra_system_ids)
+    ? editingDevice.value.device.extra_system_ids
+    : [])
+// Toggle bulk : remplace l'ensemble extra_system_ids par la sélection
+// multi-select courante (fire-and-forget vers shareBacsDevice).
+async function updateExtraSystemIds(nextIds) {
+  if (savingShare.value || !editingDevice.value?.device) return
+  savingShare.value = true
+  const dev = editingDevice.value.device
+  try {
+    const { data } = await shareBacsDevice(dev.id, nextIds || [])
+    Object.assign(dev, data)
+    success('Partage mis à jour')
+    await audit.refreshAuditCore()
+  } catch (e) {
+    error(e.response?.data?.detail || 'Partage impossible')
+  } finally {
+    savingShare.value = false
+  }
+}
 
 // ─── Ajout / suppression d'un usage manuel (non BACS) ────────────────
 // Bibliothèque de catégories pour le choix d'usage.
@@ -735,7 +796,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               <div class="flex items-center gap-2">
                 <p class="text-base font-medium text-gray-900 truncate leading-tight">{{ g.zone_name }}</p>
                 <span v-if="g.toRenseigner > 0"
-                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-700"
+                      class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700"
                       :title="`${g.toRenseigner} usage(s) à renseigner`">
                   <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                   {{ g.toRenseigner }} à renseigner
@@ -818,8 +879,8 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             <FontAwesomeIcon :icon="['fas', 'chevron-left']" class="w-5 h-5" />
           </button>
           <div class="flex-1 min-w-0">
-            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Zones › {{ selectedZoneGroup.zone_kind === 'technical' ? 'Technique' : 'Fonctionnelle' }}</p>
-            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedZoneGroup.zone_name }}</p>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Zones › {{ selectedZoneGroup.zone_kind === 'technical' ? 'Technique' : 'Fonctionnelle' }}</p>
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedZoneGroup.zone_name }}</p>
           </div>
           <span class="shrink-0 text-xs text-gray-500">
             {{ selectedZoneUsages.present.length }}/{{ selectedZoneGroup.items.length }}
@@ -862,12 +923,12 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <div class="px-4 pb-3 grid grid-cols-2 gap-2">
             <button type="button"
                     @click.stop="patchSystem(s, { present: true, not_concerned: false })"
-                    class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700">
+                    class="pwa-button border-2 border-emerald-500 bg-emerald-50 text-emerald-700">
               ✓ Présent
             </button>
             <button type="button"
                     @click.stop="patchSystem(s, { present: false, not_concerned: true })"
-                    class="min-h-11 py-2.5 px-3 text-sm font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+                    class="pwa-button pwa-button--idle border-2">
               ✕ Marquer absent
             </button>
           </div>
@@ -900,12 +961,12 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <div class="mt-3 grid grid-cols-2 gap-2">
             <button type="button"
                     @click="patchSystem(s, { present: true, not_concerned: false })"
-                    class="min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+                    class="pwa-button pwa-button--idle border-2">
               ✓ Présent
             </button>
             <button type="button"
                     @click="patchSystem(s, { present: false, not_concerned: true })"
-                    class="min-h-11 py-3 px-3 text-base font-medium rounded-xl border-2 border-gray-200 bg-white text-gray-600">
+                    class="pwa-button pwa-button--idle border-2">
               ✕ Absent
             </button>
           </div>
@@ -1036,7 +1097,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                  :value="openedUsage.negligible_justification || ''"
                  @change="e => patchSystem(openedUsage, { negligible_justification: e.target.value })"
                  placeholder="Justification (ex : petits ballons individuels…)"
-                 class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+                 class="pwa-input" />
         </section>
 
         <!-- Item 4 — assujettissement : parties prenantes + flags cas E/F -->
@@ -1065,14 +1126,14 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               <div class="flex-1 min-w-0">
                 <p
                   v-if="isSharedDevice(d, openedUsage.id)"
-                  class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 mb-0.5"
+                  class="text-xs font-semibold uppercase tracking-wider text-emerald-700 mb-0.5"
                 >
                   Partagé depuis « {{ deviceOriginZoneName(d) }} »
                 </p>
                 <p class="text-base font-semibold text-gray-900 truncate leading-tight">
                   {{ d.name || d.brand || d.model_reference || `Équipement #${d.id}` }}
                   <span v-if="d.is_backup === 1 || d.is_backup === true"
-                        class="inline-flex items-center justify-center align-middle ml-1 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-amber-100 text-amber-700 border border-amber-300">
+                        class="inline-flex items-center justify-center align-middle ml-1 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider rounded bg-amber-100 text-amber-700 border border-amber-300">
                     Secours
                   </span>
                 </p>
@@ -1090,7 +1151,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <div class="p-3 border-t border-gray-200 bg-gray-50 space-y-2">
             <button
               @click="openCreateDevice(openedUsage)"
-              class="w-full tap-target inline-flex items-center justify-center gap-2 px-3 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-xl transition whitespace-nowrap"
+              class="pwa-button pwa-button--add whitespace-nowrap"
             >
               <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" /> Ajouter un équipement
             </button>
@@ -1110,7 +1171,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           @click="openThermalSheet(openedUsage.zone_id, openedUsage.system_category)"
           class="w-full tap-target flex items-center gap-3 px-4 py-3.5 bg-amber-50 border border-amber-300 rounded-2xl active:bg-amber-100 text-left"
         >
-          <span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center text-lg shrink-0">🌡️</span>
+          <span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 inline-flex items-center justify-center text-base shrink-0">🌡️</span>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-amber-900 truncate">
               Régulation thermique <span class="font-normal opacity-70">— R175-6</span>
@@ -1199,7 +1260,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             type="text"
             placeholder="ex : Chaudière gaz principale"
             autocapitalize="sentences"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+            class="pwa-input"
           />
         </MobileField>
 
@@ -1210,7 +1271,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               type="text"
               placeholder="ex : Atlantic"
               autocapitalize="words"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
           <MobileField label="Référence">
@@ -1218,7 +1279,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               v-model="deviceForm.model_reference"
               type="text"
               placeholder="ex : Varmax 70"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
         </div>
@@ -1234,7 +1295,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               min="1"
               step="1"
               placeholder="1"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+              class="pwa-input pwa-input--num"
             />
           </MobileField>
           <MobileField label="Âge (années)">
@@ -1246,7 +1307,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
               min="0"
               step="1"
               placeholder="—"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+              class="pwa-input pwa-input--num"
             />
           </MobileField>
         </div>
@@ -1265,7 +1326,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 min="0"
                 step="0.1"
                 placeholder="—"
-                class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+                class="pwa-input pwa-input--num"
               />
             </MobileField>
             <MobileField v-if="showCoolPower" label="Puissance froid (kW)">
@@ -1277,7 +1338,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 min="0"
                 step="0.1"
                 placeholder="—"
-                class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+                class="pwa-input pwa-input--num"
               />
             </MobileField>
           </div>
@@ -1318,7 +1379,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             type="text"
             placeholder="ex : Local technique sous-sol"
             autocapitalize="sentences"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+            class="pwa-input"
           />
         </MobileField>
 
@@ -1344,11 +1405,11 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             <div v-if="showRegulatorDetails" class="grid grid-cols-2 gap-3">
               <MobileField label="Marque du régulateur">
                 <input v-model="deviceForm.regulator_brand" type="text" placeholder="ex : Siemens"
-                       class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+                       class="pwa-input" />
               </MobileField>
               <MobileField label="Référence">
                 <input v-model="deviceForm.regulator_model_reference" type="text" placeholder="ex : RVS43.143"
-                       class="w-full px-4 py-3 text-base border border-gray-200 rounded-xl bg-white" />
+                       class="pwa-input" />
               </MobileField>
             </div>
             <template v-if="hasProductionRole">
@@ -1468,39 +1529,26 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
             <MobileSelectSheet
               :model-value="editingDevice.device.system_id"
               :options="moveSystemOptions"
+              :group-by-hint="true"
               title="Déplacer vers un usage"
               placeholder="— Usage —"
               @update:model-value="moveDeviceToSystem"
             />
           </MobileField>
-          <div class="pt-2">
-            <p class="text-xs font-medium text-gray-600 uppercase tracking-wider mb-2">
-              <FontAwesomeIcon :icon="['fas', 'share-nodes']" class="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
-              Aussi présent dans
-            </p>
-            <div class="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-              <label
-                v-for="sys in shareCandidateSystems()"
-                :key="sys.id"
-                class="px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-gray-50"
-              >
-                <input
-                  type="checkbox"
-                  :checked="(editingDevice.device.extra_system_ids || []).includes(sys.id)"
-                  :disabled="savingShare"
-                  @change="e => toggleShareDeviceSystem(sys.id, e.target.checked)"
-                  class="w-5 h-5 rounded border-gray-300 shrink-0"
-                />
-                <span class="text-base text-gray-700 truncate">{{ sys.zone_name }} — {{ usageLabel(sys) }}</span>
-              </label>
-              <p
-                v-if="!shareCandidateSystems().length"
-                class="px-4 py-4 text-sm text-gray-500 italic text-center"
-              >
-                Aucun autre usage disponible.
-              </p>
-            </div>
-          </div>
+          <MobileField label="Aussi présent dans"
+                       hint="Sélectionne les autres usages où cet équipement physique est aussi présent. Options groupées par zone, icône colorée par catégorie.">
+            <MobileSelectSheet
+              v-if="shareSystemOptions.length"
+              :model-value="extraSystemIds"
+              :options="shareSystemOptions"
+              :multiple="true"
+              :group-by-hint="true"
+              title="Aussi présent dans"
+              placeholder="— Aucun partage —"
+              @update:model-value="updateExtraSystemIds"
+            />
+            <p v-else class="pwa-body italic">Aucun autre usage disponible.</p>
+          </MobileField>
 
           <!-- Item 7c — séparabilité du comptage : visible uniquement quand
                l'équipement est partagé entre plusieurs zones / usages. -->
@@ -1525,7 +1573,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
                 type="text"
                 placeholder="ex : circuit hydraulique unique"
                 autocapitalize="sentences"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
             </MobileField>
           </template>
@@ -1533,7 +1581,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           <div class="pt-4 border-t border-gray-200">
             <button
               @click="removeDevice(editingDevice.device)"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
+              class="pwa-button pwa-button--danger w-full bg-red-50 text-red-600 border-red-200"
             >
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer l'équipement

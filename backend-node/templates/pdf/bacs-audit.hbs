@@ -1809,6 +1809,15 @@
   plan par cartes du stepper, accord Kevin 2026-05-29).
 --}}
 {{#if actionItemsByCard.length}}
+{{!-- Encart sources : hiérarchie des références citées dans les descriptions
+     (seule source opposable = décret R175, les guides et la norme servent
+     d'aide à l'interprétation). --}}
+<div class="callout callout-sources" style="margin: 0 0 5mm;">
+  <span class="callout-icon">{{{faIcon "circle-info" "#4f46e5" "14"}}}</span>
+  <div class="callout-body">
+    <strong>Sources d'aide à l'interprétation (non opposables).</strong> Les actions ci-dessous reposent sur le <strong>décret R175</strong> (seule source juridiquement opposable), complété par : <em>Guide d'application du décret BACS</em> (ministère, version 2, janvier 2026) ; <em>Guide pratique d'application du décret BACS</em> (PROFEEL, novembre 2025) ; norme <em>NF EN ISO 52120-1</em>.
+  </div>
+</div>
 {{#each actionItemsByCard}}
 <section class="theme-section">
   <header class="theme-head">
@@ -1840,8 +1849,8 @@
             {{#if meter_type}}{{{meterTypePill meter_type "sm"}}}{{/if}}
             {{#if effortLabel}}<span class="action-card-effort action-card-effort-{{estimated_effort}}" title="Effort estimé par l'auditeur">Effort : {{effortLabel}}</span>{{/if}}
           </div>
-          <div class="action-card-title"><strong>{{title}}</strong></div>
-          {{#if description}}<div class="action-card-desc">{{description}}</div>{{/if}}
+          <div class="action-card-title"><strong>{{{title}}}</strong></div>
+          {{#if description}}<div class="action-card-desc">{{{description}}}</div>{{/if}}
           {{#if alternative_solutions_html}}
             <div class="alt-solutions">
               <p class="alt-solutions-label">Préconisations Buildy :</p>

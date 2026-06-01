@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 189;
+const TARGET_VERSION = 190;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7137,6 +7137,94 @@ function runMigrations() {
     catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
     log.info('Migration 189 appliquee : assigned_card / assigned_subsection sur action_items');
     db.pragma('user_version = 189');
+  }
+
+  if (current < 190) {
+    // Refonte BACS R175-3 §3/§4 et anticipation conformite ISO 52120-1.
+    // - Etend bacs_knowledge pour accueillir la norme NF EN ISO 52120-1
+    //   (autorite normative, kind 'iso_function', source 'iso_52120').
+    //   Le CHECK constraint historique est remplace par un PRAGMA
+    //   writable_schema (cf. memoire feedback_sqlite_check_constraint_safe_migration).
+    // - Cree la table fonctionnelle bacs_iso52120_functions (47 lignes
+    //   issues du CSV des fonctions BAC obligatoires par classe C/B/A).
+    // - Ajoute documents.compliance_mode : mode d'evaluation BACS
+    //   (decree_strict | iso_52120_class_c | iso_52120_class_b | iso_52120_class_a).
+    //   Default 'decree_strict' : lecture textuelle du decret, conservatrice.
+    // Pattern standard SQLite pour modifier des CHECK constraints :
+    // table_new + INSERT SELECT + DROP + RENAME + recreation indexes/FTS.
+    // La table bacs_knowledge est entierement re-peuplee par les scripts
+    // d'ingestion a chaque boot ; ce flush est donc sans perte.
+    db.exec(`
+      DROP TABLE IF EXISTS bacs_knowledge_new;
+      CREATE TABLE bacs_knowledge_new (
+        id INTEGER PRIMARY KEY,
+        source TEXT NOT NULL CHECK (source IN ('decree','gov_faq','gov_guide','profeel','iso_52120')),
+        authority TEXT NOT NULL CHECK (authority IN ('opposable','official','professional','internal','normative')),
+        kind TEXT NOT NULL CHECK (kind IN ('article','faq_qa','guide_section','glossary_term','iso_function')),
+        code TEXT,
+        title TEXT NOT NULL,
+        body_text TEXT NOT NULL,
+        body_html TEXT,
+        r175_refs TEXT,
+        source_url TEXT,
+        source_page INTEGER,
+        version_label TEXT,
+        position INTEGER DEFAULT 0,
+        fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO bacs_knowledge_new
+        SELECT id, source, authority, kind, code, title, body_text, body_html,
+               r175_refs, source_url, source_page, version_label, position, fetched_at
+        FROM bacs_knowledge;
+      DROP TABLE bacs_knowledge_fts;
+      DROP TRIGGER IF EXISTS bacs_knowledge_ai;
+      DROP TRIGGER IF EXISTS bacs_knowledge_ad;
+      DROP TRIGGER IF EXISTS bacs_knowledge_au;
+      DROP TABLE bacs_knowledge;
+      ALTER TABLE bacs_knowledge_new RENAME TO bacs_knowledge;
+      CREATE INDEX idx_bacs_knowledge_source ON bacs_knowledge(source);
+      CREATE INDEX idx_bacs_knowledge_kind ON bacs_knowledge(kind);
+      CREATE INDEX idx_bacs_knowledge_code ON bacs_knowledge(code);
+      CREATE VIRTUAL TABLE bacs_knowledge_fts USING fts5(
+        title, body_text, code, r175_refs,
+        content='bacs_knowledge', content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2'
+      );
+      INSERT INTO bacs_knowledge_fts(rowid, title, body_text, code, r175_refs)
+        SELECT id, title, body_text, code, r175_refs FROM bacs_knowledge;
+      CREATE TRIGGER bacs_knowledge_ai AFTER INSERT ON bacs_knowledge BEGIN
+        INSERT INTO bacs_knowledge_fts(rowid, title, body_text, code, r175_refs)
+        VALUES (new.id, new.title, new.body_text, new.code, new.r175_refs);
+      END;
+      CREATE TRIGGER bacs_knowledge_ad AFTER DELETE ON bacs_knowledge BEGIN
+        INSERT INTO bacs_knowledge_fts(bacs_knowledge_fts, rowid, title, body_text, code, r175_refs)
+        VALUES ('delete', old.id, old.title, old.body_text, old.code, old.r175_refs);
+      END;
+    `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bacs_iso52120_functions (
+        id INTEGER PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,                -- ex '1.1.2', '4.5.1'
+        domain TEXT NOT NULL,                     -- ex '1. Régulation du chauffage'
+        sub_function TEXT,                        -- ex '1.1 Régulation de l\\'émission'
+        title TEXT NOT NULL,                      -- ex 'Régulation individuelle par pièce'
+        description TEXT,                         -- texte explicatif du tableau 5
+        class_c INTEGER NOT NULL DEFAULT 0,       -- 1 si requise en classe C (standard / minimum BACS)
+        class_b INTEGER NOT NULL DEFAULT 0,       -- 1 si requise en classe B (advanced)
+        class_a INTEGER NOT NULL DEFAULT 0,       -- 1 si requise en classe A (high performance)
+        position INTEGER NOT NULL DEFAULT 0,      -- ordre d'apparition pour l'UI
+        fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_iso52120_domain ON bacs_iso52120_functions(domain);
+      CREATE INDEX IF NOT EXISTS idx_iso52120_class_c ON bacs_iso52120_functions(class_c);
+    `);
+
+    try { db.exec("ALTER TABLE afs ADD COLUMN compliance_mode TEXT DEFAULT 'decree_strict'"); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+
+    log.info('Migration 190 appliquee : bacs_knowledge etendu (iso_52120/normative/iso_function) + bacs_iso52120_functions + afs.compliance_mode');
+    db.pragma('user_version = 190');
   }
 
   if (current > TARGET_VERSION) {

@@ -50,6 +50,11 @@ const props = defineProps({
   multiple: { type: Boolean, default: false },
   // Si true : habillage rouge pâle pour signaler une info manquante.
   invalid: { type: Boolean, default: false },
+  // Si true : groupe visuellement les options par le champ `hint` (sous-titre
+  // saillant avant chaque nouveau groupe). Le hint disparaît alors de la
+  // ligne d'option (déjà porté par le sous-titre). Pratique pour grouper les
+  // usages par zone, les compteurs par énergie, etc.
+  groupByHint: { type: Boolean, default: false },
   // Si true : largeur du trigger s'adapte au contenu sélectionné (min-w-fit)
   // au lieu d'occuper 100% du parent. Utilisé dans la card 06 pour que la
   // largeur des listes reflète la richesse du nom de l'équipement choisi.
@@ -102,16 +107,33 @@ function updatePopoverPosition() {
   const el = triggerRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
-  // Popover : aussi large que le trigger AU MINIMUM, mais peut grandir
-  // jusqu'à 480px pour afficher les libellés longs sans troncature
-  // (incident card 06 : « Sous-station de réseau de chaleur urbain » et
-  // « Unité Intérieure (DRV, split, etc.) » étaient illisibles).
-  popoverStyle.value = {
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    minWidth: `${Math.max(rect.width, 280)}px`,
-    maxWidth: '480px',
-  }
+  const vh = window.innerHeight || document.documentElement.clientHeight
+  const margin = 8 // marge avec les bords du viewport
+  const gap = 4    // espace trigger ↔ popover
+  // Espace disponible au-dessus / en-dessous du trigger.
+  const spaceBelow = vh - rect.bottom - margin
+  const spaceAbove = rect.top - margin
+  // Flip vers le haut UNIQUEMENT si l'espace du dessous est vraiment trop
+  // étroit (< 200px) ET qu'on a plus de place au-dessus. Sinon on garde
+  // l'ouverture vers le bas (UX par défaut) et on borne maxHeight.
+  const openUp = spaceBelow < 200 && spaceAbove > spaceBelow
+  const maxAvail = openUp ? spaceAbove - gap : spaceBelow - gap
+  const maxH = Math.max(180, Math.min(maxAvail, Math.floor(vh * 0.6)))
+  popoverStyle.value = openUp
+    ? {
+        top: `${Math.max(margin, rect.top - gap - maxH)}px`,
+        left: `${rect.left}px`,
+        minWidth: `${Math.max(rect.width, 280)}px`,
+        maxWidth: '480px',
+        maxHeight: `${maxH}px`,
+      }
+    : {
+        top: `${rect.bottom + gap}px`,
+        left: `${rect.left}px`,
+        minWidth: `${Math.max(rect.width, 280)}px`,
+        maxWidth: '480px',
+        maxHeight: `${maxH}px`,
+      }
 }
 
 // Helpers pour les 2 modes (mono | multi).
@@ -308,7 +330,9 @@ function clear() {
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
                              class="w-3 h-3 shrink-0" />
-            <span class="truncate max-w-40">{{ o.label }}</span>
+            <!-- `chipLabel` = libellé complet (« Zone · Usage »). Fallback
+                 sur `label` si non fourni. -->
+            <span class="truncate max-w-60">{{ o.chipLabel || o.label }}</span>
             <button v-if="!disabled" type="button" @click.stop="removeChip(o.value)"
                     class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-indigo-400 hover:text-white hover:bg-indigo-500 transition"
                     v-tooltip="'Retirer'">
@@ -332,7 +356,7 @@ function clear() {
         />
         <span class="flex-1 text-left truncate"
               :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
-          {{ selectedOption?.label || customLabel || placeholder }}
+          {{ selectedOption?.chipLabel || selectedOption?.label || customLabel || placeholder }}
         </span>
       </template>
       <button v-if="clearable && (multiple ? selectedOptions.length : (selectedOption || customLabel)) && !disabled" type="button"
@@ -348,7 +372,7 @@ function clear() {
       <div v-if="open"
            data-searchable-popover="true"
            :style="popoverStyle"
-           class="fixed z-115 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+           class="fixed z-115 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden flex flex-col"
            @keydown="onKeydown">
         <div v-if="showSearch" class="relative border-b border-gray-100">
           <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -357,9 +381,16 @@ function clear() {
                  autocomplete="off" data-1p-ignore="true"
                  class="w-full pl-8 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
         </div>
-        <div ref="listRef" class="max-h-72 overflow-y-auto py-1">
-          <button v-for="(o, i) in filteredOptions" :key="o.value ?? '__null'"
-                  type="button" @click="pick(o)"
+        <div ref="listRef" class="flex-1 min-h-0 overflow-y-auto py-1">
+          <template v-for="(o, i) in filteredOptions" :key="o.value ?? '__null'">
+            <!-- Sous-titre de groupe (groupByHint) : sépare visuellement
+                 les options ayant un hint commun (ex: zone fonctionnelle). -->
+            <div v-if="groupByHint && o.hint && (i === 0 || filteredOptions[i - 1].hint !== o.hint)"
+                 :class="['mx-1 mb-1 px-2.5 py-1 rounded bg-slate-100 border-l-2 border-slate-400 text-[11px] font-semibold uppercase tracking-wider text-slate-700',
+                          i === 0 ? 'mt-0' : 'mt-2']">
+              {{ o.hint }}
+            </div>
+          <button type="button" @click="pick(o)"
                   @mouseenter="activeIndex = i"
                   :data-active="activeIndex === i"
                   :class="['w-full flex items-center gap-2.5 px-3 py-1.5 sm:py-1.5 text-sm text-left transition min-h-11 sm:min-h-0',
@@ -373,14 +404,13 @@ function clear() {
               class="w-4 h-4 shrink-0"
             />
             <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
-            <!-- Label sans truncate : le popover a maxWidth 480px et wrap si
-                 nécessaire. Les libellés longs (« Sous-station de réseau de
-                 chaleur urbain », « Unité Intérieure (DRV, split, etc.) »)
-                 doivent être lisibles intégralement, pas tronqués. -->
             <span class="flex-1 whitespace-normal wrap-break-word leading-tight">{{ o.label }}</span>
-            <span v-if="o.hint" class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
+            <!-- En mode groupByHint, le hint est porté par le sous-titre ; on
+                 évite de le doubler sur chaque ligne. -->
+            <span v-if="o.hint && !groupByHint" class="text-[11px] text-gray-400 truncate shrink-0">{{ o.hint }}</span>
             <CheckIcon v-if="isSelected(o.value)" class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           </button>
+          </template>
           <div v-if="!filteredOptions.length && !canCreate" class="px-3 py-3 text-xs text-gray-400 italic text-center">
             Aucun résultat
           </div>

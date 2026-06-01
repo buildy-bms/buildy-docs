@@ -439,7 +439,7 @@ function toggleProtocol(p) {
       <button
         type="button"
         @click="openCreate"
-        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+        class="pwa-button pwa-button--add mt-2"
       >
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         Ajouter un compteur
@@ -461,8 +461,8 @@ function toggleProtocol(p) {
             <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
           </span>
           <div class="flex-1 min-w-0">
-            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Énergies › {{ groupBy === 'usage' ? 'Par usage' : 'Par zone' }}</p>
-            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedEnergyMeta.label }}</p>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Énergies › {{ groupBy === 'usage' ? 'Par usage' : 'Par zone' }}</p>
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedEnergyMeta.label }}</p>
           </div>
         </div>
       </div>
@@ -542,13 +542,13 @@ function toggleProtocol(p) {
             <FontAwesomeIcon :icon="['fas', selectedEnergyMeta.icon.replace(/^fa-/, '')]" class="w-4 h-4" />
           </span>
           <div class="flex-1 min-w-0">
-            <p v-if="isGeneralListMode" class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
+            <p v-if="isGeneralListMode" class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
               Hors zone · toutes énergies
             </p>
-            <p v-else class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider truncate">
+            <p v-else class="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
               {{ selectedEnergyMeta.label }} › {{ groupBy === 'usage' ? 'Usage' : 'Zone' }}
             </p>
-            <p class="text-lg font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ selectedGroupLabel }}</p>
           </div>
           <span class="shrink-0 text-xs text-gray-500">{{ filteredMeters.length }}</span>
         </div>
@@ -590,7 +590,7 @@ function toggleProtocol(p) {
       <button
         type="button"
         @click="openCreate"
-        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+        class="pwa-button pwa-button--add mt-2"
       >
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         Ajouter un compteur
@@ -667,7 +667,7 @@ function toggleProtocol(p) {
                   Le décret R175-3 1° impose un sous-comptage de chaque usage soumis (chauffage, clim, ECS, éclairage…). Répondre Oui si ce compteur EST requis par le décret.
                 </p>
               </div>
-              <SegmentedToggle :model-value="!!editForm.required"
+              <SegmentedToggle size="lg" :model-value="!!editForm.required"
                                @update:model-value="v => (editForm.required = v)" class="mt-1 shrink-0" />
             </div>
             <template v-if="editing?.mode === 'edit'">
@@ -676,17 +676,39 @@ function toggleProtocol(p) {
                   <p class="text-base font-medium text-gray-700">Présent physiquement sur site ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le compteur existe et est installé, peu importe s'il communique ou pas.</p>
                 </div>
-                <SegmentedToggle :model-value="!!editForm.present_actual"
+                <SegmentedToggle size="lg" :model-value="!!editForm.present_actual"
                                  @update:model-value="v => (editForm.present_actual = v)" class="mt-1 shrink-0" />
               </div>
               <div v-if="editForm.present_actual"
-                   class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
-                <div class="flex-1 min-w-0">
-                  <p class="text-base font-medium text-gray-700">Communicant ?</p>
-                  <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
+                   class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div class="flex items-start justify-between gap-3 px-4 py-4">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-base font-medium text-gray-700">Communicant ?</p>
+                    <p class="text-xs text-gray-500 mt-1">Le compteur peut transmettre ses index par un protocole (Modbus, M-Bus, KNX, MQTT…). Pas seulement un afficheur.</p>
+                  </div>
+                  <SegmentedToggle size="lg" :model-value="!!editForm.communicating"
+                                   @update:model-value="v => (editForm.communicating = v)" class="mt-1 shrink-0" />
                 </div>
-                <SegmentedToggle :model-value="!!editForm.communicating"
-                                 @update:model-value="v => (editForm.communicating = v)" class="mt-1 shrink-0" />
+                <!-- Protocoles : visibles si Oui, juste sous la question
+                     (sinon l'auditeur les cherchait plus bas, illisible). -->
+                <div v-if="editForm.communicating && editing?.mode === 'edit'"
+                     class="px-4 pb-4 pt-1 border-t border-gray-100 bg-gray-50/50">
+                  <p class="pwa-label">Protocoles</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button
+                      v-for="p in PROTOCOLS"
+                      :key="p.value"
+                      type="button"
+                      @click="toggleProtocol(p.value)"
+                      :class="['pwa-button border',
+                        editProtocols.includes(p.value)
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                          : 'pwa-button--idle']"
+                    >
+                      {{ p.label }}
+                    </button>
+                  </div>
+                </div>
               </div>
               <div v-if="editForm.present_actual"
                    class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
@@ -694,7 +716,7 @@ function toggleProtocol(p) {
                   <p class="text-base font-medium text-gray-700">Câblé vers la GTB ?</p>
                   <p class="text-xs text-gray-500 mt-1">Le câble (RS485, Ethernet…) est physiquement raccordé à la GTB du site. Le compteur communique vraiment, pas seulement potentiellement.</p>
                 </div>
-                <SegmentedToggle :model-value="!!editForm.wired"
+                <SegmentedToggle size="lg" :model-value="!!editForm.wired"
                                  @update:model-value="v => (editForm.wired = v)" class="mt-1 shrink-0" />
               </div>
               <div class="flex items-start justify-between gap-3 px-4 py-4 bg-white border border-gray-200 rounded-xl">
@@ -702,7 +724,7 @@ function toggleProtocol(p) {
                   <p class="text-base font-medium text-red-600">Hors service ?</p>
                   <p class="text-xs text-gray-500 mt-1">Compteur HS, débranché, ou inaccessible. Sera ignoré dans le plan d'action.</p>
                 </div>
-                <SegmentedToggle yes-danger :model-value="!!editForm.out_of_service"
+                <SegmentedToggle size="lg" yes-danger :model-value="!!editForm.out_of_service"
                                  @update:model-value="v => (editForm.out_of_service = v)" class="mt-1 shrink-0" />
               </div>
             </template>
@@ -743,7 +765,7 @@ function toggleProtocol(p) {
           <div class="pt-4 border-t border-gray-200">
             <button
               @click="remove(editing.meter)"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
+              class="pwa-button pwa-button--danger w-full bg-red-50 text-red-600 border-red-200"
             >
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer le compteur

@@ -128,7 +128,7 @@ onMounted(() => { if (props.open) refresh() })
               <p class="text-base font-medium text-gray-800">Créateur de l'audit</p>
               <p class="text-xs text-gray-500">user #{{ data.owner_id }} — owner non-révocable</p>
             </div>
-            <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">OWNER</span>
+            <span class="inline-flex items-center px-2 py-0.5 text-xs font-bold bg-emerald-100 text-emerald-800 rounded-full">OWNER</span>
           </div>
           <!-- Grants -->
           <div v-for="g in data.grants" :key="g.user_id" class="flex items-center gap-3 px-4 py-3">

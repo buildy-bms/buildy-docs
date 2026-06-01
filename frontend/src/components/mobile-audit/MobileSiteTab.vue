@@ -110,7 +110,7 @@ const generatorWorksDone = computed({
         class="w-7 h-7 shrink-0 mt-0.5"
       />
       <div class="flex-1 min-w-0">
-        <p class="text-[11px] uppercase tracking-wider opacity-75 font-medium">Applicabilité R175-2</p>
+        <p class="text-xs uppercase tracking-wider opacity-75 font-medium">Applicabilité R175-2</p>
         <p class="text-base font-medium leading-tight mt-0.5">
           {{ APPLICABILITY_LABEL[document.bacs_applicability_status]?.label }}
         </p>
@@ -130,7 +130,7 @@ const generatorWorksDone = computed({
             :value="document?.project_name || ''"
             @blur="e => e.target.value !== (document?.project_name || '') && saveDebounced({ project_name: e.target.value || (isBacs ? 'Audit BACS' : 'Audit GTB') })"
             placeholder="Titre de l'audit"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+            class="pwa-input"
           />
         </MobileField>
       </div>
@@ -144,7 +144,7 @@ const generatorWorksDone = computed({
       </div>
       <div class="p-4 space-y-4">
         <MobileField label="Nom du site">
-          <div class="px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 text-base text-gray-700">
+          <div class="pwa-input bg-gray-50 text-gray-700 flex items-center">
             {{ site?.name || document?.client_name || '—' }}
           </div>
         </MobileField>
@@ -159,12 +159,12 @@ const generatorWorksDone = computed({
             placeholder="ex : 12 rue de la Paix, 75002 Paris"
             rows="2"
             autocapitalize="sentences"
-            class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white leading-relaxed"
+            class="pwa-input leading-relaxed resize-y"
           ></textarea>
         </MobileField>
 
         <MobileField v-if="site?.customer_name" label="Client">
-          <div class="px-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 text-base text-gray-700">
+          <div class="pwa-input bg-gray-50 text-gray-700 flex items-center">
             {{ site.customer_name }}
           </div>
         </MobileField>
@@ -197,7 +197,7 @@ const generatorWorksDone = computed({
                 step="0.1"
                 :value="document?.bacs_total_power_kw"
                 @input="e => saveDebounced({ bacs_total_power_kw: e.target.value === '' ? null : parseFloat(e.target.value), bacs_total_power_source: 'manual_override' })"
-                class="flex-1 px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+                class="pwa-input pwa-input--num flex-1"
                 placeholder="—"
               />
               <button
@@ -221,7 +221,7 @@ const generatorWorksDone = computed({
               type="date"
               :value="document?.bacs_building_permit_date || ''"
               @input="e => saveDebounced({ bacs_building_permit_date: e.target.value || null })"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
         </div>
@@ -241,7 +241,7 @@ const generatorWorksDone = computed({
               type="date"
               :value="document?.bacs_generator_works_date || ''"
               @input="e => saveDebounced({ bacs_generator_works_date: e.target.value || null })"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
         </div>
@@ -267,7 +267,7 @@ const generatorWorksDone = computed({
               :value="document?.bacs_district_heating_substation_kw"
               @input="e => saveDebounced({ bacs_district_heating_substation_kw: e.target.value === '' ? 0 : parseFloat(e.target.value) })"
               placeholder="—"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-right font-medium"
+              class="pwa-input pwa-input--num"
             />
           </MobileField>
         </div>

@@ -193,7 +193,7 @@ const title = computed(() =>
           type="search"
           inputmode="search"
           placeholder="Rechercher un modèle…"
-          class="touch-control w-full pl-10"
+          class="pwa-input w-full pl-10"
         />
       </div>
 

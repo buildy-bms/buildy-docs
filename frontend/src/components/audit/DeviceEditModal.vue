@@ -241,10 +241,59 @@ const complete = computed(() => isDeviceComplete(props.device, props.system?.sys
 // plusieurs usages (chaudière qui sert à la fois chauffage + ECS, etc.)
 function usageLabel(s) { return systemUsageLabel(s) }
 const savingShare = ref(false)
-const moveSystemOptions = computed(() => (audit.systems || []).map(s => ({
-  value: s.id,
-  label: `${s.zone_name || 'Zone'} — ${usageLabel(s)}`,
-})))
+// Mapping icônes/couleurs par catégorie d'usage (aligné SystemCategoryIcon).
+const SYSTEM_CATEGORY_DECOR = {
+  heating:                { icon: 'fa-fire',        color: '#dc2626' },
+  cooling:                { icon: 'fa-snowflake',   color: '#0891b2' },
+  ventilation:            { icon: 'fa-fan',         color: '#64748b' },
+  dhw:                    { icon: 'fa-faucet',      color: '#0284c7' },
+  lighting_indoor:        { icon: 'fa-lightbulb',   color: '#f59e0b' },
+  lighting_outdoor:       { icon: 'fa-tower-cell',  color: '#f59e0b' },
+  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a' },
+}
+function decorateSystemOption(s) {
+  const decor = SYSTEM_CATEGORY_DECOR[s.system_category] || { icon: 'fa-cube', color: '#6b7280' }
+  const usage = usageLabel(s)
+  const zone = s.zone_name || 'Zone non précisée'
+  return {
+    value: s.id,
+    label: usage,                            // libellé court (popover groupé : la zone est déjà en sous-titre)
+    chipLabel: `${zone} · ${usage}`,         // libellé complet pour le trigger / la pilule sélectionnée
+    hint: zone,
+    icon: decor.icon,
+    color: decor.color,
+    _zone: zone,
+    _zoneOrder: (s.zone_position ?? 999),
+  }
+}
+function sortByZoneThenUsage(a, b) {
+  if (a._zoneOrder !== b._zoneOrder) return a._zoneOrder - b._zoneOrder
+  if (a._zone !== b._zone) return a._zone.localeCompare(b._zone, 'fr')
+  return a.label.localeCompare(b.label, 'fr')
+}
+const moveSystemOptions = computed(() =>
+  (audit.systems || []).map(decorateSystemOption).sort(sortByZoneThenUsage))
+const shareSystemOptions = computed(() =>
+  (audit.systems || [])
+    .filter(s => s.id !== props.device.system_id)
+    .map(decorateSystemOption)
+    .sort(sortByZoneThenUsage))
+const extraSystemIds = computed(() =>
+  Array.isArray(props.device.extra_system_ids) ? props.device.extra_system_ids : [])
+async function updateExtraSystemIds(nextIds) {
+  if (savingShare.value) return
+  savingShare.value = true
+  try {
+    const { data } = await shareBacsDevice(props.device.id, nextIds || [])
+    Object.assign(props.device, data)
+    await audit.refreshAuditCore()
+    emit('changed')
+  } catch (e) {
+    error(e.response?.data?.detail || 'Partage impossible')
+  } finally {
+    savingShare.value = false
+  }
+}
 function shareCandidateSystems() {
   return (audit.systems || []).filter(s => s.id !== props.device.system_id)
 }
@@ -630,33 +679,28 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             <SearchableSelect
               :model-value="device.system_id"
               :options="moveSystemOptions"
+              :group-by-hint="true"
               placeholder="— Usage —"
               :disabled="savingShare"
               @update:model-value="moveDeviceToSystem"
             />
-            <p class="text-[11px] text-gray-500 mt-1">Déplace l'équipement vers un autre usage existant du site.</p>
+            <p class="text-[11px] text-gray-500 mt-1">Déplace l'équipement vers un autre usage. Options groupées par zone, icône colorée par catégorie.</p>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Aussi présent dans</label>
-            <div class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 max-h-44 overflow-y-auto">
-              <label
-                v-for="sys in shareCandidateSystems()"
-                :key="sys.id"
-                class="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-50"
-              >
-                <input
-                  type="checkbox"
-                  :checked="(device.extra_system_ids || []).includes(sys.id)"
-                  :disabled="savingShare"
-                  @change="e => toggleShareDeviceSystem(sys.id, e.target.checked)"
-                  class="w-4 h-4 rounded border-gray-300 shrink-0"
-                />
-                <span class="text-sm text-gray-700 truncate">{{ sys.zone_name }} — {{ usageLabel(sys) }}</span>
-              </label>
-              <p v-if="!shareCandidateSystems().length" class="px-3 py-3 text-xs text-gray-500 italic text-center">
-                Aucun autre usage disponible.
-              </p>
-            </div>
+            <SearchableSelect
+              v-if="shareSystemOptions.length"
+              :model-value="extraSystemIds"
+              :options="shareSystemOptions"
+              :multiple="true"
+              :clearable="true"
+              :group-by-hint="true"
+              placeholder="— Aucun partage —"
+              :disabled="savingShare"
+              @update:model-value="updateExtraSystemIds"
+            />
+            <p v-else class="text-xs text-gray-500 italic">Aucun autre usage disponible.</p>
+            <p class="text-[11px] text-gray-500 mt-1">Options regroupées par zone et décorées par catégorie d'usage (icône colorée).</p>
           </div>
         </div>
       </section>

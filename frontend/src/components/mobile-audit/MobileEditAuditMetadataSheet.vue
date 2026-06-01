@@ -97,7 +97,7 @@ async function submit() {
           autocapitalize="words"
           data-1p-ignore="true"
           placeholder="ex : Atlas Logistics SAS"
-          class="touch-control w-full"
+          class="pwa-input w-full"
         />
       </MobileField>
 
@@ -109,7 +109,7 @@ async function submit() {
           autocapitalize="sentences"
           data-1p-ignore="true"
           placeholder="ex : Mise en conformité BACS Atlas Sud"
-          class="touch-control w-full"
+          class="pwa-input w-full"
         />
       </MobileField>
     </form>

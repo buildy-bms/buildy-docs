@@ -300,6 +300,7 @@ onBeforeUnmount(teardownZonesSortable)
           <template v-for="z in sortedZones" :key="z.zone_id">
           <PhotoDropTr :row-class="'zone-row'"
                        :data-id="z.zone_id"
+                       :data-zone-id="z.zone_id"
                        :site-uuid="document?.site_uuid || ''"
                        :attach-to="{ zone_id: z.zone_id }"
                        :enabled="!!document?.site_uuid"

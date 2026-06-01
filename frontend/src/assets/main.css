@@ -502,3 +502,110 @@ input[type="checkbox"]:disabled {
 .banner-safe-top {
   padding-top: var(--buildy-banner-h, 0px);
 }
+
+/* =========================================================================
+   PWA tactile design system (uniformisation hauteurs + tailles texte).
+
+   But : une SEULE hauteur tactile pour tous les elements interactifs PWA
+   (inputs, selects, boutons, items de listes). Etalon = gabarit utilise par
+   les boutons « Photos » (BacsPhotoButton.vue) et « Note vocale »
+   (VoiceNoteButton.vue) en mode mobile : px-4 py-3.5 text-base font-medium,
+   ce qui produit ~48px de hauteur effective. On garantit `min-height: 48px`
+   pour eviter tout shrink en cas de contenu vide.
+
+   3 paliers de texte autorises hors stats :
+     - text-xs   12px  (label uppercase, hint, badge, meta)
+     - text-sm   14px  (description, body secondaire)
+     - text-base 16px  (input, bouton, titre card, contenu principal)
+   Exception : text-2xl conserve pour les stats / compteurs (3 stats severite
+   du plan d'action, KPI similaires).
+
+   IMPORTANT : ne touche PAS .touch-control (44px historique) ni .tap-target
+   (44px iOS HIG) — ces classes restent valides pour les contextes hors
+   gabarit tactile principal (chevrons de header iOS-natif, boutons inline
+   d'un tableau dense). Le gabarit PWA principal est .pwa-* a 48px.
+
+   Voir plan : il-faut-d-ploy-tout-quirky-cocoa.md (2026-05-29).
+   ======================================================================= */
+@layer components {
+  /* Input texte / nombre / date / textarea. Pour textarea, ajouter
+     `resize-y` localement. */
+  .pwa-input {
+    @apply block w-full min-h-12 px-4 py-3.5 text-base bg-white
+           border border-gray-200 rounded-xl transition
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/30
+           focus:border-indigo-500;
+  }
+  .pwa-input::placeholder { color: #9ca3af; }
+  /* Variante alignee a droite pour inputs numeriques (puissance, age, qte). */
+  .pwa-input--num { @apply text-right font-medium; }
+
+  /* Trigger du MobileSelectSheet (et tout select custom PWA). Meme
+     hauteur qu'un input, layout flex pour gerer icone + label + chevron. */
+  .pwa-select-trigger {
+    @apply w-full min-h-12 px-4 py-3.5 text-base flex items-center gap-2
+           text-left bg-white border border-gray-200 rounded-xl transition
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/30
+           focus:border-indigo-500;
+  }
+
+  /* Bouton tactile generique. A combiner avec un modificateur de couleur
+     (--primary / --success / --neutral / --danger). */
+  .pwa-button {
+    @apply inline-flex items-center justify-center gap-2 min-h-12
+           px-4 py-3.5 text-base font-medium rounded-xl transition
+           active:opacity-90;
+  }
+  .pwa-button--primary {
+    @apply bg-indigo-600 text-white border border-indigo-600 active:bg-indigo-700;
+  }
+  .pwa-button--success {
+    color: #ffffff;
+    background: #00cd92;
+    border: 1px solid #00cd92;
+  }
+  .pwa-button--neutral {
+    @apply bg-white text-gray-700 border border-gray-200 active:bg-gray-50;
+  }
+  .pwa-button--danger {
+    @apply bg-red-600 text-white border border-red-600 active:bg-red-700;
+  }
+  /* Variantes d'etat pour les ternaires (MobileYesNo / segmented) :
+     selectionne / non-selectionne / etat partiel. */
+  .pwa-button--on {
+    color: #ffffff;
+    background: #00cd92;
+    border-color: #00cd92;
+  }
+  .pwa-button--off { @apply bg-slate-600 text-white border-slate-600; }
+  .pwa-button--idle { @apply bg-white text-gray-700 border-gray-200; }
+  .pwa-button--partial { @apply bg-amber-500 text-white border-amber-500; }
+  /* Bouton « Ajouter » full-width avec bordure pointillée indigo
+     (pattern PWA dominant pour les actions create dans une liste). */
+  .pwa-button--add {
+    @apply w-full text-indigo-700 bg-transparent border-2 border-dashed
+           border-indigo-300 active:border-indigo-400 active:bg-indigo-50;
+  }
+
+  /* Item cliquable d'une liste (option de bottom sheet, card equipement,
+     card item du plan d'action). Meme hauteur et padding que pwa-input. */
+  .pwa-list-item {
+    @apply w-full min-h-12 px-4 py-3.5 text-base flex items-center gap-3
+           text-left bg-white border border-gray-200 rounded-xl transition
+           active:bg-gray-50;
+  }
+
+  /* Label au-dessus d'un input (text-xs uppercase). */
+  .pwa-label {
+    @apply block text-xs font-semibold uppercase tracking-wider
+           text-gray-600 mb-1;
+  }
+  /* Hint sous un input. */
+  .pwa-hint {
+    @apply text-xs text-gray-500 mt-1;
+  }
+  /* Description / body secondaire (text-sm). */
+  .pwa-body {
+    @apply text-sm text-gray-700 leading-relaxed;
+  }
+}

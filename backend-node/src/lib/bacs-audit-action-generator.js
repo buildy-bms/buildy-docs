@@ -33,6 +33,25 @@ const SYSTEM_LABEL_FR = {
   lighting_outdoor: 'éclairage extérieur',
   electricity_production: 'production photovoltaïque',
 };
+// Label naturel pour les titres d'actions : « le système de chauffage »
+// vs « le système d'eau chaude sanitaire » (apostrophe quand la categorie
+// commence par voyelle). Evite les tournures bancales « de eau chaude »
+// generees par concatenation brute. Cf. retour Kevin 2026-05-29.
+function systemTitleLabel(systemCategory) {
+  const cat = SYSTEM_LABEL_FR[systemCategory] || systemCategory || '';
+  if (!cat) return 'le système';
+  // Apostrophe si la categorie commence par voyelle / h muet (en pratique
+  // « eau chaude sanitaire », « éclairage intérieur », « éclairage extérieur »).
+  if (/^[aeiouhéèà]/i.test(cat)) return `le système d'${cat}`;
+  return `le système de ${cat}`;
+}
+// Formate la zone en suffixe lisible : « (zone Bureaux) » plutot que
+// «  en zone « Bureaux » » (guillemets francais qui detonnent dans un
+// titre court).
+function zoneSuffix(zoneName) {
+  if (!zoneName || !zoneName.trim()) return '';
+  return ` (zone ${zoneName.trim()})`;
+}
 const METER_TYPE_LABEL_FR = {
   electric: 'électrique',
   electric_production: 'électrique de production',
@@ -186,14 +205,28 @@ function computeTargetActions(documentId) {
       });
     }
 
-    // Les criteres R175-3 §3 et §4 sont maintenant evalues PAR DEVICE
-    // (cf retour Kevin v2.2). On boucle sur les devices du systeme.
-    // Les devices Hors-Service sont ignores (pas d'action generee).
+    // Refonte 2026-05-29 — R175-3 §3 et §4 evalues au niveau SYSTEME
+    // (et plus device par device). Lecture stricte du decret : le texte
+    // demande l'interoperabilite du BACS avec les SYSTEMES TECHNIQUES,
+    // pas de chaque equipement individuel. Les emetteurs (radiateurs,
+    // panneaux rayonnants, ventilo-convecteurs passifs) sous regulation
+    // autonome (vanne thermostatique mecanique) restent conformes R175-6
+    // — le decret n'impose pas leur communication.
+    //
+    // Cf. CSV ISO 52120-1 fonction 1.1.2 (Regulation individuelle par
+    // piece) classe C : « L'interconnexion de la regulation terminale
+    // avec le systeme de GTB est interessant a etudier mais n'est pas
+    // imposee par le decret BACS. »
+    //
+    // Les devices Hors-Service sont ignores. Le device_role est lu pour
+    // identifier le ou les equipements pertinents pour l'interoperabilite
+    // du systeme (production / distribution / regulation, pas emission).
     const sysDevices = db.db.prepare(`
       SELECT id, name, brand, model_reference, communication_protocol,
              communication_protocols, wired,
              meets_r175_3_p4, meets_r175_3_p4_autonomous, out_of_service,
-             managed_by_bms, bms_integration_out_of_service, equipment_template_id
+             managed_by_bms, bms_integration_out_of_service, equipment_template_id,
+             device_role
       FROM bacs_audit_system_devices WHERE system_id = ?
     `).all(s.id);
 
@@ -213,12 +246,41 @@ function computeTargetActions(documentId) {
       });
     }
 
-    for (const d of sysDevices) {
-      if (d.out_of_service) continue;  // skip HS
+    // Helpers pour evaluer la communicabilite et le raccordement d'un device.
+    function deviceProtocols(d) {
+      let arr = [];
+      if (d.communication_protocols) {
+        try { arr = JSON.parse(d.communication_protocols); } catch { arr = []; }
+      }
+      const legacy = d.communication_protocol &&
+        d.communication_protocol !== 'non_communicant' &&
+        d.communication_protocol !== 'absent';
+      if (!arr.length && legacy) arr = [d.communication_protocol];
+      return arr.filter(p => p && p !== 'non_communicant' && p !== 'absent');
+    }
+    function deviceRoleArr(d) {
+      if (!d.device_role) return [];
+      try {
+        const v = JSON.parse(d.device_role);
+        return Array.isArray(v) ? v : [];
+      } catch { return []; }
+    }
+    // Un device est « pertinent pour l'interoperabilite du systeme » s'il
+    // porte au moins un niveau actif (production / distribution / regulation).
+    // Les emetteurs purs (role = ['emission'] uniquement) sont exclus du
+    // critere — pas d'obligation decret de les rendre communicants.
+    function isInteropRelevant(d) {
+      const roles = deviceRoleArr(d);
+      return roles.some(r => r === 'production' || r === 'distribution' || r === 'regulation');
+    }
 
-      // Liaison GTB cassee (device fonctionnel mais GTB ne le voit pas)
-      const devName2 = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
+    // Liaison GTB cassee (device fonctionnel mais GTB ne le voit pas).
+    // Conservee au niveau device : c'est une action de reparation ciblee,
+    // pas une exigence d'interoperabilite globale du systeme.
+    for (const d of sysDevices) {
+      if (d.out_of_service) continue;
       if (d.managed_by_bms && d.bms_integration_out_of_service) {
+        const devName2 = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
         addTarget({
           source_device_id: d.id, source_subtype: 'bms_link_broken',
           category: 'bms_upgrade', severity: 'major',
@@ -228,81 +290,102 @@ function computeTargetActions(documentId) {
           zone_id: s.zone_id, equipment_id: null,
         });
       }
-      const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
-      const devLabel = `${devName} (${catFr}${zoneStr.replace(' en zone', ' —')})`;
+    }
 
-      // R175-3 §3 — interoperabilite. Deux cas distincts :
-      //  1. Equipement communicant mais NON cable a la GTB => action de
-      //     raccordement (effort moderé, l'equipement est deja capable).
-      //  2. Equipement NON communicant (aucun protocole) => action de
-      //     remplacement par un equipement communicant (effort important,
-      //     a planifier sur le renouvellement equipement).
-      // Sources protocoles : communication_protocols (multi, JSON array
-      // string — champ courant) en priorite, fallback communication_protocol
-      // (mono, legacy).
-      let protocolsArr = [];
-      if (d.communication_protocols) {
-        try { protocolsArr = JSON.parse(d.communication_protocols); }
-        catch { protocolsArr = []; }
-      }
-      const legacyMono = d.communication_protocol &&
-        d.communication_protocol !== 'non_communicant' &&
-        d.communication_protocol !== 'absent';
-      if (!protocolsArr.length && legacyMono) protocolsArr = [d.communication_protocol];
-      const hasValidProtocol = protocolsArr.some(p =>
-        p && p !== 'non_communicant' && p !== 'absent');
+    // R175-3 §3 — interoperabilite SYSTEME (refonte 2026-05-29).
+    // Le systeme est interoperable si au moins UN device pertinent
+    // (production / distribution / regulation, non HS) :
+    //   - dispose d'un protocole de communication actif ET
+    //   - est raccorde a la GTB (wired OU managed_by_bms).
+    // Si aucun device pertinent ne remplit ces criteres → 1 action systeme.
+    const relevantActive = sysDevices.filter(d => !d.out_of_service && isInteropRelevant(d));
+    const hasInteropPath = relevantActive.some(d => {
+      const protos = deviceProtocols(d);
+      return protos.length > 0 && (d.wired || d.managed_by_bms);
+    });
+    // On ne genere pas l'action si le systeme ne contient AUCUN device pertinent
+    // (ex : usage sans production/distribution/regulation saisis), pour eviter
+    // un faux positif quand l'auditeur n'a pas encore complete la saisie.
+    if (relevantActive.length > 0 && !hasInteropPath) {
+      // Balises {{type:id}} resolues en pilules cliquables cote UI et en
+      // pilules visuelles SVG FontAwesome cote PDF.
+      // Structure description : sections "Titre\nContenu" separees par
+      // \n\n. ActionDescription.vue / stripActionTags() rendent les titres
+      // en sous-titres distinctifs.
+      const deviceTags = relevantActive.map(d => `{{device:${d.id}}}`).join(' · ');
+      const eqLabel = relevantActive.length > 1
+        ? `Équipements actifs concernés (${relevantActive.length})`
+        : `Équipement actif concerné`;
+      addTarget({
+        source_system_id: s.id, source_subtype: 'system_not_interoperable',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §3',
+        title: `Raccorder {{system:${s.id}}} ({{zone:${s.zone_id || 0}}}) au BACS`,
+        description: [
+          // Décret en tête — seule source opposable.
+          `Décret R175-3 §3\n« [Les systèmes d'automatisation et de contrôle des bâtiments] sont interopérables avec les différents systèmes techniques du bâtiment. »`,
+          // Constat (sans la liste d'équipements pour aérer)
+          `Constat\nAucune voie d'interface n'existe aujourd'hui entre {{system:${s.id}}} et le BACS.`,
+          // Liste équipements en section dédiée (avec saut de ligne avant)
+          `${eqLabel}\n${deviceTags}`,
+          // Strict minimum
+          `Strict minimum pour la conformité\nÉtablir UNE voie d'interface entre {{system:${s.id}}} et le BACS. Le décret n'impose pas une solution particulière ni un composant précis. La solution la moins coûteuse est généralement :\n  • Ajouter un module de communication sur le régulateur existant s'il l'accepte (souvent le cas pour les régulateurs récents).\n  • À défaut, installer une passerelle protocolaire (BACnet / Modbus / KNX / M-Bus / MQTT) sur le composant qui porte la régulation centrale.`,
+          // Note R175-6
+          `Note R175-6\nLes émetteurs (radiateurs, ventilo-convecteurs passifs) et la régulation d'émission autonome (vanne thermostatique mécanique, thermostat de zone) restent conformes sans motorisation. L'action ne porte pas sur eux.`,
+        ].join('\n\n'),
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
 
-      if (!hasValidProtocol) {
-        // Cas 2 : non communicant — deux options a chiffrer pour eviter
-        // de prescrire systematiquement le remplacement (retour Kevin
-        // 2026-05-29 : en pratique l'ajout d'un module/passerelle est
-        // souvent moins couteux et c'est ce que l'integrateur retient).
-        addTarget({
-          source_device_id: d.id, source_subtype: 'r175_3_p3_replace',
-          category: 'communication_upgrade', severity: 'major',
-          r175_article: 'R175-3 §3',
-          title: `Rendre « ${devName} » communicant`,
-          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) ne dispose d'aucun protocole de communication et ne peut pas être raccordé au BACS en l'état. Deux options à chiffrer par l'intégrateur : (1) ajouter un module de communication (passerelle ou convertisseur BACnet/Modbus/KNX/MQTT) — souvent l'option la moins coûteuse, à privilégier sur les équipements récents en bon état ; (2) remplacer l'équipement par un modèle communicant — à planifier lors du prochain renouvellement (recommandation guide PROFEEL §3.1.2). L'intégrateur tranche selon l'âge de l'équipement, la disponibilité d'un module fabricant et le coût comparé.`,
-          zone_id: s.zone_id, equipment_id: null,
-        });
-      } else if (!d.wired && !d.managed_by_bms) {
-        // Cas 1 : communicant mais ni cable ni integre a la GTB
-        // (l'equipement parle mais personne ne l'ecoute encore).
-        const protocolList = protocolsArr.join(', ');
-        addTarget({
-          source_device_id: d.id, source_subtype: 'r175_3_p3_connect',
-          category: 'bms_upgrade', severity: 'major',
-          r175_article: 'R175-3 §3',
-          title: `Raccorder « ${devName} » à la GTB`,
-          description: `Cet équipement (${catFr}${zoneStr.replace(' en zone', ' en')}) dispose d'un protocole de communication (${protocolList}) mais n'est pas encore intégré à la GTB. À raccorder pour satisfaire R175-3 §3 (interopérabilité).`,
-          zone_id: s.zone_id, equipment_id: null,
-        });
-      }
+    // R175-3 §4 — arret manuel + gestion autonome SYSTEME.
+    // Le systeme satisfait §4 si au moins UN device pertinent (production
+    // / distribution / regulation) coche meets_r175_3_p4. Idem pour
+    // l'autonomie. Les emetteurs ne sont pas evalues (pas pilotables au
+    // sens du decret). Contre-indications par device : tracees en action
+    // informative non-bloquante.
+    const ecsLoopedAtSystem = ecsLooped; // shortcut
+    const hasManualStop = relevantActive.some(d => d.meets_r175_3_p4);
+    const hasAutonomous  = relevantActive.some(d => d.meets_r175_3_p4_autonomous);
 
-      // Item 10 — Contre-indications de pilotage par type d'équipement.
-      // On lit les codes du modèle d'équipement (bibliothèque). Un code
-      // « blocksCutPower » interdit l'action « arrêt manuel » R175-3 §4 :
-      // on ne la génère pas, on émet une action informative à la place.
+    if (relevantActive.length > 0 && !hasManualStop && !ecsLoopedAtSystem) {
+      addTarget({
+        source_system_id: s.id, source_subtype: 'system_no_manual_stop',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §4',
+        title: `Permettre l'arrêt manuel sur place de {{system:${s.id}}} ({{zone:${s.zone_id || 0}}})`,
+        description: [
+          `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent un arrêt manuel et la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
+          `Constat\nAucun équipement actif de {{system:${s.id}}} ne permet aujourd'hui un arrêt manuel directement sur place.`,
+          `Strict minimum pour la conformité\nIdentifier (ou installer si absent) un interrupteur d'arrêt accessible sur la régulation centrale ou un équipement actif du système. Le décret n'exige pas d'équipement de pilotage complexe.`,
+        ].join('\n\n'),
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
+    if (relevantActive.length > 0 && !hasAutonomous) {
+      addTarget({
+        source_system_id: s.id, source_subtype: 'system_not_autonomous',
+        category: 'bms_upgrade', severity: 'major',
+        r175_article: 'R175-3 §4',
+        title: `Garantir le redémarrage autonome de {{system:${s.id}}} ({{zone:${s.zone_id || 0}}})`,
+        description: [
+          `Décret R175-3 §4\n« [Les systèmes d'automatisation et de contrôle des bâtiments] permettent […] la gestion autonome d'un ou plusieurs systèmes techniques de bâtiment. »`,
+          `Constat\nAucun équipement actif de {{system:${s.id}}} n'est aujourd'hui déclaré capable de reprendre seul après une coupure de courant ou un redémarrage de la GTB.`,
+          `Strict minimum pour la conformité\nConfigurer la régulation centrale pour qu'elle redémarre automatiquement en mémorisant son dernier état de fonctionnement. Sur la plupart des régulateurs récents, c'est un simple paramètre d'usine à activer (aucune dépense matérielle).`,
+        ].join('\n\n'),
+        zone_id: s.zone_id, equipment_id: s.equipment_id,
+      });
+    }
+
+    // Contre-indications de pilotage par device (informatives, conservees
+    // car utiles pour le traçage technique dans le PDF) : equipements qui
+    // ne supportent pas de coupure brutale meme si §4 manuel s'applique.
+    for (const d of sysDevices) {
+      if (d.out_of_service) continue;
       const contraindications = loadContraindications(d.equipment_template_id);
       const cutPowerContraindicated = ecsLooped || contraindications.some(
         c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
-
-      // R175-3 §4 — arret manuel possible. Non coche (0 OU non evalue) =
-      // non satisfait : coherent avec la pastille ✗ affichee dans le rapport.
-      // Sauf si une contre-indication interdit la coupure (item 10) ou si
-      // l'équipement appartient à une ECS bouclée (item 3).
-      if (!d.meets_r175_3_p4 && !cutPowerContraindicated) {
-        addTarget({
-          source_device_id: d.id, source_subtype: 'r175_3_p4',
-          category: 'bms_upgrade', severity: 'major',
-          r175_article: 'R175-3 §4',
-          title: `Permettre l'arrêt manuel de « ${devName} »`,
-          description: `R175-3 §4 exige que l'utilisateur puisse arrêter manuellement chaque équipement. ${catFr}${zoneStr}.`,
-          zone_id: s.zone_id, equipment_id: null,
-        });
-      } else if (!d.meets_r175_3_p4 && cutPowerContraindicated && !ecsLooped) {
-        // Contre-indication (hors ECS bouclée déjà tracée au niveau système) :
-        // action informative non-bloquante pour le traçage dans le PDF.
+      if (!d.meets_r175_3_p4 && cutPowerContraindicated && !ecsLooped) {
+        const devName = d.name || d.brand || d.model_reference || `équipement #${d.id}`;
         const codes = contraindications.filter(c => CONTRAINDICATION_INFO[c]?.blocksCutPower);
         const infoText = codes.map(c => CONTRAINDICATION_INFO[c].label).join(' ');
         addTarget({
@@ -311,18 +394,6 @@ function computeTargetActions(documentId) {
           r175_article: 'R175-3 §4',
           title: `Pilotage adapté requis pour « ${devName} » (contre-indication)`,
           description: `${infoText} L'arrêt manuel R175-3 §4 ne doit pas se traduire par une coupure brutale d'alimentation sur cet équipement (${catFr}${zoneStr}).`,
-          zone_id: s.zone_id, equipment_id: null,
-        });
-      }
-
-      // R175-3 §4 — fonctionnement autonome (idem : non coché = non satisfait).
-      if (!d.meets_r175_3_p4_autonomous) {
-        addTarget({
-          source_device_id: d.id, source_subtype: 'r175_3_p4_autonomous',
-          category: 'bms_upgrade', severity: 'major',
-          r175_article: 'R175-3 §4',
-          title: `Activer le fonctionnement autonome de « ${devName} »`,
-          description: `R175-3 §4 exige que la GTB reprenne automatiquement la main sur l'équipement après un arrêt manuel. ${catFr}${zoneStr}.`,
           zone_id: s.zone_id, equipment_id: null,
         });
       }

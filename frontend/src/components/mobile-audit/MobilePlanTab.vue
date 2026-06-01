@@ -9,6 +9,7 @@ import { regenerateBacsActionItems, updateBacsActionItem } from '@/api'
 import MobileSheet from './MobileSheet.vue'
 import MobileField from './MobileField.vue'
 import MobileSelectSheet from './MobileSelectSheet.vue'
+import ActionDescription from '@/components/audit/ActionDescription.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
 
@@ -238,7 +239,7 @@ async function saveEdit() {
       <div v-for="sev in ['blocking', 'major', 'minor']" :key="sev"
            :class="['rounded-xl border p-3 text-center', SEVERITY_LABEL[sev].cls]">
         <p class="text-2xl font-medium leading-none">{{ itemsBySeverity[sev].length }}</p>
-        <p class="text-[10px] uppercase tracking-wider mt-1 opacity-80">{{ SEVERITY_LABEL[sev].label }}</p>
+        <p class="text-xs uppercase tracking-wider mt-1 opacity-80">{{ SEVERITY_LABEL[sev].label }}</p>
       </div>
     </div>
 
@@ -247,11 +248,21 @@ async function saveEdit() {
       v-if="drillView === 'cards'"
       @click="regenerate"
       :disabled="regenerating"
-      class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl active:bg-gray-50"
+      class="pwa-button pwa-button--neutral w-full"
     >
       <FontAwesomeIcon :icon="['fas', 'arrows-rotate']" :class="['w-4 h-4', regenerating ? 'animate-spin' : '']" />
       {{ regenerating ? 'Régénération…' : 'Régénérer le plan' }}
     </button>
+
+    <!-- Encart sources : hiérarchie des références citées dans les
+         descriptions. Visible seulement au niveau 1 (vue cartes). -->
+    <div v-if="drillView === 'cards' && filteredItems.length"
+         class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
+      <FontAwesomeIcon :icon="['fas', 'circle-info']" class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
+      <div class="text-[11px] leading-relaxed text-indigo-900/90">
+        <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions reposent sur le décret R175 (seule source opposable), complété par : Guide d'application ministère (janvier 2026) ; Guide PROFEEL (novembre 2025) ; norme NF EN ISO 52120-1.</p>
+      </div>
+    </div>
 
     <!-- NIVEAU 1 — Liste des cartes du stepper, chacune tactile. -->
     <div v-if="drillView === 'cards' && filteredItems.length" class="space-y-2">
@@ -306,19 +317,23 @@ async function saveEdit() {
           (it.status === 'done' || it.status === 'declined') ? 'opacity-60' : '']"
       >
         <div class="flex items-start gap-2 mb-2 flex-wrap">
-          <span class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-[10px] font-mono rounded bg-gray-800 text-white whitespace-nowrap">
+          <span class="inline-flex items-center justify-center min-w-12 px-2 py-1 text-xs font-mono rounded bg-gray-800 text-white whitespace-nowrap">
             {{ it.display_number || '—' }}
           </span>
-          <span :class="['inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full', SEVERITY_LABEL[it.severity].cls]">
+          <span :class="['inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full', SEVERITY_LABEL[it.severity].cls]">
             {{ SEVERITY_LABEL[it.severity].label }}
           </span>
-          <span class="text-[10px] text-gray-500 font-mono">{{ it.r175_article || '—' }}</span>
-          <span v-if="it.status === 'declined'" class="ml-auto inline-flex items-center gap-1 text-[10px] text-gray-500 italic">
+          <span class="text-xs text-gray-500 font-mono">{{ it.r175_article || '—' }}</span>
+          <span v-if="it.status === 'declined'" class="ml-auto inline-flex items-center gap-1 text-xs text-gray-500 italic">
             Écartée
           </span>
         </div>
-        <p class="text-sm font-medium text-gray-900 leading-snug">{{ it.title }}</p>
-        <p v-if="it.description" class="text-xs text-gray-600 mt-1.5 leading-relaxed">{{ it.description }}</p>
+        <p class="text-sm font-medium text-gray-900 leading-snug">
+          <ActionDescription :text="it.title" />
+        </p>
+        <p v-if="it.description" class="text-xs text-gray-600 mt-1.5 leading-relaxed">
+          <ActionDescription :text="it.description" />
+        </p>
         <p v-if="it.zone_name" class="text-xs text-gray-500 mt-2">📍 {{ it.zone_name }}</p>
       </button>
       <div v-if="!currentItems.length" class="bg-white rounded-2xl border border-dashed border-emerald-300 p-8 text-center">
@@ -347,9 +362,13 @@ async function saveEdit() {
       <div v-if="editing" class="p-4 space-y-4">
         <!-- Lecture seule : titre, description, méta -->
         <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 space-y-2">
-          <p class="text-sm font-semibold text-gray-900 leading-snug">{{ editing.title }}</p>
-          <p v-if="editing.description" class="text-xs text-gray-600 leading-relaxed">{{ editing.description }}</p>
-          <div class="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+          <p class="text-sm font-semibold text-gray-900 leading-snug">
+            <ActionDescription :text="editing.title" />
+          </p>
+          <p v-if="editing.description" class="text-xs text-gray-600 leading-relaxed">
+            <ActionDescription :text="editing.description" />
+          </p>
+          <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span v-if="editing.r175_article" class="font-mono">{{ editing.r175_article }}</span>
             <span v-if="editing.zone_name">📍 {{ editing.zone_name }}</span>
             <span v-if="editing.auto_generated" class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">

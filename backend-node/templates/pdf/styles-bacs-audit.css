@@ -1937,7 +1937,47 @@ table.device-table tr:nth-child(4n+2) td { background: #fafbfc; }
   color: #4b5563;
   margin: 0 0 1.2mm;
   line-height: 1.55;
+  /* Preserve les sauts de ligne (\n) et les paragraphes (\n\n) injectes
+     par le generateur d'actions. Les descriptions sont structurees en
+     blocs Constat / Exigence / Pistes / Note. */
+  white-space: pre-line;
 }
+/* Sections « Titre\nContenu » dans la description : sous-titres uppercase
+   distinctifs, contenu en paragraphe sous-jacent. */
+.action-card-desc .acd-section { margin: 0 0 1.6mm; }
+.action-card-desc .acd-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 5.6pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #1b2842;
+  margin: 0 0 0.4mm;
+}
+.action-card-desc .acd-body { white-space: pre-line; }
+
+/* Pilules inline injectees a la place des balises {{zone:N}}, {{system:N}},
+   {{device:N}} par le helper resolveTagAsPill (cf. _export-data.js).
+   Alignees sur le style des pilules cliquables UI (ActionDescription.vue),
+   mais sans interaction au clic — c'est du PDF. */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2mm;
+  padding: 0.2mm 1.6mm;
+  margin: 0 0.3mm;
+  font-size: 6pt;
+  font-weight: 600;
+  border-radius: 5mm;
+  border: 0.3pt solid var(--neutral-200);
+  white-space: nowrap;
+  vertical-align: 1px;
+  line-height: 1.2;
+}
+.tag-pill svg { vertical-align: -0.5px; }
+.tag-pill-zone   { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+.tag-pill-device { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+.tag-pill-meta { opacity: 0.65; font-weight: 500; }
 
 /* Variant groupé : N actions répétitives condensées en 1 carte + tableau. */
 .action-card-grouped {
