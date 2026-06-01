@@ -1,12 +1,13 @@
 <script setup>
 import { computed } from 'vue'
-import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon, EyeSlashIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, ExclamationTriangleIcon, CheckCircleIcon, PencilSquareIcon, EyeSlashIcon, EyeIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SafeHtml from '@/components/SafeHtml.vue'
 import SectionHeader from '@/components/audit/SectionHeader.vue'
 import Button from '@/components/Button.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
 import { groupByCard, CARD_FLAT_OPTIONS, cardOfAction } from '@/lib/action-cards'
+import ActionDescription from '@/components/audit/ActionDescription.vue'
 
 const CARD_OPTIONS = CARD_FLAT_OPTIONS()
 
@@ -121,6 +122,20 @@ function hasNotes(html) {
       <span v-else class="italic text-emerald-700">✓ Aucune action corrective</span>
     </template>
     <div class="px-5 py-4 space-y-5">
+      <!-- Encart sources : hiérarchie des références citées dans les
+           descriptions. Le décret est la seule source juridiquement
+           opposable ; le reste sert d'aide à l'interprétation. -->
+      <div v-if="visibleActionItems.length" class="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200">
+        <InformationCircleIcon class="w-4 h-4 shrink-0 text-indigo-500 mt-0.5" />
+        <div class="text-[11px] leading-relaxed text-indigo-900/90">
+          <p><strong class="font-semibold">Sources d'aide à l'interprétation (non opposables).</strong> Les actions ci-dessous reposent sur le décret R175 (seule source juridiquement opposable), complété par les références suivantes pour le détail d'application :</p>
+          <ul class="mt-1 space-y-0.5 list-disc pl-4">
+            <li>Guide d'application du décret BACS — ministère, version 2, janvier 2026.</li>
+            <li>Guide pratique d'application du décret BACS — PROFEEL, novembre 2025.</li>
+            <li>Norme NF EN ISO 52120-1 (Performance énergétique des bâtiments — Contribution de l'automatisation, de la régulation et de la gestion technique des bâtiments).</li>
+          </ul>
+        </div>
+      </div>
       <div v-if="!visibleActionItems.length" class="py-10 text-center">
         <CheckCircleIcon class="w-10 h-10 text-emerald-500 mx-auto" />
         <p class="mt-2 text-sm text-gray-700 font-medium">Aucune action corrective à ce stade</p>
@@ -174,8 +189,12 @@ function hasNotes(html) {
             <span class="text-[10px] text-gray-400 font-mono whitespace-nowrap">{{ it.r175_article || '—' }}</span>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm text-gray-800 font-medium leading-snug">{{ it.title }}</div>
-            <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 leading-snug">{{ it.description }}</div>
+            <div class="text-sm text-gray-800 font-medium leading-snug">
+              <ActionDescription :text="it.title" />
+            </div>
+            <div v-if="it.description" class="text-[11px] text-gray-500 mt-0.5 leading-snug">
+              <ActionDescription :text="it.description" />
+            </div>
             <div v-if="it.zone_name" class="text-[10px] text-gray-400 mt-0.5">📍 {{ it.zone_name }}</div>
           </div>
           <!-- Actions compactes à droite -->

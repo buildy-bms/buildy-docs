@@ -100,7 +100,7 @@ async function removeInspection(ins) {
             </span>
             <span
               v-if="ins.next_inspection_due_date && ins.next_inspection_due_date < todayIso"
-              class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-red-100 text-red-700 border border-red-200"
+              class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 border border-red-200"
             >
               ⚠ Échéance dépassée
             </span>
@@ -111,7 +111,7 @@ async function removeInspection(ins) {
               :value="ins.last_inspection_date || ''"
               type="date"
               @input="e => patchDebounced(ins, { last_inspection_date: e.target.value || null })"
-              class="touch-control w-full"
+              class="pwa-input w-full"
             />
           </MobileField>
 
@@ -122,7 +122,7 @@ async function removeInspection(ins) {
               autocapitalize="words"
               placeholder="ex : APAVE, SOCOTEC, Bureau Veritas…"
               @input="e => patchDebounced(ins, { last_inspection_inspector: e.target.value || null })"
-              class="touch-control w-full"
+              class="pwa-input w-full"
             />
           </MobileField>
 
@@ -132,7 +132,7 @@ async function removeInspection(ins) {
                 :value="ins.next_inspection_due_date || ''"
                 type="date"
                 @input="e => patchDebounced(ins, { next_inspection_due_date: e.target.value || null })"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
             </MobileField>
             <MobileField label="Conserver jusqu'au">
@@ -140,7 +140,7 @@ async function removeInspection(ins) {
                 :value="ins.retained_until_date || ''"
                 type="date"
                 @input="e => patchDebounced(ins, { retained_until_date: e.target.value || null })"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
             </MobileField>
           </div>
@@ -151,7 +151,7 @@ async function removeInspection(ins) {
               rows="3"
               placeholder="ex : sonde extérieure défectueuse, défaut de programmation V3V…"
               @input="e => patchDebounced(ins, { last_inspection_anomalies_html: e.target.value || null })"
-              class="touch-control w-full resize-y"
+              class="pwa-input w-full resize-y"
             ></textarea>
           </MobileField>
 
@@ -161,7 +161,7 @@ async function removeInspection(ins) {
               rows="3"
               placeholder="ex : remplacer la pompe primaire, recalibrer les vannes 3V…"
               @input="e => patchDebounced(ins, { last_inspection_recommendations_html: e.target.value || null })"
-              class="touch-control w-full resize-y"
+              class="pwa-input w-full resize-y"
             ></textarea>
           </MobileField>
 
@@ -171,7 +171,7 @@ async function removeInspection(ins) {
               type="text"
               placeholder="ex : N° de rapport, contact référent…"
               @input="e => patchDebounced(ins, { notes: e.target.value || null })"
-              class="touch-control w-full"
+              class="pwa-input w-full"
             />
           </MobileField>
 
@@ -195,7 +195,7 @@ async function removeInspection(ins) {
         type="button"
         @click="addInspection"
         :disabled="adding"
-        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition disabled:opacity-50"
+        class="pwa-button pwa-button--add mt-2 disabled:opacity-50"
       >
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         {{ adding ? 'Ajout…' : 'Ajouter une inspection' }}

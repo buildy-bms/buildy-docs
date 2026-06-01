@@ -924,6 +924,18 @@ async function _renderRawHtmlPdfImpl({ htmlPath, outputPath }) {
   }
 }
 
+// Helper expose pour les modules qui injectent des pilules FA en HTML
+// (cf. _export-data.js stripActionTags). Retourne une chaine SVG inline.
+function renderFaIconSvg(name, color, size) {
+  const def = lookupFaIcon(name);
+  if (!def) return '';
+  const [w, h, , , path] = def.icon;
+  const d = Array.isArray(path) ? path[path.length - 1] : path;
+  const px = size || '12';
+  const fill = color || 'currentColor';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${px}" height="${px}" style="vertical-align:-1px;display:inline-block;flex-shrink:0;"><path fill="${fill}" d="${d}"/></svg>`;
+}
+
 module.exports = {
   renderPdf,
   renderHtml,
@@ -932,4 +944,5 @@ module.exports = {
   loadAssetDataUrl,
   loadFileAsDataUrl,
   shutdown,
+  renderFaIconSvg,
 };

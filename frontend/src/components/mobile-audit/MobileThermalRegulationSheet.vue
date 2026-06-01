@@ -241,7 +241,7 @@ async function saveLevelNote() {
                   :value="thermalRow.generator_age_years ?? ''"
                   @blur="e => patch({ generator_age_years: e.target.value ? parseInt(e.target.value, 10) : null })"
                   placeholder="ex : 8"
-                  class="touch-control w-full"
+                  class="pwa-input w-full"
                 />
               </MobileField>
             </template>
@@ -364,7 +364,7 @@ async function saveLevelNote() {
         placeholder="Ce que tu observes…"
         class="w-full text-sm rounded-lg border border-gray-200 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
       ></textarea>
-      <p class="text-[11px] text-gray-500 italic">
+      <p class="text-xs text-gray-500 italic">
         Formatage simplifié sur mobile (pas de gras / listes). Saisir une note riche depuis le poste de bureau si besoin.
       </p>
     </div>

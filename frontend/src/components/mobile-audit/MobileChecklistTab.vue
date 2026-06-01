@@ -266,9 +266,9 @@ async function quickToggleNotAvailable(it) {
           <p class="text-2xl font-medium text-gray-900 mt-1 leading-none">
             {{ coverage[kind].covered }}<span class="text-base text-gray-500 font-normal"> / {{ coverage[kind].total }}</span>
           </p>
-          <p v-if="coverage[kind].total === 0" class="text-[11px] text-gray-500 italic mt-1">Aucun</p>
-          <p v-else-if="coverage[kind].covered === coverage[kind].total" class="text-[11px] text-emerald-700 mt-1">✓ Couvert</p>
-          <p v-else class="text-[11px] text-amber-700 mt-1">⚠ {{ coverage[kind].total - coverage[kind].covered }} sans photo</p>
+          <p v-if="coverage[kind].total === 0" class="text-xs text-gray-500 italic mt-1">Aucun</p>
+          <p v-else-if="coverage[kind].covered === coverage[kind].total" class="text-xs text-emerald-700 mt-1">✓ Couvert</p>
+          <p v-else class="text-xs text-amber-700 mt-1">⚠ {{ coverage[kind].total - coverage[kind].covered }} sans photo</p>
         </button>
       </div>
     </div>
@@ -441,9 +441,10 @@ async function quickToggleNotAvailable(it) {
             </div>
             <FontAwesomeIcon :icon="['fas', 'chevron-right']" class="w-5 h-5 text-gray-300 shrink-0" />
           </button>
-          <!-- Bouton Non dispo inline (ne ouvre pas le sheet) -->
+          <!-- Bouton Non dispo inline (ne ouvre pas le sheet) — gabarit
+               tactile PWA 48px aligné sur .pwa-button. -->
           <button type="button" @click.stop="quickToggleNotAvailable(it)"
-                  :class="['shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border',
+                  :class="['shrink-0 inline-flex items-center justify-center min-h-12 min-w-12 px-3 rounded-xl border transition',
                            it.status === 'not_available'
                              ? 'text-gray-700 bg-gray-100 border-gray-300 active:bg-gray-200'
                              : 'text-gray-500 bg-white border-gray-200 active:bg-gray-50']">
@@ -484,7 +485,7 @@ async function quickToggleNotAvailable(it) {
           <label class="block text-xs font-medium text-gray-700 mb-1.5">Pourquoi ?</label>
           <input v-model="editingReason" type="text"
                  placeholder="Ex : Le client n'a pas retrouvé les originaux"
-                 class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white" />
+                 class="pwa-input" />
         </div>
 
         <!-- Photos / fichiers -->

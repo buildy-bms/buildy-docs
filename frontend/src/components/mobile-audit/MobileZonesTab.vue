@@ -191,7 +191,7 @@ const totalSurface = computed(() =>
           class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
             <p class="text-sm text-gray-500 truncate mt-1">
               <span>{{ natureLabel(z.nature) }}</span>
               <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
@@ -204,7 +204,7 @@ const totalSurface = computed(() =>
       <button
         type="button"
         @click="openCreate('functional')"
-        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+        class="pwa-button pwa-button--add mt-2"
       >
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         Ajouter une zone
@@ -227,7 +227,7 @@ const totalSurface = computed(() =>
           class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50"
         >
           <div class="flex-1 min-w-0">
-            <p class="text-lg font-medium text-gray-900 truncate leading-tight">{{ z.name }}</p>
+            <p class="text-base font-semibold text-gray-900 truncate leading-tight">{{ z.name }}</p>
             <p class="text-sm text-gray-500 truncate mt-1">
               <span>{{ natureLabel(z.nature) }}</span>
               <span v-if="z.surface_m2"> · {{ z.surface_m2 }} m²</span>
@@ -242,7 +242,7 @@ const totalSurface = computed(() =>
       <button
         type="button"
         @click="openCreate('technical')"
-        class="mt-2 w-full tap-target inline-flex items-center justify-center gap-2 px-4 py-3 text-base font-medium text-indigo-700 border-2 border-dashed border-indigo-300 active:border-indigo-400 active:bg-indigo-50 rounded-2xl transition"
+        class="pwa-button pwa-button--add mt-2"
       >
         <FontAwesomeIcon :icon="['fas', 'plus']" class="w-5 h-5 shrink-0" />
         Ajouter une zone technique
@@ -286,7 +286,7 @@ const totalSurface = computed(() =>
             type="text"
             placeholder="ex : Bureaux R+1"
             autocapitalize="sentences"
-            class="touch-control w-full"
+            class="pwa-input w-full"
           />
         </MobileField>
 
@@ -324,7 +324,7 @@ const totalSurface = computed(() =>
             type="text"
             placeholder="ex : température minimale 22 °C"
             autocapitalize="sentences"
-            class="touch-control w-full"
+            class="pwa-input w-full"
           />
         </MobileField>
 
@@ -352,7 +352,7 @@ const totalSurface = computed(() =>
             min="0"
             step="1"
             placeholder="—"
-            class="touch-control w-full text-right font-medium"
+            class="pwa-input w-full text-right font-medium"
           />
         </MobileField>
 
@@ -382,7 +382,7 @@ const totalSurface = computed(() =>
           <div class="pt-4 border-t border-gray-200">
             <button
               @click="remove(editing.zone)"
-              class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-red-600 bg-red-50 border border-red-200 rounded-xl font-medium"
+              class="pwa-button pwa-button--danger w-full bg-red-50 text-red-600 border-red-200"
             >
               <FontAwesomeIcon :icon="['fas', 'trash']" class="w-5 h-5" />
               Supprimer la zone

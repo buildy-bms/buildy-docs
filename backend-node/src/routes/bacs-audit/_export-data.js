@@ -653,6 +653,85 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Tri par theme (A->H) puis severite (blocking->minor) puis r175 puis id.
   // Cf. lib/routes/bacs-audit/_action-cards.js. La renumerotation suit ce
   // tri : BACS-001 = premiere action du theme A en severite la plus haute.
+  // Strip des balises `{{zone:N}}` / `{{system:N}}` / `{{device:N}}`
+  // (utilisees cote UI pour faire des pilules cliquables) → en texte brut
+  // pour le PDF, en utilisant les labels reels des entites referencees.
+  // Helper local : on construit les lookups au passage si pas deja fait.
+  const zonesByIdLocal = new Map((zones || []).map(z => ({ id: z.id, name: z.name })).map(z => [z.id, z]));
+  const systemsByIdLocal = new Map((systems || []).map(s => [s.id, s]));
+  const SYSTEM_LABEL_FR_LOCAL = {
+    heating: 'chauffage', cooling: 'refroidissement', ventilation: 'ventilation',
+    dhw: 'eau chaude sanitaire', lighting_indoor: 'éclairage intérieur',
+    lighting_outdoor: 'éclairage extérieur', electricity_production: 'production photovoltaïque',
+  };
+  // Decor (icone FontAwesome + couleur) par categorie de systeme, aligne
+  // sur CATEGORY_ICON de pdf.js et SystemCategoryIcon.vue.
+  const { renderFaIconSvg } = require('../../lib/pdf');
+  const SYSTEM_DECOR_PDF = {
+    heating:                { icon: 'fire',         color: '#dc2626' },
+    cooling:                { icon: 'snowflake',    color: '#0891b2' },
+    ventilation:            { icon: 'fan',          color: '#64748b' },
+    dhw:                    { icon: 'faucet',       color: '#0284c7' },
+    lighting_indoor:        { icon: 'lightbulb',    color: '#f59e0b' },
+    lighting_outdoor:       { icon: 'tower-cell',   color: '#f59e0b' },
+    electricity_production: { icon: 'solar-panel',  color: '#16a34a' },
+  };
+  function escHtml(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function resolveTagAsPill(type, id) {
+    const n = Number(id);
+    if (type === 'zone') {
+      const z = zonesByIdLocal.get(n);
+      const label = z?.name || `Zone ${n}`;
+      return `<span class="tag-pill tag-pill-zone">${renderFaIconSvg("location-dot", "#4f46e5", "10")} ${escHtml(label)}</span>`;
+    }
+    if (type === 'system') {
+      const s = systemsByIdLocal.get(n);
+      if (!s) return `<span class="tag-pill tag-pill-system">Système ${n}</span>`;
+      const label = s.custom_label || SYSTEM_LABEL_FR_LOCAL[s.system_category] || s.system_category || 'Système';
+      const decor = SYSTEM_DECOR_PDF[s.system_category];
+      const sty = decor ? ` style="color:${decor.color};border-color:${decor.color}66;background-color:${decor.color}1A"` : '';
+      const zname = s.zone_name ? `<span class="tag-pill-meta"> · ${escHtml(s.zone_name)}</span>` : '';
+      return `<span class="tag-pill tag-pill-system"${sty}>${decor ? renderFaIconSvg(decor.icon, decor.color, "10") + " " : ""}${escHtml(label)}${zname}</span>`;
+    }
+    if (type === 'device') {
+      const d = devicesById.get(n);
+      const label = d ? (d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement #${n}`)
+                      : `Équipement ${n}`;
+      return `<span class="tag-pill tag-pill-device">${renderFaIconSvg("gear", "#475569", "10")} ${escHtml(label)}</span>`;
+    }
+    return '';
+  }
+  function stripActionTags(text) {
+    if (!text) return text;
+    // 1) Echappe le HTML existant
+    let html = escHtml(text);
+    // 2) Injecte les pilules a la place des balises
+    html = html.replace(/\{\{(zone|system|device):(\d+)\}\}/g, (_m, type, id) => resolveTagAsPill(type, id));
+    return html;
+  }
+  // Convertit une description multi-sections en HTML avec sous-titres.
+  // Format en entree : « Titre\nContenu\n\nTitre\nContenu... ». Si pas
+  // de structure detectee (pas de \n\n), retombe sur le rendu inline.
+  function descriptionToHtml(text) {
+    if (!text) return text;
+    if (!text.includes('\n\n')) return stripActionTags(text);
+    const blocks = text.split('\n\n').map(block => {
+      const idx = block.indexOf('\n');
+      if (idx < 0) return `<div class="acd-body">${stripActionTags(block)}</div>`;
+      const candidate = block.slice(0, idx).trim();
+      const body = block.slice(idx + 1);
+      const looksLikeTitle = candidate.length > 0 && candidate.length < 80 &&
+        !candidate.includes('{{') && !candidate.startsWith('•') && !candidate.startsWith('  •');
+      if (looksLikeTitle) {
+        return `<div class="acd-section"><div class="acd-title">${escHtml(candidate)}</div><div class="acd-body">${stripActionTags(body)}</div></div>`;
+      }
+      return `<div class="acd-body">${stripActionTags(block)}</div>`;
+    });
+    return blocks.join('');
+  }
+
   const numberedItems = sortActions(actionItemsRaw).map((a, idx) => {
     // Enrichit avec usage/type de compteur + énergie (depuis source_meter_id)
     // ou usage système (depuis source_device_id) pour les pills colorées
@@ -669,6 +748,9 @@ async function buildBacsAuditExportData(af, opts = {}) {
     }
     return {
       ...a,
+      // Strip des balises pour le rendu PDF (les UI Vue parsent l'original).
+      title: stripActionTags(a.title),
+      description: descriptionToHtml(a.description),
       display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
       card_key:         cardOfAction(a).card,
       card_subsection:  cardOfAction(a).subsection,

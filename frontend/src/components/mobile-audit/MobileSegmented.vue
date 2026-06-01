@@ -41,7 +41,7 @@ const TONE = {
         type="button"
         :disabled="disabled"
         @click="!disabled && $emit('update:modelValue', opt.value)"
-        :class="['flex-1 min-h-11 px-3 rounded-lg border font-medium transition',
+        :class="['pwa-button flex-1 border',
                  modelValue === opt.value
                    ? (TONE[opt.tone] || TONE.slate)
                    : 'bg-white text-gray-600 border-gray-200']"

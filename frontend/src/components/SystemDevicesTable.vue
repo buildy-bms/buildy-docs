@@ -331,6 +331,7 @@ async function removeDevice(d) {
           <PhotoDropTr
             v-for="d in displayDevices"
             :key="d.id"
+            :data-device-id="d.id"
             :site-uuid="siteUuid || ''"
             :attach-to="{ device_id: d.id }"
             :enabled="!!siteUuid"

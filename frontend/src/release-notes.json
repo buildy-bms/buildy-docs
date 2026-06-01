@@ -2,6 +2,55 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.129",
+      "date": "2026-05-29",
+      "title": "Plan d'action recentré sur les systèmes + pilules cliquables + PWA hauteurs uniformes",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Plus de fausses préconisations « rendre les radiateurs communicants »",
+          "what": "Les critères R175-3 §3 (interopérabilité) et §4 (régulation par zone, fonctionnement autonome) s'appliquent désormais au système entier (chauffage, ECS, climatisation…), pas aux émetteurs individuels. Conséquence : les radiateurs et les ventilo-convecteurs passifs ne déclenchent plus de préconisation isolée. Une seule action remonte par système non conforme, à traiter au niveau du générateur ou du régulateur central.",
+          "where": "Card « Plan de mise en conformité » du détail audit (web + PWA) + PDF Rapport chapitre 7 + outils MCP.",
+          "how": "Régénérer le plan d'action sur un audit existant (PATCH /api/bacs-audit/:id/action-items/regenerate ou via l'UI). Vérifier qu'il ne reste plus d'action ciblant un radiateur ou un ventilo-convecteur passif. Le nombre d'actions baisse typiquement de ~30 % sur les audits riches en émetteurs."
+        },
+        {
+          "kind": "feat",
+          "title": "Pilules cliquables zones / systèmes / équipements dans les actions",
+          "what": "Chaque action mentionne désormais les zones, les systèmes et les équipements concernés sous forme de pilules colorées (indigo pour zone, couleur catégorie pour système, slate pour équipement). Tap ou clic = scroll vers la card concernée dans le détail audit. Visibles aussi en PDF avec icônes FontAwesome SVG (pas d'emojis).",
+          "where": "Card Plan (web + PWA) + PDF audit BACS chapitre 7.",
+          "how": "Ouvrir une action du plan, cliquer sur une pilule « Bureaux », « Chauffage » ou « Chaudière De Dietrich » → la page scrolle vers la card audit correspondante. Sur PDF, les pilules sont visibles dans chaque action avec leur icône."
+        },
+        {
+          "kind": "feat",
+          "title": "Descriptions d'actions structurées (décret, constat, strict minimum)",
+          "what": "Chaque action affiche maintenant le texte du décret en premier (seule source opposable), puis le constat, puis le strict minimum à faire pour être conforme, puis la liste des équipements concernés. Les sous-titres sont rendus en majuscules pour distinguer les sections.",
+          "where": "Card Plan (web + PWA) + PDF Rapport.",
+          "how": "Ouvrir une action — repérer les sous-titres « Décret R175-3 §3 », « Constat », « Strict minimum pour la conformité », « Note R175-6 »."
+        },
+        {
+          "kind": "feat",
+          "title": "Encart unique « Sources d'aide à l'interprétation » en haut du plan",
+          "what": "Un seul encart indigo en tête du plan cite les sources d'aide non opposables (guide ministère, guide PROFEEL, norme ISO 52120-1) au lieu de répéter la liste dans chaque action. Décret R175 mis en avant comme seule source juridiquement opposable.",
+          "where": "Card Plan (web + PWA niveau 1) + PDF Rapport chapitre 7.",
+          "how": "Ouvrir la card Plan : un encart bleu-indigo apparaît au-dessus de la liste d'actions. Plus de répétition dans chaque action."
+        },
+        {
+          "kind": "feat",
+          "title": "Base de connaissance enrichie : 47 fonctions ISO 52120-1",
+          "what": "Les 47 fonctions de la norme NF EN ISO 52120-1 (classement A/B/C/D des fonctions BAC) sont désormais ingérées dans la base de connaissance et accessibles à Claude via MCP comme source d'aide à l'interprétation (autorité « normative », non opposable). Elles ne sont jamais citées comme source de conformité — seul le décret R175 l'est. Nouveau champ `compliance_mode` sur les audits (par défaut `decree_strict`).",
+          "where": "Backend / MCP : `/api/bacs-knowledge/search?source=iso_52120` + table `bacs_iso52120_functions`.",
+          "how": "Demander à Claude via MCP des fonctions ISO concernant la régulation d'une zone — il retourne les fonctions normatives avec leur classe A/B/C."
+        },
+        {
+          "kind": "feat",
+          "title": "PWA — hauteurs uniformes (gabarit Photos / Note vocale)",
+          "what": "Tous les inputs, boutons, sélecteurs, list items et triggers de bottom-sheet de la PWA passent à la même hauteur tactile (48 px effectif, gabarit déjà utilisé pour les boutons Photos et Note vocale). Trois paliers de texte conservés (12 / 14 / 16 px) + exception 24 px pour les stats. Nouvelles classes utilitaires `.pwa-input`, `.pwa-button`, `.pwa-select-trigger`, `.pwa-list-item`, `.pwa-label`, `.pwa-hint` dans le design system PWA.",
+          "where": "Toute la PWA (audits BACS + GTB).",
+          "how": "Ouvrir un audit en PWA. Mesurer à l'œil : tous les champs (texte, date, nombre), boutons d'action et triggers de listes déroulantes ont la même hauteur visuelle. Les sélecteurs ouvrent une bottom-sheet, jamais le `<select>` natif iOS."
+        }
+      ]
+    },
+    {
       "version": "0.1.128",
       "date": "2026-05-29",
       "title": "Clone d'AF sans doublons biblio + suppression multiple de sections",

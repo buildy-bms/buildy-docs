@@ -85,7 +85,7 @@ async function clearSynthesis() {
       <button
         @click="generate"
         :disabled="generating"
-        class="w-full inline-flex items-center justify-center gap-2 px-4 py-4 text-base font-medium text-white bg-violet-600 active:bg-violet-700 rounded-xl disabled:opacity-50"
+        class="pwa-button pwa-button--primary w-full bg-violet-600 border-violet-600 active:bg-violet-700 disabled:opacity-50"
       >
         <FontAwesomeIcon :icon="['fas', 'sparkles']" :class="['w-5 h-5', generating ? 'animate-pulse' : '']" />
         {{ generating

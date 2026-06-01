@@ -273,7 +273,7 @@ const USAGES = [
               placeholder="ex : Schneider EcoStruxure, Niagara, Buildy"
               autocapitalize="words"
               @input="saveDebounced"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
           <MobileField label="Marque / éditeur">
@@ -283,7 +283,7 @@ const USAGES = [
               placeholder="—"
               autocapitalize="words"
               @input="saveDebounced"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
           <MobileField label="Référence modèle">
@@ -292,7 +292,7 @@ const USAGES = [
               type="text"
               placeholder="ex : JACE 8000"
               @input="saveDebounced"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
           <MobileField label="Localisation">
@@ -302,7 +302,7 @@ const USAGES = [
               placeholder="ex : Local technique sous-sol"
               autocapitalize="sentences"
               @input="saveDebounced"
-              class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+              class="pwa-input"
             />
           </MobileField>
         </div>
@@ -334,8 +334,8 @@ const USAGES = [
               <SystemCategoryIcon :category="u.category" size="md" />
               <span :class="['text-base font-medium', bms[u.key] ? 'text-gray-800' : 'text-gray-400']">{{ u.label }}</span>
             </div>
-            <span v-if="bms[u.key]" class="text-[#00cd92] text-xl font-bold">✓</span>
-            <span v-else class="text-gray-300 text-xl font-bold">✗</span>
+            <span v-if="bms[u.key]" class="text-[#00cd92] text-base font-bold">✓</span>
+            <span v-else class="text-gray-300 text-base font-bold">✗</span>
           </button>
         </div>
       </div>
@@ -361,7 +361,7 @@ const USAGES = [
                 type="text"
                 placeholder="Format d'archivage : CSV, SQL, API…"
                 @input="saveDebounced"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
               <MobileYesNo
                 label="La conservation des données sur 5 ans a-t-elle été vérifiée sur place ?"
@@ -384,7 +384,7 @@ const USAGES = [
                 @input="saveDebounced"
                 rows="2"
                 placeholder="Règles / seuils / alertes actives…"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               ></textarea>
             </div>
           </div>
@@ -423,14 +423,14 @@ const USAGES = [
                 type="text"
                 placeholder="Fréquence : temps réel, quotidien…"
                 @input="saveDebounced"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
               <input
                 v-model="bms.data_provision_format"
                 type="text"
                 placeholder="Format : CSV, dashboard, API…"
                 @input="saveDebounced"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
             </template>
           </div>
@@ -501,7 +501,7 @@ const USAGES = [
               @input="saveDebounced"
               placeholder="Observations sur l'accès aux données…"
               rows="2"
-              class="touch-control w-full"
+              class="pwa-input w-full"
             ></textarea>
           </div>
         </div>
@@ -527,14 +527,14 @@ const USAGES = [
                 type="text"
                 placeholder="Périodicité : trimestrielle, annuelle…"
                 @input="saveDebounced"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
               <input
                 v-model="bms.maintenance_responsible"
                 type="text"
                 placeholder="Responsable : prestataire, équipe interne…"
                 @input="saveDebounced"
-                class="touch-control w-full"
+                class="pwa-input w-full"
               />
             </template>
           </div>
@@ -561,7 +561,7 @@ const USAGES = [
                   v-model="bms.operator_training_date"
                   type="date"
                   @input="saveDebounced"
-                  class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+                  class="pwa-input"
                 />
               </MobileField>
               <MobileField label="Organisme / formateur">
@@ -570,7 +570,7 @@ const USAGES = [
                   type="text"
                   placeholder="ex : intégrateur GTB"
                   @input="saveDebounced"
-                  class="w-full px-4 py-3.5 text-base border border-gray-200 rounded-xl bg-white"
+                  class="pwa-input"
                 />
               </MobileField>
             </template>
@@ -608,13 +608,13 @@ const USAGES = [
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
-                <SegmentedToggle :model-value="!!d.managed_by_bms"
+                <SegmentedToggle size="lg" :model-value="!!d.managed_by_bms"
                                  :disabled="!!d.out_of_service"
                                  @update:model-value="v => patchDeviceBms(d, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
-                <SegmentedToggle :model-value="(!d.managed_by_bms || !d.wired) ? null : !d.bms_integration_out_of_service"
+                <SegmentedToggle size="lg" :model-value="(!d.managed_by_bms || !d.wired) ? null : !d.bms_integration_out_of_service"
                                  :disabled="!d.managed_by_bms || !d.wired"
                                  @update:model-value="v => patchDeviceBms(d, { bms_integration_out_of_service: !v })" />
               </div>
@@ -651,13 +651,13 @@ const USAGES = [
             <div class="grid grid-cols-2 gap-2">
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Intégré ?</span>
-                <SegmentedToggle :model-value="(m.out_of_service || !m.communicating) ? null : !!m.managed_by_bms"
+                <SegmentedToggle size="lg" :model-value="(m.out_of_service || !m.communicating) ? null : !!m.managed_by_bms"
                                  :disabled="!!m.out_of_service || !m.communicating"
                                  @update:model-value="v => patchMeterBms(m, { managed_by_bms: v })" />
               </div>
               <div class="flex items-center justify-between gap-2 px-3 py-3 rounded-xl border border-gray-200 bg-white">
                 <span class="text-sm font-medium text-gray-800">Opérationnel ?</span>
-                <SegmentedToggle :model-value="(!m.managed_by_bms || !m.wired) ? null : !m.bms_integration_out_of_service"
+                <SegmentedToggle size="lg" :model-value="(!m.managed_by_bms || !m.wired) ? null : !m.bms_integration_out_of_service"
                                  :disabled="!m.managed_by_bms || !m.wired"
                                  @update:model-value="v => patchMeterBms(m, { bms_integration_out_of_service: !v })" />
               </div>

@@ -1415,28 +1415,29 @@ onBeforeUnmount(() => {
           <CheckCircleIcon class="w-3.5 h-3.5 shrink-0" /> Enregistré
         </div>
 
-        <!-- Aperçu HTML (avant export PDF) -->
+        <!-- Aperçu HTML (avant export PDF) — tooltips en placement 'bottom'
+             pour ne pas masquer les boutons voisins de la toolbar sticky. -->
         <Button variant="secondary" size="md" @click="openPreview"
-          v-tooltip="'Aperçu HTML rapide du rapport (sans génération PDF)'">
+          v-tooltip="{ text: 'Aperçu HTML rapide du rapport (sans génération PDF)', placement: 'bottom' }">
           <template #icon-left><EyeIcon class="w-4 h-4 shrink-0" /></template>
           Aperçu
         </Button>
 
         <!-- Exports PDF principaux (style cohérent avec AF : indigo solide) -->
         <Button variant="primary" size="md" :loading="exporting" @click="exportPdf"
-          v-tooltip="'Génère le rapport d\'audit complet en PDF A4'">
+          v-tooltip="{ text: 'Génère le rapport d\'audit complet en PDF A4', placement: 'bottom' }">
           <template #icon-left><DocumentArrowDownIcon class="w-4 h-4" /></template>
           {{ exporting ? 'Génération…' : 'Rapport' }}
         </Button>
         <Button variant="primary" size="md" :loading="exportingTables" @click="exportTablesPdf"
-          v-tooltip="'Génère les tableaux de synthèse (A3 paysage) destinés à l\'intégrateur'">
+          v-tooltip="{ text: 'Génère les tableaux de synthèse (A3 paysage) destinés à l\'intégrateur', placement: 'bottom' }">
           <template #icon-left><TableCellsIcon class="w-4 h-4" /></template>
           {{ exportingTables ? 'Génération…' : 'Synthèse' }}
         </Button>
 
         <!-- Livrer (CTA principal vert) -->
         <Button variant="success" size="md" :loading="delivering" @click="deliver"
-          v-tooltip="'Génère le PDF final + fige le snapshot Git'">
+          v-tooltip="{ text: 'Génère le PDF final + fige le snapshot Git', placement: 'bottom' }">
           <template #icon-left><CheckCircleIcon class="w-4 h-4 shrink-0" /></template>
           {{ delivering ? 'Livraison…' : 'Livrer' }}
         </Button>
@@ -1444,7 +1445,7 @@ onBeforeUnmount(() => {
         <!-- Menu Plus (cohérent avec AF) -->
         <div ref="settingsMenuRef" class="relative inline-flex">
           <Button variant="secondary" size="md" @click="showSettingsMenu = !showSettingsMenu"
-            v-tooltip="'Plus d\'actions'">
+            v-tooltip="{ text: 'Plus d\'actions', placement: 'bottom' }">
             <template #icon-left><EllipsisHorizontalIcon class="w-4 h-4 shrink-0" /></template>
             Plus
           </Button>

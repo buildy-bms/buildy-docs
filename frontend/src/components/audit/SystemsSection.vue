@@ -436,6 +436,7 @@ onBeforeUnmount(teardownSortables)
            sans avoir à toggle un flag d'affichage. -->
       <div class="space-y-3">
         <div v-for="g in filteredSystemsByZone" :key="g.zone_id"
+             :data-zone-id="g.zone_id"
              class="bg-slate-100/60 border border-slate-200 rounded-lg p-3">
           <div class="flex items-center gap-2 pb-2 border-b border-gray-100"
                :class="collapsedZones.has(g.zone_id) ? '' : 'mb-3'">
@@ -464,7 +465,7 @@ onBeforeUnmount(teardownSortables)
                    au système (device card) uniquement, voir SystemDevicesTable.
                    Les usages "non concerné" restent visibles (grisés via
                    opacity-60 + bordure dashed dans le :class plus bas). -->
-              <div :data-id="s.id"
+              <div :data-id="s.id" :data-system-id="s.id"
                    :class="['system-card rounded-lg border bg-white',
                             s.present ? ['border-gray-200 border-l-4 shadow-sm', CATEGORY_BORDER[s.system_category] || 'border-l-indigo-400']
                                       : (s.not_concerned ? 'border-dashed border-gray-200 bg-gray-50/40 opacity-60'

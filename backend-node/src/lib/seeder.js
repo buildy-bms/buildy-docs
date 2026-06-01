@@ -1052,4 +1052,113 @@ module.exports = {
   libraryExtendAf,
   seedBacsRequirementsOnBoot, seedBacsMeterRequirementsOnBoot,
   seedBacsAuditStructure, resyncBacsAuditWithSiteZones,
+  seedIso52120OnBoot,
 };
+
+// ── ISO 52120-1 : fonctions BAC obligatoires (47 lignes) ───────────────
+// Idempotent : on (re-)ingere a chaque boot pour garantir que le CSV est
+// la source de verite. Aucun cout perceptible (47 INSERT dans une
+// transaction).
+function seedIso52120OnBoot() {
+  const fs = require('fs');
+  const path = require('path');
+  const csvPath = path.resolve(__dirname, '../../scripts/iso-52120/functions.csv');
+  if (!fs.existsSync(csvPath)) {
+    log.warn('Seed ISO 52120-1 skip : CSV introuvable a ' + csvPath);
+    return;
+  }
+  // Retire BOM UTF-8 eventuel + verifie l'en-tete attendu.
+  const raw = fs.readFileSync(csvPath, 'utf8').replace(/^﻿/, '');
+  const rows = parseCsvSemicolon(raw);
+  const header = rows.shift();
+  if (!header || !/^R.f.rence$/i.test((header[0] || '').trim())) {
+    log.warn('Seed ISO 52120-1 skip : en-tete CSV inattendu (' + JSON.stringify(header?.[0]) + ')');
+    return;
+  }
+  const bool = (v) => (v || '').trim().toUpperCase() === 'OUI' ? 1 : 0;
+  const entries = rows.map((r, i) => ({
+    code: (r[0] || '').trim(),
+    domain: (r[1] || '').trim(),
+    sub_function: (r[2] || '').trim() || null,
+    title: (r[3] || '').trim(),
+    description: (r[4] || '').trim() || null,
+    class_c: bool(r[5]),
+    class_b: bool(r[6]),
+    class_a: bool(r[7]),
+    position: i + 1,
+  })).filter(e => e.code);
+
+  if (!entries.length) {
+    log.warn('Seed ISO 52120-1 skip : 0 ligne extraite');
+    return;
+  }
+
+  const derivR175 = (domain) => {
+    if (/chauffage|refroidissement|ventilation|climatisation/i.test(domain)) return 'R175-3,R175-6';
+    if (/eau chaude/i.test(domain)) return 'R175-3';
+    if (/éclairage|eclairage/i.test(domain)) return 'R175-3';
+    if (/gestion technique/i.test(domain)) return 'R175-3,R175-4';
+    return 'R175-3';
+  };
+
+  const tx = db.db.transaction(() => {
+    db.db.prepare('DELETE FROM bacs_iso52120_functions').run();
+    const insFn = db.db.prepare(`
+      INSERT INTO bacs_iso52120_functions
+        (code, domain, sub_function, title, description, class_c, class_b, class_a, position)
+      VALUES (@code, @domain, @sub_function, @title, @description, @class_c, @class_b, @class_a, @position)
+    `);
+    for (const e of entries) insFn.run(e);
+
+    db.db.prepare("DELETE FROM bacs_knowledge WHERE source = 'iso_52120'").run();
+    const insK = db.db.prepare(`
+      INSERT INTO bacs_knowledge
+        (source, authority, kind, code, title, body_text, r175_refs, version_label, position, fetched_at)
+      VALUES ('iso_52120', 'normative', 'iso_function', @code, @title, @body_text, @r175_refs, @version_label, @position, CURRENT_TIMESTAMP)
+    `);
+    for (const e of entries) {
+      const classes = [];
+      if (e.class_c) classes.push('Classe C (standard / minimum BACS)');
+      if (e.class_b) classes.push('Classe B (advanced)');
+      if (e.class_a) classes.push('Classe A (high performance)');
+      const body = [
+        `Domaine : ${e.domain}`,
+        e.sub_function ? `Sous-fonction : ${e.sub_function}` : null,
+        `Intitulé : ${e.title}`,
+        e.description ? `Description (Tableau 5) : ${e.description}` : null,
+        classes.length ? `Niveau requis : ${classes.join(' · ')}` : 'Niveau requis : (non obligatoire)',
+      ].filter(Boolean).join('\n');
+      insK.run({
+        code: `ISO-${e.code}`,
+        title: `Fonction ${e.code} — ${e.title}`,
+        body_text: body,
+        r175_refs: derivR175(e.domain),
+        version_label: 'NF EN ISO 52120-1 — Tableau 5 (fonctions BAC obligatoires)',
+        position: e.position,
+      });
+    }
+  });
+  tx();
+  log.info(`Seed ISO 52120-1 : ${entries.length} fonctions (table + bacs_knowledge)`);
+}
+
+// CSV parser minimal (delimiter `;`, cellules entre guillemets supportees).
+function parseCsvSemicolon(text) {
+  const rows = [];
+  let row = []; let cell = ''; let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else { inQ = false; } }
+      else cell += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ';') { row.push(cell); cell = ''; }
+      else if (c === '\n') { row.push(cell); if (row.some(v => v.trim() !== '')) rows.push(row); row = []; cell = ''; }
+      else if (c === '\r') { /* skip */ }
+      else cell += c;
+    }
+  }
+  if (cell || row.length) { row.push(cell); if (row.some(v => v.trim() !== '')) rows.push(row); }
+  return rows;
+}

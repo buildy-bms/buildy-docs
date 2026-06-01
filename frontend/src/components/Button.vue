@@ -45,7 +45,8 @@ const VARIANT_CLASSES = {
 const SIZE_CLASSES = {
   sm: 'px-2.5 py-1 text-xs gap-1',
   md: 'px-3 py-1.5 text-sm gap-1.5',
-  lg: 'px-4 py-2.5 text-base gap-2 min-h-11',
+  // lg = gabarit tactile PWA (48px, aligne sur BacsPhotoButton / VoiceNoteButton).
+  lg: 'px-4 py-3.5 text-base gap-2 min-h-12',
 }
 
 const ICON_SIZE = {

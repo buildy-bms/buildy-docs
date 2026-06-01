@@ -25,6 +25,9 @@ async function main() {
   require('./lib/seeder').seedBacsRequirementsOnBoot();
   // Phase 3 audit BACS — matrice usage x nature_zone -> meter_type
   require('./lib/seeder').seedBacsMeterRequirementsOnBoot();
+  // Mig 190 — Ingestion fonctions BAC obligatoires NF EN ISO 52120-1 (47 lignes)
+  // dans bacs_iso52120_functions + bacs_knowledge (source 'iso_52120').
+  require('./lib/seeder').seedIso52120OnBoot();
 
   const fastifyOpts = { logger: false, trustProxy: true };
   if (config.httpsEnabled) {
