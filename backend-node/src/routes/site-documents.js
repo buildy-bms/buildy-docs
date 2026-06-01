@@ -55,7 +55,8 @@ async function routes(fastify) {
     if (!site || site.deleted_at) return reply.code(404).send({ detail: 'Site non trouve' });
     const { category, bacs_audit_system_id, bacs_audit_device_id,
       bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_bms_document_id,
-      bacs_audit_checklist_id, bacs_audit_action_item_id } = request.query;
+      bacs_audit_checklist_id, bacs_audit_action_item_id,
+      bacs_audit_inspection_id } = request.query;
     let sql = `
       SELECT d.*, u.display_name AS uploaded_by_name
       FROM site_documents d
@@ -92,6 +93,10 @@ async function routes(fastify) {
       sql += ' AND d.bacs_audit_action_item_id = ?';
       args.push(parseInt(bacs_audit_action_item_id, 10));
     }
+    if (bacs_audit_inspection_id) {
+      sql += ' AND d.bacs_audit_inspection_id = ?';
+      args.push(parseInt(bacs_audit_inspection_id, 10));
+    }
     sql += ' ORDER BY d.uploaded_at DESC';
     return db.db.prepare(sql).all(...args);
   });
@@ -106,6 +111,7 @@ async function routes(fastify) {
     const { title, category, bacs_audit_system_id, bacs_audit_bms_document_id,
       bacs_audit_device_id, bacs_audit_zone_id, bacs_audit_meter_id,
       bacs_audit_checklist_id, bacs_audit_action_item_id,
+      bacs_audit_inspection_id,
       // EXIF optionnel envoyé en query par le client (extrait avant la
       // compression côté navigateur qui strip l'EXIF). Prioritaire sur
       // ce que le serveur peut extraire du buffer reçu.
@@ -214,10 +220,10 @@ async function routes(fastify) {
         (site_id, title, category, filename, original_name, size_bytes, mime_type,
          bacs_audit_system_id, bacs_audit_bms_document_id, bacs_audit_device_id,
          bacs_audit_zone_id, bacs_audit_meter_id, bacs_audit_checklist_id,
-         bacs_audit_action_item_id, uploaded_by,
+         bacs_audit_action_item_id, bacs_audit_inspection_id, uploaded_by,
          taken_at, gps_latitude, gps_longitude, camera_make, camera_model,
          media_type, duration_seconds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       site.site_id, title, category, filename, file.filename, sizeBytes, storedMime,
       bacs_audit_system_id ? parseInt(bacs_audit_system_id, 10) : null,
@@ -227,6 +233,7 @@ async function routes(fastify) {
       bacs_audit_meter_id ? parseInt(bacs_audit_meter_id, 10) : null,
       bacs_audit_checklist_id ? parseInt(bacs_audit_checklist_id, 10) : null,
       bacs_audit_action_item_id ? parseInt(bacs_audit_action_item_id, 10) : null,
+      bacs_audit_inspection_id ? parseInt(bacs_audit_inspection_id, 10) : null,
       userId || null,
       finalTakenAt, finalGpsLat, finalGpsLng, finalCameraMake, finalCameraModel,
       mediaType, clientDuration != null && clientDuration !== '' ? parseFloat(clientDuration) : null,

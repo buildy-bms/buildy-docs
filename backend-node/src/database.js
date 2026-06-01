@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 190;
+const TARGET_VERSION = 191;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7225,6 +7225,20 @@ function runMigrations() {
 
     log.info('Migration 190 appliquee : bacs_knowledge etendu (iso_52120/normative/iso_function) + bacs_iso52120_functions + afs.compliance_mode');
     db.pragma('user_version = 190');
+  }
+
+  if (current < 191) {
+    // Migration 191 — Rattachement des site_documents aux inspections R175-5-1.
+    // Permet de glisser le rapport PDF d'inspection officielle directement
+    // dans la card concernee. La FK ON DELETE SET NULL preserve le fichier
+    // si l'inspection est supprimee (orphelin attribuable au site).
+    try { db.exec(`ALTER TABLE site_documents ADD COLUMN bacs_audit_inspection_id INTEGER
+                   REFERENCES bacs_audit_inspections(id) ON DELETE SET NULL`); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_site_documents_inspection
+             ON site_documents(bacs_audit_inspection_id)`);
+    log.info('Migration 191 appliquee : site_documents.bacs_audit_inspection_id');
+    db.pragma('user_version = 191');
   }
 
   if (current > TARGET_VERSION) {
