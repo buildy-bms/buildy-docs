@@ -38,24 +38,30 @@ const LEVEL_DEVICE_FIELD = {
   distribution: 'distribution_device_id',
   emission:     'emission_device_id',
 }
-const LEVEL_REGULATION_FIELD = {
-  production:   'production_regulation_device_id',
-  distribution: 'distribution_regulation_device_id',
-  emission:     'emission_regulation_device_id',
+// Mig 193 — colonne TEXT JSON pour les équipements additionnels par niveau.
+// La FK primaire (LEVEL_DEVICE_FIELD) reste source de vérité pour R175-6.
+const LEVEL_EXTRA_FIELD = {
+  production:   'production_extra_device_ids',
+  distribution: 'distribution_extra_device_ids',
+  emission:     'emission_extra_device_ids',
 }
 
 const deviceField = computed(() => LEVEL_DEVICE_FIELD[props.level])
-const regulationField = computed(() => LEVEL_REGULATION_FIELD[props.level])
+const extraField = computed(() => LEVEL_EXTRA_FIELD[props.level])
 const deviceId = computed(() => props.thermal[deviceField.value])
-const regulationDeviceId = computed(() => props.thermal[regulationField.value])
+const extraIds = computed(() => {
+  const raw = props.thermal[extraField.value]
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.map(n => parseInt(n, 10)).filter(n => !Number.isNaN(n)) : []
+  } catch { return [] }
+})
 
-// Mig 187 v20 — selectedDevices ne contient que des ids présents dans le
-// dropdown strict du niveau. Les anciennes FK régulateur (pointant
-// éventuellement vers un device d'un autre niveau, ex. aérotherme stocké
-// dans `production_regulation_device_id`) ne sont plus affichées comme
-// chips orphelins (id brut sans label) — elles restent en DB mais ne
-// polluent plus l'UI. Le régulateur déporté est désormais documenté
-// uniquement via les champs free-text de la modale équipement.
+// Multi-sélection illimitée : premier item = device_id (FK primaire),
+// les suivants = JSON array dans la colonne *_extra_device_ids (mig 193).
+// Filtré sur les ids présents dans le dropdown strict du niveau pour
+// ne pas afficher de chips orphelins.
 const selectedDevices = computed(() => {
   const validIds = new Set(props.deviceOptions.map(o => o.value))
   const seen = new Set()
@@ -67,7 +73,7 @@ const selectedDevices = computed(() => {
     }
   }
   push(deviceId.value)
-  if (!props.integrated) push(regulationDeviceId.value)
+  for (const id of extraIds.value) push(id)
   return ids
 })
 
@@ -93,23 +99,17 @@ const allOptions = computed(() => {
 })
 
 function setLevelDevices(ids) {
-  const arr = Array.isArray(ids) ? ids : []
-  // On garde les 2 derniers ids sélectionnés (FIFO) si l'utilisateur en
-  // pousse plus que 2.
-  const limited = arr.length > 2 ? arr.slice(-2) : arr
-  const [d, r] = limited
-  const patch = {
-    [deviceField.value]: d != null ? parseInt(d, 10) : null,
-  }
-  // Mig 187 v20 — n'écrase regulationField QUE si l'utilisateur a
-  // explicitement sélectionné un 2e item. En single-pick, on préserve la
-  // FK régulateur historique en DB (les anciennes données ne sont plus
-  // affichées par selectedDevices si elles pointent vers un device d'un
-  // autre niveau, mais on évite d'écraser silencieusement).
-  if (arr.length >= 2) {
-    patch[regulationField.value] = r != null ? parseInt(r, 10) : null
-  }
-  emit('patch-thermal', patch)
+  // Mig 193 — multi-sélection illimitée par niveau.
+  // ids[0] → FK primaire `*_device_id` (source de vérité R175-6)
+  // ids[1..N] → JSON dans `*_extra_device_ids`
+  const arr = Array.isArray(ids)
+    ? ids.map(n => parseInt(n, 10)).filter(n => !Number.isNaN(n))
+    : []
+  const [primary, ...extra] = arr
+  emit('patch-thermal', {
+    [deviceField.value]: primary != null ? primary : null,
+    [extraField.value]: extra.length ? JSON.stringify(extra) : null,
+  })
 }
 
 // Mig 187 v10 — type de régulation lu et écrit directement sur le device.

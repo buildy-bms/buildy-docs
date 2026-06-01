@@ -333,7 +333,7 @@ async function removeDevice(d) {
             :key="d.id"
             :data-device-id="d.id"
             :site-uuid="siteUuid || ''"
-            :attach-to="{ device_id: d.id }"
+            :attach-to="{ device_id: d.id, system_id: system.id }"
             :enabled="!!siteUuid"
             :row-class="[d.out_of_service ? 'opacity-60' : '',
                          isSharedFromOtherZone(d) ? 'bg-emerald-50/30' : ''].join(' ')"

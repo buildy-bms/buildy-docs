@@ -24,7 +24,7 @@ const emit = defineEmits([
 <template>
   <CollapsibleSection storage-key="synthesis" section-id="section-synthesis" :active="active">
     <template #header>
-      <SectionHeader number="13" :title="'Note de synthèse'"
+      <SectionHeader number="12" :title="'Note de synthèse'"
                      subtitle="Affichée en tête du PDF d'audit livré au client."
                      :icon="SparklesIcon" icon-color="text-violet-500"
                      :step="step"

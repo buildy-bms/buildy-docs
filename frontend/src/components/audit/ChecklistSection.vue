@@ -310,7 +310,7 @@ defineExpose({ refresh: load })
 <template>
   <CollapsibleSection storage-key="docs-checklist" section-id="section-docs-checklist" :active="active">
     <template #header>
-      <SectionHeader number="9" title="Check-list documentaire"
+      <SectionHeader number="8" title="Check-list documentaire"
                      :subtitle="`${totalScore} / ${totalPossible} collectés (${completionPct}%)`"
                      :icon="ClipboardDocumentCheckIcon" icon-color="text-indigo-600"
                      :step="step"

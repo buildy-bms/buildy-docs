@@ -84,7 +84,7 @@ function hasNotes(html) {
 <template>
   <CollapsibleSection storage-key="review" section-id="section-review" :active="active">
     <template #header>
-      <SectionHeader number="12" :title="'Plan de mise en conformité'"
+      <SectionHeader number="11" :title="'Plan de mise en conformité'"
                      :subtitle="`${visibleActionItems.length} action${visibleActionItems.length > 1 ? 's' : ''}${resolvedCount ? ' · ' + resolvedCount + ' résolue' + (resolvedCount > 1 ? 's' : '') + ' masquée' + (resolvedCount > 1 ? 's' : '') : ''}`"
                      :icon="ExclamationTriangleIcon" icon-color="text-orange-500"
                      :step="step"
