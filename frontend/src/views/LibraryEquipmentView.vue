@@ -636,7 +636,6 @@ onMounted(async () => {
                 Nom {{ sortBy === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
               <th class="text-center px-2 py-2.5 w-10" title="Captures d'écran (cliquer pour ouvrir, glisser une image dessus pour ajouter)">Photos</th>
-              <th class="text-center px-4 py-2.5 whitespace-nowrap">Slug</th>
               <th class="text-center px-4 py-2.5 whitespace-nowrap cursor-pointer hover:text-gray-700" @click="toggleSort('default_energy_source')">
                 Énergie {{ sortBy === 'default_energy_source' ? (sortDir === 'asc' ? '↑' : '↓') : '' }}
               </th>
@@ -666,7 +665,7 @@ onMounted(async () => {
                 <tr class="border-t-2"
                     :style="{ borderTopColor: grp.color, backgroundColor: grp.color + '14' }">
                   <td class="px-3 py-2.5" colspan="2"></td>
-                  <td class="px-4 py-2.5 whitespace-nowrap" colspan="10">
+                  <td class="px-4 py-2.5 whitespace-nowrap" colspan="9">
                     <span class="inline-flex items-center gap-2 font-bold text-sm tracking-wide"
                           :style="{ color: grp.color }">
                       <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg"
@@ -716,7 +715,6 @@ onMounted(async () => {
                       <span v-if="t.attachments_count > 0" class="text-[11px] font-semibold">{{ t.attachments_count }}</span>
                     </button>
                   </td>
-                  <td class="px-4 py-2 text-center whitespace-nowrap"><code class="text-[11px] bg-gray-100 px-1.5 py-0.5 rounded">{{ t.slug }}</code></td>
                   <td class="px-4 py-2 text-center whitespace-nowrap">
                     <EnergyPill :value="t.default_energy_source" size="xs" />
                   </td>
@@ -828,7 +826,7 @@ onMounted(async () => {
               </td>
             </tr>
             <tr v-if="!filteredSorted.length">
-              <td colspan="12" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+              <td colspan="11" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                 {{ searchQuery ? `Aucun template ne correspond à « ${searchQuery} ».` : 'Aucun template.' }}
               </td>
             </tr>
