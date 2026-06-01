@@ -67,7 +67,7 @@ const missingFields = () => {
   const out = []
   if (!hasIdentity()) out.push('un nom, une marque ou une référence')
   if (energyRequired.value && !form.value.energy_source) out.push('l\'énergie primaire')
-  if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('le rôle')
+  if (roleApplies.value && !(Array.isArray(form.value.device_role) && form.value.device_role.length)) out.push('la fonction')
   if (protocolCount() === 0) out.push('le(s) protocole(s)')
   return out
 }
@@ -135,7 +135,7 @@ async function submit(keepContext = false) {
                  class="w-full px-3 py-2 min-h-11 sm:min-h-0 border border-gray-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
         </div>
         <div v-if="roleApplies" :class="{ 'sm:col-span-2': true }">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Rôle(s) de l'équipement <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Fonction(s) de l'équipement <span class="text-red-500">*</span></label>
           <SearchableSelect
             v-model="form.device_role"
             :options="roleOptions"

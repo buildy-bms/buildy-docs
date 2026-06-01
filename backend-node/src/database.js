@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 194;
+const TARGET_VERSION = 195;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7397,6 +7397,54 @@ function runMigrations() {
     }
     log.info(`Migration 194 appliquee : ${libCleaned} modele(s) bibliotheque patche(s) (defaults role/energy)`);
     db.pragma('user_version = 194');
+  }
+
+  if (current < 195) {
+    // Migration 195 — Suite et correction de la doctrine `energy_source` =
+    // production seule (cf. mig 194).
+    //
+    // 9 corrections sur la bibliothèque (revue manuelle Kévin + Claude,
+    // juin 2026) :
+    //
+    //  - PAC : `heat_pump` n'est pas une énergie, c'est une techno. La PAC
+    //    consomme de l'ÉLECTRICITÉ (compresseur). Aligne sur split, UE-DRV,
+    //    CET qui ont déjà `electric` depuis la mig 194.
+    //  - Aérateurs / ventilateurs autonomes (destrato, VMC simple flux,
+    //    VMC double flux, ventilation générique, CTA) : le moteur ventilo
+    //    crée le débit d'air → ajout du rôle `production` (cohérent avec
+    //    extracteur d'air autonome, déjà arbitré mig 194).
+    //  - Prises de courant pilotées : la prise distribue l'élec au
+    //    consommateur branché derrière, elle ne consomme rien → rôle
+    //    `distribution`, energy=null.
+    //  - BSO motorisé : rôle `regulation`, energy=null. La conso élec du
+    //    moteur n'est pas une énergie primaire. La coercion backend
+    //    forcerait null de toute façon à chaque PATCH device.
+    //  - ASI / Onduleur de secours : source d'énergie de secours pour le
+    //    bâtiment quand le réseau coupe = production électrique (au sens
+    //    R175). Aligne sur Batterie stationnaire.
+    const LIB_PATCHES_195 = [
+      { slug: 'pompe-a-chaleur',     role: ['production'],              energy: 'electric' },
+      { slug: 'destratificateur',    role: ['production', 'emission'],  energy: 'electric' },
+      { slug: 'cta',                 role: ['production', 'distribution', 'emission', 'regulation'], energy: 'electric' },
+      { slug: 'vmc-simple-flux',     role: ['production', 'distribution', 'emission'], energy: 'electric' },
+      { slug: 'vmc-double-flux',     role: ['production', 'distribution', 'emission', 'regulation'], energy: 'electric' },
+      { slug: 'ventilation-generique', role: ['production', 'emission'], energy: 'electric' },
+      { slug: 'prises-pilotees',     role: ['distribution'],            energy: null },
+      { slug: 'bso',                 role: ['regulation'],              energy: null },
+      { slug: 'onduleur-asi',        role: ['production'],              energy: 'electric' },
+    ];
+    const stmt195 = db.prepare(`
+      UPDATE equipment_templates
+      SET default_device_role = ?, default_energy_source = ?
+      WHERE slug = ?
+    `);
+    let lib195 = 0;
+    for (const p of LIB_PATCHES_195) {
+      const r = stmt195.run(JSON.stringify(p.role), p.energy, p.slug);
+      if (r.changes > 0) lib195++;
+    }
+    log.info(`Migration 195 appliquee : ${lib195} modele(s) bibliotheque corrige(s) (PAC electric + ventilation production + prises distribution + BSO null + ASI production)`);
+    db.pragma('user_version = 195');
   }
 
   if (current > TARGET_VERSION) {

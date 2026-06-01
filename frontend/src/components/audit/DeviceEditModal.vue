@@ -421,12 +421,13 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
         </div>
       </section>
 
-      <!-- Rôle de l'équipement & énergie primaire — section clé pour la
-           cohérence métier. L'énergie n'apparaît QUE si le rôle contient
-           Production (doctrine mig 194 : un radiateur à eau chaude n'a pas
-           d'énergie primaire propre, c'est l'équipement amont qui la porte). -->
+      <!-- Fonction(s) de l'équipement & énergie primaire — section clé pour
+           la cohérence métier. L'énergie n'apparaît QUE si la fonction
+           contient Production (doctrine mig 194 : un radiateur à eau chaude
+           n'a pas d'énergie primaire propre, c'est l'équipement amont qui la
+           porte). -->
       <section class="rounded-xl border border-gray-200 overflow-hidden">
-        <h4 :class="headCls">Rôle de l'équipement</h4>
+        <h4 :class="headCls">Fonction(s) de l'équipement</h4>
         <div class="p-3 space-y-3">
           <SearchableSelect :model-value="deviceRole" :options="ROLE_OPTIONS"
                             :multiple="true" :clearable="true" :creatable="true" size="sm"
@@ -437,7 +438,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
           <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-900 space-y-2">
             <div class="font-semibold flex items-center gap-1.5">
               <span class="text-base">💡</span>
-              <span>Comment choisir le(s) rôle(s) ?</span>
+              <span>Comment choisir la (les) fonction(s) ?</span>
             </div>
             <ul class="space-y-1 pl-1">
               <li><strong class="text-rose-700">Production</strong> — l'équipement transforme une énergie primaire (gaz, élec, soleil, bois…) en chaleur, froid ou lumière sur place. <em>Une énergie primaire devra être renseignée.</em></li>

@@ -323,7 +323,7 @@ async function removeDevice(d) {
             <DataTableSortHeader sort-key="quantity" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Qté</DataTableSortHeader>
             <DataTableSortHeader sort-key="power_kw" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Puissance</DataTableSortHeader>
             <DataTableSortHeader sort-key="energy_source" :active-key="sortKey" :dir="sortDir" @toggle="toggleSort">Énergie</DataTableSortHeader>
-            <th>Niveau(x)</th>
+            <th>Fonction(s)</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -420,9 +420,9 @@ async function removeDevice(d) {
                 />
               </div>
             </td>
-            <!-- Niveau(x) : Production / Distribution / Régulation / Émission.
-                 Multi-select, applique R175-6 sur chauffage / clim mais reste
-                 informatif pour les autres usages. -->
+            <!-- Fonction(s) : Production / Distribution / Émission / Régulation.
+                 Multi-select. Pilote aussi la doctrine énergie primaire — un
+                 device sans Production n'a pas d'energy_source (mig 194). -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div class="min-w-32">
                 <SearchableSelect
@@ -432,7 +432,7 @@ async function removeDevice(d) {
                   :multiple="true"
                   :clearable="true"
                   size="sm"
-                  placeholder="Niveau(x)"
+                  placeholder="Fonction(s)"
                 />
               </div>
             </td>

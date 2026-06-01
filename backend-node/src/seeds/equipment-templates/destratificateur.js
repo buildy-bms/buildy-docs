@@ -8,7 +8,7 @@ module.exports = {
   bacs_justification: '<p>L\'article R175-1 définit un <strong>système de chauffage</strong> comme la combinaison des composantes nécessaires pour assurer l\'augmentation contrôlée de la température de l\'air intérieur. Un destratificateur participe à cette fonction en homogénéisant la température et en limitant les pertes liées à la stratification thermique.</p><p>À ce titre, il fait partie du périmètre BACS et doit pouvoir être <strong>supervisé, arrêté manuellement et géré de manière autonome</strong> en cohérence avec les autres systèmes thermiques.</p><p>L\'intégration du destratificateur dans la solution Buildy permet de remonter son état et son écart de température mesuré, et d\'ajuster sa consigne de déclenchement.</p>',
   preferred_protocols: 'Modbus TCP,KNX/IP',
   default_energy_source: 'electric',
-  default_device_role: ['emission'],
+  default_device_role: ['production', 'emission'],
   icon_kind: 'fa',
   icon_value: 'fa-fan',
   icon_color: '#fb923c',

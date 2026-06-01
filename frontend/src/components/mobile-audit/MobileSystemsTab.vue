@@ -1353,11 +1353,11 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           </MobileField>
         </template>
 
-        <!-- Rôle(s) d'abord : l'énergie n'apparaît qu'ensuite, et SEULEMENT
-             si le rôle inclut Production (doctrine mig 194). Pour un
-             radiateur à eau chaude ou un ventilo-convecteur, pas d'énergie
-             primaire — elle est portée par l'équipement amont. -->
-        <MobileField label="Rôle(s) de l'équipement">
+        <!-- Fonction(s) d'abord : l'énergie n'apparaît qu'ensuite, et
+             SEULEMENT si la fonction inclut Production (doctrine mig 194).
+             Pour un radiateur à eau chaude ou un ventilo-convecteur, pas
+             d'énergie primaire — elle est portée par l'équipement amont. -->
+        <MobileField label="Fonction(s) de l'équipement">
           <MobileSelectSheet
             :model-value="Array.isArray(deviceForm.device_role) ? deviceForm.device_role : (deviceForm.device_role ? [deviceForm.device_role] : [])"
             @update:model-value="v => deviceForm.device_role = v"
