@@ -17,7 +17,27 @@ import { METER_TYPES, getMeterUsageMeta } from '@/lib/meter-options'
 const props = defineProps({
   meters: { type: Array, required: true },
   zones: { type: Array, required: true },
+  systems: { type: Array, default: () => [] },
 })
+
+// Mapping usage compteur → system_category(s) du système bacs correspondant.
+const METER_USAGE_TO_SYSTEM_CATS = {
+  heating: ['heating'],
+  cooling: ['cooling'],
+  dhw: ['dhw'],
+  pv: ['electricity_production'],
+  lighting: ['lighting_indoor', 'lighting_outdoor'],
+}
+function systemNameForMeter(m) {
+  if (!m || m.zone_id == null) return null
+  const cats = METER_USAGE_TO_SYSTEM_CATS[m.usage] || []
+  if (!cats.length) return null
+  const names = props.systems
+    .filter(s => s.zone_id === m.zone_id && cats.includes(s.system_category)
+      && s.custom_label && s.custom_label.trim())
+    .map(s => s.custom_label.trim())
+  return names.length ? names.join(' / ') : null
+}
 const emit = defineEmits(['cell-click', 'add-meter'])
 
 // Zones triées : Général (zone_id null) en premier, puis fonctionnelles,
@@ -133,6 +153,8 @@ function badgeTitle(meter, meta) {
   const parts = []
   if (meta?.label) parts.push(meta.label)
   if (meter.zone_name) parts.push(meter.zone_name)
+  const sysName = systemNameForMeter(meter)
+  if (sysName) parts.push(sysName)
   if (meter.required && !meter.present_actual && !meter.out_of_service) parts.push('Requis manquant')
   if (meter.out_of_service) parts.push('Hors service')
   return parts.join(' · ')

@@ -766,6 +766,13 @@ async function routes(fastify) {
       production_regulation_device_id: z.number().int().nullable().optional(),
       distribution_regulation_device_id: z.number().int().nullable().optional(),
       emission_regulation_device_id: z.number().int().nullable().optional(),
+      // Migration 193 — équipements supplémentaires par niveau (JSON array
+      // d'ids). La FK primaire reste source de vérité pour R175-6 ; ces
+      // colonnes documentent les équipements additionnels sélectionnés au
+      // multiselect par l'auditeur (ex. 3 chaudières en cascade).
+      production_extra_device_ids: z.string().nullable().optional(),
+      distribution_extra_device_ids: z.string().nullable().optional(),
+      emission_extra_device_ids: z.string().nullable().optional(),
       // Migration 129 : note libre par niveau, en plus de la note globale
       // `notes_html` au niveau du couple zone × catégorie.
       production_notes_html: z.string().nullable().optional(),

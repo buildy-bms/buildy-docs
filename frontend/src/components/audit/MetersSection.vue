@@ -31,7 +31,7 @@ const emit = defineEmits([
 ])
 
 const audit = useAuditStore()
-const { meters, document, zones } = storeToRefs(audit)
+const { meters, document, zones, systems } = storeToRefs(audit)
 const { error } = useNotification()
 const { confirm } = useConfirm()
 
@@ -153,7 +153,7 @@ function hasNotes(html) {
 <template>
   <CollapsibleSection storage-key="meters" section-id="section-meters" :active="active">
     <template #header>
-      <SectionHeader number="5" :title="'Compteurs et mesurage'"
+      <SectionHeader number="4" :title="'Compteurs et mesurage'"
                      :subtitle="audit.isBacs ? 'R175-3 1° — suivi continu, pas horaire, conservation 5 ans' : 'Compteurs présents et raccordés'"
                      :icon="BoltIcon" icon-color="text-emerald-600"
                      :step="step"
@@ -203,6 +203,7 @@ function hasNotes(html) {
       <MeterCoverageMatrix
         :meters="meters"
         :zones="zones"
+        :systems="systems"
         @cell-click="focusMeterFromMatrix"
         @add-meter="onAddMeter"
       />
@@ -215,6 +216,7 @@ function hasNotes(html) {
           :energy="section.energy"
           :meters="section.meters"
           :zones="zones"
+          :systems="systems"
           :document="document"
           :protocol-options="protocolOptions"
           :meter-usages="meterUsages"

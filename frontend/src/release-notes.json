@@ -2,6 +2,48 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.134",
+      "date": "2026-05-29",
+      "title": "Audit BACS — drag-drop photos restauré, multi-équipements régulation, numérotation cards alignée",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Drag-drop d'une photo sur un compteur restauré",
+          "what": "Le drag-drop photo direct sur une ligne compteur avait été retiré lors de la refonte du plan de comptage (0.1.103). Restauré dans la table par énergie : on peut à nouveau glisser une photo / un PDF directement sur la ligne du compteur — la pièce est rattachée à `bacs_audit_meter_id`.",
+          "where": "Card 4 « Compteurs et mesurage » → tableau par énergie → ligne compteur.",
+          "how": "Glisser une photo depuis le bureau sur une ligne compteur : la photo apparaît dans la galerie du compteur, son icône photo passe en vert."
+        },
+        {
+          "kind": "fix",
+          "title": "Drag-drop photo équipement : icône passe en vert et photo visible dans la galerie",
+          "what": "L'upload se faisait bien (le document apparaissait dans Documents du site) mais le `bacs_audit_system_id` n'était pas posé sur le document, donc le filtre `device_id AND system_id` du BacsPhotoButton de la ligne ne ramenait pas la photo. L'attach-to du PhotoDropTr est maintenant `{ device_id, system_id }`, aligné avec celui du BacsPhotoButton — l'icône passe en vert et la photo apparaît dans la galerie.",
+          "where": "Card 3 « Systèmes » → tableau d'équipements → ligne device.",
+          "how": "Glisser une photo sur une ligne équipement → icône photo passe immédiatement en vert, galerie affiche bien la photo."
+        },
+        {
+          "kind": "feat",
+          "title": "Nom du système affiché pour chaque compteur",
+          "what": "Quand un système BACS porte un nom personnalisé (custom_label), il est désormais affiché sous l'usage du compteur dans le tableau par énergie et inclus dans le tooltip de la matrice de couverture. Le mapping usage → catégorie système (heating/cooling/dhw/pv/lighting) permet de relier compteur et système matchant la zone.",
+          "where": "Card 4 « Compteurs » → tableau par énergie (sous la pilule Usage) + matrice de couverture (tooltip au survol).",
+          "how": "Renommer un système avec un custom_label, ouvrir la card Compteurs : le nom apparaît sous l'usage des compteurs de la zone correspondante."
+        },
+        {
+          "kind": "feat",
+          "title": "Multi-équipements pour la régulation thermique (Production / Distribution / Émission)",
+          "what": "Le multiselect des 3 niveaux R175-6 acceptait au maximum 2 items (slot équipement + slot régulateur déporté hérité). Refonte : sélection illimitée. Le 1er item reste la FK primaire (source de vérité pour les calculs R175-6) ; les items supplémentaires sont stockés en JSON dans 3 nouvelles colonnes (mig 193). Permet de saisir 3 chaudières en cascade, 2 pompes de distribution, etc.",
+          "where": "Card 5 « Régulation thermique » → ligne zone × usage → multiselect Production / Distribution / Émission.",
+          "how": "Ouvrir la card Régulation, sélectionner 3+ équipements sur Production : la sélection est persistée et restituée au reload."
+        },
+        {
+          "kind": "fix",
+          "title": "Numérotation des cards alignée sur le stepper",
+          "what": "Les cards 4 à 13 décalées d'un cran par rapport au stepper (héritage de la card « 3 Zones techniques » du mode non-unifié). Décalage 4→3, 5→4, … 13→12 : Systèmes 3, Compteurs 4, Régulation 5, GTB 6, Inspections 7, Check-list 8, Documents 9, Credentials 10, Plan 11, Synthèse 12.",
+          "where": "Numéros affichés à gauche du titre de chaque card audit.",
+          "how": "Ouvrir un audit en mode unifié : la numérotation va de 1 à 12 sans trou et correspond à l'ordre du stepper."
+        }
+      ]
+    },
+    {
       "version": "0.1.133",
       "date": "2026-05-29",
       "title": "Audit BACS — paquet de fixes UI (parties prenantes, site picker, drag-drop, move équipement)",

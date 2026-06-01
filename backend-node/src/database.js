@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 192;
+const TARGET_VERSION = 193;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7265,6 +7265,30 @@ function runMigrations() {
     }
     log.info('Migration 192 appliquee : site_parties.kind accepte owner_lessor');
     db.pragma('user_version = 192');
+  }
+
+  if (current < 193) {
+    // Migration 193 — Multi-équipements par niveau de régulation thermique
+    // (R175-6 : Production / Distribution / Émission). Le schéma historique
+    // n'avait qu'une FK `*_device_id` (équipement principal) + une FK
+    // `*_regulation_device_id` (régulateur déporté, désormais retiré de
+    // l'UI au profit des champs free-text de la modale équipement).
+    // 3 colonnes TEXT JSON pour stocker la liste des équipements
+    // supplémentaires saisis dans le multiselect de chaque niveau. La FK
+    // primaire (`*_device_id`) reste source de vérité pour les calculs R175-6
+    // (cf. project_buildy_docs_thermal_3levels) ; les extras enrichissent la
+    // documentation visuelle de l'auditeur.
+    const cols = [
+      'production_extra_device_ids',
+      'distribution_extra_device_ids',
+      'emission_extra_device_ids',
+    ];
+    for (const c of cols) {
+      try { db.exec(`ALTER TABLE bacs_audit_thermal_regulation ADD COLUMN ${c} TEXT`); }
+      catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    }
+    log.info('Migration 193 appliquee : bacs_audit_thermal_regulation.{production,distribution,emission}_extra_device_ids');
+    db.pragma('user_version = 193');
   }
 
   if (current > TARGET_VERSION) {

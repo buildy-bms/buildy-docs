@@ -22,7 +22,7 @@ const props = defineProps({
   siteUuid: { type: String, required: true },
   attachTo: { type: Object, required: true },
   enabled: { type: Boolean, default: true },
-  rowClass: { type: String, default: '' },
+  rowClass: { type: [String, Array, Object], default: '' },
 })
 const emit = defineEmits(['changed'])
 

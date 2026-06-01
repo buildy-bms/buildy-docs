@@ -17,6 +17,7 @@ import ProtocolMultiPicker from '@/components/ProtocolMultiPicker.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import SearchableSelect from '@/components/SearchableSelect.vue'
 import BacsPhotoButton from '@/components/BacsPhotoButton.vue'
+import PhotoDropTr from '@/components/PhotoDropTr.vue'
 import VoiceNoteButton from '@/components/VoiceNoteButton.vue'
 import { meterUsageLabel, METER_USAGES, getMeterUsageMeta } from '@/lib/meter-options'
 
@@ -24,11 +25,39 @@ const props = defineProps({
   energy: { type: Object, required: true }, // { value, label, icon, color }
   meters: { type: Array, required: true },
   zones: { type: Array, default: () => [] },
+  systems: { type: Array, default: () => [] },
   document: { type: Object, default: null },
   protocolOptions: { type: Array, required: true },
   meterUsages: { type: Array, required: true }, // pour le contextLabel des notes
   highlightId: { type: Number, default: null }, // surligne temporairement une ligne
 })
+
+// Mapping usage compteur → system_category(s) du système bacs correspondant.
+// Lighting peut matcher indoor ou outdoor — on accepte les 2.
+const METER_USAGE_TO_SYSTEM_CATS = {
+  heating: ['heating'],
+  cooling: ['cooling'],
+  dhw: ['dhw'],
+  pv: ['electricity_production'],
+  lighting: ['lighting_indoor', 'lighting_outdoor'],
+}
+
+// Pour un compteur donné, retourne le custom_label du système BACS
+// matchant (zone × usage) si défini, sinon null. Utilisé pour afficher
+// « Chaudière principale » sous l'usage du compteur quand le système
+// porte un nom propre.
+function systemNameForMeter(m) {
+  if (!m || m.zone_id == null) return null
+  const cats = METER_USAGE_TO_SYSTEM_CATS[m.usage] || []
+  if (!cats.length) return null
+  const names = props.systems
+    .filter(s => s.zone_id === m.zone_id && cats.includes(s.system_category)
+      && s.custom_label && s.custom_label.trim())
+    .map(s => s.custom_label.trim())
+  if (!names.length) return null
+  // Lighting (2 sous-catégories) : on concat séparé par « / ».
+  return names.join(' / ')
+}
 
 // Options du SearchableSelect « Localisation » : zones techniques d'abord
 // (un compteur est généralement installé dans un local technique / TGBT /
@@ -49,7 +78,7 @@ const locationOptions = computed(() => {
 
 const emit = defineEmits([
   'patch-meter', 'duplicate-meter', 'remove-meter', 'open-notes',
-  'add-meter', 'reorder',
+  'add-meter', 'reorder', 'photos-changed',
 ])
 
 // Replié par défaut si 0 compteur (sections vides → moins de bruit).
@@ -272,12 +301,17 @@ onBeforeUnmount(teardownSortable)
                 </td>
               </tr>
               <!-- Ligne compteur -->
-              <tr v-else
+              <PhotoDropTr v-else
                 :data-id="row.meter.id"
-                :class="['meter-row',
+                :data-meter-id="row.meter.id"
+                :site-uuid="document?.site_uuid || ''"
+                :attach-to="{ meter_id: row.meter.id }"
+                :enabled="!!document?.site_uuid"
+                :row-class="['meter-row',
                   row.meter.out_of_service ? 'opacity-50' : '',
                   row.meter.required && !row.meter.present_actual && !row.meter.out_of_service ? 'bg-red-50/40' : '',
-                  highlightId === row.meter.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']">
+                  highlightId === row.meter.id ? 'ring-2 ring-amber-300 bg-amber-50/40' : '']"
+                @changed="$emit('photos-changed')">
               <td class="align-middle">
                 <button type="button"
                         class="drag-handle inline-flex p-1 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing"
@@ -291,8 +325,17 @@ onBeforeUnmount(teardownSortable)
                 {{ row.meter.zone_name || 'Compteur général' }}
               </td>
               <td>
-                <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
-                <span v-else class="text-xs text-gray-400 italic">—</span>
+                <div class="flex flex-col gap-0.5">
+                  <MeterUsagePill v-if="row.meter.zone_id" :usage="row.meter.usage" />
+                  <span v-else class="text-xs text-gray-400 italic">—</span>
+                  <!-- Nom du système BACS rattaché (zone × usage) si défini.
+                       Permet de distinguer plusieurs systèmes de même usage. -->
+                  <span v-if="systemNameForMeter(row.meter)"
+                        class="text-[10px] text-gray-500 truncate"
+                        v-tooltip="systemNameForMeter(row.meter)">
+                    {{ systemNameForMeter(row.meter) }}
+                  </span>
+                </div>
               </td>
               <td class="whitespace-nowrap">
                 <SegmentedToggle compact :model-value="!!row.meter.required"
@@ -374,7 +417,7 @@ onBeforeUnmount(teardownSortable)
                   </button>
                 </div>
               </td>
-            </tr>
+            </PhotoDropTr>
             </template>
           </tbody>
         </table>
