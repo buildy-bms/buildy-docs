@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.137",
+      "date": "2026-06-03",
+      "title": "Éditeur d'AF — tableau des zones plus compact + vérificateur d'intégrité des AF",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Zones fonctionnelles — lignes plus compactes dans l'éditeur",
+          "what": "Les lignes du tableau « Zones fonctionnelles » de l'éditeur d'AF étaient trop aérées. Marge verticale réduite (≈10 px → ≈6 px par ligne) pour densifier la liste, surtout utile sur les AF à nombreuses zones. La taille du texte est conservée.",
+          "where": "Document AF → chapitre « Zones fonctionnelles du bâtiment ».",
+          "how": "Ouvrir une AF avec plusieurs zones : les lignes sont plus serrées, on en voit davantage sans scroller."
+        },
+        {
+          "kind": "feature",
+          "title": "Script interne de vérification d'intégrité des AF",
+          "what": "Nouveau `scripts/verify-af-coherence.mjs` qui scanne toutes les AF et détecte les profils de corruption (chapitres en double, liens biblio orphelins ou perdus, badges « AF » inattendus, bandeau « à revoir » gonflé). Filet de sécurité après l'incident des clones d'AF de juin.",
+          "where": "Outil en ligne de commande (équipe Buildy), aucun impact UI.",
+          "how": "À la racine buildy-docs : `node scripts/verify-af-coherence.mjs` affiche un tableau de santé par AF et sort en erreur si un doublon ou une FK orpheline est trouvé."
+        }
+      ]
+    },
+    {
       "version": "0.1.136",
       "date": "2026-06-01",
       "title": "Bibliothèque — 9 modèles supplémentaires alignés sur la doctrine énergie + cohérence visuelle « Fonction(s) »",
