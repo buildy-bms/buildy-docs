@@ -289,17 +289,17 @@ async function bulkDuplicate() {
         </thead>
         <tbody>
           <tr v-for="z in visibleZones" :key="z.id" :class="['border-t border-gray-100 group hover:bg-indigo-50/40 transition-colors', sel.has(z.id) ? 'bg-indigo-50/40' : '']">
-            <td class="px-3 py-2 text-center" @click.stop>
+            <td class="px-3 py-1.5 text-center" @click.stop>
               <input type="checkbox" :checked="sel.has(z.id)" @change="sel.toggle(z.id)"
                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500/30" />
             </td>
-            <td class="px-5 py-2.5 font-semibold text-gray-800">{{ z.name }}</td>
-            <td class="px-4 py-2.5 text-right tabular-nums text-gray-600">
+            <td class="px-5 py-1.5 font-semibold text-gray-800">{{ z.name }}</td>
+            <td class="px-4 py-1.5 text-right tabular-nums text-gray-600">
               <span v-if="z.surface_m2">{{ z.surface_m2 }} <span class="text-gray-400">m²</span></span>
               <span v-else class="text-gray-300">—</span>
             </td>
-            <td class="px-4 py-2.5 text-gray-600">{{ z.occupation_type || '—' }}</td>
-            <td class="px-4 py-2.5 text-right whitespace-nowrap">
+            <td class="px-4 py-1.5 text-gray-600">{{ z.occupation_type || '—' }}</td>
+            <td class="px-4 py-1.5 text-right whitespace-nowrap">
               <Tooltip text="Éditer la zone">
                 <button @click="openEdit(z)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-opacity">
                   <PencilSquareIcon class="w-3.5 h-3.5" />
