@@ -416,29 +416,20 @@ async function removeDevice(d) {
                    :title="'La puissance R175-2 est portée par l\'équipement de PRODUCTION amont (UE DRV, chiller, chaudière, sous-station). Cet émetteur transfère vers le local des kW déjà comptabilisés via le producteur — les cumuler ici ferait du double comptage. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s).'">
                 — non applicable
               </div>
-              <div v-else class="flex flex-col items-end gap-0.5 w-28 mx-auto">
-                <div class="relative w-full">
-                  <input type="number" min="0" step="0.1"
-                         :value="d.power_kw_unknown ? '' : d[powerFieldFor(d)]"
-                         :placeholder="d.power_kw_unknown ? 'Inconnue' : '—'"
-                         :disabled="!!d.power_kw_unknown"
-                         @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                         :class="[inputCls, d.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
-                         class="text-right pr-9 placeholder:text-gray-300 w-full"
-                         v-tooltip="thermalCategories.has(system.system_category)
-                            ? (system.system_category === 'cooling' ? 'Puissance froid nominale — entre dans le cumul R175-2' : 'Puissance chaud nominale — entre dans le cumul R175-2')
-                            : 'Puissance installée — informative, hors cumul R175-2 (qui ne retient que la puissance thermique chauffage + climatisation)'" />
-                  <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
-                </div>
-                <label class="inline-flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
-                       v-tooltip="'Aucune indication de puissance disponible sur le terrain (luminaire sans plaque, vieux radiateur élec…). Marque la puissance comme « déclarée inconnue » plutôt que de laisser le champ vide.'">
-                  <input type="checkbox" :checked="!!d.power_kw_unknown"
-                         @change="e => patchDevice(d, { power_kw_unknown: e.target.checked, ...(e.target.checked ? { [powerFieldFor(d)]: null } : {}) })"
-                         class="w-3 h-3 accent-amber-500" />
-                  Inconnue
-                </label>
-                <span v-if="!thermalCategories.has(system.system_category)"
-                      class="text-[10px] text-gray-400 italic">hors R175-2</span>
+              <div v-else class="relative w-24 mx-auto">
+                <input type="number" min="0" step="0.1"
+                       :value="d.power_kw_unknown ? '' : d[powerFieldFor(d)]"
+                       :placeholder="d.power_kw_unknown ? 'Inconnue' : '—'"
+                       :disabled="!!d.power_kw_unknown"
+                       @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       :class="[inputCls, d.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
+                       class="text-right pr-9 placeholder:text-gray-300"
+                       v-tooltip="d.power_kw_unknown
+                          ? 'Puissance déclarée inconnue par auditeur. Pour modifier, ouvre cet équipement (bouton Modifier).'
+                          : (thermalCategories.has(system.system_category)
+                              ? (system.system_category === 'cooling' ? 'Puissance froid nominale — entre dans le cumul R175-2' : 'Puissance chaud nominale — entre dans le cumul R175-2')
+                              : 'Puissance installée — informative, hors cumul R175-2 (qui ne retient que la puissance thermique chauffage + climatisation)')" />
+                <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>
             <!-- Énergie — doctrine 0.1.135 : saisissable UNIQUEMENT si la
