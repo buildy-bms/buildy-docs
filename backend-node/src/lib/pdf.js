@@ -15,31 +15,27 @@ Handlebars.registerHelper('add', (a, b) => Number(a) + Number(b));
 Handlebars.registerHelper('and', function(...args) { args.pop(); return args.every(Boolean); });
 Handlebars.registerHelper('join', (arr, sep) => Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : '');
 
-// Pill colorée représentant un rôle de niveau de la chaîne énergétique
-// (production / distribution / émission / régulation / autre). Aligne le
-// PDF sur le composant ROLE_OPTIONS du frontend (lib/audit-options.js).
+// Pill colorée représentant une fonction d'équipement dans la chaîne
+// énergétique (production / distribution / émission / régulation /
+// autre). Aligne le PDF sur ROLE_OPTIONS du frontend (lib/audit-options.js).
+// Pas d'icône depuis 0.1.147/0.1.158 — fa-fan pour Émission pouvait
+// être confondu avec la catégorie d'usage Ventilation, fa-industry
+// pour Production évoquait à tort l'industriel. La couleur fait
+// office de marqueur, le label porte le sens.
 const ROLE_PILL = {
-  production:   { label: 'Production',   icon: 'industry',         color: '#dc2626' },
-  distribution: { label: 'Distribution', icon: 'route',            color: '#0ea5e9' },
-  emission:     { label: 'Émission',     icon: 'fan',              color: '#3b82f6' },
-  regulation:   { label: 'Régulation',   icon: 'sliders',          color: '#a855f7' },
-  autre:        { label: 'Autre',        icon: 'circle-question',  color: '#6b7280' },
+  production:   { label: 'Production',   color: '#dc2626' },
+  distribution: { label: 'Distribution', color: '#0ea5e9' },
+  emission:     { label: 'Émission',     color: '#3b82f6' },
+  regulation:   { label: 'Régulation',   color: '#a855f7' },
+  autre:        { label: 'Autre',        color: '#6b7280' },
 };
 Handlebars.registerHelper('rolePill', (role, variant) => {
   const cfg = ROLE_PILL[String(role || '').toLowerCase()];
   if (!cfg) return '';
   const isSm = typeof variant === 'string' && variant === 'sm';
-  const iconSize = isSm ? '7' : '9';
   const cls = isSm ? 'role-pill role-pill-sm' : 'role-pill';
-  const def = lookupFaIcon(cfg.icon);
-  let iconSvg = '';
-  if (def) {
-    const [w, h, , , path] = def.icon;
-    const d = Array.isArray(path) ? path[path.length - 1] : path;
-    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${iconSize}" height="${iconSize}" style="vertical-align:middle;display:inline-block;flex-shrink:0;margin-right:0.6mm"><path fill="${cfg.color}" d="${d}"/></svg>`;
-  }
   return new Handlebars.SafeString(
-    `<span class="${cls}" style="background:${cfg.color}1a;color:${cfg.color};border:0.3pt solid ${cfg.color}66">${iconSvg}${cfg.label}</span>`
+    `<span class="${cls}" style="background:${cfg.color}1a;color:${cfg.color};border:0.3pt solid ${cfg.color}66">${cfg.label}</span>`
   );
 });
 
@@ -205,6 +201,34 @@ Handlebars.registerHelper('energyPill', (energy, variant) => {
   if (!energy) return '';
   const cfg = ENERGY_PILL[energy] || ENERGY_PILL.autre;
   return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+});
+
+// Pastille Oui / Non / —, colorée + texte (au lieu d'un simple ✓/✗
+// dans les tableaux denses). Améliore la scannabilité du PDF synthèse
+// sur les colonnes booléennes : un lecteur voit immédiatement les Non
+// (rouge pâle) à corriger sans devoir interpréter un symbole nu.
+// Argument : valeur ternaire (true / 1 / 'yes' = Oui, false / 0 / 'no'
+// = Non, null / undefined = —).
+const BOOL_PILL = {
+  yes: { label: 'Oui', bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  no:  { label: 'Non', bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+  na:  { label: '—',   bg: '#f3f4f6', fg: '#6b7280', border: '#d1d5db' },
+};
+function triState(v) {
+  if (v === true || v === 1 || v === '1' || v === 'yes' || v === 'true') return 'yes';
+  if (v === false || v === 0 || v === '0' || v === 'no' || v === 'false') return 'no';
+  return 'na';
+}
+function renderBoolPill(state, opts = {}) {
+  const cfg = BOOL_PILL[state] || BOOL_PILL.na;
+  const isSm = opts.variant === 'sm';
+  const cls = isSm ? 'bool-pill bool-pill-sm' : 'bool-pill';
+  return new Handlebars.SafeString(
+    `<span class="${cls}" style="background:${cfg.bg};color:${cfg.fg};border:0.4pt solid ${cfg.border}">${cfg.label}</span>`
+  );
+}
+Handlebars.registerHelper('boolPill', (v, variant) => {
+  return renderBoolPill(triState(v), { variant: typeof variant === 'string' ? variant : 'md' });
 });
 
 // Pill communication équipement : rouge pâle quand non communicant,

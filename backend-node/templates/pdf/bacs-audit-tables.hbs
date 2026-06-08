@@ -220,7 +220,7 @@
         <th class="col-model">Modèle / réf.</th>
         <th class="col-energy">Énergie</th>
         <th class="col-power">Puissance (kW)</th>
-        <th class="col-role">Rôle</th>
+        <th class="col-role">Fonction(s)</th>
         <th class="col-comm">Communication</th>
         <th class="col-loc">Localisation</th>
         <th class="col-bool">Interopérable</th>
@@ -249,16 +249,23 @@
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-energy">{{#if energy_source}}{{{energyPill energy_source "sm"}}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-power">{{#if has_multiple}}{{total_power_kw}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}}{{else}}<span class="muted">—</span>{{/if}}{{/if}}</td>
+                <td class="col-power">
+                  {{#if has_multiple}}
+                    <span class="pwr-main">{{total_power_kw}}</span>
+                    <span class="pwr-detail">{{quantity}}&times;{{power_kw}}</span>
+                  {{else}}
+                    {{#if power_kw}}<span class="pwr-main">{{power_kw}}</span>{{else}}<span class="muted">—</span>{{/if}}
+                  {{/if}}
+                </td>
                 <td class="col-role">
                   {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
                 </td>
                 <td class="col-comm">{{{commPill communication_protocol "sm"}}}</td>
                 <td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-bool"><span class="{{#if meets_r175_3_p3}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p3}}✓{{else}}✗{{/if}}</span></td>
-                <td class="col-bool"><span class="{{triCls meets_r175_3_p4 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4}}</span></td>
-                <td class="col-bool"><span class="{{triCls meets_r175_3_p4_autonomous 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4_autonomous}}</span></td>
-                <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p3 "sm"}}}</td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p4 "sm"}}}</td>
+                <td class="col-bool">{{{boolPill meets_r175_3_p4_autonomous "sm"}}}</td>
+                <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
               </tr>
             {{/each}}
           {{/if}}{{/if}}

@@ -428,6 +428,37 @@ table.syn td.col-bool { text-align: center; }
   font-size: 6.4pt;
   line-height: 1.15;
   border-radius: 3mm;
+  white-space: nowrap;
+}
+/* Pastilles Oui / Non / — pour les colonnes booléennes du tableau
+   synthèse. Vert pâle / rouge pâle / gris, comme la pilule communication.
+   Variante sm pour rester dense dans les tableaux. */
+.bool-pill {
+  display: inline-block;
+  padding: 0.6mm 2.2mm;
+  font-size: 7pt;
+  font-weight: 600;
+  line-height: 1.15;
+  border-radius: 3mm;
+  white-space: nowrap;
+}
+.bool-pill-sm {
+  padding: 0.3mm 1.6mm;
+  font-size: 6.4pt;
+  border-radius: 2.6mm;
+}
+/* Colonne Puissance : la valeur principale et le détail du calcul
+   (qty × unitaire) sur 2 lignes max, jamais de wrap parasite type
+   « 22.5 (15×1.5\n) ». No-wrap sur chaque morceau. */
+table.syn td.col-power .pwr-main,
+table.syn td.col-power .pwr-detail {
+  display: block;
+  white-space: nowrap;
+}
+table.syn td.col-power .pwr-detail {
+  font-size: 6.4pt;
+  color: var(--neutral-500, #6b7280);
+  margin-top: 0.3mm;
 }
 
 /* Centrage harmonise des colonnes courtes/symboliques (booleens, pills,
