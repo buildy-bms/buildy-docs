@@ -394,16 +394,24 @@ async function removeDevice(d) {
                        v-tooltip="'Nombre d’unités identiques (multiplie la puissance pour le cumul R175-2)'" />
               </div>
             </td>
-            <!-- Puissance — item 3c : masquée hors usages thermiques. Le
-                 détail (frigorifique + type de calcul) est dans la modale. -->
+            <!-- Puissance — masquée hors usages thermiques (item 3c). Pour
+                 les usages thermiques, désactivée sur les émetteurs passifs
+                 (doctrine 0.1.135 : seuls les producteurs cumulent au R175-2 ;
+                 saisir une puissance sur un radiateur eau chaude ou une UI
+                 DRV ferait du double comptage avec le producteur amont). -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div v-if="!showPower" class="text-center text-xs text-gray-300"
                    v-tooltip="'Sans objet pour cet usage'">—</div>
+              <div v-else-if="!deviceRoleAllowsEnergySource(d.device_role)"
+                   class="px-2 py-1.5 text-xs text-gray-400 italic border border-dashed border-gray-200 rounded-md text-center cursor-help w-24 mx-auto"
+                   :title="'La puissance R175-2 est portée par l\'équipement de PRODUCTION amont (UE DRV, chiller, chaudière, sous-station). Cet émetteur transfère vers le local des kW déjà comptabilisés via le producteur — les cumuler ici ferait du double comptage. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s).'">
+                — non applicable
+              </div>
               <div v-else class="relative w-24 mx-auto">
                 <input type="number" min="0" step="0.1" :value="d[powerFieldFor(d)]" placeholder="—"
                        @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
                        :class="inputCls" class="text-right pr-9 placeholder:text-gray-300"
-                       v-tooltip="system.system_category === 'cooling' ? 'Puissance froid pour cet usage — détail chaud/froid dans la modale' : 'Puissance chaud / nominale — détail chaud/froid dans la modale'" />
+                       v-tooltip="system.system_category === 'cooling' ? 'Puissance froid nominale de ce producteur — entre dans le cumul R175-2' : 'Puissance chaud nominale de ce producteur — entre dans le cumul R175-2'" />
                 <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>

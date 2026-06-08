@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.143",
+      "date": "2026-06-08",
+      "title": "Doctrine puissance R175-2 — filtre strict sur la fonction Production + champs Puissance désactivés sur les émetteurs",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Cumul R175-2 — filtre Production strict pour éliminer tout risque de double comptage",
+          "what": "Le calcul automatique du cumul de puissance R175-2 (assujettissement) filtre désormais explicitement sur la fonction Production. Avant : un émetteur sans fonction Production mais avec une puissance saisie en catégorie chauffage ou refroidissement (cas typique : un radiateur à eau chaude ou une UI DRV) pouvait être cumulé via l'inférence sur la catégorie d'usage — risque de double comptage avec le producteur amont (chaudière, UE DRV, chiller, sous-station). Désormais : sans fonction Production, le device est strictement hors cumul, peu importe son power_calculation_type saisi ou inféré.",
+          "where": "`backend-node/src/lib/bacs-audit-power.js`. Visible sur le cumul R175-2 de la page « L'essentiel » du PDF + les chiffres du tableau de bord R175-2.",
+          "how_to_test": "Sur Communay (audit 43) : avant fix, cool=~49 kW (cumul UI DRV avec et sans Production). Après fix, cool=43,8 kW (seules les UI marquées Production cumulent). Si tu retires la fonction Production d'une UI, sa puissance sort immédiatement du cumul."
+        },
+        {
+          "kind": "ux",
+          "title": "Champ Puissance désactivé sur les émetteurs passifs (table et modale)",
+          "what": "Cohérence avec le filtre cumul : la table « Équipements » d'un système et la modale détaillée d'un équipement désactivent désormais le champ Puissance quand l'équipement n'a pas la fonction Production. Affichage « — non applicable » avec tooltip explicite : « La puissance R175-2 est portée par l'équipement de Production amont (UE DRV, chiller, chaudière, sous-station). Les cumuler ici ferait du double comptage. » Empêche l'auditeur de saisir des kW qui seraient écartés silencieusement.",
+          "where": "Carte 03 Systèmes → table équipements → colonnes Énergie et Puissance ; modale Modifier un équipement → section Identification (Puissance chaud/froid masquée si pas de Production).",
+          "how_to_test": "Sur une UI DRV (Émission seule) : champs Énergie ET Puissance affichent « — non applicable » avec leur tooltip. Ajoute la fonction Production via la colonne Fonction(s) → les deux champs deviennent saisissables. Mêmes effets sur la modale détaillée."
+        },
+        {
+          "kind": "ux",
+          "title": "Tooltips reformulés — vocabulaire « double comptage » au lieu de « énergie primaire propre »",
+          "what": "Les anciennes formulations (« cet équipement ne consomme pas d'énergie primaire ») étaient physiquement imprécises pour les émetteurs actifs (UI DRV, FCU, cassette plafonnière) qui consomment réellement un peu d'élec auxiliaire pour leur ventilateur. La nouvelle formulation explique correctement : les kW d'émission sont déjà comptabilisés via le producteur amont, les saisir une seconde fois ferait du double comptage R175-2.",
+          "where": "Modale Modifier un équipement (encart sous la fonction), table Systèmes (tooltips Énergie / Puissance), PWA mobile (encart d'aide), encart pédagogique des 4 fonctions (description de Émission précisée).",
+          "how_to_test": "Survole la cellule « — non applicable » d'un radiateur eau chaude ou d'une UI DRV : le tooltip parle de « kW déjà comptabilisés via le producteur amont » au lieu de « pas d'énergie primaire »."
+        }
+      ]
+    },
+    {
       "version": "0.1.142",
       "date": "2026-06-08",
       "title": "Pré-vérification — icônes et couleurs par catégorie d'usage / type d'entité",
