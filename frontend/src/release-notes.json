@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.158",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — pastilles Fonction(s) sans icône, Oui/Non colorés, puissance sur 2 lignes nettes",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Tableau Systèmes du PDF synthèse aligné sur la doctrine Buildy",
+          "what": "Quatre ajustements visuels : (1) Les pastilles Production / Distribution / Émission / Régulation perdent leur icône dans le PDF (alignement sur 0.1.147 frontend) — la couleur suffit, fini la confusion icône fa-fan d'Émission vs catégorie Ventilation. (2) Colonne « Rôle » renommée « Fonction(s) » dans le tableau synthèse et le rapport principal (libellé Nature de la card équipement aussi mis à jour). (3) Colonnes Interopérable / Arrêt manuel / Autonome / GTB affichent désormais des pastilles colorées Oui (vert pâle) / Non (rouge pâle) / — (gris) au lieu d'un simple ✓/✗ : un coup d'œil suffit pour repérer les défauts à corriger. (4) Cellule Puissance ne wrap plus n'importe où — la valeur principale est sur une ligne, le détail du calcul (qty × unitaire) sur une seconde ligne en plus petit, jamais de parenthèse orpheline.",
+          "where": "PDF Tableaux de synthèse audit BACS + rapport principal (label Nature → Fonction(s)).",
+          "how_to_test": "Régénérer le PDF synthèse Communay : pastilles Fonction(s) sans icône, pilules Oui/Non colorées sur les 4 dernières colonnes du tableau Systèmes, cellules Puissance type « 22.5 » + « 15×1.5 » en dessous, sans wrap parasite."
+        }
+      ]
+    },
+    {
       "version": "0.1.157",
       "date": "2026-06-08",
       "title": "PDF synthèse — nettoyage du tableau Systèmes (zones vides, sous-sections orphelines, doublons de libellé, ligne « Assujetti » répétée)",
