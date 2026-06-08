@@ -963,13 +963,13 @@
             <td>{{zoneLabel}}</td>
             <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
-            <td class="bool-cell"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
-            <td class="bool-cell"><span class="{{#if present_actual}}bool-yes{{else}}bool-no{{/if}}">{{#if present_actual}}✓{{else}}✗{{/if}}</span></td>
-            <td class="bool-cell"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell">{{{boolPill required "sm"}}}</td>
+            <td class="bool-cell">{{{boolPill present_actual "sm"}}}</td>
+            <td class="bool-cell">{{{boolPill communicating "sm"}}}</td>
             <td class="meter-protocols-cell">{{#if protocolsLabel}}<span class="muted">{{protocolsLabel}}</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>
-            <td class="bool-cell"><span class="{{#if wired}}bool-yes{{else}}bool-no{{/if}}">{{#if wired}}✓{{else}}✗{{/if}}</span></td>
+            <td class="bool-cell">{{{boolPill wired "sm"}}}</td>
             <td class="bool-cell">
-              {{#if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Intégration GTB hors service">HS</strong>{{else}}<span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span>{{/if}}
+              {{#if bms_integration_out_of_service}}<strong style="color:#b91c1c" title="Intégration GTB hors service">HS</strong>{{else}}{{{boolPill managed_by_bms "sm"}}}{{/if}}
             </td>
             <td class="bool-cell">{{#if out_of_service}}<strong style="color:#b91c1c">HS</strong>{{else}}<span class="bool-na">—</span>{{/if}}</td>
           </tr>

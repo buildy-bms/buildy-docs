@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.159",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — pastilles Oui/Non étendues à tous les tableaux denses",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Tous les tableaux booléens du PDF (Compteurs, Régulation thermique) passent en pilules colorées Oui/Non",
+          "what": "Suite de 0.1.158, le helper boolPill est désormais appliqué partout où on avait des ✓/✗ nus dans des tableaux denses : tableau Compteurs de la synthèse (Requis / Présent / Communicant / Câblé / Intégré GTB), tableau Régulation thermique de la synthèse (Régul. auto / Exempté bois / Robinets th.), tableau Compteurs détaillés par énergie du rapport principal (Requis / Présent / Communicant / Câblé / Intégré GTB). Un lecteur identifie en 2 secondes les Non rouge pâle qui pèsent dans le plan de mise en conformité.",
+          "where": "PDF Tableaux de synthèse audit BACS (tableaux 2/4 et 3/4) + chapitre 4 Compteurs du rapport principal.",
+          "how_to_test": "Régénérer les 2 PDF Communay : toutes les colonnes booléennes affichent désormais des pastilles colorées au lieu de symboles nus."
+        }
+      ]
+    },
+    {
       "version": "0.1.158",
       "date": "2026-06-08",
       "title": "PDF audit BACS — pastilles Fonction(s) sans icône, Oui/Non colorés, puissance sur 2 lignes nettes",

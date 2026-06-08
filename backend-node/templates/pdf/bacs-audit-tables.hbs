@@ -307,17 +307,13 @@
             <td class="col-ref">{{ref}}</td>
             <td class="col-type">{{{meterTypePill meter_type "sm"}}}</td>
             <td class="col-usage">{{{meterUsagePill usage "sm"}}}</td>
-            <td class="col-bool"><span class="{{#if required}}bool-yes{{else}}bool-no{{/if}}">{{#if required}}✓{{else}}✗{{/if}}</span></td>
+            <td class="col-bool">{{{boolPill required "sm"}}}</td>
             <td class="col-bool">
-              {{#if present_actual}}
-                <span class="bool-yes">✓</span>
-              {{else}}
-                <span class="bool-no">✗</span>
-                {{#if required}}<span class="missing-tag">à installer</span>{{/if}}
-              {{/if}}
+              {{{boolPill present_actual "sm"}}}
+              {{#unless present_actual}}{{#if required}}<div class="missing-tag">à installer</div>{{/if}}{{/unless}}
             </td>
-            <td class="col-bool"><span class="{{#if communicating}}bool-yes{{else}}bool-no{{/if}}">{{#if communicating}}✓{{else}}✗{{/if}}</span></td>
-            <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
+            <td class="col-bool">{{{boolPill communicating "sm"}}}</td>
+            <td class="col-bool">{{{boolPill managed_by_bms "sm"}}}</td>
             <td class="col-bool">{{#if out_of_service}}<span class="hs-tag">HS</span>{{else}}<span class="bool-na">—</span>{{/if}}</td>
             <td class="col-notes">{{#if notes_html}}{{{notes_html}}}{{else}}{{notes}}{{/if}}</td>
           </tr>
@@ -361,7 +357,7 @@
           <td class="col-ref">{{ref}}</td>
           <td class="col-zone">{{zone_name}}{{#if displayLabel}}<div class="thermal-row-label">{{displayLabel}}</div>{{/if}}</td>
           <td class="col-usage">{{{categoryIcon category "11"}}}<span class="cat-label">{{categoryLabel}}</span></td>
-          <td class="col-bool"><span class="{{#if has_automatic_regulation}}bool-yes{{else}}bool-no{{/if}}">{{#if has_automatic_regulation}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-bool">{{{boolPill has_automatic_regulation "sm"}}}</td>
           <td class="col-type">
             {{regulationLabel}}
             {{#if productionRegulationType}}<div class="thermal-row-label">P : {{productionRegulationType}}</div>{{/if}}
@@ -370,10 +366,10 @@
           </td>
           <td class="col-gen">{{generatorLabel}}</td>
           <td class="col-age">{{#if generator_age_years}}{{generator_age_years}} ans{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-bool"><span class="{{#if generator_exempt_wood}}bool-yes{{else}}bool-no{{/if}}">{{#if generator_exempt_wood}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-bool">{{{boolPill generator_exempt_wood "sm"}}}</td>
           <td class="col-sensor">{{#if sensor_position}}{{sensor_position}}{{else}}<span class="muted">—</span>{{/if}}</td>
           <td class="col-thermo">{{#if thermostat_type}}{{thermostat_type}}{{else}}<span class="muted">—</span>{{/if}}</td>
-          <td class="col-bool"><span class="{{#if has_thermostatic_valves}}bool-yes{{else}}bool-no{{/if}}">{{#if has_thermostatic_valves}}✓{{else}}✗{{/if}}</span></td>
+          <td class="col-bool">{{{boolPill has_thermostatic_valves "sm"}}}</td>
           <td class="col-notes">{{notes}}</td>
         </tr>
       {{/each}}
