@@ -2007,6 +2007,82 @@
   {{/unless}}
 </section>
 
+{{!-- ═══════════ Bordereau de saisie (Lot 5 — Plan « Qualité du livrable PDF ») ═══════════ --}}
+{{!-- Donne au PDF la valeur juridique d'un document remis : auditeur, --}}
+{{!-- responsable du site rencontré, signature SHA256, tag Git, version --}}
+{{!-- du décret de référence. --}}
+{{#if isBacs}}
+<section class="annex">
+  <h1>Bordereau de saisie</h1>
+  <div class="callout callout-info" style="margin-bottom: 4mm;">
+    <span class="callout-icon">{{{faIcon "circle-info" "#0284c7" "14"}}}</span>
+    <div class="callout-body">Trace des conditions de réalisation de l'audit, des personnes présentes lors de la visite et de l'intégrité du document remis. À conserver avec le rapport.</div>
+  </div>
+
+  <h2 style="margin-top: 6mm;">Conditions de réalisation</h2>
+  <table class="bordereau-table" style="width:100%; border-collapse:collapse; margin-top:2mm;">
+    <tbody>
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; width:42mm; color:#6b7280; font-size:9pt;">Site audité</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; font-weight:600;">{{document.client_name}} — {{document.project_name}}</td></tr>
+      {{#if site.address}}
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; color:#6b7280; font-size:9pt;">Adresse</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb;">{{site.address}}</td></tr>
+      {{/if}}
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; color:#6b7280; font-size:9pt;">Auditeur Buildy</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb;">{{#if document.created_by_name}}{{document.created_by_name}}{{else}}Équipe Buildy{{/if}}</td></tr>
+      {{#if document.delivered_at}}
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; color:#6b7280; font-size:9pt;">Date de livraison</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb;">{{formatDate document.delivered_at}}</td></tr>
+      {{/if}}
+    </tbody>
+  </table>
+
+  {{#if siteParties.length}}
+  <h2 style="margin-top: 6mm;">Parties prenantes du site</h2>
+  <p style="font-size:9pt; color:#6b7280; margin:0 0 2mm;">Personnes identifiées pour ce site — informations collectées en collaboration avec elles ou portées à leur connaissance.</p>
+  <table class="bordereau-table" style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr style="background:#f9fafb;">
+        <th style="padding:2mm 4mm; text-align:left; font-size:8.5pt; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; border-bottom:0.4pt solid #e5e7eb;">Rôle</th>
+        <th style="padding:2mm 4mm; text-align:left; font-size:8.5pt; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; border-bottom:0.4pt solid #e5e7eb;">Personne</th>
+        <th style="padding:2mm 4mm; text-align:left; font-size:8.5pt; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; border-bottom:0.4pt solid #e5e7eb;">Contact</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each siteParties}}
+      <tr>
+        <td style="padding:2mm 4mm; border-bottom:0.4pt solid #f3f4f6; font-size:9pt;">{{kindLabel}}</td>
+        <td style="padding:2mm 4mm; border-bottom:0.4pt solid #f3f4f6; font-size:9pt;">{{contact_name}}{{#if company}} — {{company}}{{/if}}</td>
+        <td style="padding:2mm 4mm; border-bottom:0.4pt solid #f3f4f6; font-size:9pt; color:#4b5563;">{{#if email}}{{email}}{{/if}}{{#if phone}} · {{phone}}{{/if}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+
+  <h2 style="margin-top: 6mm;">Intégrité du document remis</h2>
+  {{#if document.delivered_pdf_sha256}}
+  <table class="bordereau-table" style="width:100%; border-collapse:collapse;">
+    <tbody>
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; width:42mm; color:#6b7280; font-size:9pt;">Empreinte SHA-256</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; font-family:'SFMono-Regular',Menlo,monospace; font-size:8pt; word-break:break-all;">{{document.delivered_pdf_sha256}}</td></tr>
+      {{#if document.delivered_git_tag}}
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; color:#6b7280; font-size:9pt;">Référence d'archive</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; font-family:'SFMono-Regular',Menlo,monospace; font-size:9pt;">{{document.delivered_git_tag}}</td></tr>
+      {{/if}}
+      {{#if document.decree_version_label}}
+      <tr><td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb; color:#6b7280; font-size:9pt;">Version du décret référencée</td>
+          <td style="padding:2mm 4mm; border-bottom:0.4pt solid #e5e7eb;">{{document.decree_version_label}}</td></tr>
+      {{/if}}
+    </tbody>
+  </table>
+  <p style="font-size:8.5pt; color:#6b7280; margin-top:2mm; line-height:1.5;">L'empreinte SHA-256 et la référence d'archive ci-dessus identifient cette version du PDF de manière unique. Tout document affichant les mêmes valeurs est strictement identique au présent rapport, octet pour octet.</p>
+  {{else}}
+  <p style="font-size:9pt; color:#6b7280;"><em>L'empreinte d'intégrité et la version du décret référencée seront affichées une fois l'audit livré (statut « Livré » dans Buildy Docs).</em></p>
+  {{/if}}
+</section>
+{{/if}}
+
 {{!-- ═══════════ Annexe D — Disclaimers ═══════════ --}}
 <section class="annex">
   <h1>Annexe D — Mentions légales et disclaimers</h1>

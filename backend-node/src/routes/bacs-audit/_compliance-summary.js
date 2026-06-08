@@ -13,7 +13,8 @@
 // Utilisé identiquement par _export-data.js (audit réel) et
 // _preview-fixture.js (dataset fictif). Ne dépend pas de la DB.
 
-const { isTrue } = require('./_ternary');
+const { isTrue, isFalse } = require('./_ternary');
+const { readingsForAxis } = require('../../lib/bacs-buildy-readings');
 
 // Mapping exigence R175 → libellé court grand public + référence article
 // pour le tableau de bord. La liste est volontairement courte et tenue.
@@ -104,6 +105,187 @@ function buildAssujettissement(document) {
   };
 }
 
+// ── Evidence par axe R175 (Lot 1 — Plan « Qualité du livrable PDF ») ────
+// Chaque axe du tableau de bord R175 expose désormais les CHIFFRES SOURCES
+// (« sur quelles données ce verdict est-il calculé ? ») afin de rendre le
+// PDF auditable par un tiers (client, BE, avocat). Format stable :
+//   evidence = {
+//     kpis: [{ key, label, value, unit?, hint? }, ...],
+//     explanation: 'phrase courte en clair sur l'état de l'axe',
+//   }
+// Si les données nécessaires ne sont pas fournies (cas legacy / fixtures
+// incomplètes), evidence vaut `null` — le PDF affiche alors le bloc verdict
+// sans le détail « sur quelles données ? ».
+function pct(num, den) {
+  if (!den || den < 1) return null;
+  return Math.round((num / den) * 100);
+}
+function evR175_2({ document, powerSummary }) {
+  const status = document.bacs_applicability_status || null;
+  const power = powerSummary?.effectiveKw != null
+    ? Math.round(powerSummary.effectiveKw * 10) / 10
+    : (document.bacs_total_power_kw || 0);
+  const threshold = status === 'subject_2030' ? 70 : 290;
+  const kpis = [
+    { key: 'cumul_retained', label: 'Puissance retenue', value: power, unit: 'kW',
+      hint: 'Cumul chaud + froid (max retenu si réversible), équipements de secours et bois exclus.' },
+    { key: 'threshold', label: 'Seuil applicable', value: status ? threshold : null, unit: 'kW',
+      hint: status === 'subject_2030' ? 'Seuil R175-2 §1 b) — échéance 1ᵉʳ janvier 2030.'
+        : status === 'subject_2025' || status === 'subject_immediate' ? 'Seuil R175-2 §1 a) — échéance 1ᵉʳ janvier 2025.'
+        : 'Seuil non déterminé tant que la puissance et la date de permis ne sont pas renseignées.' },
+  ];
+  if (powerSummary?.autoHeatKw != null) {
+    kpis.push({ key: 'auto_heat', label: 'Cumul chaud auto', value: Math.round(powerSummary.autoHeatKw * 10) / 10, unit: 'kW' });
+  }
+  if (powerSummary?.autoCoolKw != null) {
+    kpis.push({ key: 'auto_cool', label: 'Cumul froid auto', value: Math.round(powerSummary.autoCoolKw * 10) / 10, unit: 'kW' });
+  }
+  return { kpis, explanation: null /* la conclusion est déjà dans assujettissement.conclusion */ };
+}
+function evR175_3_1({ recapStats }) {
+  if (!recapStats) return null;
+  const req = recapStats.metersRequired || 0;
+  const present = recapStats.metersPresent || 0;
+  const missing = recapStats.metersMissing || 0;
+  const coverage = pct(present, req);
+  return {
+    kpis: [
+      { key: 'meters_required', label: 'Compteurs requis (R175-3 1°)', value: req,
+        hint: 'Compteurs exigés par le décret pour suivre les consommations.' },
+      { key: 'meters_present',  label: 'Compteurs présents sur site', value: present },
+      { key: 'meters_missing',  label: 'Compteurs requis mais absents', value: missing,
+        hint: 'Manque à combler dans le plan d\'action pour atteindre R175-3 §1°.' },
+      ...(coverage != null ? [{ key: 'coverage', label: 'Couverture comptage', value: coverage, unit: '%' }] : []),
+    ],
+    explanation: missing === 0 && req > 0
+      ? 'Tous les compteurs R175-3 §1° requis sont présents sur le site.'
+      : missing > 0
+        ? `${missing} compteur(s) requis sont absents — voir le plan d'action pour les installer.`
+        : null,
+  };
+}
+function evR175_3_3({ devices }) {
+  if (!Array.isArray(devices)) return null;
+  const live = devices.filter(d => !d.out_of_service);
+  if (!live.length) return null;
+  const integrated = live.filter(d => isTrue(d.managed_by_bms)).length;
+  const notIntegrated = live.filter(d => isFalse(d.managed_by_bms)).length;
+  const unanswered = live.filter(d => d.managed_by_bms == null).length;
+  return {
+    kpis: [
+      { key: 'devices_present', label: 'Équipements en service', value: live.length },
+      { key: 'devices_integrated', label: 'Équipements intégrés à la GTB', value: integrated },
+      { key: 'devices_not_integrated', label: 'Équipements non intégrés', value: notIntegrated,
+        hint: 'Doivent être raccordés à la GTB pour respecter R175-3 §3.' },
+      ...(unanswered > 0 ? [{ key: 'devices_unanswered', label: 'Intégration non renseignée', value: unanswered,
+        hint: 'Question « intégré à la GTB ? » non répondue — à clarifier avant livraison.' }] : []),
+      { key: 'coverage', label: 'Couverture interopérabilité', value: pct(integrated, live.length), unit: '%' },
+    ],
+    explanation: notIntegrated === 0 && unanswered === 0
+      ? 'Tous les équipements en service sont intégrés à la GTB.'
+      : null,
+  };
+}
+function evR175_3_4({ devices, bms }) {
+  if (!Array.isArray(devices)) return null;
+  const live = devices.filter(d => !d.out_of_service);
+  if (!live.length) return null;
+  const arret_ok = live.filter(d => isTrue(d.meets_r175_3_p4)).length;
+  const arret_ko = live.filter(d => isFalse(d.meets_r175_3_p4)).length;
+  const arret_unanswered = live.filter(d => d.meets_r175_3_p4 == null).length;
+  const auto_ok = live.filter(d => isTrue(d.meets_r175_3_p4_autonomous)).length;
+  const auto_ko = live.filter(d => isFalse(d.meets_r175_3_p4_autonomous)).length;
+  const auto_unanswered = live.filter(d => d.meets_r175_3_p4_autonomous == null).length;
+  return {
+    kpis: [
+      { key: 'arret_manuel_ok', label: 'Arrêt manuel possible', value: arret_ok,
+        hint: 'Équipements pour lesquels l\'auditeur a confirmé un arrêt manuel sur place.' },
+      ...(arret_ko > 0 ? [{ key: 'arret_manuel_ko', label: 'Arrêt manuel impossible', value: arret_ko }] : []),
+      ...(arret_unanswered > 0 ? [{ key: 'arret_manuel_unanswered', label: 'Arrêt manuel non renseigné', value: arret_unanswered }] : []),
+      { key: 'auto_ok', label: 'Redémarrage autonome', value: auto_ok,
+        hint: 'Équipements qui repartent seuls après coupure réseau ou redémarrage GTB.' },
+      ...(auto_ko > 0 ? [{ key: 'auto_ko', label: 'Redémarrage manuel uniquement', value: auto_ko }] : []),
+      ...(auto_unanswered > 0 ? [{ key: 'auto_unanswered', label: 'Redémarrage non renseigné', value: auto_unanswered }] : []),
+    ],
+    explanation: null,
+  };
+}
+function evR175_3_data({ bms }) {
+  if (!bms) return { kpis: [], explanation: 'GTB non encore qualifiée — verdict indéterminable.' };
+  return {
+    kpis: [
+      { key: 'bms_present', label: 'GTB présente sur le site', value: isTrue(bms.present) ? 'Oui' : isFalse(bms.present) ? 'Non' : 'Non renseigné' },
+      { key: 'bms_meets_p2', label: 'Mise à disposition des données (R175-3 dernier alinéa)',
+        value: isTrue(bms.meets_r175_3_p2) ? 'Oui' : isFalse(bms.meets_r175_3_p2) ? 'Non' : 'Non renseigné' },
+    ],
+    explanation: null,
+  };
+}
+function evR175_4({ bms, inspections }) {
+  const kpis = [];
+  if (bms) {
+    kpis.push({ key: 'maint_procedures', label: 'Procédures de maintenance écrites',
+      value: isTrue(bms.has_maintenance_procedures) ? 'Oui' : isFalse(bms.has_maintenance_procedures) ? 'Non' : 'Non renseigné',
+      hint: 'R175-4 exige une procédure formalisée et appliquée.' });
+  }
+  if (Array.isArray(inspections) && inspections.length) {
+    const last = inspections[0];
+    kpis.push({ key: 'last_inspection', label: 'Dernière inspection R175-5-1',
+      value: last.last_inspection_date || 'Non renseignée' });
+  }
+  return { kpis, explanation: null };
+}
+function evR175_5({ bms }) {
+  if (!bms) return { kpis: [], explanation: 'GTB non encore qualifiée — verdict indéterminable.' };
+  return {
+    kpis: [
+      { key: 'operator_trained', label: 'Exploitant formé au paramétrage',
+        value: isTrue(bms.operator_trained) ? 'Oui' : isFalse(bms.operator_trained) ? 'Non' : 'Non renseigné',
+        hint: 'R175-5 exige une formation de l\'exploitant au pilotage de la GTB.' },
+    ],
+    explanation: null,
+  };
+}
+function evR175_6({ thermal, r175_6_applicable }) {
+  if (r175_6_applicable && !r175_6_applicable.applies) {
+    return {
+      kpis: [
+        { key: 'applies', label: 'R175-6 applicable', value: 'Non',
+          hint: r175_6_applicable.reason || 'Bâtiment hors champ R175-6.' },
+      ],
+      explanation: 'Le bâtiment est hors champ R175-6 (permis de construire et travaux générateurs antérieurs au 21/07/2021).',
+    };
+  }
+  if (!Array.isArray(thermal)) return null;
+  const total = thermal.length;
+  const withEmission = thermal.filter(t => t.emission_device_id != null).length;
+  const woodExempt  = thermal.filter(t => isTrue(t.generator_exempt_wood)).length;
+  const complete    = withEmission + woodExempt;
+  return {
+    kpis: [
+      { key: 'thermal_total', label: 'Régulations thermiques requises', value: total,
+        hint: 'Une par couple (zone × catégorie chauffage/refroidissement) attendu sur le site.' },
+      { key: 'thermal_complete', label: 'Régulations complètes saisies', value: complete },
+      ...(woodExempt > 0 ? [{ key: 'thermal_wood_exempt', label: 'Exemptions bois (R175-6 §3)', value: woodExempt }] : []),
+      { key: 'coverage', label: 'Couverture R175-6', value: pct(complete, total), unit: '%' },
+    ],
+    explanation: null,
+  };
+}
+function buildEvidence(axis, ctx) {
+  switch (axis) {
+    case 'r175_2':      return evR175_2(ctx);
+    case 'r175_3_1':    return evR175_3_1(ctx);
+    case 'r175_3_3':    return evR175_3_3(ctx);
+    case 'r175_3_4':    return evR175_3_4(ctx);
+    case 'r175_3_data': return evR175_3_data(ctx);
+    case 'r175_4':      return evR175_4(ctx);
+    case 'r175_5':      return evR175_5(ctx);
+    case 'r175_6':      return evR175_6(ctx);
+    default:            return null;
+  }
+}
+
 /**
  * Calcule la synthèse de conformité.
  *
@@ -114,10 +296,16 @@ function buildAssujettissement(document) {
  * @param {object|null} args.bms — la GTB existante (ou null)
  * @param {object} args.r175_6_applicable — { applies: bool, reason: string }
  * @param {string|null} args.applicabilityLabel — libellé pré-calculé
+ * @param {Array} [args.devices] — équipements (pour evidence R175-3 §3/§4)
+ * @param {Array} [args.thermal] — lignes régulation thermique (R175-6)
+ * @param {Array} [args.inspections] — dernière inspection (R175-4)
+ * @param {object} [args.powerSummary] — { effectiveKw, autoHeatKw, autoCoolKw } (R175-2)
+ * @param {object} [args.recapStats] — { metersRequired, metersPresent, metersMissing… } (R175-3 §1°)
  * @returns {object} synthèse pour cover + L'essentiel + tableau de bord
  */
 function buildComplianceSummary({
   document, actionItems, actionItemsRaw, bms, r175_6_applicable, applicabilityLabel,
+  devices, thermal, inspections, powerSummary, recapStats,
 }) {
   const blocking = actionItems.blocking?.length || 0;
   const major    = actionItems.major?.length || 0;
@@ -189,6 +377,19 @@ function buildComplianceSummary({
     } else if (bmsUnanswered && GTB_DEPENDENT_AXES.has(ex.axis)) {
       contextSummary = 'GTB non renseignée — verdict non calculable tant que la question n\'est pas répondue.';
     }
+    // Lot 1 — evidence par axe : les chiffres-preuve qui ont mené au verdict.
+    // Permet au PDF (Lot 4) et aux consommateurs MCP de tracer chaque
+    // affirmation R175. `null` si les données nécessaires n'ont pas été
+    // fournies (fixtures legacy).
+    const evidence = buildEvidence(ex.axis, {
+      document, bms, devices, thermal, inspections, powerSummary, recapStats, r175_6_applicable,
+    });
+    // Lot 4 — Lectures Buildy attachées à l'axe (interprétations Buildy
+    // pertinentes pour cet article). Permet au PDF de citer la Lecture
+    // sous le verdict (« sur quelle interprétation s'appuie-t-on ? »).
+    const buildy_readings = readingsForAxis(ex.axis).map(r => ({
+      code: r.code, title: r.title, summary: r.summary,
+    }));
     return {
       code: ex.code,
       axis: ex.axis,
@@ -201,6 +402,8 @@ function buildComplianceSummary({
       actionsBlocking: bucket.blocking,
       actionsMajor: bucket.major,
       actionsMinor: bucket.minor,
+      evidence,
+      buildy_readings,
     };
   });
 

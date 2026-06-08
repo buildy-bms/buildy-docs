@@ -1153,6 +1153,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     bms,
     r175_6_applicable,
     applicabilityLabel: applicabilityLabelForSummary,
+    // Lot 1 — evidence par axe R175 : on passe les données sources pour
+    // que chaque ligne du tableau de bord porte ses chiffres-preuve.
+    devices,
+    thermal,
+    inspections,
+    powerSummary: {
+      effectiveKw: powerSummary.effectiveKw,
+      autoHeatKw: autoPower.heatKw,
+      autoCoolKw: autoPower.coolKw,
+    },
+    recapStats,
   });
 
   // Vue satellite statique du site (Google Static Maps) embarquée en data
@@ -1201,8 +1212,17 @@ async function buildBacsAuditExportData(af, opts = {}) {
     })
     : null;
 
+  // Lot 5 — bordereau : enrichit l'auteur de l'audit avec son nom d'affichage
+  // (display_name ou email) pour pouvoir tracer « Audit réalisé par … » sur
+  // le PDF, sans casser les consommateurs qui lisent juste `document.created_by`.
+  const creatorRow = af.created_by ? db.users.getById(af.created_by) : null;
+  const auditDocument = {
+    ...af,
+    created_by_name: creatorRow?.display_name || creatorRow?.email || null,
+  };
+
   return {
-    document: af,
+    document: auditDocument,
     isBacs,
     isSiteAudit: !isBacs,
     site,
@@ -1275,6 +1295,20 @@ async function buildBacsAuditExportData(af, opts = {}) {
     powerRecap,
     // Items 5 + 8 — cumul automatique des puissances chaud / froid.
     powerSummary,
+    // Lot 2 — versioning juridique : version R175 actuellement en vigueur,
+    // utilisée pour le footer PDF des exports intermédiaires (avant livraison).
+    // À la livraison, on grave af.decree_version_label définitif. On
+    // construit un libellé synthétique « R175 version applicable au JJ/MM/YYYY »
+    // à partir du MAX(effective_from) des articles du décret encore en vigueur.
+    currentDecreeVersionLabel: (() => {
+      const row = db.db.prepare(`
+        SELECT MAX(effective_from) AS dt FROM bacs_knowledge
+        WHERE source = 'decree' AND effective_until IS NULL AND code LIKE 'R175-%'
+      `).get();
+      if (!row?.dt) return null;
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(row.dt);
+      return m ? `R175 version applicable au ${m[3]}/${m[2]}/${m[1]}` : `R175 version du ${row.dt}`;
+    })(),
     r175_6_applicable,
     complianceLabel: bms?.overall_compliance ? COMPLIANCE_LABEL[bms.overall_compliance] : null,
     applicabilityLabel: af.bacs_applicability_status ? APPLICABILITY_LABEL[af.bacs_applicability_status] : null,

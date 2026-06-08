@@ -9,6 +9,7 @@ import {
   DocumentDuplicateIcon,
   ChevronDoubleUpIcon, ChevronDoubleDownIcon, ChevronUpIcon, ChevronDownIcon,
   ClockIcon, EyeIcon, TableCellsIcon, EllipsisHorizontalIcon,
+  ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 import {
   getAf, updateAf, getSite,
@@ -42,6 +43,7 @@ import SystemCategoryIcon from '@/components/SystemCategoryIcon.vue'
 import MeterTypePill from '@/components/MeterTypePill.vue'
 import MeterUsagePill from '@/components/MeterUsagePill.vue'
 import AddZoneModal from '@/components/AddZoneModal.vue'
+import PrecheckModal from '@/components/audit/PrecheckModal.vue'
 import AddMeterModal from '@/components/AddMeterModal.vue'
 import BulkPhotoUploadModal from '@/components/BulkPhotoUploadModal.vue'
 import TranscriptAssistantModal from '@/components/TranscriptAssistantModal.vue'
@@ -88,6 +90,8 @@ const { isNarrow } = useViewport()
 const showShare = ref(false)
 const showEditMetadata = ref(false)
 const showEditSite = ref(false)
+// Lot 4 — modale de pré-vérification de cohérence avant livraison.
+const showPrecheck = ref(false)
 
 async function onMetadataSaved(updated) {
   showEditMetadata.value = false
@@ -1267,7 +1271,15 @@ async function deliver() {
     success(`Audit livré — tag Git ${data.delivered_git_tag}`)
     refresh()
   } catch (e) {
-    error(e.response?.data?.detail || 'Échec de la livraison')
+    // Lot 3 — si le backend refuse la livraison à cause d'incohérences
+    // bloquantes (409), on ouvre la modale Précheck pour aider l'auditeur
+    // à corriger sans qu'il ait à chercher où.
+    if (e.response?.status === 409 && e.response?.data?.precheck) {
+      showPrecheck.value = true
+      error('Livraison refusée : corrige les incohérences bloquantes listées ci-dessus avant de réessayer.')
+    } else {
+      error(e.response?.data?.detail || 'Échec de la livraison')
+    }
   } finally {
     delivering.value = false
   }
@@ -1467,6 +1479,13 @@ onBeforeUnmount(() => {
           v-tooltip="{ text: 'Génère les tableaux de synthèse (A3 paysage) destinés à l\'intégrateur', placement: 'bottom' }">
           <template #icon-left><TableCellsIcon class="w-4 h-4" /></template>
           {{ exportingTables ? 'Génération…' : 'Synthèse' }}
+        </Button>
+
+        <!-- Vérifier (Lot 4 — pré-check de cohérence avant livraison) -->
+        <Button variant="secondary" size="md" @click="showPrecheck = true"
+          v-tooltip="{ text: 'Pré-vérification de cohérence avant livraison (R175 — Lot 4)', placement: 'bottom' }">
+          <template #icon-left><ShieldCheckIcon class="w-4 h-4 shrink-0" /></template>
+          Vérifier
         </Button>
 
         <!-- Livrer (CTA principal vert) -->
@@ -1814,6 +1833,9 @@ onBeforeUnmount(() => {
 
     <!-- Partage audit (mêmes APIs que ShareAfModal AF — table documents unifiée) -->
     <ShareAfModal v-if="showShare" :af-id="docId" @close="showShare = false" />
+
+    <!-- Lot 4 — Pré-vérification de cohérence avant livraison -->
+    <PrecheckModal v-if="showPrecheck" :audit-id="docId" @close="showPrecheck = false" />
 
     <!-- Modifier les paramètres de l'audit (parité AF) -->
     <EditAuditMetadataModal
