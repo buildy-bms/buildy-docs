@@ -86,10 +86,10 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
            class="p-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-3">
         <span class="text-2xl">⚠</span>
         <div>
-          <div class="font-semibold">{{ data.summary.blocking_count }} incohérence(s) bloquante(s) — livraison refusée</div>
+          <div class="font-semibold">{{ data.summary.blocking_count }} point(s) bloquant(s) — la livraison est suspendue</div>
           <div class="text-sm text-rose-700 mt-1">
-            Corrigez les points ci-dessous avant de cliquer « Livrer ». Le backend refusera l'envoi tant qu'il
-            reste un bloquant non résolu (les cas exceptionnels nécessitent un appel API avec <code>?force=1</code>).
+            Corrige les points ci-dessous avant de cliquer « Livrer ». Chaque finding indique comment et où corriger.
+            Une fois tout résolu, reviens dans cette modale et clique « Re-vérifier » pour confirmer.
           </div>
         </div>
       </div>
@@ -100,11 +100,12 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
         <div v-for="g in groupedBlocking" :key="'b-' + g.entity" class="border border-rose-200 rounded-lg overflow-hidden">
           <div class="bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-rose-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm">
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm" :title="f.code">
               <div class="font-medium text-gray-900">{{ f.message }}</div>
-              <div v-if="f.hint" class="text-xs text-gray-600 mt-1">{{ f.hint }}</div>
-              <div v-if="f.fix_hint" class="text-xs text-rose-700 mt-1">→ {{ f.fix_hint }}</div>
-              <div class="text-[10px] text-gray-400 uppercase tracking-wider mt-1">{{ f.code }}</div>
+              <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
+              <div v-if="f.fix_hint" class="text-xs text-rose-800 bg-rose-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
+                <strong>Comment corriger :</strong> {{ f.fix_hint }}
+              </div>
             </li>
           </ul>
         </div>
@@ -116,11 +117,12 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
         <div v-for="g in groupedWarnings" :key="'w-' + g.entity" class="border border-amber-200 rounded-lg overflow-hidden">
           <div class="bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-amber-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm">
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm" :title="f.code">
               <div class="font-medium text-gray-900">{{ f.message }}</div>
-              <div v-if="f.hint" class="text-xs text-gray-600 mt-1">{{ f.hint }}</div>
-              <div v-if="f.fix_hint" class="text-xs text-amber-700 mt-1">→ {{ f.fix_hint }}</div>
-              <div class="text-[10px] text-gray-400 uppercase tracking-wider mt-1">{{ f.code }}</div>
+              <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
+              <div v-if="f.fix_hint" class="text-xs text-amber-800 bg-amber-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
+                <strong>Comment corriger :</strong> {{ f.fix_hint }}
+              </div>
             </li>
           </ul>
         </div>
