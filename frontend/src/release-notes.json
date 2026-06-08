@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.144",
+      "date": "2026-06-08",
+      "title": "Saisie de puissance débloquée sur éclairage et PV (production)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le champ Puissance était masqué sur éclairage et PV alors que les luminaires LED sont des producteurs (mig 195)",
+          "what": "Depuis la mig 195 les luminaires LED et l'ASI portent la fonction Production (ils transforment de l'élec primaire en lumière / élec de secours). Mais le champ Puissance restait masqué pour les catégories d'usage non-thermiques (lighting_indoor / lighting_outdoor / electricity_production) — incohérent avec l'Énergie qui était bien saisissable. Désormais la puissance suit la même règle que l'Énergie : saisissable dès que la fonction Production est cochée, peu importe la catégorie d'usage.",
+          "where": "Table Systèmes → colonne Puissance ; modale Modifier un équipement (label adapté : « Puissance installée (kW) » pour éclairage, « Puissance crête (kW) » pour PV).",
+          "how_to_test": "Sur Communay, ligne « Éclairage intérieur » de la carte Systèmes : le champ Puissance accepte maintenant une valeur. La puissance saisie sur lighting/PV n'entre PAS dans le cumul R175-2 (qui ne traite que thermique) — c'est informatif, mais visible dans le PDF."
+        }
+      ]
+    },
+    {
       "version": "0.1.143",
       "date": "2026-06-08",
       "title": "Doctrine puissance R175-2 — filtre strict sur la fonction Production + champs Puissance désactivés sur les émetteurs",

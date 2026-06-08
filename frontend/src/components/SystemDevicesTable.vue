@@ -59,7 +59,13 @@ import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceRoleAllowsEnergyS
 // les systèmes qui mettent en jeu une puissance thermique ou aéraulique.
 // Masquées pour l'éclairage et la production d'électricité (où elles
 // n'alimentent ni le cumul R175-2 ni un calcul utile).
-const POWER_RELEVANT_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+// La puissance suit la même règle que l'Énergie : saisissable dès qu'un
+// équipement a la fonction Production (doctrine 0.1.143). Avant 0.1.144,
+// on masquait la puissance hors thermique (lighting, PV) — incohérent avec
+// la mig 195 qui a donné Production aux luminaires et à l'ASI.
+// La puissance saisie sur lighting/PV est informative — `computeAutoPower`
+// côté backend ne cumule que les catégories thermiques pour R175-2.
+const POWER_RELEVANT_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 const showPower = computed(() => POWER_RELEVANT_CATEGORIES.has(props.system?.system_category))
 
 // Champ de puissance pertinent pour l'usage de CE tableau. Dans un usage
