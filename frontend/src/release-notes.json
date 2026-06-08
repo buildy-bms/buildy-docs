@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.146",
+      "date": "2026-06-08",
+      "title": "Case « Inconnue » retirée de la table Systèmes — gardée dans la modale détaillée",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Table Systèmes allégée — la case « Puissance Inconnue » vit désormais uniquement dans la modale d'édition",
+          "what": "La table de la carte Systèmes est densifiée et redevient lisible : la case « Inconnue » qui apparaissait sous chaque champ Puissance est retirée. L'état « Inconnue » reste visible dans la cellule (placeholder « Inconnue » en italique sur fond grisé, champ désactivé) avec un tooltip qui invite à ouvrir l'équipement pour modifier. Toute la configuration avancée (incluant le toggle Inconnue) reste accessible via le bouton « Modifier » de la ligne.",
+          "where": "Carte 03 Systèmes → tableau des équipements. Modale Modifier un équipement → section Identification → case « Puissance déclarée inconnue ».",
+          "how_to_test": "Sur Communay, ouvrir un luminaire intérieur via « Modifier », cocher « Puissance déclarée inconnue » → fermer la modale → la cellule Puissance de la table affiche « Inconnue » en italique grisé."
+        }
+      ]
+    },
+    {
       "version": "0.1.145",
       "date": "2026-06-08",
       "title": "Puissance — option « déclarée inconnue » + libellé « hors R175-2 » sur éclairage et PV",
