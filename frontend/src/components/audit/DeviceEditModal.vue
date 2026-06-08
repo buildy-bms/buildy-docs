@@ -54,7 +54,11 @@ const METERING_OPTS = [
   { value: 'partial', label: 'Partiel', tone: 'amber' },
   { value: 'no', label: 'Non', tone: 'slate' },
 ]
-const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+// Élargi en 0.1.144 : la puissance est aussi pertinente pour lighting/PV
+// dès lors que la fonction Production est cochée. Cumul R175-2 (thermique
+// seul) reste géré par computeAutoPower côté backend — la puissance lighting
+// saisie reste informative et n'entre pas dans le cumul d'assujettissement.
+const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 
 const showPower = computed(() => POWER_RELEVANT.has(props.system?.system_category))
 const roleApplies = computed(() => isThermalCategory(props.system?.system_category))
@@ -79,7 +83,13 @@ const hasCooling = computed(() => servedCategories.value.has('cooling'))
 // porte la puissance nominale. Masqué pour un usage refroidissement seul.
 const showHeatPower = computed(() => showPower.value && (hasHeating.value || !hasCooling.value))
 const showCoolPower = computed(() => showPower.value && hasCooling.value)
-const heatPowerLabel = computed(() => (hasHeating.value ? 'Puissance chaud (kW)' : 'Puissance (kW)'))
+const heatPowerLabel = computed(() => {
+  const cat = props.system?.system_category
+  if (cat === 'lighting_indoor' || cat === 'lighting_outdoor') return 'Puissance installée (kW)'
+  if (cat === 'electricity_production') return 'Puissance crête (kW)'
+  if (hasHeating.value) return 'Puissance chaud (kW)'
+  return 'Puissance (kW)'
+})
 // `power_kw` est LA colonne lue par le cumul R175-2 et le PDF. `power_kw_cooling`
 // n'est qu'un complément, réservé aux équipements réversibles (chaud ET froid).
 // Donc : usage refroidissement seul → la puissance froid va dans `power_kw` ;
