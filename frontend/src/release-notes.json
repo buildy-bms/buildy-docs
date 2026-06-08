@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.156",
+      "date": "2026-06-08",
+      "title": "PDF synthèse — pastilles colorées sur le tableau Systèmes (usage, énergie, rôles, communication)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le tableau Systèmes techniques du PDF synthèse s'aligne enfin sur l'identité visuelle du rapport principal",
+          "what": "Les colonnes Usage / Énergie / Rôle / Communication du tableau 1/4 affichaient du texte simple, alors que les autres tableaux (Compteurs, Régulation) et le rapport principal avaient déjà des pastilles colorées avec icônes. Désormais : pastille catégorie (🔥 Chauffage rouge, ❄️ Refroidissement cyan, 💡 Éclairage ambre, etc.), pastille énergie (⚡ Électrique jaune, 🔥 Gaz rouge…), pastilles de rôle (🟥 Production, 🟦 Distribution, 🔷 Émission, 🟪 Régulation) — toutes en variante « sm » pour rester dense — et pastille communication (vert si communicant, rouge pâle si non communicant). Nouveau helper `energyPill` et `commPill` côté lib/pdf.js.",
+          "where": "PDF Tableaux de synthèse audit BACS, tableau 1/4 « Systèmes techniques par zone fonctionnelle ».",
+          "how_to_test": "Régénérer le PDF synthèse Communay : toutes les colonnes Usage/Énergie/Rôle/Communication portent leur pastille colorée."
+        }
+      ]
+    },
+    {
       "version": "0.1.155",
       "date": "2026-06-08",
       "title": "PDF synthèse audit BACS — fix : HTML brut visible dans les titres d'actions",
