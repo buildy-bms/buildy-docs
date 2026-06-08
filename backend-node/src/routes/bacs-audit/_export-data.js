@@ -280,6 +280,60 @@ async function buildBacsAuditExportData(af, opts = {}) {
   }
 
   // Enrichit systems avec devices + sums + flags dérivés et group par zone
+  // Verdict de conformité R175-3 par système (PDF chap 3). Ne s'applique
+  // qu'aux audits BACS et aux postes thermiques + éclairage soumis au
+  // décret. Pour chaque système présent on lit les devices et on compte
+  // les défauts sur les 4 critères clés : communicant, interopérable
+  // (R175-3 §3), arrêt manuel (R175-3 §4), autonome au défaut (§4 alinéa).
+  const isBacsKind = af.kind === 'bacs_audit';
+  const R175_CATS = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production']);
+  function computeSystemCompliance(s, devs) {
+    if (!isBacsKind || !R175_CATS.has(s.system_category)) return null;
+    if (isTrue(s.not_concerned)) {
+      return { verdict: 'na', label: 'Hors périmètre déclaré', reasons: [s.not_concerned_reason].filter(Boolean) };
+    }
+    if (s.present !== 1) return null;
+    if (isTrue(s.marked_negligible_under_5pct)) {
+      return {
+        verdict: 'exempt',
+        label: 'Exempté — règle des 5 % (FAQ ministère, juin 2025)',
+        reasons: [s.negligible_justification].filter(Boolean),
+      };
+    }
+    const active = devs.filter(d => !isTrue(d.out_of_service) && !isTrue(d.is_backup));
+    if (!active.length) {
+      return { verdict: 'pending', label: 'À compléter — aucun équipement actif renseigné', reasons: [] };
+    }
+    const reasons = [];
+    const nComm  = active.filter(d => isFalse(d.is_communicating)).length;
+    const nIop   = active.filter(d => isFalse(d.meets_r175_3_p3)).length;
+    const nStop  = active.filter(d => isFalse(d.meets_r175_3_p4)).length;
+    const nAuto  = active.filter(d => isFalse(d.meets_r175_3_p4_autonomous)).length;
+    const nUnk   = active.filter(d =>
+      d.is_communicating == null || d.meets_r175_3_p3 == null
+      || d.meets_r175_3_p4 == null || d.meets_r175_3_p4_autonomous == null).length;
+    if (nComm)  reasons.push(`${nComm} équipement${nComm > 1 ? 's' : ''} non communicant${nComm > 1 ? 's' : ''} (R175-3 §1°)`);
+    if (nIop)   reasons.push(`${nIop} équipement${nIop > 1 ? 's' : ''} sans interopérabilité (R175-3 §3°)`);
+    if (nStop)  reasons.push(`${nStop} équipement${nStop > 1 ? 's' : ''} sans arrêt manuel (R175-3 §4°)`);
+    if (nAuto)  reasons.push(`${nAuto} équipement${nAuto > 1 ? 's' : ''} sans mode autonome au défaut (R175-3 §4° alinéa)`);
+    if (reasons.length) {
+      const verdict = (nComm + nIop) > 0 ? 'non_compliant' : 'partial';
+      return {
+        verdict,
+        label: verdict === 'non_compliant' ? 'Non conforme R175-3' : 'Conformité partielle R175-3',
+        reasons,
+      };
+    }
+    if (nUnk) {
+      return {
+        verdict: 'pending',
+        label: 'À compléter — critères R175-3 non renseignés',
+        reasons: [`${nUnk} équipement${nUnk > 1 ? 's' : ''} avec réponses manquantes sur les 4 critères R175-3`],
+      };
+    }
+    return { verdict: 'compliant', label: 'Conforme R175-3', reasons: [] };
+  }
+
   const enrichedSystems = systems.map(s => {
     const devs = devicesBySystem.get(s.id) || [];
     const totalKw = devs.reduce((sum, d) => sum + (Number(d.power_kw) || 0) * (Number(d.quantity) || 1), 0);
@@ -318,6 +372,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       devices: devs,
       device_count: devs.length,
       total_power_kw: totalKw,
+      compliance: computeSystemCompliance(s, devs),
     };
   });
   // Group systems par zone
@@ -406,6 +461,15 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (!protocolsList.length && m.communication_protocol) {
       protocolsList = [COMM_LABEL[m.communication_protocol] || m.communication_protocol];
     }
+    // Verdict de conformité R175-3 1° pour un compteur requis :
+    // - manquant (required mais pas présent_actual)
+    // - non communicant (présent mais ne remonte pas) → ligne rouge pâle
+    // - hors service géré séparément (badge HS)
+    // Indique au lecteur PDF quelles lignes méritent action immédiate.
+    const compliantPresent = isTrue(m.present_actual);
+    const compliantComm = isTrue(m.communicating);
+    const reqFailed = !!m.required && !isTrue(m.out_of_service)
+      && (!compliantPresent || !compliantComm);
     return {
       ...m,
       typeLabel: METER_TYPE_LABEL[m.meter_type] || m.meter_type,
@@ -415,6 +479,7 @@ async function buildBacsAuditExportData(af, opts = {}) {
       isGeneral: !m.zone_id,
       protocolsList,
       protocolsLabel: protocolsList.join(' / '),
+      complianceFailed: reqFailed,
     };
   });
   // Liste affichée dans le PDF chapitre 4 : on retire les compteurs ni

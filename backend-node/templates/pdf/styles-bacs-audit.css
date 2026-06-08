@@ -3287,3 +3287,63 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
   margin-left: 1.5mm;
 }
 .meter-row-hs td { opacity: 0.5; }
+/* Compteur requis non conforme (manquant ou non communicant). Fond
+   rouge pâle pour scanner visuellement les lignes qui pèsent dans le
+   plan de mise en conformité. La règle HS (opacity 0.5) reste prioritaire
+   car un compteur HS ne pèse plus sur la conformité actuelle. */
+.meter-row-noncompliant td { background: #fef2f2; }
+.meter-row-noncompliant.meter-row-hs td { background: transparent; }
+
+/* ─── Verdict de conformité par système (chap 3) ──────────────────────
+   Encart en tête de chaque system-card-body pour expliquer pourquoi le
+   système est conforme/non conforme/en attente, avec les défauts listés.
+   Aligné sur le code couleur global des verdicts (vert/orange/rouge). */
+.system-compliance {
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+  padding: 1.5mm 2mm;
+  margin-bottom: 2mm;
+  border-radius: 1.5mm;
+  border-left: 0.8mm solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 8pt;
+  line-height: 1.35;
+}
+.system-compliance-badge {
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: 0.02em;
+}
+.system-compliance-reasons {
+  margin: 0;
+  padding-left: 4mm;
+  color: #475569;
+}
+.system-compliance-reasons li { margin: 0.3mm 0; }
+.system-compliance-compliant {
+  border-left-color: #16a34a;
+  background: #ecfdf5;
+}
+.system-compliance-compliant .system-compliance-badge { color: #166534; }
+.system-compliance-partial {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+.system-compliance-partial .system-compliance-badge { color: #92400e; }
+.system-compliance-non_compliant {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+.system-compliance-non_compliant .system-compliance-badge { color: #991b1b; }
+.system-compliance-pending {
+  border-left-color: #6366f1;
+  background: #eef2ff;
+}
+.system-compliance-pending .system-compliance-badge { color: #3730a3; }
+.system-compliance-exempt {
+  border-left-color: #64748b;
+  background: #f1f5f9;
+}
+.system-compliance-exempt .system-compliance-badge { color: #334155; }
+.system-compliance-na { display: none; }
