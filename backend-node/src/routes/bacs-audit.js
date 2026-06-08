@@ -81,6 +81,45 @@ async function routes(fastify) {
     }
   });
 
+  // POST /bacs-audit/:documentId/precheck/auto-fix — applique un fix
+  // automatique sur un finding qui le supporte (champ `auto_fix_action`).
+  // Utile quand le champ DB fautif n'est plus exposé dans l'UI (refonte).
+  fastify.post('/bacs-audit/:documentId/precheck/auto-fix', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, request, reply, { requiredRole: 'write' });
+    if (!af) return;
+    const schema = z.object({
+      action: z.enum(['clear_regulation_deport_refs']),
+      entity_id: z.number().int().positive(),
+    });
+    let body;
+    try { body = schema.parse(request.body); }
+    catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    if (body.action === 'clear_regulation_deport_refs') {
+      // Nullify les FK régulateur déporté qui pointent sur ce device, dans
+      // les régulations thermiques de cet audit. Cf. finding DEV-003.
+      const r = db.db.prepare(`
+        UPDATE bacs_audit_thermal_regulation
+        SET
+          production_regulation_device_id = CASE WHEN production_regulation_device_id = ? THEN NULL ELSE production_regulation_device_id END,
+          distribution_regulation_device_id = CASE WHEN distribution_regulation_device_id = ? THEN NULL ELSE distribution_regulation_device_id END,
+          emission_regulation_device_id = CASE WHEN emission_regulation_device_id = ? THEN NULL ELSE emission_regulation_device_id END,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = ?
+          AND (production_regulation_device_id = ? OR distribution_regulation_device_id = ? OR emission_regulation_device_id = ?)
+      `).run(body.entity_id, body.entity_id, body.entity_id, id, body.entity_id, body.entity_id, body.entity_id);
+      logBacsAudit(request, 'bacs.precheck.auto_fix', id, {
+        action: 'clear_regulation_deport_refs',
+        device_id: body.entity_id,
+        rows_changed: r.changes,
+      });
+      const { buildPrecheck } = require('../lib/bacs-audit-precheck');
+      return { ok: true, rows_changed: r.changes, precheck: buildPrecheck(id) };
+    }
+    return reply.code(400).send({ detail: `Action auto-fix inconnue : ${body.action}` });
+  });
+
   // GET /bacs-buildy-readings — catalogue des Lectures Buildy (interprétations
   // versionnées du décret R175). Lu par UI (tooltip R175) et le PDF audit
   // (bloc « Sur quelles données ? »).

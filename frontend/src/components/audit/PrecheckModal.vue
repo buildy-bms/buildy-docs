@@ -23,6 +23,7 @@ const { error: notifyError } = useNotification()
 
 const loading = ref(true)
 const data = ref(null)
+const fixing = ref({}) // map de findingKey → bool
 
 async function load() {
   loading.value = true
@@ -35,6 +36,28 @@ async function load() {
     data.value = { blocking: [], warnings: [], summary: { blocking_count: 0, warnings_count: 0 } }
   } finally {
     loading.value = false
+  }
+}
+
+async function autoFix(finding) {
+  const key = `${finding.code}-${finding.entity_id}`
+  fixing.value[key] = true
+  try {
+    const res = await fetch(`/api/bacs-audit/${props.auditId}/precheck/auto-fix`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: finding.auto_fix_action, entity_id: finding.entity_id }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${res.status}`)
+    }
+    const out = await res.json()
+    data.value = out.precheck
+  } catch (e) {
+    notifyError(`Correction automatique échouée : ${e.message}`)
+  } finally {
+    fixing.value[key] = false
   }
 }
 
@@ -106,6 +129,13 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
               <div v-if="f.fix_hint" class="text-xs text-rose-800 bg-rose-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
                 <strong>Comment corriger :</strong> {{ f.fix_hint }}
               </div>
+              <button v-if="f.auto_fix_action" type="button"
+                      :disabled="fixing[f.code + '-' + f.entity_id]"
+                      @click="autoFix(f)"
+                      class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
+                <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+              </button>
             </li>
           </ul>
         </div>
@@ -123,6 +153,13 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
               <div v-if="f.fix_hint" class="text-xs text-amber-800 bg-amber-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
                 <strong>Comment corriger :</strong> {{ f.fix_hint }}
               </div>
+              <button v-if="f.auto_fix_action" type="button"
+                      :disabled="fixing[f.code + '-' + f.entity_id]"
+                      @click="autoFix(f)"
+                      class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
+                <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+              </button>
             </li>
           </ul>
         </div>
