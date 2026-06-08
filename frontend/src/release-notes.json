@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.152",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — fix : le rouge pâle des compteurs non conformes s'applique enfin sur toutes les lignes",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Compteurs non conformes en rouge pâle : visible sur lignes paires ET impaires",
+          "what": "La règle générale du zébrage des tableaux (`table tr:nth-child(even) td`) avait une spécificité CSS supérieure à `.meter-row-noncompliant td` et écrasait le rouge pâle une ligne sur deux. La règle est désormais qualifiée sur `.energy-section-table` pour battre le zébrage. Conséquence : sur Communay, les lignes Climatisation Bureaux 1, Général Bureaux 1, Locaux sociaux 1 Général, etc. apparaissent maintenant correctement en rouge pâle.",
+          "where": "Chapitre 4 du PDF audit BACS.",
+          "how_to_test": "Regénérer le PDF Communay : toutes les lignes Requis=✓ Présent=✗ apparaissent en rouge pâle, plus seulement une sur deux."
+        }
+      ]
+    },
+    {
       "version": "0.1.151",
       "date": "2026-06-08",
       "title": "PDF audit BACS — verdict de conformité par système, fix « Non communicant · sans fil », lignes rouges compteurs",

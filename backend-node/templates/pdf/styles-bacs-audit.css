@@ -3289,10 +3289,12 @@ h3.subheading-3 + .entity-block { margin-top: 1mm; }
 .meter-row-hs td { opacity: 0.5; }
 /* Compteur requis non conforme (manquant ou non communicant). Fond
    rouge pâle pour scanner visuellement les lignes qui pèsent dans le
-   plan de mise en conformité. La règle HS (opacity 0.5) reste prioritaire
-   car un compteur HS ne pèse plus sur la conformité actuelle. */
-.meter-row-noncompliant td { background: #fef2f2; }
-.meter-row-noncompliant.meter-row-hs td { background: transparent; }
+   plan de mise en conformité. Spécificité (0,2,2) requise pour battre
+   `table tr:nth-child(even) td { background: #fafafa }` (incident
+   2026-06-08 Communay : seules les lignes impaires viraient au rouge).
+   HS reste prioritaire (compteur HS ne pèse plus sur la conformité). */
+.energy-section-table tr.meter-row-noncompliant td { background: #fef2f2; }
+.energy-section-table tr.meter-row-noncompliant.meter-row-hs td { background: transparent; }
 
 /* ─── Verdict de conformité par système (chap 3) ──────────────────────
    Encart en tête de chaque system-card-body pour expliquer pourquoi le
