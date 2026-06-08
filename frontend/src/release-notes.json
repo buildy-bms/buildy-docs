@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.147",
+      "date": "2026-06-08",
+      "title": "Fonctions équipement — pastilles colorées sans icône (anti-confusion catégorie d'usage)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Plus d'icônes sur les pilules Production / Distribution / Émission / Régulation",
+          "what": "Les icônes des fonctions d'équipement (fa-industry, fa-route, fa-fan, fa-sliders, fa-circle-question) sont remplacées par de simples pastilles colorées. Raison : l'icône fa-fan (ventilateur) pour Émission pouvait être confondue avec la catégorie d'usage Ventilation ; fa-industry pour Production évoquait à tort l'industriel. La couleur seule suffit comme marqueur visuel, le label porte le sens. Aligné partout : table Systèmes, modale Modifier un équipement, sélecteur d'ajout, biblio (LibraryEquipmentView + LibraryDevicePicker).",
+          "where": "Tous les sélecteurs et pilules de fonction(s) d'équipement, dans l'audit BACS comme dans la bibliothèque.",
+          "how_to_test": "Sur Communay, ouvrir n'importe quel équipement : les pilules Production+Émission (par ex.) affichent une petite pastille colorée + le label, plus d'icône. Idem dans la biblio sous /library/equipments."
+        }
+      ]
+    },
+    {
       "version": "0.1.146",
       "date": "2026-06-08",
       "title": "Case « Inconnue » retirée de la table Systèmes — gardée dans la modale détaillée",

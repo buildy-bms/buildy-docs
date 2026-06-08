@@ -330,6 +330,12 @@ function clear() {
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]"
                              :style="{ color: o.color || '#6b7280' }"
                              class="w-3 h-3 shrink-0" />
+            <!-- Pastille colorée quand l'option a une couleur mais pas
+                 d'icône (ROLE_OPTIONS depuis 0.1.147 : pas d'icône pour
+                 éviter la confusion avec les catégories d'usage). -->
+            <span v-else-if="o.color"
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :style="{ backgroundColor: o.color }"></span>
             <!-- `chipLabel` = libellé complet (« Zone · Usage »). Fallback
                  sur `label` si non fourni. -->
             <span class="truncate max-w-60">{{ o.chipLabel || o.label }}</span>
@@ -354,6 +360,9 @@ function clear() {
           :style="{ color: selectedOption.color || '#6b7280' }"
           class="w-4 h-4 shrink-0"
         />
+        <span v-else-if="selectedOption?.color"
+              class="w-2.5 h-2.5 rounded-full shrink-0"
+              :style="{ backgroundColor: selectedOption.color }"></span>
         <span class="flex-1 text-left truncate"
               :class="(selectedOption || customLabel) ? 'text-gray-900' : 'text-gray-400 italic'">
           {{ selectedOption?.chipLabel || selectedOption?.label || customLabel || placeholder }}
@@ -403,6 +412,12 @@ function clear() {
               :style="{ color: o.color || '#6b7280' }"
               class="w-4 h-4 shrink-0"
             />
+            <!-- Pastille colorée (ROLE_OPTIONS sans icône) — aligne visuellement
+                 sur 16px comme une icône, mais utilise juste une couleur de
+                 marqueur. -->
+            <span v-else-if="o.color"
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :style="{ backgroundColor: o.color }"></span>
             <span v-else-if="hasAnyIcon" class="w-4 shrink-0"></span>
             <span class="flex-1 whitespace-normal wrap-break-word leading-tight">{{ o.label }}</span>
             <!-- En mode groupByHint, le hint est porté par le sous-titre ; on
