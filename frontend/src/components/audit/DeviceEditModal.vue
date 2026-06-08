@@ -399,24 +399,34 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                    :class="inputCls" class="w-full" />
           </div>
           <template v-if="showPower">
-            <div v-if="showHeatPower">
-              <label class="block text-[11px] font-medium text-gray-600 mb-0.5">{{ heatPowerLabel }}</label>
-              <input type="number" min="0" step="0.1" :value="device.power_kw ?? ''" placeholder="—"
-                     @blur="e => patch({ power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                     :class="inputCls" class="w-full" />
+            <!-- Doctrine 0.1.135 — la puissance R175-2 est portée par les
+                 producteurs (UE DRV, chiller, chaudière, sous-station). Pour
+                 un émetteur passif (UI DRV, FCU, radiateur eau chaude), saisir
+                 une puissance ici ferait du double comptage avec le producteur
+                 amont. Champ désactivé + encart explicatif. -->
+            <div v-if="!showEnergyField" class="sm:col-span-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 leading-snug">
+              <strong class="text-gray-700">Puissance non saisissable</strong> — cet équipement transfère vers l'air ou l'eau du local des kW de chaud/froid produits par un équipement amont (UE DRV, chiller, chaudière, sous-station). Ces kW sont déjà comptabilisés via la puissance du producteur, les saisir ici ferait du double comptage côté cumul R175-2. Pour activer ces champs, ajoute la fonction <strong>Production</strong> à l'équipement.
             </div>
-            <div v-if="showCoolPower" :class="{ 'sm:col-span-2': !showHeatPower }">
-              <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Puissance froid (kW)</label>
-              <input type="number" min="0" step="0.1" :value="device[coolPowerField] ?? ''" placeholder="—"
-                     @blur="e => patch({ [coolPowerField]: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                     :class="inputCls" class="w-full" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de calcul de puissance</label>
-              <SearchableSelect :model-value="device.power_calculation_type" :options="POWER_CALC_OPTIONS"
-                                :clearable="true" size="sm" placeholder="Calcul automatique"
-                                @update:model-value="v => patch({ power_calculation_type: v || null })" />
-            </div>
+            <template v-else>
+              <div v-if="showHeatPower">
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">{{ heatPowerLabel }}</label>
+                <input type="number" min="0" step="0.1" :value="device.power_kw ?? ''" placeholder="—"
+                       @blur="e => patch({ power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       :class="inputCls" class="w-full" />
+              </div>
+              <div v-if="showCoolPower" :class="{ 'sm:col-span-2': !showHeatPower }">
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Puissance froid (kW)</label>
+                <input type="number" min="0" step="0.1" :value="device[coolPowerField] ?? ''" placeholder="—"
+                       @blur="e => patch({ [coolPowerField]: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                       :class="inputCls" class="w-full" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de calcul de puissance</label>
+                <SearchableSelect :model-value="device.power_calculation_type" :options="POWER_CALC_OPTIONS"
+                                  :clearable="true" size="sm" placeholder="Calcul automatique"
+                                  @update:model-value="v => patch({ power_calculation_type: v || null })" />
+              </div>
+            </template>
           </template>
         </div>
       </section>
@@ -443,7 +453,7 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             <ul class="space-y-1 pl-1">
               <li><strong class="text-rose-700">Production</strong> — l'équipement transforme une énergie primaire (gaz, élec, soleil, bois…) en chaleur, froid ou lumière sur place. <em>Une énergie primaire devra être renseignée.</em></li>
               <li><strong class="text-sky-700">Distribution</strong> — l'équipement transporte un fluide (eau chaude, eau glacée, air, élec) du producteur vers l'émetteur. Ex. : circuit eau chaude, gaines de soufflage, bouclage ECS.</li>
-              <li><strong class="text-blue-700">Émission</strong> — l'équipement restitue l'énergie dans le local. Ex. : radiateur, ventilo-convecteur, bouches d'air, luminaire.</li>
+              <li><strong class="text-blue-700">Émission</strong> — l'équipement restitue dans le local des kW produits par un équipement amont. Ex. : radiateur à eau chaude, ventilo-convecteur, UI DRV, bouches d'air. <em>La puissance et l'énergie sont portées par le producteur amont, pas par l'émetteur.</em></li>
               <li><strong class="text-purple-700">Régulation</strong> — l'équipement pilote (thermostat, détecteur, sonde, régulateur de chaufferie).</li>
             </ul>
             <div class="pt-1 border-t border-blue-200/60 text-blue-800/90 italic">{{ roleHelpExample }}</div>
@@ -461,8 +471,9 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
                               :clearable="true" size="sm" placeholder="Sélectionne l'énergie primaire…"
                               @update:model-value="v => patch({ energy_source: v || null })" />
           </div>
-          <div v-else class="pt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
-            <strong class="text-gray-700">Pas d'énergie primaire à renseigner</strong> — cet équipement ne consomme pas d'énergie primaire (gaz, élec…). Il reçoit son fluide ou son alimentation d'un autre équipement marqué <em>Production</em>. Si tu veux saisir une énergie, ajoute le rôle <strong>Production</strong> ci-dessus.
+          <div v-else class="pt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 leading-snug">
+            <strong class="text-gray-700">Énergie non saisissable ici</strong> — cet équipement transfère vers l'air ou l'eau du local des kW déjà comptabilisés via la puissance du producteur amont (UE DRV, chiller, chaudière, sous-station, etc.). Les saisir ici ferait du double comptage au cumul R175-2. L'énergie primaire et la puissance se renseignent sur le producteur, pas sur les émetteurs / distributeurs / régulateurs passifs.<br/><br/>
+            <em>Si cet équipement transforme directement une énergie primaire en chaleur/froid/lumière sur place</em> (cas d'un convecteur élec direct, d'un aérotherme gaz autonome, d'une VMC qui consomme de l'élec pour son moteur, d'un luminaire LED), ajoute la fonction <strong>Production</strong> ci-dessus — les champs Énergie et Puissance deviendront actifs.
           </div>
         </div>
       </section>

@@ -28,6 +28,8 @@
  * catégorie du système et l'énergie de l'équipement (heuristique douce).
  */
 
+const { rolesAllowEnergySource } = require('./device-roles');
+
 // Catégories de systèmes considérées comme « chaud » / « froid » pour le
 // rattachement par défaut d'une puissance device sans cooling explicite.
 const HEAT_CATEGORIES = new Set(['heating']);
@@ -53,6 +55,13 @@ const MIXED_CATEGORIES = new Set(['ventilation']);
  */
 function inferPowerCalculationType(device) {
   if (device.is_backup) return 'out_of_scope';
+  // Doctrine 0.1.135 (mig 194) — seuls les équipements de PRODUCTION
+  // cumulent au R175-2. Un émetteur passif (UI DRV, FCU, cassette, radiateur
+  // à eau chaude, plancher chauffant) transfère vers l'air/l'eau du local
+  // des kW DÉJÀ comptabilisés via la puissance du producteur amont (UE DRV,
+  // chiller, chaudière, sous-station). Les cumuler côté émetteur ferait du
+  // double comptage. Filtre dur — pas d'inférence aval qui puisse rattraper.
+  if (!rolesAllowEnergySource(device.device_role)) return 'out_of_scope';
   const energy = device.energy_source || null;
   const cat = device.system_category || null;
   const tplSlug = device.equipment_template_slug || null;
@@ -99,6 +108,13 @@ const POWER_CALC_TYPE_LABEL = {
  * @returns {{ heat:number, cool:number, type:string, inScope:boolean }}
  */
 function devicePowerContribution(device) {
+  // Doctrine 0.1.135 — filtre dur : un équipement sans fonction Production
+  // ne cumule jamais au R175-2, peu importe son power_calculation_type
+  // saisi explicitement. Garantit l'absence de double comptage UE DRV / UI DRV,
+  // chiller / FCU, chaudière / radiateurs eau chaude, etc.
+  if (!rolesAllowEnergySource(device.device_role)) {
+    return { heat: 0, cool: 0, type: 'out_of_scope', inScope: false };
+  }
   const type = device.power_calculation_type || inferPowerCalculationType(device);
   const qty = Number(device.quantity) || 1;
   const pHeat = (Number(device.power_kw) || 0) * qty;

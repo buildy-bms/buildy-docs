@@ -1381,7 +1381,7 @@ const coolPowerField = computed(() => (showHeatPower.value ? 'power_kw_cooling' 
           />
         </MobileField>
         <div v-else class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 leading-snug">
-          Pas d'énergie primaire à renseigner — cet équipement ne consomme pas d'énergie directement. Ajoute le rôle <strong>Production</strong> ci-dessus pour saisir une énergie.
+          Énergie et puissance non saisissables ici — les kW de cet émetteur sont déjà comptabilisés via la puissance du producteur amont (chaudière, UE DRV, chiller, sous-station). Les saisir ici ferait du double comptage R175-2. Si l'équipement transforme directement de l'énergie primaire en chaleur / froid / lumière (convecteur élec direct, VMC, luminaire LED…), ajoute la fonction <strong>Production</strong> ci-dessus.
         </div>
 
         <MobileField label="Localisation">
