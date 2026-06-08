@@ -203,6 +203,12 @@ watch(() => props.modelValue, (v) => {
             class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
           >
             <FontAwesomeIcon v-if="o.icon" :icon="['fas', faName(o.icon)]" :style="{ color: o.color || '#6366f1' }" class="w-3 h-3" />
+            <!-- Pastille colorée quand l'option a une couleur mais pas
+                 d'icône (ROLE_OPTIONS depuis 0.1.147 pour éviter la
+                 confusion avec les catégories d'usage). -->
+            <span v-else-if="o.color"
+                  class="w-2 h-2 rounded-full"
+                  :style="{ backgroundColor: o.color }"></span>
             <!-- `chipLabel` = libellé complet (ex « Zone · Usage »). Fallback
                  sur `label` si non fourni par l'option. -->
             {{ o.chipLabel || o.label }}
@@ -217,6 +223,9 @@ watch(() => props.modelValue, (v) => {
           :style="{ color: matchedOption.color || '#6b7280' }"
           class="w-4 h-4 shrink-0"
         />
+        <span v-else-if="matchedOption?.color"
+              class="w-2.5 h-2.5 rounded-full shrink-0"
+              :style="{ backgroundColor: matchedOption.color }"></span>
         <span
           v-else-if="matchedOption?.pill"
           :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0', pillClass(matchedOption.pillTone)]"
@@ -322,11 +331,12 @@ watch(() => props.modelValue, (v) => {
             <div class="flex-1 overflow-y-auto overscroll-contain px-1 py-2">
               <template v-for="(o, oi) in filtered" :key="o.value ?? '__null'">
                 <!-- Sous-titre de groupe (groupByHint) : insere quand la
-                     valeur du hint change. Bandeau saillant pour bien
-                     scander les groupes (gabarit aligne sur les cartes
-                     du plan d'action, slate clair). -->
+                     valeur du hint change. Sticky top-0 — le bandeau reste
+                     visible en haut du scroller pendant qu'on parcourt ses
+                     options, puis bascule sur le groupe suivant. -mx-1 px-1
+                     pour atteindre les bords du conteneur (qui a px-1). -->
                 <div v-if="groupByHint && o.hint && (oi === 0 || filtered[oi - 1].hint !== o.hint)"
-                     :class="['mx-1 mb-1 px-3 py-2 rounded-lg bg-slate-100 border-l-[3px] border-slate-400 text-sm font-semibold text-slate-800',
+                     :class="['sticky top-0 z-10 -mx-1 px-3 py-2 mb-1 bg-slate-100 border-y border-slate-200 border-l-[3px] border-l-slate-400 text-sm font-semibold text-slate-800',
                               oi === 0 ? 'mt-0' : 'mt-3']">
                   {{ o.hint }}
                 </div>
@@ -344,6 +354,13 @@ watch(() => props.modelValue, (v) => {
                   :style="{ color: o.color || '#6b7280' }"
                   class="w-5 h-5 shrink-0"
                 />
+                <!-- Pastille colorée (ROLE_OPTIONS sans icône depuis
+                     0.1.147). Aligne visuellement sur la colonne 20px. -->
+                <span v-else-if="o.color"
+                      class="w-5 shrink-0 inline-flex items-center justify-start">
+                  <span class="w-2.5 h-2.5 rounded-full"
+                        :style="{ backgroundColor: o.color }"></span>
+                </span>
                 <span
                   v-else-if="o.pill"
                   :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0', pillClass(o.pillTone)]"

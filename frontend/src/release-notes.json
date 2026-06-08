@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.150",
+      "date": "2026-06-08",
+      "title": "PWA — parité pastilles fonctions + zones sticky dans les sheets de sélection",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "PWA : pastilles colorées des fonctions d'équipement (Production / Émission…) et noms de zones sticky dans la bottom sheet",
+          "what": "Deux rattrapages PWA pour aligner le mobile sur le desktop : (1) les fonctions d'équipement (Production / Distribution / Émission / Régulation) affichent désormais leur pastille colorée dans les pilules du trigger et dans la liste — il manquait le marqueur visuel depuis 0.1.147. (2) Quand on choisit l'usage principal ou un partage d'usage dans la bottom sheet, le nom de zone (Bureaux 1, Cellule 1…) reste collé en haut pendant le scroll et bascule sur le suivant — même comportement qu'en desktop.",
+          "where": "PWA audit : modale d'édition d'un équipement → champ Fonction(s), champ Usage principal, champ Aussi présent dans.",
+          "how_to_test": "Sur iPad, ouvrir un équipement → Fonction(s) : pilules avec pastille colorée. Ouvrir Usage principal sur un site multi-zones : scroller, le bandeau Bureaux 1 reste figé puis bascule sur Bureaux 2."
+        }
+      ]
+    },
+    {
       "version": "0.1.149",
       "date": "2026-06-08",
       "title": "« Déplacer vers » — noms de zones plus visibles et sticky",
