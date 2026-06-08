@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.148",
+      "date": "2026-06-08",
+      "title": "« Déplacer vers » — popover qui reste dans l'écran + icônes catégorie",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Liste déroulante « Déplacer vers » repositionnée vers le haut quand on est en bas de page + icônes colorées par catégorie",
+          "what": "Le mini-popover qui s'ouvre depuis l'icône « ↔ » de chaque équipement (déplacer vers un autre usage) s'ouvre désormais au-dessus du bouton quand il n'y a plus assez de place en bas du viewport (incident Communay : la zone « Bureaux 2 » disparaissait sous le pli). En complément, chaque ligne d'usage proposée porte maintenant l'icône colorée de sa catégorie (flamme rouge = chauffage, flocon cyan = refroidissement, etc.) — lecture instantanée du type de système ciblé.",
+          "where": "Toutes les cartes Systèmes (audit BACS et site_audit) : icône « ↔ » dans les actions d'un équipement → popover « Déplacer vers ». Idem icône « partage » juste à côté.",
+          "how_to_test": "Sur Communay, descendre tout en bas de la card 03 (vers Cellule 1), cliquer ↔ sur un équipement : le popover apparaît au-dessus du bouton et chaque usage proposé porte son icône colorée."
+        }
+      ]
+    },
+    {
       "version": "0.1.147",
       "date": "2026-06-08",
       "title": "Fonctions équipement — pastilles colorées sans icône (anti-confusion catégorie d'usage)",
