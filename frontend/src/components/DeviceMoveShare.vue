@@ -212,8 +212,13 @@ onBeforeUnmount(() => {
       <div class="overflow-y-auto flex-1 py-2 px-3">
         <!-- Déplacer vers : liste cliquable d'usages, 1 clic = déplacement -->
         <template v-if="openKind === 'move'">
-          <div v-for="g in systemsByZone" :key="g.zone_id" class="mb-1.5 last:mb-0">
-            <p class="text-[10px] uppercase tracking-wider text-gray-400 px-1">{{ g.zone_name }}</p>
+          <div v-for="g in systemsByZone" :key="g.zone_id" class="mb-2 last:mb-0">
+            <!-- Sticky en haut du scroller : le nom de la zone reste visible
+                 tant qu'on scroll dans ses items, puis est remplacé par le
+                 suivant. -mx-3 px-3 étend le bandeau bleuté jusqu'aux bords. -->
+            <p class="sticky top-0 z-10 -mx-3 px-3 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200">
+              {{ g.zone_name }}
+            </p>
             <button
               v-for="s in g.items"
               :key="s.id"
@@ -239,8 +244,10 @@ onBeforeUnmount(() => {
         <!-- Partager : usages supplémentaires (multi-sélection). Les usages
              « non concernés » sont masqués. -->
         <template v-else>
-          <div v-for="g in shareZones" :key="g.zone_id" class="mb-1.5 last:mb-0">
-            <p class="text-[10px] uppercase tracking-wider text-gray-400 px-1">{{ g.zone_name }}</p>
+          <div v-for="g in shareZones" :key="g.zone_id" class="mb-2 last:mb-0">
+            <p class="sticky top-0 z-10 -mx-3 px-3 py-1 mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-slate-100 border-y border-slate-200">
+              {{ g.zone_name }}
+            </p>
             <label
               v-for="s in g.items"
               :key="s.id"
