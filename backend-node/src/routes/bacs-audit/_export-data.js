@@ -400,11 +400,19 @@ async function buildBacsAuditExportData(af, opts = {}) {
       // non-BACS, c'est juste le custom_label (déjà capturé par
       // categoryLabel). Utilisé par les templates PDF chap 3 + synthèse
       // pour distinguer 2 systèmes Chauffage dans la même zone.
-      displayLabel: s.is_bacs === 0
-        ? (s.custom_label || 'Usage')
-        : (s.custom_label && s.custom_label.trim()
-            ? `${SYSTEM_LABEL[s.system_category] || s.system_category} (${s.custom_label.trim()})`
-            : (SYSTEM_LABEL[s.system_category] || s.system_category)),
+      // Anti-doublon « Éclairage intérieur (Éclairage intérieur) » : si
+      // le custom_label est identique au libellé catégorie (en
+      // ignorant casse/accents/espaces), on ne le répète pas entre
+      // parenthèses (incident PDF Communay 2026-06-08).
+      displayLabel: (() => {
+        if (s.is_bacs === 0) return s.custom_label || 'Usage';
+        const baseLabel = SYSTEM_LABEL[s.system_category] || s.system_category;
+        const custom = (s.custom_label || '').trim();
+        if (!custom) return baseLabel;
+        const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+        if (norm(custom) === norm(baseLabel)) return baseLabel;
+        return `${baseLabel} (${custom})`;
+      })(),
       negativeLabel: SYSTEM_NEGATIVE_LABEL[s.system_category] || `Pas de ${(SYSTEM_LABEL[s.system_category] || s.system_category).toLowerCase()}`,
       commLabel: s.communication ? (COMM_LABEL[s.communication] || s.communication) : '—',
       devices: devs,
@@ -1373,11 +1381,35 @@ async function buildBacsAuditExportData(af, opts = {}) {
     zones,
     // Split fonctionnelles BACS vs techniques (tableaux/compteurs) pour
     // affichage en deux blocs distincts dans le PDF ch.2.
+    // Les zones techniques vides (aucun équipement ni compteur ni note)
+    // sont retirées pour ne pas polluer le tableau de synthèse : une
+    // armoire TGBT inventoriée mais sans contenu n'apporte rien au
+    // lecteur (incident PDF Communay 2026-06-08).
     zonesFunctional,
-    zonesTechnical,
+    zonesTechnical: (() => {
+      const zonesWithStuff = new Set();
+      for (const s of enrichedSystems) {
+        if (s.zone_id != null && (s.devices?.length || hasZoneNotes({ ...s, photos: [] }))) {
+          zonesWithStuff.add(s.zone_id);
+        }
+      }
+      for (const m of meters) {
+        if (m.zone_id != null) zonesWithStuff.add(m.zone_id);
+        if (m.location_zone_id != null) zonesWithStuff.add(m.location_zone_id);
+      }
+      return zonesTechnical.filter(z => zonesWithStuff.has(z.id) || hasZoneNotes(z));
+    })(),
     zonesFunctionalHaveNotes,
     zonesTechnicalHaveNotes,
     systemsByZone,
+    // Variante synthèse : seules les zones avec au moins un système
+    // présent + ≥1 équipement. Évite les zones-headers orphelins
+    // « Armoire TGBT » suivis de rien. Le rapport principal continue
+    // d'utiliser systemsByZone (qui montre aussi les systèmes non
+    // présents / non concernés pour expliquer le hors-champ).
+    systemsByZoneForSynthesis: systemsByZone
+      .map(g => ({ ...g, items: g.items.filter(s => s.present === 1 && (s.devices?.length || 0) > 0) }))
+      .filter(g => g.items.length),
     // Zones fonctionnelles sans système thermique présent (hors R175-2).
     zonesOutOfBacsScope,
     // Item 7d/7e — zones fonctionnelles de suivi (regroupement + justification).

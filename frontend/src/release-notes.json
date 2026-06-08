@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.157",
+      "date": "2026-06-08",
+      "title": "PDF synthèse — nettoyage du tableau Systèmes (zones vides, sous-sections orphelines, doublons de libellé, ligne « Assujetti » répétée)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Le PDF synthèse audit BACS arrête de polluer le lecteur avec des lignes inutiles",
+          "what": "Quatre nettoyages cumulés : (1) Zones techniques sans aucun équipement ni compteur ni note (Armoire TGBT, TD Combles, etc.) retirées du tableau « Zones techniques » et du tableau Systèmes — finie la liste de tableaux électriques vides. (2) Sous-sections de systèmes présents mais sans équipement saisi (« Refroidissement — Assujetti : Realtherm » suivi de rien) retirées. (3) Libellé « Éclairage intérieur (Éclairage intérieur) » corrigé : si le custom_label est identique à la catégorie (insensible casse/accents), pas de répétition entre parenthèses. (4) Ligne « — Assujetti : Realtherm » répétée à chaque sous-section retirée : l'info est déjà sur la couverture, pas besoin de la marteler.",
+          "where": "PDF Tableaux de synthèse audit BACS — tableau Zones techniques + tableau 1/4 Systèmes.",
+          "how_to_test": "Régénérer le PDF synthèse Communay : les zones techniques affichent uniquement PDL Enedis / PDL Gaz / Local chaufferie (celles qui hébergent des éléments), et le tableau Systèmes n'a plus de header de sous-section sans équipement en dessous."
+        }
+      ]
+    },
+    {
       "version": "0.1.156",
       "date": "2026-06-08",
       "title": "PDF synthèse — pastilles colorées sur le tableau Systèmes (usage, énergie, rôles, communication)",

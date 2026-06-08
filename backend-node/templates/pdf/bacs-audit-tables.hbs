@@ -230,16 +230,13 @@
       </tr>
     </thead>
     <tbody>
-      {{#each systemsByZone}}
+      {{#each systemsByZoneForSynthesis}}
         <tr class="zone-row"><th colspan="14">{{zone_name}}</th></tr>
         {{#each items}}
-          {{#if present}}
-            {{!-- Item 4d — assujetti calculé pour ce système --}}
-            {{#if liability}}{{#if ../../hasLiabilityData}}
-              <tr class="liability-row">
-                <td colspan="14">{{{categoryIcon system_category "10"}}} <strong>{{displayLabel}}</strong> — {{liability.label}}</td>
-              </tr>
-            {{/if}}{{/if}}
+          {{!-- systemsByZoneForSynthesis a déjà filtré les items en amont
+               (present + devices.length). L'info d'assujetti R175-2 est
+               sur la couverture du PDF — pas répétée à chaque sous-section. --}}
+          {{#if present}}{{#if devices.length}}
             {{#each devices}}
               <tr {{#if out_of_service}}class="row-hs"{{/if}}>
                 <td class="col-ref">{{ref}}</td>
@@ -264,7 +261,7 @@
                 <td class="col-bool"><span class="{{#if managed_by_bms}}bool-yes{{else}}bool-no{{/if}}">{{#if managed_by_bms}}✓{{else}}✗{{/if}}</span></td>
               </tr>
             {{/each}}
-          {{/if}}
+          {{/if}}{{/if}}
         {{/each}}
       {{/each}}
     </tbody>
