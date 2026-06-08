@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.139",
+      "date": "2026-06-08",
+      "title": "Pré-vérification d'audit — messages reformulés en langage utilisateur",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Plus de jargon technique dans la modale « Vérifier »",
+          "what": "Les messages de la pré-vérification avant livraison étaient trop techniques (« supprime la FK fautive », « appel API avec ?force=1 »). Toutes les explications sont désormais en langage métier auditeur. Chaque finding affiche maintenant : (1) le message factuel, (2) une explication « Pourquoi c'est un problème », (3) un bloc « Comment corriger » détaillé avec localisation exacte dans l'app — souvent en proposant deux options selon la réalité terrain (ex. soit retirer la FK, soit décocher la régulation intégrée).",
+          "where": "Modale « Vérifier l'audit » (toolbar audit BACS).",
+          "how_to_test": "Ouvrir un audit avec des incohérences (par ex. Communay) → bouton « Vérifier ». Vérifier que les messages sont parlants et que chaque finding propose un « Comment corriger » dans un encart coloré."
+        }
+      ]
+    },
+    {
       "version": "0.1.138",
       "date": "2026-06-08",
       "title": "Audit BACS — qualité juridique du livrable PDF : chiffres-preuve, pré-check de cohérence, version du décret figée et bordereau de saisie",
