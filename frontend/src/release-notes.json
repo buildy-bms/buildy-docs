@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.154",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — verdicts de conformité neutres (sans interpellation de l'auditeur)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les verdicts ne s'adressent plus à l'auditeur (« il manque tes réponses », « ouvre cet équipement ») mais constatent l'état du dossier",
+          "what": "Reformulation neutre des libellés : « Conformité non statuée — N équipements non qualifiés », « Aucun équipement actif inventorié ». Les raisons décrivent factuellement ce qui manque dans le dossier (« Les 4 critères de conformité n'ont pas été qualifiés sur le terrain pour : … ») au lieu de demander des actions à l'auditeur. Le PDF est lu par le client final (MOA, bureau de contrôle) — il ne doit pas voir des instructions de saisie destinées à un opérateur Buildy.",
+          "where": "Chapitre 3 du PDF audit BACS, encart de conformité.",
+          "how_to_test": "Regénérer le PDF Communay sur un système avec équipements non qualifiés : aucun « tes / ouvre / saisis » dans l'encart."
+        }
+      ]
+    },
+    {
       "version": "0.1.153",
       "date": "2026-06-08",
       "title": "PDF audit BACS — verdicts de conformité réécrits en langage client",

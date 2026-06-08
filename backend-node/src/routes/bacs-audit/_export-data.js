@@ -315,8 +315,8 @@ async function buildBacsAuditExportData(af, opts = {}) {
     if (!active.length) {
       return {
         verdict: 'pending',
-        label: 'Aucun équipement actif renseigné',
-        reasons: ['Saisis les équipements de ce poste (au moins un actif, hors secours et hors service) pour pouvoir statuer sur la conformité.'],
+        label: 'Aucun équipement actif inventorié',
+        reasons: ['Le poste est déclaré présent mais aucun équipement actif (hors secours et hors service) n\'a été inventorié — la conformité ne peut donc pas être statuée.'],
       };
     }
     const failComm  = active.filter(d => isFalse(d.is_communicating));
@@ -358,10 +358,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
       return {
         verdict: 'pending',
         label: pending.length === 1
-          ? 'Conformité à statuer — il manque tes réponses sur 1 équipement'
-          : `Conformité à statuer — il manque tes réponses sur ${pending.length} équipements`,
+          ? 'Conformité non statuée — 1 équipement non qualifié'
+          : `Conformité non statuée — ${pending.length} équipements non qualifiés`,
         reasons: [
-          `Ouvre ${pending.length === 1 ? 'cet équipement' : 'chacun de ces équipements'} dans la card 03 et réponds Oui/Non aux 4 questions : remontée GTB, interopérabilité, arrêt manuel local, autonomie au défaut — ${listDeviceNames(pending)}.`,
+          `Les 4 critères de conformité (remontée GTB, interopérabilité, arrêt manuel local, autonomie au défaut) n'ont pas été qualifiés sur le terrain pour ${pending.length === 1 ? 'cet équipement' : 'ces équipements'} : ${listDeviceNames(pending)}.`,
         ],
       };
     }
