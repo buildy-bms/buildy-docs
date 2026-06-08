@@ -34,8 +34,17 @@ const PLAUSIBLE_POWER_KW = {
 const PLAUSIBLE_AGE_YEARS = { max: 60 };
 const PLAUSIBLE_ZONE_SURFACE_M2 = { min: 1, max: 50000 };
 
-function newFinding(code, severity, entity, entity_id, field, message, hint, fixHint) {
-  return { code, severity, entity, entity_id, field, message, hint: hint || null, fix_hint: fixHint || null };
+function newFinding(code, severity, entity, entity_id, field, message, hint, fixHint, opts = {}) {
+  return {
+    code, severity, entity, entity_id, field, message,
+    hint: hint || null,
+    fix_hint: fixHint || null,
+    // Lot 7 — auto-fix : si `auto_fix_action` est posé, la modale UI propose
+    // un bouton « Corriger automatiquement » qui appelle
+    // POST /bacs-audit/:id/precheck/auto-fix avec { finding_code, entity_id }.
+    auto_fix_action: opts.autoFixAction || null,
+    auto_fix_label: opts.autoFixLabel || null,
+  };
 }
 
 function buildPrecheck(documentId) {
@@ -145,7 +154,11 @@ function buildPrecheck(documentId) {
         blocking.push(newFinding('DEV-003', 'blocking', 'device', d.id, 'regulation_integrated',
           `Équipement « ${d.name || '#' + d.id} » : sa régulation est marquée intégrée à l\'équipement, mais il est désigné comme régulateur d\'un autre équipement dans la régulation thermique de ${where}.`,
           'Une régulation intégrée pilote uniquement son propre équipement — elle ne peut pas être désignée comme régulateur d\'un autre équipement situé ailleurs.',
-          `Deux options selon la réalité terrain : (1) si la régulation est bien intégrée à cet équipement, retire-le du champ « Régulateur » dans la régulation thermique de ${where} ; (2) si la régulation est en fait portée par un boîtier séparé qui pilote plusieurs équipements, ouvre cet équipement et décoche la case « Régulation intégrée à l'équipement ».`));
+          `Les champs « régulateur déporté » ne sont plus exposés dans l\'UI actuelle (refonte récente). Ce sont des saisies historiques restées en DB. Utilise le bouton « Corriger automatiquement » ci-dessous : Buildy retirera cet équipement des champs régulateur déporté de la régulation thermique de ${where}, sans toucher à sa propre case « Régulation intégrée à l\'équipement ».`,
+          {
+            autoFixAction: 'clear_regulation_deport_refs',
+            autoFixLabel: 'Corriger automatiquement (retirer les références régulateur déporté fautives)',
+          }));
       }
     }
     // Plages plausibles puissance

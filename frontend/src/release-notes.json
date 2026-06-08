@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.140",
+      "date": "2026-06-08",
+      "title": "Pré-vérification — bouton « Corriger automatiquement » pour les références de régulateur déporté héritées",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Fix auto pour les saisies historiques invisibles dans l'UI",
+          "what": "Certains audits anciens (typiquement Communay) ont des saisies en DB qui ne sont plus exposées dans l'UI actuelle de la carte 5 Régulation thermique — notamment les champs « régulateur déporté » (production_regulation_device_id, distribution_regulation_device_id, emission_regulation_device_id). Quand le pré-check détecte qu'un équipement avec régulation intégrée est désigné comme régulateur déporté ailleurs, l'auditeur n'avait aucun moyen de corriger depuis l'UI. La modale Précheck propose désormais un bouton « ✓ Corriger automatiquement » qui nullify les FK fautives en un clic, sans toucher à la case « Régulation intégrée à l'équipement » du device.",
+          "where": "Modale Vérifier avant livraison, sous chaque finding DEV-003. Le bouton appelle `POST /bacs-audit/:id/precheck/auto-fix` avec l'action `clear_regulation_deport_refs`.",
+          "how_to_test": "Ouvrir Communay → bouton « Vérifier » → cliquer « Corriger automatiquement » sur les 2 blockings DEV-003 (Unité Intérieure GREE et Chaudière 1). Le précheck se re-lance automatiquement et passe à `can_deliver: true`. Le bouton Livrer se débloque."
+        }
+      ]
+    },
+    {
       "version": "0.1.139",
       "date": "2026-06-08",
       "title": "Pré-vérification d'audit — messages reformulés en langage utilisateur",
