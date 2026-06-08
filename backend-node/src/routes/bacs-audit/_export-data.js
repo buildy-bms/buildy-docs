@@ -814,6 +814,35 @@ async function buildBacsAuditExportData(af, opts = {}) {
     html = html.replace(/\{\{(zone|system|device):(\d+)\}\}/g, (_m, type, id) => resolveTagAsPill(type, id));
     return html;
   }
+  // Variante texte brut (PDF synthèse / tableaux denses) : remplace les
+  // balises {{zone:id}} / {{system:id}} / {{device:id}} par juste le
+  // libellé entité, sans chip ni SVG ni couleur. Sinon le HTML produit
+  // par stripActionTags() apparaît brut dans le tableau récap quand on
+  // le rend via {{title}} (handlebars escape par défaut).
+  function resolveTagAsPlain(type, n) {
+    const id = Number(n);
+    if (type === 'zone') {
+      const z = zones.find(zz => zz.id === id);
+      return z ? (z.name || `Zone #${id}`) : `Zone #${id}`;
+    }
+    if (type === 'system') {
+      const s = systems.find(ss => ss.id === id);
+      if (!s) return `Système #${id}`;
+      const label = s.custom_label || SYSTEM_LABEL_FR_LOCAL[s.system_category] || s.system_category || 'Système';
+      return s.zone_name ? `${label} · ${s.zone_name}` : label;
+    }
+    if (type === 'device') {
+      const d = devicesById.get(id);
+      return d ? (d.name || [d.brand, d.model_reference].filter(Boolean).join(' ') || `Équipement #${id}`)
+               : `Équipement ${id}`;
+    }
+    return '';
+  }
+  function stripActionTagsToPlain(text) {
+    if (!text) return text;
+    return String(text).replace(/\{\{(zone|system|device):(\d+)\}\}/g,
+      (_m, type, id) => resolveTagAsPlain(type, id));
+  }
   // Convertit une description multi-sections en HTML avec sous-titres.
   // Format en entree : « Titre\nContenu\n\nTitre\nContenu... ». Si pas
   // de structure detectee (pas de \n\n), retombe sur le rendu inline.
@@ -853,6 +882,10 @@ async function buildBacsAuditExportData(af, opts = {}) {
       ...a,
       // Strip des balises pour le rendu PDF (les UI Vue parsent l'original).
       title: stripActionTags(a.title),
+      // Variante texte brut pour le PDF synthèse (tableaux denses) qui
+      // rend en {{title_plain}} (échappé) : chips + SVG inline n'ont
+      // pas leur place dans un tableau récap scannable.
+      title_plain: stripActionTagsToPlain(a.title),
       description: descriptionToHtml(a.description),
       display_number: 'BACS-' + String(idx + 1).padStart(3, '0'),
       card_key:         cardOfAction(a).card,
