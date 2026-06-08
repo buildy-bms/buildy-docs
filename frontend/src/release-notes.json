@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.160",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — pastilles Oui/Non stylées partout + carte satellite zoomée",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Pastilles Oui/Non du chapitre 4 Compteurs (rapport principal) — CSS manquait",
+          "what": "En 0.1.159 le helper boolPill a été ajouté côté template du rapport principal, mais le CSS .bool-pill/.bool-pill-sm n'existait que dans styles-bacs-audit-tables.css (synthèse). Conséquence : les pastilles apparaissaient en cellules rectangulaires peu compactes au lieu de pilules arrondies vertes/rouges. Le CSS est désormais aussi présent dans styles-bacs-audit.css pour le rapport principal.",
+          "where": "PDF rapport principal audit BACS, chapitre 4 Compteurs (tableaux par énergie).",
+          "how_to_test": "Régénérer le PDF Rapport principal Communay : les pastilles Oui/Non rendues compactes et arrondies."
+        },
+        {
+          "kind": "ux",
+          "title": "Carte satellite des zones — niveau de zoom calculé pour mieux cadrer le site",
+          "what": "L'auto-fit visible= de Google Static Maps laissait une marge trop large quand les zones du site étaient proches (cas typique : un seul bâtiment, plusieurs zones fonctionnelles à 50-100m). Les entreprises voisines occupaient la moitié de la carte. Désormais : center + zoom calculés depuis le bounding-box (table empirique span en degrés → niveau zoom 14 à 20). Site compact ~200m → zoom 19 ; site étendu ~500m → zoom 18, etc.",
+          "where": "PDF rapport principal audit BACS, chapitre 2 Zones fonctionnelles, carte satellite hybrid.",
+          "how_to_test": "Régénérer le PDF Communay : la carte satellite est centrée sur le bâtiment (plus serré qu'avant)."
+        }
+      ]
+    },
+    {
       "version": "0.1.159",
       "date": "2026-06-08",
       "title": "PDF audit BACS — pastilles Oui/Non étendues à tous les tableaux denses",
