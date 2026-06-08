@@ -161,13 +161,32 @@ async function buildZonesStaticMap({ site, zones }) {
     );
   });
 
-  // visible= force l'auto-fit sur tous les points listés (pas besoin de
-  // center/zoom explicites — Google calcule le cadrage).
-  const visibles = located.map(z => `${z.latitude},${z.longitude}`).join('|');
+  // Cadrage : center + zoom calculés depuis le bounding-box des points.
+  // L'auto-fit `visible=` de Google laisse une marge trop large quand les
+  // points sont proches (zones d'un même site ~100m) — on perd en
+  // lisibilité du bâtiment (incident PDF Communay 2026-06-08, vue trop
+  // large avec entreprises voisines en hors-sujet). Table empirique :
+  // span en degrés vs niveau de zoom Google Maps (range 0=monde →
+  // 21=détail rue).
+  const lats = located.map(z => Number(z.latitude));
+  const lngs = located.map(z => Number(z.longitude));
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
+  const span = Math.max(maxLat - minLat, maxLng - minLng);
+  let zoom;
+  if (span < 0.0008)      zoom = 20;  // < ~90 m → 1 ou 2 zones très proches
+  else if (span < 0.002)  zoom = 19;  // < ~220 m → site compact
+  else if (span < 0.005)  zoom = 18;  // < ~550 m
+  else if (span < 0.012)  zoom = 17;
+  else if (span < 0.025)  zoom = 16;
+  else if (span < 0.05)   zoom = 15;
+  else                    zoom = 14;
 
   const params = [
     'size=640x400', 'scale=2', 'maptype=hybrid', 'language=fr',
-    `visible=${encodeURIComponent(visibles)}`,
+    `center=${centerLat},${centerLng}`, `zoom=${zoom}`,
     ...markerParams,
     `key=${encodeURIComponent(key)}`,
   ];

@@ -837,6 +837,25 @@ table.meta-table tr:last-child td { border-bottom: none; }
 .bool-na  { color: #9ca3af; }
 table td.bool-cell { text-align: center; }
 
+/* Pastilles Oui / Non / — pour les colonnes booléennes des tableaux
+   denses (chapitre 4 Compteurs). Mêmes couleurs que la pilule
+   communication et que la synthèse — cohérence visuelle inter-PDF.
+   Variante sm pour rester compact dans les colonnes étroites. */
+.bool-pill {
+  display: inline-block;
+  padding: 0.6mm 2.2mm;
+  font-size: 7pt;
+  font-weight: 600;
+  line-height: 1.15;
+  border-radius: 3mm;
+  white-space: nowrap;
+}
+.bool-pill-sm {
+  padding: 0.3mm 1.6mm;
+  font-size: 6.4pt;
+  border-radius: 2.6mm;
+}
+
 /* ── Total row pour les tables additionnelles (chauffage+clim) ───── */
 table .total-row td {
   background: #f3f4f6;
