@@ -427,7 +427,7 @@ async function removeDevice(d) {
                          class="text-right pr-9 placeholder:text-gray-300 w-full"
                          v-tooltip="thermalCategories.has(system.system_category)
                             ? (system.system_category === 'cooling' ? 'Puissance froid nominale — entre dans le cumul R175-2' : 'Puissance chaud nominale — entre dans le cumul R175-2')
-                            : 'Puissance installée — informative, n\\'entre pas dans le cumul R175-2 (R175-2 ne retient que la puissance thermique chauffage + climatisation)'" />
+                            : 'Puissance installée — informative, hors cumul R175-2 (qui ne retient que la puissance thermique chauffage + climatisation)'" />
                   <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
                 </div>
                 <label class="inline-flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
