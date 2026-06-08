@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.149",
+      "date": "2026-06-08",
+      "title": "« Déplacer vers » — noms de zones plus visibles et sticky",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les noms de zone restent visibles en haut du popover pendant le scroll",
+          "what": "Dans le popover « Déplacer vers » / « Partager », les en-têtes de zone (Bureaux 1, Bureaux 2, Cellule 1...) passent en bandeau bleuté semi-gras avec border, et restent collés en haut de la liste quand on scroll dans une zone. Quand on dépasse la dernière entrée de Bureaux 1, le bandeau est remplacé par Bureaux 2. Plus de perte de repère sur les sites multi-zones.",
+          "where": "Card 03 Systèmes → bouton « ↔ » ou « partage » d'un équipement → popover.",
+          "how_to_test": "Sur Communay, ouvrir « Déplacer vers » sur un équipement d'une zone avec beaucoup d'usages, scroller : le titre Bureaux 1 reste figé en haut, puis bascule sur Bureaux 2 dès qu'on entre dans le groupe suivant."
+        }
+      ]
+    },
+    {
       "version": "0.1.148",
       "date": "2026-06-08",
       "title": "« Déplacer vers » — popover qui reste dans l'écran + icônes catégorie",
