@@ -177,6 +177,35 @@ function buildPrecheck(documentId) {
         'Vérifier la date de mise en service — un équipement de plus de 60 ans est très rare en service réel.',
         'Ouvre cet équipement et vérifie le champ Âge.'));
     }
+    // Lot 8 — fonction(s) désalignée(s) du modèle biblio. Si le device est
+    // basé sur un equipment_template dont les `default_device_role` ont
+    // évolué (typiquement mig 195 : VMC, CTA, destratificateur, extracteur,
+    // PAC, ASI, etc.), on propose de réaligner. Cas courant : un device
+    // VMC créé avant juin 2026 en `['emission']` alors que la biblio est
+    // désormais `['production','emission']` — résultat : son énergie n'est
+    // plus saisissable dans l'UI.
+    if (d.equipment_template_id) {
+      const tpl = db.db.prepare(`
+        SELECT name, default_device_role FROM equipment_templates WHERE id = ?
+      `).get(d.equipment_template_id);
+      if (tpl?.default_device_role) {
+        const tplRoles = parseRoles(tpl.default_device_role);
+        const tplHasProd = tplRoles.some(r => /production|generator/i.test(r));
+        const devHasProd = roles.some(r => /production|generator/i.test(r));
+        // Cas concret : la biblio a Production, l'instance ne l'a pas. La
+        // doctrine énergie primaire bloque la saisie d'énergie sur ce device.
+        if (tplHasProd && !devHasProd) {
+          warnings.push(newFinding('DEV-006', 'warning', 'device', d.id, 'device_role',
+            `Équipement « ${d.name || '#' + d.id} » (modèle « ${tpl.name} ») : la fonction « Production » n\'est pas cochée alors que la bibliothèque l\'attribue désormais à ce type d\'équipement.`,
+            'Sans la fonction Production, le champ Énergie primaire reste désactivé pour cet équipement — ce qui empêche sa puissance d\'entrer dans le cumul R175-2 et le PDF affiche un trou.',
+            `Si l\'équipement consomme bien de l\'élec / du gaz directement (cas habituel d\'une VMC, CTA, extracteur, destratificateur, panneau radiant, ASI), clique « Corriger automatiquement » ci-dessous : Buildy alignera les fonctions du device sur celles du modèle biblio (${tplRoles.join(' + ')}) — ensuite tu pourras choisir son énergie.`,
+            {
+              autoFixAction: 'align_device_roles_to_template',
+              autoFixLabel: `Aligner les fonctions sur le modèle (${tplRoles.join(' + ')})`,
+            }));
+        }
+      }
+    }
   }
 
   // ── Zones : plages plausibles surface ────────────────────────────────

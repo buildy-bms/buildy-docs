@@ -53,7 +53,7 @@ const auditStore = useAuditStore()
 const documentSystems = computed(() => auditStore.systems || [])
 
 // Source partagee : lib/audit-options.js (icones + couleurs synchronises)
-import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete } from '@/lib/audit-options'
+import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceRoleAllowsEnergySource } from '@/lib/audit-options'
 
 // Item 3c — les puissances nominales (chaud / froid) n'ont de sens que pour
 // les systèmes qui mettent en jeu une puissance thermique ou aéraulique.
@@ -407,16 +407,26 @@ async function removeDevice(d) {
                 <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
               </div>
             </td>
-            <!-- Énergie -->
+            <!-- Énergie — doctrine 0.1.135 : saisissable UNIQUEMENT si la
+                 fonction inclut Production. Pour les émetteurs / distributeurs
+                 / régulateurs passifs, on désactive le champ et on affiche un
+                 tiret avec tooltip explicatif (pour qu'un auditeur ne croie
+                 pas à un bug). -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
               <div class="min-w-28">
+                <div v-if="!deviceRoleAllowsEnergySource(d.device_role)"
+                     class="px-2 py-1.5 text-xs text-gray-400 italic border border-dashed border-gray-200 rounded-md text-center cursor-help"
+                     :title="'L\'énergie primaire n\'est saisissable que pour un équipement de PRODUCTION. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s). Cas typique : une VMC qui consomme de l\'élec → fonction « Production + Émission ».'">
+                  — non applicable
+                </div>
                 <SearchableSelect
+                  v-else
                   :model-value="d.energy_source"
                   @update:model-value="v => patchDevice(d, { energy_source: v || null })"
                   :options="ENERGY_OPTIONS"
                   :clearable="false"
                   size="sm"
-                  placeholder="Énergie"
+                  placeholder="Énergie primaire"
                 />
               </div>
             </td>
