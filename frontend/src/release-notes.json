@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.155",
+      "date": "2026-06-08",
+      "title": "PDF synthèse audit BACS — fix : HTML brut visible dans les titres d'actions",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Les titres d'actions du tableau récapitulatif affichent enfin du texte propre (chips/SVG remplacés par des libellés simples)",
+          "what": "Sur le PDF Tableaux de synthèse, la colonne Titre de l'action montrait `Raccorder <span class=\"tag-pill\"...><svg ...> refroidissement</span> au BACS` en clair. Cause : le rapport principal rend le titre via {{{title}}} (HTML avec chips colorés + SVG inline), mais la synthèse l'utilisait via {{title}} (escape par défaut). Nouvelle variante title_plain générée côté backend qui remplace {{zone:id}} / {{system:id}} / {{device:id}} par leur libellé simple, sans HTML — résultat dans le tableau : `Raccorder refroidissement · Bureaux 1 au BACS`.",
+          "where": "PDF Tableaux de synthèse audit BACS, tableau 4/4 « Plan d'action récapitulatif ».",
+          "how_to_test": "Régénérer le PDF synthèse Communay : tous les titres d'actions sont en texte propre, plus de balises HTML visibles."
+        }
+      ]
+    },
+    {
       "version": "0.1.154",
       "date": "2026-06-08",
       "title": "PDF audit BACS — verdicts de conformité neutres (sans interpellation de l'auditeur)",

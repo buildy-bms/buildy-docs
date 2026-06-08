@@ -411,7 +411,7 @@
               <td class="col-sev"><span class="sev sev-{{severity}}">{{#if (eq severity "blocking")}}Bloquante{{else}}{{#if (eq severity "major")}}Majeure{{else}}Mineure{{/if}}{{/if}}</span></td>
               <td class="col-r175">{{r175_article}}</td>
               <td class="col-zone">{{#if zone_name}}{{zone_name}}{{else}}<span class="muted">—</span>{{/if}}</td>
-              <td class="col-title">{{title}}</td>
+              <td class="col-title">{{title_plain}}</td>
               <td class="col-source">
                 {{#if source_table}}
                   {{#if (eq source_table "bacs_audit_system_devices")}}E-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_meters")}}M-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_thermal_regulation")}}T-{{source_id}}{{else}}{{#if (eq source_table "bacs_audit_bms")}}GTB{{else}}<span class="muted">—</span>{{/if}}{{/if}}{{/if}}{{/if}}
