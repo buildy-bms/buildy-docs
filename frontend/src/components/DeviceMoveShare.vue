@@ -15,9 +15,28 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ArrowsRightLeftIcon, ShareIcon } from '@heroicons/vue/24/outline'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { moveBacsDevice, shareBacsDevice } from '@/api'
 import { systemUsageLabel } from '@/lib/audit-options'
+import { resolveFaIconName } from '@/lib/equipment-icons'
 import { useNotification } from '@/composables/useNotification'
+
+// Aligné sur DeviceEditModal — icône + couleur par catégorie d'usage. Les
+// icônes apportent une lecture instantanée de la catégorie ciblée (flamme
+// rouge = chauffage, etc.). Pas centralisé pour éviter une dépendance
+// circulaire avec SystemCategoryIcon.
+const SYSTEM_CATEGORY_DECOR = {
+  heating:                { icon: 'fa-fire',        color: '#dc2626' },
+  cooling:                { icon: 'fa-snowflake',   color: '#0891b2' },
+  ventilation:            { icon: 'fa-fan',         color: '#64748b' },
+  dhw:                    { icon: 'fa-faucet',      color: '#0284c7' },
+  lighting_indoor:        { icon: 'fa-lightbulb',   color: '#f59e0b' },
+  lighting_outdoor:       { icon: 'fa-tower-cell',  color: '#f59e0b' },
+  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a' },
+}
+function decorOf(s) {
+  return SYSTEM_CATEGORY_DECOR[s.system_category] || { icon: 'fa-cube', color: '#6b7280' }
+}
 
 const props = defineProps({
   device: { type: Object, required: true },
@@ -102,13 +121,27 @@ function close() { openKind.value = null }
 
 // Popover téléporté au <body> pour échapper aux overflow:hidden des cartes.
 const popupRef = ref(null)
-const pos = ref({ top: 0, left: 0 })
+const pos = ref({ top: 0, left: 0, maxHeight: 480 })
 const DROPDOWN_W = 288
+const MIN_PANEL_H = 220 // sous cette hauteur en bas, on flip vers le haut
 
 function updatePos() {
   const r = rootRef.value?.getBoundingClientRect()
   if (!r) return
-  pos.value = { top: r.bottom + 4, left: Math.max(8, r.right - DROPDOWN_W) }
+  const vh = window.innerHeight || document.documentElement.clientHeight
+  const margin = 8
+  const gap = 4
+  const spaceBelow = vh - r.bottom - margin
+  const spaceAbove = r.top - margin
+  // Flip vers le haut quand l'espace en bas est insuffisant ET qu'il y a plus
+  // de place en haut. Évite de tronquer la liste sous le viewport en bas de
+  // page (incident 2026-06-08 sur l'audit Communay : « Bureaux 2 » coupé).
+  const flipUp = spaceBelow < MIN_PANEL_H && spaceAbove > spaceBelow
+  const maxAvail = flipUp ? spaceAbove - gap : spaceBelow - gap
+  const maxHeight = Math.max(180, Math.min(480, maxAvail))
+  pos.value = flipUp
+    ? { top: Math.max(margin, r.top - gap - maxHeight), left: Math.max(8, r.right - DROPDOWN_W), maxHeight }
+    : { top: r.bottom + gap, left: Math.max(8, r.right - DROPDOWN_W), maxHeight }
 }
 function onDocClick(e) {
   if (rootRef.value && rootRef.value.contains(e.target)) return
@@ -164,8 +197,8 @@ onBeforeUnmount(() => {
     <div
       v-if="openKind"
       ref="popupRef"
-      :style="{ position: 'fixed', top: pos.top + 'px', left: pos.left + 'px', width: DROPDOWN_W + 'px' }"
-      class="z-60 bg-white border border-gray-200 rounded-lg shadow-lg text-sm flex flex-col max-h-112"
+      :style="{ position: 'fixed', top: pos.top + 'px', left: pos.left + 'px', width: DROPDOWN_W + 'px', maxHeight: pos.maxHeight + 'px' }"
+      class="z-60 bg-white border border-gray-200 rounded-lg shadow-lg text-sm flex flex-col"
     >
       <div class="px-3 py-2 border-b border-gray-100 shrink-0">
         <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -192,6 +225,11 @@ onBeforeUnmount(() => {
                          ? 'bg-indigo-50 text-indigo-700 font-medium cursor-default'
                          : 'hover:bg-gray-50 text-gray-700']"
             >
+              <FontAwesomeIcon
+                :icon="['fas', resolveFaIconName(decorOf(s).icon)]"
+                :style="{ color: decorOf(s).color }"
+                class="w-3.5 h-3.5 shrink-0"
+              />
               <span class="truncate flex-1">{{ labelOf(s) }}</span>
               <span v-if="s.id === device.system_id" class="text-[10px] text-indigo-500 shrink-0">actuel</span>
             </button>
@@ -214,6 +252,11 @@ onBeforeUnmount(() => {
                 :disabled="saving"
                 @change="e => toggleShare(s.id, e.target.checked)"
                 class="rounded border-gray-300 shrink-0"
+              />
+              <FontAwesomeIcon
+                :icon="['fas', resolveFaIconName(decorOf(s).icon)]"
+                :style="{ color: decorOf(s).color }"
+                class="w-3.5 h-3.5 shrink-0"
               />
               <span class="text-gray-700 truncate">{{ labelOf(s) }}</span>
             </label>
