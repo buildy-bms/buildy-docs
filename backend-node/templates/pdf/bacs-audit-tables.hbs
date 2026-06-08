@@ -243,7 +243,7 @@
             {{#each devices}}
               <tr {{#if out_of_service}}class="row-hs"{{/if}}>
                 <td class="col-ref">{{ref}}</td>
-                <td class="col-usage">{{{categoryIcon ../system_category "11"}}}<span class="cat-label">{{../categoryLabel}}</span></td>
+                <td class="col-usage">{{{systemCategoryPill ../system_category "sm"}}}</td>
                 <td class="col-name">
                   <strong>{{name}}</strong>
                   {{#if out_of_service}}<span class="hs-tag">HS</span>{{/if}}
@@ -251,11 +251,13 @@
                 </td>
                 <td class="col-brand">{{#if brand}}{{brand}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-model">{{#if model_reference}}{{model_reference}}{{else}}<span class="muted">—</span>{{/if}}</td>
-                <td class="col-energy">{{energyLabel}}</td>
-                <td class="col-power">{{#if has_multiple}}{{total_power_kw}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{power_kw}}{{/if}}</td>
-                <td class="col-role">{{roleLabel}}</td>
-                <td class="col-comm">{{commLabel}}</td>
-                <td class="col-loc">{{location}}</td>
+                <td class="col-energy">{{#if energy_source}}{{{energyPill energy_source "sm"}}}{{else}}<span class="muted">—</span>{{/if}}</td>
+                <td class="col-power">{{#if has_multiple}}{{total_power_kw}} <span class="muted">({{quantity}}&times;{{power_kw}})</span>{{else}}{{#if power_kw}}{{power_kw}}{{else}}<span class="muted">—</span>{{/if}}{{/if}}</td>
+                <td class="col-role">
+                  {{#if device_role.length}}{{#each device_role}}{{{rolePill this "sm"}}} {{/each}}{{else}}<span class="muted">—</span>{{/if}}
+                </td>
+                <td class="col-comm">{{{commPill communication_protocol "sm"}}}</td>
+                <td class="col-loc">{{#if location}}{{location}}{{else}}<span class="muted">—</span>{{/if}}</td>
                 <td class="col-bool"><span class="{{#if meets_r175_3_p3}}bool-yes{{else}}bool-no{{/if}}">{{#if meets_r175_3_p3}}✓{{else}}✗{{/if}}</span></td>
                 <td class="col-bool"><span class="{{triCls meets_r175_3_p4 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4}}</span></td>
                 <td class="col-bool"><span class="{{triCls meets_r175_3_p4_autonomous 'bool-yes' 'bool-no' 'bool-na'}}">{{triSym meets_r175_3_p4_autonomous}}</span></td>

@@ -186,6 +186,39 @@ Handlebars.registerHelper('systemCategoryPill', (cat, variant) => {
   const cfg = SYSTEM_CATEGORY_PILL[cat] || SYSTEM_CATEGORY_PILL.other;
   return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
 });
+
+// Pill « énergie primaire » pour la colonne Énergie d'un équipement
+// (PDF synthèse tableau systèmes). Aligné sur ENERGY_LABEL (_labels.js)
+// + couleurs métier (gaz rouge flamme, élec jaune éclair, etc.).
+const ENERGY_PILL = {
+  gas:              { icon: 'fire',                 label: 'Gaz',                 bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' },
+  electric:         { icon: 'bolt',                 label: 'Électrique',          bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' },
+  heat_pump:        { icon: 'bolt',                 label: 'Électrique',          bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' },
+  wood:             { icon: 'tree',                 label: 'Bois',                bg: '#ecfccb', fg: '#3f6212', border: '#bef264' },
+  biomass:          { icon: 'leaf',                 label: 'Biomasse',            bg: '#ecfccb', fg: '#3f6212', border: '#bef264' },
+  fuel_oil:         { icon: 'oil-can',              label: 'Fioul',               bg: '#f3f4f6', fg: '#374151', border: '#d1d5db' },
+  district_heating: { icon: 'temperature-half',     label: 'Calories / Frigories',bg: '#ede9fe', fg: '#5b21b6', border: '#c4b5fd' },
+  solar:            { icon: 'solar-panel',          label: 'Solaire',             bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  autre:            { icon: 'circle-question',      label: 'Autre',               bg: '#f9fafb', fg: '#374151', border: '#e5e7eb' },
+};
+Handlebars.registerHelper('energyPill', (energy, variant) => {
+  if (!energy) return '';
+  const cfg = ENERGY_PILL[energy] || ENERGY_PILL.autre;
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+});
+
+// Pill communication équipement : rouge pâle quand non communicant,
+// vert quand communicant + suffixe filaire/sans fil discret. Pour le
+// tableau synthèse uniquement (le rapport principal a son propre
+// rendu avec pilules R175-3 dédiées).
+const COMM_STATE_PILL = {
+  yes: { icon: 'wifi',              label: 'Communicant',     bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' },
+  no:  { icon: 'plug-circle-xmark', label: 'Non communicant', bg: '#fef2f2', fg: '#b91c1c', border: '#fecaca' },
+};
+Handlebars.registerHelper('commPill', (hasProtocol, variant) => {
+  const cfg = hasProtocol ? COMM_STATE_PILL.yes : COMM_STATE_PILL.no;
+  return renderMeterPill(cfg, { variant: typeof variant === 'string' ? variant : 'md' });
+});
 Handlebars.registerHelper('or', function(...args) {
   // Handlebars passe l'options en dernier argument, on l'exclut
   return args.slice(0, -1).some(v => !!v);
