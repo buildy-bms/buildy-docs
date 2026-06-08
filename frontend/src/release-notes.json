@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.151",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — verdict de conformité par système, fix « Non communicant · sans fil », lignes rouges compteurs",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "PDF : plus de « Non communicant · sans fil » absurde sur les équipements sans protocole",
+          "what": "Le suffixe « · filaire / sans fil » n'apparaît plus quand l'équipement n'a aucun protocole de communication. Auparavant, un équipement saisi historiquement avec wired=0 sans protocole affichait « Non communicant · sans fil », ce qui n'avait pas de sens (la question filaire/sans fil ne se pose que pour un équipement communicant).",
+          "where": "Chapitre 3 du PDF audit, attribut Communication de chaque équipement.",
+          "how_to_test": "Regénérer le PDF Communay : les équipements non communicants n'ont plus de suffixe parasite."
+        },
+        {
+          "kind": "feature",
+          "title": "PDF : encart de verdict R175-3 sur chaque système (conforme / partiel / non conforme / à compléter / exempté)",
+          "what": "En tête de chaque carte système (chap 3), un bandeau coloré indique en clair le verdict R175-3 du système et la raison : « Non conforme R175-3 : 2 équipements non communicants (R175-3 §1°) + 1 équipement sans arrêt manuel (R175-3 §4°) ». Le lecteur (MOA, BE, bureau de contrôle) comprend en un coup d'œil ce qui pèche sans devoir lire les pilules de chaque équipement. Vert = conforme, orange = partiel, rouge = non conforme, indigo = en attente de saisie, gris = exempté (règle des 5 %).",
+          "where": "Chapitre 3 du PDF audit BACS, au-dessus de la liste des équipements de chaque système thermique/éclairage/PV.",
+          "how_to_test": "Regénérer le PDF Communay : sur le système Chauffage Monosplits Lot A, l'encart doit indiquer le défaut majeur."
+        },
+        {
+          "kind": "feature",
+          "title": "PDF : lignes rouge pâle sur les compteurs requis non conformes",
+          "what": "Dans le chapitre 4 (Compteurs), toute ligne d'un compteur requis (R175-3 1°) mais non présent ou non communicant est désormais surlignée en rouge pâle. Permet de scanner visuellement les lignes qui pèsent dans le plan de mise en conformité, sans confondre avec les compteurs HS (qui restent affichés en opacity 0.5).",
+          "where": "Chapitre 4 du PDF audit BACS, tableau par énergie.",
+          "how_to_test": "Regénérer le PDF Communay : les lignes des compteurs requis manquants ou non communicants ont un fond rouge pâle."
+        }
+      ]
+    },
+    {
       "version": "0.1.150",
       "date": "2026-06-08",
       "title": "PWA — parité pastilles fonctions + zones sticky dans les sheets de sélection",

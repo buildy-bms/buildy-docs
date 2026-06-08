@@ -679,6 +679,20 @@
         {{#if (eq is_looped "no_loop")}}<span class="system-card-flag system-card-flag-muted" title="Production ECS sans boucle">Sans boucle</span>{{/if}}
       </div>
       <div class="system-card-body">
+        {{!-- Verdict de conformité R175-3 par système : permet au lecteur
+             du PDF (MOA, BE, bureau de contrôle) de comprendre en 1 coup
+             d'œil pourquoi ce système est conforme ou non, sans avoir à
+             croiser les pilules de chaque équipement. --}}
+        {{#if compliance}}
+        <div class="system-compliance system-compliance-{{compliance.verdict}}">
+          <span class="system-compliance-badge">{{compliance.label}}</span>
+          {{#if compliance.reasons.length}}
+            <ul class="system-compliance-reasons">
+              {{#each compliance.reasons}}<li>{{this}}</li>{{/each}}
+            </ul>
+          {{/if}}
+        </div>
+        {{/if}}
         {{!-- Item 3 — Avertissement légionelles pour les ECS bouclées --}}
         {{#if (and (eq system_category "dhw") (eq is_looped "looped"))}}
         <div class="callout callout-warning system-callout">
@@ -774,7 +788,7 @@
                   </div>
                   <div class="device-attr">
                     <span class="device-attr-label">Communication</span>
-                    <span class="device-attr-value">{{commLabel}}{{#if (eq wired 1)}} <span class="muted">· filaire</span>{{else if (eq wired 0)}} <span class="muted">· sans fil</span>{{/if}}</span>
+                    <span class="device-attr-value">{{commLabel}}{{#if communication_protocol}}{{#if (eq wired 1)}} <span class="muted">· filaire</span>{{else if (eq wired 0)}} <span class="muted">· sans fil</span>{{/if}}{{/if}}</span>
                   </div>
                   <div class="device-attr">
                     <span class="device-attr-label">Localisation</span>
@@ -945,7 +959,7 @@
           </td>
         </tr>
         {{#each items}}
-          <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}">
+          <tr class="meter-row{{#if out_of_service}} meter-row-hs{{/if}}{{#if complianceFailed}} meter-row-noncompliant{{/if}}">
             <td>{{zoneLabel}}</td>
             <td>{{#if isGeneral}}<span class="bool-na">—</span>{{else}}{{{meterUsagePill usage "sm"}}}{{/if}}</td>
             <td>{{#if locationLabel}}{{locationLabel}}{{else}}<span class="bool-na">—</span>{{/if}}</td>
