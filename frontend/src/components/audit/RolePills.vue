@@ -2,9 +2,11 @@
 /**
  * Affichage en lecture seule des fonctions d'un équipement (Production /
  * Distribution / Émission / Régulation / Autre) sous forme de pilules
- * colorées avec icône.
+ * colorées avec une PASTILLE de couleur (plus d'icône — Buildy Docs 0.1.147,
+ * pour éviter la confusion entre l'icône fa-fan d'Émission et la catégorie
+ * d'usage Ventilation, etc.).
  *
- * Source unique des couleurs et icônes : `ROLE_OPTIONS` de `lib/audit-options.js`.
+ * Source unique des couleurs : `ROLE_OPTIONS` de `lib/audit-options.js`.
  * Utilisé en bibliothèque (LibraryEquipmentView, LibraryDevicePicker) et
  * partout où on a besoin d'afficher les fonctions sans permettre l'édition.
  *
@@ -12,15 +14,16 @@
  * qui rend des chips éditables (audit).
  */
 import { computed } from 'vue'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { ROLE_OPTIONS } from '@/lib/audit-options'
-import { resolveFaIconName } from '@/lib/equipment-icons'
 
 const props = defineProps({
   // Soit un array de valeurs, soit une string CSV, soit une string JSON array.
   roles: { type: [Array, String, null], default: null },
   size: { type: String, default: 'sm' }, // 'xs' | 'sm' | 'md'
-  // En affichage compact (catalogue dense), on cache le label texte.
+  // Affichage compact (catalogue dense) : on cache le label texte, garde
+  // juste la pastille colorée + tooltip avec le nom complet.
+  // Note : `iconOnly` est conservé pour compat ascendante ; sémantiquement
+  // c'est désormais « pastille seule ».
   iconOnly: { type: Boolean, default: false },
 })
 
@@ -41,19 +44,16 @@ const items = computed(() => {
     return {
       value: v,
       label: opt?.label || v,
-      icon: opt?.icon || 'fa-cube',
       color: opt?.color || '#6b7280',
     }
   })
 })
 
 const sizeClasses = computed(() => {
-  if (props.size === 'xs') return { pill: 'text-[10px] px-1.5 py-0.5 gap-0.5', icon: 'w-2.5 h-2.5' }
-  if (props.size === 'md') return { pill: 'text-xs px-2 py-1 gap-1.5',          icon: 'w-3.5 h-3.5' }
-  return                          { pill: 'text-[11px] px-1.5 py-0.5 gap-1',    icon: 'w-3 h-3' }
+  if (props.size === 'xs') return { pill: 'text-[10px] px-1.5 py-0.5 gap-1', dot: 'w-1.5 h-1.5' }
+  if (props.size === 'md') return { pill: 'text-xs px-2 py-1 gap-1.5',       dot: 'w-2 h-2' }
+  return                          { pill: 'text-[11px] px-1.5 py-0.5 gap-1', dot: 'w-1.5 h-1.5' }
 })
-
-function faName(icon) { return resolveFaIconName(icon) }
 </script>
 
 <template>
@@ -67,7 +67,9 @@ function faName(icon) { return resolveFaIconName(icon) }
             backgroundColor: o.color + '12',
           }"
           v-tooltip="iconOnly ? o.label : null">
-      <FontAwesomeIcon :icon="['fas', faName(o.icon)]" :class="sizeClasses.icon" />
+      <span class="rounded-full shrink-0"
+            :class="sizeClasses.dot"
+            :style="{ backgroundColor: o.color }"></span>
       <span v-if="!iconOnly">{{ o.label }}</span>
     </span>
   </span>

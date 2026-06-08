@@ -75,12 +75,15 @@ export function systemUsageLabel(system) {
   return SYSTEM_CATEGORY_LABELS[system.system_category] || system.system_category || 'Usage'
 }
 
+// Pastilles de couleur SANS icône — l'icône (par ex. fa-fan pour Émission)
+// pouvait être confondue avec la catégorie d'usage Ventilation. La couleur
+// suffit comme marqueur visuel, le label porte le sens (Buildy Docs 0.1.147).
 export const ROLE_OPTIONS = [
-  { value: 'production',   label: 'Production',   icon: 'fa-industry',          color: '#dc2626' },
-  { value: 'distribution', label: 'Distribution', icon: 'fa-route',             color: '#0ea5e9' },
-  { value: 'emission',     label: 'Émission',     icon: 'fa-fan',               color: '#3b82f6' },
-  { value: 'regulation',   label: 'Régulation',   icon: 'fa-sliders',           color: '#a855f7' },
-  { value: 'autre',        label: 'Autre',        icon: 'fa-circle-question',   color: '#6b7280' },
+  { value: 'production',   label: 'Production',   color: '#dc2626' },
+  { value: 'distribution', label: 'Distribution', color: '#0ea5e9' },
+  { value: 'emission',     label: 'Émission',     color: '#3b82f6' },
+  { value: 'regulation',   label: 'Régulation',   color: '#a855f7' },
+  { value: 'autre',        label: 'Autre',        color: '#6b7280' },
 ]
 
 // ── Types de régulation par niveau (mig 184) ──────────────────────────
