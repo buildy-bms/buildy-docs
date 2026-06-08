@@ -282,56 +282,94 @@ async function buildBacsAuditExportData(af, opts = {}) {
   // Enrichit systems avec devices + sums + flags dérivés et group par zone
   // Verdict de conformité R175-3 par système (PDF chap 3). Ne s'applique
   // qu'aux audits BACS et aux postes thermiques + éclairage soumis au
-  // décret. Pour chaque système présent on lit les devices et on compte
-  // les défauts sur les 4 critères clés : communicant, interopérable
-  // (R175-3 §3), arrêt manuel (R175-3 §4), autonome au défaut (§4 alinéa).
+  // décret. Le message est écrit pour qu'un client non technique
+  // (gestionnaire, MOA) comprenne en une phrase ce qui pèche et
+  // pourquoi c'est problématique. Nom des équipements concernés
+  // explicite (max 3 + « + N autres »), référence au décret en
+  // fin de phrase pour la traçabilité juridique (pas en attaque).
   const isBacsKind = af.kind === 'bacs_audit';
   const R175_CATS = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production']);
+  function listDeviceNames(devs) {
+    const names = devs.map(d => d.name || 'Équipement sans nom').filter(Boolean);
+    if (names.length <= 3) return names.join(', ');
+    return `${names.slice(0, 3).join(', ')} + ${names.length - 3} autre${names.length - 3 > 1 ? 's' : ''}`;
+  }
   function computeSystemCompliance(s, devs) {
     if (!isBacsKind || !R175_CATS.has(s.system_category)) return null;
     if (isTrue(s.not_concerned)) {
-      return { verdict: 'na', label: 'Hors périmètre déclaré', reasons: [s.not_concerned_reason].filter(Boolean) };
+      return {
+        verdict: 'na',
+        label: 'Poste déclaré hors périmètre',
+        reasons: [s.not_concerned_reason].filter(Boolean),
+      };
     }
     if (s.present !== 1) return null;
     if (isTrue(s.marked_negligible_under_5pct)) {
       return {
         verdict: 'exempt',
-        label: 'Exempté — règle des 5 % (FAQ ministère, juin 2025)',
-        reasons: [s.negligible_justification].filter(Boolean),
+        label: 'Poste exempté du décret (consommation < 5 % du total)',
+        reasons: [s.negligible_justification || 'Règle des 5 % (FAQ ministère, juin 2025).'],
       };
     }
     const active = devs.filter(d => !isTrue(d.out_of_service) && !isTrue(d.is_backup));
     if (!active.length) {
-      return { verdict: 'pending', label: 'À compléter — aucun équipement actif renseigné', reasons: [] };
+      return {
+        verdict: 'pending',
+        label: 'Aucun équipement actif renseigné',
+        reasons: ['Saisis les équipements de ce poste (au moins un actif, hors secours et hors service) pour pouvoir statuer sur la conformité.'],
+      };
     }
-    const reasons = [];
-    const nComm  = active.filter(d => isFalse(d.is_communicating)).length;
-    const nIop   = active.filter(d => isFalse(d.meets_r175_3_p3)).length;
-    const nStop  = active.filter(d => isFalse(d.meets_r175_3_p4)).length;
-    const nAuto  = active.filter(d => isFalse(d.meets_r175_3_p4_autonomous)).length;
-    const nUnk   = active.filter(d =>
+    const failComm  = active.filter(d => isFalse(d.is_communicating));
+    const failIop   = active.filter(d => isFalse(d.meets_r175_3_p3));
+    const failStop  = active.filter(d => isFalse(d.meets_r175_3_p4));
+    const failAuto  = active.filter(d => isFalse(d.meets_r175_3_p4_autonomous));
+    const pending   = active.filter(d =>
       d.is_communicating == null || d.meets_r175_3_p3 == null
-      || d.meets_r175_3_p4 == null || d.meets_r175_3_p4_autonomous == null).length;
-    if (nComm)  reasons.push(`${nComm} équipement${nComm > 1 ? 's' : ''} non communicant${nComm > 1 ? 's' : ''} (R175-3 §1°)`);
-    if (nIop)   reasons.push(`${nIop} équipement${nIop > 1 ? 's' : ''} sans interopérabilité (R175-3 §3°)`);
-    if (nStop)  reasons.push(`${nStop} équipement${nStop > 1 ? 's' : ''} sans arrêt manuel (R175-3 §4°)`);
-    if (nAuto)  reasons.push(`${nAuto} équipement${nAuto > 1 ? 's' : ''} sans mode autonome au défaut (R175-3 §4° alinéa)`);
+      || d.meets_r175_3_p4 == null || d.meets_r175_3_p4_autonomous == null);
+    const reasons = [];
+    if (failComm.length) {
+      reasons.push(`Ne remonte${failComm.length > 1 ? 'nt' : ''} pas ${failComm.length > 1 ? 'leurs' : 'ses'} données à une GTB — donc ni pilotable${failComm.length > 1 ? 's' : ''}, ni mesurable${failComm.length > 1 ? 's' : ''} : ${listDeviceNames(failComm)} (R175-3 §1°).`);
+    }
+    if (failIop.length) {
+      reasons.push(`Communique${failIop.length > 1 ? 'nt' : ''} en protocole propriétaire fermé — donc non intégrable${failIop.length > 1 ? 's' : ''} à la GTB du site : ${listDeviceNames(failIop)} (R175-3 §3°).`);
+    }
+    if (failStop.length) {
+      reasons.push(`Pas d'arrêt manuel à proximité — l'occupant ne peut pas couper rapidement en cas d'inconfort ou de problème : ${listDeviceNames(failStop)} (R175-3 §4°).`);
+    }
+    if (failAuto.length) {
+      reasons.push(`S'arrête${failAuto.length > 1 ? 'nt' : ''} si la GTB tombe en panne — pas de mode dégradé autonome, le service est interrompu : ${listDeviceNames(failAuto)} (R175-3 §4° dernier alinéa).`);
+    }
     if (reasons.length) {
-      const verdict = (nComm + nIop) > 0 ? 'non_compliant' : 'partial';
+      // Bloquant = §1° (non communicant) ou §3° (non interopérable) :
+      // sans ça, la GTB ne peut littéralement pas voir/parler à
+      // l'équipement → non_compliant. §4° (arrêt manuel) et §4° alinéa
+      // (autonomie au défaut) sont graves mais ne bloquent pas
+      // l'intégration → partial.
+      const verdict = (failComm.length + failIop.length) > 0 ? 'non_compliant' : 'partial';
       return {
         verdict,
-        label: verdict === 'non_compliant' ? 'Non conforme R175-3' : 'Conformité partielle R175-3',
+        label: verdict === 'non_compliant'
+          ? 'Non conforme au décret BACS — actions correctives requises'
+          : 'Presque conforme — quelques équipements à reprendre',
         reasons,
       };
     }
-    if (nUnk) {
+    if (pending.length) {
       return {
         verdict: 'pending',
-        label: 'À compléter — critères R175-3 non renseignés',
-        reasons: [`${nUnk} équipement${nUnk > 1 ? 's' : ''} avec réponses manquantes sur les 4 critères R175-3`],
+        label: pending.length === 1
+          ? 'Conformité à statuer — il manque tes réponses sur 1 équipement'
+          : `Conformité à statuer — il manque tes réponses sur ${pending.length} équipements`,
+        reasons: [
+          `Ouvre ${pending.length === 1 ? 'cet équipement' : 'chacun de ces équipements'} dans la card 03 et réponds Oui/Non aux 4 questions : remontée GTB, interopérabilité, arrêt manuel local, autonomie au défaut — ${listDeviceNames(pending)}.`,
+        ],
       };
     }
-    return { verdict: 'compliant', label: 'Conforme R175-3', reasons: [] };
+    return {
+      verdict: 'compliant',
+      label: 'Conforme au décret BACS',
+      reasons: ['Tous les équipements actifs cochent les 4 critères : ils remontent à la GTB, parlent un protocole ouvert, ont un arrêt manuel local et continuent à fonctionner en mode dégradé si la GTB tombe.'],
+    };
   }
 
   const enrichedSystems = systems.map(s => {

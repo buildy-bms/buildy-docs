@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.153",
+      "date": "2026-06-08",
+      "title": "PDF audit BACS — verdicts de conformité réécrits en langage client",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Les encarts de conformité par système parlent maintenant le langage du client (effet bloquant + nom des équipements + référence décret en bas de phrase)",
+          "what": "Fini les libellés jargon comme « À compléter — critères R175-3 non renseignés » ou « 1 équipement avec réponses manquantes sur les 4 critères R175-3 » qui ne disaient pas quoi faire ni pourquoi c'était gênant. Chaque verdict explique en une phrase l'effet concret du défaut (« Ne remontent pas leurs données à une GTB — donc ni pilotables, ni mesurables »), liste les équipements concernés par leur nom (max 3 + « + N autres »), et termine par la référence au décret entre parenthèses. Le verdict « pending » explique précisément où ouvrir l'équipement et quelles 4 questions poser.",
+          "where": "Chapitre 3 du PDF audit BACS, encart de conformité en tête de chaque système.",
+          "how_to_test": "Regénérer le PDF Communay : les encarts de conformité doivent être lisibles par un MOA ou un avocat sans glossaire."
+        }
+      ]
+    },
+    {
       "version": "0.1.152",
       "date": "2026-06-08",
       "title": "PDF audit BACS — fix : le rouge pâle des compteurs non conformes s'applique enfin sur toutes les lignes",
