@@ -89,12 +89,40 @@ async function routes(fastify) {
     const af = assertBacsAuditExists(id, request, reply, { requiredRole: 'write' });
     if (!af) return;
     const schema = z.object({
-      action: z.enum(['clear_regulation_deport_refs']),
+      action: z.enum(['clear_regulation_deport_refs', 'align_device_roles_to_template']),
       entity_id: z.number().int().positive(),
     });
     let body;
     try { body = schema.parse(request.body); }
     catch (e) { return reply.code(400).send({ detail: e.errors?.[0]?.message }); }
+
+    if (body.action === 'align_device_roles_to_template') {
+      // Lot 8 — réaligne les fonctions d'un device sur celles de son modèle
+      // bibliothèque (mig 195 a fait évoluer la biblio pour VMC/CTA/etc.,
+      // les instances créées avant gardent leur ancienne fonction).
+      const dev = db.db.prepare(`
+        SELECT d.id, d.equipment_template_id, t.default_device_role, t.name
+        FROM bacs_audit_system_devices d
+        LEFT JOIN equipment_templates t ON t.id = d.equipment_template_id
+        JOIN bacs_audit_systems s ON s.id = d.system_id
+        WHERE d.id = ? AND s.document_id = ?
+      `).get(body.entity_id, id);
+      if (!dev) return reply.code(404).send({ detail: `Équipement #${body.entity_id} introuvable dans cet audit.` });
+      if (!dev.equipment_template_id || !dev.default_device_role) {
+        return reply.code(400).send({ detail: `Équipement #${body.entity_id} n'a pas de modèle bibliothèque à aligner.` });
+      }
+      db.db.prepare(`
+        UPDATE bacs_audit_system_devices SET device_role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(dev.default_device_role, body.entity_id);
+      logBacsAudit(request, 'bacs.precheck.auto_fix', id, {
+        action: 'align_device_roles_to_template',
+        device_id: body.entity_id,
+        new_roles: dev.default_device_role,
+        template_name: dev.name,
+      });
+      const { buildPrecheck } = require('../lib/bacs-audit-precheck');
+      return { ok: true, new_roles: dev.default_device_role, precheck: buildPrecheck(id) };
+    }
 
     if (body.action === 'clear_regulation_deport_refs') {
       // Nullify les FK régulateur déporté qui pointent sur ce device, dans

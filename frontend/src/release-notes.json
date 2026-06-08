@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.141",
+      "date": "2026-06-08",
+      "title": "Énergie désactivée plus claire dans la table Systèmes + auto-fix pour aligner les fonctions sur la bibliothèque",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Le champ Énergie de la table Systèmes affiche désormais clairement « non applicable » quand la fonction n'est pas Production",
+          "what": "Sur un équipement sans la fonction Production (ex. VMC en Émission seule), le sélecteur Énergie laissait penser qu'on pouvait choisir une valeur — sauf que le backend la nullifiait silencieusement après coercion (doctrine 0.1.135). Désormais le champ s'affiche en pointillés gris avec « — non applicable » et un tooltip détaillé qui explique pourquoi et comment l'activer (ajouter la fonction Production).",
+          "where": "Carte 03 Systèmes → ligne équipement → colonne Énergie.",
+          "how_to_test": "Sur Communay, ligne VMC : le champ Énergie est maintenant clairement marqué « — non applicable ». Survole-le → tooltip explicatif. Si tu ajoutes la fonction « Production » dans la colonne Fonction(s) à droite, le champ devient un vrai sélecteur d'énergie."
+        },
+        {
+          "kind": "feat",
+          "title": "Nouveau pré-check : fonctions désalignées du modèle bibliothèque (DEV-006)",
+          "what": "Après la mig 195 (juin 2026), la bibliothèque a évolué (VMC, CTA, extracteur, destratificateur, ASI, etc. ajoutent la fonction Production qui leur manquait). Mais les équipements créés AVANT la mig conservent leur ancienne fonction — typiquement une VMC en Émission seule alors qu'elle devrait être Production+Émission. Le pré-check détecte maintenant ces désalignements et propose un bouton « Aligner les fonctions sur le modèle » qui copie en un clic les fonctions à jour depuis la biblio.",
+          "where": "Modale Vérifier → section Points d'attention → finding DEV-006 sur chaque équipement concerné.",
+          "how_to_test": "Sur Communay, la modale Vérifier affiche 9 findings DEV-006 (VMC, aérothermes, extracteurs…). Clic « Aligner les fonctions sur le modèle (production + emission) » → la fonction est mise à jour et le champ Énergie de la ligne correspondante devient saisissable."
+        }
+      ]
+    },
+    {
       "version": "0.1.140",
       "date": "2026-06-08",
       "title": "Pré-vérification — bouton « Corriger automatiquement » pour les références de régulateur déporté héritées",
