@@ -14,6 +14,40 @@
 import { ref, onMounted, computed } from 'vue'
 import BaseModal from '../BaseModal.vue'
 import { useNotification } from '@/composables/useNotification'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { resolveFaIconName } from '@/lib/equipment-icons'
+
+// Lot 9 — décor par catégorie d'usage (chauffage/refroidissement/etc.) +
+// décor par type d'entité (système/équipement/compteur/etc.). Aligne la
+// modale Précheck sur la charte visuelle Buildy partagée avec DeviceEditModal,
+// SystemCategoryIcon, etc.
+const SYSTEM_CATEGORY_DECOR = {
+  heating:                { icon: 'fa-fire',        color: '#dc2626', label: 'Chauffage' },
+  cooling:                { icon: 'fa-snowflake',   color: '#0891b2', label: 'Refroidissement' },
+  ventilation:            { icon: 'fa-fan',         color: '#64748b', label: 'Ventilation' },
+  dhw:                    { icon: 'fa-faucet',      color: '#0284c7', label: 'ECS' },
+  lighting_indoor:        { icon: 'fa-lightbulb',   color: '#f59e0b', label: 'Éclairage intérieur' },
+  lighting_outdoor:       { icon: 'fa-tower-cell',  color: '#f59e0b', label: 'Éclairage extérieur' },
+  electricity_production: { icon: 'fa-solar-panel', color: '#16a34a', label: 'Production PV' },
+}
+const ENTITY_DECOR = {
+  document: { icon: 'fa-id-card',        color: '#6b7280' },
+  system:   { icon: 'fa-layer-group',    color: '#6b7280' },
+  device:   { icon: 'fa-cube',           color: '#6b7280' },
+  meter:    { icon: 'fa-gauge',          color: '#6b7280' },
+  thermal:  { icon: 'fa-sliders',        color: '#a855f7' },
+  bms:      { icon: 'fa-microchip',      color: '#0ea5e9' },
+  zone:     { icon: 'fa-map-pin',        color: '#6b7280' },
+}
+function decorFor(f) {
+  // Priorité à la catégorie d'usage (chauffage/refroidissement/…) si fournie.
+  // Sinon retombe sur l'icône générique du type d'entité.
+  if (f.system_category && SYSTEM_CATEGORY_DECOR[f.system_category]) {
+    return SYSTEM_CATEGORY_DECOR[f.system_category];
+  }
+  return ENTITY_DECOR[f.entity] || { icon: 'fa-circle-exclamation', color: '#6b7280' };
+}
+function faName(icon) { return resolveFaIconName(icon) }
 
 const props = defineProps({
   auditId: { type: Number, required: true },
@@ -123,19 +157,24 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
         <div v-for="g in groupedBlocking" :key="'b-' + g.entity" class="border border-rose-200 rounded-lg overflow-hidden">
           <div class="bg-rose-50 px-3 py-2 text-sm font-medium text-rose-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-rose-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm" :title="f.code">
-              <div class="font-medium text-gray-900">{{ f.message }}</div>
-              <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
-              <div v-if="f.fix_hint" class="text-xs text-rose-800 bg-rose-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
-                <strong>Comment corriger :</strong> {{ f.fix_hint }}
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3" :title="f.code">
+              <FontAwesomeIcon :icon="['fas', faName(decorFor(f).icon)]"
+                               :style="{ color: decorFor(f).color }"
+                               class="w-4 h-4 shrink-0 mt-0.5" />
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-gray-900">{{ f.message }}</div>
+                <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
+                <div v-if="f.fix_hint" class="text-xs text-rose-800 bg-rose-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
+                  <strong>Comment corriger :</strong> {{ f.fix_hint }}
+                </div>
+                <button v-if="f.auto_fix_action" type="button"
+                        :disabled="fixing[f.code + '-' + f.entity_id]"
+                        @click="autoFix(f)"
+                        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
+                  <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                  <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                </button>
               </div>
-              <button v-if="f.auto_fix_action" type="button"
-                      :disabled="fixing[f.code + '-' + f.entity_id]"
-                      @click="autoFix(f)"
-                      class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg transition">
-                <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-              </button>
             </li>
           </ul>
         </div>
@@ -147,19 +186,24 @@ function entityLabel(e) { return ENTITY_LABEL[e] || e }
         <div v-for="g in groupedWarnings" :key="'w-' + g.entity" class="border border-amber-200 rounded-lg overflow-hidden">
           <div class="bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">{{ entityLabel(g.entity) }} · {{ g.findings.length }} point{{ g.findings.length > 1 ? 's' : '' }}</div>
           <ul class="divide-y divide-amber-100">
-            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm" :title="f.code">
-              <div class="font-medium text-gray-900">{{ f.message }}</div>
-              <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
-              <div v-if="f.fix_hint" class="text-xs text-amber-800 bg-amber-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
-                <strong>Comment corriger :</strong> {{ f.fix_hint }}
+            <li v-for="f in g.findings" :key="f.code + '-' + f.entity_id" class="px-3 py-2.5 text-sm flex items-start gap-3" :title="f.code">
+              <FontAwesomeIcon :icon="['fas', faName(decorFor(f).icon)]"
+                               :style="{ color: decorFor(f).color }"
+                               class="w-4 h-4 shrink-0 mt-0.5" />
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-gray-900">{{ f.message }}</div>
+                <div v-if="f.hint" class="text-xs text-gray-600 mt-1.5 leading-snug">{{ f.hint }}</div>
+                <div v-if="f.fix_hint" class="text-xs text-amber-800 bg-amber-100/60 mt-2 px-2 py-1.5 rounded leading-snug">
+                  <strong>Comment corriger :</strong> {{ f.fix_hint }}
+                </div>
+                <button v-if="f.auto_fix_action" type="button"
+                        :disabled="fixing[f.code + '-' + f.entity_id]"
+                        @click="autoFix(f)"
+                        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
+                  <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
+                  <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
+                </button>
               </div>
-              <button v-if="f.auto_fix_action" type="button"
-                      :disabled="fixing[f.code + '-' + f.entity_id]"
-                      @click="autoFix(f)"
-                      class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition">
-                <span v-if="fixing[f.code + '-' + f.entity_id]">⟳ Correction en cours…</span>
-                <span v-else>✓ {{ f.auto_fix_label || 'Corriger automatiquement' }}</span>
-              </button>
             </li>
           </ul>
         </div>

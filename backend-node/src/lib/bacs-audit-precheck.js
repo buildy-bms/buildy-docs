@@ -44,6 +44,10 @@ function newFinding(code, severity, entity, entity_id, field, message, hint, fix
     // POST /bacs-audit/:id/precheck/auto-fix avec { finding_code, entity_id }.
     auto_fix_action: opts.autoFixAction || null,
     auto_fix_label: opts.autoFixLabel || null,
+    // Lot 9 — décor pour l'UI : catégorie d'usage (chauffage/refroidissement/
+    // ventilation/ECS/éclairage/PV) → icône+couleur cohérentes avec le reste
+    // de l'UI Buildy. `null` si l'entité n'est pas rattachée à une catégorie.
+    system_category: opts.systemCategory || null,
   };
 }
 
@@ -80,7 +84,7 @@ function buildPrecheck(documentId) {
   `).all(documentId);
 
   const devicesAll = db.db.prepare(`
-    SELECT d.* FROM bacs_audit_system_devices d
+    SELECT d.*, s.system_category FROM bacs_audit_system_devices d
     JOIN bacs_audit_systems s ON s.id = d.system_id
     WHERE s.document_id = ?
   `).all(documentId);
@@ -108,7 +112,8 @@ function buildPrecheck(documentId) {
       blocking.push(newFinding('SYS-001', 'blocking', 'system', s.id, 'present/not_concerned',
         `${lab} : ce système est marqué à la fois « présent » ET « non concerné ».`,
         'Ces deux réponses sont contradictoires — un système est soit présent, soit non concerné, jamais les deux.',
-        'Va dans la carte Systèmes, ouvre cette ligne et décoche l\'une des deux cases.'));
+        'Va dans la carte Systèmes, ouvre cette ligne et décoche l\'une des deux cases.',
+        { systemCategory: s.system_category }));
     }
     // Présent sans aucun équipement (ni propre ni partagé)
     if (isTrue(s.present)) {
@@ -117,7 +122,8 @@ function buildPrecheck(documentId) {
         warnings.push(newFinding('SYS-002', 'warning', 'system', s.id, 'present',
           `${lab} : marqué présent mais aucun équipement n\'a été saisi dessus.`,
           'Sans équipement, on ne peut pas vérifier les exigences d\'interopérabilité GTB ni de régulation thermique sur ce système.',
-          'Ouvre la carte Systèmes, déplie cette ligne et ajoute au moins un équipement (ou décoche « présent » si la zone n\'a vraiment rien).'));
+          'Ouvre la carte Systèmes, déplie cette ligne et ajoute au moins un équipement (ou décoche « présent » si la zone n\'a vraiment rien).',
+          { systemCategory: s.system_category }));
       }
     }
   }
@@ -131,13 +137,15 @@ function buildPrecheck(documentId) {
       blocking.push(newFinding('DEV-001', 'blocking', 'device', d.id, 'energy_source',
         `Équipement « ${d.name || '#' + d.id} » : une énergie primaire est renseignée alors que sa fonction ne contient pas « Production ».`,
         'Un émetteur passif (radiateur, ventilo-convecteur, unité intérieure DRV…) reçoit son fluide d\'un autre équipement — il n\'a pas d\'énergie primaire propre.',
-        'Ouvre cet équipement (carte Systèmes) et, soit ajoute la fonction « Production » si c\'est réellement un générateur, soit supprime l\'énergie sélectionnée.'));
+        'Ouvre cet équipement (carte Systèmes) et, soit ajoute la fonction « Production » si c\'est réellement un générateur, soit supprime l\'énergie sélectionnée.',
+        { systemCategory: d.system_category }));
     }
     if (isProducer && !d.energy_source) {
       warnings.push(newFinding('DEV-002', 'warning', 'device', d.id, 'energy_source',
         `Équipement de production « ${d.name || '#' + d.id} » sans énergie primaire renseignée.`,
         'Sans énergie, l\'équipement n\'est pas comptabilisé dans le cumul de puissance qui détermine l\'assujettissement R175-2.',
-        'Ouvre cet équipement et choisis son énergie (gaz, électricité, fioul, réseau de chaleur urbain, etc.).'));
+        'Ouvre cet équipement et choisis son énergie (gaz, électricité, fioul, réseau de chaleur urbain, etc.).',
+        { systemCategory: d.system_category }));
     }
     // Régulation intégrée détournée comme régulateur déporté (audit-coherence-checks
     // garde déjà le PATCH thermal, ici on vérifie l'état actuel des rows).
@@ -158,6 +166,7 @@ function buildPrecheck(documentId) {
           {
             autoFixAction: 'clear_regulation_deport_refs',
             autoFixLabel: 'Corriger automatiquement (retirer les références régulateur déporté fautives)',
+            systemCategory: d.system_category,
           }));
       }
     }
@@ -168,14 +177,16 @@ function buildPrecheck(documentId) {
         warnings.push(newFinding('DEV-004', 'warning', 'device', d.id, 'power_kw',
           `Équipement « ${d.name || '#' + d.id} » : puissance saisie ${d.power_kw} kW (hors plage habituelle ${range.min}–${range.max} kW pour un équipement ${d.system_category}).`,
           'Une valeur très haute ou très basse peut être un piège — fausse l\'assujettissement R175-2 et la crédibilité du rapport. Souvent une confusion entre puissance nominale et consommation instantanée.',
-          'Ouvre cet équipement et vérifie le champ Puissance (en kW nominaux).'));
+          'Ouvre cet équipement et vérifie le champ Puissance (en kW nominaux).',
+          { systemCategory: d.system_category }));
       }
     }
     if (d.age_years != null && d.age_years > PLAUSIBLE_AGE_YEARS.max) {
       warnings.push(newFinding('DEV-005', 'warning', 'device', d.id, 'age_years',
         `Équipement « ${d.name || '#' + d.id} » : âge déclaré ${d.age_years} ans — c\'est inhabituel (> ${PLAUSIBLE_AGE_YEARS.max} ans).`,
         'Vérifier la date de mise en service — un équipement de plus de 60 ans est très rare en service réel.',
-        'Ouvre cet équipement et vérifie le champ Âge.'));
+        'Ouvre cet équipement et vérifie le champ Âge.',
+        { systemCategory: d.system_category }));
     }
     // Lot 8 — fonction(s) désalignée(s) du modèle biblio. Si le device est
     // basé sur un equipment_template dont les `default_device_role` ont
@@ -202,6 +213,7 @@ function buildPrecheck(documentId) {
             {
               autoFixAction: 'align_device_roles_to_template',
               autoFixLabel: `Aligner les fonctions sur le modèle (${tplRoles.join(' + ')})`,
+              systemCategory: d.system_category,
             }));
         }
       }
@@ -254,7 +266,8 @@ function buildPrecheck(documentId) {
         r175_6_required
           ? 'R175-6 impose d\'identifier l\'émetteur (radiateur, ventilo-convecteur, plancher chauffant…) qui matérialise la régulation par zone.'
           : 'R175-6 n\'est pas applicable sur ce bâtiment (permis antérieur au 21/07/2021), mais le PDF affichera quand même « régulation incomplète » sur cette ligne.',
-        `Ouvre la carte Systèmes, descends jusqu'à la zone « ${t.zone_name || '?'} » et désigne l'équipement d'émission ${catFr} dans le panneau Régulation R175-6 (ou marque l'exemption bois si applicable).`));
+        `Ouvre la carte Systèmes, descends jusqu'à la zone « ${t.zone_name || '?'} » et désigne l'équipement d'émission ${catFr} dans le panneau Régulation R175-6 (ou marque l'exemption bois si applicable).`,
+        { systemCategory: t.category }));
     }
   }
 
