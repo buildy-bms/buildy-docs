@@ -61,6 +61,10 @@ const METERING_OPTS = [
 const POWER_RELEVANT = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 
 const showPower = computed(() => POWER_RELEVANT.has(props.system?.system_category))
+// Catégories effectivement cumulées dans R175-2 (chauffage + climatisation +
+// éventuellement ventilation/ECS via batterie). Le reste reste informatif.
+const THERMAL_R175_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
+const isThermalForR175 = computed(() => THERMAL_R175_CATEGORIES.has(props.system?.system_category))
 const roleApplies = computed(() => isThermalCategory(props.system?.system_category))
 const isShared = computed(() => Array.isArray(props.device.extra_system_ids) && props.device.extra_system_ids.length > 0)
 
@@ -419,18 +423,41 @@ const headCls = 'px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs font-se
             </div>
             <template v-else>
               <div v-if="showHeatPower">
-                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">{{ heatPowerLabel }}</label>
-                <input type="number" min="0" step="0.1" :value="device.power_kw ?? ''" placeholder="—"
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+                  {{ heatPowerLabel }}
+                  <span v-if="!isThermalForR175" class="text-gray-400 font-normal">— hors R175-2, informatif</span>
+                </label>
+                <input type="number" min="0" step="0.1"
+                       :value="device.power_kw_unknown ? '' : (device.power_kw ?? '')"
+                       :placeholder="device.power_kw_unknown ? 'Inconnue (déclarée)' : '—'"
+                       :disabled="!!device.power_kw_unknown"
                        @blur="e => patch({ power_kw: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       :class="inputCls" class="w-full" />
+                       :class="[inputCls, device.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
+                       class="w-full" />
               </div>
               <div v-if="showCoolPower" :class="{ 'sm:col-span-2': !showHeatPower }">
-                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Puissance froid (kW)</label>
-                <input type="number" min="0" step="0.1" :value="device[coolPowerField] ?? ''" placeholder="—"
+                <label class="block text-[11px] font-medium text-gray-600 mb-0.5">
+                  Puissance froid (kW)
+                  <span v-if="!isThermalForR175" class="text-gray-400 font-normal">— hors R175-2, informatif</span>
+                </label>
+                <input type="number" min="0" step="0.1"
+                       :value="device.power_kw_unknown ? '' : (device[coolPowerField] ?? '')"
+                       :placeholder="device.power_kw_unknown ? 'Inconnue (déclarée)' : '—'"
+                       :disabled="!!device.power_kw_unknown"
                        @blur="e => patch({ [coolPowerField]: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       :class="inputCls" class="w-full" />
+                       :class="[inputCls, device.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
+                       class="w-full" />
               </div>
+              <!-- Toggle « Puissance inconnue » (mig 197) — sur toutes catégories. -->
               <div class="sm:col-span-2">
+                <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                  <input type="checkbox" :checked="!!device.power_kw_unknown"
+                         @change="e => patch({ power_kw_unknown: e.target.checked, ...(e.target.checked ? { power_kw: null, power_kw_cooling: null } : {}) })"
+                         class="w-4 h-4 accent-amber-500" />
+                  <span><strong>Puissance déclarée inconnue</strong> — aucune indication disponible sur le terrain (luminaire sans plaque, vieux radiateur élec, etc.). Permet de valider l'étape Systèmes sans saisir de valeur.</span>
+                </label>
+              </div>
+              <div v-if="isThermalForR175" class="sm:col-span-2">
                 <label class="block text-[11px] font-medium text-gray-600 mb-0.5">Type de calcul de puissance</label>
                 <SearchableSelect :model-value="device.power_calculation_type" :options="POWER_CALC_OPTIONS"
                                   :clearable="true" size="sm" placeholder="Calcul automatique"

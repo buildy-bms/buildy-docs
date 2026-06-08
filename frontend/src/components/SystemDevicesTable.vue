@@ -67,6 +67,9 @@ import { ENERGY_OPTIONS, ROLE_OPTIONS, isDeviceComplete, deviceRoleAllowsEnergyS
 // côté backend ne cumule que les catégories thermiques pour R175-2.
 const POWER_RELEVANT_CATEGORIES = new Set(['heating', 'cooling', 'ventilation', 'dhw', 'lighting_indoor', 'lighting_outdoor', 'electricity_production'])
 const showPower = computed(() => POWER_RELEVANT_CATEGORIES.has(props.system?.system_category))
+// Catégories effectivement cumulées dans R175-2 (chauffage + climatisation +
+// ventilation avec batterie). Les autres restent informatives.
+const thermalCategories = new Set(['heating', 'cooling', 'ventilation', 'dhw'])
 
 // Champ de puissance pertinent pour l'usage de CE tableau. Dans un usage
 // refroidissement, un équipement réversible (qui sert aussi un usage
@@ -400,25 +403,42 @@ async function removeDevice(d) {
                        v-tooltip="'Nombre d’unités identiques (multiplie la puissance pour le cumul R175-2)'" />
               </div>
             </td>
-            <!-- Puissance — masquée hors usages thermiques (item 3c). Pour
-                 les usages thermiques, désactivée sur les émetteurs passifs
-                 (doctrine 0.1.135 : seuls les producteurs cumulent au R175-2 ;
-                 saisir une puissance sur un radiateur eau chaude ou une UI
-                 DRV ferait du double comptage avec le producteur amont). -->
+            <!-- Puissance — règles :
+                 1. Désactivée sur émetteurs passifs (sans Production) → double comptage
+                 2. Saisissable sur producteurs (toutes catégories depuis 0.1.144)
+                 3. Catégories thermiques : entre dans le cumul R175-2
+                 4. Catégories non-thermiques (lighting/PV/...) : info hors R175-2
+                 5. Toggle « Inconnue » (mig 197) : permet de valider sans saisir
+                    quand la puissance n'est pas identifiable sur place. -->
             <td class="px-2 py-2 align-middle whitespace-nowrap">
-              <div v-if="!showPower" class="text-center text-xs text-gray-300"
-                   v-tooltip="'Sans objet pour cet usage'">—</div>
-              <div v-else-if="!deviceRoleAllowsEnergySource(d.device_role)"
+              <div v-if="!deviceRoleAllowsEnergySource(d.device_role)"
                    class="px-2 py-1.5 text-xs text-gray-400 italic border border-dashed border-gray-200 rounded-md text-center cursor-help w-24 mx-auto"
                    :title="'La puissance R175-2 est portée par l\'équipement de PRODUCTION amont (UE DRV, chiller, chaudière, sous-station). Cet émetteur transfère vers le local des kW déjà comptabilisés via le producteur — les cumuler ici ferait du double comptage. Pour activer ce champ, ajoute la fonction « Production » dans la colonne Fonction(s).'">
                 — non applicable
               </div>
-              <div v-else class="relative w-24 mx-auto">
-                <input type="number" min="0" step="0.1" :value="d[powerFieldFor(d)]" placeholder="—"
-                       @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
-                       :class="inputCls" class="text-right pr-9 placeholder:text-gray-300"
-                       v-tooltip="system.system_category === 'cooling' ? 'Puissance froid nominale de ce producteur — entre dans le cumul R175-2' : 'Puissance chaud nominale de ce producteur — entre dans le cumul R175-2'" />
-                <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
+              <div v-else class="flex flex-col items-end gap-0.5 w-28 mx-auto">
+                <div class="relative w-full">
+                  <input type="number" min="0" step="0.1"
+                         :value="d.power_kw_unknown ? '' : d[powerFieldFor(d)]"
+                         :placeholder="d.power_kw_unknown ? 'Inconnue' : '—'"
+                         :disabled="!!d.power_kw_unknown"
+                         @blur="e => patchDevice(d, { [powerFieldFor(d)]: e.target.value === '' ? null : parseFloat(e.target.value) })"
+                         :class="[inputCls, d.power_kw_unknown ? 'bg-gray-50 italic placeholder:text-gray-500' : '']"
+                         class="text-right pr-9 placeholder:text-gray-300 w-full"
+                         v-tooltip="thermalCategories.has(system.system_category)
+                            ? (system.system_category === 'cooling' ? 'Puissance froid nominale — entre dans le cumul R175-2' : 'Puissance chaud nominale — entre dans le cumul R175-2')
+                            : 'Puissance installée — informative, n\\'entre pas dans le cumul R175-2 (R175-2 ne retient que la puissance thermique chauffage + climatisation)'" />
+                  <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">kW</span>
+                </div>
+                <label class="inline-flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
+                       v-tooltip="'Aucune indication de puissance disponible sur le terrain (luminaire sans plaque, vieux radiateur élec…). Marque la puissance comme « déclarée inconnue » plutôt que de laisser le champ vide.'">
+                  <input type="checkbox" :checked="!!d.power_kw_unknown"
+                         @change="e => patchDevice(d, { power_kw_unknown: e.target.checked, ...(e.target.checked ? { [powerFieldFor(d)]: null } : {}) })"
+                         class="w-3 h-3 accent-amber-500" />
+                  Inconnue
+                </label>
+                <span v-if="!thermalCategories.has(system.system_category)"
+                      class="text-[10px] text-gray-400 italic">hors R175-2</span>
               </div>
             </td>
             <!-- Énergie — doctrine 0.1.135 : saisissable UNIQUEMENT si la
