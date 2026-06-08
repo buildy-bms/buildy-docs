@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.142",
+      "date": "2026-06-08",
+      "title": "Pré-vérification — icônes et couleurs par catégorie d'usage / type d'entité",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Modale Vérifier — chaque finding porte son icône colorée",
+          "what": "À gauche de chaque incohérence ou point d'attention, Buildy affiche désormais l'icône de la catégorie d'usage concernée (🔴 chauffage, 🔵 refroidissement, 💧 ECS, 💡 éclairage, 🔆 PV, 🌀 ventilation) — ou à défaut l'icône du type d'entité (équipement, compteur, GTB, régulation thermique, zone). Cohérence visuelle complète avec le reste de l'app.",
+          "where": "Modale Vérifier avant livraison, sections « Incohérences bloquantes » et « Points d'attention ».",
+          "how_to_test": "Sur Communay (audit 43), ouvrir Vérifier : chaque finding affiche une icône à gauche. Une VMC en ventilation apparaît avec un ventilateur gris, une UI DRV en cooling avec un flocon bleu, une chaudière en heating avec une flamme rouge."
+        }
+      ]
+    },
+    {
       "version": "0.1.141",
       "date": "2026-06-08",
       "title": "Énergie désactivée plus claire dans la table Systèmes + auto-fix pour aligner les fonctions sur la bibliothèque",
