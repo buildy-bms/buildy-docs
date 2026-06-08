@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 195;
+const TARGET_VERSION = 196;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7447,6 +7447,48 @@ function runMigrations() {
     db.pragma('user_version = 195');
   }
 
+  if (current < 196) {
+    // Migration 196 — Versioning juridique du décret (Lot 2 — Plan « Qualité
+    // du livrable PDF »). Permet à un PDF audit livré en 2026 d'être
+    // interprétable en 2030 même si le décret a évolué.
+    //
+    // 1. Colonnes sur `documents` capturées au moment de la livraison :
+    //    - `decree_version_label` : étiquette officielle de la version
+    //      (ex: « R175 — version JO du 26/12/2025 »).
+    //    - `decree_version_snapshot_at` : ISO du moment où la version a été
+    //      figée dans le PDF livré.
+    // 2. Colonnes sur `bacs_knowledge` pour soft-versioning des articles :
+    //    - `effective_from` : date d'entrée en vigueur de la version
+    //      (ex: '2026-01-01').
+    //    - `effective_until` : date de fin d'effet (NULL = version courante).
+    //
+    // Cette migration ne touche AUCUNE donnée existante. Le seed
+    // bacs-knowledge devra être étendu pour poser `effective_from='2026-01-01'`
+    // sur la version actuelle ; sans cette donnée, le PDF affichera
+    // « Version du décret en vigueur ce jour » sans date précise (rétrocompat).
+    // Table physique = `afs` (la colonne `kind` distingue af / bacs_audit /
+    // site_audit / brochure / whitepaper) — pas une table `documents` qui
+    // n'existe pas. CLAUDE.md mentionne `documents` au sens conceptuel.
+    const cols = [
+      { table: 'afs',            col: 'decree_version_label',        type: 'TEXT' },
+      { table: 'afs',            col: 'decree_version_snapshot_at',  type: 'TEXT' },
+      { table: 'bacs_knowledge', col: 'effective_from',              type: 'TEXT' },
+      { table: 'bacs_knowledge', col: 'effective_until',             type: 'TEXT' },
+    ];
+    for (const c of cols) {
+      try { db.exec(`ALTER TABLE ${c.table} ADD COLUMN ${c.col} ${c.type}`); }
+      catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    }
+    // Pose l'effective_from sur les articles décret existants (version actuelle
+    // = JO 26 décembre 2025, qui a reporté l'échéance R175-2 de 2027 à 2030).
+    db.prepare(`
+      UPDATE bacs_knowledge SET effective_from = '2025-12-26'
+      WHERE source = 'decree' AND effective_from IS NULL
+    `).run();
+    log.info('Migration 196 appliquee : versioning juridique du decret (documents.decree_version_*, bacs_knowledge.effective_from/until)');
+    db.pragma('user_version = 196');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -8396,6 +8438,8 @@ const afs = {
       'bacs_total_power_kw', 'bacs_total_power_source', 'bacs_building_permit_date',
       'bacs_applicable_deadline', 'bacs_applicability_status',
       'delivered_pdf_sha256', 'delivered_git_tag',
+      // Lot 2 — versioning juridique du décret au moment de la livraison.
+      'decree_version_label', 'decree_version_snapshot_at',
       'audit_synthesis_html', 'audit_synthesis_generated_at',
       'audit_existing_af_status', 'bacs_district_heating_substation_kw',
       'bacs_roi_study_status', 'bacs_roi_study_html',

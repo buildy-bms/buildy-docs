@@ -840,6 +840,7 @@ function buildHeaderFooter({
   version,        // ex: "af-v0.14"
   logoDataUrl,    // result of loadAssetDataUrl('logo-buildy.svg')
   footerNote,     // optionnel, defaut = "<docType> · document confidentiel"
+  decreeVersionLabel, // optionnel — Lot 2 : ajoute la version R175 de référence dans le footer
   margin,         // optionnel, defaut adapte au portrait A4
 }) {
   const esc = (s) => String(s || '')
@@ -847,7 +848,12 @@ function buildHeaderFooter({
     .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
   const ctx = `${esc(clientName)} · ${esc(projectName)}`;
   const docRight = `${esc(docType)} · ${esc(version)}`;
-  const note = footerNote || `${docType} · document confidentiel`;
+  // Lot 2 — Versioning juridique : pour les audits BACS livrés, on grave la
+  // version du décret de référence dans le pied de page, en l'ajoutant au
+  // libellé existant (footerNote ou défaut). Conserve la rétrocompat des
+  // PDF AF/brochure qui passent un footerNote spécifique sans décret R175.
+  let note = footerNote || `${docType} · document confidentiel`;
+  if (decreeVersionLabel) note = `${note} · ${decreeVersionLabel}`;
   return {
     displayHeaderFooter: true,
     margin: margin || { top: '18mm', bottom: '16mm', left: '12mm', right: '12mm' },

@@ -15,6 +15,7 @@ const { seedBacsAuditStructure, resyncBacsAuditWithSiteZones } = require('../../
 const gitLib = require('../../lib/git');
 const { assertBacsAuditExists } = require('./_shared');
 const { isStepComplete } = require('../../lib/bacs-audit-step-completion');
+const { buildPrecheck } = require('../../lib/bacs-audit-precheck');
 
 async function routes(fastify) {
   // ─── Livraison de l'audit ──────────────────────────────────────────
@@ -31,6 +32,30 @@ async function routes(fastify) {
     if (!af) return;
     const userId = request.authUser?.id;
     const user = userId ? db.users.getById(userId) : null;
+
+    // Lot 3 — pré-check de cohérence : refuse la livraison si des incohérences
+    // bloquantes restent. Permet à l'auditeur d'ignorer avec ?force=1 pour les
+    // cas exceptionnels (audit volontairement incomplet, on doit pouvoir le
+    // tracer dans audit_log). Recommande très fortement de corriger avant.
+    const force = request.query?.force === '1' || request.query?.force === 'true';
+    try {
+      const precheck = buildPrecheck(documentId);
+      if (precheck.blocking.length > 0 && !force) {
+        return reply.code(409).send({
+          detail: `${precheck.blocking.length} incohérence(s) bloquante(s) — corrigez avant la livraison ou forcez avec ?force=1.`,
+          precheck,
+        });
+      }
+      if (precheck.blocking.length > 0 && force) {
+        db.auditLog.add({
+          afId: documentId, userId, action: 'bacs_audit.deliver.forced',
+          payload: { blocking_count: precheck.blocking.length, blocking_codes: precheck.blocking.map(b => b.code) },
+        });
+        log.warn(`Audit BACS #${documentId} livré en FORCE par user #${userId} malgré ${precheck.blocking.length} blockings.`);
+      }
+    } catch (e) {
+      log.warn(`Pré-check livraison #${documentId} a échoué : ${e.message} — livraison autorisée sans pré-check.`);
+    }
 
     // 1. Genere le PDF final via l'endpoint export-pdf interne (re-utilise la
     // meme logique : on duplique pas la generation, on appelle inject)
@@ -57,11 +82,27 @@ async function routes(fastify) {
       return reply.code(500).send({ detail: `Snapshot Git echoue : ${e.message}` });
     }
 
+    // Lot 2 — versioning juridique : capture la version du décret au moment
+    // de la livraison. Utilise MAX(effective_from) des articles R175 encore
+    // en vigueur ; format « R175 version applicable au JJ/MM/YYYY » pour le
+    // footer PDF — déterministe et lisible par un juriste.
+    const decreeRow = db.db.prepare(`
+      SELECT MAX(effective_from) AS dt FROM bacs_knowledge
+      WHERE source = 'decree' AND effective_until IS NULL AND code LIKE 'R175-%'
+    `).get();
+    let decreeVersionLabel = 'R175 — version en vigueur';
+    if (decreeRow?.dt) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(decreeRow.dt);
+      decreeVersionLabel = m ? `R175 version applicable au ${m[3]}/${m[2]}/${m[1]}` : `R175 version du ${decreeRow.dt}`;
+    }
+
     db.afs.update(documentId, {
       status: 'livree', // FR temporaire, sera 'delivered' apres rename m37
       deliveredAt: new Date().toISOString(),
       deliveredPdfSha256: snap.sha256,
       deliveredGitTag: snap.gitTag,
+      decreeVersionLabel,
+      decreeVersionSnapshotAt: new Date().toISOString(),
       updatedBy: userId,
     });
 

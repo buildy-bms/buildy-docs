@@ -346,6 +346,10 @@ async function routes(fastify) {
           docType: isBacs ? 'Audit BACS' : 'Audit GTB',
           version,
           logoDataUrl: logoSmall,
+          // Lot 2 — versioning juridique : la version R175 livrée est gravée
+          // au moment du `audit_deliver`. Pour les exports intermédiaires
+          // (preview, brouillon), on lit la version courante de bacs_knowledge.
+          decreeVersionLabel: isBacs ? (af.decree_version_label || data.currentDecreeVersionLabel || null) : null,
           footerNote: isBacs
             ? 'Audit BACS · décret R175 · document confidentiel'
             : 'Audit GTB · préparation devis · document confidentiel',

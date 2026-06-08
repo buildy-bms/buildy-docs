@@ -65,6 +65,36 @@ async function routes(fastify) {
     return data.compliance;
   });
 
+  // GET /bacs-audit/:documentId/precheck — vérification de cohérence avant
+  // livraison (Lot 3 — Plan « Qualité du livrable PDF »). Liste les
+  // contradictions inter-entités, plages aberrantes, doctrine énergie
+  // primaire, GTB non qualifiée, etc. `blocking` empêche `audit_deliver`.
+  fastify.get('/bacs-audit/:documentId/precheck', async (request, reply) => {
+    const id = parseInt(request.params.documentId, 10);
+    const af = assertBacsAuditExists(id, request, reply);
+    if (!af) return;
+    const { buildPrecheck } = require('../lib/bacs-audit-precheck');
+    try {
+      return buildPrecheck(id);
+    } catch (e) {
+      return reply.code(500).send({ detail: `Pré-check échoué : ${e.message}` });
+    }
+  });
+
+  // GET /bacs-buildy-readings — catalogue des Lectures Buildy (interprétations
+  // versionnées du décret R175). Lu par UI (tooltip R175) et le PDF audit
+  // (bloc « Sur quelles données ? »).
+  fastify.get('/bacs-buildy-readings', async () => {
+    const { listReadings, CATALOG_VERSION, CATALOG_DATE } = require('../lib/bacs-buildy-readings');
+    return { version: CATALOG_VERSION, date: CATALOG_DATE, readings: listReadings() };
+  });
+  fastify.get('/bacs-buildy-readings/:code', async (request, reply) => {
+    const { getReading } = require('../lib/bacs-buildy-readings');
+    const r = getReading(request.params.code);
+    if (!r) return reply.code(404).send({ detail: 'Lecture Buildy inconnue' });
+    return r;
+  });
+
   // GET /bacs-audit/:documentId/full — instantane complet d'un audit en un
   // seul appel : document, site, zones, systemes, equipements, compteurs,
   // GTB, regulation thermique, plan d'action, parties, puissances, synthese

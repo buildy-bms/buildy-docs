@@ -2,6 +2,55 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.138",
+      "date": "2026-06-08",
+      "title": "Audit BACS — qualité juridique du livrable PDF : chiffres-preuve, pré-check de cohérence, version du décret figée et bordereau de saisie",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Chaque verdict R175 affiche maintenant les chiffres-preuve qui l'ont calculé",
+          "what": "Sous chaque ligne du tableau de bord R175 (assujettissement, suivi continu, interopérabilité, arrêt manuel/autonome, mise à disposition des données, vérifications, formation, régulation thermique), Buildy expose désormais les chiffres-clé qui ont mené au verdict : puissance retenue + seuil applicable pour R175-2, nombre de compteurs requis vs présents pour R175-3 §1°, ratio d'équipements intégrés à la GTB pour §3, etc. Un BE ou un avocat peut maintenant tracer chaque affirmation du rapport jusqu'aux données saisies.",
+          "where": "API : nouveau payload `evidence.kpis[]` sur chaque entrée de `r175Dashboard` (route `GET /api/bacs-audit/:id/compliance`). MCP : `audit_compliance_review` retourne le même format enrichi. Le PDF affichera ces chiffres dans une refonte visuelle à venir.",
+          "how_to_test": "Depuis le détail d'un audit livré, ouvrir l'URL `/api/bacs-audit/<id>/compliance` dans un onglet — chaque ligne porte son bloc `evidence` avec les KPIs et une explication contextuelle."
+        },
+        {
+          "kind": "feat",
+          "title": "Catalogue versionné des « Lectures Buildy » — interprétations Buildy du décret",
+          "what": "Toutes les interprétations Buildy qui complètent le texte du décret R175 (ex: arrêt manuel évalué par équipement, granularité de régulation thermique dérivée de l'émetteur, formation au paramétrage et pas seulement au pilotage) sont désormais regroupées dans un catalogue unique avec un code stable (LB-R175-3-P3-PASSIF, LB-R175-5-FORMATION, etc.). Chaque verdict R175 du tableau de bord cite la Lecture Buildy applicable.",
+          "where": "Nouvelle route `GET /api/bacs-buildy-readings` (catalogue) et `/api/bacs-buildy-readings/:code` (détail). Champ `buildy_readings` sur chaque entrée du dashboard R175.",
+          "how_to_test": "Récupère le catalogue : `curl -k https://docs.buildy.fr/api/bacs-buildy-readings` — 7 Lectures Buildy versionnées avec leur texte intégral."
+        },
+        {
+          "kind": "feat",
+          "title": "Pré-check de cohérence avant livraison — empêche les audits incohérents de sortir",
+          "what": "Nouveau bouton « Vérifier » dans la toolbar d'un audit BACS. Lance une analyse cross-entités qui détecte : contradictions (« système présent ET non concerné », régulation intégrée détournée comme régulateur déporté), doctrine énergie primaire (energy_source posée sur un non-producteur), GTB non qualifiée, puissances/surfaces hors plage plausible, régulation thermique sans émetteur, etc. Les incohérences bloquantes empêchent désormais la livraison (statut 409 si on tente `audit_deliver` sans avoir tout corrigé).",
+          "where": "Toolbar audit BACS desktop, à gauche du bouton « Livrer ». Une modale liste blockings + warnings groupés par entité, avec un rappel d'où corriger.",
+          "how_to_test": "Ouvre un audit (par ex. Communay) → toolbar → « Vérifier » : la modale liste les 2 blockings + 9 warnings (équipements régulation intégrée détournés, régulations thermiques sans émetteur). Clic « Livrer » sans correction → la modale s'ouvre automatiquement."
+        },
+        {
+          "kind": "feat",
+          "title": "Version du décret R175 figée au moment de la livraison",
+          "what": "Quand un audit est livré, Buildy capture la version du décret en vigueur ce jour-là (ex: « R175 version applicable au 26/12/2025 » — version qui a reporté l'échéance 2027 à 2030). Cette étiquette est gravée dans le PDF livré (pied de page + bordereau de saisie) ET dans la DB. Un audit livré en 2026 reste interprétable juridiquement en 2030 même si le décret a évolué.",
+          "where": "Pied de page de chaque page du PDF audit BACS + Annexe Bordereau de saisie. Colonnes `documents.decree_version_label` + `documents.decree_version_snapshot_at` en DB.",
+          "how_to_test": "Exporte un PDF audit BACS (ex: audit 43) → tous les pieds de page affichent « Audit BACS · décret R175 · document confidentiel · R175 version applicable au 26/12/2025 »."
+        },
+        {
+          "kind": "feat",
+          "title": "Bordereau de saisie en fin de PDF — valeur juridique du document remis",
+          "what": "Avant l'Annexe D, le PDF audit BACS contient désormais un « Bordereau de saisie » qui trace les conditions de réalisation : site audité + adresse, auditeur Buildy (nom complet), date de livraison, parties prenantes du site identifiées (propriétaires, preneurs à bail, mainteneurs avec contacts), empreinte SHA-256 du PDF, référence d'archive Git et version du décret référencée. C'est la page qui transforme le PDF en document juridique remis et acté.",
+          "where": "Avant-dernière section du PDF audit BACS (avant Annexe D — Mentions légales).",
+          "how_to_test": "Exporte un PDF audit BACS → fais défiler jusqu'à « Bordereau de saisie » : table « Conditions de réalisation » + « Parties prenantes du site » + « Intégrité du document remis ». L'empreinte SHA-256 et le tag Git apparaissent une fois l'audit livré (sinon mention « affichées une fois l'audit livré »)."
+        },
+        {
+          "kind": "ux",
+          "title": "Refus de livraison si incohérences bloquantes — modale précheck automatique",
+          "what": "Si tu cliques « Livrer » alors qu'il reste des incohérences bloquantes (régulation intégrée détournée, GTB non qualifiée, etc.), le backend refuse la livraison (HTTP 409). Le frontend ouvre alors automatiquement la modale précheck pour t'aider à localiser et corriger. Un appel API avec `?force=1` permet de bypasser pour les cas exceptionnels (tracé dans audit_log).",
+          "where": "Bouton « Livrer » de la toolbar — comportement modifié.",
+          "how_to_test": "Sur audit Communay : clic « Livrer » → la modale Précheck s'ouvre avec la liste des blockings à corriger en premier."
+        }
+      ]
+    },
+    {
       "version": "0.1.137",
       "date": "2026-06-03",
       "title": "Éditeur d'AF — tableau des zones plus compact + vérificateur d'intégrité des AF",
