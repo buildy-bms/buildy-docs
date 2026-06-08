@@ -1468,6 +1468,10 @@ async function routes(fastify) {
       brand: z.string().nullable().optional(),
       model_reference: z.string().nullable().optional(),
       power_kw: z.number().nullable().optional(),
+      // Mig 197 — puissance déclarée explicitement inconnue par l'auditeur
+      // (distinct de « non renseigné »). Permet de valider l'étape Systèmes
+      // sur un luminaire sans plaque visible, un vieux radiateur élec, etc.
+      power_kw_unknown: z.boolean().nullable().optional(),
       // Item 8 — puissance frigorifique (équipement thermodynamique) +
       // type de calcul de puissance + équipement de secours.
       power_kw_cooling: z.number().nullable().optional(),

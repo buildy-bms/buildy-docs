@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.145",
+      "date": "2026-06-08",
+      "title": "Puissance — option « déclarée inconnue » + libellé « hors R175-2 » sur éclairage et PV",
+      "highlights": [
+        {
+          "kind": "feat",
+          "title": "Case « Puissance déclarée inconnue » disponible sur tous les équipements",
+          "what": "Quand l'auditeur ne peut pas identifier la puissance sur le terrain (luminaire sans plaque, vieux radiateur élec, équipement caché derrière un faux-plafond…), il peut désormais cocher « Puissance déclarée inconnue ». Distinction explicite avec « non renseigné » : un équipement à puissance inconnue permet de valider l'étape Systèmes sans saisir 0 kW (qui fausserait le cumul R175-2 si appliqué à un producteur thermique). Migration 197 — nouvelle colonne `power_kw_unknown`.",
+          "where": "Table Systèmes (case « Inconnue » sous le champ Puissance) et modale Modifier un équipement (case « Puissance déclarée inconnue » avec explication).",
+          "how_to_test": "Sur n'importe quel équipement avec fonction Production, cocher « Inconnue » → le champ Puissance se désactive et affiche « Inconnue (déclarée) ». Décocher → la valeur précédemment saisie réapparaît."
+        },
+        {
+          "kind": "ux",
+          "title": "Label « hors R175-2 — informatif » sur les puissances éclairage et PV",
+          "what": "Le décret R175-2 ne retient QUE la puissance thermique (chauffage + climatisation) pour l'assujettissement BACS. Une puissance saisie sur un luminaire ou un onduleur PV n'entre pas dans le seuil 70/290 kW. Le label clarifie ça à côté du champ, pour qu'aucun auditeur ne croie que ça pourrait influencer le verdict.",
+          "where": "Table Systèmes (ligne « hors R175-2 » sous Puissance pour lighting/PV) ; modale Modifier un équipement (mention « — hors R175-2, informatif » à droite du label).",
+          "how_to_test": "Sur une ligne « Éclairage intérieur » ou « Production photovoltaïque », la mention apparaît sous le champ Puissance. Sur Chauffage / Refroidissement / Ventilation / ECS : pas de mention (ces catégories peuvent compter dans R175-2)."
+        }
+      ]
+    },
+    {
       "version": "0.1.144",
       "date": "2026-06-08",
       "title": "Saisie de puissance débloquée sur éclairage et PV (production)",

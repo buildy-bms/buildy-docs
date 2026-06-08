@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 196;
+const TARGET_VERSION = 197;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7487,6 +7487,22 @@ function runMigrations() {
     `).run();
     log.info('Migration 196 appliquee : versioning juridique du decret (documents.decree_version_*, bacs_knowledge.effective_from/until)');
     db.pragma('user_version = 196');
+  }
+
+  if (current < 197) {
+    // Migration 197 — Permet à l'auditeur de déclarer explicitement une
+    // puissance « inconnue » (0.1.145). Distingue 3 états :
+    //   - power_kw IS NULL ET power_kw_unknown=0/null  → « à renseigner »
+    //   - power_kw IS NULL ET power_kw_unknown=1       → « déclarée inconnue » (terrain)
+    //   - power_kw > 0                                 → valeur saisie
+    // Cas d'usage : luminaire LED dont la puissance individuelle n'est pas
+    // identifiable, vieux radiateur élec sans plaque, etc. Permet de valider
+    // l'étape Systèmes sans saisir 0 kW (qui fausserait le cumul si
+    // appliqué à un producteur thermique).
+    try { db.exec(`ALTER TABLE bacs_audit_system_devices ADD COLUMN power_kw_unknown INTEGER`); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+    log.info('Migration 197 appliquee : bacs_audit_system_devices.power_kw_unknown (declared)');
+    db.pragma('user_version = 197');
   }
 
   if (current > TARGET_VERSION) {
