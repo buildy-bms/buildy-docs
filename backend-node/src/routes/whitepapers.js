@@ -162,7 +162,7 @@ async function generateWhitepaperPdf(row) {
     coverImageUrl: resolveWpAssetUrl(meta.cover_image_url),
     coverImageCaption: meta.cover_image_caption || null,
     hasBackCover,
-    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
     hideCoverEyebrow: meta.hide_cover_eyebrow === true,
     coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
   };
@@ -453,7 +453,7 @@ async function routes(fastify) {
       coverImageUrl: resolveWpAssetUrl(meta.cover_image_url),
       coverImageCaption: meta.cover_image_caption || null,
       hasBackCover,
-      logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
+      logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
       hideCoverEyebrow: meta.hide_cover_eyebrow === true,
       coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
     };

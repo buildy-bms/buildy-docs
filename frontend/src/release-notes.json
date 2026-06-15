@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.178",
+      "date": "2026-06-08",
+      "title": "Whitepaper — logo en haut à droite + refonte design page contenu (cards + solution card + garantie)",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Cover : logo Buildy wordmark en haut à droite (plus grand), logo du bas retiré",
+          "what": "Nouveau fichier logo-buildy-white.png (récupéré du whitepaper #41) chargé via loadAssetDataUrl. Position absolute top:18mm right:22mm height:22mm — visible et bien proportionné. Le logo en bas à gauche (logo-lockup) est retiré du template pour ne pas dupliquer.",
+          "where": "Page 1 du whitepaper, haut à droite.",
+          "how_to_test": "Régénérer aperçu : logo en haut à droite, pas en bas."
+        },
+        {
+          "kind": "feature",
+          "title": "Page contenu refondue en layout marketing moderne",
+          "what": "Le contenu Tiptap classique (h2 + ul + p) du chapitre est remplacé par 4 sections design : (1) lead Poppins 18pt navy en accroche. (2) Grid 3 cards pain points (icône emoji + titre Poppins + description) sur fond gris clair avec accent top vert menthe. (3) Solution card pleine navy avec eyebrow vert « LA SOLUTION BUILDY », titre Poppins 22pt blanc, body, URL stylisée monospace dans un encart vert. (4) Guarantee card vert pâle avec rond check vert + titre + description (« Pas de remplacement matériel — aucun risque de régression »). Look proche d'une landing SaaS moderne plutôt que d'un livre blanc académique.",
+          "where": "Page 2 du whitepaper Buildy Easy Access.",
+          "how_to_test": "Régénérer aperçu : page 2 = 3 cards + 1 grosse solution card navy + 1 guarantee card verte."
+        }
+      ]
+    },
+    {
       "version": "0.1.177",
       "date": "2026-06-08",
       "title": "Whitepaper — back-cover : marges alignées sur la cover + plus de wrap dans h3 et CTA",
