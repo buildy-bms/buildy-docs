@@ -4,14 +4,17 @@ import Sortable from 'sortablejs'
 import {
   MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
   EyeIcon, DocumentArrowDownIcon, DocumentDuplicateIcon,
-  ArrowUpTrayIcon, ClipboardDocumentIcon,
+  ArrowUpTrayIcon, ClipboardDocumentIcon, ChartBarIcon,
 } from '@heroicons/vue/24/outline'
 import api, {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
   uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
   cloneSectionTemplate,
   getOfferingsPublishInfo, publishOfferingsCatalog, publishOfferingsBrochure,
+  getOfferingsClicks, refreshOfferingsClicks,
 } from '@/api'
+import ClicksStatsCard from '@/components/ClicksStatsCard.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import ContentValidationDot from '@/components/ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
@@ -143,6 +146,32 @@ function formatBytes(n) {
 async function copyPublishedUrl(url) {
   try { await navigator.clipboard.writeText(url); notifySuccess('Lien copié') }
   catch { notifyError('Impossible de copier le lien') }
+}
+
+// Statistiques de clics : modale séparée par kind (catalog | brochure)
+// utilisant le composant ClicksStatsCard partagé avec les whitepapers.
+const showStatsKind = ref(null)          // null | 'catalog' | 'brochure'
+const stats = ref({ catalog: null, brochure: null })
+const statsLoading = ref(false)
+async function loadStats(kind) {
+  statsLoading.value = true
+  try { stats.value[kind] = (await getOfferingsClicks(kind)).data }
+  catch (e) { notifyError(`Stats ${kind} indisponibles : ${e.response?.data?.detail || e.message}`) }
+  finally { statsLoading.value = false }
+}
+async function refreshStats() {
+  if (!showStatsKind.value) return
+  statsLoading.value = true
+  try {
+    await refreshOfferingsClicks()
+    await loadStats(showStatsKind.value)
+  } catch (e) {
+    notifyError(`Rafraîchissement KO : ${e.response?.data?.detail || e.message}`)
+  } finally { statsLoading.value = false }
+}
+async function openStats(kind) {
+  showStatsKind.value = kind
+  if (!stats.value[kind]) await loadStats(kind)
 }
 
 async function downloadPdfFromRoute(route, fallbackName, loadingRef, errorMsg) {
@@ -557,6 +586,9 @@ onBeforeUnmount(teardownSortables)
         <button @click="copyPublishedUrl(publishInfo.catalog.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
           <ClipboardDocumentIcon class="w-4 h-4" />
         </button>
+        <button @click="openStats('catalog')" class="text-gray-400 hover:text-indigo-700 shrink-0" v-tooltip="'Statistiques de téléchargements'">
+          <ChartBarIcon class="w-4 h-4" />
+        </button>
         <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.catalog.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.catalog.published_at) }}</span>
       </div>
       <div v-if="publishInfo.brochure" class="flex items-center gap-2 text-sm min-w-0">
@@ -568,9 +600,26 @@ onBeforeUnmount(teardownSortables)
         <button @click="copyPublishedUrl(publishInfo.brochure.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
           <ClipboardDocumentIcon class="w-4 h-4" />
         </button>
+        <button @click="openStats('brochure')" class="text-gray-400 hover:text-indigo-700 shrink-0" v-tooltip="'Statistiques de téléchargements'">
+          <ChartBarIcon class="w-4 h-4" />
+        </button>
         <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.brochure.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.brochure.published_at) }}</span>
       </div>
     </div>
+
+    <!-- Modale statistiques de clics du tracker /dl/<slug> -->
+    <BaseModal v-if="showStatsKind"
+               :title="showStatsKind === 'catalog' ? 'Statistiques — Tableau des offres' : 'Statistiques — Brochure détaillée'"
+               size="xl"
+               @close="showStatsKind = null">
+      <ClicksStatsCard
+        :clicks="stats[showStatsKind]"
+        :tracker-url="publishInfo[showStatsKind]?.url"
+        :loading="statsLoading"
+        @refresh="refreshStats"
+        @copy-url="copyPublishedUrl(publishInfo[showStatsKind]?.url)"
+      />
+    </BaseModal>
 
     <div class="flex items-center gap-3 mb-4 flex-wrap">
       <div class="relative max-w-md flex-1 min-w-65">

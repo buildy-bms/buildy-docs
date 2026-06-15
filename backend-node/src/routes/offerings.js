@@ -20,6 +20,14 @@ const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
 const { uploadWhitepaperPdf } = require('../lib/whitepaper-ftp');
+const { ensureTracker, ingestClicks } = require('../lib/whitepaper-tracker');
+
+// Slugs des PDFs offerings (sans extension). Utilisé pour le tracker
+// /dl/<slug> et les statistiques de téléchargement.
+const OFFERINGS_SLUGS = {
+  catalog: 'tableau-des-offres-buildy',
+  brochure: 'brochure-fonctionnalites-buildy',
+};
 
 // Filigrane Buildy (favicon en gris pale) — meme constante que les
 // autres PDF (cf routes/export.js).
@@ -527,12 +535,21 @@ async function routes(fastify) {
       log.error(`Publish ${kind} FTP failed: ${err.message}`);
       return reply.code(502).send({ detail: `Échec de l'envoi vers le FTP : ${err.message}` });
     }
+    // Publie/refresh le redirecteur traçable /dl/<slug> (best-effort).
+    try { await ensureTracker(); }
+    catch (err) { log.warn(`Publish ${kind} — tracker KO : ${err.message}`); }
+
+    // URL exposée = lien traçable /dl/<slug> (URL stable même si on
+    // change le nom du PDF distant). Les clics sont comptés à chaque
+    // GET du tracker PHP (cf. ingestClicks() pour stats).
+    const slug = OFFERINGS_SLUGS[kind];
+    const trackerUrl = `${config.wpTrackerPublicBase}/${slug}`;
     const row = db.publishedOfferings.upsert({
-      kind, filename: upload.filename, url: upload.url, sizeBytes: upload.size, publishedBy: userId,
+      kind, filename: upload.filename, url: trackerUrl, sizeBytes: upload.size, publishedBy: userId,
     });
     db.auditLog.add({
       userId, action: `offerings.publish.${kind}`,
-      payload: { url: upload.url, size: upload.size },
+      payload: { url: trackerUrl, ftp_url: upload.url, size: upload.size },
     });
     return row;
   }
@@ -592,6 +609,28 @@ async function routes(fastify) {
 
   // État des publications (URL + date + taille) — affiché dans la UI.
   fastify.get('/offerings/publish-info', async () => db.publishedOfferings.list());
+
+  // Statistiques de clics du lien /dl/<slug> (catalog ou brochure).
+  // Mêmes données que les whitepapers, vue par slug.
+  fastify.get('/offerings/clicks', async (request, reply) => {
+    const kind = request.query.kind;
+    const slug = OFFERINGS_SLUGS[kind];
+    if (!slug) return reply.code(400).send({ detail: 'kind invalide (catalog | brochure)' });
+    return db.whitepaperClicks.statsForSlug(slug);
+  });
+
+  // Ingestion FTP des hits.log → DB (idempotent). Bouton « Rafraîchir »
+  // dans la UI. Réutilise le même tracker que les whitepapers.
+  fastify.post('/offerings/clicks/refresh', async (request, reply) => {
+    try {
+      const result = await ingestClicks();
+      log.info(`Offerings clicks refresh: ${result.newRows} nouveaux clics (sur ${result.lines} lignes)`);
+      return result;
+    } catch (err) {
+      log.error(`Offerings clicks refresh failed: ${err.message}`);
+      return reply.code(502).send({ detail: `Rafraîchissement KO : ${err.message}` });
+    }
+  });
 }
 
 module.exports = routes;

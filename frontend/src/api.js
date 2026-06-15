@@ -253,6 +253,8 @@ export const exportOfferingsPdfUrl = () => `/api/offerings/export-pdf`
 export const getOfferingsPublishInfo = () => api.get('/offerings/publish-info')
 export const publishOfferingsCatalog = () => api.post('/offerings/publish')
 export const publishOfferingsBrochure = () => api.post('/offerings/brochure/publish')
+export const getOfferingsClicks = (kind) => api.get('/offerings/clicks', { params: { kind } })
+export const refreshOfferingsClicks = () => api.post('/offerings/clicks/refresh')
 export const listOfferingLevels = () => api.get('/offering-levels')
 export const updateOfferingLevel = (slug, data) => api.patch(`/offering-levels/${slug}`, data)
 

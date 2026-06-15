@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.187",
+      "date": "2026-06-08",
+      "title": "Library functionalities — tracker /dl/<slug> + stats clics + chmod 644 fix Forbidden",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Fix Forbidden sur les PDFs publiés (chmod 644 manquant après upload FTP)",
+          "what": "Le helper uploadWhitepaperPdf (utilisé par whitepapers ET offerings) faisait l'upload FTP sans chmod, donc OVH créait les fichiers en 600 → 403 Forbidden côté HTTP. Ajout d'un `SITE CHMOD 644 <filename>` post-upload, best-effort (warn si le serveur ne le supporte pas). Bénéfice : tout PDF publié devient lisible publiquement.",
+          "where": "Tous les PDFs publiés via Buildy Docs (whitepapers + offerings catalog + offerings brochure).",
+          "how_to_test": "Republier le tableau/brochure et ouvrir l'URL : doit télécharger sans 403."
+        },
+        {
+          "kind": "feature",
+          "title": "Tracker /dl/<slug> étendu aux 2 PDFs offerings + page de stats clics",
+          "what": "Réutilisation complète du tracker /dl/<slug> des whitepapers (1 seul script PHP polymorphe sur le FTP, regex slug agnostique du type de doc). Les URLs publiées des offerings passent maintenant par /dl/tableau-des-offres-buildy et /dl/brochure-fonctionnalites-buildy → chaque téléchargement est compté (IP anonymisée, referer hôte, user-agent). Nouvelle route GET /api/offerings/clicks?kind=catalog|brochure (stats by_day, by_referer, recent) + POST /api/offerings/clicks/refresh (ingestion best-effort du hits.log). Composant ClicksStatsCard.vue extrait et partagé entre WhitepaperDetailView et LibraryFunctionalitiesView (DRY). Bouton ChartBarIcon dans le bandeau « En ligne » ouvre une modale plein écran avec les stats du PDF correspondant.",
+          "where": "/library/functionalities après publication d'un PDF.",
+          "how_to_test": "Publier, cliquer le PDF depuis une autre fenêtre privée, revenir, cliquer l'icône Stats : voir 1 clic, Rafraîchir refait l'ingestion."
+        }
+      ]
+    },
+    {
       "version": "0.1.186",
       "date": "2026-06-08",
       "title": "Library functionalities — publication FTP du tableau des offres et de la brochure (URL stable buildy.fr)",
