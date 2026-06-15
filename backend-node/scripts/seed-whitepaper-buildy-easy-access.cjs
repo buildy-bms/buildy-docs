@@ -50,9 +50,17 @@ const CHAPTER_1_HTML = `
 const CHAPTER_2_TITLE = 'Voir Buildy Easy Access lors d\'une démo live';
 const CHAPTER_2_HTML = `
 <p>Une démonstration guidée de 30 minutes sur Hyperveez avec vos sites réels. Nous configurons une ou deux supervisions tierces de votre patrimoine en direct, vous testez l'accès, vous mesurez le gain de temps obtenu.</p>
+
+<div class="pricing-tile">
+  <div class="pricing-eyebrow">À partir de</div>
+  <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois</span></div>
+  <div class="pricing-note">en option de l'abonnement Essentials</div>
+  <div class="pricing-bundle">— ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
+</div>
+
 <p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
 <p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a> — Tél. 04 28 39 03 34</p>
-<p><em>Buildy Easy Access est inclus de série dans les niveaux Smart et Premium. Aucun engagement n'est requis pour la démonstration.</em></p>
+<p><em>Aucun engagement n'est requis pour la démonstration.</em></p>
 `.trim();
 
 const db = require(path.join(ROOT, 'backend-node/src/database'));
