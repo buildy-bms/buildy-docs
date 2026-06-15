@@ -26,8 +26,26 @@ const TITLE = 'Buildy Easy Access';
 const SUBTITLE = 'Tous vos bâtiments sur une carte. Un clic, vous êtes dans la GTB du site. Quelle que soit la marque.';
 
 const db = require(path.join(ROOT, 'backend-node/src/database'));
-const { renderFaIconSvg } = require(path.join(ROOT, 'backend-node/src/lib/pdf'));
+const { renderFaIconSvg, loadAssetDataUrl } = require(path.join(ROOT, 'backend-node/src/lib/pdf'));
 db.init();
+
+// Logos clients embed data URL (mini-bandeau preuve sociale page 3).
+// Mêmes 15 logos que le whitepaper #41 « Méthode interne d'audit BACS ».
+const CLIENT_LOGOS = [
+  'logo-cbre.png', 'logo-eiffage.png', 'logo-spie.png',
+  'logo-vinted.png', 'logo-id-logistics-1.png', 'logo-gse.png',
+  'logo-ceva.png', 'logo-itron.png', 'logo-rexel.png',
+  'logo-dimo.png', 'logo-cpmo.png', 'logo-virtuo.png',
+  'logo-jmg-partners.png', 'logo-roiret.png', 'logo-demouselle.png',
+];
+const CLIENT_LOGOS_HTML = `
+<div class="clients-strip">
+  <div class="clients-eyebrow">Ils nous font confiance</div>
+  <div class="clients-grid">
+    ${CLIENT_LOGOS.map(f => `<div class="client-cell"><img src="${loadAssetDataUrl('client-logos/' + f)}" alt="" /></div>`).join('\n    ')}
+  </div>
+</div>
+`.trim();
 
 // Icônes FA Solid embed SVG (vert menthe pour pain cards, navy pour
 // les autres). Taille interne ajustée via le CSS .pain-card .pain-icon
@@ -68,7 +86,7 @@ const CHAPTER_1_HTML = `
 </div>
 `.trim();
 
-// ─── Page 3 ─ rien à remplacer + preuve sociale ──────────────────────
+// ─── Page 3 ─ rien à remplacer + Pack + preuve sociale + logos ───────
 const CHAPTER_2_TITLE = 'Rien à remplacer. Rien à risquer.';
 const CHAPTER_2_HTML = `
 <p class="lead">Vos automates, vos régulateurs, vos sondes, votre supervision actuelle : tout reste en place. Buildy n'ajoute qu'une couche d'accès et une vue d'ensemble.</p>
@@ -76,15 +94,31 @@ const CHAPTER_2_HTML = `
 <div class="guarantee-card">
   <div class="guarantee-check">✓</div>
   <div>
-    <div class="guarantee-title">Pas de serveur à 100 000 €. Pas de migration. Rien à réceptionner.</div>
+    <div class="guarantee-title">Pas de gros serveur hyperviseur à 100 000 €. Pas de migration. Rien à réceptionner.</div>
     <p>Le matériel reste en place, vos automaticiens continuent leur travail comme avant. La supervision historique du site fonctionne sans changement. C'est uniquement la manière d'y accéder et de voir l'ensemble qui change.</p>
   </div>
+</div>
+
+<div class="pack-card">
+  <div class="pack-eyebrow">Clé en main</div>
+  <h2 class="pack-title">Le Buildy Easy Access Pack</h2>
+  <p>Sur chaque site, on installe tout, clé en main. Vous n'avez rien à gérer. Le pack comprend :</p>
+  <ul class="pack-list">
+    <li>La passerelle Buildy Edge, avec l'intelligence embarquée qui relie votre GTB existante à la plateforme cloud Buildy.</li>
+    <li>Un routeur 4G avec carte SIM multi-opérateurs.</li>
+    <li>En option, une antenne 4G déportée et son câble.</li>
+    <li>L'installation et la mise en service complètes.</li>
+    <li>Les frais de déplacement sur site.</li>
+  </ul>
+  <p class="pack-close">Le Pack est installé une fois, sur devis. Buildy s'occupe du reste.</p>
 </div>
 
 <div class="proof-card">
   <div class="proof-eyebrow">Ce que font nos clients</div>
   <p class="proof-text">Comme beaucoup de nos clients, vous pouvez commencer par un site, voir ce que ça donne, puis en connecter d'autres à votre rythme. C'est exactement ce qu'ils font.</p>
 </div>
+
+${CLIENT_LOGOS_HTML}
 `.trim();
 
 // ─── Page 4 ─ back-cover CTA ─────────────────────────────────────────
@@ -93,11 +127,14 @@ const CHAPTER_3_HTML = `
 <p>30 minutes en visio. On vous montre Easy Access sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
 
 <div class="pricing-tile">
+  <div class="pricing-header">Abonnement plateforme</div>
   <div class="pricing-eyebrow">À partir de</div>
   <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois / bâtiment</span></div>
   <div class="pricing-note">même avec plusieurs interfaces de GTB sur le site</div>
   <div class="pricing-bundle">ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
 </div>
+
+<p class="pricing-install">Installation du Pack Easy Access (passerelle, routeur 4G, mise en service, déplacement) : une fois, sur devis.</p>
 
 <p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
 <p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
