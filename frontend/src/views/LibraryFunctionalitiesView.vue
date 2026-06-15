@@ -118,7 +118,22 @@ async function downloadPdfFromRoute(route, fallbackName, loadingRef, errorMsg) {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   } catch (e) {
-    notifyError(errorMsg)
+    // Le `responseType: blob` masque le body JSON d'erreur. On essaie
+    // de le lire ici pour afficher le détail au caller + console.
+    let detail = e.message || ''
+    if (e.response?.data instanceof Blob) {
+      try {
+        const text = await e.response.data.text()
+        try {
+          const j = JSON.parse(text)
+          detail = j.detail || j.message || text
+        } catch { detail = text }
+      } catch { /* ignore */ }
+    } else if (e.response?.data?.detail) {
+      detail = e.response.data.detail
+    }
+    console.error(`[PDF ${route}] status=${e.response?.status} detail=${detail}`, e)
+    notifyError(`${errorMsg} (${e.response?.status || 'no response'}) — ${detail || e.message}`)
   } finally {
     loadingRef.value = false
   }

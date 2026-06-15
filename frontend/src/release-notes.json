@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.184",
+      "date": "2026-06-08",
+      "title": "Library functionalities — détail d'erreur PDF + log console pour debug",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Toast d'erreur PDF affiche le code HTTP et le détail backend",
+          "what": "downloadPdfFromRoute() lit désormais le blob d'erreur pour extraire le `detail` JSON renvoyé par le backend (sinon masqué par responseType: blob). Le toast d'erreur affiche `Échec... (500) — message` + console.error détaillé pour debug.",
+          "where": "Boutons Tableau des offres et Brochure détaillée de /library/functionalities.",
+          "how_to_test": "Cliquer le bouton : si erreur, le toast et la console donnent le détail."
+        }
+      ]
+    },
+    {
       "version": "0.1.183",
       "date": "2026-06-08",
       "title": "Brochure Easy Access — 2 tiers abonnement (sans/avec 4G) + puces centrées",
