@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.194",
+      "date": "2026-06-15",
+      "title": "Whitepaper Easy Access : CTA secondaire encore plus aéré (25 mm)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Marge supérieure du CTA portée à 25 mm",
+          "what": "Le bouton « Découvrir les offres Smart et Premium » page 4 du whitepaper Buildy Easy Access est désormais séparé de la phrase de clarification par 25 mm (auparavant 18 mm, jugé encore trop collé).",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF du whitepaper #55."
+        }
+      ]
+    },
+    {
       "version": "0.1.193",
       "date": "2026-06-15",
       "title": "Tableau des offres + Brochure : config PDF mutualisée (anti-divergence) + CTA whitepaper plus aéré",
