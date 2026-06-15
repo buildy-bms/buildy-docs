@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.186",
+      "date": "2026-06-08",
+      "title": "Library functionalities — publication FTP du tableau des offres et de la brochure (URL stable buildy.fr)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Publier le Tableau des offres et la Brochure détaillée sur buildy.fr/telechargements/",
+          "what": "Mêmes mécanismes que la publication des whitepapers, étendus aux 2 PDFs de la bibliothèque de fonctionnalités. Nouvelle migration 198 (table published_offerings : kind, filename, url, size_bytes, published_at, published_by). Nouvelles routes : POST /api/offerings/publish (catalog → tableau-des-offres-buildy.pdf), POST /api/offerings/brochure/publish (brochure → brochure-fonctionnalites-buildy.pdf), GET /api/offerings/publish-info. Helper uploadWhitepaperPdf réutilisé tel quel (générique malgré le nom). 2 boutons UI « Publier tableau » / « Publier brochure » à côté des « Télécharger » dans la toolbar de /library/functionalities. Bandeau « En ligne » avec URL, taille, date de publication, bouton copier (comme sur la page whitepaper). Filenames stables → l'URL est pérenne, republication écrase le fichier distant.",
+          "where": "/library/functionalities.",
+          "how_to_test": "Cliquer « Publier tableau » : URL stable buildy.fr/telechargements/tableau-des-offres-buildy.pdf apparait dans le bandeau. Idem brochure."
+        }
+      ]
+    },
+    {
       "version": "0.1.185",
       "date": "2026-06-08",
       "title": "Library functionalities — fix génération PDF (import api dynamique cassé)",

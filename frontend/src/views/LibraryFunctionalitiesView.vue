@@ -4,11 +4,13 @@ import Sortable from 'sortablejs'
 import {
   MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
   EyeIcon, DocumentArrowDownIcon, DocumentDuplicateIcon,
+  ArrowUpTrayIcon, ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 import api, {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
   uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
   cloneSectionTemplate,
+  getOfferingsPublishInfo, publishOfferingsCatalog, publishOfferingsBrochure,
 } from '@/api'
 import ContentValidationDot from '@/components/ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
@@ -100,6 +102,48 @@ const showBulk = ref(false)
 const offeringsPreviewOpen = ref(false)
 const generatingOfferings = ref(false)
 const generatingBrochure = ref(false)
+const publishingOfferings = ref(false)
+const publishingBrochure = ref(false)
+// Publication FTP (URL stable buildy.fr/telechargements/...)
+// info.catalog / info.brochure = { filename, url, size_bytes, published_at } | null
+const publishInfo = ref({ catalog: null, brochure: null })
+async function loadPublishInfo() {
+  try { publishInfo.value = (await getOfferingsPublishInfo()).data || { catalog: null, brochure: null } }
+  catch { /* silencieux : page d'admin reste utilisable */ }
+}
+async function publishCatalogOnline() {
+  publishingOfferings.value = true
+  try {
+    const { data } = await publishOfferingsCatalog()
+    publishInfo.value.catalog = data
+    notifySuccess(`Tableau des offres publié — ${data.url}`)
+  } catch (e) {
+    notifyError(`Échec de la publication du tableau : ${e.response?.data?.detail || e.message}`)
+  } finally { publishingOfferings.value = false }
+}
+async function publishBrochureOnline() {
+  publishingBrochure.value = true
+  try {
+    const { data } = await publishOfferingsBrochure()
+    publishInfo.value.brochure = data
+    notifySuccess(`Brochure détaillée publiée — ${data.url}`)
+  } catch (e) {
+    notifyError(`Échec de la publication de la brochure : ${e.response?.data?.detail || e.message}`)
+  } finally { publishingBrochure.value = false }
+}
+function formatPublishedDate(iso) {
+  if (!iso) return ''
+  try { return new Date(iso.replace(' ', 'T') + 'Z').toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+  catch { return iso }
+}
+function formatBytes(n) {
+  if (!n) return ''
+  return n > 1024 * 1024 ? `${(n / 1048576).toFixed(1)} Mo` : `${Math.round(n / 1024)} Ko`
+}
+async function copyPublishedUrl(url) {
+  try { await navigator.clipboard.writeText(url); notifySuccess('Lien copié') }
+  catch { notifyError('Impossible de copier le lien') }
+}
 
 async function downloadPdfFromRoute(route, fallbackName, loadingRef, errorMsg) {
   loadingRef.value = true
@@ -441,6 +485,7 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 onMounted(async () => {
   await refresh()
+  loadPublishInfo()
   if (route.query.open) {
     const target = items.value.find(t => t.slug === route.query.open)
     if (target) openEditor(target)
@@ -467,14 +512,28 @@ onBeforeUnmount(teardownSortables)
           <EyeIcon class="w-4 h-4" /> Aperçu offres
         </button>
         <button @click="downloadOfferingsPdf" :disabled="generatingOfferings"
-                v-tooltip="'Télécharger le PDF du catalogue Buildy 2026 (régénéré depuis la base)'"
+                v-tooltip="'Télécharger le PDF du catalogue Buildy (régénéré depuis la base)'"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingOfferings ? 'Génération…' : 'Tableau des offres' }}
+        </button>
+        <button @click="publishCatalogOnline" :disabled="publishingOfferings"
+                v-tooltip="'Publier le tableau des offres sur buildy.fr/telechargements (URL stable, écrase la version précédente)'"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
+                :class="publishInfo.catalog ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
+          <ArrowUpTrayIcon class="w-4 h-4" />
+          {{ publishingOfferings ? 'Publication…' : (publishInfo.catalog ? 'Mettre à jour tableau' : 'Publier tableau') }}
         </button>
         <button @click="downloadBrochurePdf" :disabled="generatingBrochure"
                 v-tooltip="'Télécharger la brochure : référentiel détaillé de chaque fonctionnalité (annexe au tableau des offres)'"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg whitespace-nowrap transition disabled:opacity-50">
           <DocumentArrowDownIcon class="w-4 h-4" /> {{ generatingBrochure ? 'Génération…' : 'Brochure détaillée' }}
+        </button>
+        <button @click="publishBrochureOnline" :disabled="publishingBrochure"
+                v-tooltip="'Publier la brochure sur buildy.fr/telechargements (URL stable, écrase la version précédente)'"
+                class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition disabled:opacity-50"
+                :class="publishInfo.brochure ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'">
+          <ArrowUpTrayIcon class="w-4 h-4" />
+          {{ publishingBrochure ? 'Publication…' : (publishInfo.brochure ? 'Mettre à jour brochure' : 'Publier brochure') }}
         </button>
         <button @click="showBulk = true" :disabled="!bulkItems.length"
                 class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 rounded-lg whitespace-nowrap transition disabled:opacity-50">
@@ -484,6 +543,32 @@ onBeforeUnmount(teardownSortables)
                 class="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm whitespace-nowrap transition">
           <PlusIcon class="w-4 h-4" /> Nouvelle fonctionnalité
         </button>
+      </div>
+    </div>
+
+    <!-- Bandeaux « En ligne » : URLs publiques stables des PDFs publiés. -->
+    <div v-if="publishInfo.catalog || publishInfo.brochure" class="mb-4 space-y-1.5">
+      <div v-if="publishInfo.catalog" class="flex items-center gap-2 text-sm min-w-0">
+        <span class="inline-flex items-center gap-1.5 font-medium text-emerald-700 shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Tableau en ligne
+        </span>
+        <a :href="publishInfo.catalog.url" target="_blank" rel="noopener"
+           class="text-indigo-600 hover:underline truncate">{{ publishInfo.catalog.url }}</a>
+        <button @click="copyPublishedUrl(publishInfo.catalog.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+          <ClipboardDocumentIcon class="w-4 h-4" />
+        </button>
+        <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.catalog.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.catalog.published_at) }}</span>
+      </div>
+      <div v-if="publishInfo.brochure" class="flex items-center gap-2 text-sm min-w-0">
+        <span class="inline-flex items-center gap-1.5 font-medium text-emerald-700 shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Brochure en ligne
+        </span>
+        <a :href="publishInfo.brochure.url" target="_blank" rel="noopener"
+           class="text-indigo-600 hover:underline truncate">{{ publishInfo.brochure.url }}</a>
+        <button @click="copyPublishedUrl(publishInfo.brochure.url)" class="text-gray-400 hover:text-gray-700 shrink-0" v-tooltip="'Copier le lien'">
+          <ClipboardDocumentIcon class="w-4 h-4" />
+        </button>
+        <span class="text-gray-400 shrink-0 whitespace-nowrap text-xs">· {{ formatBytes(publishInfo.brochure.size_bytes) }} · publié le {{ formatPublishedDate(publishInfo.brochure.published_at) }}</span>
       </div>
     </div>
 

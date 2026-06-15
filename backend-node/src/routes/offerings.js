@@ -19,6 +19,7 @@ const config = require('../config');
 const db = require('../database');
 const log = require('../lib/logger').system;
 const { renderPdf, renderHtml, buildHeaderFooter, loadAssetDataUrl, loadFileAsDataUrl } = require('../lib/pdf');
+const { uploadWhitepaperPdf } = require('../lib/whitepaper-ftp');
 
 // Filigrane Buildy (favicon en gris pale) — meme constante que les
 // autres PDF (cf routes/export.js).
@@ -506,6 +507,91 @@ async function routes(fastify) {
       .header('Content-Disposition', `attachment; filename="${filename}"`)
       .send(fs.createReadStream(outputPath));
   });
+
+  // ─── Publications FTP (catalog + brochure) ─────────────────────────
+  // Régénère le PDF + l'envoie sur le FTP OVH avec un nom STABLE (sans
+  // timestamp) pour que l'URL publique soit pérenne. Une republication
+  // overwrite le fichier distant. État (URL + date + size) stocké dans
+  // la table published_offerings (1 ligne par kind).
+  async function _publishToFtp({ kind, filename, generate, request, reply }) {
+    const userId = request.authUser?.id;
+    let gen;
+    try { gen = await generate(); }
+    catch (err) {
+      log.error(`Publish ${kind} render failed: ${err.message}`);
+      return reply.code(500).send({ detail: `Échec de la génération PDF : ${err.message}` });
+    }
+    let upload;
+    try { upload = await uploadWhitepaperPdf(gen.path, filename); }
+    catch (err) {
+      log.error(`Publish ${kind} FTP failed: ${err.message}`);
+      return reply.code(502).send({ detail: `Échec de l'envoi vers le FTP : ${err.message}` });
+    }
+    const row = db.publishedOfferings.upsert({
+      kind, filename: upload.filename, url: upload.url, sizeBytes: upload.size, publishedBy: userId,
+    });
+    db.auditLog.add({
+      userId, action: `offerings.publish.${kind}`,
+      payload: { url: upload.url, size: upload.size },
+    });
+    return row;
+  }
+
+  fastify.post('/offerings/publish', async (request, reply) => {
+    return _publishToFtp({
+      kind: 'catalog',
+      filename: 'tableau-des-offres-buildy.pdf',
+      generate: async () => {
+        const data = buildOfferingsData();
+        const exportsDir = path.resolve(config.exportsDir, '_offerings');
+        fs.mkdirSync(exportsDir, { recursive: true });
+        const outputPath = path.join(exportsDir, `publish-catalog-${Date.now()}.pdf`);
+        return await renderPdf({
+          template: 'offering-catalog',
+          styles: ['styles-offering-catalog', '_offerings-table'],
+          data, outputPath, pageFormat: 'A4', coverFullBleed: true,
+          pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
+          pdfOptions: buildHeaderFooter({
+            clientName: 'Buildy', projectName: 'Référentiel des fonctionnalités',
+            docType: 'Catalogue', version: String(data.year),
+            logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+            footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+          }),
+        });
+      },
+      request, reply,
+    });
+  });
+
+  fastify.post('/offerings/brochure/publish', async (request, reply) => {
+    return _publishToFtp({
+      kind: 'brochure',
+      filename: 'brochure-fonctionnalites-buildy.pdf',
+      generate: async () => {
+        const data = await buildBrochureData();
+        const exportsDir = path.resolve(config.exportsDir, '_offerings');
+        fs.mkdirSync(exportsDir, { recursive: true });
+        const outputPath = path.join(exportsDir, `publish-brochure-${Date.now()}.pdf`);
+        return await renderPdf({
+          template: 'brochure',
+          styles: ['styles-brochure', '_offerings-table'],
+          data, outputPath, pageFormat: 'A4', coverFullBleed: true, populateToc: true,
+          pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
+          watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
+          pdfOptions: buildHeaderFooter({
+            clientName: 'Buildy', projectName: 'Référentiel des fonctionnalités',
+            docType: 'Brochure', version: String(data.year),
+            logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+            footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+          }),
+        });
+      },
+      request, reply,
+    });
+  });
+
+  // État des publications (URL + date + taille) — affiché dans la UI.
+  fastify.get('/offerings/publish-info', async () => db.publishedOfferings.list());
 }
 
 module.exports = routes;
