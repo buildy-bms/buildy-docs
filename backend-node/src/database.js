@@ -10959,6 +10959,35 @@ const whitepaperClicks = {
     `).all(afId);
     return { total, uniques, last_hit_at: lastHit, by_day: byDay, by_referer: byReferer, recent };
   },
+  // Variante par slug : utilisée pour les PDFs non-whitepaper (offerings
+  // catalog / brochure) qui n'ont pas d'af_id mais sont quand même
+  // traçés via le même tracker /dl/<slug>.
+  statsForSlug(slug) {
+    const total = db.prepare(
+      `SELECT COUNT(*) AS c FROM whitepaper_clicks WHERE slug = ?`).get(slug).c;
+    const uniques = db.prepare(
+      `SELECT COUNT(DISTINCT ip_prefix) AS c FROM whitepaper_clicks WHERE slug = ?`).get(slug).c;
+    const lastHit = db.prepare(
+      `SELECT MAX(hit_at) AS m FROM whitepaper_clicks WHERE slug = ?`).get(slug).m;
+    const byDay = db.prepare(`
+      SELECT substr(hit_at, 1, 10) AS day, COUNT(*) AS count
+      FROM whitepaper_clicks WHERE slug = ?
+      GROUP BY day ORDER BY day DESC LIMIT 30
+    `).all(slug);
+    const byReferer = db.prepare(`
+      SELECT CASE WHEN referer IS NULL OR referer = '' THEN '(accès direct)'
+                  ELSE referer END AS source,
+             COUNT(*) AS count
+      FROM whitepaper_clicks WHERE slug = ?
+      GROUP BY source ORDER BY count DESC LIMIT 10
+    `).all(slug);
+    const recent = db.prepare(`
+      SELECT hit_at, ip_prefix, referer, user_agent
+      FROM whitepaper_clicks WHERE slug = ?
+      ORDER BY hit_at DESC LIMIT 25
+    `).all(slug);
+    return { total, uniques, last_hit_at: lastHit, by_day: byDay, by_referer: byReferer, recent };
+  },
 };
 
 // ─── Publications offerings (catalog + brochure) ────────────────────

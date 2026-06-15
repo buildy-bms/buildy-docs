@@ -42,6 +42,15 @@ async function uploadWhitepaperPdf(localPath, filename) {
     });
     await client.ensureDir(config.wpFtpRemoteDir);
     await client.uploadFrom(localPath, filename);
+    // SITE CHMOD 644 : sans ça, certains serveurs FTP (dont OVH) créent
+    // les fichiers en 600, ce qui empêche le serveur web de les servir
+    // → 403 Forbidden côté visiteur. Best-effort : si le serveur ne
+    // supporte pas SITE CHMOD, on log un warn et on continue.
+    try {
+      await client.send(`SITE CHMOD 644 ${filename}`);
+    } catch (err) {
+      log.warn(`SITE CHMOD 644 ${filename} a échoué : ${err.message}`);
+    }
   } finally {
     client.close();
   }
