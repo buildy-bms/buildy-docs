@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.165",
+      "date": "2026-06-08",
+      "title": "Livre blanc — Aperçu PDF (bouton + route inline), back-cover navy plein-bord (vrai)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Back-cover navy enfin VRAIMENT plein-bord (re-render dernière page sans margin Puppeteer)",
+          "what": "L'ancien `closingFullBleed` ne masquait que les bandes top/bottom (pas left/right) et ajoutait un accent vert 4mm parasite. Le rendu donnait une page navy mais avec bandes blanches sur les côtés. Nouveau mécanisme `backCoverFullBleed` qui applique la même technique que `coverFullBleed` à la dernière page : Puppeteer re-rend la dernière page sans aucune margin, et pdf-lib remplace la page dans le PDF final. Vraie page navy edge-to-edge, sans accent parasite. Helper `replaceLastPage()` ajouté dans pdf.js.",
+          "where": "PDF livre blanc — dernière page si meta.has_back_cover=true.",
+          "how_to_test": "Exporter le whitepaper #55 : la page 3 est navy de bord à bord, sans bande blanche."
+        },
+        {
+          "kind": "feature",
+          "title": "Bouton « Aperçu PDF » dans l'UI whitepaper",
+          "what": "Nouveau bouton à côté d'Export PDF qui ouvre le PDF dans un nouvel onglet (Content-Disposition: inline). Pas de téléchargement → tu vois le rendu directement, Cmd+R pour relancer. Route backend GET /api/whitepapers/:id/preview/pdf.",
+          "where": "Top-bar éditeur whitepaper, à gauche du bouton Export PDF.",
+          "how_to_test": "Cliquer « Aperçu PDF » sur le whitepaper Buildy Easy Access."
+        },
+        {
+          "kind": "fix",
+          "title": ".closing CSS : margins négatifs pour edge-to-edge + suppression min-height qui forçait un overflow",
+          "what": "Le CSS .closing utilisait `min-height: 297mm` qui produisait un overflow et faisait apparaître une 2e page non re-rendue. Nouveau gabarit : margins négatifs -22mm/-12mm/-18mm/-12mm (équivalents aux marges de page parent) pour atteindre les bords + padding 32mm/24mm pour le contenu. page-break-inside: avoid pour éviter la coupure en 2.",
+          "where": "styles-whitepaper-book.css.",
+          "how_to_test": "Le contenu de la back-cover doit tenir sur 1 seule page."
+        }
+      ]
+    },
+    {
       "version": "0.1.164",
       "date": "2026-06-08",
       "title": "Script seed whitepaper — mode --update pour aligner un livre blanc existant sans toucher la DB ad hoc",

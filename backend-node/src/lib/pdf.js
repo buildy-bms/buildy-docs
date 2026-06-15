@@ -476,7 +476,7 @@ async function renderPdf(opts) {
   return _withTimeout(_renderPdfImpl(opts), RENDER_TIMEOUT_MS, `renderPdf(${opts.template})`);
 }
 
-async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, closingFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
+async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions = {}, populateToc = false, pageFormat = 'A4', pageOrientation = 'portrait', skipFirstPageHeaderFooter = false, watermark = null, coverFullBleed = false, closingFullBleed = false, backCoverFullBleed = false, addFormFields = false, pageContainerSelector = '.page', fresh = false, pageMarginTopMm = 22, pageMarginBottomMm = 18 }) {
   const tpl = loadTemplate(template, { fresh });
   const css = loadStyles(styles);
   const fullCss = getEmbeddedFontsCss() + '\n' + css;
@@ -650,6 +650,44 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       try { fs.unlinkSync(coverTmpPath); } catch { /* ignore */ }
     }
 
+    // Back-cover plein-bord : même technique que coverFullBleed, appliquée
+    // à la DERNIÈRE page (CTA marketing navy plein-bord d'un livre blanc).
+    // Le mécanisme `closingFullBleed` qui pose juste des rectangles navy en
+    // post-process ne couvre que top/bottom (pas left/right) et superpose
+    // une bande verte qu'on ne veut pas toujours. Ce re-render produit une
+    // vraie page navy edge-to-edge.
+    if (backCoverFullBleed) {
+      // Lire le PDF déjà rendu pour connaître l'index de la dernière page.
+      const { PDFDocument } = require('pdf-lib');
+      const mainDoc = await PDFDocument.load(fs.readFileSync(outputPath));
+      const lastPageNum = mainDoc.getPageCount(); // 1-based pour pageRanges
+      const lastTmpPath = outputPath.replace(/\.pdf$/i, '.last-tmp.pdf');
+      const sizeRule = pageOrientation === 'landscape'
+        ? `${pageFormat} landscape`
+        : `${pageFormat} portrait`;
+      const overrideStyleId = await page.evaluate((size) => {
+        const id = '__back_cover_fullbleed_override__';
+        const style = document.createElement('style');
+        style.id = id;
+        style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }`;
+        document.head.appendChild(style);
+        return id;
+      }, sizeRule);
+      await page.pdf({
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+        pageRanges: String(lastPageNum),
+        path: lastTmpPath,
+      });
+      await page.evaluate((id) => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }, overrideStyleId);
+      await replaceLastPage(outputPath, lastTmpPath);
+      try { fs.unlinkSync(lastTmpPath); } catch { /* ignore */ }
+    }
+
     // Post-processing pdf-lib en une seule passe (charge/save) :
     //   - Masque header/footer de la page 1 si demande (preserve liens TOC).
     //   - Applique le filigrane Buildy sur les pages demandees.
@@ -700,6 +738,19 @@ async function replaceFirstPage(mainPath, coverPath) {
   const [coverPage] = await mainDoc.copyPages(coverDoc, [0]);
   mainDoc.removePage(0);
   mainDoc.insertPage(0, coverPage);
+  fs.writeFileSync(mainPath, await mainDoc.save());
+}
+
+async function replaceLastPage(mainPath, lastPath) {
+  const { PDFDocument } = require('pdf-lib');
+  const mainBytes = fs.readFileSync(mainPath);
+  const lastBytes = fs.readFileSync(lastPath);
+  const mainDoc = await PDFDocument.load(mainBytes);
+  const lastDoc = await PDFDocument.load(lastBytes);
+  const [lastPage] = await mainDoc.copyPages(lastDoc, [0]);
+  const lastIdx = mainDoc.getPageCount() - 1;
+  mainDoc.removePage(lastIdx);
+  mainDoc.insertPage(lastIdx, lastPage);
   fs.writeFileSync(mainPath, await mainDoc.save());
 }
 

@@ -155,9 +155,9 @@ async function generateWhitepaperPdf(row) {
     outputPath,
     pageFormat: 'A4',
     coverFullBleed: !isSinglePage,
-    // Back cover navy plein-bord → masquer header/footer sur cette page
-    // aussi (sinon le footer logo apparaît sur le fond navy).
-    closingFullBleed: !isSinglePage && hasBackCover,
+    // Back-cover navy plein-bord : re-rendu de la dernière page sans
+    // margin Puppeteer (vraie page edge-to-edge, pas juste un mask top/bot).
+    backCoverFullBleed: !isSinglePage && hasBackCover,
     // Header/footer Buildy unifié (logo en footer + pagination).
     pdfOptions: isSinglePage ? undefined : buildHeaderFooter({
       clientName: 'Buildy',
@@ -436,6 +436,34 @@ async function routes(fastify) {
     });
     reply.header('Content-Type', 'text/html; charset=utf-8');
     return reply.send(html);
+  });
+
+  // ─── Aperçu PDF inline (ouvre dans le navigateur, pas de download) ─
+  // Même rendu que /export/pdf mais Content-Disposition: inline pour que
+  // le viewer PDF du navigateur s'ouvre directement. Pratique pour
+  // itérer sur le design final via Cmd+R (recharge le PDF). Pour
+  // l'itération CSS/template ultra-rapide sans Puppeteer, préférer
+  // /preview qui rend du HTML pur.
+  fastify.get('/whitepapers/:id/preview/pdf', async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const row = db.afs.getById(id);
+    if (!row || row.kind !== 'whitepaper' || row.deleted_at) {
+      return reply.code(404).send({ detail: 'Livre blanc introuvable' });
+    }
+    if (!assertRead(request, reply, id)) return;
+    let gen;
+    try {
+      gen = await generateWhitepaperPdf(row);
+    } catch (err) {
+      if (!err.clientStatus) log.error(`PDF whitepaper ${id} preview failed: ${err.message}`);
+      return reply.code(err.clientStatus || 502).send({
+        detail: err.clientStatus ? err.message : `Échec de la génération PDF : ${err.message}`,
+      });
+    }
+    const buf = fs.readFileSync(gen.path);
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', `inline; filename="${row.slug || 'livre-blanc'}.pdf"`);
+    return reply.send(buf);
   });
 
   // ─── Export PDF ────────────────────────────────────────────────────

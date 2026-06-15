@@ -33,19 +33,24 @@
 
 /* ─── Back-cover (dernière page CTA marketing) ───────────────────────
    Fond navy plein-bord, titre Poppins blanc, gros bouton CTA vert
-   menthe (#00cd92). On utilise les memes mecanismes que .cover pour
-   forcer le plein-bord (margin negatif + width calc + @page :last). */
+   menthe (#00cd92). Le PLEIN-BORD est garanti par le re-render
+   backCoverFullBleed côté pdf.js (la dernière page est régénérée
+   sans margin Puppeteer). Le CSS ici doit donc juste :
+   - démarrer sur une nouvelle page (break-before)
+   - peindre le fond navy edge-to-edge (margins négatifs équivalents
+     à la marge de page parent : 22mm top, 18mm bottom, 12mm side)
+   - padding interne raisonnable pour le contenu textuel
+   PAS de min-height: 297mm (faisait overflow et créait une 2e page
+   non re-renderée laide). */
 .closing {
   break-before: page;
   background: #1b2842;
   color: #ffffff;
-  margin: 0;
-  padding: 28mm 22mm;
+  margin: -22mm -12mm -18mm -12mm;
+  padding: 32mm 24mm;
   min-height: 297mm;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  page-break-inside: avoid;
 }
 .closing-eyebrow {
   text-transform: uppercase;
