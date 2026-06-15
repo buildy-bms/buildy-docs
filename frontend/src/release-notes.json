@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.191",
+      "date": "2026-06-15",
+      "title": "Whitepaper Easy Access : CTA secondaire « Découvrir les offres » en bouton outline",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "CTA secondaire en bouton visible (outline navy)",
+          "what": "Le lien « Découvrir les offres Smart et Premium » sous la phrase de clarification (page « Combien ça coûte ») devient un véritable bouton outline navy (fond blanc + bordure et texte navy + Poppins 10.5pt + radius pill + padding 3.5×8 mm), centré sous le bloc. Il reste visuellement distinct du CTA principal vert « Réserver une démonstration » de la back-cover.",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF du whitepaper #55 et vérifier que le CTA secondaire est lisible comme un bouton, pas un simple texte souligné."
+        }
+      ]
+    },
+    {
       "version": "0.1.190",
       "date": "2026-06-15",
       "title": "Whitepaper Buildy Easy Access : refonte de la page « Combien ça coûte »",
