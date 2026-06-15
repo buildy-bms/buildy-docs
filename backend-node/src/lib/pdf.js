@@ -661,31 +661,49 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
       const { PDFDocument } = require('pdf-lib');
       const mainDoc = await PDFDocument.load(fs.readFileSync(outputPath));
       const lastPageNum = mainDoc.getPageCount(); // 1-based pour pageRanges
-      const lastTmpPath = outputPath.replace(/\.pdf$/i, '.last-tmp.pdf');
-      const sizeRule = pageOrientation === 'landscape'
-        ? `${pageFormat} landscape`
-        : `${pageFormat} portrait`;
-      const overrideStyleId = await page.evaluate((size) => {
-        const id = '__back_cover_fullbleed_override__';
-        const style = document.createElement('style');
-        style.id = id;
-        style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }`;
-        document.head.appendChild(style);
-        return id;
-      }, sizeRule);
-      await page.pdf({
-        printBackground: true,
-        preferCSSPageSize: true,
-        margin: { top: '0', right: '0', bottom: '0', left: '0' },
-        pageRanges: String(lastPageNum),
-        path: lastTmpPath,
-      });
-      await page.evaluate((id) => {
-        const el = document.getElementById(id);
-        if (el) el.remove();
-      }, overrideStyleId);
-      await replaceLastPage(outputPath, lastTmpPath);
-      try { fs.unlinkSync(lastTmpPath); } catch { /* ignore */ }
+      if (lastPageNum < 2) {
+        log.warn(`backCoverFullBleed ignoré : pageCount=${lastPageNum}, dernière page = cover`);
+      } else {
+        const lastTmpPath = outputPath.replace(/\.pdf$/i, '.last-tmp.pdf');
+        const sizeRule = pageOrientation === 'landscape'
+          ? `${pageFormat} landscape`
+          : `${pageFormat} portrait`;
+        // Injecte deux choses pour le re-render :
+        //   1. @page sans margin (vrai plein-bord Puppeteer)
+        //   2. body { background: navy } pour que toute la zone page
+        //      hors .closing soit aussi peinte (sinon blanc autour si le
+        //      contenu .closing ne couvre pas tout).
+        const overrideStyleId = await page.evaluate((size) => {
+          const id = '__back_cover_fullbleed_override__';
+          const style = document.createElement('style');
+          style.id = id;
+          style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }
+                               body { background: #1b2842 !important; }`;
+          document.head.appendChild(style);
+          return id;
+        }, sizeRule);
+        try {
+          await page.pdf({
+            printBackground: true,
+            preferCSSPageSize: true,
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+            pageRanges: String(lastPageNum),
+            path: lastTmpPath,
+          });
+          await replaceLastPage(outputPath, lastTmpPath);
+        } catch (err) {
+          // Fail-safe : si le re-render plante (changement de layout dû à
+          // l'override CSS qui change le nombre de pages), on garde le PDF
+          // initial sans back-cover plein-bord plutôt que de tout casser.
+          log.warn(`backCoverFullBleed re-render failed : ${err.message}`);
+        } finally {
+          await page.evaluate((id) => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+          }, overrideStyleId);
+          try { fs.unlinkSync(lastTmpPath); } catch { /* ignore */ }
+        }
+      }
     }
 
     // Post-processing pdf-lib en une seule passe (charge/save) :

@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.166",
+      "date": "2026-06-08",
+      "title": "Livre blanc — fix 502 export PDF + modale d'aperçu intégrée",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Fix 502 « Page range exceeds page count » sur l'export PDF whitepaper",
+          "what": "Le CSS .closing en 0.1.165 utilisait margin négatifs + min-height: 297mm pour atteindre les bords — combinaison qui cassait le layout Chromium et supprimait la 3e page du rendu initial. Le re-render `backCoverFullBleed` tentait alors pageRanges=3 sur un PDF qui n'avait que 2 pages → erreur Puppeteer + 502. Nouveau CSS .closing simplifié (padding seul, plus de margin négatif ni min-height). Le navy plein-bord est désormais obtenu via `body { background: #1b2842 }` injecté au moment du re-render seulement. Fail-safe ajouté : si re-render plante, on garde le PDF initial sans casser la requête.",
+          "where": "PDF livre blanc — export et aperçu.",
+          "how_to_test": "Exporter ou aperçu PDF du whitepaper #55 : ne doit plus 502."
+        },
+        {
+          "kind": "feature",
+          "title": "Modale d'aperçu PDF intégrée (plus de nouvel onglet)",
+          "what": "Le bouton « Aperçu PDF » ouvre désormais une modale plein écran avec un viewer PDF natif iframe (chargé via blob URL, cookie OIDC auto). Boutons « Régénérer » (relance le rendu Puppeteer après édition) + « Télécharger » + « Fermer ». Plus besoin de naviguer dans un nouvel onglet pour itérer.",
+          "where": "Top-bar éditeur whitepaper → bouton Aperçu PDF.",
+          "how_to_test": "Sur Buildy Easy Access, cliquer Aperçu PDF : modale qui charge le PDF en ~3-5s."
+        }
+      ]
+    },
+    {
       "version": "0.1.165",
       "date": "2026-06-08",
       "title": "Livre blanc — Aperçu PDF (bouton + route inline), back-cover navy plein-bord (vrai)",
