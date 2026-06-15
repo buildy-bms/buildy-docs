@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.182",
+      "date": "2026-06-08",
+      "title": "Brochure Easy Access — restructuration : page 3 allégée, page 4 dédiée tarification (Pack + Abonnement), fixes mineurs",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Page 4 dédiée à la tarification avec narration Pack → Abonnement en 2 étapes",
+          "what": "Le bloc Pack a été extrait de la page 3 (qui débordait sur une page parasite) et regroupé avec l'Abonnement sur une nouvelle page 4 intitulée « Combien ça coûte ». Présentation en 2 « price-step » numérotés : étape 1 = Le Buildy Easy Access Pack (kicker UNE FOIS, SUR DEVIS + liste à puces de ce qui est inclus), étape 2 = L'abonnement plateforme (kicker CHAQUE MOIS, PAR BÂTIMENT + encadré vert 20 € HT / mois / bâtiment + mention bundle Smart/Premium). Enchainement Pack → Abonnement naturel et lisible.",
+          "where": "Nouvelle page 4 du whitepaper. La back-cover devient page 5.",
+          "how_to_test": "Régénérer aperçu : 5 pages au lieu de 5 désordonnées."
+        },
+        {
+          "kind": "fix",
+          "title": "Page 3 allégée (guarantee + proof + logos) et footer back-cover corrigé",
+          "what": "Page 3 contient maintenant uniquement : lead + guarantee-card + proof-card + bandeau logos clients. Plus de débord sur une page parasite. Footer back-cover : (1) accès au contexte parent corrigé via {{../version}} et {{../dateLabel}} (sinon rendu vide dans {{#each chapters}}), (2) tiret long remplacé par point milieu pour la charte voix Buildy. .back-center reçoit margin-top: 14mm pour éviter le chevauchement avec le wordmark-top.",
+          "where": "Page 3 et page 5 (back-cover) du whitepaper.",
+          "how_to_test": "Régénérer aperçu."
+        }
+      ]
+    },
+    {
       "version": "0.1.181",
       "date": "2026-06-08",
       "title": "Brochure Easy Access — bloc Pack page 3 + logos clients + ABONNEMENT PLATEFORME + mention installation",

@@ -86,7 +86,7 @@ const CHAPTER_1_HTML = `
 </div>
 `.trim();
 
-// ─── Page 3 ─ rien à remplacer + Pack + preuve sociale + logos ───────
+// ─── Page 3 ─ rien à remplacer + preuve sociale + logos ──────────────
 const CHAPTER_2_TITLE = 'Rien à remplacer. Rien à risquer.';
 const CHAPTER_2_HTML = `
 <p class="lead">Vos automates, vos régulateurs, vos sondes, votre supervision actuelle : tout reste en place. Buildy n'ajoute qu'une couche d'accès et une vue d'ensemble.</p>
@@ -99,44 +99,57 @@ const CHAPTER_2_HTML = `
   </div>
 </div>
 
-<div class="pack-card">
-  <div class="pack-eyebrow">Clé en main</div>
-  <h2 class="pack-title">Le Buildy Easy Access Pack</h2>
-  <p>Sur chaque site, on installe tout, clé en main. Vous n'avez rien à gérer. Le pack comprend :</p>
-  <ul class="pack-list">
-    <li>La passerelle Buildy Edge, avec l'intelligence embarquée qui relie votre GTB existante à la plateforme cloud Buildy.</li>
-    <li>Un routeur 4G avec carte SIM multi-opérateurs.</li>
-    <li>En option, une antenne 4G déportée et son câble.</li>
-    <li>L'installation et la mise en service complètes.</li>
-    <li>Les frais de déplacement sur site.</li>
-  </ul>
-  <p class="pack-close">Le Pack est installé une fois, sur devis. Buildy s'occupe du reste.</p>
-</div>
-
 <div class="proof-card">
   <div class="proof-eyebrow">Ce que font nos clients</div>
-  <p class="proof-text">Comme beaucoup de nos clients, vous pouvez commencer par un site, voir ce que ça donne, puis en connecter d'autres à votre rythme. C'est exactement ce qu'ils font.</p>
+  <p class="proof-text">Comme beaucoup de nos clients, vous pouvez commencer par un site, voir ce que ça donne, puis en connecter d'autres à votre rythme.</p>
 </div>
 
 ${CLIENT_LOGOS_HTML}
 `.trim();
 
-// ─── Page 4 ─ back-cover CTA ─────────────────────────────────────────
-const CHAPTER_3_TITLE = 'Voyez-le en live, sur de vrais bâtiments.';
+// ─── Page 4 ─ Tarification : Pack + Abonnement ───────────────────────
+const CHAPTER_3_TITLE = 'Combien ça coûte';
 const CHAPTER_3_HTML = `
-<p>30 minutes en visio. On vous montre Easy Access sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
+<p class="lead">Deux lignes claires sur le devis. Une fois pour l'installation, puis chaque mois pour la plateforme. Pas d'autres frais cachés.</p>
 
-<div class="pricing-tile">
-  <div class="pricing-header">Abonnement plateforme</div>
-  <div class="pricing-eyebrow">À partir de</div>
-  <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois / bâtiment</span></div>
-  <div class="pricing-note">même avec plusieurs interfaces de GTB sur le site</div>
-  <div class="pricing-bundle">ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
+<div class="price-step">
+  <div class="price-step-num">1</div>
+  <div class="price-step-body">
+    <div class="price-step-kicker">Une fois, sur devis</div>
+    <h2 class="price-step-title">Le Buildy Easy Access Pack</h2>
+    <p>Sur chaque site, on installe tout, clé en main. Vous n'avez rien à gérer. Le pack comprend :</p>
+    <ul class="pack-list">
+      <li>La passerelle Buildy Edge, avec l'intelligence embarquée qui relie votre GTB existante à la plateforme cloud Buildy.</li>
+      <li>Un routeur 4G avec carte SIM multi-opérateurs.</li>
+      <li>En option, une antenne 4G déportée et son câble.</li>
+      <li>L'installation et la mise en service complètes.</li>
+      <li>Les frais de déplacement sur site.</li>
+    </ul>
+  </div>
 </div>
 
-<p class="pricing-install">Installation du Pack Easy Access (passerelle, routeur 4G, mise en service, déplacement) : une fois, sur devis.</p>
+<div class="price-step price-step-recurring">
+  <div class="price-step-num">2</div>
+  <div class="price-step-body">
+    <div class="price-step-kicker">Chaque mois, par bâtiment</div>
+    <h2 class="price-step-title">L'abonnement plateforme</h2>
+    <p>Une fois le Pack en place, l'accès à Hyperveez se règle au mois, par site. Tarif identique quel que soit le nombre d'interfaces de GTB présentes sur le bâtiment.</p>
+    <div class="price-step-amount">
+      <span class="amt-prefix">À partir de</span>
+      <span class="amt-value">20 € <span class="amt-unit">HT / mois / bâtiment</span></span>
+    </div>
+    <p class="price-step-note">Cet abonnement est <strong>inclus de série</strong> dans les offres <strong>Smart</strong> et <strong>Premium</strong> de Buildy. Vous n'avez rien à ajouter.</p>
+  </div>
+</div>
+`.trim();
+
+// ─── Page 5 ─ back-cover CTA ─────────────────────────────────────────
+const CHAPTER_4_TITLE = 'Voyez-le en live, sur de vrais bâtiments.';
+const CHAPTER_4_HTML = `
+<p>30 minutes en visio. On vous montre Easy Access sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
 
 <p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
+
 <p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
 <p><em>Aucun engagement n'est requis pour la démonstration.</em></p>
 `.trim();
@@ -159,6 +172,7 @@ const WANTED_CHAPTERS = [
   { position: 1, title: CHAPTER_1_TITLE, bodyHtml: CHAPTER_1_HTML },
   { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
   { position: 3, title: CHAPTER_3_TITLE, bodyHtml: CHAPTER_3_HTML },
+  { position: 4, title: CHAPTER_4_TITLE, bodyHtml: CHAPTER_4_HTML },
 ];
 
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
