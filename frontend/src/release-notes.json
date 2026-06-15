@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.170",
+      "date": "2026-06-08",
+      "title": "Livre blanc — corrections de contenu + image cover transparente",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Corrections multiples sur le whitepaper Buildy Easy Access",
+          "what": "(1) Titre chapitre 1 reformulé en « Centraliser l'accès à toutes vos supervisions GTB » (plus produit, moins racoleur). (2) Titre back-cover en « Voir Buildy Easy Access lors d'une démo live ». (3) Lien CTA corrigé : https://www.buildy.fr/demander-une-demo/ (au lieu de buildy.fr/demo). (4) Bullet « accès non tracés » remplacé par « credentials qui circulent par email et Teams, pas de révocation centralisée » — claim factuel (Buildy ne trace pas non plus côté NetBird). Paragraphe solution recentré sur l'auth unique + révocation centralisée, sans mentionner de traçage. (5) Cover image : fond blanc retiré (background + border-radius + box-shadow), pour conserver la transparence native du PNG fourni.",
+          "where": "Whitepaper #55 — pages 2 et 3 + image page 1.",
+          "how_to_test": "Régénérer l'aperçu : capture Hyperveez se fond dans le navy (transparence)."
+        }
+      ]
+    },
+    {
       "version": "0.1.169",
       "date": "2026-06-08",
       "title": "Livre blanc Buildy Easy Access — refonte cover/back-cover alignée sur le #41 + image cover + contenu mesuré",

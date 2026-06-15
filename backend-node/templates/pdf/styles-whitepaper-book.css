@@ -74,9 +74,9 @@
   height: auto;
   max-height: 95mm;
   object-fit: contain;
-  border-radius: 3mm;
-  box-shadow: 0 6mm 16mm rgba(0, 0, 0, 0.45);
-  background: #ffffff;
+  /* Pas de background ni de border-radius : l'image PNG est transparente
+     côté Kévin (capture Hyperveez sans fond), on laisse le navy passer
+     au travers des zones transparentes. */
 }
 .cover-image-caption {
   margin-top: 6mm;

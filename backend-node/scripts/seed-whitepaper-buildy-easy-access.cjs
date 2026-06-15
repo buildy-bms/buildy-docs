@@ -27,30 +27,30 @@ const SLUG = 'buildy-easy-access';
 const TITLE = 'Buildy Easy Access';
 const SUBTITLE = 'Un seul portail sécurisé pour superviser toutes vos GTB tierces, quelle que soit la marque déployée sur chaque site.';
 
-const CHAPTER_1_TITLE = 'Un Excel, des VPN, et une supervision impossible à gouverner';
+const CHAPTER_1_TITLE = 'Centraliser l\'accès à toutes vos supervisions GTB';
 const CHAPTER_1_HTML = `
 <h2>La réalité du multi-sites aujourd'hui</h2>
 <p>Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel. Une colonne URL, une colonne VPN, une colonne identifiant, une colonne mot de passe. Pour accéder à un site, il faut installer le client VPN du bon fabricant, retrouver les credentials, attendre la connexion, et tomber sur l'interface native de la GTB — Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk — toutes différentes les unes des autres.</p>
 <p>Ce mode de fonctionnement crée trois problèmes structurels pour un gestionnaire de patrimoine :</p>
 <ul>
   <li><strong>La connaissance est dans la tête d'une seule personne.</strong> Quand elle quitte l'entreprise, la moitié du parc devient inaccessible le temps de reconstituer les accès.</li>
-  <li><strong>Les accès sont partagés et non tracés.</strong> Impossible de savoir qui s'est connecté, quand, sur quelle GTB, et ce qui a été modifié.</li>
+  <li><strong>Les credentials circulent par email et Teams.</strong> Pas de révocation centralisée : un mot de passe partagé reste valide même après le départ du collaborateur.</li>
   <li><strong>Le temps d'investigation est démesuré.</strong> Quelques minutes pour ouvrir le bon VPN, retrouver le bon login, attendre la connexion — multiplié par le nombre de sites concernés à chaque alerte.</li>
 </ul>
 
 <h2>Ce que change Buildy Easy Access</h2>
 <p>Buildy Easy Access centralise l'accès à toutes vos supervisions GTB tierces depuis un seul portail Hyperveez. Chaque interface native est exposée via un lien proxy chiffré HTTPS de la forme :</p>
 <blockquote><p><code>https://votre_gtb.proxy.buildy.fr</code></p></blockquote>
-<p>Concrètement, sur la vue cartographique nationale d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification forte unique</strong> côté Buildy, accès tracé par utilisateur et par site, révocation immédiate quand un collaborateur quitte l'entreprise.</p>
+<p>Concrètement, sur la vue cartographique nationale d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification unique côté Buildy</strong> (un seul compte par collaborateur), révocation immédiate lors du départ d'un membre de l'équipe sans avoir à toucher aux credentials natifs des GTB.</p>
 
 <h2>Pas de remplacement matériel</h2>
 <p>Vos automates, vos régulateurs, vos sondes terrain et la supervision historique du site restent en place et continuent de fonctionner. Buildy Easy Access ne touche ni aux équipements, ni aux données, ni au paramétrage des GTB existantes — il intervient uniquement sur la couche <strong>accès</strong> et <strong>vue d'ensemble multi-sites</strong>. Aucun serveur hyperviseur à 100 k€ à déployer, aucune migration de base de données, aucun PV de réception à attendre.</p>
 `.trim();
 
-const CHAPTER_2_TITLE = 'Voir Buildy Easy Access sur votre patrimoine';
+const CHAPTER_2_TITLE = 'Voir Buildy Easy Access lors d\'une démo live';
 const CHAPTER_2_HTML = `
 <p>Une démonstration guidée de 30 minutes sur Hyperveez avec vos sites réels. Nous configurons une ou deux supervisions tierces de votre patrimoine en direct, vous testez l'accès, vous mesurez le gain de temps obtenu.</p>
-<p class="cta-button"><a href="https://buildy.fr/demo">Réserver une démonstration</a></p>
+<p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
 <p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a> — Tél. 04 28 39 03 34</p>
 <p><em>Buildy Easy Access est inclus de série dans les niveaux Smart et Premium. Aucun engagement n'est requis pour la démonstration.</em></p>
 `.trim();
