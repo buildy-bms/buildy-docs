@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.181",
+      "date": "2026-06-08",
+      "title": "Brochure Easy Access — bloc Pack page 3 + logos clients + ABONNEMENT PLATEFORME + mention installation",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Page 3 enrichie : bloc Pack Easy Access + mini-bandeau 15 logos clients",
+          "what": "(1) Titre guarantee-card mis à jour : « Pas de gros serveur hyperviseur à 100 000 €. Pas de migration. Rien à réceptionner. » (2) Nouveau bloc .pack-card outline mint : eyebrow CLÉ EN MAIN + titre Poppins 16pt + intro + liste à puces vert menthe (passerelle Buildy Edge, routeur 4G + SIM multi-opérateurs, option antenne déportée, installation, déplacement) + clôture italique navy « Le Pack est installé une fois, sur devis. ». (3) Mini-bandeau .clients-strip en bas : 15 logos clients (CBRE, Eiffage, SPIE, Vinted, ID Logistics, GSE, CEVA, Itron, Rexel, Dimo, CPMO, Virtuo, JMG, Roiret, Demouselle) en grille 5×3 compacte avec eyebrow ILS NOUS FONT CONFIANCE. Logos copiés depuis le whitepaper #41.",
+          "where": "Page 3 du whitepaper.",
+          "how_to_test": "Régénérer aperçu."
+        },
+        {
+          "kind": "feature",
+          "title": "Page 4 : libellé ABONNEMENT PLATEFORME + mention installation Pack sous l'encadré",
+          "what": "Le pricing tile gagne un header ABONNEMENT PLATEFORME en Poppins 11pt blanc avec border-bottom mint pour distinguer l'abonnement récurrent de l'installation one-shot. Juste sous l'encadré pricing, ligne italique discrète : « Installation du Pack Easy Access (passerelle, routeur 4G, mise en service, déplacement) : une fois, sur devis. »",
+          "where": "Page 4 du whitepaper, encadré pricing.",
+          "how_to_test": "Régénérer aperçu."
+        }
+      ]
+    },
+    {
       "version": "0.1.180",
       "date": "2026-06-08",
       "title": "Whitepaper — texte solution-card agrandi",
