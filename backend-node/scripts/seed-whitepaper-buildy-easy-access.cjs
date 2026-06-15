@@ -24,34 +24,35 @@ const path = require('path');
 
 const ROOT = process.cwd();
 const SLUG = 'buildy-easy-access';
-const TITLE = 'Le logiciel de supervision GTB le plus utilisé en France ? Un fichier Excel.';
-const SUBTITLE = 'Comment Buildy Easy Access remplace les VPN, les credentials partagés et les interfaces obscures par un seul point d\'entrée sécurisé.';
+const TITLE = 'Buildy Easy Access';
+const SUBTITLE = 'Un seul portail sécurisé pour superviser toutes vos GTB tierces, quelle que soit la marque déployée sur chaque site.';
 
-const CHAPTER_1_TITLE = 'Un Excel, des VPN, et une grande confiance dans le turnover';
+const CHAPTER_1_TITLE = 'Un Excel, des VPN, et une supervision impossible à gouverner';
 const CHAPTER_1_HTML = `
-<h2>Aujourd'hui, voilà à quoi ressemble votre supervision multi-sites</h2>
-<p>Un fichier Excel partagé dans Teams ou Google Drive. Une colonne « URL », une colonne « VPN », une colonne « login », une colonne « mot de passe ». Vous tapez le nom du site, vous récupérez les credentials, vous installez le client VPN du bon fabricant, vous attendez la connexion, vous tombez sur une interface qui n'a pas bougé depuis 2008.</p>
-<p>Et quand la personne qui maintenait ce fichier quitte l'entreprise, <strong>c'est l'apocalypse</strong> : la moitié des sites devient inaccessible, les mots de passe sont périmés, plus personne ne sait quel VPN va avec quelle marque.</p>
-<h2>Ce que Buildy Easy Access fait à la place</h2>
-<p>Un seul portail Hyperveez. Les supervisions de Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk — <strong>quelle que soit la marque déployée sur chaque site</strong> — sont exposées via des liens proxy chiffrés HTTPS de la forme :</p>
+<h2>La réalité du multi-sites aujourd'hui</h2>
+<p>Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel. Une colonne URL, une colonne VPN, une colonne identifiant, une colonne mot de passe. Pour accéder à un site, il faut installer le client VPN du bon fabricant, retrouver les credentials, attendre la connexion, et tomber sur l'interface native de la GTB — Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk — toutes différentes les unes des autres.</p>
+<p>Ce mode de fonctionnement crée trois problèmes structurels pour un gestionnaire de patrimoine :</p>
+<ul>
+  <li><strong>La connaissance est dans la tête d'une seule personne.</strong> Quand elle quitte l'entreprise, la moitié du parc devient inaccessible le temps de reconstituer les accès.</li>
+  <li><strong>Les accès sont partagés et non tracés.</strong> Impossible de savoir qui s'est connecté, quand, sur quelle GTB, et ce qui a été modifié.</li>
+  <li><strong>Le temps d'investigation est démesuré.</strong> Quelques minutes pour ouvrir le bon VPN, retrouver le bon login, attendre la connexion — multiplié par le nombre de sites concernés à chaque alerte.</li>
+</ul>
+
+<h2>Ce que change Buildy Easy Access</h2>
+<p>Buildy Easy Access centralise l'accès à toutes vos supervisions GTB tierces depuis un seul portail Hyperveez. Chaque interface native est exposée via un lien proxy chiffré HTTPS de la forme :</p>
 <blockquote><p><code>https://votre_gtb.proxy.buildy.fr</code></p></blockquote>
-<p>Pas de client VPN à installer. Pas de mot de passe partagé. <strong>Authentification forte unique</strong> + accès tracé. Les interfaces s'intègrent à la vue cartographique d'hypervision Buildy : un clic sur un site et la console native du fabricant s'ouvre dans un nouvel onglet, sans changer d'identité.</p>
-<h2>Pas besoin de remplacer ce qui marche</h2>
-<p>Vos automates, vos régulateurs, vos sondes terrain restent en place. La supervision historique du site continue de fonctionner — c'est juste l'<strong>accès</strong> et la <strong>vue d'ensemble</strong> qui changent. Pas de serveur hyperviseur à 100 k€, pas de migration de données, pas de PV de réception bloqué pendant 6 mois.</p>
+<p>Concrètement, sur la vue cartographique nationale d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification forte unique</strong> côté Buildy, accès tracé par utilisateur et par site, révocation immédiate quand un collaborateur quitte l'entreprise.</p>
+
+<h2>Pas de remplacement matériel</h2>
+<p>Vos automates, vos régulateurs, vos sondes terrain et la supervision historique du site restent en place et continuent de fonctionner. Buildy Easy Access ne touche ni aux équipements, ni aux données, ni au paramétrage des GTB existantes — il intervient uniquement sur la couche <strong>accès</strong> et <strong>vue d'ensemble multi-sites</strong>. Aucun serveur hyperviseur à 100 k€ à déployer, aucune migration de base de données, aucun PV de réception à attendre.</p>
 `.trim();
 
 const CHAPTER_2_TITLE = 'Voir Buildy Easy Access sur votre patrimoine';
-// Note : ce chapitre est rendu en BACK-COVER (fond navy plein-bord) grâce
-// à meta.has_back_cover=true ci-dessous. On utilise <p class="cta-button">
-// pour produire un bouton CTA vert menthe arrondi.
 const CHAPTER_2_HTML = `
-<h2>30 minutes pour voir si ça change vraiment quelque chose</h2>
-<p>Une démo guidée d'Hyperveez avec vos sites réels. On configure 1 ou 2 supervisions tierces sur votre patrimoine en live, vous testez l'accès, vous mesurez le gain de temps.</p>
-<p>Si ça vous parle, vous déployez sur l'ensemble du parc. Si ça ne vous parle pas, vous gardez votre Excel.</p>
-<p class="cta-button"><a href="https://buildy.fr/demo">Réserver une démo</a></p>
-<h2>Ou par email</h2>
-<p><a href="mailto:contact@buildy.fr">contact@buildy.fr</a></p>
-<p><em>Buildy Easy Access est inclus de série dans les niveaux Smart et Premium. Aucun engagement requis pour la démo.</em></p>
+<p>Une démonstration guidée de 30 minutes sur Hyperveez avec vos sites réels. Nous configurons une ou deux supervisions tierces de votre patrimoine en direct, vous testez l'accès, vous mesurez le gain de temps obtenu.</p>
+<p class="cta-button"><a href="https://buildy.fr/demo">Réserver une démonstration</a></p>
+<p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a> — Tél. 04 28 39 03 34</p>
+<p><em>Buildy Easy Access est inclus de série dans les niveaux Smart et Premium. Aucun engagement n'est requis pour la démonstration.</em></p>
 `.trim();
 
 const db = require(path.join(ROOT, 'backend-node/src/database'));
@@ -84,8 +85,8 @@ if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
     wp_meta_json: JSON.stringify({
       subtitle: SUBTITLE,
       has_back_cover: true,
-      cover_image_url: null,
-      cover_image_caption: null,
+      cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
+      cover_image_caption: 'Hyperveez — vue cartographique nationale du patrimoine supervisé par Buildy.',
     }),
   });
 
@@ -137,14 +138,12 @@ db.afs.update(wp.id, {
   wp_version: '1.0',
   wp_meta_json: JSON.stringify({
     subtitle: SUBTITLE,
-    // Dernier chapitre rendu en BACK-COVER navy plein-bord (CTA marketing).
     has_back_cover: true,
-    // URL d'une capture d'écran Hyperveez en page de garde. Vide pour
-    // l'instant — à renseigner via PATCH /api/whitepapers/:id { meta: {...} }
-    // ou édition wp_meta_json directe. Format : URL HTTPS publique (FTP OVH
-    // crisp-faq/, ou data URI base64). Recommandé : 1600x900px max.
-    cover_image_url: null,
-    cover_image_caption: null,
+    // Capture Hyperveez en page de garde — wp-asset: résolu en data URL
+    // au rendu via loadAssetDataUrl(filename). Fichier dans
+    // backend-node/templates/pdf/assets/wp-buildy-easy-access-cover.webp.
+    cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
+    cover_image_caption: 'Hyperveez — vue cartographique nationale du patrimoine supervisé par Buildy.',
   }),
   updatedBy: owner.id,
 });
