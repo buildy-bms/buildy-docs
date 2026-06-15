@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.162",
+      "date": "2026-06-08",
+      "title": "Nouveau livre blanc marketing « Buildy Easy Access » (script seed)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Script de seed pour un livre blanc 3 pages sur Buildy Easy Access (ton LinkedIn punchy)",
+          "what": "Nouveau script `backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs` qui crée en base un livre blanc marketing 3 pages (cover + chapitre corps + chapitre CTA) sur la fonctionnalité Buildy Easy Access. Reprend l'angle qui a fonctionné sur le post LinkedIn (« la GTB la plus utilisée en France ? un fichier Excel »), pratiques actuelles ridiculisées, démonstration solution, CTA démo guidée. Idempotent : si slug `buildy-easy-access` existe déjà, le script affiche l'URL et sort. Audience `asset_manager`. Layout `book` (cover full-bleed navy/vert menthe).",
+          "where": "Sidebar Buildy Docs → Whitepapers (route `/whitepapers/{id}` après lancement du script).",
+          "how_to_test": "Lancer `node backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs` depuis la racine du repo, puis ouvrir l'URL affichée et exporter en PDF (3 pages exactement)."
+        }
+      ]
+    },
+    {
       "version": "0.1.161",
       "date": "2026-06-08",
       "title": "PDF carte satellite — cap zoom à 18 max, vue bâtiment toujours visible",
