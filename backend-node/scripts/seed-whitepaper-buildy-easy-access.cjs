@@ -57,13 +57,61 @@ const CHAPTER_2_HTML = `
 const db = require(path.join(ROOT, 'backend-node/src/database'));
 db.init();
 
+const UPDATE_MODE = process.argv.includes('--update');
 const existing = db.afs.getBySlug(SLUG);
 if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
-  console.log(`✓ Livre blanc déjà présent : afs #${existing.id} (slug='${SLUG}').`);
-  console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${existing.id}`);
+  if (!UPDATE_MODE) {
+    console.log(`✓ Livre blanc déjà présent : afs #${existing.id} (slug='${SLUG}').`);
+    console.log(`  Édition  : https://docs.buildy.fr:3443/whitepapers/${existing.id}`);
+    console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/preview`);
+    console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/export/pdf`);
+    console.log('  Pour re-synchroniser meta + body chapitres avec ce script (idempotent, sans toucher à la DB ad hoc) :');
+    console.log('    node backend-node/scripts/seed-whitepaper-buildy-easy-access.cjs --update');
+    process.exit(0);
+  }
+
+  // Mode --update : aligne le whitepaper existant sur le contenu du
+  // script (meta + titres + body_html des 2 chapitres). Pas de DELETE :
+  // on UPDATE en place via les helpers DB officiels. Tout edit manuel
+  // utilisateur sur le titre/body sera écrasé — c'est le but du mode.
+  console.log(`→ Mode --update : alignement du whitepaper afs #${existing.id} sur le script.`);
+
+  db.afs.update(existing.id, {
+    title: TITLE,
+    wp_layout: 'book',
+    wp_audience: 'asset_manager',
+    wp_version: '1.0',
+    wp_meta_json: JSON.stringify({
+      subtitle: SUBTITLE,
+      has_back_cover: true,
+      cover_image_url: null,
+      cover_image_caption: null,
+    }),
+  });
+
+  const currentChapters = db.sections.listByAf(existing.id)
+    .slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+  const wanted = [
+    { position: 1, title: CHAPTER_1_TITLE, bodyHtml: CHAPTER_1_HTML },
+    { position: 2, title: CHAPTER_2_TITLE, bodyHtml: CHAPTER_2_HTML },
+  ];
+  // Aligne 1-1 sur position : update si existe, create si manque, delete les excédents.
+  for (const w of wanted) {
+    const c = currentChapters.find(x => x.position === w.position);
+    if (c) {
+      db.sections.update(c.id, { title: w.title, body_html: w.bodyHtml });
+    } else {
+      db.sections.create({ afId: existing.id, parentId: null, position: w.position,
+                           title: w.title, bodyHtml: w.bodyHtml, kind: 'standard' });
+    }
+  }
+  for (const c of currentChapters) {
+    if (!wanted.find(w => w.position === c.position)) db.sections.delete(c.id);
+  }
+
+  console.log(`✓ Whitepaper mis à jour : afs #${existing.id}.`);
   console.log(`  Preview  : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/preview`);
   console.log(`  Export PDF : https://docs.buildy.fr:3443/api/whitepapers/${existing.id}/export/pdf`);
-  console.log('  Pour reseed après édition du script : DELETE FROM afs WHERE slug = \'' + SLUG + '\' puis relancer.');
   process.exit(0);
 }
 
