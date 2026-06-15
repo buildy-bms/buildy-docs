@@ -5,7 +5,7 @@ import {
   MagnifyingGlassIcon, XMarkIcon, PencilIcon, PlusIcon, Bars3Icon, SparklesIcon,
   EyeIcon, DocumentArrowDownIcon, DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline'
-import {
+import api, {
   listSectionTemplates, reorderSectionTemplates, updateSectionTemplate,
   uploadSectionTemplateAttachment, previewOfferingsUrl, exportOfferingsPdfUrl,
   cloneSectionTemplate,
@@ -104,7 +104,9 @@ const generatingBrochure = ref(false)
 async function downloadPdfFromRoute(route, fallbackName, loadingRef, errorMsg) {
   loadingRef.value = true
   try {
-    const { default: api } = await import('@/api')
+    // api est importé en statique (l'ancien `await import('@/api')` +
+    // déstructuration de `default` produisait parfois `undefined` après
+    // bundle Vite — connu, fix 0.1.185).
     const response = await api.post(route, {}, { responseType: 'blob' })
     const dispo = response.headers['content-disposition'] || ''
     const match = /filename="([^"]+)"/.exec(dispo)
