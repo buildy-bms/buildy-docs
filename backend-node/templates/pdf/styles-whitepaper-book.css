@@ -65,9 +65,10 @@
   letter-spacing: -0.005em;
 }
 .cover-image-frame {
-  margin: 14mm 0 0;
-  text-align: left;
+  margin: 14mm auto 0;
+  text-align: center;
 }
+.cover-image-frame .cover-image { margin: 0 auto; }
 .cover-image {
   display: block;
   width: 100%;
@@ -86,6 +87,7 @@
   font-size: 9pt;
   font-style: italic;
   letter-spacing: 0.02em;
+  text-align: center;
 }
 .cover-foot {
   margin-top: auto;

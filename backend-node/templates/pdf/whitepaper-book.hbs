@@ -13,8 +13,10 @@
     {{#if logoWhiteDataUrl}}
     <img src="{{logoWhiteDataUrl}}" alt="Buildy" class="cover-logo" />
     {{/if}}
-    Livre blanc
+    {{#unless hideCoverEyebrow}}
+    {{coverEyebrowLabel}}
     <span class="meta">{{#if audienceLabel}}{{audienceLabel}} · {{/if}}{{#if version}}Version {{version}} · {{/if}}{{dateLabel}}</span>
+    {{/unless}}
   </div>
 
   <div class="cover-center">

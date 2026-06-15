@@ -163,6 +163,8 @@ async function generateWhitepaperPdf(row) {
     coverImageCaption: meta.cover_image_caption || null,
     hasBackCover,
     logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
+    hideCoverEyebrow: meta.hide_cover_eyebrow === true,
+    coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
   };
   const isSinglePage = row.wp_layout === 'single-page';
   const result = await renderPdf({
@@ -175,15 +177,24 @@ async function generateWhitepaperPdf(row) {
     // Back-cover navy plein-bord : re-rendu de la dernière page sans
     // margin Puppeteer (vraie page edge-to-edge, pas juste un mask top/bot).
     backCoverFullBleed: !isSinglePage && hasBackCover,
-    // Header/footer Buildy unifié (logo en footer + pagination).
-    pdfOptions: isSinglePage ? undefined : buildHeaderFooter({
-      clientName: 'Buildy',
-      projectName: row.title,
-      docType: 'Livre blanc',
-      version: row.wp_version || '1.0',
-      logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-      footerNote: `Livre blanc Buildy · ${row.title}`,
-    }),
+    // Footer Buildy : logo + libellé brochure + pagination.
+    // Pas de header (Puppeteer génère un displayHeaderFooter unique
+    // pour les 2, mais on neutralise le header par un template vide).
+    pdfOptions: isSinglePage ? undefined : (() => {
+      const hf = buildHeaderFooter({
+        clientName: 'Buildy',
+        projectName: row.title,
+        docType: 'Brochure',
+        version: row.wp_version || '1.0',
+        logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+        footerNote: `${meta.footer_doc_label || 'Brochure Buildy'} · ${row.title}`,
+      });
+      // Neutralise le header (Kévin veut pas de header sur les pages
+      // whitepaper — la cover+back-cover sont full-bleed donc concernées
+      // seulement par les pages intermédiaires).
+      hf.headerTemplate = '<div></div>';
+      return hf;
+    })(),
   });
   return { path: result.path, sizeBytes: result.sizeBytes, mode: 'chapters', meta };
 }
@@ -443,6 +454,8 @@ async function routes(fastify) {
       coverImageCaption: meta.cover_image_caption || null,
       hasBackCover,
       logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
+      hideCoverEyebrow: meta.hide_cover_eyebrow === true,
+      coverEyebrowLabel: meta.cover_eyebrow_label || 'Livre blanc',
     };
     const isSinglePage = row.wp_layout === 'single-page';
     const html = renderHtml({
