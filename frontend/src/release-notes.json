@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.180",
+      "date": "2026-06-08",
+      "title": "Whitepaper — texte solution-card agrandi",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Solution-card : font-size 11 → 13pt + margin paragraphes 4 → 5mm",
+          "what": "Texte de la solution card navy (page 2) lisait trop petit sur fond foncé. Passé à 13pt avec plus d'air entre paragraphes.",
+          "where": "Page 2 du whitepaper.",
+          "how_to_test": "Régénérer aperçu."
+        }
+      ]
+    },
+    {
       "version": "0.1.179",
       "date": "2026-06-08",
       "title": "Brochure Buildy Easy Access — 4 pages, charte voix Buildy, icônes FA, preuve sociale",
