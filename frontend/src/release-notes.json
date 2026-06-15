@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.198",
+      "date": "2026-06-15",
+      "title": "Whitepaper Easy Access : retours à la ligne dans l'accroche du chapitre 2",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Accroche « Vous nous avez dit… » découpée phrase par phrase",
+          "what": "Lead du chapitre 2 du whitepaper Buildy Easy Access : un saut de ligne après chaque phrase pour un rythme plus posé (« Vous nous avez dit que c'était votre quotidien. / Comme beaucoup de nos clients. / Pas besoin de vous refaire le tableau, vous le vivez déjà. / Voici comment on le règle. »).",
+          "where": "Whitepaper Buildy Easy Access (#55), chapitre 2 lead.",
+          "how_to_test": "Régénérer le PDF du whitepaper #55."
+        }
+      ]
+    },
+    {
       "version": "0.1.197",
       "date": "2026-06-15",
       "title": "Whitepaper Easy Access : intro page prix alignée sur facturation annuelle",
