@@ -2,6 +2,41 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.163",
+      "date": "2026-06-08",
+      "title": "Livre blanc — logo footer, page de fin navy + CTA vert, cover image, preview HTML",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "PDF livre blanc : header/footer Buildy unifié avec logo",
+          "what": "L'export PDF d'un whitepaper applique désormais buildHeaderFooter() comme tous les autres PDF Buildy : logo Buildy en bas de page, libellé du document à gauche, pagination à droite. Skip automatique de la cover et de la back-cover navy (sinon le footer apparaît sur l'aplat).",
+          "where": "PDF livre blanc — toutes les pages sauf cover et back-cover.",
+          "how_to_test": "Exporter le PDF Buildy Easy Access (#55) : page 2 doit afficher le logo en footer."
+        },
+        {
+          "kind": "feature",
+          "title": "PDF livre blanc : page de fin navy plein-bord avec bouton CTA vert menthe",
+          "what": "Nouveau concept de « back-cover » : si meta.has_back_cover=true, le dernier chapitre est rendu sur fond navy plein-bord (#1b2842), texte blanc, titre Poppins souligné vert menthe (#00cd92). L'auteur peut wrapper un lien dans <p class=\"cta-button\"> pour produire un gros bouton CTA arrondi vert menthe avec shadow. @page :last { background: #1b2842 } pour la double défense Chromium sub-pixel.",
+          "where": "PDF livre blanc, dernier chapitre si meta.has_back_cover=true.",
+          "how_to_test": "Exporter Buildy Easy Access : page 3 fond navy, bouton « Réserver une démo » vert menthe."
+        },
+        {
+          "kind": "feature",
+          "title": "PDF livre blanc : capture d'écran / mockup sur la page de garde",
+          "what": "Nouveau champ meta.cover_image_url + meta.cover_image_caption. Si renseignés, une image encadrée (max-height 100mm, rounded, shadow) apparaît sous le sous-titre de la cover, avec caption optionnelle en italique. Renseignable via PATCH /api/whitepapers/:id { meta: { cover_image_url: '...' } } (UI dédiée à venir).",
+          "where": "PDF livre blanc, page de garde.",
+          "how_to_test": "PATCH le whitepaper #55 avec une URL d'image et regénérer."
+        },
+        {
+          "kind": "feature",
+          "title": "Route preview HTML hot-reloadable pour itérer sur le design",
+          "what": "Nouvelle route GET /api/whitepapers/:id/preview qui rend le HTML du livre blanc directement dans le navigateur (pas de Puppeteer). Cmd+R recharge le rendu en 100ms au lieu des 30s du cycle Puppeteer. Pratique pour ajuster CSS/template. Pour la preview PDF avec header/footer, garder l'export PDF classique.",
+          "where": "https://docs.buildy.fr:3443/api/whitepapers/55/preview",
+          "how_to_test": "Ouvrir l'URL preview du whitepaper Buildy Easy Access."
+        }
+      ]
+    },
+    {
       "version": "0.1.162",
       "date": "2026-06-08",
       "title": "Nouveau livre blanc marketing « Buildy Easy Access » (script seed)",
