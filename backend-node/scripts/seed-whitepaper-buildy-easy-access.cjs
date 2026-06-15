@@ -94,7 +94,7 @@ if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
       subtitle: SUBTITLE,
       has_back_cover: true,
       cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
-      cover_image_caption: 'Hyperveez — vue cartographique nationale du patrimoine supervisé par Buildy.',
+      cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
       hide_cover_eyebrow: true,
       footer_doc_label: 'Brochure Buildy',
     }),
@@ -153,7 +153,7 @@ db.afs.update(wp.id, {
     // au rendu via loadAssetDataUrl(filename). Fichier dans
     // backend-node/templates/pdf/assets/wp-buildy-easy-access-cover.webp.
     cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
-    cover_image_caption: 'Hyperveez — vue cartographique nationale du patrimoine supervisé par Buildy.',
+    cover_image_caption: 'Visualisez l\'ensemble de vos bâtiments sur une carte et accédez à votre GTB en un clic !',
   }),
   updatedBy: owner.id,
 });
