@@ -2,6 +2,34 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.169",
+      "date": "2026-06-08",
+      "title": "Livre blanc Buildy Easy Access — refonte cover/back-cover alignée sur le #41 + image cover + contenu mesuré",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Cover et back-cover refondues sur la mise en page du whitepaper #41 (Méthode audit BACS)",
+          "what": "Refonte complète des sections cover et back-cover (template + CSS) en reprenant le gabarit du whitepaper #41 : cover navy plein-bord avec logo wordmark en haut, eyebrow + meta, titre énorme Poppins 52pt, sous-titre, image cover encadrée avec shadow, footer avec lockup logo + audience ; back-cover centrée verticalement, logo en haut, h3 titre, contenu, signature avec rule + nom + role, footer disclaimer. Plus de plein-bord cassé, plus de doublon, look pro et homogène avec le #41.",
+          "where": "PDF livre blanc — toutes les pages 1 et N (back-cover).",
+          "how_to_test": "Aperçu PDF du whitepaper Buildy Easy Access : pages 1 et 3 doivent reprendre exactement le look du #41."
+        },
+        {
+          "kind": "feature",
+          "title": "Capture Hyperveez intégrée sur la page de garde via résolution wp-asset:",
+          "what": "Nouveau mécanisme côté backend : si meta.cover_image_url commence par 'wp-asset:<filename>', on résout en data URL embed via loadAssetDataUrl(filename) depuis backend-node/templates/pdf/assets/. Permet de stocker des images cover dans le repo (versionnées Git) sans dépendre de FTP/URL externes. La capture Hyperveez (vue cartographique nationale, ~316KB webp) apparaît sur la cover.",
+          "where": "wp_meta_json.cover_image_url = 'wp-asset:wp-buildy-easy-access-cover.webp'.",
+          "how_to_test": "La cover affiche la carte de France avec les pins multi-sites + caption italique."
+        },
+        {
+          "kind": "ux",
+          "title": "Contenu réécrit en ton mesuré (corporate, factuel, plus de familiarité)",
+          "what": "Suppression du ton agressif (« apocalypse », « ça vous parle / vous gardez votre Excel »). Réécriture en posture analyste : constat structuré en 3 problèmes (connaissance silotée, accès non tracés, temps d'investigation), démonstration solution, garanties (pas de remplacement matériel). Sous-titre cover repositionné autour de la valeur produit (« Un seul portail sécurisé pour superviser toutes vos GTB tierces »).",
+          "where": "Body des 2 chapitres du whitepaper Buildy Easy Access.",
+          "how_to_test": "Lecture des pages 2 et 3 : ton corporate, lisible par un asset manager non technique."
+        }
+      ]
+    },
+    {
       "version": "0.1.168",
       "date": "2026-06-08",
       "title": "Livre blanc — fix doublon back-cover + logo cover/back-cover + modale plus large",

@@ -40,6 +40,24 @@ const AUDIENCE_LABELS = {
   exploitant: 'Exploitant',
 };
 
+// Résout un URL meta.cover_image_url qui peut être :
+//   - null / vide → null
+//   - 'wp-asset:<filename>' → data URL embed depuis templates/pdf/assets/
+//     (Puppeteer-friendly, pas de fetch réseau pendant le rendu)
+//   - 'http(s)://...' ou 'data:...' → renvoie tel quel
+function resolveWpAssetUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('wp-asset:')) {
+    const filename = url.slice('wp-asset:'.length);
+    try { return loadAssetDataUrl(filename); }
+    catch (e) {
+      log.warn(`wp-asset introuvable : ${filename}`);
+      return null;
+    }
+  }
+  return url;
+}
+
 const createSchema = z.object({
   title: z.string().min(1, 'Titre requis'),
   layout: z.enum(LAYOUTS).optional(),
@@ -141,15 +159,9 @@ async function generateWhitepaperPdf(row) {
     audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
     dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
     chapters,
-    // Image cover optionnelle (URL data URI ou http(s)) — capture
-    // Hyperveez, mockup produit, etc. Renseignée via meta.cover_image_url.
-    coverImageUrl: meta.cover_image_url || null,
+    coverImageUrl: resolveWpAssetUrl(meta.cover_image_url),
     coverImageCaption: meta.cover_image_caption || null,
     hasBackCover,
-    // Logo Buildy embed (data URL) pour cover + back-cover plein-bord :
-    // le header/footer Puppeteer est masqué sur ces 2 pages (re-render
-    // sans margin), donc il faut le logo direct dans le template HTML
-    // sinon il est invisible sur fond navy.
     logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
   };
   const isSinglePage = row.wp_layout === 'single-page';
@@ -427,7 +439,7 @@ async function routes(fastify) {
       audienceLabel: AUDIENCE_LABELS[row.wp_audience] || null,
       dateLabel: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
       chapters,
-      coverImageUrl: meta.cover_image_url || null,
+      coverImageUrl: resolveWpAssetUrl(meta.cover_image_url),
       coverImageCaption: meta.cover_image_caption || null,
       hasBackCover,
       logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),

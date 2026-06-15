@@ -7,14 +7,16 @@
 </head>
 <body>
 
-{{!-- Couverture pleine page --}}
+{{!-- ═══════════ Couverture pleine page (style #41) ═══════════ --}}
 <section class="cover">
-  {{#if logoWhiteDataUrl}}
-  <img class="cover-logo" src="{{logoWhiteDataUrl}}" alt="Buildy" />
-  {{/if}}
   <div class="cover-eyebrow">
-    Livre blanc <span class="accent">·</span> Buildy{{#if audienceLabel}} <span class="accent">·</span> {{audienceLabel}}{{/if}}
+    {{#if logoWhiteDataUrl}}
+    <img src="{{logoWhiteDataUrl}}" alt="Buildy" class="cover-logo" />
+    {{/if}}
+    Livre blanc
+    <span class="meta">{{#if audienceLabel}}{{audienceLabel}} · {{/if}}{{#if version}}Version {{version}} · {{/if}}{{dateLabel}}</span>
   </div>
+
   <div class="cover-center">
     <h1 class="cover-title">{{title}}</h1>
     {{#if subtitle}}<p class="cover-sub">{{subtitle}}</p>{{/if}}
@@ -25,24 +27,41 @@
     </figure>
     {{/if}}
   </div>
+
   <div class="cover-foot">
-    {{#if version}}<strong>Version {{version}}</strong> · {{/if}}{{dateLabel}}
+    {{#if logoWhiteDataUrl}}
+    <div class="wordmark logo-lockup">
+      <img src="{{logoWhiteDataUrl}}" alt="Buildy" />
+    </div>
+    {{/if}}
+    <div class="edition">{{#if audienceLabel}}À l'attention des {{audienceLabel}}{{else}}Livre blanc Buildy{{/if}}</div>
   </div>
 </section>
 
-{{!-- Chapitres : flux naturel, chaque .chapter-title force une page.
-     Si le dernier chapitre est marqué `is_back_cover`, il est rendu en
-     section.closing (fond navy plein-bord, CTA vert menthe).            --}}
+{{!-- ═══════════ Chapitres (style flux naturel) ═══════════ --}}
 {{#each chapters}}
 {{#if is_back_cover}}
-<section class="closing">
+{{!-- BACK COVER (style #41) — centrée, navy plein-bord, logo en haut --}}
+<section class="back">
   {{#if ../logoWhiteDataUrl}}
-  <img class="closing-logo" src="{{../logoWhiteDataUrl}}" alt="Buildy" />
+  <div class="wordmark-top">
+    <img src="{{../logoWhiteDataUrl}}" alt="Buildy" />
+  </div>
   {{/if}}
-  <div class="closing-eyebrow">Aller plus loin</div>
-  <h1 class="closing-title">{{title}}</h1>
-  <div class="closing-body">
-    {{{body_html}}}
+
+  <div class="back-center">
+    <h3>{{title}}</h3>
+    <div class="back-body">{{{body_html}}}</div>
+
+    <div class="signature">
+      <div class="rule"></div>
+      <div class="name">Buildy</div>
+      <div class="role">Éditeur, intégrateur et mainteneur de solutions de supervision multi-sites pour le bâtiment tertiaire</div>
+    </div>
+  </div>
+
+  <div class="back-foot">
+    Livre blanc édité par Buildy. {{#if version}}Version {{version}} — {{/if}}{{dateLabel}}. La reproduction partielle ou totale est libre à condition de mentionner la source.
   </div>
 </section>
 {{else}}
