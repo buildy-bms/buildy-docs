@@ -146,6 +146,11 @@ async function generateWhitepaperPdf(row) {
     coverImageUrl: meta.cover_image_url || null,
     coverImageCaption: meta.cover_image_caption || null,
     hasBackCover,
+    // Logo Buildy embed (data URL) pour cover + back-cover plein-bord :
+    // le header/footer Puppeteer est masqué sur ces 2 pages (re-render
+    // sans margin), donc il faut le logo direct dans le template HTML
+    // sinon il est invisible sur fond navy.
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
   };
   const isSinglePage = row.wp_layout === 'single-page';
   const result = await renderPdf({
@@ -425,6 +430,7 @@ async function routes(fastify) {
       coverImageUrl: meta.cover_image_url || null,
       coverImageCaption: meta.cover_image_caption || null,
       hasBackCover,
+      logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-blanc.png'),
     };
     const isSinglePage = row.wp_layout === 'single-page';
     const html = renderHtml({

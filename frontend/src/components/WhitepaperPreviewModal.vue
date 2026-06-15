@@ -62,9 +62,12 @@ onBeforeUnmount(() => {
 
 <template>
   <BaseModal :title="title" size="full" @close="emit('close')">
-    <!-- Iframe qui occupe toute la modale (92vh - header BaseModal ~50px).
-         Le viewer PDF natif du navigateur s'affiche dedans. -->
-    <div class="relative -mx-5 -my-3 bg-gray-100" style="height: calc(92vh - 110px); min-height: 500px;">
+    <!-- Iframe qui occupe ~90vw × 90vh. BaseModal en size=full a un wrapper
+         w-fit max-w-[92vw], donc on force la largeur via le style inline du
+         conteneur iframe pour atteindre 90vw réel (sinon la modale prend
+         juste la largeur de l'iframe par défaut = min-w 36rem). -->
+    <div class="relative -mx-5 -my-3 bg-gray-100"
+         style="width: calc(90vw - 40px); height: calc(90vh - 110px); min-height: 500px;">
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
         <ArrowPathIcon class="w-5 h-5 mr-2 animate-spin" />
         Génération du PDF…
