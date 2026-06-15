@@ -411,12 +411,64 @@
   content: '';
   position: absolute;
   left: 0;
-  top: 2.2mm;
+  /* Centre vertical du bullet aligné sur le centre de la première
+     ligne du texte. line-height 1.45 × 10pt ≈ 14.5pt soit ≈ 5.1mm.
+     Centre ligne ≈ 2.55mm. Bullet 3mm de haut → top = 2.55 - 1.5 = ~1mm. */
+  top: 1.4mm;
   width: 3mm;
   height: 3mm;
   background: #00cd92;
   border-radius: 50%;
 }
+/* Price tiers (page 4, 2 tarifs côte à côte sans/avec connectivité 4G) */
+.chapter-body .price-tiers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+  margin: 4mm 0 4mm;
+}
+.chapter-body .price-tier {
+  background: rgba(0, 205, 146, 0.07);
+  border: 0.4mm solid rgba(0, 205, 146, 0.35);
+  border-radius: 2.5mm;
+  padding: 5mm 5mm 4mm;
+  text-align: center;
+}
+.chapter-body .price-tier-highlight {
+  background: rgba(0, 205, 146, 0.12);
+  border-color: rgba(0, 205, 146, 0.55);
+}
+.chapter-body .price-tier .tier-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 19pt;
+  font-weight: 700;
+  color: #00cd92;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin-bottom: 3mm;
+}
+.chapter-body .price-tier .tier-unit {
+  font-size: 10pt;
+  font-weight: 500;
+  color: #1b2842;
+  margin-left: 1mm;
+}
+.chapter-body .price-tier .tier-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.4;
+  color: #374151;
+  font-weight: 500;
+}
+.chapter-body .price-tier .tier-sub {
+  display: block;
+  margin-top: 1mm;
+  font-size: 8.5pt;
+  color: #6b7280;
+  font-weight: 400;
+  font-style: italic;
+}
+
 .chapter-body .price-step-amount {
   background: rgba(0, 205, 146, 0.1);
   border: 0.4mm solid rgba(0, 205, 146, 0.45);

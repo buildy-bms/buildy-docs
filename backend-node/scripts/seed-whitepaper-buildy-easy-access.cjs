@@ -134,9 +134,15 @@ const CHAPTER_3_HTML = `
     <div class="price-step-kicker">Chaque mois, par bâtiment</div>
     <h2 class="price-step-title">L'abonnement plateforme</h2>
     <p>Une fois le Pack en place, l'accès à Hyperveez se règle au mois, par site. Tarif identique quel que soit le nombre d'interfaces de GTB présentes sur le bâtiment.</p>
-    <div class="price-step-amount">
-      <span class="amt-prefix">À partir de</span>
-      <span class="amt-value">20 € <span class="amt-unit">HT / mois / bâtiment</span></span>
+    <div class="price-tiers">
+      <div class="price-tier">
+        <div class="tier-value">20 € <span class="tier-unit">HT / mois</span></div>
+        <div class="tier-label">Sans connectivité 4G</div>
+      </div>
+      <div class="price-tier price-tier-highlight">
+        <div class="tier-value">40 € <span class="tier-unit">HT / mois</span></div>
+        <div class="tier-label">Avec connectivité 4G M2M multi-opérateurs intégrée<br><span class="tier-sub">jusqu'à 1 Go mensuel inclus</span></div>
+      </div>
     </div>
     <p class="price-step-note">Cet abonnement est <strong>inclus de série</strong> dans les offres <strong>Smart</strong> et <strong>Premium</strong> de Buildy. Vous n'avez rien à ajouter.</p>
   </div>

@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.183",
+      "date": "2026-06-08",
+      "title": "Brochure Easy Access — 2 tiers abonnement (sans/avec 4G) + puces centrées",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Abonnement : 2 tarifs côte à côte (20€ sans 4G / 40€ avec 4G M2M intégrée)",
+          "what": "Le bloc Abonnement plateforme passe d'un seul tarif « 20 € à partir de » à 2 mini-cards côte à côte : (1) 20 € HT / mois sans connectivité 4G (encadré mint léger), (2) 40 € HT / mois avec connectivité 4G M2M multi-opérateurs intégrée + mention « jusqu'à 1 Go mensuel inclus » en italique (encadré mint plus marqué = recommandé). Permet à l'asset manager de comprendre directement l'option 4G sans devoir demander.",
+          "where": "Page 4 du whitepaper, étape 2 du pricing.",
+          "how_to_test": "Régénérer aperçu."
+        },
+        {
+          "kind": "ux",
+          "title": "Puces vertes des listes centrées sur la première ligne du texte",
+          "what": "Les bullet points verts de la liste du Pack (passerelle, routeur 4G, antenne, installation, déplacement) étaient placés trop bas (top: 2.2mm). Repositionnés à top: 1.4mm pour aligner le centre du bullet avec le centre de la première ligne du texte (line-height 1.45 × 10pt ≈ 5.1mm → centre ≈ 2.55mm).",
+          "where": "Page 4 du whitepaper, liste du Pack.",
+          "how_to_test": "Régénérer aperçu."
+        }
+      ]
+    },
+    {
       "version": "0.1.182",
       "date": "2026-06-08",
       "title": "Brochure Easy Access — restructuration : page 3 allégée, page 4 dédiée tarification (Pack + Abonnement), fixes mineurs",
