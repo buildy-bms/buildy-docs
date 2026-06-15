@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.193",
+      "date": "2026-06-15",
+      "title": "Tableau des offres + Brochure : config PDF mutualisée (anti-divergence) + CTA whitepaper plus aéré",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Config PDF Tableau des offres / Brochure mutualisée dans 2 helpers uniques",
+          "what": "Les 4 endpoints (export + publish) × (catalog + brochure) passent désormais OBLIGATOIREMENT par `_renderCatalogPdf()` / `_renderBrochurePdf()` qui contiennent l'unique appel à `renderPdf`. La duplication précédente avait silencieusement divergé : `backCoverFullBleed: true` était présent côté export mais ABSENT côté publish → la page de fin navy plein-bord disparaissait sur les PDF publiés. Bug corrigé, et il devient impossible que ça redivergera.",
+          "where": "/library/functionalities → boutons Tableau des offres / Brochure / Mettre à jour tableau / Mettre à jour brochure.",
+          "how_to_test": "Publier le tableau des offres, télécharger le PDF depuis `/dl/tableau-des-offres-buildy` : la dernière page doit être navy plein-bord (identique au bouton « Tableau des offres » de la UI)."
+        },
+        {
+          "kind": "fix",
+          "title": "Whitepaper Easy Access : CTA secondaire encore plus aéré",
+          "what": "Marge supérieure du bouton « Découvrir les offres Smart et Premium » portée à 18 mm (auparavant 10 mm, jugé trop collé à la phrase de clarification).",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF, vérifier un espace clair entre la phrase de clarification et le bouton vert."
+        }
+      ]
+    },
+    {
       "version": "0.1.192",
       "date": "2026-06-15",
       "title": "Whitepaper Easy Access : CTA secondaire vert plein + meilleure aération",
