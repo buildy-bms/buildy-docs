@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.195",
+      "date": "2026-06-15",
+      "title": "Fix réel : CTA whitepaper enfin aéré (spécificité CSS)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "CTA secondaire whitepaper : règle CSS avec spécificité suffisante",
+          "what": "Les versions 0.1.192/193/194 augmentaient bien la marge supérieure du CTA dans `styles-whitepaper-book.css`, mais la règle `.chapter-body .price-step-body p` (déjà présente, spécificité 0,2,1) écrasait silencieusement `.chapter-body .price-step-secondary-cta` (spécificité 0,2,0). Sélecteur remonté à `.chapter-body .price-step-body .price-step-secondary-cta` (0,3,0) pour gagner. La marge 25 mm est désormais réellement appliquée.",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF #55 : grand espace clair entre la phrase de clarification et le CTA vert."
+        }
+      ]
+    },
+    {
       "version": "0.1.194",
       "date": "2026-06-15",
       "title": "Whitepaper Easy Access : CTA secondaire encore plus aéré (25 mm)",

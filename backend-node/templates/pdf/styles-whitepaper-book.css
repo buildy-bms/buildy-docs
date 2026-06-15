@@ -553,11 +553,11 @@
 /* CTA secondaire (bouton outline navy, distinct du CTA principal vert).
    Centré sous la phrase de clarification, sert de pont vers le tableau
    des offres Smart/Premium publié sur buildy.fr. */
-.chapter-body .price-step-secondary-cta {
+.chapter-body .price-step-body .price-step-secondary-cta {
   text-align: center;
   margin: 25mm 0 0;
 }
-.chapter-body .price-step-secondary-cta a {
+.chapter-body .price-step-body .price-step-secondary-cta a {
   display: inline-block;
   padding: 4mm 9mm;
   background: #00cd92;
