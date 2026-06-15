@@ -57,7 +57,7 @@ const ICON_BOLT        = renderFaIconSvg('bolt',        '#00cd92', '32');
 // ─── Page 2 ─ confirmation + comment ça marche + 3 bénéfices ─────────
 const CHAPTER_1_TITLE = 'Vous nous l\'avez dit. On a la réponse.';
 const CHAPTER_1_HTML = `
-<p class="lead">Vous nous avez dit que c'était votre quotidien. Comme beaucoup de nos clients. Pas besoin de vous refaire le tableau, vous le vivez déjà. Voici comment on le règle.</p>
+<p class="lead">Vous nous avez dit que c'était votre quotidien.<br>Comme beaucoup de nos clients.<br>Pas besoin de vous refaire le tableau, vous le vivez déjà.<br>Voici comment on le règle.</p>
 
 <div class="solution-card">
   <div class="solution-eyebrow">Comment ça marche</div>
