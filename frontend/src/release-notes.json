@@ -2,6 +2,27 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.171",
+      "date": "2026-06-08",
+      "title": "Livre blanc Buildy Easy Access — encart pricing mis en évidence + « Document édité »",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Encart pricing en évidence sur la back-cover (UX/UI premium)",
+          "what": "Nouveau bloc `.pricing-tile` sur la back-cover entre le paragraphe démo et le bouton CTA : eyebrow discret « À PARTIR DE », montant énorme « 20 € HT / mois » Poppins 36pt vert menthe, note « en option de l'abonnement Essentials », puis séparateur fin et mention bundle « ou incluse de série dans les abonnements Smart et Premium ». Cadre subtil vert menthe à 7% d'opacité + bordure 0.6mm vert à 45%, max-width 105mm centré. Hiérarchie visuelle : œil → montant XL → contexte → bundle.",
+          "where": "Page 3 du PDF whitepaper Buildy Easy Access.",
+          "how_to_test": "Régénérer l'aperçu : le pricing saute aux yeux juste avant le bouton démo."
+        },
+        {
+          "kind": "ux",
+          "title": "« Livre blanc édité par Buildy » → « Document édité par Buildy »",
+          "what": "Pied de page back-cover reformulé : tous les whitepapers ne sont pas forcément des « livres blancs » au sens strict. « Document » est plus neutre et couvre brochures commerciales, mémos techniques, etc.",
+          "where": "Footer back-cover de tout PDF whitepaper.",
+          "how_to_test": "Pied page 3 : « Document édité par Buildy. Version 1.0 — juin 2026. »"
+        }
+      ]
+    },
+    {
       "version": "0.1.170",
       "date": "2026-06-08",
       "title": "Livre blanc — corrections de contenu + image cover transparente",
