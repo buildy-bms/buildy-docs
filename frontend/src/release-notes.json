@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.185",
+      "date": "2026-06-08",
+      "title": "Library functionalities — fix génération PDF (import api dynamique cassé)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Génération PDF Tableau des offres / Brochure remarchent",
+          "what": "Le `const { default: api } = await import('@/api')` produisait `api = undefined` après bundle Vite (issue connue de la déstructuration de default sur import dynamique avec module multi-export). Passage à un import statique `import api, { ... } from '@/api'` — pattern propre et reliable. Fix de l'erreur `Cannot read properties of undefined (reading 'post')` qui empêchait toute génération de PDF depuis /library/functionalities.",
+          "where": "Boutons Tableau des offres et Brochure détaillée de /library/functionalities.",
+          "how_to_test": "Recliquer les boutons : le PDF doit se télécharger comme avant."
+        }
+      ]
+    },
+    {
       "version": "0.1.184",
       "date": "2026-06-08",
       "title": "Library functionalities — détail d'erreur PDF + log console pour debug",
