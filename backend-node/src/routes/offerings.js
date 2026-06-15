@@ -409,6 +409,59 @@ async function routes(fastify) {
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
   });
 
+  // ─── Helpers mutualisés de rendu PDF ───────────────────────────────
+  // SOURCE UNIQUE de la config renderPdf catalog/brochure : les 4 endpoints
+  // (export + publish) × (catalog + brochure) passent OBLIGATOIREMENT par
+  // ces 2 fonctions. Toute divergence (ex : oubli de backCoverFullBleed
+  // côté publish) est désormais impossible.
+  function _renderCatalogPdf({ data, outputPath }) {
+    return renderPdf({
+      template: 'offering-catalog',
+      styles: ['styles-offering-catalog', '_offerings-table', '_buildy-back-cover'],
+      data,
+      outputPath,
+      pageFormat: 'A4',
+      coverFullBleed: true,
+      backCoverFullBleed: true,
+      pageMarginTopMm: 14,
+      pageMarginBottomMm: 14,
+      skipFirstPageHeaderFooter: true,
+      pdfOptions: buildHeaderFooter({
+        clientName: 'Buildy',
+        projectName: 'Référentiel des fonctionnalités',
+        docType: 'Catalogue',
+        version: String(data.year),
+        logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+        footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+      }),
+    });
+  }
+
+  function _renderBrochurePdf({ data, outputPath }) {
+    return renderPdf({
+      template: 'brochure',
+      styles: ['styles-brochure', '_offerings-table', '_buildy-back-cover'],
+      data,
+      outputPath,
+      pageFormat: 'A4',
+      coverFullBleed: true,
+      backCoverFullBleed: true,
+      populateToc: true,
+      pageMarginTopMm: 14,
+      pageMarginBottomMm: 14,
+      skipFirstPageHeaderFooter: true,
+      watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
+      pdfOptions: buildHeaderFooter({
+        clientName: 'Buildy',
+        projectName: 'Référentiel des fonctionnalités',
+        docType: 'Brochure',
+        version: String(data.year),
+        logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+        footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
+      }),
+    });
+  }
+
   // ─── Export PDF du catalogue d'offres ──────────────────────────────
   fastify.post('/offerings/export-pdf', async (request, reply) => {
     const data = buildOfferingsData();
@@ -422,30 +475,7 @@ async function routes(fastify) {
 
     let result;
     try {
-      result = await renderPdf({
-        template: 'offering-catalog',
-        styles: ['styles-offering-catalog', '_offerings-table', '_buildy-back-cover'],
-        data,
-        outputPath,
-        pageFormat: 'A4',
-        coverFullBleed: true,
-        backCoverFullBleed: true,
-        // Marges 14/14 alignees avec styles-offering-catalog.css @page.
-        pageMarginTopMm: 14,
-        pageMarginBottomMm: 14,
-        // Header/footer Puppeteer alignes sur la brochure pour que la page
-        // tableau soit strictement identique. skipFirstPageHeaderFooter pour
-        // que la cover reste full-bleed sans surimpression.
-        skipFirstPageHeaderFooter: true,
-        pdfOptions: buildHeaderFooter({
-          clientName: 'Buildy',
-          projectName: 'Référentiel des fonctionnalités',
-          docType: 'Catalogue',
-          version: String(data.year),
-          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-          footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
-        }),
-      });
+      result = await _renderCatalogPdf({ data, outputPath });
     } catch (err) {
       log.error(`Offerings PDF render failed: ${err.message}`);
       return reply.code(500).send({ detail: `Echec generation PDF : ${err.message}` });
@@ -487,30 +517,7 @@ async function routes(fastify) {
 
     let result;
     try {
-      result = await renderPdf({
-        template: 'brochure',
-        styles: ['styles-brochure', '_offerings-table', '_buildy-back-cover'],
-        data,
-        outputPath,
-        pageFormat: 'A4',
-        coverFullBleed: true,
-        backCoverFullBleed: true,
-        populateToc: true,
-        // Marges 14/14 alignees avec styles-brochure.css @page (necessaire
-        // pour que populateToc calcule le bon numero de page).
-        pageMarginTopMm: 14,
-        pageMarginBottomMm: 14,
-        skipFirstPageHeaderFooter: true,
-        watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
-        pdfOptions: buildHeaderFooter({
-          clientName: 'Buildy',
-          projectName: 'Référentiel des fonctionnalités',
-          docType: 'Brochure',
-          version: String(data.year),
-          logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-          footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
-        }),
-      });
+      result = await _renderBrochurePdf({ data, outputPath });
     } catch (err) {
       log.error(`Brochure PDF render failed: ${err.message}`);
       return reply.code(500).send({ detail: `Echec generation PDF : ${err.message}` });
@@ -575,18 +582,7 @@ async function routes(fastify) {
         const exportsDir = path.resolve(config.exportsDir, '_offerings');
         fs.mkdirSync(exportsDir, { recursive: true });
         const outputPath = path.join(exportsDir, `publish-catalog-${Date.now()}.pdf`);
-        return await renderPdf({
-          template: 'offering-catalog',
-          styles: ['styles-offering-catalog', '_offerings-table', '_buildy-back-cover'],
-          data, outputPath, pageFormat: 'A4', coverFullBleed: true,
-          pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
-          pdfOptions: buildHeaderFooter({
-            clientName: 'Buildy', projectName: 'Référentiel des fonctionnalités',
-            docType: 'Catalogue', version: String(data.year),
-            logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-            footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
-          }),
-        });
+        return await _renderCatalogPdf({ data, outputPath });
       },
       request, reply,
     });
@@ -601,19 +597,7 @@ async function routes(fastify) {
         const exportsDir = path.resolve(config.exportsDir, '_offerings');
         fs.mkdirSync(exportsDir, { recursive: true });
         const outputPath = path.join(exportsDir, `publish-brochure-${Date.now()}.pdf`);
-        return await renderPdf({
-          template: 'brochure',
-          styles: ['styles-brochure', '_offerings-table', '_buildy-back-cover'],
-          data, outputPath, pageFormat: 'A4', coverFullBleed: true, populateToc: true,
-          pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
-          watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
-          pdfOptions: buildHeaderFooter({
-            clientName: 'Buildy', projectName: 'Référentiel des fonctionnalités',
-            docType: 'Brochure', version: String(data.year),
-            logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
-            footerNote: 'Référentiel des fonctionnalités Buildy · document confidentiel',
-          }),
-        });
+        return await _renderBrochurePdf({ data, outputPath });
       },
       request, reply,
     });
