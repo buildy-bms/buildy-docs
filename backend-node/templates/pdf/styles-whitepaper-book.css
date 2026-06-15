@@ -488,7 +488,15 @@
   color: #00cd92;
   letter-spacing: -0.02em;
   line-height: 1.05;
+  margin-bottom: 1.5mm;
+}
+.chapter-body .price-tier .tier-annual {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5pt;
+  font-weight: 500;
+  color: #6b7280;
   margin-bottom: 3mm;
+  letter-spacing: 0.01em;
 }
 .chapter-body .price-tier .tier-unit {
   font-size: 10pt;
