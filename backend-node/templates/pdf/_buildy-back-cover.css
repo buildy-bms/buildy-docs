@@ -1,0 +1,129 @@
+/* Back-cover Buildy unifiée — styles partagés entre tous les PDFs qui
+   incluent le partial _buildy-back-cover.hbs.
+
+   Le rendu est plein-bord navy : il faut activer `backCoverFullBleed:
+   true` côté renderPdf() pour que la dernière page soit re-rendue sans
+   margin Puppeteer. Sans ça, les margins de page resteraient blanches.
+
+   @page :last force aussi le fond navy en cas de fallback (Chromium ne
+   respecte pas fiablement, d'où la double défense côté re-render). */
+@page :last { margin: 0; background: #1b2842; }
+
+.back {
+  background: #1b2842;
+  color: #ffffff;
+  width: 210mm;
+  height: 297mm;
+  margin: 0;
+  padding: 22mm 20mm;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  page-break-before: always;
+  break-before: page;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.back .wordmark-top {
+  position: absolute;
+  top: 30mm;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+.back .wordmark-top img {
+  height: 52px;
+  width: auto;
+  max-width: 180px;
+  display: inline-block;
+  object-fit: contain;
+}
+.back .back-center {
+  max-width: 170mm;
+  width: 100%;
+  margin-top: 14mm;
+}
+.back .back-center h3 {
+  font-family: 'Poppins', sans-serif;
+  color: #ffffff;
+  font-size: 22pt;
+  font-weight: 700;
+  margin: 0 0 24px 0;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.back .back-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 12pt;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 8mm;
+}
+.back .back-body p { margin: 0 0 5mm 0; }
+.back .back-body p:last-child { margin-bottom: 0; }
+.back .back-body strong { color: #ffffff; font-weight: 600; }
+.back .back-body em { color: rgba(255, 255, 255, 0.7); font-style: italic; }
+.back .back-body a {
+  color: #00cd92;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 205, 146, 0.5);
+}
+/* Bouton CTA arrondi vert menthe (wrapper <p class="cta-button">). */
+.back .back-body .cta-button {
+  display: block;
+  text-align: center;
+  margin: 10mm auto 6mm;
+}
+.back .back-body .cta-button a {
+  display: inline-block;
+  background: #00cd92;
+  color: #1b2842;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 13pt;
+  text-decoration: none;
+  padding: 4mm 14mm;
+  border-radius: 100mm;
+  box-shadow: 0 3mm 8mm rgba(0, 205, 146, 0.4);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.back .back-center .signature {
+  margin-top: 30px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.back .back-center .signature .rule {
+  width: 24mm;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.35);
+  margin: 0 auto 20px auto;
+}
+.back .back-center .signature .name {
+  font-size: 14pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.back .back-center .signature .role {
+  font-size: 10.5pt;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 6px;
+  font-style: italic;
+  max-width: 135mm;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.4;
+}
+.back .back-foot {
+  position: absolute;
+  left: 28mm;
+  right: 28mm;
+  bottom: 18mm;
+  font-size: 8pt;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+}

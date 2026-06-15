@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.189",
+      "date": "2026-06-08",
+      "title": "Tableau des offres + Brochure : back-cover Buildy unifiée (style Easy Access)",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Back-cover Buildy unifiée sur les 2 PDFs library + whitepaper",
+          "what": "Extraction de la back-cover (page de fin navy plein-bord, logo wordmark, h3 « Voyez-le en live… », CTA vert « Réserver une démonstration », signature, footer disclaimer) en partial Handlebars `_buildy-back-cover.hbs` + partial CSS `_buildy-back-cover.css` réutilisables. Inclusion dans `offering-catalog.hbs` et `brochure.hbs`. Les 4 appels renderPdf de offerings (export + publish, catalog + brochure) ajoutent désormais `_buildy-back-cover` aux styles + `backCoverFullBleed: true` + data `logoWhiteDataUrl`, `version` (year), `dateLabel` au build des données. Texte « Easy Access » du pitch démo généralisé en « Buildy » pour qu'il convienne aux 3 PDFs (catalog, brochure, whitepaper). Whitepaper Easy Access inchangé (sa back-cover passe encore par CHAPTER_4 / is_back_cover).",
+          "where": "Tableau des offres + Brochure détaillée (download + publish).",
+          "how_to_test": "Régénérer ou republier l'un des PDFs : la dernière page doit être la back-cover navy plein-bord identique au Whitepaper Easy Access."
+        }
+      ]
+    },
+    {
       "version": "0.1.188",
       "date": "2026-06-08",
       "title": "Fix build : import BaseModal en double",
