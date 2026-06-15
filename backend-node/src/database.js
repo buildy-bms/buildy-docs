@@ -12,7 +12,7 @@ let db;
 // Ajouter une nouvelle migration = incrementer TARGET_VERSION + ajouter
 // le bloc dans `runMigrations()`. Jamais modifier une migration existante.
 
-const TARGET_VERSION = 197;
+const TARGET_VERSION = 198;
 
 function runMigrations() {
   const current = db.pragma('user_version', { simple: true });
@@ -7505,6 +7505,27 @@ function runMigrations() {
     db.pragma('user_version = 197');
   }
 
+  // ── Migration 198 : table de publications offerings (catalog + brochure) ──
+  // Stocke l'état de publication FTP des 2 PDFs librairie publiables
+  // depuis /library/functionalities. Une ligne par kind ('catalog' ou
+  // 'brochure'). Réutilise le helper uploadWhitepaperPdf (générique
+  // malgré le nom). Pas de PK auto-increment : kind suffit (singleton
+  // par type, republier overwrite la ligne).
+  if (current < 198) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS published_offerings (
+        kind TEXT PRIMARY KEY CHECK (kind IN ('catalog', 'brochure')),
+        filename TEXT NOT NULL,
+        url TEXT NOT NULL,
+        size_bytes INTEGER,
+        published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        published_by INTEGER REFERENCES users(id)
+      );
+    `);
+    log.info('Migration 198 appliquee : table published_offerings (catalog + brochure)');
+    db.pragma('user_version = 198');
+  }
+
   if (current > TARGET_VERSION) {
     log.warn(`DB version ${current} > TARGET_VERSION ${TARGET_VERSION}. Possible downgrade ?`);
   }
@@ -10940,8 +10961,35 @@ const whitepaperClicks = {
   },
 };
 
+// ─── Publications offerings (catalog + brochure) ────────────────────
+const publishedOfferings = {
+  get(kind) {
+    return db.prepare('SELECT * FROM published_offerings WHERE kind = ?').get(kind);
+  },
+  list() {
+    const rows = db.prepare('SELECT * FROM published_offerings').all();
+    const out = { catalog: null, brochure: null };
+    for (const r of rows) out[r.kind] = r;
+    return out;
+  },
+  upsert({ kind, filename, url, sizeBytes, publishedBy }) {
+    db.prepare(`
+      INSERT INTO published_offerings (kind, filename, url, size_bytes, published_at, published_by)
+      VALUES (?, ?, ?, ?, datetime('now'), ?)
+      ON CONFLICT (kind) DO UPDATE SET
+        filename = excluded.filename,
+        url = excluded.url,
+        size_bytes = excluded.size_bytes,
+        published_at = excluded.published_at,
+        published_by = excluded.published_by
+    `).run(kind, filename, url, sizeBytes, publishedBy);
+    return this.get(kind);
+  },
+};
+
 module.exports = {
   init,
+  publishedOfferings,
   whitepaperClicks,
   pdfBoilerplate,
   offeringLevels,
