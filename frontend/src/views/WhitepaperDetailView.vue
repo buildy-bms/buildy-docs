@@ -5,7 +5,7 @@ import { storeToRefs } from 'pinia'
 import {
   ArrowLeftIcon, PlusIcon, TrashIcon, ChevronUpIcon, ChevronDownIcon,
   ArrowDownTrayIcon, ArrowUpTrayIcon, ClipboardDocumentIcon, DocumentTextIcon, BookOpenIcon,
-  ChartBarIcon, ArrowPathIcon,
+  ChartBarIcon, ArrowPathIcon, EyeIcon,
 } from '@heroicons/vue/24/outline'
 import { useWhitepaperStore } from '@/stores/whitepaper'
 import { exportWhitepaperPdf } from '@/api'
@@ -212,6 +212,16 @@ watch(() => route.params.id, async (id) => {
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-gray-400">{{ saving ? 'Enregistrement…' : 'Tout enregistré' }}</span>
+        <a
+          :href="`/api/whitepapers/${whitepaper?.id}/preview/pdf`"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap"
+          v-tooltip="'Ouvre le PDF dans un nouvel onglet (sans téléchargement)'"
+        >
+          <EyeIcon class="w-4 h-4 shrink-0" />
+          Aperçu PDF
+        </a>
         <button
           @click="exportPdf"
           :disabled="exporting"
