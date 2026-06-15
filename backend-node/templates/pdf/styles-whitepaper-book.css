@@ -125,7 +125,10 @@
   width: 210mm;
   height: 297mm;
   margin: 0;
-  padding: 30mm 28mm;
+  /* Mêmes marges que la cover (22mm 20mm) — cohérence des deux pages
+     plein-bord. La largeur utile interne (210 - 40) = 170mm passe sans
+     wrap pour le h3 et le CTA. */
+  padding: 22mm 20mm;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -152,7 +155,8 @@
   object-fit: contain;
 }
 .back-center {
-  max-width: 150mm;
+  max-width: 170mm;
+  width: 100%;
 }
 .back-center h3 {
   font-family: 'Poppins', sans-serif;
@@ -162,6 +166,7 @@
   margin: 0 0 24px 0;
   letter-spacing: -0.02em;
   line-height: 1.15;
+  white-space: nowrap;
 }
 .back-body {
   font-family: 'Inter', sans-serif;
@@ -256,6 +261,7 @@
   border-radius: 100mm;
   box-shadow: 0 3mm 8mm rgba(0, 205, 146, 0.4);
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .back-center .signature {
   margin-top: 30px;
