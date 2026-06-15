@@ -150,7 +150,7 @@ const CHAPTER_3_HTML = `
       </div>
     </div>
 
-    <p class="price-step-note">Le routeur 4G est inclus dans le Pack. L'abonnement couvre l'accès à la plateforme, et la connexion 4G mensuelle quand c'est Buildy qui la fournit.</p>
+    <p class="price-step-note">Le routeur 4G est inclus dans le Pack.<br>L'abonnement couvre l'accès à la plateforme, et la connexion 4G mensuelle quand c'est Buildy qui la fournit.</p>
 
     <p class="price-step-secondary-cta"><a href="https://www.buildy.fr/dl/tableau-des-offres-buildy">Découvrir les offres Smart et Premium</a></p>
   </div>
