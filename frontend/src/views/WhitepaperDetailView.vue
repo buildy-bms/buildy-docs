@@ -12,6 +12,9 @@ import { exportWhitepaperPdf } from '@/api'
 import { useNotification } from '@/composables/useNotification'
 import { useConfirm } from '@/composables/useConfirm'
 import WhitepaperRichTextEditor from '@/components/WhitepaperRichTextEditor.vue'
+import WhitepaperPreviewModal from '@/components/WhitepaperPreviewModal.vue'
+
+const showPreview = ref(false)
 
 const route = useRoute()
 const router = useRouter()
@@ -212,16 +215,14 @@ watch(() => route.params.id, async (id) => {
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <span class="text-xs text-gray-400">{{ saving ? 'Enregistrement…' : 'Tout enregistré' }}</span>
-        <a
-          :href="`/api/whitepapers/${whitepaper?.id}/preview/pdf`"
-          target="_blank"
-          rel="noopener"
+        <button
+          @click="showPreview = true"
           class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-          v-tooltip="'Ouvre le PDF dans un nouvel onglet (sans téléchargement)'"
+          v-tooltip="'Aperçu du PDF dans une modale (Cmd+R pour régénérer après édition)'"
         >
           <EyeIcon class="w-4 h-4 shrink-0" />
           Aperçu PDF
-        </a>
+        </button>
         <button
           @click="exportPdf"
           :disabled="exporting"
@@ -530,5 +531,13 @@ watch(() => route.params.id, async (id) => {
         </div>
       </main>
     </div>
+
+    <!-- Modale d'aperçu PDF (iframe blob, viewer PDF natif du navigateur) -->
+    <WhitepaperPreviewModal
+      v-if="showPreview && whitepaper?.id"
+      :id="whitepaper.id"
+      :title="`Aperçu PDF — ${whitepaper.title || 'Livre blanc'}`"
+      @close="showPreview = false"
+    />
   </div>
 </template>
