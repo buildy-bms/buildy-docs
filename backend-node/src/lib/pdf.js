@@ -657,52 +657,47 @@ async function _renderPdfImpl({ template, styles, data, outputPath, pdfOptions =
     // une bande verte qu'on ne veut pas toujours. Ce re-render produit une
     // vraie page navy edge-to-edge.
     if (backCoverFullBleed) {
-      // Lire le PDF déjà rendu pour connaître l'index de la dernière page.
-      const { PDFDocument } = require('pdf-lib');
-      const mainDoc = await PDFDocument.load(fs.readFileSync(outputPath));
-      const lastPageNum = mainDoc.getPageCount(); // 1-based pour pageRanges
-      if (lastPageNum < 2) {
-        log.warn(`backCoverFullBleed ignoré : pageCount=${lastPageNum}, dernière page = cover`);
-      } else {
-        const lastTmpPath = outputPath.replace(/\.pdf$/i, '.last-tmp.pdf');
-        const sizeRule = pageOrientation === 'landscape'
-          ? `${pageFormat} landscape`
-          : `${pageFormat} portrait`;
-        // Injecte deux choses pour le re-render :
-        //   1. @page sans margin (vrai plein-bord Puppeteer)
-        //   2. body { background: navy } pour que toute la zone page
-        //      hors .closing soit aussi peinte (sinon blanc autour si le
-        //      contenu .closing ne couvre pas tout).
-        const overrideStyleId = await page.evaluate((size) => {
-          const id = '__back_cover_fullbleed_override__';
-          const style = document.createElement('style');
-          style.id = id;
-          style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }
-                               body { background: #1b2842 !important; }`;
-          document.head.appendChild(style);
-          return id;
-        }, sizeRule);
-        try {
-          await page.pdf({
-            printBackground: true,
-            preferCSSPageSize: true,
-            margin: { top: '0', right: '0', bottom: '0', left: '0' },
-            pageRanges: String(lastPageNum),
-            path: lastTmpPath,
-          });
-          await replaceLastPage(outputPath, lastTmpPath);
-        } catch (err) {
-          // Fail-safe : si le re-render plante (changement de layout dû à
-          // l'override CSS qui change le nombre de pages), on garde le PDF
-          // initial sans back-cover plein-bord plutôt que de tout casser.
-          log.warn(`backCoverFullBleed re-render failed : ${err.message}`);
-        } finally {
-          await page.evaluate((id) => {
-            const el = document.getElementById(id);
-            if (el) el.remove();
-          }, overrideStyleId);
-          try { fs.unlinkSync(lastTmpPath); } catch { /* ignore */ }
-        }
+      const lastTmpPath = outputPath.replace(/\.pdf$/i, '.last-tmp.pdf');
+      const sizeRule = pageOrientation === 'landscape'
+        ? `${pageFormat} landscape`
+        : `${pageFormat} portrait`;
+      // Injecte deux choses pour le re-render :
+      //   1. @page sans margin (vrai plein-bord Puppeteer)
+      //   2. body { background: navy } pour que toute la zone page hors
+      //      .closing soit aussi peinte (sinon blanc autour si le
+      //      contenu .closing ne couvre pas tout).
+      // On re-rend le DOM ENTIER (pas pageRanges) car le retrait des
+      // margins change le re-flow → pageCount du tmp ≠ pageCount du
+      // PDF principal. replaceLastPage() prend ensuite la DERNIÈRE
+      // page du tmp pour la réinjecter à la dernière position du
+      // PDF principal. Cf. incident 0.1.166 « Page range exceeds
+      // page count ».
+      const overrideStyleId = await page.evaluate((size) => {
+        const id = '__back_cover_fullbleed_override__';
+        const style = document.createElement('style');
+        style.id = id;
+        style.textContent = `@page { size: ${size}; margin: 0 !important; padding: 0 !important; }
+                             body { background: #1b2842 !important; }`;
+        document.head.appendChild(style);
+        return id;
+      }, sizeRule);
+      try {
+        await page.pdf({
+          printBackground: true,
+          preferCSSPageSize: true,
+          margin: { top: '0', right: '0', bottom: '0', left: '0' },
+          path: lastTmpPath,
+        });
+        await replaceLastPage(outputPath, lastTmpPath);
+      } catch (err) {
+        // Fail-safe : on garde le PDF initial sans back-cover plein-bord.
+        log.warn(`backCoverFullBleed re-render failed : ${err.message}`);
+      } finally {
+        await page.evaluate((id) => {
+          const el = document.getElementById(id);
+          if (el) el.remove();
+        }, overrideStyleId);
+        try { fs.unlinkSync(lastTmpPath); } catch { /* ignore */ }
       }
     }
 
@@ -765,7 +760,13 @@ async function replaceLastPage(mainPath, lastPath) {
   const lastBytes = fs.readFileSync(lastPath);
   const mainDoc = await PDFDocument.load(mainBytes);
   const lastDoc = await PDFDocument.load(lastBytes);
-  const [lastPage] = await mainDoc.copyPages(lastDoc, [0]);
+  // Prend la DERNIÈRE page de lastDoc (pas la première) : quand on
+  // re-rend tout le DOM sans margin pour atteindre plein-bord, le
+  // tmp PDF contient autant de pages que le rendu — la closing est la
+  // dernière. Cf. bug 0.1.166 où pageRanges=N plantait car le re-flow
+  // sans margin produit un pageCount différent du PDF principal.
+  const lastTmpIdx = lastDoc.getPageCount() - 1;
+  const [lastPage] = await mainDoc.copyPages(lastDoc, [lastTmpIdx]);
   const lastIdx = mainDoc.getPageCount() - 1;
   mainDoc.removePage(lastIdx);
   mainDoc.insertPage(lastIdx, lastPage);

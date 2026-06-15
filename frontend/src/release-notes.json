@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.167",
+      "date": "2026-06-08",
+      "title": "Livre blanc — vrai fix back-cover plein-bord (re-render robuste au re-flow)",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "back-cover navy enfin générée sans erreur Puppeteer",
+          "what": "L'approche pageRanges='N' du re-render plantait quand le retrait des margins changeait le re-flow Chromium (pageCount du tmp ≠ pageCount du PDF principal). Nouvelle approche : on re-rend le DOM entier sans margin (peu importe combien de pages ça produit), et on remplace la dernière page du PDF principal par la dernière page du re-render. La closing étant la dernière section du DOM, c'est elle qui est en dernière page du re-render → garantit qu'on extrait bien la closing plein-bord navy.",
+          "where": "PDF livre blanc — export et aperçu.",
+          "how_to_test": "Régénérer l'aperçu du whitepaper #55 : la dernière page doit être navy de bord à bord."
+        }
+      ]
+    },
+    {
       "version": "0.1.166",
       "date": "2026-06-08",
       "title": "Livre blanc — fix 502 export PDF + modale d'aperçu intégrée",
