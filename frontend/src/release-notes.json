@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.188",
+      "date": "2026-06-08",
+      "title": "Fix build : import BaseModal en double",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "Suppression import BaseModal redondant",
+          "what": "0.1.187 ajoutait `import BaseModal from '@/components/BaseModal.vue'` alors qu'il était déjà importé ligne 17 → SyntaxError Babel à la build Vite en prod. Supprimé l'import dupliqué.",
+          "where": "frontend/src/views/LibraryFunctionalitiesView.vue.",
+          "how_to_test": "Le build prod passe et la page charge."
+        }
+      ]
+    },
+    {
       "version": "0.1.187",
       "date": "2026-06-08",
       "title": "Library functionalities — tracker /dl/<slug> + stats clics + chmod 644 fix Forbidden",

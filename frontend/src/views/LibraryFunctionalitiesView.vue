@@ -14,7 +14,6 @@ import api, {
   getOfferingsClicks, refreshOfferingsClicks,
 } from '@/api'
 import ClicksStatsCard from '@/components/ClicksStatsCard.vue'
-import BaseModal from '@/components/BaseModal.vue'
 import ContentValidationDot from '@/components/ContentValidationDot.vue'
 import { getValidationStatus } from '@/lib/content-validation'
 import PdfPreviewModal from '@/components/PdfPreviewModal.vue'
