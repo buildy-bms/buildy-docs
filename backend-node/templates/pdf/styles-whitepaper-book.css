@@ -555,21 +555,22 @@
    des offres Smart/Premium publié sur buildy.fr. */
 .chapter-body .price-step-secondary-cta {
   text-align: center;
-  margin: 6mm 0 0;
+  margin: 10mm 0 0;
 }
 .chapter-body .price-step-secondary-cta a {
   display: inline-block;
-  padding: 3.5mm 8mm;
-  background: #ffffff;
-  border: 0.6mm solid #1b2842;
+  padding: 4mm 9mm;
+  background: #00cd92;
+  border: none;
   border-radius: 100mm;
-  color: #1b2842;
+  color: #ffffff;
   font-family: 'Poppins', sans-serif;
-  font-size: 10.5pt;
+  font-size: 11pt;
   font-weight: 600;
   text-decoration: none;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  box-shadow: 0 1.5mm 4mm rgba(0, 205, 146, 0.3);
 }
 
 /* Bandeau logos clients (mini-version du wall #41). Grille 5×3 compacte,

@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.192",
+      "date": "2026-06-15",
+      "title": "Whitepaper Easy Access : CTA secondaire vert plein + meilleure aération",
+      "highlights": [
+        {
+          "kind": "fix",
+          "title": "CTA secondaire vert plein + plus d'espace + saut de ligne dans la clarification",
+          "what": "Le bouton « Découvrir les offres Smart et Premium » (page 4 Combien ça coûte) devient un CTA vert plein #00cd92 avec texte blanc, padding 4×9 mm, ombre douce et radius pill. Marge supérieure augmentée à 10 mm pour aérer. Phrase de clarification coupée en deux lignes (saut après « inclus dans le Pack. »).",
+          "where": "Whitepaper Buildy Easy Access (#55), page 4.",
+          "how_to_test": "Régénérer le PDF du whitepaper #55. Bouton vert plein lisible, espace clair entre la phrase de clarification et le bouton, phrase sur 2 lignes."
+        }
+      ]
+    },
+    {
       "version": "0.1.191",
       "date": "2026-06-15",
       "title": "Whitepaper Easy Access : CTA secondaire « Découvrir les offres » en bouton outline",
