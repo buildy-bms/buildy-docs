@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.172",
+      "date": "2026-06-08",
+      "title": "Whitepaper Buildy Easy Access — titre ch1, pricing par bâtiment",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Titre ch1 + pricing affiné",
+          "what": "(1) Titre chapitre 1 → « Il est temps d'oublier Excel pour la gestion technique de vos bâtiments » (accroche claire, posture client). (2) Pricing : « 20 € HT / mois / bâtiment » + note « même avec plusieurs interfaces de GTB sur le site » (forfait par site, pas par interface). Suppression de la mention « en option de l'abonnement Essentials » jugée superflue (la mention bundle Smart/Premium suffit).",
+          "where": "Whitepaper #55 page 2 (titre) + page 3 (pricing tile).",
+          "how_to_test": "Régénérer aperçu."
+        }
+      ]
+    },
+    {
       "version": "0.1.171",
       "date": "2026-06-08",
       "title": "Livre blanc Buildy Easy Access — encart pricing mis en évidence + « Document édité »",

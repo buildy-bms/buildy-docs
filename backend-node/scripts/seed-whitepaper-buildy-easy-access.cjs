@@ -27,7 +27,7 @@ const SLUG = 'buildy-easy-access';
 const TITLE = 'Buildy Easy Access';
 const SUBTITLE = 'Un seul portail sécurisé pour superviser toutes vos GTB tierces, quelle que soit la marque déployée sur chaque site.';
 
-const CHAPTER_1_TITLE = 'Centraliser l\'accès à toutes vos supervisions GTB';
+const CHAPTER_1_TITLE = 'Il est temps d\'oublier Excel pour la gestion technique de vos bâtiments';
 const CHAPTER_1_HTML = `
 <h2>La réalité du multi-sites aujourd'hui</h2>
 <p>Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel. Une colonne URL, une colonne VPN, une colonne identifiant, une colonne mot de passe. Pour accéder à un site, il faut installer le client VPN du bon fabricant, retrouver les credentials, attendre la connexion, et tomber sur l'interface native de la GTB — Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk — toutes différentes les unes des autres.</p>
@@ -53,8 +53,8 @@ const CHAPTER_2_HTML = `
 
 <div class="pricing-tile">
   <div class="pricing-eyebrow">À partir de</div>
-  <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois</span></div>
-  <div class="pricing-note">en option de l'abonnement Essentials</div>
+  <div class="pricing-amount">20 € <span class="pricing-unit">HT / mois / bâtiment</span></div>
+  <div class="pricing-note">même avec plusieurs interfaces de GTB sur le site</div>
   <div class="pricing-bundle">— ou incluse de série dans les abonnements <strong>Smart</strong> et <strong>Premium</strong></div>
 </div>
 
