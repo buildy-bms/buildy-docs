@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.179",
+      "date": "2026-06-08",
+      "title": "Brochure Buildy Easy Access — 4 pages, charte voix Buildy, icônes FA, preuve sociale",
+      "highlights": [
+        {
+          "kind": "feature",
+          "title": "Refonte complète du contenu en 4 pages selon la charte voix Buildy",
+          "what": "Page 1 cover inchangée (logo droite, capture Hyperveez, sous-titre punchy « Tous vos bâtiments sur une carte. Un clic, vous êtes dans la GTB du site. Quelle que soit la marque. », edition « À L'ATTENTION DES ASSET MANAGERS »). Page 2 « Vous nous l'avez dit. On a la réponse. » avec lead intro + solution card navy « Une carte, un clic, vous êtes dans la GTB » + 3 cards bénéfices (user-shield, lock-open, bolt) — icônes FontAwesome Solid SVG vert menthe dans rond mint pâle. Page 3 « Rien à remplacer. Rien à risquer. » avec lead + guarantee card verte + nouvelle proof-card outline « Comme beaucoup de nos clients, vous pouvez commencer par un site… ». Page 4 back-cover « Voyez-le en live, sur de vrais bâtiments. » avec pricing tile + CTA. Tous les tirets longs retirés, voix directe « vous », pas de jargon (credentials, proxy, révocation supprimés).",
+          "where": "Whitepaper #55, 4 pages.",
+          "how_to_test": "Régénérer aperçu : 4 pages, icônes FA visibles, aucun tiret long, ton direct."
+        }
+      ]
+    },
+    {
       "version": "0.1.178",
       "date": "2026-06-08",
       "title": "Whitepaper — logo en haut à droite + refonte design page contenu (cards + solution card + garantie)",
