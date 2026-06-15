@@ -1,0 +1,40 @@
+<!-- Back-cover Buildy unifiée : section plein-bord navy avec logo top,
+     titre, pitch démo, CTA bouton vert, contact, signature et footer.
+     Utilisée par les PDFs whitepapers (Buildy Easy Access) ainsi que
+     par les exports library/functionalities (Tableau des offres,
+     Brochure détaillée). Style CSS isolé dans _buildy-back-cover.css.
+
+     Requiert dans le contexte :
+       - logoWhiteDataUrl (string, data URL du logo wordmark blanc)
+       - version (string, ex « 1.0 » ou « 2026 ») — optionnel
+       - dateLabel (string, ex « juin 2026 ») — optionnel
+
+     Le rendu PDF doit activer `backCoverFullBleed: true` côté
+     renderPdf() pour que la page soit re-rendue plein-bord. -->
+<section class="back">
+  {{#if logoWhiteDataUrl}}
+  <div class="wordmark-top">
+    <img src="{{logoWhiteDataUrl}}" alt="Buildy" />
+  </div>
+  {{/if}}
+
+  <div class="back-center">
+    <h3>Voyez-le en live, sur de vrais bâtiments.</h3>
+    <div class="back-body">
+      <p>30 minutes en visio. On vous montre Buildy sur des bâtiments en exploitation, avec plusieurs marques de GTB. Vous voyez l'accès en un clic, en direct, pas sur une maquette.</p>
+      <p class="cta-button"><a href="https://www.buildy.fr/demander-une-demo/">Réserver une démonstration</a></p>
+      <p>Ou par email&nbsp;: <a href="mailto:contact@buildy.fr">contact@buildy.fr</a>&nbsp;&nbsp;Tél. 04 28 39 03 34</p>
+      <p><em>Aucun engagement n'est requis pour la démonstration.</em></p>
+    </div>
+
+    <div class="signature">
+      <div class="rule"></div>
+      <div class="name">Buildy</div>
+      <div class="role">Éditeur, intégrateur et mainteneur de solutions de supervision multi-sites pour le bâtiment tertiaire</div>
+    </div>
+  </div>
+
+  <div class="back-foot">
+    Document édité par Buildy. {{#if version}}Version {{version}} · {{/if}}{{dateLabel}}. La reproduction partielle ou totale est libre à condition de mentionner la source.
+  </div>
+</section>

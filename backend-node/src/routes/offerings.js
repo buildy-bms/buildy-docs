@@ -161,6 +161,11 @@ function buildOfferingsData() {
     exportDate,
     year,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    // Pour le partial _buildy-back-cover (logo blanc wordmark, version,
+    // dateLabel). version = year (catalogue versionné à l'année).
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
+    version: String(year),
+    dateLabel: exportDate,
   };
 }
 
@@ -360,6 +365,11 @@ async function buildBrochureData() {
     exportDate,
     year,
     logoDataUrl: loadAssetDataUrl('logo-buildy.svg'),
+    // Pour le partial _buildy-back-cover (logo blanc wordmark, version,
+    // dateLabel). version = year (catalogue versionné à l'année).
+    logoWhiteDataUrl: loadAssetDataUrl('logo-buildy-white.png'),
+    version: String(year),
+    dateLabel: exportDate,
   };
 }
 
@@ -414,11 +424,12 @@ async function routes(fastify) {
     try {
       result = await renderPdf({
         template: 'offering-catalog',
-        styles: ['styles-offering-catalog', '_offerings-table'],
+        styles: ['styles-offering-catalog', '_offerings-table', '_buildy-back-cover'],
         data,
         outputPath,
         pageFormat: 'A4',
         coverFullBleed: true,
+        backCoverFullBleed: true,
         // Marges 14/14 alignees avec styles-offering-catalog.css @page.
         pageMarginTopMm: 14,
         pageMarginBottomMm: 14,
@@ -478,11 +489,12 @@ async function routes(fastify) {
     try {
       result = await renderPdf({
         template: 'brochure',
-        styles: ['styles-brochure', '_offerings-table'],
+        styles: ['styles-brochure', '_offerings-table', '_buildy-back-cover'],
         data,
         outputPath,
         pageFormat: 'A4',
         coverFullBleed: true,
+        backCoverFullBleed: true,
         populateToc: true,
         // Marges 14/14 alignees avec styles-brochure.css @page (necessaire
         // pour que populateToc calcule le bon numero de page).
@@ -565,7 +577,7 @@ async function routes(fastify) {
         const outputPath = path.join(exportsDir, `publish-catalog-${Date.now()}.pdf`);
         return await renderPdf({
           template: 'offering-catalog',
-          styles: ['styles-offering-catalog', '_offerings-table'],
+          styles: ['styles-offering-catalog', '_offerings-table', '_buildy-back-cover'],
           data, outputPath, pageFormat: 'A4', coverFullBleed: true,
           pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
           pdfOptions: buildHeaderFooter({
@@ -591,7 +603,7 @@ async function routes(fastify) {
         const outputPath = path.join(exportsDir, `publish-brochure-${Date.now()}.pdf`);
         return await renderPdf({
           template: 'brochure',
-          styles: ['styles-brochure', '_offerings-table'],
+          styles: ['styles-brochure', '_offerings-table', '_buildy-back-cover'],
           data, outputPath, pageFormat: 'A4', coverFullBleed: true, populateToc: true,
           pageMarginTopMm: 14, pageMarginBottomMm: 14, skipFirstPageHeaderFooter: true,
           watermark: { ...BUILDY_WATERMARK, skipFirstPage: true, opacity: 0.025 },
