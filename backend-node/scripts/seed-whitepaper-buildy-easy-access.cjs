@@ -29,22 +29,41 @@ const SUBTITLE = 'Un seul portail sécurisé pour superviser toutes vos GTB tier
 
 const CHAPTER_1_TITLE = 'Il est temps d\'oublier Excel pour la gestion technique de vos bâtiments';
 const CHAPTER_1_HTML = `
-<h2>La réalité du multi-sites aujourd'hui</h2>
-<p>Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel. Une colonne URL, une colonne VPN, une colonne identifiant, une colonne mot de passe. Pour accéder à un site, il faut installer le client VPN du bon fabricant, retrouver les credentials, attendre la connexion, et tomber sur l'interface native de la GTB — Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk — toutes différentes les unes des autres.</p>
-<p>Ce mode de fonctionnement crée trois problèmes structurels pour un gestionnaire de patrimoine :</p>
-<ul>
-  <li><strong>La connaissance est dans la tête d'une seule personne.</strong> Quand elle quitte l'entreprise, la moitié du parc devient inaccessible le temps de reconstituer les accès.</li>
-  <li><strong>Les credentials circulent par email et Teams.</strong> Pas de révocation centralisée : un mot de passe partagé reste valide même après le départ du collaborateur.</li>
-  <li><strong>Le temps d'investigation est démesuré.</strong> Quelques minutes pour ouvrir le bon VPN, retrouver le bon login, attendre la connexion — multiplié par le nombre de sites concernés à chaque alerte.</li>
-</ul>
+<p class="lead">Sur un parc de plusieurs dizaines de bâtiments tertiaires, l'outil de supervision le plus utilisé n'est pas une plateforme GTB — c'est un fichier Excel partagé sur Teams.</p>
 
-<h2>Ce que change Buildy Easy Access</h2>
-<p>Buildy Easy Access centralise l'accès à toutes vos supervisions GTB tierces depuis un seul portail Hyperveez. Chaque interface native est exposée via un lien proxy chiffré HTTPS de la forme :</p>
-<blockquote><p><code>https://votre_gtb.proxy.buildy.fr</code></p></blockquote>
-<p>Concrètement, sur la vue cartographique nationale d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification unique côté Buildy</strong> (un seul compte par collaborateur), révocation immédiate lors du départ d'un membre de l'équipe sans avoir à toucher aux credentials natifs des GTB.</p>
+<div class="pain-grid">
+  <div class="pain-card">
+    <div class="pain-icon">🔑</div>
+    <div class="pain-title">Connaissance silotée</div>
+    <p>Les accès sont dans la tête d'une seule personne. Quand elle quitte l'entreprise, la moitié du parc devient inaccessible le temps de tout reconstituer.</p>
+  </div>
+  <div class="pain-card">
+    <div class="pain-icon">📧</div>
+    <div class="pain-title">Credentials sur Teams</div>
+    <p>URLs, VPN, logins, mots de passe&nbsp;: tout circule par email et Teams. Pas de révocation centralisée quand un collaborateur change de poste.</p>
+  </div>
+  <div class="pain-card">
+    <div class="pain-icon">⏱️</div>
+    <div class="pain-title">Temps d'investigation</div>
+    <p>Ouvrir le bon VPN, retrouver le bon login, attendre la connexion, comprendre l'interface native du fabricant. Multiplié par chaque alerte.</p>
+  </div>
+</div>
 
-<h2>Pas de remplacement matériel</h2>
-<p>Vos automates, vos régulateurs, vos sondes terrain et la supervision historique du site restent en place et continuent de fonctionner. Buildy Easy Access ne touche ni aux équipements, ni aux données, ni au paramétrage des GTB existantes — il intervient uniquement sur la couche <strong>accès</strong> et <strong>vue d'ensemble multi-sites</strong>. Aucun serveur hyperviseur à 100 k€ à déployer, aucune migration de base de données, aucun PV de réception à attendre.</p>
+<div class="solution-card">
+  <div class="solution-eyebrow">La solution Buildy</div>
+  <h2>Un seul portail, toutes vos GTB tierces</h2>
+  <p>Buildy Easy Access centralise l'accès à toutes vos supervisions GTB tierces depuis Hyperveez. Chaque interface native — <strong>Schneider EcoStruxure, Distech Controls, Niagara, PCVue, Panorama, ABB doGate, Spacelynk</strong>, peu importe la marque — est exposée via un lien proxy chiffré HTTPS de la forme&nbsp;:</p>
+  <div class="solution-url">https://<span class="url-var">votre_gtb</span>.proxy.buildy.fr</div>
+  <p>Sur la vue cartographique d'Hyperveez, vous cliquez sur un site et la console native du fabricant s'ouvre dans un nouvel onglet — sans client VPN, sans saisie d'identifiants, sans changement de logiciel. <strong>Authentification unique</strong> côté Buildy, <strong>révocation immédiate</strong> lors du départ d'un collaborateur, sans avoir à toucher aux credentials natifs des GTB.</p>
+</div>
+
+<div class="guarantee-card">
+  <div class="guarantee-check">✓</div>
+  <div>
+    <div class="guarantee-title">Pas de remplacement matériel — aucun risque de régression</div>
+    <p>Vos automates, vos régulateurs, vos sondes terrain et votre supervision historique restent en place. Buildy n'intervient que sur la couche <strong>accès</strong> et <strong>vue d'ensemble multi-sites</strong>. Aucun serveur hyperviseur à 100&nbsp;k€, aucune migration de données, aucun PV de réception à attendre.</p>
+  </div>
+</div>
 `.trim();
 
 const CHAPTER_2_TITLE = 'Voir Buildy Easy Access lors d\'une démo live';
