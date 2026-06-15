@@ -2,6 +2,20 @@
   "intro": "Liste des nouveautés et correctifs de Buildy Docs, en ordre chronologique inverse. Chaque entrée précise ce qui change, où le voir dans l'app, et comment le tester rapidement.",
   "versions": [
     {
+      "version": "0.1.175",
+      "date": "2026-06-08",
+      "title": "Whitepaper Buildy Easy Access — cover sans eyebrow, légende centrée, header retiré, footer Brochure Buildy",
+      "highlights": [
+        {
+          "kind": "ux",
+          "title": "Suite de polish UX sur le whitepaper",
+          "what": "(1) Cover-image-caption centrée sous l'image. (2) Eyebrow « LIVRE BLANC · ASSET MANAGER · VERSION 1.0 · JUIN 2026 » désactivable via meta.hide_cover_eyebrow=true. (3) Header retiré des pages chapitre (Puppeteer headerTemplate=<div></div>) — on garde seulement le footer logo+pagination. (4) Footer libellé personnalisable via meta.footer_doc_label (par défaut 'Brochure Buildy' au lieu de 'Livre blanc Buildy').",
+          "where": "Whitepaper #55 page 1 (cover) et 2 (header/footer).",
+          "how_to_test": "Régénérer aperçu : pas d'eyebrow cover, légende centrée, header absent page 2, footer = 'Brochure Buildy · Buildy Easy Access'."
+        }
+      ]
+    },
+    {
       "version": "0.1.174",
       "date": "2026-06-08",
       "title": "Whitepaper — cover : marges réduites + titre sur 1 ligne + image plus grande",

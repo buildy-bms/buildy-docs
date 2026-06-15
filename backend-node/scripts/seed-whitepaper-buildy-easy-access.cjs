@@ -95,6 +95,8 @@ if (existing && existing.kind === 'whitepaper' && !existing.deleted_at) {
       has_back_cover: true,
       cover_image_url: 'wp-asset:wp-buildy-easy-access-cover.webp',
       cover_image_caption: 'Hyperveez — vue cartographique nationale du patrimoine supervisé par Buildy.',
+      hide_cover_eyebrow: true,
+      footer_doc_label: 'Brochure Buildy',
     }),
   });
 
