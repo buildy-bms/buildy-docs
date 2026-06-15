@@ -13,7 +13,7 @@
   width: 210mm;
   height: 297mm;
   margin: 0;
-  padding: 30mm 28mm;
+  padding: 22mm 20mm;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -52,7 +52,8 @@
   letter-spacing: -0.04em;
   color: #ffffff;
   margin: 0;
-  max-width: 165mm;
+  max-width: 175mm;
+  white-space: nowrap;
 }
 .cover-sub {
   margin-top: 24px;
@@ -60,19 +61,19 @@
   line-height: 1.4;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.85);
-  max-width: 160mm;
+  max-width: 175mm;
   letter-spacing: -0.005em;
 }
 .cover-image-frame {
-  margin: 22mm 0 0;
+  margin: 14mm 0 0;
   text-align: left;
 }
 .cover-image {
   display: block;
   width: 100%;
-  max-width: 165mm;
+  max-width: 175mm;
   height: auto;
-  max-height: 95mm;
+  max-height: 130mm;
   object-fit: contain;
   /* Pas de background ni de border-radius : l'image PNG est transparente
      côté Kévin (capture Hyperveez sans fond), on laisse le navy passer
